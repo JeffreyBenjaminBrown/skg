@@ -180,8 +180,8 @@ pub fn reverse_some_of_node(node: &Graphnode) -> Graphnode {
     pid               : node . pid               . clone(),
     extra_ids         : node . extra_ids         . clone(),
     body              : node . body              . clone(),
-    hidesFromSubs     :
-      node . hidesFromSubs        . clone(),
+    hides             :
+      node . hides        . clone(),
     flags             : node . flags              . clone(),
   }}
 

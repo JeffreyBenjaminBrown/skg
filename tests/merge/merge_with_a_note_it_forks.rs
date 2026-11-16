@@ -63,7 +63,7 @@ async fn merge_with_a_note_it_forks_impl (
   let own_ids : [ID; 2] = [ ID::from ("a"), ID::from ("b") ];
   for (relation, members) in [
     ("forks",         members_of ( a . forks . or_default () )),
-    ("hidesFromSubs", members_of ( a . hidesFromSubs . or_default () )),
+    ("hides", members_of ( a . hides . or_default () )),
     ("contains",      members_of ( &a . contains )),
   ] {
     assert! ( ! members . iter () . any ( |m| own_ids . contains (m) ),

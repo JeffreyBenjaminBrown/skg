@@ -49,7 +49,7 @@ fn complete_from_rust (node : &GraphnodeInRust) -> Graphnode {
     body : node . body . clone (),
     contains : node . contains . clone (),
     forks : node . forks . clone (),
-    hidesFromSubs : node . hidesFromSubs . clone (),
+    hides : node . hides . clone (),
     flags : node . flags . clone (),
   } }
 

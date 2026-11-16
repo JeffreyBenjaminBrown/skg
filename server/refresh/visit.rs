@@ -556,7 +556,7 @@ fn hidden_in_its_forks_folder (
   let graph : &InRustGraph = walk . truth . graph;
   let member : ID = graph . pid_else_raw_id (&member);
   graph . outbound_gnids_for_relation_gated (
-    &note, NodeRelation::HidesFromSubs, walk . truth . restriction )
+    &note, NodeRelation::Hides, walk . truth . restriction )
     . iter () . any ( |hidden| graph . pid_else_raw_id (hidden) == member ) }
 
 /// Whether 'child' stands in a folder at 'parent' that omits
@@ -597,7 +597,7 @@ fn unhidden_in_the_hides_folder (
     tree . get (child) . unwrap () . value () . occurrence_gnid () . cloned ()
     else { return false; };
   let graph : &InRustGraph = walk . truth . graph;
-  ! graph . outbound_gnids_for_relation (&hider, NodeRelation::HidesFromSubs)
+  ! graph . outbound_gnids_for_relation (&hider, NodeRelation::Hides)
     . iter () . any ( |gnid| graph . pid_else_raw_id (gnid) == hidden ) }
 
 /// Where the save reads claims: the child at 'treeid', if it claims
@@ -972,7 +972,7 @@ fn redraw_folders (
 /// The folders that stand, for the node a re-pointed root now shows,
 /// where a folder of the kind of 'folder' stood: those a request for
 /// its relation draws, both sides of a partner relation ('(folder
-/// hidesFromSubs)' draws the hider and hidden folders; '(folder
+/// hides)' draws the hider and hidden folders; '(folder
 /// forks)' the one forks folder). None for the folders drawn inside
 /// others or only in the diff view, for the illegal-edit folder, which
 /// each visit draws, and for the ID folder, which no request draws.
@@ -981,7 +981,7 @@ fn kinds_redrawing (
 ) -> Vec<Folder> {
   match folder {
     Folder::Forks                  => folders_of_relation (FolderRelation::Forks),
-    Folder::Hider | Folder::Hidden => folders_of_relation (FolderRelation::HidesFromSubs),
+    Folder::Hider | Folder::Hidden => folders_of_relation (FolderRelation::Hides),
     Folder::Container              => folders_of_relation (FolderRelation::Containers),
     Folder::Mentioner              => folders_of_relation (FolderRelation::Mentioners),
     Folder::Alias                  => folders_of_relation (FolderRelation::Aliases),
@@ -1159,7 +1159,7 @@ fn folder_request_rank (
     ViewRequest::Folder (FolderRelation::Mentioners)    => 1,
     ViewRequest::Folder (FolderRelation::Aliases)       => 2,
     ViewRequest::Folder (FolderRelation::Forks)         => 3,
-    ViewRequest::Folder (FolderRelation::HidesFromSubs) => 4,
+    ViewRequest::Folder (FolderRelation::Hides) => 4,
     ViewRequest::Flags                                  => 5,
     ViewRequest::Editable | ViewRequest::WriteProtected
       | ViewRequest::WriteProtectedSubtree
@@ -1173,7 +1173,7 @@ fn folders_of_relation (
 ) -> Vec<Folder> {
   match relation {
     FolderRelation::Aliases       => vec! [ Folder::Alias ],
-    FolderRelation::HidesFromSubs => vec! [ Folder::Hider, Folder::Hidden ],
+    FolderRelation::Hides => vec! [ Folder::Hider, Folder::Hidden ],
     FolderRelation::Forks         => vec! [ Folder::Forks ],
     FolderRelation::Containers    => vec! [ Folder::Container ],
     FolderRelation::Mentioners    => vec! [ Folder::Mentioner ], } }

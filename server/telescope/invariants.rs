@@ -175,8 +175,8 @@ pub fn telescope_violations_of (
     m . or_default () . to_vec () };
   check ("forks",
          & msv ( &node . forks ));
-  check ("hidesFromSubs",
-         & msv ( &node . hidesFromSubs ));
+  check ("hides",
+         & msv ( &node . hides ));
   violations }
 
 /// Recorders whose telescope-warning truth may differ between two valid

@@ -108,7 +108,7 @@ node p
 fn a_subscribee_as_such_shows_what_its_subscriber_neither_hides_nor_contains () {
   let graph : InRustGraph = graph (&[
     Graphnode { forks : msv_ids (&["e"]),
-                hidesFromSubs : msv_ids (&["h"]),
+                hides : msv_ids (&["h"]),
                 contains      : ids (&["i"]), .. node ("s") },
     Graphnode { contains : ids (&["h", "i", "k"]), .. node ("e") },
     node ("h"), node ("i"), node ("k"), ]);
@@ -161,7 +161,7 @@ node p
 fn the_hidden_in_subscribee_folder_holds_what_the_subscriber_hides_of_the_subscribees_content () {
   let graph : InRustGraph = graph (&[
     Graphnode { forks : msv_ids (&["e"]),
-                hidesFromSubs : msv_ids (&["h", "o"]), .. node ("s") },
+                hides : msv_ids (&["h", "o"]), .. node ("s") },
     Graphnode { contains : ids (&["h", "k"]), .. node ("e") },
     node ("h"), node ("k"), node ("o"), ]);
   let input : String = formatdoc! ("
@@ -194,7 +194,7 @@ fn a_buffer_of_many_kinds_is_a_fixpoint () {
     node ("c1"), node ("c2"), node ("n"),
     Graphnode { forks : msv_ids (&["n"]), .. node ("o") },
     Graphnode { forks : msv_ids (&["e"]),
-                hidesFromSubs : msv_ids (&["h", "away"]), .. node ("s") },
+                hides : msv_ids (&["h", "away"]), .. node ("s") },
     Graphnode { contains : ids (&["h", "k", "c"]), .. node ("e") },
     node ("h"), node ("k"), node ("away"),
     Graphnode { contains : ids (&["p"]), .. node ("q") },

@@ -214,8 +214,8 @@ fn write_graphnode_to_dir (
           contains : & node . contains,
           forks :
             node . forks . or_default (),
-          hidesFromSubs :
-            node . hidesFromSubs . or_default (), },
+          hides :
+            node . hides . or_default (), },
         &config ) ?;
     let (_, node_fs) : (SkgrepoName, GraphnodeOnDisk) =
       decomposed . into_sections () . into_iter () . next ()

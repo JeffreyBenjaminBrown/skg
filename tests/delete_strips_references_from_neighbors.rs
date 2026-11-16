@@ -200,7 +200,7 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
     config, ID::from ("owner"), &SkgrepoName::from ("main")) ?;
   assert_eq! (members_of (&recorder . contains), vec! [ID::from ("kept")]);
   assert! (recorder . forks . or_default () . is_empty ());
-  assert! (recorder . hidesFromSubs . or_default () . is_empty ());
+  assert! (recorder . hides . or_default () . is_empty ());
   assert! (recorder . title . contains ("[[id:gone][text link left alone]]"),
             "cleanup reports text links but does not rewrite them" );
   Ok (( ))

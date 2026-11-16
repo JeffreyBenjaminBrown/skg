@@ -124,7 +124,7 @@ node s
 #[test]
 fn in_a_forks_folder_a_forker_its_viewparent_hides_vanishes () {
   let graph : InRustGraph = graph (&[
-    Graphnode { hidesFromSubs : msv_ids (&["f"]), .. node ("s") },
+    Graphnode { hides : msv_ids (&["f"]), .. node ("s") },
     Graphnode { forks : msv_ids (&["s"]), .. node ("f") }, ]);
   let input : String = formatdoc! ("
     * {} s

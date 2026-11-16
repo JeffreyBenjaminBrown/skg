@@ -75,7 +75,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
           MSV::Specified(vec![]),
           "acquiree_text_preserver should have empty subscriptions" );
         assert_eq!(
-          acquiree_text_preserver . hidesFromSubs,
+          acquiree_text_preserver . hides,
           MSV::Specified(vec![]),
           "acquiree_text_preserver should have empty hides" );
 

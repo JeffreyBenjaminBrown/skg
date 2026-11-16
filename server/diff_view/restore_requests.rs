@@ -185,7 +185,7 @@ fn in_links_at_head (
   let inbound : [(NodeRelation, &RecorderwardRelmap); 3] = [
     (NodeRelation::Contains,      &before . contained_by),
     (NodeRelation::Forks,         &before . forkers_of),
-    (NodeRelation::HidesFromSubs, &before . hiders_of) ];
+    (NodeRelation::Hides, &before . hiders_of) ];
   let mut relationships : Vec<RestoredRelationship> = Vec::new ();
   for (relation, recorders_of) in inbound {
     let mut recorders : Vec<&ID> = recorders_of . get (pid)
@@ -224,7 +224,7 @@ fn relation_list (
   match relation {
     NodeRelation::Contains      => Some ( &node . contains ),
     NodeRelation::Forks         => Some ( node . forks . or_default () ),
-    NodeRelation::HidesFromSubs => Some ( node . hidesFromSubs . or_default () ),
+    NodeRelation::Hides => Some ( node . hides . or_default () ),
     NodeRelation::LinksTo       => None, } }
 
 /// The relationships each restoreRel request in 'viewforest' stands
@@ -294,7 +294,7 @@ fn add_relationship (
   let list : &mut Vec<RelPartner<ID>> = match key . relation {
     NodeRelation::Contains      => &mut recorder . contains,
     NodeRelation::Forks         => specified (&mut recorder . forks, live_list),
-    NodeRelation::HidesFromSubs => specified (&mut recorder . hidesFromSubs, live_list),
+    NodeRelation::Hides => specified (&mut recorder . hides, live_list),
     NodeRelation::LinksTo       => return Ok (( )), };
   let member_of = |stored : &ID| -> ID {
     if restored_pids . contains (stored) { stored . clone () }

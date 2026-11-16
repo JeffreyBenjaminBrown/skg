@@ -192,11 +192,11 @@ struct FolderSpec {
 
 const WRITE_PROTECTED_FOLDERS : [FolderSpec; 4] = [
   FolderSpec { atom : "hiderFolder", recorder : "roHider-owner",
-            relation : "hidesFromSubs",
+            relation : "hides",
             member_a : "roHider-a", member_b : "roHider-b",
             intruder : "roHider-x" },
   FolderSpec { atom : "hiddenFolder", recorder : "roHidden-owner",
-            relation : "hidesFromSubs",
+            relation : "hides",
             member_a : "roHidden-a", member_b : "roHidden-b",
             intruder : "roHidden-x" },
   FolderSpec { atom : "containerFolder", recorder : "roCont-owner",
@@ -370,10 +370,10 @@ async fn forker_only_members (
                          "(skg hiddenOutsideOfForkPartnersFolder)", "(gnid roSub-a)");
     let owner : Graphnode = graphnode_by_gnid (
       &graph . load_full (), config, &ID::from ("roSub-owner") ) ?;
-    if members_of (owner . hidesFromSubs . or_default ()) != vec! [ ID::from ("roSub-a") ] {
+    if members_of (owner . hides . or_default ()) != vec! [ ID::from ("roSub-a") ] {
       fails . record (s, format! (
         "deleting a forker-only member must hide it: hides = {:?}",
-        owner . hidesFromSubs )); } }
+        owner . hides )); } }
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
@@ -461,9 +461,9 @@ const CHAIN_FOLDERS : [ChainFolderSpec; 6] = [
   ChainFolderSpec { atom : "forksFolder", owner : "chSube-owner",
                     member : "chSube-m", relation : None },
   ChainFolderSpec { atom : "hiderFolder", owner : "chHider-owner",
-                    member : "chHider-m", relation : Some ("hidesFromSubs") },
+                    member : "chHider-m", relation : Some ("hides") },
   ChainFolderSpec { atom : "hiddenFolder", owner : "chHidden-owner",
-                    member : "chHidden-m", relation : Some ("hidesFromSubs") },
+                    member : "chHidden-m", relation : Some ("hides") },
   ChainFolderSpec { atom : "containerFolder", owner : "chCont-owner",
                     member : "chCont-m", relation : Some ("containers") },
   ChainFolderSpec { atom : "mentionerFolder", owner : "chMent-owner",
@@ -583,11 +583,11 @@ async fn folder_request_scenarios (
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(skg forksFolder)");
     fails . want_contains (s, &resp . saved_view, "(gnid wSub-a)"); }
-  { // (folder hidesFromSubs) on wSub-owner, which neither hides nor is hidden:
+  { // (folder hides) on wSub-owner, which neither hides nor is hidden:
     // both sides write-protected and empty, so nothing appears.
     let s : &str = "folder-request/hides-empty";
     let resp : SaveResponse = save (
-      &request_buf ("wSub-owner", "hidesFromSubs"),
+      &request_buf ("wSub-owner", "hides"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
@@ -669,7 +669,7 @@ async fn editable_forksFolder (
   Ok (( )) }
 
 /// Deleting a member from the write-protected hiddenFolder must not unhide it
-/// on disk: the recorder's hidesFromSubs is never read
+/// on disk: the recorder's hides is never read
 /// from the folder, so the deleted member stays hidden. (The view-level
 /// twin -- respawn in the saved view -- is the hiddenFolder case of
 /// write_protected_delete; the extraction-seam twin is in commit 1.)
@@ -681,7 +681,7 @@ async fn hiddenFolder_delete_does_not_unhide (
 ) -> Result<(), Box<dyn Error>> {
   let s : &str = "hiddenFolder/no-unhide-on-disk";
   let buf : String = render_with_requested_relation_folders (
-    "roHidden-owner", "hidesFromSubs", config, tantivy, graph ) . await ?;
+    "roHidden-owner", "hides", config, tantivy, graph ) . await ?;
   let a_line : String =
     line_containing (&buf, "(gnid roHidden-a)") . to_string ();
   let edited : String = buf . replace (&format! ("{}\n", a_line), "");
@@ -690,7 +690,7 @@ async fn hiddenFolder_delete_does_not_unhide (
   // Either the recorder is a no-op (absent from the plan), or its SaveNode
   // still hides roHidden-a; in no case is roHidden-a unhidden.
   if let Some (n) = saved_node_by_gnid (&nodes, "roHidden-owner") {
-    let hides : Vec<ID> = match &n . hidesFromSubs {
+    let hides : Vec<ID> = match &n . hides {
       MSV::Specified (gnids) => members_of (gnids),
       MSV::Unspecified => Vec::new (), };
     if ! hides . is_empty () && ! hides . contains (&ID::from ("roHidden-a")) {

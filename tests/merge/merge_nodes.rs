@@ -161,10 +161,10 @@ fn verify_filesystem_after_merge_2_into_1(
   // Note: node 1 originally hid both "hidden-from-1s-subscriptions"
   // and "hidden-from-subscriptions-of-1-but-in-content-of-2".
   // The latter is now in node 1's contents, so it should be removed from hides.
-  assert_eq!(node_1 . hidesFromSubs . or_default() . len(),
+  assert_eq!(node_1 . hides . or_default() . len(),
              1,
              "Node 1 should have 1 hides relationship");
-  assert_eq!(&node_1 . hidesFromSubs . or_default()[0] . member,
+  assert_eq!(&node_1 . hides . or_default()[0] . member,
              &ID::from ("hidden-from-1s-subscriptions"));
 
   let acquiree_text_preserver_path: String =
@@ -188,8 +188,8 @@ fn verify_filesystem_after_merge_2_into_1(
   // (when read from disk, missing fields are Unspecified)
   assert_eq!(acquiree_text_preserver . forks, MSV::Unspecified,
              "acquiree_text_preserver should have Unspecified for forks");
-  assert_eq!(acquiree_text_preserver . hidesFromSubs, MSV::Unspecified,
-             "acquiree_text_preserver should have Unspecified for hidesFromSubs");
+  assert_eq!(acquiree_text_preserver . hides, MSV::Unspecified,
+             "acquiree_text_preserver should have Unspecified for hides");
 
   Ok(( )) }
 
@@ -323,13 +323,13 @@ fn verify_filesystem_after_merge_1_into_2(
              vec![ ID::from ("1-subscribes-to"), ID::from ("overridden-by-1") ],
              "Node 2 should fork what node 1 forked");
 
-  // Verify hidesFromSubs: should have node 1's hides,
+  // Verify hides: should have node 1's hides,
   // but not "hidden-from-subscriptions-of-1-but-in-content-of-2"
   // (because it's in node 2's contents)
-  assert_eq!(node_2 . hidesFromSubs . or_default() . len(),
+  assert_eq!(node_2 . hides . or_default() . len(),
              1,
-             "Node 2 should have 1 hidesFromSubs relationship");
-  assert_eq!(&node_2 . hidesFromSubs . or_default()[0] . member,
+             "Node 2 should have 1 hides relationship");
+  assert_eq!(&node_2 . hides . or_default()[0] . member,
              &ID::from ("hidden-from-1s-subscriptions"),
              "Node 2 should hide hidden-from-1s-subscriptions");
 
@@ -357,8 +357,8 @@ fn verify_filesystem_after_merge_1_into_2(
   // (these relationships stay with the acquirer, not the acquiree_text_preserver)
   assert_eq!(acquiree_text_preserver . forks, MSV::Unspecified,
              "acquiree_text_preserver should have Unspecified for forks");
-  assert_eq!(acquiree_text_preserver . hidesFromSubs, MSV::Unspecified,
-             "acquiree_text_preserver should have Unspecified for hidesFromSubs");
+  assert_eq!(acquiree_text_preserver . hides, MSV::Unspecified,
+             "acquiree_text_preserver should have Unspecified for hides");
 
   Ok(( )) }
 
@@ -467,7 +467,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   let hiders : HashSet<ID> =
     find_related_nodes (
       &graph_snap, &input_acquirer,
-      "hidesFromSubs", "hidden", "hider" );
+      "hides", "hidden", "hider" );
   assert!( hiders . contains (&ID::from ("hides-1-from-subscriptions")),
            "inverse hides under pid 2 should include \
             hides-1-from-subscriptions" );
@@ -495,7 +495,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   let hidden_by_h1 : HashSet<ID> =
     find_related_nodes (
       &graph_snap, &vec![ID::from ("hides-1-from-subscriptions")],
-      "hidesFromSubs", "hider", "hidden" );
+      "hides", "hider", "hidden" );
   assert!( hidden_by_h1 . contains (&ID::from ("2")),
            "hides-1-from-subscriptions's forward hides should include \
             canonical pid 2" );

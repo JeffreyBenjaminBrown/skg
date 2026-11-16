@@ -25,8 +25,8 @@ fn all_tests
       s . reset ("test_none_forks_get_replaced_with_disk_forks", fixtures) ?;
       test_none_forks_get_replaced_with_disk_forks (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_none_hidesFromSubs_get_replaced_with_disk_hides", fixtures) ?;
-      test_none_hidesFromSubs_get_replaced_with_disk_hides (
+      s . reset ("test_none_hides_get_replaced_with_disk_hides", fixtures) ?;
+      test_none_hides_get_replaced_with_disk_hides (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
@@ -161,15 +161,15 @@ async fn test_none_forks_get_replaced_with_disk_forks_logic (
 
   Ok (( )) }
 
-async fn test_none_hidesFromSubs_get_replaced_with_disk_hides (
+async fn test_none_hides_get_replaced_with_disk_hides (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
-      test_none_hidesFromSubs_get_replaced_with_disk_hides_logic (
+      test_none_hides_get_replaced_with_disk_hides_logic (
         config ) . await
     }
 
-async fn test_none_hidesFromSubs_get_replaced_with_disk_hides_logic (
+async fn test_none_hides_get_replaced_with_disk_hides_logic (
   config : &SkgConfig,
 
 ) -> Result < (), Box<dyn Error> > {
@@ -177,39 +177,39 @@ async fn test_none_hidesFromSubs_get_replaced_with_disk_hides_logic (
   { let mut user_node : Graphnode = empty_graphnode ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
-      user_node . hidesFromSubs = MSV::Unspecified; }
+      user_node . hides = MSV::Unspecified; }
     let result : Graphnode =
       supplement_from_disk_then_extract_graphnode (
         &config, user_node ) . await ?;
     assert_eq! (
-      members_msv (&result . hidesFromSubs),
+      members_msv (&result . hides),
       MSV::Specified ( vec![ ID::new ("hide_1_on_disk") ]),
-      "Unspecified hidesFromSubs from client should be replaced with hides from disk." ); }
+      "Unspecified hides from client should be replaced with hides from disk." ); }
 
   { let mut user_node : Graphnode = empty_graphnode ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
-      user_node . hidesFromSubs = MSV::Specified ( vec![] ); }
+      user_node . hides = MSV::Specified ( vec![] ); }
     let result : Graphnode =
       supplement_from_disk_then_extract_graphnode (
         &config, user_node ) . await ?;
     assert_eq! (
-      result . hidesFromSubs,
+      result . hides,
       MSV::Specified ( vec![] ),
-      "Specified ( [] ) hidesFromSubs from client should be preserved, not replaced by data from disk." ); }
+      "Specified ( [] ) hides from client should be preserved, not replaced by data from disk." ); }
 
   { let mut user_node : Graphnode = empty_graphnode ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
-      user_node . hidesFromSubs = rel_partners_at_relRepo_msv (
+      user_node . hides = rel_partners_at_relRepo_msv (
         & SkgrepoName::from ("main"),
         MSV::Specified ( vec![ ID::new ("new_hide") ] ) ); }
     let result : Graphnode =
       supplement_from_disk_then_extract_graphnode (
         &config, user_node ) . await ?;
     assert_eq! (
-      members_msv (&result . hidesFromSubs),
+      members_msv (&result . hides),
       MSV::Specified ( vec![ ID::new ("new_hide") ] ),
-      "hidesFromSubs from client should be preserved, not replaced by data from disk." ); }
+      "hides from client should be preserved, not replaced by data from disk." ); }
 
   Ok (( )) }

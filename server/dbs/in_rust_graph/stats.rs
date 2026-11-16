@@ -126,9 +126,9 @@ fn fetch_all_graphnodestats_in_rust (
     let shown_containers : HashSet<ID> = inbound_shown (NodeRelation::Contains);
     let shown_contents : HashSet<ID> = outbound_shown (NodeRelation::Contains);
     let hiders : usize =
-      inbound_shown (NodeRelation::HidesFromSubs) . len ();
+      inbound_shown (NodeRelation::Hides) . len ();
     let hides : usize =
-      outbound_shown (NodeRelation::HidesFromSubs) . len ();
+      outbound_shown (NodeRelation::Hides) . len ();
     let forkers : usize =
       inbound_shown (NodeRelation::Forks) . len ();
     let forkees : usize =

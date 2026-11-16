@@ -432,7 +432,7 @@ pub enum DeleteFrom {
 /// origin (which could be the recorder-collection pass or the save
 /// itself),
 /// remove every id in 'deleted_id_set' from the four
-/// outbound list fields (contains, forks, hidesFromSubs).
+/// outbound list fields (contains, forks, hides).
 ///
 /// 'deleted_id_set' includes both the primary pid of each delete
 /// and the extra_ids of that node from the in-Rust graph.
@@ -522,7 +522,7 @@ pub(crate) fn apply_delete_propagation_cleanup (
         nc . contains . retain ( |record|
           ! stripped (record, &deleted_id_set) );
         for list in [ &mut nc . forks,
-                      &mut nc . hidesFromSubs ] {
+                      &mut nc . hides ] {
           if let MSV::Specified (records) = list {
             records . retain ( |record|
               ! stripped (record, &deleted_id_set) ); }} }} } }
@@ -575,7 +575,7 @@ fn records_of_graphnodeInRust (
 ) -> Vec<&RelPartner<ID>> {
   node . contains . iter ()
     . chain ( node . forks . or_default () . iter () )
-    . chain ( node . hidesFromSubs . or_default () . iter () )
+    . chain ( node . hides . or_default () . iter () )
     . collect () }
 
 
@@ -596,7 +596,7 @@ pub(crate) fn graphnode_from_graphnodeInRust (
     body                         : rust . body . clone (),
     contains                     : rust . contains . clone (),
     forks                        : rust . forks . clone (),
-    hidesFromSubs                : rust . hidesFromSubs . clone (),
+    hides                        : rust . hides . clone (),
     flags                        : rust . flags . clone (),
   }}
 

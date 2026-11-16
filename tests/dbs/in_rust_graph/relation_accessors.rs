@@ -45,7 +45,7 @@ fn node (
     else { MSV::Specified ( rel_partners_at_relRepo (
       &node . home_skgrepo,
       forks . iter () . map ( |gnid| ID::from (*gnid) ) . collect ())) };
-  node . hidesFromSubs =
+  node . hides =
     if hides . is_empty () { MSV::Unspecified }
     else { MSV::Specified ( rel_partners_at_relRepo (
       &node . home_skgrepo,
@@ -102,13 +102,13 @@ fn relation_accessors_return_both_membership_directions () {
     graph . other_member_pids (
       &ID::from ("recorder"),
       RelationRole::new (
-        NodeRelation::HidesFromSubs, BinaryRolePosition::First)),
+        NodeRelation::Hides, BinaryRolePosition::First)),
     vec![ID::from ("hidden")] );
   assert_eq!(
     graph . other_member_pids (
       &ID::from ("recorder"),
       RelationRole::new (
-        NodeRelation::HidesFromSubs, BinaryRolePosition::Second)),
+        NodeRelation::Hides, BinaryRolePosition::Second)),
     vec![ID::from ("hider")] ); }
 
 #[test]

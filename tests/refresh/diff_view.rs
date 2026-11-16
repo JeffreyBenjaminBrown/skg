@@ -238,7 +238,7 @@ node p
 fn the_diff_view_adds_no_default_folders () {
   let graph_nodes : Vec<Graphnode> = vec! [
     Graphnode { forks : msv_ids (&["e"]),
-                hidesFromSubs : msv_ids (&["h"]), .. node ("s") },
+                hides : msv_ids (&["h"]), .. node ("s") },
     Graphnode { contains : ids (&["h"]), .. node ("e") },
     node ("h"),
     Graphnode { forks : msv_ids (&["e"]), .. node ("u") }, ];

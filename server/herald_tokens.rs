@@ -12,7 +12,7 @@
 //!     (contains          (in  COUNT (ancestors GEN...))
 //!                        (out COUNT (ancestors GEN...)))
 //!     (forks            (in ...) (out ...))
-//!     (hidesFromSubs (in ...) (out ...))
+//!     (hides (in ...) (out ...))
 //!     (linksTo          (in COUNT (ancestors GEN...)
 //!                            (substantive COUNT (ancestors GEN...)))
 //!                        (out COUNT (ancestors GEN...))))
@@ -94,8 +94,8 @@ impl AncestorFlags {
       (NodeRelation::Contains,                  false) => Some (&mut self . contains_out),
       (NodeRelation::LinksTo,               true ) => Some (&mut self . links_in),
       (NodeRelation::LinksTo,               false) => Some (&mut self . links_out),
-      (NodeRelation::HidesFromSubs, true )             => Some (&mut self . hides_in),
-      (NodeRelation::HidesFromSubs, false)             => Some (&mut self . hides_out),
+      (NodeRelation::Hides, true )             => Some (&mut self . hides_in),
+      (NodeRelation::Hides, false)             => Some (&mut self . hides_out),
       (NodeRelation::Forks,                     true ) => Some (&mut self . forks_in),
       (NodeRelation::Forks,                     false) => Some (&mut self . forks_out), };
     if let Some (v) = slot {
@@ -242,7 +242,7 @@ pub fn relationship_heralds_sexp (
     NodeRelation::Forks . relation_name (), counts . forkers, &flags . forks_in,
     counts . forkees, &flags . forks_out) { parts . push (s); }
   if let Some (s) = relation_sexp (
-    NodeRelation::HidesFromSubs . relation_name (), counts . hiders, &flags . hides_in,
+    NodeRelation::Hides . relation_name (), counts . hiders, &flags . hides_in,
     counts . hides, &flags . hides_out) { parts . push (s); }
   let props : Vec<String> =
     [ ("aliases", aliases), ("extraIds", extra_ids), ("flags", flag_count) ]

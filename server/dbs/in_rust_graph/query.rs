@@ -31,9 +31,9 @@ pub fn find_related_nodes (
         if let Some (n) = graph . nodes . get (&pid) {
           out . extend ( members_of ( n . forks . or_default () )
                          . iter () . map (&pid_or_self) ); },
-      ("hidesFromSubs", "hider",                      "hidden")     =>
+      ("hides", "hider",                      "hidden")     =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( members_of ( n . hidesFromSubs . or_default () )
+          out . extend ( members_of ( n . hides . or_default () )
                          . iter () . map (&pid_or_self) ); },
       ("linksTo",                      "mentioner",   "mentioned")  =>
         if let Some (n) = graph . nodes . get (&pid) {
@@ -46,7 +46,7 @@ pub fn find_related_nodes (
       ("forks",                        "forkee",      "forker")      =>
         if let Some (s) = graph . forkers_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
-      ("hidesFromSubs",                "hidden",      "hider")       =>
+      ("hides",                "hidden",      "hider")       =>
         if let Some (s) = graph . hiders_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
       ("linksTo",                      "mentioned",   "mentioner")  =>

@@ -126,7 +126,7 @@
       "linksTo":                     { "in": "medium", "out": "normal",
                                         "in_substantive": "high" },
       "forks":                       { "in": "high",   "out": "medium" },
-      "hidesFromSubs":               { "in": "medium", "out": "normal" }
+      "hides":               { "in": "medium", "out": "normal" }
     },
     "floors": {
       "comment": "The least tier a glyph shows. Ancestor flag a is the parent; b is the grandparent, and so on.",

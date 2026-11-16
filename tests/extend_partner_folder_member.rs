@@ -173,7 +173,7 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
       let requested_folders : String = n_view . replacen (
         "node ",
         "node (viewRequests (folder forks) \
-         (folder hidesFromSubs))", 1 );
+         (folder hides))", 1 );
       let with_folders : String =
         save (&requested_folders, config, tantivy, &graph)
         . await ? . saved_view;

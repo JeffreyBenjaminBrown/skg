@@ -661,7 +661,7 @@ impl RelationshipEditRequest {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FolderRelation {
   Aliases,
-  HidesFromSubs,
+  Hides,
   Forks, // the one forks folder, holding both sides of the relation
   // These two build one write-protected folder each: their other
   // side is the node's content, or its links, shown without a folder.
@@ -672,7 +672,7 @@ pub enum FolderRelation {
 impl FolderRelation {
   pub const ALL : [FolderRelation; 5] = [
     FolderRelation::Aliases,
-    FolderRelation::HidesFromSubs,
+    FolderRelation::Hides,
     FolderRelation::Forks,
     FolderRelation::Containers,
     FolderRelation::Mentioners ];
@@ -682,7 +682,7 @@ impl FolderRelation {
   ) -> &'static str {
     match self {
       FolderRelation::Aliases                   => "aliases",
-      FolderRelation::HidesFromSubs             => "hidesFromSubs",
+      FolderRelation::Hides                     => "hides",
       FolderRelation::Forks                     => "forks",
       FolderRelation::Containers                => "containers",
       FolderRelation::Mentioners                => "mentioners", } }
@@ -908,10 +908,10 @@ impl Folder {
         None,
       Folder::Hider =>
         Some (RelationRole::new (
-          NodeRelation::HidesFromSubs, BinaryRolePosition::First)),
+          NodeRelation::Hides, BinaryRolePosition::First)),
       Folder::Hidden =>
         Some (RelationRole::new (
-          NodeRelation::HidesFromSubs, BinaryRolePosition::Second)),
+          NodeRelation::Hides, BinaryRolePosition::Second)),
       Folder::Container =>
         Some (RelationRole::new (
           NodeRelation::Contains, BinaryRolePosition::First)),

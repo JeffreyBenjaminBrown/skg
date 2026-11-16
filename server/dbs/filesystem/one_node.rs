@@ -248,8 +248,8 @@ pub(crate) fn prepare_graphnode_telescope (
         contains : & graphnode . contains,
         forks :
           graphnode . forks . or_default (),
-        hidesFromSubs :
-          graphnode . hidesFromSubs . or_default (), },
+        hides :
+          graphnode . hides . or_default (), },
       config )
     . map_err ( |e| io::Error::new (
       io::ErrorKind::InvalidData, e ) ) ?;

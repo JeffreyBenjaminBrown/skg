@@ -80,9 +80,9 @@ pub fn hide_report_lines (
     if ! config . skgrepo_is_owned (&node . home_skgrepo) { continue; }
     let on_disk : Option<Graphnode> = graphnode_from_graph (graph, &node . pid);
     let disk_hides : Vec<ID> = on_disk . as_ref ()
-      . map ( |disk| visible_members (disk . hidesFromSubs . or_default ()) )
+      . map ( |disk| visible_members (disk . hides . or_default ()) )
       . unwrap_or_default ();
-    let hides_after : Vec<ID> = match &node . hidesFromSubs {
+    let hides_after : Vec<ID> = match &node . hides {
       MSV::Specified (hides) => visible_members (hides),
       MSV::Unspecified => disk_hides . clone (), };
     let subscribees : Vec<ID> = match &node . forks {

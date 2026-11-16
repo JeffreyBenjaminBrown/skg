@@ -8,14 +8,14 @@ sub-forms like (contains (in ...) (out ...)). A chain node (a
 node of the containerward chain) relates outbound to a tracked
 ancestor: it has a relation with an (out ... (ancestors ...)) side.
 That relation names the role: contains -> container, linksTo ->
-mentioner, forks -> forker, hidesFromSubs -> hider. Only meaningful
+mentioner, forks -> forker, hides -> hider. Only meaningful
 for a node already known by its position to be a chain node; an
 ordinary content child can carry
 the same outbound ancestor (e.g. a cycle) yet is not a chain node."
   (cl-loop for (rel . role) in '((contains    . container)
                                  (linksTo . mentioner)
                                  (forks . forker)
-                                 (hidesFromSubs . hider))
+                                 (hides . hider))
            for form = (assq rel rels-body)
            when (and form
                      (let ((out (assq 'out (cdr form))))

@@ -60,8 +60,8 @@ pub struct GraphnodeOnDisk {
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub forks: Vec<ListItem>,
 
-  #[serde(default, skip_serializing_if = "Vec::is_empty", rename = "hides", alias = "hides_from_its_subscriptions")]
-  pub hidesFromSubs: Vec<ID>,
+  #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "hides_from_its_subscriptions")]
+  pub hides: Vec<ID>,
 
   #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "misc")]
   pub flags: Vec<Flag>,
@@ -86,8 +86,8 @@ impl GraphnodeOnDisk {
         nonempty_items ( self . contains ),
       forks                        :
         nonempty_items ( self . forks ),
-      hidesFromSubs                :
-        nonempty_gnids ( self . hidesFromSubs ), }}
+      hides                        :
+        nonempty_gnids ( self . hides ), }}
 
   /// Treat one section as a whole node: exact for single-section
   /// telescopes; the per-file git/diff paths use it as interim
@@ -123,9 +123,9 @@ impl GraphnodeOnDisk {
         &skgrepo, members_only ( self . contains ) ),
       forks                        : rel_partners_at_relRepo_msv (
         &skgrepo, msv_gnids ( members_only ( self . forks ) ) ),
-      hidesFromSubs                : rel_partners_at_relRepo_msv (
+      hides                        : rel_partners_at_relRepo_msv (
         &skgrepo,
-        msv_gnids ( self . hidesFromSubs ) ),
+        msv_gnids ( self . hides ) ),
       flags                         : self . flags,
       home_skgrepo: skgrepo,
     }}
@@ -197,8 +197,8 @@ pub fn graphnode_on_disk_from_section (
       slices . contains . unwrap_or_default (),
     forks                        :
       slices . forks . unwrap_or_default (),
-    hidesFromSubs                :
-      slices . hidesFromSubs . unwrap_or_default (),
+    hides                        :
+      slices . hides . unwrap_or_default (),
     flags                        :
       if is_home { flags . to_vec () } else { Vec::new () }, }}
 

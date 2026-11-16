@@ -21,7 +21,7 @@ fn full_fixture () -> InRustGraph {
     &skgrepo, vec![ID::from ("target-alias"), ID::from ("dangling")]);
   recorder . forks = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("target-alias")]));
-  recorder . hidesFromSubs = MSV::Specified (rel_partners_at_relRepo (
+  recorder . hides = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("target-alias")]));
   recorder . body = Some (
     "[[id:target-alias][target]] and [[id:text-dangling][missing]]" . to_string ());
@@ -110,7 +110,7 @@ fn alias_acquisition_rekeys_all_four_inverse_indexes () {
   recorder . contains = rel_partners_at_relRepo (&skgrepo, vec![ID::from ("future")]);
   recorder . forks = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("future")]));
-  recorder . hidesFromSubs = MSV::Specified (rel_partners_at_relRepo (
+  recorder . hides = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("future")]));
   recorder . body = Some ("[[id:future][future]]" . to_string ());
   let mut graph : InRustGraph =
@@ -174,7 +174,7 @@ fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
   recorder . contains = rel_partners_at_relRepo (&skgrepo, raw_gnids . clone ());
   recorder . forks = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, raw_gnids . clone ()));
-  recorder . hidesFromSubs = MSV::Specified (rel_partners_at_relRepo (
+  recorder . hides = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, raw_gnids . clone ()));
   recorder . body = Some (
     "[[id:target][primary]] [[id:extra][extra]]" . to_string ());
@@ -209,12 +209,12 @@ fn changed_recorder_removes_and_adds_all_four_inverse_contributions () {
   let mut old : Graphnode = node ("recorder");
   old . contains = rel_partners_at_relRepo (&skgrepo, vec![ID::from ("old")]);
   old . forks = MSV::Specified (old . contains . clone ());
-  old . hidesFromSubs = MSV::Specified (old . contains . clone ());
+  old . hides = MSV::Specified (old . contains . clone ());
   old . body = Some ("[[id:old][old]]" . to_string ());
   let mut final_node : Graphnode = node ("recorder");
   final_node . contains = rel_partners_at_relRepo (&skgrepo, vec![ID::from ("new")]);
   final_node . forks = MSV::Specified (final_node . contains . clone ());
-  final_node . hidesFromSubs =
+  final_node . hides =
     MSV::Specified (final_node . contains . clone ());
   final_node . body = Some ("[[id:new][new]]" . to_string ());
   let mut graph : InRustGraph = InRustGraph::from_graphnodes (&[old]);
@@ -250,7 +250,7 @@ proptest! {
     let mut recorder : Graphnode = node ("recorder");
     recorder . contains = rel_partners_at_relRepo (&skgrepo, raw_gnids . clone ());
     recorder . forks = MSV::Specified (recorder . contains . clone ());
-    recorder . hidesFromSubs = MSV::Specified (recorder . contains . clone ());
+    recorder . hides = MSV::Specified (recorder . contains . clone ());
     recorder . body = Some (raw_indexes . iter ()
       . map (|index| format! ("[[id:{}][x]]", universe [*index]))
       . collect::<Vec<String>> () . join (" "));

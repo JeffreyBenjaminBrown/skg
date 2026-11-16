@@ -22,7 +22,7 @@ use std::iter::once;
 /// containment maps).
 const GRAPH_RELATIONS : [NodeRelation; 3] = [
   NodeRelation::LinksTo,
-  NodeRelation::HidesFromSubs,
+  NodeRelation::Hides,
   NodeRelation::Forks, ];
 
 /// The stats of each occurrence (its rels, props, birth, 'cycle',
@@ -225,8 +225,8 @@ fn set_herald_strings_in_viewnode (
       . and_then ( |parent| subscriber_of_subscribee_as_such (tree, parent . id ()) )
     { if relationship_is_visible (
         graph, restriction, relRepos, node_pid, &subscriber_pid,
-        RelationRole::new (NodeRelation::HidesFromSubs, BinaryRolePosition::First) )
-      { flags . record (NodeRelation::HidesFromSubs, true, 3); }}}
+        RelationRole::new (NodeRelation::Hides, BinaryRolePosition::First) )
+      { flags . record (NodeRelation::Hides, true, 3); }}}
   let unintegrated : Option<usize> =
     // A subscribee as such counts the nodes its content goal draws as
     // occurrences: nodes the skgrepo restriction shows, as the count of its
@@ -463,7 +463,7 @@ fn birth_facts_for_folder (
         compound_folder_parties (tree, folder_treeid)
         else { return Vec::new (); }; // unsayable, so entombstoned
       once ( BirthFact::new (
-          NodeRelation::HidesFromSubs, Side::In,
+          NodeRelation::Hides, Side::In,
           generation_above_a_member (tree, folder_treeid, parties . subscriber) ))
         . chain ( parties . subscribee . map ( |subscribee| BirthFact::new (
             NodeRelation::Contains, Side::In,

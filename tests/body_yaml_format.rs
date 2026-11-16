@@ -21,7 +21,7 @@ fn node_with_body (
     body                         : Some (body . to_string ()),
     contains                     : vec! [],
     forks                        : vec! [],
-    hidesFromSubs                : vec! [],
+    hides                        : vec! [],
     flags                        : vec! [],
   } }
 
@@ -95,7 +95,7 @@ fn field_order_places_body_between_extra_ids_and_contains () {
     contains                     : vec! [
       ListItem::Member ( ID::new ("c1") ) ],
     forks                        : vec! [],
-    hidesFromSubs                : vec! [],
+    hides                        : vec! [],
     flags                        : vec! [],
   };
   let yaml : String = node . to_yaml () . unwrap ();

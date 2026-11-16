@@ -45,7 +45,7 @@ fn s_e_h (
     Some (record) => [ at (Record::Main, &["c"]), at (record, &["h"]) ] . concat (), };
   graph (&[
     Graphnode { forks : MSV::Specified ( at (Record::Main, &["e"]) ),
-                hidesFromSubs : MSV::Specified ( at (hide, &["h"]) ),
+                hides : MSV::Specified ( at (hide, &["h"]) ),
                 .. node ("s") },
     Graphnode { contains : e_contains, .. node ("e") },
     node ("c"), node ("h") ]) }
@@ -133,7 +133,7 @@ fn a_restricted_hide_of_what_e_contains_restrictedly_stands_nowhere_under_a_narr
 fn a_visible_hide_of_what_a_restricted_subscribee_contains_stands_outside_under_a_narrowing () {
   let graph : InRustGraph = graph (&[
     Graphnode { forks : MSV::Specified ( at (Record::Main, &["e"]) ),
-                hidesFromSubs : MSV::Specified ( at (Record::Main, &["h"]) ),
+                hides : MSV::Specified ( at (Record::Main, &["h"]) ),
                 .. node ("s") },
     Graphnode { home_skgrepo : SkgrepoName::from ("private"),
                 contains     : at (Record::Private, &["c", "h"]),
@@ -149,7 +149,7 @@ fn a_visible_hide_of_what_a_restricted_subscribee_contains_stands_outside_under_
 #[test]
 fn a_graphnode_the_viewparent_no_longer_hides_leaves_the_hides_folder () {
   let graph : InRustGraph = graph (&[
-    Graphnode { hidesFromSubs : MSV::Specified ( ids (&["q"]) ), .. node ("r") },
+    Graphnode { hides : MSV::Specified ( ids (&["q"]) ), .. node ("r") },
     node ("q"), node ("u") ]);
   let input : String = formatdoc! ("
     * {} r

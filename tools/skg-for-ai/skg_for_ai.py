@@ -133,7 +133,7 @@ FOREST_VIEW_REQUESTS = {
   "containers"    : None,
   "mentioners"    : "(folder mentioners)",
   "forks"         : "(folder forks)",
-  "hidesFromSubs" : "(folder hidesFromSubs)",
+  "hides"         : "(folder hides)",
   "aliases"       : "(folder aliases)",
   "flags"         : "flags" }
 # Commands that name one forest kind.
@@ -2975,9 +2975,13 @@ def parse_edited_compact_view (compact_text):
   return headlines
 
 # The heralds whose words include a handle word, which a handle's words
-# leave out: the forks folder's label holds 'fork', the word for the
-# fork operation, which no folder takes.
-HERALD_PHRASES_HOLDING_HANDLE_WORDS = ( "It forks these, or these fork it.", )
+# leave out: the labels of the forks, hider and hidden folders hold
+# 'fork' or 'forks', the words for the fork operation, which no
+# folder takes.
+HERALD_PHRASES_HOLDING_HANDLE_WORDS = (
+  "It forks these, or these fork it.",
+  "It hides these from its forks.",
+  "These hide it from their forks." )
 
 def handle_words (display_text):
   """The words of a handle's display text: its tokens, the heralds of

@@ -464,11 +464,11 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
           "forks") ?;
         m . member = raw_disk_member (disk, &submitted); }} }
   { let disk : &[RelPartner<ID>] =
-      disk_node . hidesFromSubs . or_default ();
+      disk_node . hides . or_default ();
     let subscribes : Vec<RelPartner<ID>> =
       supplemented . forks . or_default () . to_vec ();
     if let MSV::Specified (v) =
-      &mut supplemented . hidesFromSubs {
+      &mut supplemented . hides {
       for m in v . iter_mut () {
         let submitted : ID = m . member . clone ();
         let key : RelationshipMemberKey = member_key ( &submitted );
@@ -621,9 +621,9 @@ pub fn supplement_unspecified_fields_from_disk (
   if from_buffer . forks . is_unspecified() {
     from_buffer . forks =
       disk_node . forks . clone(); }
-  if from_buffer . hidesFromSubs . is_unspecified() {
-    from_buffer . hidesFromSubs =
-      disk_node . hidesFromSubs . clone(); }
+  if from_buffer . hides . is_unspecified() {
+    from_buffer . hides =
+      disk_node . hides . clone(); }
   if from_buffer . flags . is_empty() {
     from_buffer . flags = disk_node . flags . clone(); }
   from_buffer }

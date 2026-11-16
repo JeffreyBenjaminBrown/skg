@@ -118,8 +118,8 @@
 (skg node (gnid x) (view (rels (forks (in 1) (out 2))) (birth (forks in 2))))
 ---- text: 1K2
 ---- styles: high*1 low*1 medium*1
-==== birth: hidesFromSubs
-(skg node (gnid x) (view (rels (hidesFromSubs (in 1) (out 2))) (birth (hidesFromSubs in 2))))
+==== birth: hides
+(skg node (gnid x) (view (rels (hides (in 1) (out 2))) (birth (hides in 2))))
 ---- text: 1H2
 ---- styles: medium*1 low*1 normal*1
 ==== node: unwarranted, a cycle, a delete request, contained by the parent and another
@@ -218,8 +218,8 @@
 ---- styles: boring*2 -*1 boring*2 -*1 boring*2
 ==== folders: a write-protected folder
 (skg hiderFolder)
----- text: ☮ These hide it from their subscriptions.
----- styles: crucial*1 -*1 message*39
+---- text: ☮ These hide it from their forks.
+---- styles: crucial*1 -*1 message*31
 ==== folders: a writable folder
 (skg forksFolder)
 ---- text: It forks these, or these fork it.

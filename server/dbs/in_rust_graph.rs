@@ -53,7 +53,7 @@ pub struct InRustGraph {
   pub contained_by     : RecorderwardRelmap,
   /// 'X → {pids of nodes whose forks includes X}'
   pub forkers_of       : RecorderwardRelmap,
-  /// 'X → {pids of nodes whose hidesFromSubs includes X}'
+  /// 'X → {pids of nodes whose hides includes X}'
   pub hiders_of        : RecorderwardRelmap,
   /// 'X → {pids of nodes whose linksTo includes X}'
   pub mentioners_of    : RecorderwardRelmap,
@@ -170,7 +170,7 @@ fn add_relationship_contributions (
   for second_member in members_of ( node . forks . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
     add_to_inverse_map (&mut graph . forkers_of, &key, pid); }
-  for second_member in members_of ( node . hidesFromSubs . or_default () ) {
+  for second_member in members_of ( node . hides . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
     add_to_inverse_map (&mut graph . hiders_of, &key, pid); }
   for second_member in &node . linksTo {
@@ -195,7 +195,7 @@ fn remove_relationship_contributions (
   for second_member in members_of ( node . forks . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
     remove_from_inverse_map (&mut graph . forkers_of, &key, pid); }
-  for second_member in members_of ( node . hidesFromSubs . or_default () ) {
+  for second_member in members_of ( node . hides . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
     remove_from_inverse_map (&mut graph . hiders_of, &key, pid); }
   for second_member in &node . linksTo {

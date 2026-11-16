@@ -161,7 +161,7 @@ fn relationship_keys (
       . map (|raw| canonical (&raw)) . collect ()),
     ("forkers_of", members_of (node . forks . or_default ())
       . into_iter () . map (|raw| canonical (&raw)) . collect ()),
-    ("hiders_of", members_of (node . hidesFromSubs . or_default ())
+    ("hiders_of", members_of (node . hides . or_default ())
       . into_iter () . map (|raw| canonical (&raw)) . collect ()),
     ("mentioners_of", node . linksTo . iter ()
       . map (canonical) . collect ()),
@@ -224,7 +224,7 @@ pub fn validate_internal_indexes (
       record (&mut contained_by, &member, &node . pid); }
     for member in members_of (node . forks . or_default ()) {
       record (&mut forkers_of, &member, &node . pid); }
-    for member in members_of (node . hidesFromSubs . or_default ()) {
+    for member in members_of (node . hides . or_default ()) {
       record (&mut hiders_of, &member, &node . pid); }
     for member in &node . linksTo {
       record (&mut mentioners_of, member, &node . pid); }}

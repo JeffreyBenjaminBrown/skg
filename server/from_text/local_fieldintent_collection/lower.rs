@@ -54,7 +54,7 @@ pub struct NodeSaveIntent {
   pub extra_ids         : Vec<ID>,
   pub aliases           : MSV<(String, Option<SkgrepoName>)>,
   pub forks             : MSV<(ID, Option<SkgrepoName>)>,
-  pub hidesFromSubs     : MSV<ID>,
+  pub hides             : MSV<ID>,
   pub flags              : Vec<Flag>,
   pub flag_request  : Option<(Flag, bool)>,
 }
@@ -156,8 +156,8 @@ impl NodeIntent {
           . map ( |alias| (alias . member, None) )
           . collect () ), },
       forks                        : no_explicit_msv (&node . forks),
-      hidesFromSubs                :
-        members_msv (&node . hidesFromSubs),
+      hides                        :
+        members_msv (&node . hides),
       flags                         : node . flags,
       flag_request             : None,
     }) }
@@ -242,8 +242,8 @@ impl NodeSaveIntent {
           &skgrepo, gnids_only (self . contains . or_default ()) ),
       forks                        :
         rel_partners_at_relRepo_msv (&skgrepo, gnids_only_msv (self . forks)),
-      hidesFromSubs                :
-        rel_partners_at_relRepo_msv (&skgrepo, self . hidesFromSubs),
+      hides                        :
+        rel_partners_at_relRepo_msv (&skgrepo, self . hides),
       flags                         : self . flags,
     };
     node . normalize_gnids ();
@@ -256,16 +256,16 @@ impl NodeSaveIntent {
     inferred_unhides : &[ID],
   ) {
     let mut hides : Vec<ID> =
-      if self . hidesFromSubs . is_unspecified() {
+      if self . hides . is_unspecified() {
         base_hides . or_default() . to_vec()
       } else {
-        self . hidesFromSubs . or_default() . to_vec()
+        self . hides . or_default() . to_vec()
       };
     hides . retain ( |gnid| ! inferred_unhides . contains (gnid) );
     for gnid in inferred_hides {
       if ! hides . contains (gnid) {
         hides . push (gnid . clone()); }}
-    self . hidesFromSubs =
+    self . hides =
       MSV::Specified (hides); }}
 
 /// This is an ordered map of one NodeIntent per PID; lowering
@@ -391,7 +391,7 @@ fn lower_one_entry (
           msv_from_slot (entry . aliases),
         forks                        :
           msv_from_slot (entry . forks),
-        hidesFromSubs                : MSV::Unspecified,
+        hides                        : MSV::Unspecified,
         flags                    : Vec::new(),
         flag_request             : entry . flag,
       })) }} }
@@ -476,11 +476,11 @@ impl LoweredNodeIntents {
   ) -> Vec<ID> {
     match self . by_pid . get (&subscriber_from_disk . pid) {
       Some (NodeIntent::Save (intent))
-        if ! intent . hidesFromSubs . is_unspecified () =>
-          intent . hidesFromSubs . or_default () . to_vec (),
+        if ! intent . hides . is_unspecified () =>
+          intent . hides . or_default () . to_vec (),
       _ =>
         members_of (
-          subscriber_from_disk . hidesFromSubs . or_default () ),
+          subscriber_from_disk . hides . or_default () ),
     }}
 
   /// This applies inferred hides/unhides to the subscriber's
@@ -493,7 +493,7 @@ impl LoweredNodeIntents {
     inferred_unhides : &[ID],
   ) {
     let base_hides : MSV<ID> =
-      members_msv (&subscriber . hidesFromSubs);
+      members_msv (&subscriber . hides);
     if let Some (intent) =
       self . by_pid . get_mut (&subscriber . pid)
     { intent . apply_hiderel_delta (

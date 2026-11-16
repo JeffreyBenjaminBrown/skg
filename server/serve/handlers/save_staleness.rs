@@ -269,7 +269,7 @@ fn as_a_view_reads_it_back (
     .. node } ) }
 
 /// 'node' with each member of its relationship lists ('contains',
-/// 'forks', 'hidesFromSubs') replaced by its pid,
+/// 'forks', 'hides') replaced by its pid,
 /// and every later member with the same pid dropped, keeping order. A
 /// nodeMerge of two members of one list leaves both IDs in the file,
 /// naming one graphnode, which a view draws once.
@@ -294,7 +294,7 @@ fn with_relationships_by_distinct_pid (
   Graphnode {
     contains      : by_distinct_pid     (node . contains),
     forks         : msv_by_distinct_pid (node . forks),
-    hidesFromSubs : msv_by_distinct_pid (node . hidesFromSubs),
+    hides : msv_by_distinct_pid (node . hides),
     .. node } }
 
 /// The pids of the graphnodes the buffer writes or deletes: its
@@ -351,7 +351,7 @@ fn change_since_rendered (
     ( "forks",
       relationships_changed (&then . forks, &now . forks) ),
     ( "hides",
-      relationships_changed (&then . hidesFromSubs, &now . hidesFromSubs) ), ] {
+      relationships_changed (&then . hides, &now . hides) ), ] {
     if changed { aspects . push ( StaleAspect { name, detail : None } ); }}
   if let Some (home) = &changes . home {
     aspects . push ( StaleAspect {

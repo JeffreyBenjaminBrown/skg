@@ -840,7 +840,7 @@ async fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
           input, config) . await?;
       assert_eq!(
         members_msv (&saved_node_by_gnid (&instructions, "r")
-          . hidesFromSubs),
+          . hides),
         MSV::Specified (vec![ID::from ("e1")]));
       assert!(
         ! save_gnids (&instructions) . contains (&ID::from ("e")),
@@ -864,7 +864,7 @@ async fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
           input, config) . await?;
       assert_eq!(
         saved_node_by_gnid (&instructions, "r")
-          . hidesFromSubs,
+          . hides,
         MSV::Unspecified);
       assert_eq!(
         members_of (&saved_node_by_gnid (&instructions, "r") . contains),
@@ -888,7 +888,7 @@ async fn subscribee_as_such_visible_child_removes_subscriber_hide (
           input, config) . await?;
       assert_eq!(
         saved_node_by_gnid (&instructions, "R")
-          . hidesFromSubs,
+          . hides,
         MSV::Specified (vec![]));
       assert!(
         ! save_gnids (&instructions) . contains (&ID::from ("E1")),
@@ -914,7 +914,7 @@ async fn subscribee_as_such_unhide_preserves_unrelated_hides (
           input, config) . await?;
       assert_eq!(
         members_msv (&saved_node_by_gnid (&instructions, "R")
-          . hidesFromSubs),
+          . hides),
         MSV::Specified (
           vec![ID::from ("hidden-in-E2"),
                ID::from ("hidden-for-no-reason")]));
@@ -984,7 +984,7 @@ async fn ordinary_same_gnid_occurrence_keeps_contains_edit_when_also_as_subscrib
         vec![ID::from ("e1")]);
       assert_eq!(
         members_msv (&saved_node_by_gnid (&instructions, "r")
-          . hidesFromSubs),
+          . hides),
         MSV::Specified (vec![ID::from ("e1")]));
       Ok (()) }
 
@@ -1378,7 +1378,7 @@ fn removing_one_subscribee_keeps_the_rest (
 fn deleting_from_hiddenFolder_emits_no_hide_change (
 ) {
   // hiddenFolder is write-protected: its membership is never collected into
-  // the recorder's hidesFromSubs. A member shown there
+  // the recorder's hides. A member shown there
   // (and, equally, a member deleted from there) emits no hide intent;
   // the recorder's hides stay Unspecified (no opinion), preserving
   // whatever disk holds. The compound partner folders have this guarantee tested;
@@ -1395,5 +1395,5 @@ fn deleting_from_hiddenFolder_emits_no_hide_change (
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
     saved_node_by_gnid (&instructions, "recorder")
-      . hidesFromSubs,
+      . hides,
     MSV::Unspecified); }

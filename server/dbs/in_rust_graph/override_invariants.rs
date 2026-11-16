@@ -138,7 +138,7 @@ fn violations_of_owned_note (
   let contents : HashSet<ID> =
     outbound_keys (graph, pid, NodeRelation::Contains);
   let hidden : HashSet<ID> =
-    outbound_keys (graph, pid, NodeRelation::HidesFromSubs);
+    outbound_keys (graph, pid, NodeRelation::Hides);
   let forkers : HashSet<ID> =
     graph . inbound_pids_for_relation (pid, NodeRelation::Forks)
     . into_iter () . collect ();

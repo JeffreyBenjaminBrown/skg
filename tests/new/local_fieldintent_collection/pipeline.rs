@@ -166,7 +166,7 @@ async fn pipeline_subscribee_hiderels (
           &forest, config, &SkgrepoRestriction::unrestricted (config))?;
       assert_eq!(
         members_msv (&saved_node_by_gnid (&plan . node_instructions, "r")
-          . hidesFromSubs),
+          . hides),
         MSV::Specified (vec![ID::from ("e1")]));
       assert!(
         ! save_gnids (&plan . node_instructions)

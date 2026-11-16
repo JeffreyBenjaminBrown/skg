@@ -34,7 +34,7 @@ use std::collections::{HashMap, HashSet};
 const RELATIONS_WITH_RELREPOS : [NodeRelation; 3] = [
   NodeRelation::Contains,
   NodeRelation::Forks,
-  NodeRelation::HidesFromSubs, ];
+  NodeRelation::Hides, ];
 
 /// See the module comment.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -200,7 +200,7 @@ fn relation_list (
   match relation {
     NodeRelation::Contains      => node . contains . clone (),
     NodeRelation::Forks         => node . forks . or_default () . to_vec (),
-    NodeRelation::HidesFromSubs => node . hidesFromSubs . or_default () . to_vec (),
+    NodeRelation::Hides => node . hides . or_default () . to_vec (),
     NodeRelation::LinksTo       => Vec::new (), } }
 
 fn relation_list_mut (
@@ -216,7 +216,7 @@ fn relation_list_mut (
   match relation {
     NodeRelation::Contains      => node . contains . as_mut_slice (),
     NodeRelation::Forks         => msv_list (&mut node . forks),
-    NodeRelation::HidesFromSubs => msv_list (&mut node . hidesFromSubs),
+    NodeRelation::Hides => msv_list (&mut node . hides),
     NodeRelation::LinksTo       => &mut [], } }
 
 /// A relationship's default relRepo, given its recorder's home, its
@@ -233,7 +233,7 @@ fn default_relRepo (
   resolve       : &dyn Fn (&ID) -> ID,
   home_of       : &dyn Fn (&ID) -> Option<SkgrepoName>,
 ) -> SkgrepoName {
-  if relation == NodeRelation::HidesFromSubs {
+  if relation == NodeRelation::Hides {
     return hide_skgrepo (
       graph, config, recorder_home, member, subscribes, resolve, home_of ); }
   match home_of (member) {

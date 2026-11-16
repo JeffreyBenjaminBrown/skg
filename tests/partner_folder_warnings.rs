@@ -87,7 +87,7 @@ async fn write_protected_folder_repairs_warn_impl (
       &[ ID ("n" . to_string ()) ] ) ?;
   let folder_request : String = initial_buffer . replacen (
     "node ",
-    "node (viewRequests (folder hidesFromSubs))", 1 );
+    "node (viewRequests (folder hides))", 1 );
   let mut views_state : ViewsState = fresh_views_state ();
   let complete_buffer : String =
     save_buffer (&folder_request, config, tantivy, &graph, &mut views_state)

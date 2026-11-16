@@ -79,7 +79,7 @@ fn with_hides (
   mut node : Graphnode,
   hides    : &[&str],
 ) -> Graphnode {
-  node . hidesFromSubs = msv_of (&node . home_skgrepo, hides);
+  node . hides = msv_of (&node . home_skgrepo, hides);
   node }
 
 fn violations_for (

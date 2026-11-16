@@ -981,7 +981,7 @@ describe('skg.metadata relRepo gesture', function ()
         if role.kind then table.insert(kinds, role.kind) end end
     end
     assert.are.same({ 'contains', 'linksTo', 'forks',
-                      'hidesFromSubs' }, relations)
+                      'hides' }, relations)
     assert.are.same({ 'content', 'forkee' }, kinds)
   end)
 

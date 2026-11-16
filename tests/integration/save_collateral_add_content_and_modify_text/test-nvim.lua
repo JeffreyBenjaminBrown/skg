@@ -39,7 +39,7 @@ local function role_of_chain_node_from_rels (rels_body)
   if not rels_body then return nil end
   local roles = { { 'contains', 'container' }, { 'linksTo', 'mentioner' },
                   { 'forks', 'forker' },
-                  { 'hidesFromSubs', 'hider' } }
+                  { 'hides', 'hider' } }
   for _, pair in ipairs(roles) do
     local form = child_named(rels_body, pair[1])
     if form then

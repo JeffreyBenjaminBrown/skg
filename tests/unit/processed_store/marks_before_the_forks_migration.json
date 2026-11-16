@@ -14,6 +14,17 @@
     {
       "leaf": {
         "Relationship": {
+          "relation": "HidesFromSubs",
+          "recorder": "a",
+          "member": "c",
+          "aspect": "Existence"
+        }
+      },
+      "fingerprint": 43
+    },
+    {
+      "leaf": {
+        "Relationship": {
           "relation": "Contains",
           "recorder": "a",
           "member": "b",

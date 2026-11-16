@@ -273,7 +273,7 @@ node g
 fn a_subscriptions_request_adds_the_subscribee_folder_and_drops_an_empty_subscriber_folder () {
   let graph : InRustGraph = graph (&[
     Graphnode { forks : msv_ids (&["e"]),
-                hidesFromSubs : msv_ids (&["o"]), .. node ("s") },
+                hides : msv_ids (&["o"]), .. node ("s") },
     node ("e"), node ("o"), ]);
   let input : String = format! ( "* {} s\n",
     occurrence_metadata ("s", "(viewRequests (folder forks))") );
@@ -409,7 +409,7 @@ node c wp
 fn a_subscriptions_request_completes_a_subscribee_folder_already_there () {
   let graph : InRustGraph = graph (&[
     Graphnode { forks : msv_ids (&["e"]),
-                hidesFromSubs : msv_ids (&["o"]), .. node ("s") },
+                hides : msv_ids (&["o"]), .. node ("s") },
     node ("e"), node ("o"), ]);
   let input : String = formatdoc! ("
     * {} s

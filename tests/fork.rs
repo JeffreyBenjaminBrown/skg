@@ -368,8 +368,8 @@ async fn a_reply_under_an_unread_message_integrates_it (
   assert_eq! ( members_of (& f_disk . contains),
                vec! [ ID::from ("d"), ID::from ("m1") ],
     "the reply must file m1 in f, by its original's ID" );
-  assert! ( f_disk . hidesFromSubs . or_default () . is_empty (),
-    "filing m1 hides nothing: {:?}", f_disk . hidesFromSubs );
+  assert! ( f_disk . hides . or_default () . is_empty (),
+    "filing m1 hides nothing: {:?}", f_disk . hides );
   let redrawn : &str = &response . saved_view;
   assert! ( second_level (redrawn) . last () . is_some_and ( |line|
               line . contains (& format! ("(gnid {})", clone . pid . 0))
@@ -1044,7 +1044,7 @@ async fn fork_save_instruction (
     "clone copies N's child IDs shallow (not descendants)" );
   assert_eq! ( members_of ( c . forks . or_default () ), vec! [ ID::from ("N") ],
     "clone forks N" );
-  assert! ( c . hidesFromSubs . or_default () . is_empty (),
+  assert! ( c . hides . or_default () . is_empty (),
     "clone records no hides" );
   assert! ( config . skgrepo_is_owned (& c . home_skgrepo),
     "clone lives in an owned repo, got {:?}", c . home_skgrepo );

@@ -149,7 +149,7 @@ fn fork_clone_hides_children_the_edit_deleted () {
     & config_two_owned_one_foreign (), &SkgrepoRestriction::unrestricted (& config_two_owned_one_foreign ()) );
   assert_eq! (
     members_of (
-      spec . clone . 0 . hidesFromSubs . or_default () ),
+      spec . clone . 0 . hides . or_default () ),
     vec! [ ID::from ("N2") ],
     "the clone must hide exactly the children the edit deleted" ); }
 

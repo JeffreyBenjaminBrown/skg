@@ -450,7 +450,7 @@ async fn extraction_honors_overridesHere (
           node_instructions_from (buffer, config) . await ?;
         if let Some (s_node) = opt_saved_node_by_gnid (&instructions, "S") {
           assert! (
-            ! s_node . hidesFromSubs . or_default ()
+            ! s_node . hides . or_default ()
               . iter () . any ( |m| &m . member == &ID::from ("N") ),
             "S must not hide N: the shown R stands for N" ); }}
       { // Deleting R where it stands for N there deletes R and hides
@@ -471,7 +471,7 @@ async fn extraction_honors_overridesHere (
           "R is deleted" );
         let s_node : &Graphnode = saved_node_by_gnid (&instructions, "S");
         assert! (
-          s_node . hidesFromSubs . or_default ()
+          s_node . hides . or_default ()
             . iter () . any ( |m| &m . member == &ID::from ("N") ),
           "S hides N" );
         assert! (

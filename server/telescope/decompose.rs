@@ -33,7 +33,7 @@ pub struct DecompositionInput<'a> {
   pub aliases                      : &'a [RelPartner<String>],
   pub contains                     : &'a [RelPartner<ID>],
   pub forks                        : &'a [RelPartner<ID>],
-  pub hidesFromSubs                : &'a [RelPartner<ID>],
+  pub hides                        : &'a [RelPartner<ID>],
 }
 
 /// A complete on-disk telescope prepared by the decomposition boundary.
@@ -118,7 +118,7 @@ pub fn decompose_node (
     note ( input . home );
     for m in input . contains          { note ( &m . relRepo ); }
     for m in input . forks            { note ( &m . relRepo ); }
-    for m in input . hidesFromSubs
+    for m in input . hides
                                        { note ( &m . relRepo ); }
     for m in input . aliases           { note ( &m . relRepo ); }}
   { // title/body text live in the home section
@@ -136,8 +136,8 @@ pub fn decompose_node (
       input . contains, skgrepo, &is_more_public );
     section . forks = decompose_ordered (
       input . forks, skgrepo, &is_more_public );
-    section . hidesFromSubs = decompose_unordered (
-      input . hidesFromSubs, skgrepo );
+    section . hides = decompose_unordered (
+      input . hides, skgrepo );
     section . aliases = {
       let mine : Vec<String> =
         input . aliases . iter ()
@@ -155,7 +155,7 @@ pub fn decompose_node (
                  || s . aliases . is_some ()
                  || s . contains . is_some ()
                  || s . forks . is_some ()
-                 || s . hidesFromSubs . is_some () )
+                 || s . hides . is_some () )
          . unwrap_or (false) } ); }
   skgrepo_names . sort_by_key ( |skgrepo| rank (skgrepo) );
   let complete_sections : Vec<(SkgrepoName, GraphnodeOnDisk)> =

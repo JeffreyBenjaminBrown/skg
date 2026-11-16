@@ -14,7 +14,7 @@ use crate::types::links::links_with_ranges_from_text;
 pub enum StructuredField {
   Contains,
   Forks,
-  HidesFromSubs,
+  Hides,
 }
 
 impl StructuredField {
@@ -22,7 +22,7 @@ impl StructuredField {
     match self {
       Self::Contains => "contains",
       Self::Forks => "forks",
-      Self::HidesFromSubs => "hidesFromSubs", } }
+      Self::Hides => "hides", } }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -141,8 +141,8 @@ pub fn preview (
           relRepo : member . relRepo . clone (), }); }};
     record (StructuredField::Contains, &node . contains);
     record (StructuredField::Forks, node . forks . or_default ());
-    record (StructuredField::HidesFromSubs,
-            node . hidesFromSubs . or_default ());
+    record (StructuredField::Hides,
+            node . hides . or_default ());
     record_links (&mut result . links, node, raw_gnid, TextField::Title,
                        &node . title);
     if let Some (body) = &node . body {
@@ -196,8 +196,8 @@ pub fn rewrite (
     rewritten . contains . retain (|m| m . member != fresh . raw_gnid);
     rewritten . forks = remove_exact (
       &rewritten . forks, &fresh . raw_gnid);
-    rewritten . hidesFromSubs = remove_exact (
-      &rewritten . hidesFromSubs, &fresh . raw_gnid);
+    rewritten . hides = remove_exact (
+      &rewritten . hides, &fresh . raw_gnid);
     writes . push (NodeInstruction::Save (SaveNode (rewritten))); }
   Ok (writes)
 }
@@ -252,7 +252,7 @@ mod tests {
     let mut owned = node ("owned", "main");
     owned . contains = vec! [member ("main", "gone"), member ("main", "keep")];
     owned . forks = MSV::Specified (vec! [member ("main", "gone")]);
-    owned . hidesFromSubs =
+    owned . hides =
       MSV::Specified (vec! [member ("private", "gone")]);
     let mut foreign = node ("foreign", "foreign");
     foreign . contains = vec! [member ("foreign", "gone")];
@@ -274,7 +274,7 @@ mod tests {
       panic! ("cleanup must produce a SaveNode"); };
     assert_eq! (rewritten . contains, vec! [member ("main", "keep")]);
     assert_eq! (rewritten . forks, MSV::Specified (Vec::new ()));
-    assert_eq! (rewritten . hidesFromSubs,
+    assert_eq! (rewritten . hides,
                 MSV::Specified (Vec::new ()));
     assert_eq! (graph . get (&gnid ("foreign")) . unwrap () . contains,
                 vec! [member ("foreign", "gone")]);

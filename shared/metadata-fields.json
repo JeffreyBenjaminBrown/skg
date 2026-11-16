@@ -34,7 +34,7 @@
             { "value": "flags" },
             { "value": "folder",
               "arguments": [ { "one_of": [ "aliases",
-                                           "hidesFromSubs", "forks",
+                                           "hides", "forks",
                                            "containers", "mentioners" ] } ] } ] } ] },
     { "kind": "ghost", "atoms": [ "ghost" ],
       "fields": [

@@ -137,7 +137,7 @@ fn hides_of (
   config : &SkgConfig,
   pid    : &str,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
-  Ok ( members_of ( node (config, pid) ? . hidesFromSubs . or_default () )) }
+  Ok ( members_of ( node (config, pid) ? . hides . or_default () )) }
 
 fn ids (
   pids : &[&str],

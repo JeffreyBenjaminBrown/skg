@@ -40,7 +40,7 @@ pub struct ComposedNode {
   pub aliases                      : Option<Vec<RelPartner<String>>>,
   pub contains                     : Vec<RelPartner<ID>>,
   pub forks                        : Option<Vec<RelPartner<ID>>>,
-  pub hidesFromSubs                : Option<Vec<RelPartner<ID>>>,
+  pub hides                        : Option<Vec<RelPartner<ID>>>,
 }
 
 /// The compose entry point: one telescope on disk -> the effective
@@ -118,8 +118,8 @@ pub fn graphnode_from_composition (
     body                         : composed . body,
     contains                     : composed . contains,
     forks                        : msv ( composed . forks ),
-    hidesFromSubs                :
-      msv ( composed . hidesFromSubs ),
+    hides                        :
+      msv ( composed . hides ),
     flags, } ) }
 
 /// Compose sections (already in fold order, most public first -- the
@@ -179,10 +179,10 @@ pub fn compose_sections (
         sections, |s| s . forks . as_deref (),
         resolve, &mut warnings ) ) }
     else { None };
-  composed . hidesFromSubs =
-    if mentioned ( &|s| s . hidesFromSubs . is_some () ) {
+  composed . hides =
+    if mentioned ( &|s| s . hides . is_some () ) {
       Some ( compose_unordered (
-        sections, |s| s . hidesFromSubs . as_deref (),
+        sections, |s| s . hides . as_deref (),
         resolve, &mut warnings ) ) }
     else { None };
   composed . aliases = {

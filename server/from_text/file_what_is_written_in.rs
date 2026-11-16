@@ -210,7 +210,7 @@ fn file_in_subscriber (
     let pid : ID = graph . pid_else_raw_id (gnid);
     pid == member || member_mirrors . contains (&pid) };
   if node . contains . iter () . any ( |record| stands_for_member (&record . member) )
-     || node . hidesFromSubs . or_default () . iter () . any ( |record|
+     || node . hides . or_default () . iter () . any ( |record|
           graph . pid_else_raw_id (&record . member) == member )
   { return false; }
   let member_home : Option<SkgrepoName> =

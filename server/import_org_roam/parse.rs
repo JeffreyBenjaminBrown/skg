@@ -322,7 +322,7 @@ fn graphnode_from_section_tree (
     body,
     contains,
     forks                        : MSV::Unspecified,
-    hidesFromSubs                : MSV::Unspecified,
+    hides                        : MSV::Unspecified,
     flags                        :
       if tree . section . had_id {
         vec![Flag::Had_ID_Before_Import] }

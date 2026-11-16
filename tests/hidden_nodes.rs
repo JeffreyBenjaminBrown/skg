@@ -137,7 +137,7 @@ fn a_save_under_a_restriction_keeps_every_hide_and_member (
       save_under (f, &edited, &public) ?;
       let r : GraphnodeInRust = node_in_graph (f, "r");
       assert_eq! ( r . title, "r edited" );
-      assert_eq! ( sorted ( members_of ( r . hidesFromSubs . or_default () )),
+      assert_eq! ( sorted ( members_of ( r . hides . or_default () )),
                    vec! [ ID::from ("hh"), ID::from ("hp"), ID::from ("hv") ],
                    "the save keeps every hide" );
       assert_r_keeps_its_members (f);
@@ -166,7 +166,7 @@ fn deleting_a_restricted_vognodes_line_removes_its_record_alone (
       assert_ne! ( edited, switched );
       save_under (f, &edited, &public) ?;
       let r : GraphnodeInRust = node_in_graph (f, "r");
-      assert_eq! ( sorted ( members_of ( r . hidesFromSubs . or_default () )),
+      assert_eq! ( sorted ( members_of ( r . hides . or_default () )),
                    vec! [ ID::from ("hp"), ID::from ("hv") ],
                    "the hide of hh goes; that of hp, recorded in r's private \
                     section, stays" );
@@ -206,7 +206,7 @@ fn deleting_a_restricted_vognode_whose_hide_would_land_restricted_is_refused (
       assert_refused_for_a_restricted_record (
         save_view_under (f, VIEW, &opened . replacen ( &format! ("{}\n", x_line), "", 1 ),
                          &public),
-        "- Relation: hidesFromSubs\n- Member: x\n- The record's repo: private" );
+        "- Relation: hides\n- Member: x\n- The record's repo: private" );
       assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
       Ok (( )) } ) }
 
@@ -376,11 +376,11 @@ fn a_switch_draws_restricted_vognodes_in_the_folders (
 ** (skg (vnid 0i) node (gnid b) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) b
 " );
       assert_eq! ( widened, "\
-* (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 3)) (forks (out 1)) (hidesFromSubs (out 1))) repoBoundary)) r
+* (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 3)) (forks (out 1)) (hides (out 1))) repoBoundary)) r
 ** (skg (vnid 0b) forksFolder)
 *** (skg (vnid 0c) node (gnid hs) (skgRepos (nodeRepo private) (relRepo public)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) hs secret
 *** (skg (vnid 0d) hiddenOutsideOfForkPartnersFolder)
-**** (skg (vnid 0e) folded node (gnid hh) (skgRepos (nodeRepo private)) writeProtected (view (rels (hidesFromSubs (in 1 (ancestors 3)))) (birth (hidesFromSubs in 3)) repoBoundary)) hh secret
+**** (skg (vnid 0e) folded node (gnid hh) (skgRepos (nodeRepo private)) writeProtected (view (rels (hides (in 1 (ancestors 3)))) (birth (hides in 3)) repoBoundary)) hh secret
 ** (skg (vnid 0f) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
 ** (skg (vnid 0g) node (gnid h) (skgRepos (nodeRepo private) (relRepo public)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (props (aliases 1)) (birth (contains in 1)) repoBoundary)) h secret
 *** (skg (vnid 0h) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
@@ -560,7 +560,7 @@ fn a_save_under_the_narrowing_then_a_widening_keep_rs_private_record (
 
 /// r's private section records that r subscribes to s, hides s1 from
 /// its subscribers and overrides o, each a public graphnode. The view
-/// of r asks for its hidesFromSubs folders; the forks folder is
+/// of r asks for its hides folders; the forks folder is
 /// drawn by default. No folder shows the override, which the save
 /// keeps from disk.
 #[test]
@@ -576,7 +576,7 @@ fn a_narrowing_and_a_widening_keep_rs_private_subscription_and_override_records 
         &opened, "* (skg node (gnid r)",
         |line| line . replacen (
           "node (gnid r)",
-          "node (gnid r) (viewRequests (folder hidesFromSubs))", 1 ));
+          "node (gnid r) (viewRequests (folder hides))", 1 ));
       let all : SkgrepoRestriction =
         SkgrepoRestriction::unrestricted (&f . config);
       let shown : String = save_view_cleanly_under (f, VIEW, &asking, &all) ? . saved_view;
@@ -728,7 +728,7 @@ fn a_restricted_headline_whose_record_a_save_removed_goes_quietly (
       let opened : String = open_view_of_r (f, &public) ?;
       let requested : String = save_under (
         f, &opened . replacen (
-          "node (gnid r)", "node (gnid r) (viewRequests (folder hidesFromSubs))", 1 ),
+          "node (gnid r)", "node (gnid r) (viewRequests (folder hides))", 1 ),
         &public ) ? . saved_view;
       let hh_lines : Vec<usize> = requested . lines () . enumerate ()
         . filter ( |(_, line)| line . contains ("restricted (gnid hh)") )
@@ -744,7 +744,7 @@ fn a_restricted_headline_whose_record_a_save_removed_goes_quietly (
         . map ( |(_, line)| format! ("{}\n", line) )
         . collect ();
       let saved : SaveResponse = save_under (f, &edited, &public) ?;
-      assert_eq! ( members_of ( node_in_graph (f, "r") . hidesFromSubs . or_default () ),
+      assert_eq! ( members_of ( node_in_graph (f, "r") . hides . or_default () ),
                    vec! [ ID::from ("s1") ],
                    "r no longer hides hh" );
       assert! ( ! saved . saved_view . contains ("(gnid hh)"),
@@ -896,7 +896,7 @@ fn a_requested_hidden_folder_holding_a_dangling_hide_saves (
         let opened : String = open_view_of_r (f, &restriction) ?;
         let requested : String = save_under (
           f, &opened . replacen (
-            "node (gnid r)", "node (gnid r) (viewRequests (folder hidesFromSubs))", 1 ),
+            "node (gnid r)", "node (gnid r) (viewRequests (folder hides))", 1 ),
           &restriction ) ? . saved_view;
         let requested_tree : Tree<Viewnode> = viewnode_tree_as_written (&requested);
         let hidden_folder_children : Vec<String> =
@@ -910,7 +910,7 @@ fn a_requested_hidden_folder_holding_a_dangling_hide_saves (
         let saved : SaveResponse = save_under (f, &requested, &restriction) ?;
         assert_eq! ( saved . saved_view, requested,
                      "under {} the buffer saves as it was", name );
-        assert_eq! ( members_of ( node_in_graph (f, "r") . hidesFromSubs . or_default () ),
+        assert_eq! ( members_of ( node_in_graph (f, "r") . hides . or_default () ),
                      vec! [ ID::from ("s1"), ID::from ("nowhere") ],
                      "under {} r keeps both hides", name ); }
       Ok (( )) } ) }
@@ -995,14 +995,14 @@ fn write_fixture_where_r_hides (
   hides           : &[&str],
   private_section : PrivateSectionOfR,
 ) -> Result<(), Box<dyn Error>> {
-  let hidesFromSubs : String =
+  let hides : String =
     if hides . is_empty () { String::new () }
     else { format! ( "hides:\n{}",
                      hides . iter () . map ( |hide| format! ("- {}\n", hide) )
                      . collect::<String> () ) };
   let r : String = format! (
     "pid: r\ntitle: r\ncontains:\n- a\n- h\n- b\nforks:\n- hs\n{}",
-    hidesFromSubs );
+    hides );
   let public : &[(&str, &str)] = &[
     ("r",  &r),
     ("a",  "pid: a\ntitle: a\n"),

@@ -247,7 +247,7 @@ fn rehome_inherited_new_node (
   retag_msv (&mut node . aliases, &old_skgrepo, new_skgrepo);
   retag_msv (&mut node . forks, &old_skgrepo, new_skgrepo);
   retag_msv (
-    &mut node . hidesFromSubs, &old_skgrepo, new_skgrepo);
+    &mut node . hides, &old_skgrepo, new_skgrepo);
 }
 
 fn skgrepo_is_foreign(
@@ -265,7 +265,7 @@ fn skgrepo_is_foreign(
 /// For *editable* fields (title, body, contains):
 /// Some([]) and None are equivalent, so we normalize them for comparison.
 ///
-/// For *non-editable* fields (aliases, forks, hidesFromSubs): Unspecified means "no opinion"
+/// For *non-editable* fields (aliases, forks, hides): Unspecified means "no opinion"
 /// (because the user did not mention it in the buffer),
 /// and therefore does not represent an edit.
 pub(crate) fn buffernode_differs_from_disknode(
@@ -294,8 +294,8 @@ pub(crate) fn buffernode_differs_from_disknode(
                       &disk_node . aliases)
      && fields_match( &buffer_node . forks,
                       &disk_node . forks)
-     && fields_match( &buffer_node . hidesFromSubs,
-                      &disk_node . hidesFromSubs)) }
+     && fields_match( &buffer_node . hides,
+                      &disk_node . hides)) }
 
 /// Lets us treat Specified([]) and Unspecified as equivalent.
 pub(crate) fn flatten_ms<T: Clone>(
@@ -477,8 +477,8 @@ pub fn refuse_records_landing_restricted (
       "forks", node . forks . or_default (),
       &disk_list ( |n| n . forks . or_default () ));
     refuse_new_restricted_records (
-      "hidesFromSubs", node . hidesFromSubs . or_default (),
-      &disk_list ( |n| n . hidesFromSubs . or_default () ));
+      "hides", node . hides . or_default (),
+      &disk_list ( |n| n . hides . or_default () ));
     for alias in node . aliases . or_default () {
       if SkgrepoRestriction::record_is_visible (restriction, &alias . relRepo)
         { continue; }

@@ -90,7 +90,7 @@ pub fn resolve_visibility (
         &subscribee_from_disk . contains, skgrepo_restriction );
     let subscriber_hides : Vec<ID> = // a restricted hide the buffer could not show, so no save removes it
       members_with_visible_records (
-        subscriber_from_disk . hidesFromSubs . or_default (),
+        subscriber_from_disk . hides . or_default (),
         skgrepo_restriction );
     let inferred_hides : Vec<ID> =
       subscribee_contains . iter()
@@ -228,7 +228,7 @@ fn apply_hiddenoutside_edits (
     // from newly inferred hides: preceding user actions in this save retain
     // their ordinary inference semantics.
     let replaceable_outside : HashSet<ID> =
-      subscriber_from_disk . hidesFromSubs . or_default ()
+      subscriber_from_disk . hides . or_default ()
       . iter ()
       . filter (|member| is_visible (member))
       .map (|member| key (&member . member))
@@ -237,7 +237,7 @@ fn apply_hiddenoutside_edits (
     let submitted : HashSet<ID> =
       edit . members . iter () . map (|gnid| key (gnid)) . collect ();
     let disk_hide_keys : HashSet<ID> =
-      subscriber_from_disk . hidesFromSubs . or_default ()
+      subscriber_from_disk . hides . or_default ()
       . iter () . map (|member| key (&member . member)) . collect ();
     for member in &edit . members {
       if ! disk_hide_keys . contains (&key (member)) {
@@ -332,7 +332,7 @@ fn infer_hides_from_contains_removals (
         subscriber_contains . iter () . collect ();
       let disk_hides : Vec<ID> = // a restricted hide stays, as the buffer could not show it
         members_with_visible_records (
-          subscriber_from_disk . hidesFromSubs . or_default (),
+          subscriber_from_disk . hides . or_default (),
           skgrepo_restriction );
       new_contains . iter ()
         . filter ( |gnid| ! disk_contains . contains (gnid) )

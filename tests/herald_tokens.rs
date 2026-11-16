@@ -113,17 +113,17 @@ fn compound_partner_folders_two_births_in_fixed_order () {
   // Relations emitted contains-first; birth lists in the given order.
   let c = RelationCounts { hiders : 1, containers : 1, .. counts () };
   let mut f = AncestorFlags::default ();
-  f . record (NodeRelation::HidesFromSubs, true, 4);
+  f . record (NodeRelation::Hides, true, 4);
   f . record (NodeRelation::Contains, true, 2);
   assert_eq! (
     emit (&c, 0, 0, &f,
           &[BirthFact::new (
-              NodeRelation::HidesFromSubs, Side::In, Some (4)),
+              NodeRelation::Hides, Side::In, Some (4)),
             BirthFact::new (NodeRelation::Contains, Side::In, Some (2))])
       . as_deref (),
     Some ("(rels (contains (in 1 (ancestors 2))) \
-           (hidesFromSubs (in 1 (ancestors 4)))) \
-           (birth (hidesFromSubs in 4) (contains in 2))") );
+           (hides (in 1 (ancestors 4)))) \
+           (birth (hides in 4) (contains in 2))") );
 }
 
 #[test]

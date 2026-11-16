@@ -102,7 +102,7 @@ pub struct Graphnode {
   // (see 'RelPartner'). List order is composition order.
   pub contains                     : Vec<RelPartner<ID>>, // See docs/data-model_technical.org.
   pub forks                        : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.
-  pub hidesFromSubs                : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.
+  pub hides                        : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.
 
   pub flags: Vec<Flag>,
 }
@@ -176,7 +176,7 @@ pub fn empty_graphnode () -> Graphnode {
     body                         : None,
     contains                     : Vec::new(),
     forks                        : MSV::Unspecified,
-    hidesFromSubs                : MSV::Unspecified,
+    hides                        : MSV::Unspecified,
     flags                        : Vec::new (),
   }}
 

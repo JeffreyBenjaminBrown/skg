@@ -17,7 +17,7 @@
       "recorded_by": "forker",
       "folders": { "forker": "forksFolder",
                    "forkee": "forksFolder" } },
-    { "name": "hidesFromSubs",
+    { "name": "hides",
       "letter": "H", "display_position": 3,
       "roles": [ "hider", "hidden" ],
       "recorded_by": "hider",

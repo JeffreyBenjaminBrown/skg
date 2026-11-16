@@ -103,7 +103,7 @@ fn nodeMerge_from_acquirer_and_acquiree (
 /// - contains: [acquiree_text_preserver] + acquirer's + acquiree's novel contents
 ///   - 'Novel' = not among the acquirer's contents
 /// - Combined forks
-/// - Filtered hidesFromSubs: can't hide your own
+/// - Filtered hides: can't hide your own
 ///   content, and can't hide what either member showed pre-merge
 ///   ('shown_pre_merge')
 fn three_nodeMerged_graphnodes(
@@ -202,7 +202,7 @@ fn three_nodeMerged_graphnodes(
     combined . retain (not_own);
     updated_acquirer . forks =
       MSV::Specified (combined); }
-  { // Combine hidesFromSubs, filtering to hide
+  { // Combine hides, filtering to hide
     // nothing that the acquirer contains, and nothing either member
     // showed through its subscriptions pre-merge: if it was
     // contained in one member's subscribee and unhidden by (and not
@@ -211,16 +211,16 @@ fn three_nodeMerged_graphnodes(
     // like the intersection": exactly the intersection when both
     // members could see the id through some subscribee.)
     let mut combined : Vec<RelPartner<ID>> = combine_rel_partners (
-      & [ acquirer_from_disk . hidesFromSubs
+      & [ acquirer_from_disk . hides
             . or_default (),
-          acquiree_from_disk . hidesFromSubs
+          acquiree_from_disk . hides
             . or_default () ] );
     combined . retain ( // if it's in 'new_contains', then it's not here
       |m| ! new_contains . contains ( &m . member ));
     combined . retain (
       |m| ! shown_pre_merge . contains ( &m . member ));
     combined . retain (not_own);
-    updated_acquirer . hidesFromSubs =
+    updated_acquirer . hides =
       MSV::Specified (combined); }
   Ok (updated_acquirer) }
 
@@ -236,7 +236,7 @@ fn gnids_shown_through_subscriptions (
 ) -> Result<HashSet<ID>, Box<dyn Error>> {
   let mut shown : HashSet<ID> = HashSet::new ();
   let hides : Vec<ID> =
-    members_of ( node . hidesFromSubs . or_default () );
+    members_of ( node . hides . or_default () );
   let contains : Vec<ID> =
     members_of ( & node . contains );
   for subscribee_gnid in members_of ( node . forks . or_default () ) {
@@ -267,7 +267,7 @@ fn create_acquiree_text_preserver(acquiree: &Graphnode) -> Graphnode {
     body: acquiree . body . clone(),
     contains                     : vec![],
     forks                        : MSV::Specified(vec![]),
-    hidesFromSubs                : MSV::Specified(vec![]),
+    hides                        : MSV::Specified(vec![]),
     flags                        : if flag_is_true (
       &acquiree . flags, Flag::NoSearchMatching)
       { vec![Flag::NoSearchMatching] }

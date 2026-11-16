@@ -71,7 +71,7 @@ fn lowering_produces_ordered_nodeInstructions_and_signals () {
                 MSV::Specified (vec![ID::from ("e")]) );
     // Unmentioned fields lower to Unspecified; hides is never
     // emitted by collection (resolution sets it later).
-    assert_eq!( root . hidesFromSubs,
+    assert_eq!( root . hides,
                 MSV::Unspecified ); }
   assert!( matches!( &nodeInstructions [1],
     NodeInstruction::Save (SaveNode (node))

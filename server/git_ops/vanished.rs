@@ -143,10 +143,10 @@ fn sighting_at_commit (
     let contains_gnids   : Vec<ID> = members_of (& own . contains);
     let forks_gnids      : MSV<ID> = members_msv (& own . forks);
     let hides_gnids       : MSV<ID> = members_msv (
-      & own . hidesFromSubs);
+      & own . hides);
     keep ("contains",                     & contains_gnids);
     keep ("forks",                       forks_gnids . or_default ());
-    keep ("hidesFromSubs", hides_gnids . or_default ());
+    keep ("hides", hides_gnids . or_default ());
     outbound };
   let inbound : Vec<(ID, &'static str)> =
     inbound_references_in_tree (gitrepo, prefix, skgrepo_name, gnid, &tree);
@@ -191,8 +191,8 @@ fn inbound_references_in_tree (
     note ("forks",
           node . forks . or_default () . iter ()
             . any ( |m| &m . member == gnid ));
-    note ("hidesFromSubs",
-          node . hidesFromSubs . or_default () . iter ()
+    note ("hides",
+          node . hides . or_default () . iter ()
             . any ( |m| &m . member == gnid ));
     note ("link",
           links_from_node (&node) . iter ()

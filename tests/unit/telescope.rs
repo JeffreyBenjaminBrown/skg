@@ -90,7 +90,7 @@ fn composed_from_lists (
     contains,
     forks                        :
       if subs . is_empty () { None } else { Some (subs) },
-    hidesFromSubs                :
+    hides                        :
       if hides . is_empty () { None } else { Some (hides) }, }}
 
 fn decompose_then_compose (
@@ -112,8 +112,8 @@ fn decompose_then_compose (
         contains : &composed . contains,
         forks :
           composed . forks . as_deref () . unwrap_or (&[]),
-        hidesFromSubs :
-          composed . hidesFromSubs . as_deref ()
+        hides :
+          composed . hides . as_deref ()
           . unwrap_or (&[]), } );
   compose_sections ( &sections, &identity_resolve ) }
 
@@ -130,7 +130,7 @@ fn flags_write_at_home_and_compose_defensively_from_all_sections () {
     pid: &ID::from ("p"), extra_ids: &[], flags: &misc,
     title: Some ("title"), body: None, home: &home,
     aliases: &[], contains: &contains, forks: &[],
-    hidesFromSubs: &[],
+    hides: &[],
   }, &telescope_config ()) . unwrap () . into_sections ();
   assert_eq! (sections . first () . unwrap () . 1 . flags, misc);
   assert! (sections . iter () . skip (1)
@@ -190,8 +190,8 @@ proptest! {
         v . sort_by ( |a, b| a . member . cmp ( &b . member ));
         v };
       prop_assert_eq! (
-        sort ( recomposed . hidesFromSubs . as_ref () ),
-        sort ( composed . hidesFromSubs . as_ref () )); }
+        sort ( recomposed . hides . as_ref () ),
+        sort ( composed . hides . as_ref () )); }
     prop_assert_eq! ( recomposed . title . as_deref (), Some ("t") );
     prop_assert_eq! ( recomposed . home, Some (home) );
     prop_assert! ( warnings . is_empty (),
@@ -215,7 +215,7 @@ proptest! {
           body : None, home : &home,
           aliases : &[], contains : &composed . contains,
           forks : &[],
-          hidesFromSubs : &[], } );
+          hides : &[], } );
     let sections_twice : Vec<(SkgrepoName, SectionSlices)> =
       decompose_sections (
         & DecompositionInput {
@@ -224,7 +224,7 @@ proptest! {
           body : None, home : &home,
           aliases : &[], contains : &recomposed . contains,
           forks : &[],
-          hidesFromSubs : &[], } );
+          hides : &[], } );
     prop_assert_eq! (sections_once, sections_twice);
   }
 
@@ -514,7 +514,7 @@ fn pre_october_2026_hides_and_flags_keys_still_load () {
   let old : GraphnodeOnDisk = yaml_serde::from_str (
     "pid: p\ntitle: t\nhides_from_its_subscriptions:\n- h\nmisc:\n- NoSearchMatching\n"
   ) . unwrap ();
-  assert_eq! (old . hidesFromSubs, vec! [ID::from ("h")]);
+  assert_eq! (old . hides, vec! [ID::from ("h")]);
   assert_eq! (old . flags,         vec! [Flag::NoSearchMatching]);
   let yaml : String = old . to_yaml () . unwrap ();
   for new_key in ["hides:", "flags:"] {

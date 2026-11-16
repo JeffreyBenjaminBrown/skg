@@ -134,7 +134,7 @@ async fn test_multi_root_view_with_shared_nodes (
       // containers folder, whose one write-protected member is node 1;
       // node 1 has no container, so no chain hangs under it.
       let expected = indoc! {
-        "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2)) (hidesFromSubs (out 2))))) title 1
+        "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2)) (hides (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg node (gnid 2) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)) (birth (contains in 1)))) title 2
@@ -142,10 +142,10 @@ async fn test_multi_root_view_with_shared_nodes (
          * (skg node (gnid 2) (skgRepos (nodeRepo main)) (view (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)))) title 2
          this one string could span pages
          ** (skg containerFolder)
-         *** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 2 (ancestors 2))) (hidesFromSubs (out 2))) (birth (contains out 2)))) title 1
+         *** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 2 (ancestors 2))) (hides (out 2))) (birth (contains out 2)))) title 1
          ** (skg forksFolder)
-         *** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hidesFromSubs (in 1))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2)) (hidesFromSubs (in 1))) (props (extraIds 1)) (birth (forks in 2)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2)) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2)))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_metadata_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
@@ -183,7 +183,7 @@ async fn test_multi_root_view_with_node_limit (
       // (folders are not budget-bound); subscribee members are
       // write-protected.
       let expected = indoc! {
-        "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2)) (hidesFromSubs (out 2))))) title 1
+        "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2)) (hides (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg node (gnid 2) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)) (birth (contains in 1)))) title 2
@@ -191,10 +191,10 @@ async fn test_multi_root_view_with_node_limit (
          * (skg node (gnid 2) (skgRepos (nodeRepo main)) (view (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)))) title 2
          this one string could span pages
          ** (skg containerFolder)
-         *** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 2 (ancestors 2))) (hidesFromSubs (out 2))) (birth (contains out 2)))) title 1
+         *** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 2 (ancestors 2))) (hides (out 2))) (birth (contains out 2)))) title 1
          ** (skg forksFolder)
-         *** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hidesFromSubs (in 1))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2)) (hidesFromSubs (in 1))) (props (extraIds 1)) (birth (forks in 2)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2)) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2)))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_metadata_eq!(result, expected,
                  "Multi root view limit=3 truncates by the §5.5 budget");

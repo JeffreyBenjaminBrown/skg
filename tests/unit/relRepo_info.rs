@@ -134,7 +134,7 @@ fn only_atom_bearing_relations_are_accepted (
   assert! ( relation_from_client_string ("subscribesTo") . is_err (),
     "a retired relation name" );
   assert! ( relation_from_client_string (
-    "hidesFromSubs") . is_err (),
+    "hides") . is_err (),
     "hides have no explicit-repo path" );
   assert! ( relation_from_client_string ("linksTo") . is_err () );
 }

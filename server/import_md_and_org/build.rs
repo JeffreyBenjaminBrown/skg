@@ -111,7 +111,7 @@ fn node_for_section (
     body : normalize_body (Some (body)),
     contains : Vec::new (),
     forks : MSV::Unspecified,
-    hidesFromSubs : MSV::Unspecified,
+    hides : MSV::Unspecified,
     flags : if section . explicit_id . is_some () {
       vec![Flag::Had_ID_Before_Import]
     } else { Vec::new () },

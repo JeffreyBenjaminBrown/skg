@@ -702,7 +702,7 @@ the subtree, while preserving derived facts."
   "The menu tree offers exactly the two writable kinds, one per
 writable position, and covers all four schema relations."
   (should (equal (mapcar #'car (skg--relationship-kind-menu-tree))
-                 '("contains" "linksTo" "forks" "hidesFromSubs")))
+                 '("contains" "linksTo" "forks" "hides")))
   (should (equal (delq nil
                        (mapcar (lambda (role) (nth 1 role))
                                (apply #'append

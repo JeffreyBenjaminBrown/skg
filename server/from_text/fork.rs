@@ -445,7 +445,7 @@ pub fn build_fork_clone (
     contains      : buffer_contains,
     forks         : MSV::Specified ( rel_partners_at_relRepo (
       &clone_skgrepo, vec! [ buffer_node . pid . clone () ] )),
-    hidesFromSubs : MSV::Specified (
+    hides : MSV::Specified (
       // The children the forking edit deleted.
       disk_contains . iter ()
         . filter (visible)

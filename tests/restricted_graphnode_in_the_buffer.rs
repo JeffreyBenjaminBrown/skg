@@ -113,7 +113,7 @@ fn a_hide_only_a_restricted_subscription_explains_is_refused (
           format! ("{}\n**** (skg node (gnid h)) h", line) );
       assert_refused_naming_private ( save_under (
         f, VIEW, &with_hide, public, true, DeleteFrom::NotChosen ),
-        "hidesFromSubs", "h" );
+        "hides", "h" );
       assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
       assert_eq! ( list_in (f, "public/r.skg", "hides"), vec! ["o"] );
       Ok (( )) } ) }

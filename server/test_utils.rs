@@ -635,7 +635,7 @@ pub fn set_skgrepo_retagging_relRepos (
       for m in v . iter_mut () {
         m . relRepo = skgrepo . clone (); }} };
   retag_msv ( &mut node . forks );
-  retag_msv ( &mut node . hidesFromSubs );
+  retag_msv ( &mut node . hides );
   if let MSV::Specified (v) = &mut node . aliases {
     for m in v . iter_mut () {
       m . relRepo = skgrepo . clone (); }} }
@@ -890,7 +890,7 @@ It better be okay with newlines."# . to_string() ),
                     MSV::Specified(vec![ID::new ("11"),
                              ID::new ("12"),
                              ID::new ("13")])),
-    hidesFromSubs: MSV::Unspecified,
+    hides: MSV::Unspecified,
     flags: Vec::new (), }}
 
 /// Extract Graphnode from Save variant; panics on Delete.

@@ -189,7 +189,7 @@ fn hide_floor_is_the_most_public_explaining_subscription (
     let mut buffer : Graphnode = recorder . clone ();
     buffer . forks = MSV::Specified ( vec! [
       pm ("public", "expl-a") ] ); // degenerate tag; sticky restores
-    buffer . hidesFromSubs = MSV::Specified ( vec! [
+    buffer . hides = MSV::Specified ( vec! [
       pm ("public", "victim") ] ); // degenerate tag
     let resolved : Graphnode =
       apply_sticky_relRepos_in_graph (
@@ -198,7 +198,7 @@ fn hide_floor_is_the_most_public_explaining_subscription (
       resolved . forks . or_default (),
       & [ pm ("private", "expl-a") ] );
     assert_eq! (
-      resolved . hidesFromSubs . or_default (),
+      resolved . hides . or_default (),
       & [ pm ("private", "victim") ] ); }
   { // A public explanation exists too: the inference is innocent,
     // so the hide may stay public.
@@ -210,13 +210,13 @@ fn hide_floor_is_the_most_public_explaining_subscription (
     buffer . forks = MSV::Specified ( vec! [
       pm ("public", "expl-a"),
       pm ("public", "expl-b") ] );
-    buffer . hidesFromSubs = MSV::Specified ( vec! [
+    buffer . hides = MSV::Specified ( vec! [
       pm ("public", "victim") ] );
     let resolved : Graphnode =
       apply_sticky_relRepos_in_graph (
         buffer, &disk, &RequestedRelRepos::default (), &graph, &config) . unwrap ();
     assert_eq! (
-      resolved . hidesFromSubs . or_default (),
+      resolved . hides . or_default (),
       & [ pm ("public", "victim") ] ); }
 }
 
@@ -499,7 +499,7 @@ fn same_save_hidden_node_homeSkgrepoMove_sets_the_new_hide_skgrepo (
   let mut hider_intent : NodeIntent =
     NodeIntent::graph_save_from_graphnode (hider);
   if let NodeIntent::Save (intent) = &mut hider_intent {
-    intent . hidesFromSubs =
+    intent . hides =
       MSV::Specified (vec! [ID::new ("hidden")]); }
   let hidden_intent : NodeIntent = NodeIntent::graph_save_from_graphnode (
     node_at ("hidden", "public"));
@@ -514,7 +514,7 @@ fn same_save_hidden_node_homeSkgrepoMove_sets_the_new_hide_skgrepo (
       _ => None })
     .expect ("hider save instruction");
   assert_eq! (
-    hider . hidesFromSubs,
+    hider . hides,
     MSV::Specified (vec! [pm ("public", "hidden")]) );
 }
 

@@ -54,7 +54,7 @@ node p
 #[test]
 fn the_hidden_folder_takes_its_nodes_order () {
   let graph : InRustGraph = graph (&[
-    Graphnode { hidesFromSubs : msv_ids (&["a", "b"]), .. node ("p") },
+    Graphnode { hides : msv_ids (&["a", "b"]), .. node ("p") },
     node ("a"), node ("b"), ]);
   let input : String = formatdoc! ("
     * {} p

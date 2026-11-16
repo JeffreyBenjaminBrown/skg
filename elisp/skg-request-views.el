@@ -46,7 +46,7 @@ an interactive command NAME that requests REQUEST-FORM and auto-saves."
   ;; Folders ('C-c l'): both folders of the relation.
   (skg-show-folderOf-aliases       (folder aliases)
     "Show the aliases folder for the headline at point.")
-  (skg-show-folderOf-hidesFromSubs (folder hidesFromSubs)
+  (skg-show-folderOf-hides (folder hides)
     "Show the hide folders (hiderFolder + hiddenFolder).")
   (skg-show-folderOf-forks         (folder forks)
     "Show the forksFolder: the notes this one forks, then those that fork it.")

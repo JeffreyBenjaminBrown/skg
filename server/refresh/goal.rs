@@ -315,7 +315,7 @@ fn less_what_the_subscriber_integrates (
   unintegrated_content_gnids (
     graph, contents,
     &graph . outbound_gnids_for_relation_gated (
-      subscriber, NodeRelation::HidesFromSubs, restriction ),
+      subscriber, NodeRelation::Hides, restriction ),
     &graph . outbound_gnids_for_relation_gated (
       subscriber, NodeRelation::Contains, restriction )) }
 
@@ -477,7 +477,7 @@ fn forker_only_members (
     resolve_all (forkees, graph) . into_iter ()
     . chain ( resolve_all (
       &graph . outbound_gnids_for_relation_gated (
-        described, NodeRelation::HidesFromSubs, restriction ),
+        described, NodeRelation::Hides, restriction ),
       graph ))
     . collect ();
   graph . inbound_pids_for_relation_gated (described, NodeRelation::Forks, restriction)
@@ -554,7 +554,7 @@ pub(crate) fn hidden_in_subscribee (
     &graph . outbound_gnids_for_relation_gated (
       subscribee, NodeRelation::Contains, walk . truth . restriction ),
     &graph . outbound_gnids_for_relation_gated (
-      subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ));
+      subscriber, NodeRelation::Hides, walk . truth . restriction ));
   resolve_all (&goal, graph) }
 
 /// Goal list for a hiddenInForkPartnerFolder: the intersection of the
@@ -585,7 +585,7 @@ pub(crate) fn hidden_outside_of_subscribees (
   let goal : Vec<ID> = goal_list_for_hiddenOutsideOfSubscribee_folder (
     graph,
     &graph . outbound_gnids_for_relation_gated (
-      subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ),
+      subscriber, NodeRelation::Hides, walk . truth . restriction ),
     &graph . outbound_gnids_for_relation_gated (
       subscriber, NodeRelation::Forks, walk . truth . restriction ),
     walk . truth . restriction );

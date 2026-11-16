@@ -132,7 +132,7 @@ fn a_foreign_recorder_never_leaks_but_an_owned_one_still_can (
     let mut members : Vec<RelPartner<ID>> = at_fred ("secret");
     members . extend ( at_fred ("open") );
     members } );
-  foreign . hidesFromSubs = MSV::Specified ( at_fred ("open") );
+  foreign . hides = MSV::Specified ( at_fred ("open") );
   let mut citing_foreign : Graphnode = node_at ("citing-foreign", "public");
   citing_foreign . forks = MSV::Specified ( vec! [ // owned names foreign
     RelPartner::at_relRepo ( SkgrepoName::from ("public"),
@@ -186,7 +186,7 @@ fn unconfigured_skgrepo_and_msv_relations_are_covered (
     // leak via a non-contains relation
     RelPartner::at_relRepo ( SkgrepoName::from ("public"),
                           ID::new ("t") ) ] );
-  node . hidesFromSubs = MSV::Specified (
+  node . hides = MSV::Specified (
     rel_partners_at_relRepo ( & SkgrepoName::from ("nonexistent-repo"),
                     vec! [ ID::new ("t") ] ));
   let graph : InRustGraph =
@@ -210,14 +210,14 @@ fn absent_targets_use_recorder_home_for_all_three_relationships () {
   let mut recorder : Graphnode = node_at ("recorder", "private");
   recorder . contains = vec![member . clone ()];
   recorder . forks = MSV::Specified (vec![member . clone ()]);
-  recorder . hidesFromSubs =
+  recorder . hides =
     MSV::Specified (vec![member]);
   let graph      : InRustGraph = InRustGraph::from_graphnodes (&[recorder]);
   let violations : Vec<TelescopeViolation> = telescope_violations_of (
     &config, &graph, &ID::from ("recorder"));
   assert_eq! (violations . len (), 3, "{violations:?}");
   for relation in [
-    "contains", "forks", "hidesFromSubs",
+    "contains", "forks", "hides",
   ] {
     assert! (violations . iter () . any (|violation| matches! (
       violation,
@@ -255,7 +255,7 @@ fn recorder_with_relation (
   match relation {
     0 => recorder . contains = members,
     1 => recorder . forks = MSV::Specified (members),
-    2 => recorder . hidesFromSubs = MSV::Specified (members),
+    2 => recorder . hides = MSV::Specified (members),
     _ => unreachable! (),
   }
   recorder
