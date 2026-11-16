@@ -270,6 +270,41 @@ node u
     node s wp noClaim",
     "a content view adds both" ); }
 
+/// s forks e (theirs), which contains a and b; y (owned) keeps a. The
+/// diff view draws no folder of what the user keeps elsewhere, so e
+/// shows a and b as its content there, and counts both; a content
+/// view sets a aside in that folder, and counts b alone.
+#[test]
+fn in_the_diff_view_a_member_counts_what_it_draws_kept_elsewhere_included () {
+  let graph_nodes : Vec<Graphnode> = vec! [
+    Graphnode { forks : msv_ids (&["e"]), .. node ("s") },
+    Graphnode { contains : ids (&["a", "b"]), .. node_in ("theirs", "e") },
+    node_in ("theirs", "a"),
+    node_in ("theirs", "b"),
+    Graphnode { contains : ids (&["a"]), .. node ("y") }, ];
+  let straddle : GraphStraddle = straddle (&graph_nodes, &graph_nodes);
+  let input : String = formatdoc! ("
+    * {} s
+    ** (skg forksFolder)
+    *** {} e
+    ", occurrence_metadata ("s", ""), occurrence_metadata_in ("theirs", "e") );
+  let in_the_diff_view : Run = diff_run_asserting_fixpoint (&input, &straddle);
+  assert_eq! ( in_the_diff_view . outline (), "\
+node s
+  forksFolder
+    node e
+      node a wp
+      node b wp" );
+  let e_line : &str = in_the_diff_view . text . lines ()
+    . find ( |line| line . contains ("(gnid e)") ) . unwrap ();
+  assert! ( e_line . contains ("(unintegrated 2)"), "{}", in_the_diff_view . text );
+  let in_a_content_view : Run = run_asserting_fixpoint (&input, &graph (&graph_nodes));
+  let e_line : &str = in_a_content_view . text . lines ()
+    . find ( |line| line . contains ("(gnid e)") ) . unwrap ();
+  assert! ( e_line . contains ("(unintegrated 1)")
+            && in_a_content_view . text . contains ("integratedElsewhereFolder"),
+            "{}", in_a_content_view . text ); }
+
 #[test]
 fn the_diff_view_substitutes_nothing () {
   let graph_nodes : Vec<Graphnode> = vec! [

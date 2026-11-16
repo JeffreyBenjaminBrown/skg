@@ -37,6 +37,7 @@ pub fn set_viewnodestats_in_viewforest (
   config                : &SkgConfig,
   restriction           : &SkgrepoRestriction,
   relRepos              : &mut RelRepoLookup,
+  is_diff_view          : bool, // where a member as such keeps what the user keeps elsewhere among its content ('content_goal_gnids')
 ) {
   let multi_skgrepo : bool = config . skgrepos . len () > 1;
   let mut ancestor_gnids : HashSet<ID> = HashSet::new ();
@@ -51,7 +52,8 @@ pub fn set_viewnodestats_in_viewforest (
     &mut ancestor_gnids,
     relRepos,
     container_to_contents,
-    content_to_containers ); }
+    content_to_containers,
+    is_diff_view ); }
 
 fn set_viewnodestats_recursive (
   tree                  : &mut Tree<Viewnode>,
@@ -64,6 +66,7 @@ fn set_viewnodestats_recursive (
   relRepos              : &mut RelRepoLookup,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
+  is_diff_view          : bool,
 ) {
   let opt_pid : Option<ID> =
     if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
@@ -80,7 +83,8 @@ fn set_viewnodestats_recursive (
         None => stands_as_member (tree, treeid), };
       set_herald_strings_in_viewnode (
         tree, treeid, &node_pid, stands_as_member_here, fork_roles . as_ref (),
-        graph, config, restriction, relRepos, container_to_contents, content_to_containers );
+        graph, config, restriction, relRepos, container_to_contents, content_to_containers,
+        is_diff_view );
       set_omitted_body (tree, treeid, &node_pid, graph);
       set_relRepo (tree, treeid, stands_as_member_here, fork_roles . as_ref (),
                    graph, relRepos, config);
@@ -104,7 +108,8 @@ fn set_viewnodestats_recursive (
       ancestor_gnids,
       relRepos,
       container_to_contents,
-      content_to_containers ); }
+      content_to_containers,
+      is_diff_view ); }
   if was_new {
     if let Some ( ref pid ) = opt_pid
     { ancestor_gnids . remove (pid); } } }
@@ -199,6 +204,7 @@ fn set_herald_strings_in_viewnode (
   relRepos              : &mut RelRepoLookup,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
+  is_diff_view          : bool,
 ) {
   let (gstats, in_place_of)
     : (GraphnodeStats, Option<ID>) = {
@@ -235,14 +241,16 @@ fn set_herald_strings_in_viewnode (
     // occurrences: nodes the skgrepo restriction shows, as the count of its
     // contents is ('RelationCounts'). An indirect member stands in
     // neither fork role ('fork_roles'), but shows its content as any
-    // member as such does, and counts it too.
+    // member as such does, and counts it too. The diff view draws no
+    // folder of what the user keeps elsewhere, so there a member
+    // counts it among its content, where it draws it.
     if stands_as_member_here || fork_roles . is_some () {
       note_of_member_as_such (tree, treeid) . map ( |note| {
         let members : HashSet<ID> = content_goal_gnids (
           graph, config, restriction, node_pid,
           &graph . outbound_member_keys_for_relation_gated (
             node_pid, NodeRelation::Contains, restriction ),
-          Some (&note) )
+          Some (&note), ! is_diff_view )
           . into_iter ()
           . filter ( |gnid| graph . node_is_shown (gnid, restriction) )
           . collect ();

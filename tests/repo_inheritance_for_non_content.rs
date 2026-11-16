@@ -66,7 +66,8 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
     &content_to_containers,
     &config,
     &SkgrepoRestriction::unrestricted (&config),
-    &mut RelRepoLookup::over (&graph) );
+    &mut RelRepoLookup::over (&graph),
+    false );
   // B has same skgrepo as A, so homeRepoAtBoundary should be false,
   // even though B claims nothing.
   let b_ref =
@@ -110,7 +111,8 @@ fn skgrepo_inheritance_across_non_content_different_skgrepo () {
     &content_to_containers,
     &config,
     &SkgrepoRestriction::unrestricted (&config),
-    &mut RelRepoLookup::over (&graph) );
+    &mut RelRepoLookup::over (&graph),
+    false );
   let b_ref =
     viewforest . get (a_gnid) . unwrap ()
     . first_child () . unwrap ();

@@ -18,6 +18,11 @@
 //   content ('docs/forks.org', "Adding a child under a member as
 //   such"), but a stale buffer showing a child another view removed
 //   does not put it back.
+// - A child a stale buffer shows in a member's folder of what the user
+//   keeps elsewhere, or of what the note hides in it, was not cut
+//   there, though another view since stopped keeping it, or unhid it:
+//   the save hides nothing, and the note is not stale. These use the
+//   fixture of 'tests/hides_by_integration.rs'.
 // - A member standing write-protected and bare, extended by an
 //   editable-view request on its note, is drawn as a fresh view draws
 //   it, its containers folder included.

@@ -109,7 +109,7 @@ fn stored_list_reads_of_the_viewnode_stats_pass (
   STORED_LIST_READS . with ( |reads| reads . set (0) );
   set_viewnodestats_in_viewforest ( // a lookup of its own, so that it reads the list itself
     tree, &graph, &container_to_contents, &content_to_containers,
-    &config, restriction, &mut RelRepoLookup::over (&graph) );
+    &config, restriction, &mut RelRepoLookup::over (&graph), false );
   STORED_LIST_READS . with ( |reads| reads . get () ) }
 
 /// Under a skgrepo restriction and unrestricted alike. Unrestricted,

@@ -293,30 +293,33 @@ fn content_goal (
   let relRepos : HashMap<ID, SkgrepoName> =
     unknown_or_restricted_members_relRepos (graph, restriction, pid, &members);
   Goal::ordered ( gnid_items (
-    content_goal_gnids ( graph, config, restriction, pid, &members, note . as_ref () ),
+    content_goal_gnids ( graph, config, restriction, pid, &members, note . as_ref (), true ),
     &relRepos )) }
 
-/// The content the occurrence of 'member' shows outside the diff
-/// view: the members of its 'contains' list whose records the skgrepo
-/// restriction shows ('members', gated, a raw ID where nothing
-/// answers), less what 'note' hides or contains and what the user
-/// keeps elsewhere, when the occurrence is a member as such of the
-/// note's forks folder (a forkee or forker as such). The restricted
-/// members among them are drawn as Restricted vognodes. The stats pass
-/// counts a member's unintegrated content from it, so that the count
-/// is what is drawn.
+/// The content the occurrence of 'member' shows: the members of its
+/// 'contains' list whose records the skgrepo restriction shows
+/// ('members', gated, a raw ID where nothing answers), less what
+/// 'note' hides or contains and, where 'kept_elsewhere_counts' (outside
+/// the diff view, which draws no folder of it), what the user keeps
+/// elsewhere, when the occurrence is a member as such of the note's
+/// forks folder (a forkee or forker as such). The restricted members
+/// among them are drawn as Restricted vognodes. The stats pass counts
+/// a member's unintegrated content from it, so that the count is what
+/// is drawn.
 pub(crate) fn content_goal_gnids (
-  graph       : &InRustGraph,
-  config      : &SkgConfig,
-  restriction : &SkgrepoRestriction,
-  member      : &ID,
-  members     : &[RelPartner<RelationshipMemberKey>],
-  note        : Option<&ID>,
+  graph                 : &InRustGraph,
+  config                : &SkgConfig,
+  restriction           : &SkgrepoRestriction,
+  member                : &ID,
+  members               : &[RelPartner<RelationshipMemberKey>],
+  note                  : Option<&ID>,
+  kept_elsewhere_counts : bool,
 ) -> Vec<ID> {
   let contents : Vec<ID> = members . iter ()
     . map ( |member| member . member . id () . clone () )
     . collect ();
-  less_what_the_note_integrates (graph, config, restriction, member, note, &contents, true) }
+  less_what_the_note_integrates (
+    graph, config, restriction, member, note, &contents, kept_elsewhere_counts ) }
 
 /// 'contents', the content of 'member', less what 'note' hides or
 /// contains and, where 'kept_elsewhere_counts', less what an owned

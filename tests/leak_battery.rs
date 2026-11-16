@@ -275,7 +275,8 @@ fn ancestor_heralds_gate_privately_recorded_relations (
           & HashMap::new (),
           config,
           restriction,
-          &mut RelRepoLookup::over (&graph) );
+          &mut RelRepoLookup::over (&graph),
+          false );
         let c_treeid : NodeId = first_root (&viewforest);
         let s_ref = viewforest . get (c_treeid) . unwrap ()
           . first_child () . unwrap ();

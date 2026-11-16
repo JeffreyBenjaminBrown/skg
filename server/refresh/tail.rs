@@ -52,7 +52,7 @@ fn set_derived_facts (
   set_viewnodestats_in_viewforest (
     viewforest . as_internal_tree_mut (), truth . graph,
     &container_to_contents, &content_to_containers,
-    truth . config, truth . restriction, &mut relRepos );
+    truth . config, truth . restriction, &mut relRepos, walk . is_diff_view () );
   if let RefreshMode::DiffView { straddle, buffer_kind, processed_store } = walk . mode {
     set_diffView_facts_in_viewforest (
       viewforest, straddle, buffer_kind, processed_store, truth . graph ); }
