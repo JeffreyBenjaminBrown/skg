@@ -6,17 +6,21 @@
 #
 # Before the first run:
 #   1. gh auth login
-#   2. Create the organization named in OWNER below, in the browser:
-#      https://github.com/account/organizations/new  (choose the Free plan).
-#      Or set OWNER to your own GitHub user name instead.
+#   2. tools/team/pacer.sh pause     (so no session is mid-save)
 #
 # It is safe to run again: a repo that already has the remote is only pushed.
-# Every repo is created PRIVATE. To make one public later:
-#     gh repo edit OWNER/NAME --visibility public --accept-visibility-change-consequences
+#
+# Every repo is created PUBLIC, except claude-private, which is PRIVATE:
+# it is the only one that may mention Jeff's private nodes. Before
+# anything is created, tools/team/public-leak-check.sh must find no
+# mention of a private node in what is about to become public; if it
+# finds one, this script stops and creates nothing.
+# To change one repo's visibility later:
+#     gh repo edit OWNER/NAME --visibility private --accept-visibility-change-consequences
 
 set -e
 
-OWNER=kgs-in-skg
+OWNER=skg-kgs      # https://github.com/skg-kgs
 
 # GitHub name   local folder
 REPOS="
@@ -30,6 +34,9 @@ for folder in data/claude/team/*/notes; do
 team-$name  $folder"
 done
 
+echo "Checking that nothing about to be public mentions a private node ..."
+tools/team/public-leak-check.sh
+
 echo "$REPOS" | while read -r name folder; do
   [ -z "$name" ] && continue
   echo "== $OWNER/$name  <-  $folder"
@@ -41,7 +48,9 @@ echo "$REPOS" | while read -r name folder; do
   if git -C "$folder" remote | grep -q '^origin$'; then
     git -C "$folder" push origin main
   else
-    gh repo create "$OWNER/$name" --private --source "$folder" --remote origin --push
+    visibility=--public
+    [ "$name" = claude-private ] && visibility=--private
+    gh repo create "$OWNER/$name" $visibility --source "$folder" --remote origin --push
   fi
 done
 
