@@ -2,15 +2,16 @@
 //
 // A nodeMerge takes something like the intersection of hides: whatever
 // either member showed as unintegrated forked content pre-merge --
-// contained in one of its forkees, unhidden by and not contained in
-// that member -- the merged node must keep showing, so such ids are dropped
+// contained in one of its fork partners (a forkee, or a forker it does
+// not hide), unhidden by and not contained in that member -- the
+// merged node must keep showing, so such ids are dropped
 // from the combined hides. Hides nobody's view contradicted survive the
 // union.
 //
 // Fixture: a hides [x, z]; b forks e and hides [y];
 // e contains [x, y]. So pre-merge b shows x (e contains it, b
 // neither hides nor contains it); nobody shows y (b hides it, a
-// cannot see it); nobody shows z (no forkee contains it).
+// cannot see it); nobody shows z (no fork partner contains it).
 
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};

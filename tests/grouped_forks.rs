@@ -46,6 +46,9 @@ mod forkees_drawn_editable;
 #[path = "forkers_drawn_editable.rs"]
 mod forkers_drawn_editable;
 
+#[path = "hides_apply_to_every_fork_partner.rs"]
+mod hides_apply_to_every_fork_partner;
+
 #[path = "children_of_a_raw_root_are_raw.rs"]
 mod children_of_a_raw_root_are_raw;
 

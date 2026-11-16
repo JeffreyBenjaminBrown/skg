@@ -14,6 +14,7 @@ use crate::from_text::weave::weave;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoChange, SkgrepoName, members_of, rel_partners_at_relRepo};
 use crate::types::disk_home::home_from_disk;
@@ -338,7 +339,7 @@ fn has_restricted_sections (
 ///   the relationship instead stays at the recorder's home: the relationship
 ///   and foreign ID are intentionally shared with that skgrepo.
 /// - hides additionally floor at the most public explaining
-///   fork (see 'hide_repo'): a hide is only as public as
+///   fork, either way (see 'hide_skgrepo'): a hide is only as public as
 ///   some fork that makes it meaningful, else it leaks the
 ///   inference that a private fork exists. Hides carry no
 ///   explicit-repo path: the folder that displays them is write-protected
@@ -486,8 +487,8 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
         let unclamped : SkgrepoName = match sticky {
           Some (skgrepo) => skgrepo,
           None => hide_skgrepo (
-            graph, config, &recorder_home, &m . member, &forkees,
-            &resolve, &home_of ), };
+            graph, config, &recorder_pid, &recorder_home, &m . member,
+            &forkees, &resolve, &home_of ), };
         m . relRepo = config . more_private_of (
           unclamped, recorder_home . clone () );
         m . member = raw_disk_member (disk, &submitted); }} }
@@ -525,18 +526,21 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
 
 /// A new hide's relRepo: at least the more private of the endpoints'
 /// homes, and at least as private as some explanation of it. An
-/// explanation is a fork of the hider whose forkee
-/// contains the hidden node, and stands at the more private of the
-/// fork's relRepo and the relRepo of the contains record: a
-/// hide more public than either would name what only that record
-/// tells. The most public explanation is the floor, because the
-/// inference "the hider forks something containing X" is
+/// explanation is a fork partner of the hider, either way, that
+/// contains the hidden node: a note the hider forks ('forkees', as
+/// the save leaves them) or one forking the hider (by the graph). It
+/// stands at the more private of the 'forks' relationship's relRepo
+/// (in whichever file records it) and the relRepo of the contains
+/// record: a hide more public than either would name what only that
+/// record tells. The most public explanation is the floor, because the
+/// inference "the hider is a fork partner of something containing X" is
 /// innocent whenever any explanation is visible; with no explanation
 /// found, the endpoint rule alone applies (junk-tolerant; the
 /// validators report residue).
 pub(crate) fn hide_skgrepo (
   graph         : &InRustGraph,
   config        : &SkgConfig,
+  recorder      : &ID,
   recorder_home : &SkgrepoName,
   hidden        : &ID,
   forkees       : &[RelPartner<ID>],
@@ -551,24 +555,32 @@ pub(crate) fn hide_skgrepo (
         config . more_private_of ( recorder_home . clone (), h ),
       _ => recorder_home . clone (), }};
   let hidden_key : ID = resolve (hidden);
-  let explaining_skgrepos : Vec<SkgrepoName> =
-    forkees . iter ()
-    . flat_map ( |sub| {
-      let explaining_records : Vec<SkgrepoName> =
-        graph . pid_of ( & sub . member )
+  let explanations_through : &dyn Fn (&ID, &SkgrepoName) -> Vec<SkgrepoName> =
+    // The explanations through one fork partner, whose 'forks'
+    // relationship with the hider stands at 'fork_relRepo'.
+    &|partner : &ID, fork_relRepo : &SkgrepoName| -> Vec<SkgrepoName> {
+      graph . pid_of (partner)
         . and_then ( |p| graph . nodes . get (&p) )
-        . map ( |forkee| forkee . contains . iter ()
+        . map ( |partner| partner . contains . iter ()
                 . filter ( |c| resolve ( &c . member ) == hidden_key )
                 . map ( |c|
-                  // A foreign forkee's contains record has no
+                  // A foreign partner's contains record has no
                   // rung, so the fork alone explains the hide.
                   if config . skgrepo_is_owned (&c . relRepo) {
                     config . more_private_of (
-                      sub . relRepo . clone (), c . relRepo . clone () )
-                  } else { sub . relRepo . clone () } )
+                      fork_relRepo . clone (), c . relRepo . clone () )
+                  } else { fork_relRepo . clone () } )
                 . collect () )
-        . unwrap_or_default ();
-      explaining_records } )
+        . unwrap_or_default () };
+  let explaining_skgrepos : Vec<SkgrepoName> =
+    forkees . iter ()
+    . flat_map ( |forkee| explanations_through (&forkee . member, &forkee . relRepo) )
+    . chain (
+      graph . inbound_pids_for_relation (&resolve (recorder), NodeRelation::Forks)
+        . into_iter ()
+        . filter_map ( |forker| graph . relRepo (&forker, NodeRelation::Forks, recorder)
+                                . map ( |fork_relRepo| (forker, fork_relRepo) ))
+        . flat_map ( |(forker, fork_relRepo)| explanations_through (&forker, &fork_relRepo) ))
     . collect ();
   let fork_floor : Option<SkgrepoName> =
     explaining_skgrepos . into_iter ()

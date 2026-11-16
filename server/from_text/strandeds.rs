@@ -129,11 +129,11 @@ pub fn stranded_relationships (
           relation, recorder : recorder_pid . clone (), member : member . clone () };
         if ! seen . insert (relationship . clone ()) { continue; }
         let default_before : SkgrepoName = default_relRepo (
-          graph, config, relation, &recorder_home_before, &partner . member,
-          &forks_before, &resolve, &home_before );
+          graph, config, relation, &recorder_pid, &recorder_home_before,
+          &partner . member, &forks_before, &resolve, &home_before );
         let default_after : SkgrepoName = default_relRepo (
-          graph, config, relation, &recorder_home_after, &partner . member,
-          &forks_after, &resolve, &home_after );
+          graph, config, relation, &recorder_pid, &recorder_home_after,
+          &partner . member, &forks_after, &resolve, &home_after );
         if partner . relRepo != default_before
           || partner . relRepo == default_after { continue; }
         strandeds . push ( StrandedRelationship {
@@ -221,12 +221,13 @@ fn relation_list_mut (
 
 /// A relationship's default relRepo, given its recorder's home, its
 /// member's home ('home_of'), and, for a hide, the recorder's
-/// forks: the rule a new relationship follows
+/// forks and forkers: the rule a new relationship follows
 /// ('apply_sticky_relRepos_in_graph_with_prospective_homes').
 fn default_relRepo (
   graph         : &InRustGraph,
   config        : &SkgConfig,
   relation      : NodeRelation,
+  recorder      : &ID,
   recorder_home : &SkgrepoName,
   member        : &ID,
   forkees       : &[RelPartner<ID>],
@@ -235,7 +236,7 @@ fn default_relRepo (
 ) -> SkgrepoName {
   if relation == NodeRelation::Hides {
     return hide_skgrepo (
-      graph, config, recorder_home, member, forkees, resolve, home_of ); }
+      graph, config, recorder, recorder_home, member, forkees, resolve, home_of ); }
   match home_of (member) {
     Some (member_home) => config . default_relRepo (recorder_home, &member_home),
     None => recorder_home . clone (), } }

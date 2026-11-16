@@ -50,6 +50,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::mirrors::{Mirrors, mirrors_of};
 use crate::dbs::node_lookup::opt_graphnode_by_gnid;
+use crate::refresh::goal::fork_partners_shown;
 use crate::from_text::local_fieldintent_collection::lower::LoweredNodeIntents;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::from_text::local_fieldintent_collection::types::{
@@ -405,18 +406,24 @@ fn members_with_visible_records (
 
 /// Applies the submitted visible-outside subset after all ordinary hide
 /// inference.  Only the old *visible outside* hides are replaceable: hides
-/// whose records are restricted, and members inside a forkee, remain owned
+/// whose records are restricted, and members inside a fork partner, remain owned
 /// by the graph and survive an edit of this compound partner folder. A hide is
 /// visible, and so replaceable, when the skgrepo restriction holds its relRepo
 /// ('SkgrepoRestriction::record_is_visible'): the folder as drawn showed its
 /// member, as an occurrence or a gnid-only vognode, so the submitted
 /// folder is the whole set of hides with a visible record outside the
-/// forkees, and a folder saved under a skgrepo restriction never unhides a
+/// fork partners, and a folder saved under a skgrepo restriction never unhides a
 /// member it could not show. Nor does it unhide a member it showed as a
 /// restricted viewnode (its node kept out): deleting that line changes
 /// no relationship to the note it stands for. What counts as inside is what the folder's goal
 /// subtracts ('goal_list_for_hiddenOutsideOfForkPartners_folder'): the content
-/// of each forkee by the records the skgrepo restriction shows.
+/// of each fork partner the forks folder shows, forkee or forker
+/// ('fork_partners_shown'), by the records the skgrepo restriction
+/// shows. So a hide of something only a forker contains, which the
+/// view draws in that forker's folder of what the note hides in it,
+/// is not replaced here: a save that moves it out of that folder
+/// unhides it ('resolve_forker_visibility') whether or not the buffer
+/// keeps this folder.
 fn apply_hiddenoutside_edits (
   lowered                : &mut LoweredNodeIntents,
   edits                  : &[(ID, HiddenOutsideEdit)],
@@ -442,14 +449,15 @@ fn apply_hiddenoutside_edits (
       &|member : &RelPartner<ID>| -> bool {
       SkgrepoRestriction::record_is_visible (
         skgrepo_restriction, &member . relRepo ) };
-    let forkee_gnids : Vec<ID> =
-      lowered . forker_forks_after_save (&forker_from_disk);
+    let partner_gnids : Vec<ID> = fork_partners_shown (
+      graph, skgrepo_restriction, &forker_from_disk . pid,
+      &lowered . forker_forks_after_save (&forker_from_disk) );
     let mut inside : HashSet<ID> = HashSet::new ();
-    for forkee_gnid in forkee_gnids {
-      let Some (forkee) =
-        opt_graphnode_by_gnid (graph, config, &forkee_gnid) ?
+    for partner_gnid in partner_gnids {
+      let Some (partner) =
+        opt_graphnode_by_gnid (graph, config, &partner_gnid) ?
       else { continue; };
-      for member in forkee . contains . iter ()
+      for member in partner . contains . iter ()
         . filter (|member| is_visible (member)) {
         inside . insert (key (&member . member)); }}
 
@@ -494,15 +502,17 @@ fn apply_hiddenoutside_edits (
         forker_from_disk, &inferred_hides, &inferred_unhides); }}
   Ok (candidates) }
 
-/// Deleting (or moving away) a child of an owned forker F, where
-/// that child is disk-content of a node F forks, hides the
-/// child from F's forks -- otherwise the child would
-/// reappear under F as unintegrated forkee content the user just
-/// dismissed (docs/sharing-model.org: branches deleted from a clone
-/// become hides). Symmetrically, re-adding such a child to F's
+/// Deleting (or moving away) a child of an owned note F, where
+/// that child is disk-content of a fork partner of F (a node F forks,
+/// or a forker of F that F does not hide: the members its forks
+/// folder shows, 'fork_partners_shown'), hides the child from F's
+/// forks -- otherwise the child would reappear under that partner as
+/// unintegrated content the user just dismissed (docs/sharing-model.org:
+/// branches deleted from a clone become hides). Symmetrically,
+/// re-adding such a child to F's
 /// contains drops a stale hide of it by F. A removed child counts as
 /// the member it stands for ('member_it_stands_for'): removing a
-/// mirror of a forkee's member hides that member, unless the
+/// mirror of a partner's member hides that member, unless the
 /// same save leaves F containing the member. Placing a mirror
 /// drops no hide, as containing it does not integrate the member
 /// ('unintegrated_content_gnids' in 'server/refresh/goal.rs' compares
@@ -520,8 +530,8 @@ fn apply_hiddenoutside_edits (
 /// - A node with no disk entry removes nothing (a fork clone's
 ///   creation-time hides are computed in 'build_fork_clone').
 /// - Only what the skgrepo restriction shows explains or blocks a
-///   hide: the forker's forks, each forkee's content
-///   and the forker's hides are read by their visible records. A
+///   hide: the note's forks, its forkers, each partner's content
+///   and the note's hides are read by their visible records. A
 ///   member only a restricted record explains is not hidden, and
 ///   re-adding a member drops no restricted hide of it.
 fn infer_hides_from_contains_removals (
@@ -577,7 +587,7 @@ fn infer_hides_from_contains_removals (
     let inferred_hides : Vec<ID> =
       if removed . is_empty () { Vec::new () }
       else {
-        let forkee_content : HashSet<ID> = {
+        let partner_content : HashSet<ID> = {
           let forkees : Vec<ID> = match &forks_msv {
             // The post-save forks: unforking a node in
             // the same save also stops hides being inferred from it.
@@ -587,19 +597,20 @@ fn infer_hides_from_contains_removals (
                 forker_from_disk . forks . or_default (),
                 skgrepo_restriction ), };
           let mut content : HashSet<ID> = HashSet::new ();
-          for forkee in &forkees {
-            if let Some (forkee_from_disk) =
+          for partner in fork_partners_shown (
+            graph, skgrepo_restriction, &forker_pid, &forkees )
+          { if let Some (partner_from_disk) =
               opt_graphnode_by_gnid (
-                graph, config, forkee ) ?
+                graph, config, &partner ) ?
             { content . extend (
                 members_with_visible_records (
-                  & forkee_from_disk . contains,
+                  & partner_from_disk . contains,
                   skgrepo_restriction )); }}
           content };
         let new_contains_set : HashSet<&ID> = new_contains . iter () . collect ();
         removed . iter ()
           . filter_map ( |gnid| member_it_stands_for (
-            graph, skgrepo_restriction, gnid, &forkee_content ))
+            graph, skgrepo_restriction, gnid, &partner_content ))
           . filter ( |member| ! new_contains_set . contains (member) )
           . collect () };
     if inferred_hides . is_empty () && inferred_unhides . is_empty ()

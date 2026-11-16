@@ -416,7 +416,7 @@ fn folder_goal (
     Folder::HiddenOutsideOfForkPartners => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       Some ( Goal::ordered ( gnid_items (
-        hidden_outside_of_forkees (
+        hidden_outside_of_fork_partners (
           &occurrence_pid_of (parties . hider) ?, walk ),
         &HashMap::new ()))) },
     Folder::Forks =>
@@ -490,7 +490,7 @@ fn forks_folder_goal (
 /// in graph order, less those it forks ('forkees', as its list has
 /// them) and those it hides by such records. A forker it hides stands
 /// in the folder of what it hides outside its fork partners instead.
-fn forker_only_members (
+pub(crate) fn forker_only_members (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
   described   : &ID,
@@ -506,6 +506,26 @@ fn forker_only_members (
   graph . inbound_pids_for_relation_gated (described, NodeRelation::Forks, restriction)
     . into_iter ()
     . filter ( |forker| ! left_out . contains (forker) )
+    . collect () }
+
+/// The fork partners of 'note' that its forks folder shows, by the
+/// records the skgrepo restriction shows: the notes it forks
+/// ('forkees', which the caller reads as the view drew them or as a
+/// save leaves them), each resolved to its pid, then its forker-only
+/// members ('forker_only_members'). These are the partners that
+/// explain a hide of the note's ('docs/glossary.org', "hides"): what
+/// one of them contains, the view draws under it, and the note's
+/// hide of it stands there.
+pub(crate) fn fork_partners_shown (
+  graph       : &InRustGraph,
+  restriction : &SkgrepoRestriction,
+  note        : &ID,
+  forkees     : &[ID],
+) -> Vec<ID> {
+  let forker_only : Vec<ID> =
+    forker_only_members (graph, restriction, note, forkees);
+  resolve_all (forkees, graph) . into_iter ()
+    . chain (forker_only)
     . collect () }
 
 /// Whether 'pid' has a fork partner, either way, by a record the
@@ -607,45 +627,51 @@ fn goal_list_for_hiddenInForkPartner_folder (
     . filter ( |gnid| contains_set . contains (&graph . pid_else_raw_id (gnid)) )
     . cloned () . collect () }
 
-/// What 'forker' hides outside the content of its forkees, by
-/// the records the skgrepo restriction shows: the goal of its compound
-/// folder 'HiddenOutsideOfForkPartners', in the order of its hides list.
-/// A forkee's content is read by the same records, so a hide of
-/// something a forkee contains only by a restricted record stands
-/// here, outside, as it does in the view.
-pub(crate) fn hidden_outside_of_forkees (
-  forker     : &ID,
+/// What 'note' hides that none of its fork partners contains, by the
+/// records the skgrepo restriction shows: the goal of its compound
+/// folder 'HiddenOutsideOfForkPartners', in the order of its hides
+/// list. Its fork partners are the members its forks folder shows,
+/// forkees and forkers alike ('fork_partners_shown'): a hide one of
+/// them contains stands under that member instead, in its folder of
+/// what the note hides in it. A partner's content is read by the same
+/// records, so a hide of something a partner contains only by a
+/// restricted record stands here, outside, as it does in the view.
+pub(crate) fn hidden_outside_of_fork_partners (
+  note       : &ID,
   walk       : &Walk,
 ) -> Vec<ID> {
   let graph : &InRustGraph = walk . truth . graph;
+  let restriction : &SkgrepoRestriction = walk . truth . restriction;
   let goal : Vec<ID> = goal_list_for_hiddenOutsideOfForkPartners_folder (
     graph,
     &graph . outbound_gnids_for_relation_gated (
-      forker, NodeRelation::Hides, walk . truth . restriction ),
-    &graph . outbound_gnids_for_relation_gated (
-      forker, NodeRelation::Forks, walk . truth . restriction ),
-    walk . truth . restriction );
+      note, NodeRelation::Hides, restriction ),
+    &fork_partners_shown (
+      graph, restriction, note,
+      &graph . outbound_gnids_for_relation_gated (
+        note, NodeRelation::Forks, restriction )),
+    restriction );
   resolve_all (&goal, graph) }
 
-/// Goal list for a hiddenOutsideOfForkPartnersFolder: the forker's
-/// hides-list minus everything any forkee contains by a record
-/// the skgrepo restriction shows.
+/// Goal list for a hiddenOutsideOfForkPartnersFolder: the note's
+/// hides-list minus everything any of its fork partners contains by a
+/// record the skgrepo restriction shows.
 fn goal_list_for_hiddenOutsideOfForkPartners_folder (
   graph             : &InRustGraph,
-  forker_hides      : &[ID],
-  forkees           : &[ID],
+  note_hides        : &[ID],
+  fork_partners     : &[ID],
   restriction       : &SkgrepoRestriction,
 ) -> Vec<ID> {
-  let forkee_content_of : &dyn Fn (&ID) -> Vec<ID> = &|forkee : &ID| -> Vec<ID> {
+  let partner_content_of : &dyn Fn (&ID) -> Vec<ID> = &|partner : &ID| -> Vec<ID> {
     graph . outbound_gnids_for_relation_gated (
-      &graph . pid_else_raw_id (forkee), NodeRelation::Contains, restriction ) };
-  let all_forkee_content : HashSet<ID> =
-    forkees . iter ()
-      . flat_map ( |pid| forkee_content_of (pid) )
+      &graph . pid_else_raw_id (partner), NodeRelation::Contains, restriction ) };
+  let all_partner_content : HashSet<ID> =
+    fork_partners . iter ()
+      . flat_map ( |pid| partner_content_of (pid) )
       . map ( |gnid| graph . pid_else_raw_id (&gnid) )
       . collect ();
-  forker_hides . iter ()
-    . filter ( |gnid| ! all_forkee_content
+  note_hides . iter ()
+    . filter ( |gnid| ! all_partner_content
               . contains (&graph . pid_else_raw_id (gnid)) )
     . cloned () . collect () }
 

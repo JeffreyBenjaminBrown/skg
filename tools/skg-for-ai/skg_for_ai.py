@@ -2980,8 +2980,8 @@ def parse_edited_compact_view (compact_text):
 # folder takes.
 HERALD_PHRASES_HOLDING_HANDLE_WORDS = (
   "It forks these, or these fork it.",
-  "It hides these from what it forks.",
-  "These hide it from what they fork." )
+  "It hides these from its forks.",
+  "These hide it from their forks." )
 
 def handle_words (display_text):
   """The words of a handle's display text: its tokens, the heralds of

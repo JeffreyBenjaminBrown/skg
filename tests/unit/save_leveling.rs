@@ -221,6 +221,51 @@ fn hide_floor_is_the_most_public_explaining_fork (
 }
 
 #[test]
+fn hide_floor_counts_a_forker_as_explaining (
+) {
+  // A forker of the hider explains a hide as a forkee does: the
+  // 'forks' relationship is read in the forker's file.
+  let config : SkgConfig =
+    config_with_order ( & ["public", "trusted", "private"] );
+  let hidden : Graphnode = node_at ("victim", "public");
+  let recorder : Graphnode = node_at ("recorder", "public");
+  let hider_buffer = || -> Graphnode {
+    let mut buffer : Graphnode = recorder . clone ();
+    buffer . forks = MSV::Specified ( Vec::new () );
+    buffer . hides = MSV::Specified ( vec! [
+      pm ("public", "victim") ] ); // degenerate tag
+    buffer };
+  let forker_at = |pid : &str, fork_relRepo : &str| -> Graphnode {
+    let mut forker : Graphnode = node_at (pid, "public");
+    forker . forks = MSV::Specified ( vec! [ pm (fork_relRepo, "recorder") ] );
+    forker . contains = vec! [ pm ("public", "victim") ];
+    forker };
+  { // Only a forker whose 'forks' relationship is private explains
+    // the hide: the hide is private.
+    let graph : InRustGraph = graph_from ( & [
+      recorder . clone (), hidden . clone (), forker_at ("forker-a", "private") ] );
+    let resolved : Graphnode =
+      apply_sticky_relRepos_in_graph (
+        hider_buffer (), &recorder, &RequestedRelRepos::default (), &graph, &config)
+      . unwrap ();
+    assert_eq! (
+      resolved . hides . or_default (),
+      & [ pm ("private", "victim") ] ); }
+  { // A second forker, publicly, explains it too: the hide may stay
+    // public.
+    let graph : InRustGraph = graph_from ( & [
+      recorder . clone (), hidden, forker_at ("forker-a", "private"),
+      forker_at ("forker-b", "public") ] );
+    let resolved : Graphnode =
+      apply_sticky_relRepos_in_graph (
+        hider_buffer (), &recorder, &RequestedRelRepos::default (), &graph, &config)
+      . unwrap ();
+    assert_eq! (
+      resolved . hides . or_default (),
+      & [ pm ("public", "victim") ] ); }
+}
+
+#[test]
 fn explicit_skgrepo_at_or_more_private_than_floor_is_honored (
 ) {
   // Allowed-side acceptance ('docs/telescopes.org', "Where new

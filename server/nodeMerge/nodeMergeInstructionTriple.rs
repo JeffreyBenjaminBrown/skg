@@ -1,4 +1,5 @@
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::node_lookup::{graphnode_by_gnid, opt_graphnode_by_gnid};
 use crate::from_text::local_fieldintent_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
@@ -70,15 +71,15 @@ fn nodeMerge_from_acquirer_and_acquiree (
   let acquiree_text_preserver : Graphnode =
     create_acquiree_text_preserver (&acquiree_from_disk);
   let shown_pre_merge : HashSet<ID> = {
-    // Whatever either member showed as unintegrated forkee
-    // content before the merge, the merged node must keep showing,
+    // Whatever either member showed as unintegrated content of its
+    // fork partners before the merge, the merged node must keep showing,
     // so these ids are dropped from the combined
     // hides below.
     let mut shown : HashSet<ID> =
-      gnids_shown_through_forkees (
+      gnids_shown_through_fork_partners (
         &acquirer_from_disk, graph, config ) ?;
     shown . extend (
-      gnids_shown_through_forkees (
+      gnids_shown_through_fork_partners (
         &acquiree_from_disk, graph, config ) ? );
     shown };
   let updated_acquirer : Graphnode =
@@ -224,12 +225,13 @@ fn three_nodeMerged_graphnodes(
       MSV::Specified (combined); }
   Ok (updated_acquirer) }
 
-/// The ids 'node' shows as unintegrated forkee content: contained
-/// by some node it forks, and neither hidden by it nor among
-/// its own contents (the forkee-as-such display rule,
-/// docs/sharing-model.org). A forkee with no disk entry
-/// contributes nothing.
-fn gnids_shown_through_forkees (
+/// The ids 'node' shows as unintegrated content of its fork
+/// partners: contained by some node it forks or some node forking it
+/// that it does not hide (the members its forks folder shows), and
+/// neither hidden by it nor among its own contents (the
+/// member-as-such display rule, docs/sharing-model.org). A partner
+/// with no disk entry contributes nothing.
+fn gnids_shown_through_fork_partners (
   node   : &Graphnode,
   graph  : &InRustGraph,
   config : &SkgConfig,
@@ -239,11 +241,18 @@ fn gnids_shown_through_forkees (
     members_of ( node . hides . or_default () );
   let contains : Vec<ID> =
     members_of ( & node . contains );
-  for forkee_gnid in members_of ( node . forks . or_default () ) {
-    let Some (forkee) = opt_graphnode_by_gnid (
-      graph, config, &forkee_gnid ) ?
+  let forkers_shown : Vec<ID> =
+    graph . inbound_pids_for_relation (&node . pid, NodeRelation::Forks)
+    . into_iter ()
+    . filter ( |forker| ! hides . iter ()
+               . any ( |hidden| graph . pid_else_raw_id (hidden) == *forker ))
+    . collect ();
+  for partner_gnid in members_of ( node . forks . or_default () )
+    . into_iter () . chain (forkers_shown)
+  { let Some (partner) = opt_graphnode_by_gnid (
+      graph, config, &partner_gnid ) ?
     else { continue; };
-    for gnid in members_of ( & forkee . contains ) {
+    for gnid in members_of ( & partner . contains ) {
       if ! hides . contains (&gnid)
         && ! contains . contains (&gnid)
       { shown . insert ( gnid ); }} }
@@ -333,4 +342,32 @@ mod flag_tests {
         if acquiree_value { vec![Flag::NoSearchMatching] }
         else { Vec::new () }); }
   }
+
+  /// A forker that A does not hide shows its content under A, so what
+  /// it adds is shown through it; a forker A hides shows nothing.
+  #[test]
+  fn what_a_forker_adds_is_shown_through_it_unless_hidden () {
+    let owned = |pid : &str| -> Graphnode { Graphnode {
+      pid          : ID::from (pid),
+      title        : pid . to_string (),
+      home_skgrepo : SkgrepoName::from ("owned"),
+      .. empty_graphnode () } };
+    let at_home = |pids : &[&str]| -> Vec<RelPartner<ID>> {
+      rel_partners_at_relRepo (
+        &SkgrepoName::from ("owned"),
+        pids . iter () . map ( |pid| ID::from (*pid) ) . collect () ) };
+    let mut a : Graphnode = owned ("A");
+    a . contains = at_home (&["x"]);
+    a . hides = MSV::Specified ( at_home (&["G"]) );
+    let mut f : Graphnode = owned ("F");
+    f . forks = MSV::Specified ( at_home (&["A"]) );
+    f . contains = at_home (&["x", "y"]);
+    let mut g : Graphnode = owned ("G");
+    g . forks = MSV::Specified ( at_home (&["A"]) );
+    g . contains = at_home (&["z"]);
+    let graph : InRustGraph = InRustGraph::from_graphnodes (
+      &[ a . clone (), f, g, owned ("x"), owned ("y"), owned ("z") ] );
+    assert_eq! (
+      gnids_shown_through_fork_partners (&a, &graph, &config ()) . unwrap (),
+      HashSet::from ([ ID::from ("y") ]) ); }
 }

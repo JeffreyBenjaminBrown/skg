@@ -109,7 +109,7 @@ fn a_save_under_a_restriction_keeps_the_members_its_restricted_vognodes_stand_fo
 /// records that r contains hc (private). A view of r drawn under "private" (no restriction)
 /// and switched to "public" shows Restricted vognodes, not empty
 /// folders: hs in the forks folder, hh beside
-/// hv in the folder of what r hides outside its forkees; and h in
+/// hv in the folder of what r hides outside its fork partners; and h in
 /// r's content. Of hp and hc, whose records are restricted, it shows
 /// nothing. Saved with an edit, it keeps every hide and every member.
 #[test]
@@ -144,7 +144,7 @@ fn a_save_under_a_restriction_keeps_every_hide_and_member (
       Ok (( )) } ) }
 
 /// As above, but the line of the Restricted vognode hh is deleted
-/// from the folder of what r hides outside its forkees before the
+/// from the folder of what r hides outside its fork partners before the
 /// save. A restricted vognode's line edits no relationship to the
 /// note it stands for: every hide stays, and the save's rerender
 /// draws hh there again.
@@ -723,7 +723,7 @@ fn save_view_cleanly_under (
 /// r hides s1 and hh, private, from what it forks, recording both in
 /// its public file. Under "public", with the folder of what r hides
 /// requested, hh stands as a restricted headline there and in the
-/// folder of what r hides outside its forkees. A save of another view
+/// folder of what r hides outside its fork partners. A save of another view
 /// of r, unrestricted, stops r hiding hh; the first view, rerendered
 /// under "public", loses both of hh's restricted headlines.
 #[test]

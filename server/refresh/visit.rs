@@ -50,7 +50,7 @@ use crate::refresh::editability::{
 use crate::refresh::extent::{Extent, extent_of_parent};
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, goal_of_parent, has_a_fork_partner,
-  hidden_by_fork_partner, hidden_in_fork_partner, hidden_outside_of_forkees,
+  hidden_by_fork_partner, hidden_in_fork_partner, hidden_outside_of_fork_partners,
   member_of_child, note_of_forker_as_such, note_of_member_as_such,
   visible_illegal_edits};
 use crate::refresh::goal::partnerFolder_members_in_graph;
@@ -1323,7 +1323,7 @@ fn add_hidden_outside_folder (
   walk              : &mut Walk,
 ) {
   if child_folder (tree, forks_folder, &Folder::HiddenOutsideOfForkPartners) . is_none ()
-     && ! hidden_outside_of_forkees (forker, walk) . is_empty ()
+     && ! hidden_outside_of_fork_partners (forker, walk) . is_empty ()
   { let hidden_outside : NodeId = tree . get_mut (forks_folder) . unwrap ()
       . append ( viewnode_of (
         ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners) )) . id ();

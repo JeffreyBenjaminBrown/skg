@@ -11,6 +11,12 @@
 // 'forks' relationship and the contains record that explain it. Re-adding a
 // member drops no hide the skgrepo restriction keeps out.
 //
+// A forker of the hider explains a hide as a forkee does
+// ('TODO/every-mirror/2_plan.org', Q12): deleting a member's line
+// that a forker still contains hides it, by the same visible records
+// and at the same floor, the 'forks' relationship read in the
+// forker's file.
+//
 // Every fixture has the skgrepos "public" and "private", both owned.
 
 use crate::git_fixture::{
@@ -121,6 +127,56 @@ fn re_adding_a_member_drops_no_restricted_hide (
                    "r's public file contains h" );
       assert_eq! ( list_in (f, "private/r.skg", "hides"), vec! ["h"],
                    "r's private section still hides h" );
+      Ok (( )) } ) }
+
+/// r contains y publicly; f forks r publicly, and contains y only
+/// by a record in its private section. With no skgrepo restriction,
+/// y's line under r is deleted: f still contains y, so y is hidden in
+/// r (it would come back under f), and the hide lands in r's private
+/// section, no more publicly than f's record that explains it.
+#[test]
+fn a_hide_a_forker_explains_lands_no_more_publicly_than_its_record (
+) -> Result<(), Box<dyn Error>> {
+  under_public (
+    &[ ("r", "pid: r\ntitle: r\ncontains:\n- y\n- c\n"),
+       ("f", "pid: f\ntitle: f\nforks:\n- r\n"),
+       ("c", "pid: c\ntitle: c\n"),
+       ("y", "pid: y\ntitle: y\n") ],
+    &[ ("f", "pid: f\ncontains:\n- y\n") ],
+    |f, _public| {
+      let unrestricted : SkgrepoRestriction =
+        SkgrepoRestriction::unrestricted (&f . config);
+      let opened : String = open_content_view (f, "r", VIEW, &unrestricted) ?;
+      save_cleanly (f, &without_line (&opened, "** (skg node (gnid y)"), &unrestricted) ?;
+      assert_eq! ( list_in (f, "public/r.skg", "contains"), vec! ["c"],
+                   "y's line is gone from r" );
+      assert_eq! ( list_in (f, "public/r.skg", "hides"), Vec::<String>::new (),
+                   "r's public file names no hide of y" );
+      assert_eq! ( list_in (f, "private/r.skg", "hides"), vec! ["y"],
+                   "r's private section hides y" );
+      Ok (( )) } ) }
+
+/// The same deletion under "public": f's content, as the narrowing
+/// shows it, lacks y, so nothing explains a hide of y, and r's files
+/// name no hide.
+#[test]
+fn a_member_only_a_forkers_restricted_record_explains_is_not_hidden (
+) -> Result<(), Box<dyn Error>> {
+  under_public (
+    &[ ("r", "pid: r\ntitle: r\ncontains:\n- y\n- c\n"),
+       ("f", "pid: f\ntitle: f\nforks:\n- r\n"),
+       ("c", "pid: c\ntitle: c\n"),
+       ("y", "pid: y\ntitle: y\n") ],
+    &[ ("f", "pid: f\ncontains:\n- y\n") ],
+    |f, public| {
+      let opened : String = open_content_view (f, "r", VIEW, public) ?;
+      save_cleanly (f, &without_line (&opened, "** (skg node (gnid y)"), public) ?;
+      assert_eq! ( list_in (f, "public/r.skg", "contains"), vec! ["c"],
+                   "y's line is gone from r" );
+      assert_eq! ( list_in (f, "public/r.skg", "hides"), Vec::<String>::new (),
+                   "r's public file hides nothing" );
+      assert! ( ! skg_files (f) ? . contains_key ("private/r.skg"),
+                "no private section of r appears" );
       Ok (( )) } ) }
 
 //

@@ -6,7 +6,7 @@
 // forker's hides from what the buffer shows: the
 // forkee-visibility step, for a forkee shown editable under
 // its forker, and the save of the folder of what the forker
-// hides outside its forkees. Each reads the forkee's content
+// hides outside its fork partners. Each reads the forkee's content
 // and the forker's hides by the records the skgrepo restriction
 // shows, as the view drew them: a hide recorded in a restricted
 // section is neither removed nor moved, and no hide is written of a
@@ -108,7 +108,7 @@ fn a_restricted_hide_of_restricted_forkee_content_stands_nowhere_and_saves_keep_
 
 /// r hides hpub by a record in its public file and hpriv by one in
 /// its private section; e contains neither. Under "public" the folder
-/// of what r hides outside its forkees shows hpub alone. Saved
+/// of what r hides outside its fork partners shows hpub alone. Saved
 /// unchanged, then with hpub's line deleted, then with a hide of n
 /// added, the folder's edits reach r's public file alone, and the
 /// private section keeps its hide of hpriv.
@@ -145,7 +145,7 @@ fn edits_of_the_hidden_outside_folder_leave_a_restricted_hide_alone (
 /// r hides h and o by records in its public file; e contains c by a
 /// public record and h by a private one. Under "public" e's content
 /// is c alone, so both hides stand outside, in the folder of what r
-/// hides outside its forkees. Saved unchanged, r keeps both;
+/// hides outside its fork partners. Saved unchanged, r keeps both;
 /// with h's line deleted, r's public file hides o alone.
 #[test]
 fn a_hide_of_what_the_forkee_contains_restrictedly_stands_outside_and_its_edits_save (

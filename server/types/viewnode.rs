@@ -604,7 +604,7 @@ pub enum Folder {
   Hidden,
   HiddenInForkPartner, // Child of a member as such of a forks folder (a forkee or forker as such). Collects children of the member that the note whose forks folder holds it hides. Write-protected (but these relationships are editable by modifying the listed contents of the member as such).
   HiddenByForkPartner, // Child of a forker as such. Collects what the forker hides of the content of the note whose forks folder holds it. Write-protected (the forker's hides are its owner's, edited in its own view).
-  HiddenOutsideOfForkPartners, // Child of a forks folder. Collects things hidden by the forks folder's parent but absent from every forkee's content, a forker it hides among them. This compound partner folder is editable as an exclusive visible-outside subset; its hide skgrepos remain derived. Shown after every member, under the same forks folder.
+  HiddenOutsideOfForkPartners, // Child of a forks folder. Collects things hidden by the forks folder's parent but absent from the content of every fork partner the folder shows (its forkees and the forkers it does not hide), a forker it hides among them. This compound partner folder is editable as an exclusive visible-outside subset; its hide skgrepos remain derived. Shown after every member, under the same forks folder.
   Container, // Collects nodes that contain its parent. Write-protected (editable from the other side of the relationship).
   Mentioner, // Collects nodes that link to its parent. Write-protected (a link lives in the linking node's text).
   // The diff view's two derived folders. Their membership comes from the extra IDs of the graph straddle's after-graph; both are save-inert.

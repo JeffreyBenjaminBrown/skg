@@ -86,7 +86,7 @@ fn a_relRepo_request_into_a_restricted_skgrepo_is_refused (
 
 /// r forks e1 publicly and e by a record in its private
 /// section; e contains h. Under "public" a hide of h is typed into
-/// the folder of what r hides outside its forkees. The one
+/// the folder of what r hides outside its fork partners. The one
 /// 'forks' relationship that explains the hide is restricted, so the hide
 /// would land in "private": refused, naming the skgrepo.
 #[test]

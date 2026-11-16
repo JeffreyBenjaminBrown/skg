@@ -10,7 +10,8 @@
 //! included), its hides as the plan leaves them against its hides on
 //! disk. That catches every source of a hide, and reports what the
 //! save will in fact write. Then each child that left an owned
-//! forker that forks something, and whose departure hid
+//! note with a fork partner its forks folder shows (a note it forks,
+//! or a forker it does not hide), and whose departure hid
 //! nothing, earns a "Hides nothing:" line naming the rule that held.
 //! .
 //! Only what the skgrepo restriction shows counts, as in the
@@ -21,6 +22,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text::local_fieldintent_collection::resolve_visibility::member_it_stands_for;
+use crate::refresh::goal::fork_partners_shown;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig};
 use crate::types::nodes::complete::Graphnode;
@@ -90,18 +92,18 @@ pub fn hide_report_lines (
       MSV::Unspecified => on_disk . as_ref ()
         . map ( |disk| visible_members (disk . forks . or_default ()) )
         . unwrap_or_default (), };
-    let forkee_contents : Vec<(ID, Vec<ID>)> =
-      forkees . iter ()
-      . map ( |forkee| (
-        forkee . clone (),
-        graphnode_from_graph (graph, forkee)
-          . map ( |forkee| visible_members (&forkee . contains) )
+    let partner_contents : Vec<(ID, Vec<ID>)> =
+      fork_partners_shown (graph, restriction, &node . pid, &forkees) . iter ()
+      . map ( |partner| (
+        partner . clone (),
+        graphnode_from_graph (graph, partner)
+          . map ( |partner| visible_members (&partner . contains) )
           . unwrap_or_default () ))
       . collect ();
-    let containers_of = |member : &ID| -> String { // the forkees whose content holds 'member', named
-      forkee_contents . iter ()
+    let containers_of = |member : &ID| -> String { // the fork partners whose content holds 'member', named
+      partner_contents . iter ()
         . filter ( |(_, content)| content . contains (member) )
-        . map ( |(forkee, _)| label (forkee) )
+        . map ( |(partner, _)| label (partner) )
         . collect::<Vec<String>> () . join (" and ") };
     let as_content_of = |member : &ID| -> String {
       let containers : String = containers_of (member);
@@ -122,13 +124,13 @@ pub fn hide_report_lines (
       changes . push ( format! ( "Stops hiding {} from {}{}.",
         label (member), forker_label (&node . pid), as_content_of (member) )); }
     let Some (disk) = &on_disk else { continue; };
-    if forkees . is_empty () { continue; }
+    if partner_contents . is_empty () { continue; }
     let contains_after : Vec<ID> = visible_members (&node . contains);
     let removed : Vec<ID> = visible_members (&disk . contains) . into_iter ()
       . filter ( |child| ! contains_after . contains (child) )
       . filter ( |child| ! deleted . contains (child) )
       . collect ();
-    let all_content : HashSet<ID> = forkee_contents . iter ()
+    let all_content : HashSet<ID> = partner_contents . iter ()
       . flat_map ( |(_, content)| content . iter () . cloned () )
       . collect ();
     for child in &removed {
@@ -139,8 +141,8 @@ pub fn hide_report_lines (
       let why : String = match stands_for {
         None => format! (
           "it is no content of {}, nor a mirror of any",
-          forkee_contents . iter ()
-            . map ( |(forkee, _)| label (forkee) )
+          partner_contents . iter ()
+            . map ( |(partner, _)| label (partner) )
             . collect::<Vec<String>> () . join (" or ") ),
         Some (member) if hidden . contains (&&member)
                          || deleted . contains (&member) => continue,

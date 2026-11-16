@@ -26,7 +26,9 @@
 // - T's title, edited there, is saved; FF's is refused;
 // - a headline typed under T joins T's content after Y; one typed
 //   under FF is refused;
-// - Z moved out of T's folder of what N hides is unhidden in N;
+// - Z, which only T contains, is in T's folder of what N hides, not
+//   in the folder of what N hides outside its fork partners; moved
+//   out of T's folder, it is unhidden in N;
 // - a buffer drawing T write-protected and bare rerenders as it is,
 //   and an editable-view request on N extends T.
 // A separate test narrows the skgrepo restriction so that T's record
@@ -472,28 +474,19 @@ async fn a_child_typed_under_a_foreign_forker_is_refused (
   Ok (( )) }
 
 /// Z, which N hides and T contains, stands in T's folder of what N
-/// hides in it. Moved out of that folder to stand under T, claiming,
-/// it is unhidden in N, as under a forkee. (The buffer leaves out the
-/// folder of what N hides outside its fork partners, which still
-/// lists Z, so that no edit of that folder hides it again: plan 2's
-/// slice 4 takes Z out of it, since T contains Z.)
+/// hides in it, and not in the folder of what N hides outside its
+/// fork partners, since T, a fork partner, contains it (here that
+/// folder holds nothing, so is not drawn). Moved out of T's folder to
+/// stand under T, claiming, Z is unhidden in N, as under a forkee.
 async fn a_hide_moved_out_under_a_forker_is_unhidden (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let view : String = view_of (config, tantivy, "N") ?;
-  let without_outside : String = {
-    let lines : Vec<&str> = view . lines () . collect ();
-    let at : usize = lines . iter ()
-      . position ( |line| line . contains ("hiddenOutsideOfForkPartnersFolder") )
-      . unwrap ();
-    let below : usize = lines [at + 1 ..] . iter ()
-      . take_while ( |line| depth (line) > depth (lines [at]) ) . count ();
-    let mut kept : Vec<&str> = lines [.. at] . to_vec ();
-    kept . extend ( &lines [at + 1 + below ..] );
-    kept . join ("\n") + "\n" };
+  assert! ( ! view . contains ("hiddenOutsideOfForkPartnersFolder"),
+            "nothing N hides is outside its fork partners:\n{}", view );
   let hidden_in : Vec<&str> = {
-    let lines : Vec<&str> = without_outside . lines () . collect ();
+    let lines : Vec<&str> = view . lines () . collect ();
     let at : usize = lines . iter ()
       . position ( |line| line . contains ("hiddenInForkPartnerFolder") ) . unwrap ();
     let below : usize = lines [at + 1 ..] . iter ()
@@ -501,13 +494,13 @@ async fn a_hide_moved_out_under_a_forker_is_unhidden (
     lines [at ..= at + below] . to_vec () };
   let z_line : &str = hidden_in [1];
   assert! ( z_line . contains ("(gnid Z)"), "{:?}", hidden_in );
-  let moved : String = without_outside
+  let moved : String = view
     . replacen ( &(hidden_in . join ("\n") + "\n"), "", 1 )
     . replacen (
-      &format! ("{}\n", line_of (&without_outside, "Y")),
+      &format! ("{}\n", line_of (&view, "Y")),
       &format! ("{}\n{} (skg node (gnid Z) (skgRepos (nodeRepo main))) Z\n",
-                line_of (&without_outside, "Y"),
-                "*" . repeat ( depth (line_of (&without_outside, "Y")) )),
+                line_of (&view, "Y"),
+                "*" . repeat ( depth (line_of (&view, "Y")) )),
       1 );
   save_cleanly (&moved, "N", config, tantivy) . await ?;
   assert_eq! ( members_of ( node (config, "N") ? . hides . or_default () ),

@@ -1704,7 +1704,7 @@ def check_forking_and_hiding_by_placing (context):
   if ( "Fork:" in completed . stdout or "Server: saved," not in completed . stdout
        or completed . stdout . count (hide_line) != 1 ):
     raise CaseFailure ( f"the hiding save printed {completed . stdout!r}" )
-  require_equal ( "what the node hides from what it forks",
+  require_equal ( "what the node hides from its forks",
                   skg_list (context, "elsewhere-id", "hides"),
                   [ "fred-detail-id" ] )
   lines = read_file (compact_path) . split ("\n")

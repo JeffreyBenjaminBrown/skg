@@ -1,0 +1,6 @@
+tantivy_folder = "/tmp/placeholder"
+beep_when_server_becomes_available = false
+
+[[repos]]
+name = "main"
+path = "main"
