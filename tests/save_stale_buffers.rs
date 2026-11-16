@@ -11,111 +11,26 @@ use skg::repo_watch::reload::reload_changed_skg_files;
 use skg::serve::ViewsState;
 use skg::serve::handlers::rebuild_session_lifetime_stores::rebuild_session_lifetime_stores_in_place;
 use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
-use skg::serve::handlers::save_buffer::handle_save_buffer_request;
-use skg::serve::handlers::single_root_view::handle_single_root_view_request;
 use skg::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::{
-  copy_dir_all, extract_string_field_from_sexp, graph_handle_from_config,
-  load_config_with_overrides, read_all_lp_messages, skg_env_from_parts};
-use skg::dbs::init::create_empty_tantivy_index;
-use skg::types::env::SkgEnv;
-use skg::types::misc::{SkgConfig, TantivyIndex};
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::test_utils::{extract_string_field_from_sexp, read_all_lp_messages};
+use skg::types::views_state::ViewforestId;
 
+use crate::save_handler_helpers::{
+  Fixture, errors_of, fixture_from, left_as_the_graph_has_it, new_connection,
+  open_view, save, saved};
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::fs;
-use std::io::{BufReader, Write};
+use std::io::BufReader;
 use std::net::TcpStream;
-use std::path::{Path, PathBuf};
-use tempfile::TempDir;
-
-struct Fixture {
-  dir    : TempDir,
-  config : SkgConfig,
-  env    : SkgEnv,
-}
+use std::path::PathBuf;
 
 fn fixture (
 ) -> Result<Fixture, Box<dyn Error>> {
-  let dir : TempDir = TempDir::new () ?;
-  copy_dir_all ( Path::new ("tests/save_stale_buffers/fixtures"), dir . path () ) ?;
-  let root : &Path = dir . path ();
-  let config : SkgConfig = load_config_with_overrides (
-    root . join ("skgconfig.toml") . to_str () . unwrap (),
-    Some ("save-stale-buffers"),
-    &[ ("main",   root . join ("main")),
-       ("theirs", root . join ("theirs")),
-       ("other",  root . join ("other")) ] ) ?;
-  fs::create_dir_all ( root . join ("other") ) ?;
-  let config : SkgConfig = SkgConfig {
-    tantivy_folder : root . join ("tantivy"),
-    data_root      : root . to_path_buf (),
-    .. config };
-  let tantivy : TantivyIndex =
-    create_empty_tantivy_index (&config . tantivy_folder) ?;
-  let env : SkgEnv = skg_env_from_parts (
-    &config, &tantivy, &graph_handle_from_config (&config) ?);
-  Ok ( Fixture { dir, config, env } ) }
-
-fn new_connection (
-) -> ViewsState {
-  ViewsState { open_views     : OpenViews::new (),
-               graph_straddle : None, } }
-
-/// Open a content view of 'gnid' as 'view_id': its text, which the
-/// client keeps as the view's baseline.
-fn open_view (
-  f           : &mut Fixture,
-  views_state : &mut ViewsState,
-  gnid        : &str,
-  view_id     : &str,
-) -> String {
-  let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
-  handle_single_root_view_request (
-    &mut stream,
-    &format! ( "((request . \"single root content view\") (id . \"{}\") (view-id . \"{}\"))",
-               gnid, view_id ),
-    &f . env, views_state,
-    &SkgrepoRestriction::unrestricted (&f . config) );
-  drop (stream);
-  let messages : Vec<String> = read_all_lp_messages (&mut BufReader::new (read_end));
-  let response : &String = messages . last () . expect ("a content-view response");
-  extract_string_field_from_sexp (response, "content") . expect ("content") }
-
-/// Save 'buffer' as 'view_id' through the save handler, with the
-/// envelope's '(baseline BASELINE)' when given: the terminal message.
-fn save (
-  f           : &mut Fixture,
-  views_state : &mut ViewsState,
-  view_id     : &str,
-  buffer      : &str,
-  baseline    : Option<&str>,
-) -> String {
-  let request : String = format! (
-    "((request . \"save buffer\") (view-id . \"{}\"))",
-    view_id );
-  let envelope : String = format! (
-    "((saved-buffer \"{}\"){} (other-views ()))",
-    sexp_string_body (buffer),
-    baseline . map ( |text| format! (" (baseline \"{}\")", sexp_string_body (text)) )
-      . unwrap_or_default () );
-  let (mut client_writes, server_reads) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  write! ( client_writes, "Content-Length: {}\r\n\r\n{}",
-           envelope . len (), envelope ) . unwrap ();
-  let (mut server_writes, client_reads) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  handle_save_buffer_request (
-    &mut BufReader::new (server_reads), &mut server_writes, &request,
-    &mut f . env, views_state,
-    &SkgrepoRestriction::unrestricted (&f . config) );
-  drop (server_writes);
-  read_all_lp_messages (&mut BufReader::new (client_reads))
-    . pop ()
-    . expect ("a terminal message") }
+  fixture_from ( "tests/save_stale_buffers/fixtures", "save-stale-buffers",
+                 &["main", "theirs", "other"] ) }
 
 /// Rerender every view 'views_state' holds: the "rerender-view"
 /// messages of the stream.
@@ -148,12 +63,6 @@ fn change_elsewhere (
     f, &mut elsewhere, &view_id, &edit (&view), Some (&view) );
   assert! ( saved (&result), "{}", result ); }
 
-/// 'text' escaped to sit between the quotes of a sexp string.
-fn sexp_string_body (
-  text : &str,
-) -> String {
-  text . replace ('\\', "\\\\") . replace ('"', "\\\"") }
-
 fn file_path (
   f       : &Fixture,
   skgrepo : &str,
@@ -175,18 +84,6 @@ fn texts_of_files_in (
   fs::read_dir ( f . dir . path () . join (skgrepo) ) . unwrap ()
     . map ( |entry| fs::read_to_string ( entry . unwrap () . path () ) . unwrap () )
     . collect () }
-
-fn errors_of (
-  save_result : &str,
-) -> String {
-  save_result . split ("(errors") . nth (1) . unwrap_or ("") . to_string () }
-
-/// Whether a terminal save message is a save-result without errors.
-fn saved (
-  save_result : &str,
-) -> bool {
-  save_result . starts_with ("((response-type save-result)")
-  && errors_of (save_result) . starts_with (" ())") }
 
 /// Replace b's body in a view of b.
 fn with_b_body_edited (
@@ -524,15 +421,6 @@ fn with_rb_body_edited (
   view : &str,
 ) -> String {
   view . replace ("rb's second line", "rb's second line, edited") }
-
-/// The warning a save gives for leaving 'gnid', titled 'title' in the
-/// buffer, as the graph has it, after the graph changed it.
-fn left_as_the_graph_has_it (
-  title : &str,
-  gnid  : &str,
-) -> String {
-  format! ( "Left as the graph has it: {} ({}), which changed after this buffer was rendered and which this buffer did not edit.",
-            title, gnid ) }
 
 /// The same warning, for a 'gnid' the graph deleted.
 fn left_deleted_as_the_graph_has_it (

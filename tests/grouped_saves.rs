@@ -8,6 +8,10 @@ mod git_fixture_helpers;
 #[path = "shared/tcp_stream_pair.rs"]
 mod tcp_stream_pair;
 
+#[path = "shared/save_handler_helpers.rs"]
+#[allow(dead_code)] // Each test file uses only some of the helpers.
+mod save_handler_helpers;
+
 #[path = "shared/parse_helpers.rs"]
 #[allow(dead_code)] // This target uses only some of the helpers.
 mod parse_helpers;
