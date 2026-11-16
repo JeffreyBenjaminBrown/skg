@@ -13,11 +13,10 @@
 //!   claimsMembership, and N is not graph-content of R after the
 //!   save, then N is hidden from R.
 //! - If N is a claimsMembership viewchild of E but is not
-//!   graph-content of E, then it is not a hiderel edit. If the graph
-//!   lacks N (the user typed it there) it joins E's content, when the
-//!   user owns E, and the save is refused otherwise
-//!   ('add_children_typed_under_member_as_such'). Any other such N is not
-//!   touched: the refresh of the save's rerender makes it vanish.
+//!   graph-content of E, then it is not a hiderel edit: the user
+//!   placed it there (typed it, or moved it from elsewhere), and it
+//!   joins E's content, when the user owns E, and the save is refused
+//!   otherwise ('add_children_placed_under_member_as_such').
 //! - A foreign R records no hides: a save that would hide or unhide
 //!   anything in R is refused ('cut_under_a_foreign_note').
 //! - An E the graph lacks (typed there) has no list to lose: what it
@@ -97,7 +96,7 @@ pub fn resolve_visibility (
       opt_graphnode_by_gnid (
         graph, config, forker ) ?
     else { continue; };
-    add_children_typed_under_member_as_such (
+    add_children_placed_under_member_as_such (
       &mut lowered, &forkee_from_disk, MemberAsSuch::Forkee, &signal . visible,
       graph, config, skgrepo_restriction ) ?;
     let forker_contains : HashSet<ID> =
@@ -172,19 +171,22 @@ impl MemberAsSuch {
     match self { MemberAsSuch::Forkee => "forkee",
                  MemberAsSuch::Forker => "forker", } }}
 
-/// Each child typed under a member M as such (a claiming child the
-/// buffer shows there, of a node the graph lacks, that M's list does
-/// not name) joins M's content, when the user owns M: inserted right
-/// after the sibling it follows in the buffer that M's list names (or
-/// another child typed there), first when none precedes it. M's
-/// contains is read by the records the skgrepo restriction shows, as
-/// the view drew them; disk supplementation keeps the rest where they
-/// stand. Under a foreign M the save is refused: only M's owner can
-/// change its content, and making it one's own (forking it) is done
-/// from a view of M as itself. A child the graph has, placed under M
-/// but not named by its list, is no member of M and joins nothing:
-/// the save's rerender leaves it out.
-fn add_children_typed_under_member_as_such (
+/// Each child placed under a member M as such (a claiming child the
+/// buffer shows there that M's list does not name: a headline typed
+/// there, or a node moved there from elsewhere) joins M's content,
+/// when the user owns M: inserted right after the sibling it follows
+/// in the buffer that M's list names (or another child placed there),
+/// first when none precedes it ('docs/forks.org', "Adding a child
+/// under a member as such"). M's contains is read by the records the
+/// skgrepo restriction shows, as the view drew them; disk
+/// supplementation keeps the rest where they stand. Under a foreign M
+/// the save is refused: only M's owner can change its content, and
+/// making it one's own is done from a view of M as itself. A child a
+/// stale buffer shows under M, which another view removed from M's
+/// list since, is never put back here: the buffer's baseline shows
+/// it too, so M is a stale graphnode the buffer did not edit, left as
+/// the graph has it ('server/serve/handlers/save_staleness.rs').
+fn add_children_placed_under_member_as_such (
   lowered             : &mut LoweredNodeIntents,
   member_from_disk    : &Graphnode,
   member_as_such      : MemberAsSuch,
@@ -200,19 +202,18 @@ fn add_children_typed_under_member_as_such (
       &member_from_disk . contains, skgrepo_restriction );
   let named : HashSet<ID> =
     members_of (&member_from_disk . contains) . iter () . map (key) . collect ();
-  let typed : HashSet<&ID> =
+  let placed : HashSet<&ID> =
     shown . iter ()
-    . filter ( |gnid| graph . pid_of (gnid) . is_none ()
-                      && ! named . contains (&key (gnid)) )
+    . filter ( |gnid| ! named . contains (&key (gnid)) )
     . collect ();
-  if typed . is_empty () { return Ok (( )); }
+  if placed . is_empty () { return Ok (( )); }
   if ! config . skgrepo_is_owned (&member_from_disk . home_skgrepo) {
     return Err ( Box::new ( BufferValidationError::Other ( format! (
       "Cannot add a child under {} ('{}'), a foreign node shown as a {}: only its owner can change its content. To add one, make the node your own first: view it as itself, where an edit forks it.",
       member_from_disk . pid, member_from_disk . title, member_as_such . word () )))); }
-  let mut follows : Option<usize> = None; // where the last sibling the list names, or the last typed child, stands
+  let mut follows : Option<usize> = None; // where the last sibling the list names, or the last child placed there, stands
   for gnid in shown {
-    if typed . contains (gnid) {
+    if placed . contains (gnid) {
       let at : usize = follows . map_or (0, |position| position + 1);
       contains . insert (at, gnid . clone ());
       follows = Some (at);
@@ -229,9 +230,9 @@ fn add_children_typed_under_member_as_such (
 /// ('less_what_the_forker_integrates' in 'server/refresh/goal.rs'),
 /// and otherwise all of it; either way by the records the skgrepo
 /// restriction shows, as the view drew it. So:
-/// - a child typed under F joins F's content, when the user owns F,
-///   and the save is refused otherwise
-///   ('add_children_typed_under_member_as_such');
+/// - a child placed under F (typed there, or moved there) joins F's
+///   content, when the user owns F, and the save is refused otherwise
+///   ('add_children_placed_under_member_as_such');
 /// - a child of F that N hides, shown claiming under F (moved out of
 ///   F's folder of what N hides in it), is unhidden in N, as under a
 ///   forkee;
@@ -269,7 +270,7 @@ fn resolve_forker_visibility (
     let Some (note_from_disk) : Option<Graphnode> =
       opt_graphnode_by_gnid (graph, config, note) ?
       else { continue; };
-    add_children_typed_under_member_as_such (
+    add_children_placed_under_member_as_such (
       lowered, &forker_from_disk, MemberAsSuch::Forker, &signal . visible,
       graph, config, skgrepo_restriction ) ?;
     let key : &dyn Fn (&ID) -> ID =

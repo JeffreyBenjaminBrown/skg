@@ -459,8 +459,9 @@ spent: it shows its content less what the node contains or hides,
 and its own folders. Its title and body save when you own it; a
 foreign one's edits are refused (view it as itself to fork it).
 Deleting one of its children hides it in the forking node; a headline
-typed under it joins its content, after the child it follows, when
-you own it, and is refused under a foreign one.
+typed under it, or a node moved there from elsewhere, joins its
+content, after the child it follows, when you own it, and is refused
+under a foreign one.
 
 Each node a forksFolder holds that forks the node and that the node
 does not fork (a forker as such, =Kb=, claiming nothing) is drawn the
@@ -471,8 +472,8 @@ folder of what the node hides of its content ("☮ It contains these,
 but c hides them."), then the folder of what it hides of the node's
 content ("☮ a hides these, which c contains."), each folded and
 write-protected. Its title and body save when you own it, and are
-refused when it is foreign; a headline typed under it joins its
-content when you own it. A save never reads its partial content as
+refused when it is foreign; a headline typed under it, or a node
+moved there, joins its content when you own it. A save never reads its partial content as
 its whole list. Deleting one of its children (a cut) makes the
 node fork it, so it becomes a mutual (=bKb=), redrawn claiming, among
 the forkees, without its folder of what it hides of the node's

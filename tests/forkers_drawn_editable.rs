@@ -23,7 +23,8 @@
 //   itself again;
 // - T's title, edited there, is saved; FF's is refused;
 // - a headline typed under T joins T's content after Y; one typed
-//   under FF is refused;
+//   under FF is refused; so does, and is, a node moved there from N's
+//   content;
 // - Z, which only T contains, is in T's folder of what N hides, not
 //   in the folder of what N hides outside its fork partners; moved
 //   out of T's folder, it is unhidden in N;
@@ -41,8 +42,8 @@ use crate::git_fixture::{
   Fixture, OwnedSkgrepos, open_content_view, switch_skgrepo_set, with_git_fixture,
   write_unchanged_skgrepos};
 use crate::view_and_save_helpers::{
-  children_of, content_of, depth, ids, line_of, node, refusal_of, save_cleanly,
-  skg_files, under, view_of, with_line_after_subtree_of};
+  children_of, content_of, depth, ids, line_of, moved_after, node, refusal_of,
+  save_cleanly, skg_files, under, view_of, with_line_after_subtree_of};
 use skg::metadata_canon::without_viewnode_ids;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::run_with_shared_test_stores;
@@ -91,6 +92,10 @@ fn all_tests
       a_child_typed_under_an_owned_forker_joins_its_content (&s . config, &mut s . tantivy) . await ?;
       s . reset ("a_child_typed_under_a_foreign_forker_is_refused", FIXTURES) ?;
       a_child_typed_under_a_foreign_forker_is_refused (&s . config, &mut s . tantivy) . await ?;
+      s . reset ("a_node_moved_under_an_owned_forker_joins_its_content", FIXTURES) ?;
+      a_node_moved_under_an_owned_forker_joins_its_content (&s . config, &mut s . tantivy) . await ?;
+      s . reset ("a_node_moved_under_a_foreign_forker_is_refused", FIXTURES) ?;
+      a_node_moved_under_a_foreign_forker_is_refused (&s . config, &mut s . tantivy) . await ?;
       s . reset ("a_hide_moved_out_under_a_forker_is_unhidden", FIXTURES) ?;
       a_hide_moved_out_under_a_forker_is_unhidden (&s . config, &mut s . tantivy) . await ?;
       s . reset ("a_write_protected_forker_stays_until_its_note_is_extended", FIXTURES) ?;
@@ -296,6 +301,46 @@ async fn a_child_typed_under_a_foreign_forker_is_refused (
   assert! ( refusal . contains ("Cannot add a child under FF")
             && refusal . contains ("shown as a forker")
             && refusal . contains ("make the node your own first"),
+            "{}", refusal );
+  assert_eq! ( skg_files (config) ?, before, "nothing is written" );
+  Ok (( )) }
+
+/// X4, cut from N's content and pasted under T after Y, joins T's
+/// content right after Y, as a headline typed there does
+/// ('docs/forks.org', "Adding a child under a member as such"); N no
+/// longer contains it and hides nothing new, since no fork partner
+/// contained it. The saved view shows it under T, after Y: T now adds
+/// it to N.
+async fn a_node_moved_under_an_owned_forker_joins_its_content (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let view : String = view_of (config, tantivy, "N") ?;
+  let moved : String = moved_after (&view, "X4", "Y");
+  let saved_view : String = save_cleanly (&moved, "N", config, tantivy) . await ?;
+  assert_eq! ( members_of (& node (config, "T") ? . contains),
+               ids (&["X1", "X3", "Y", "X4", "Z"]),
+               "X4 joins T's content after Y" );
+  let n : Graphnode = node (config, "N") ?;
+  assert_eq! ( members_of (&n . contains), ids (&["X1", "X2", "X3"]), "X4 left N" );
+  assert_eq! ( members_of (n . hides . or_default ()), ids (&["Z"]), "N hides nothing new" );
+  let shown : Vec<&str> = content_of (&saved_view, "T");
+  assert! ( shown . len () == 2 && shown [1] . contains ("(gnid X4)"),
+            "the saved view shows X4 under T, after Y:\n{}", saved_view );
+  Ok (( )) }
+
+/// X4, moved under FF, foreign, is refused as a headline typed there
+/// is; nothing is written.
+async fn a_node_moved_under_a_foreign_forker_is_refused (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let view : String = view_of (config, tantivy, "N") ?;
+  let moved : String = moved_after (&view, "X4", "f1");
+  let before : BTreeMap<String, String> = skg_files (config) ?;
+  let refusal : String = refusal_of (&moved, "N", config, tantivy) . await ?;
+  assert! ( refusal . contains ("Cannot add a child under FF")
+            && refusal . contains ("shown as a forker"),
             "{}", refusal );
   assert_eq! ( skg_files (config) ?, before, "nothing is written" );
   Ok (( )) }

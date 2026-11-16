@@ -147,6 +147,21 @@ pub fn with_line_after_subtree_of (
   for line in below { subtree . push_str (&format! ("{}\n", line)); }
   buf . replacen (&subtree, &format! ("{}{}\n", subtree, typed), 1) }
 
+/// 'view' with the first line showing 'moved' (a leaf) cut, and
+/// pasted right after the first line showing 'sibling' and what
+/// stands under it, at that line's depth.
+pub fn moved_after (
+  view    : &str,
+  moved   : &str,
+  sibling : &str,
+) -> String {
+  let moved_line : &str = line_of (view, moved);
+  assert! ( under (view, moved) . is_empty (), "{} is a leaf:\n{}", moved, view );
+  let stars : String = "*" . repeat ( depth (line_of (view, sibling)) );
+  with_line_after_subtree_of (
+    &without_subtree_of (view, moved), sibling,
+    &format! ( "{} {}", stars, moved_line . trim_start_matches ('*') . trim_start () )) }
+
 /// The gnids of the members of the first forks folder in 'buf', in
 /// order.
 pub fn first_forks_folders_members (

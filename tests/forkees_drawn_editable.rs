@@ -12,6 +12,8 @@
 // - E's title, edited there, is saved; F's is refused;
 // - a headline typed under E joins E's content, after the sibling it
 //   follows; one typed under F is refused;
+// - a node moved from N's content to under E joins E's content, as a
+//   typed one does, and leaves N; one moved under F is refused;
 // - with a node budget of 1, E and F are drawn write-protected, bare;
 // - a buffer drawing E write-protected (as an older server did)
 //   rerenders as it is, and an editable-view request on N extends E;
@@ -21,8 +23,8 @@ use std::error::Error;
 use std::collections::BTreeMap;
 
 use crate::view_and_save_helpers::{
-  children_of, depth, ids, line_of, node, refusal_of, save_cleanly, skg_files,
-  under, view_of, with_line_after_subtree_of, without_subtree_of};
+  children_of, depth, ids, line_of, moved_after, node, refusal_of, save_cleanly,
+  skg_files, under, view_of, with_line_after_subtree_of, without_subtree_of};
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
@@ -49,6 +51,10 @@ fn all_tests
       a_child_typed_under_an_owned_forkee_joins_its_content (&s . config, &mut s . tantivy) . await ?;
       s . reset ("a_child_typed_under_a_foreign_forkee_is_refused", FIXTURES) ?;
       a_child_typed_under_a_foreign_forkee_is_refused (&s . config, &mut s . tantivy) . await ?;
+      s . reset ("a_node_moved_under_an_owned_forkee_joins_its_content", FIXTURES) ?;
+      a_node_moved_under_an_owned_forkee_joins_its_content (&s . config, &mut s . tantivy) . await ?;
+      s . reset ("a_node_moved_under_a_foreign_forkee_is_refused", FIXTURES) ?;
+      a_node_moved_under_a_foreign_forkee_is_refused (&s . config, &mut s . tantivy) . await ?;
       s . reset ("a_spent_budget_leaves_forkees_write_protected", FIXTURES) ?;
       a_spent_budget_leaves_forkees_write_protected (&s . config, &mut s . tantivy) . await ?;
       s . reset ("a_write_protected_forkee_stays_until_its_forker_is_extended", FIXTURES) ?;
@@ -193,6 +199,47 @@ async fn a_child_typed_under_a_foreign_forkee_is_refused (
     &view, "f1", &format! ("{} typed under F", stars) );
   let before : BTreeMap<String, String> = skg_files (config) ?;
   let refusal : String = refusal_of (&typed, "N", config, tantivy) . await ?;
+  assert! ( refusal . contains ("Cannot add a child under F")
+            && refusal . contains ("make the node your own first"),
+            "{}", refusal );
+  assert_eq! ( skg_files (config) ?, before, "nothing is written" );
+  Ok (( )) }
+
+/// n1, cut from N's content and pasted under E after e1, joins E's
+/// content right after e1, as a headline typed there does
+/// ('docs/forks.org', "Adding a child under a member as such"); N no
+/// longer contains it, and hides nothing new (no fork partner
+/// contained it). The saved view shows it under E.
+async fn a_node_moved_under_an_owned_forkee_joins_its_content (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let view : String = view_of (config, tantivy, "N") ?;
+  let moved : String = moved_after (&view, "n1", "e1");
+  let saved : String = save_cleanly (&moved, "N", config, tantivy) . await ?;
+  assert_eq! ( members_of (& node (config, "E") ? . contains),
+               ids (&["e1", "n1", "H", "e2"]),
+               "n1 joins E's content after e1" );
+  let n : Graphnode = node (config, "N") ?;
+  assert! ( members_of (&n . contains) . is_empty (), "n1 left N: {:?}", n . contains );
+  assert_eq! ( members_of (n . hides . or_default ()), ids (&["H", "G"]),
+               "N hides nothing new" );
+  let shown : Vec<&str> = children_of (&saved, "E") . into_iter ()
+    . filter ( |line| line . contains ("(skg node ") ) . collect ();
+  assert! ( shown . len () == 3 && shown [1] . contains ("(gnid n1)"),
+            "the saved view shows n1 under E, after e1:\n{}", saved );
+  Ok (( )) }
+
+/// n1, moved under F, foreign, is refused as a headline typed there
+/// is; nothing is written.
+async fn a_node_moved_under_a_foreign_forkee_is_refused (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let view : String = view_of (config, tantivy, "N") ?;
+  let moved : String = moved_after (&view, "n1", "f1");
+  let before : BTreeMap<String, String> = skg_files (config) ?;
+  let refusal : String = refusal_of (&moved, "N", config, tantivy) . await ?;
   assert! ( refusal . contains ("Cannot add a child under F")
             && refusal . contains ("make the node your own first"),
             "{}", refusal );

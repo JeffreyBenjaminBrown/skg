@@ -1710,12 +1710,13 @@ editability or the node budget is spent; a foreign one too. One the
 buffer already shows write-protected stays so at a plain rerender;
 =(viewRequests editableView)= on its forker extends it. An editable
 forkee as such saves its title and body when the user owns it (a
-foreign one's must match the disk), and a headline typed under it
-joins its content when the user owns it (the save is refused under a
+foreign one's must match the disk), and a child placed under it that
+its list does not name (typed there, or moved from elsewhere) joins
+its content when the user owns it (the save is refused under a
 foreign one). Each forker as such (a member of that =forksFolder=
 claiming nothing, which forks the occurrence's note and is not
 forked by it) is drawn the same way, showing what it adds to the
-note's content; its title and body, and a headline typed under it,
+note's content; its title and body, and a child placed under it,
 are read as a forkee as such's, never its content as its whole
 list. A save that cuts one of its children makes the note fork it,
 and hides the child in the note unless the note contains it after the

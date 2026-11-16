@@ -315,13 +315,13 @@ fn all_tests
         "tests/hidden_from_forks/fixtures-forkee-edit") ?;
       test_moving_foreign_forkee_content_elsewhere_still_hides (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_extra_view_child_under_foreign_forkee_vanishes",
+      s . reset ("test_a_node_placed_under_a_foreign_forkee_is_refused",
         "tests/hidden_from_forks/fixtures-forkee-edit") ?;
-      test_extra_view_child_under_foreign_forkee_vanishes (
+      test_a_node_placed_under_a_foreign_forkee_is_refused (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_extra_view_child_under_owned_forkee_vanishes",
+      s . reset ("test_a_node_placed_under_an_owned_forkee_joins_it",
         "tests/hidden_from_forks/fixtures-forkee-edit") ?;
-      test_extra_view_child_under_owned_forkee_vanishes (
+      test_a_node_placed_under_an_owned_forkee_joins_it (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_forkee_and_compound_partner_folders",
         "tests/hidden_from_forks/fixtures-every-kind-of-folder/skgconfig.toml") ?;
@@ -874,7 +874,11 @@ async fn test_moving_foreign_forkee_content_elsewhere_still_hides (
       rerendered );
     Ok (( )) }
 
-async fn test_extra_view_child_under_foreign_forkee_vanishes (
+/// A node the graph has, placed under e, a foreign forkee as such, is
+/// refused as a headline typed there is: only e's owner can change
+/// e's content ('docs/forks.org', "Adding a child under a member as
+/// such"). Nothing is written.
+async fn test_a_node_placed_under_a_foreign_forkee_is_refused (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -902,29 +906,26 @@ async fn test_extra_view_child_under_foreign_forkee_vanishes (
         "**** (skg node (gnid e2) (skgRepos (nodeRepo foreign)) writeProtected) e2\n\
          **** (skg node (gnid a) (skgRepos (nodeRepo owned)) writeProtected) a\n\
          **** (skg node (gnid e1) (skgRepos (nodeRepo foreign)) writeProtected) e1" );
-    let rerendered : String =
-      save_buffer_for_hidden_from_forks_test (
-        &edited, &config, tantivy, &graph, &mut views_state
-      ) . await?;
-
-    // The extra viewchild 'a' (not in e's contains, claiming
-    // membership) vanishes.
+    let e_before : Graphnode = node_from_disk (&config, "e")?;
+    let refusal : String =
+      match save_buffer_for_hidden_from_forks_test (
+        &edited, &config, tantivy, &graph, &mut views_state ) . await {
+        Ok (saved) => panic! ( "placing a under foreign e must be refused; it saved:\n{}", saved ),
+        Err (error) => error . to_string (), };
     assert!(
-      ! rerendered . contains ("(gnid a)"),
-      "Extra view-child 'a' should vanish:\n{}",
-      rerendered );
-    assert_line_order (&rerendered, "(gnid e1)", "(gnid e2)");
-    assert_does_not_hide_e1 (&rerendered);
+      refusal . contains ("Cannot add a child under e ('forkee-e'), a foreign node shown as a forkee"),
+      "{}", refusal );
     let e_skg : Graphnode =
       node_from_disk (&config, "e")?;
-    assert!(
-      ! e_skg . contains . iter () . any ( |m| m . member == ID::from ("a") ),
-      "Extra view-child should not become graph-content of e: {:?}",
-      e_skg . contains );
-
+    assert_eq! ( e_skg . contains, e_before . contains, "e's content is unchanged" );
     Ok (( )) }
 
-async fn test_extra_view_child_under_owned_forkee_vanishes (
+/// A node the graph has, placed under r, an owned forkee as such
+/// (here a member the same save makes a forkee: a claims it in its
+/// forks folder), joins r's content, after the sibling it follows,
+/// as a headline typed there does ('docs/forks.org', "Adding a child
+/// under a member as such"); a hides nothing for it.
+async fn test_a_node_placed_under_an_owned_forkee_joins_it (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -940,32 +941,30 @@ async fn test_extra_view_child_under_owned_forkee_vanishes (
               ** (skg forksFolder)
               *** (skg node (gnid r) (skgRepos (nodeRepo owned))) r
               **** (skg node (gnid r2) (skgRepos (nodeRepo owned)) writeProtected) r2
-              **** (skg node (gnid e) (skgRepos (nodeRepo foreign)) writeProtected) forkee-e
+              **** (skg node (gnid e11) (skgRepos (nodeRepo foreign)) writeProtected) e11
               **** (skg node (gnid r1) (skgRepos (nodeRepo owned)) writeProtected) r1
               "} . to_string();
     let rerendered : String =
       save_buffer_for_hidden_from_forks_test (
         &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
-
-    // The extra viewchild 'e' (not in r's contains, claiming
-    // membership) vanishes.
     assert!(
-      ! rerendered . contains ("(gnid e)"),
-      "Extra view-child 'e' should vanish:\n{}",
+      rerendered . contains ("(gnid e11)"),
+      "e11 stands under r:\n{}",
       rerendered );
-    assert_line_order (&rerendered, "(gnid r1)", "(gnid r2)");
     assert!(
       ! rerendered . contains ("hiddenInForkPartnerFolder"),
-      "Extra view-child should not infer a hide:\n{}",
+      "placing e11 hides nothing:\n{}",
       rerendered );
     let r_skg : Graphnode =
       node_from_disk (&config, "r")?;
-    assert!(
-      ! r_skg . contains . iter () . any ( |m| m . member == ID::from ("e") ),
-      "Extra view-child should not become graph-content of r: {:?}",
-      r_skg . contains );
-
+    assert_eq! (
+      r_skg . contains . iter () . map ( |m| m . member . clone () ) . collect::<Vec<ID>> (),
+      vec! [ ID::from ("r1"), ID::from ("r2"), ID::from ("e11") ],
+      "e11 joins r's content after r2, the sibling it follows" );
+    let a_skg : Graphnode =
+      node_from_disk (&config, "a")?;
+    assert! ( a_skg . hides . or_default () . is_empty (), "{:?}", a_skg . hides );
     Ok (( )) }
 
 /// Every kind of Folder:

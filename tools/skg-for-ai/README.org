@@ -1388,6 +1388,9 @@ there claiming nothing; removing it hides it in the folder's node.
 Under it, a forker as such, stands what it adds to the folder's
 node's content; removing one of those makes the folder's node fork
 it, and hides the child unless the node contains it after the save.
+A node placed under a forkee or forker as such joins that member's
+content, after the child it follows, when you own the member; under
+a foreign one the save is refused.
 
 A placed node takes no other word in its handle, no body and no
 children in the save that places it: it is saved write-protected,
@@ -1419,8 +1422,9 @@ editable node, unless the view already shows its node editable (a
 repeat); its title and body save when you own it, and a foreign
 one's are refused; a child removed from under it is hidden instead,
 and from under a forker the node also comes to fork it (see "Placing
-an existing node"); a headline typed under it joins its content when
-you own it, and is refused under a foreign one.
+an existing node"); a headline typed under it, or an existing node
+moved there, joins its content when you own it, and is refused under
+a foreign one.
 
 The report says what forks, and where the clone goes:
 #+begin_example

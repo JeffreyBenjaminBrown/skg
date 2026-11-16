@@ -166,7 +166,8 @@ fn orphan_warnings (
 /// reads no claims. (A claiming child of a forks folder is a
 /// forkee as such, which the save does not create. A child typed under
 /// an editable member as such has a parent that reads claims: it
-/// joins the member's content, or the save is refused.)
+/// joins the member's content, or the save is refused, as a node moved
+/// there does.)
 fn is_created_as_an_orphan (
   viewforest : &ViewForest,
   node       : NodeRef<Viewnode>,

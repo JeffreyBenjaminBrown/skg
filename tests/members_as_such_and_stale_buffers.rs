@@ -232,3 +232,51 @@ fn a_collateral_view_redraws_a_fork_the_save_made_as_a_claim
             && list_in (&bx, "forks") == vec! ["byx"],
             "{}", bx );
   Ok (()) }
+
+//
+// A child placed under a member as such, and a stale buffer
+//
+
+#[test]
+fn a_stale_buffer_does_not_put_back_a_child_removed_from_a_member_as_such
+  () -> Result<(), Box<dyn Error>> {
+  // The first client's view of A shows E, A's forkee as such, with e1
+  // and e2 under it. The second removes e2 from E in E's own view.
+  // The first view still shows e2 under E, and its baseline does too,
+  // so E is stale and unedited there: saved unchanged, or with
+  // another node edited, E is left as the graph has it, without e2;
+  // with E edited, the save is refused.
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let mut second : ViewsState = new_connection ();
+  let a_in_first : String = open_view (&mut f, &mut first, "A", "A-first");
+  assert! ( under (&a_in_first, "E") . iter () . any ( |line| line . contains ("(gnid e2)") ),
+            "{}", a_in_first );
+  let e_in_second : String = open_view (&mut f, &mut second, "E", "E-second");
+  let removal : String = save (
+    &mut f, &mut second, "E-second",
+    &without_subtree_of (&e_in_second, "e2"), Some (&e_in_second) );
+  assert! ( saved (&removal), "{}", removal );
+  assert_eq! ( list_in (&file_text (&f, "main", "E"), "contains"), vec! ["e1"] );
+  let unchanged : String = save (
+    &mut f, &mut first, "A-first", &a_in_first, Some (&a_in_first) );
+  assert! ( saved (&unchanged)
+            && warnings_of (&unchanged) . contains (&left_as_the_graph_has_it ("E", "E")),
+            "{}", unchanged );
+  assert_eq! ( list_in (&file_text (&f, "main", "E"), "contains"), vec! ["e1"],
+               "e2 is not put back" );
+  let other_edit : String = save (
+    &mut f, &mut first, "A-first", &retitled (&a_in_first, "a1", "a1 retitled"),
+    Some (&a_in_first) );
+  assert! ( saved (&other_edit), "{}", other_edit );
+  assert! ( file_text (&f, "main", "a1") . contains ("title: a1 retitled") );
+  assert_eq! ( list_in (&file_text (&f, "main", "E"), "contains"), vec! ["e1"],
+               "e2 is not put back" );
+  let e_edited : String = save (
+    &mut f, &mut first, "A-first", &retitled (&a_in_first, "E", "E retitled"),
+    Some (&a_in_first) );
+  assert! ( ! saved (&e_edited)
+            && e_edited . contains ("changed after the buffer was rendered"),
+            "{}", e_edited );
+  assert_eq! ( list_in (&file_text (&f, "main", "E"), "contains"), vec! ["e1"] );
+  Ok (()) }

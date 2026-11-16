@@ -249,6 +249,27 @@ skgrepo list ranks first, usually the original; the save warns that
 it does, and that switching the view to your own perspective
 (=C-c v o=) shows the fork.
 
+*** Adding a child under a member as such
+
+A member as such of the forks folder, forkee or forker, shows its
+content in part, so the save never reads what stands under it as its
+whole list. But a child you place under it that its list does not
+name -- a headline you type there, or a node you move there (cut from
+elsewhere and pasted) -- joins that member's content, right after the
+sibling it follows, when you own the member; the place it was cut
+from loses it, as any move does
+('add_children_placed_under_member_as_such' in
+'server/from_text/local_fieldintent_collection/resolve_visibility.rs').
+Under a member someone else owns the save is refused: only its owner
+can change its content, and to add a child you must first make the
+node your own, from a view of it as itself.
+
+A stale view does not put back a child another view removed from the
+member: the view's baseline shows that child under the member too, so
+the member, which the graph changed under the view, is left as the
+graph has it, with a warning; and if the view edits the member, the
+save is refused ('server/serve/handlers/save_staleness.rs').
+
 *** Cutting from a forker
 
 A note that forks yours stands in your note's forks folder too, as a

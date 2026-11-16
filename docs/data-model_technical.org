@@ -627,10 +627,12 @@ the edits of the hidden-outside folder, which run last. So:
   cutting one of E's children hides it in N, and a child N hides,
   shown claiming under E, is unhidden (the forkee-visibility step), a
   save that would hide or unhide anything in a foreign N being
-  refused; a headline typed under E joins E's content, after the
-  sibling it follows, when the user owns E, and is refused otherwise;
+  refused; a child placed under E that E's list does not name (a
+  headline typed there, or a node moved there) joins E's content,
+  after the sibling it follows, when the user owns E, and is refused
+  otherwise;
 - in a forker as such F, drawn editable: F's title and body are saved
-  or refused as E's are, and a headline typed under F joins F's
+  or refused as E's are, and a child placed under F joins F's
   content as under E; a child N hides, shown claiming under F, is
   unhidden; a child F showed that the buffer no longer shows under
   F was cut from it, which makes N fork F (a mutual now) and hides

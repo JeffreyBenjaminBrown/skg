@@ -575,8 +575,8 @@ fn content_members (
 /// This returns the children that the buffer presents as visible
 /// content of one member as such of a forks folder. The list is not
 /// saved as the member's contains; it is the signal from which the
-/// note's hides and unhides, and the children typed under the member,
-/// are inferred, downstream. It is not deduplicated.
+/// note's hides and unhides, and the children placed under the
+/// member (typed there, or moved there), are inferred, downstream. It is not deduplicated.
 fn visible_content_members (
   node_ref : NodeRef<Viewnode>,
 ) -> Vec<ID> {

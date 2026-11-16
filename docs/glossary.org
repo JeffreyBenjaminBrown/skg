@@ -646,11 +646,14 @@ own list is never read there, since it shows its content in part. Its
 title and body are saved when the user owns it, and refused when it
 is foreign (a text claim: they must stay as on disk). Cutting one of
 its children, or showing again one the forker hides, edits what the
-forker hides (see "the forkee-visibility step"). A headline typed
-under it joins its content, after the sibling it follows, when the
-user owns it; under a foreign one the save is refused, saying to make
-the node one's own first ('add_children_typed_under_member_as_such' in
-'server/from_text/local_fieldintent_collection/resolve_visibility.rs').
+forker hides (see "the forkee-visibility step"). A child placed under
+it that its list does not name -- a headline typed there, or a node
+moved there from elsewhere -- joins its content, after the sibling it
+follows, when the user owns it; under a foreign one the save is
+refused, saying to make the node one's own first
+('add_children_placed_under_member_as_such' in
+'server/from_text/local_fieldintent_collection/resolve_visibility.rs';
+'docs/forks.org', "Adding a child under a member as such").
 Its delete, nodeMerge and flag requests are ignored. A member of the
 folder claiming nothing -- a forker-only member, or a forkee the user
 detached -- is no forkee as such but a forker as such.
@@ -679,8 +682,8 @@ of what N hides in it and the folder of what it hides of N's content
 forkee as such, never as its whole list: an absent child is one N
 contains or hides, never removed from the forker. Its title and body
 are saved when the user owns it, and refused when it is foreign; a
-headline typed under it joins its content when the user owns it, and
-is refused otherwise; its delete, nodeMerge and flag requests are
+child placed under it (typed, or moved there) joins its content when
+the user owns it, and is refused otherwise; its delete, nodeMerge and flag requests are
 ignored. What the buffer shows under it is the forker-visibility
 signal (see "the forker-visibility step"): cutting a child from it
 makes N fork it, so that it stands as a mutual.
