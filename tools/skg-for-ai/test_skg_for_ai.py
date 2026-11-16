@@ -3152,14 +3152,16 @@ FOLLOWS_YOURS_SUMMARY = (
   "# Showing your perspective (each root author's perspective is the default).\n" )
 FOLLOWS_THIRDS_SUMMARY = (
   "# Showing third's perspective (each root author's perspective is the default).\n" )
-R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n***** ⟨It forks these, or these fork it.⟩\n****** A ⟨☮ Kb ⟳⟩\n****** B ⟨☮ Kb ⌂:third⟩\n****** U ⟨☮ Kb ⌂:main⟩\n** K ⟨0k⟩\n"
-R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK ⌂:foreign⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n***** ⟨It forks these, or these fork it.⟩\n****** A ⟨☮ Kb⟩\n****** B ⟨☮ Kb ⌂:third⟩\n****** U ⟨☮ Kb ⟳ ⌂:main⟩\n** K ⟨0k⟩\n"
+R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n***** ⟨It forks these, or these fork it.⟩\n****** A ⟨☮ Kb ⟳⟩\n****** B ⟨Kb ⌂:third⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳ ⌂:foreign⟩\n****** U ⟨Kb ⌂:main⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳ ⌂:foreign⟩\n** K ⟨0o⟩\n"
+R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK ⌂:foreign⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n***** ⟨It forks these, or these fork it.⟩\n****** A ⟨Kb⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳⟩\n****** B ⟨Kb ⌂:third⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳ ⌂:foreign⟩\n****** U ⟨☮ Kb ⟳ ⌂:main⟩\n** K ⟨0o⟩\n"
 def once_u_has_a_body (view):
   """VIEW as drawn once U has a body: U's write-protected occurrence,
-  as a forker of M in M's forks folder, says so ('B')."""
+  a repeat among M's forkers where U stands in M's place, says so
+  ('B'). Where U is no repeat it is an editable forker as such, which
+  shows its body."""
   return view . replace ( "U ⟨☮ Kb", "U ⟨☮B Kb" )
 
-R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK ⌂:foreign⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n***** ⟨It forks these, or these fork it.⟩\n****** A ⟨☮ Kb⟩\n****** B ⟨☮ Kb ⟳ ⌂:third⟩\n****** U ⟨☮ Kb ⌂:main⟩\n** K ⟨0k⟩\n"
+R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK ⌂:foreign⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n***** ⟨It forks these, or these fork it.⟩\n****** A ⟨Kb⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳⟩\n****** B ⟨☮ Kb ⟳ ⌂:third⟩\n****** U ⟨Kb ⌂:main⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳ ⌂:foreign⟩\n** K ⟨0o⟩\n"
 
 def copy_perspective_fixture (data_root):
   """The perspective data, with a config naming its two foreign
@@ -3356,7 +3358,7 @@ def check_switching_perspective_through_a_daemon (context):
   require_tool_run ([ "perspective", sidecar_path, "root-authors" ])
   require_equal ( "R's view, following its root author's", r_tree (folder),
                   once_u_has_a_body (R_SHOWING_A) . replace (
-                    "U ⟨☮B", "U, retitled again ⟨☮B" ) )
+                    "U ⟨Kb", "U, retitled again ⟨Kb" ) )
 
 def check_viewing_a_root_a_perspective_put_in_place (context):
   """Through a daemon, a view of M switched to the user's perspective

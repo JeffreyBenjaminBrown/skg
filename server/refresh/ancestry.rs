@@ -45,7 +45,7 @@ const ANC_OCCURRENCE : &[ExpectedAncestor] =
 const ANC_HIDDEN_OUTSIDE : &[ExpectedAncestor] =
   &[ ExpectedAncestor::Folder (Folder::Forks),
      ExpectedAncestor::Occurrence ];
-const ANC_HIDDEN_IN : &[ExpectedAncestor] =
+const ANC_UNDER_A_MEMBER_AS_SUCH : &[ExpectedAncestor] =
   &[ ExpectedAncestor::Occurrence,
      ExpectedAncestor::Folder (Folder::Forks),
      ExpectedAncestor::Occurrence ];
@@ -97,9 +97,10 @@ pub fn parent_reads_claims (
     _ => false, } }
 
 /// The node the folder at 'folder' describes, whose relationships,
-/// properties or hides it shows: for a compound folder, the
-/// forkee as such of the folder of what its forker hides in it, or the
-/// note whose hides outside its fork partners the other shows
+/// properties or hides it shows: for a compound folder, the member as
+/// such it stands under (in the folder of what the note hides in that
+/// member, or of what that member hides of the note's content), or the
+/// note whose hides outside its fork partners the folder shows
 /// ('compound_folder_parties'); for any other folder, its
 /// viewparent. None if 'folder' is no folder, or stands where its
 /// ancestry is missing.
@@ -110,9 +111,12 @@ pub fn described_node (
   let ViewnodeKind::Folder (kind) : &ViewnodeKind =
     &tree . get (folder) ? . value () . kind else { return None; };
   match kind {
-    Folder::HiddenInForkPartner | Folder::HiddenOutsideOfForkPartners => {
+    Folder::HiddenInForkPartner => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
-      Some ( parties . forkee . unwrap_or (parties . hider) ) },
+      parties . container },
+    Folder::HiddenOutsideOfForkPartners | Folder::HiddenByForkPartner => {
+      let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
+      Some ( parties . hider ) },
     _ => required_ancestors (tree, folder) . first () . copied (), } }
 
 /// The gnids the view shows above the headline at 'treeid': of each
@@ -135,17 +139,22 @@ pub fn view_ancestor_gnids (
     . collect () }
 
 /// A compound folder's two parties, where they stand: the note whose
-/// hides it shows (the 'hider'), and, for the folder of what that
-/// note hides in one forkee, that forkee as such (the 'forkee'). In
-///   forker > forksFolder > forkee > hiddenInForkPartnerFolder
-/// the forkee is the folder's viewparent and the forker three
+/// hides it shows (the 'hider'), and, for the folders under a member
+/// as such of a forks folder, the note whose content holds what is
+/// hidden (the 'container'). In
+///   note > forksFolder > member > hiddenInForkPartnerFolder
+/// (what the note hides of the member's content) the member is the
+/// container, the folder's viewparent, and the note the hider, three
 /// generations up; in
+///   note > forksFolder > forker > hiddenByForkPartnerFolder
+/// (what a forker as such hides of the note's content) the forker is
+/// the hider and the note the container; in
 ///   note > forksFolder > hiddenOutsideOfForkPartnersFolder
-/// the note is two up.
+/// the note is the hider, two up, and there is no container.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CompoundFolderParties {
   pub hider      : NodeId,
-  pub forkee     : Option<NodeId>,
+  pub container  : Option<NodeId>,
 }
 
 /// The parties of the compound folder at 'folder', as
@@ -158,13 +167,16 @@ pub fn compound_folder_parties (
   let ViewnodeKind::Folder (kind) : &ViewnodeKind =
     &tree . get (folder) ? . value () . kind else { return None; };
   let required : Vec<NodeId> = required_ancestors (tree, folder);
-  match kind { // the places are those of the rows ANC_HIDDEN_IN and ANC_HIDDEN_OUTSIDE
+  match kind { // the places are those of the rows ANC_UNDER_A_MEMBER_AS_SUCH and ANC_HIDDEN_OUTSIDE
     Folder::HiddenInForkPartner => Some ( CompoundFolderParties {
       hider      : *required . get (2) ?,
-      forkee     : Some ( *required . first () ? ) } ),
+      container  : Some ( *required . first () ? ) } ),
+    Folder::HiddenByForkPartner => Some ( CompoundFolderParties {
+      hider      : *required . first () ?,
+      container  : Some ( *required . get (2) ? ) } ),
     Folder::HiddenOutsideOfForkPartners => Some ( CompoundFolderParties {
       hider      : *required . get (1) ?,
-      forkee     : None } ),
+      container  : None } ),
     _ => None, } }
 
 /// The ancestors the row of the descriptor at 'treeid' requires, as
@@ -195,7 +207,8 @@ pub fn required_ancestry (
         | Folder::Acquired | Folder::IllegalEdit { .. } => ANC_OCCURRENCE,
       Folder::AcquiredBy => ANC_GHOST,
       Folder::HiddenOutsideOfForkPartners => ANC_HIDDEN_OUTSIDE,
-      Folder::HiddenInForkPartner => ANC_HIDDEN_IN, },
+      Folder::HiddenInForkPartner
+        | Folder::HiddenByForkPartner => ANC_UNDER_A_MEMBER_AS_SUCH, },
     ViewnodeKind::PropertyMember (member) => match member {
       PropertyMember::Alias { .. } => ANC_ALIAS_FOLDER,
       PropertyMember::ID { .. }    => ANC_ID_FOLDER,

@@ -229,7 +229,7 @@ fn rekind_to_occurrence (
     Vognode::GnidOnly (gnid_only) => ( gnid_only . claimsMembership, true ),
     _ => (true, false), };
   let editability : DrawnEditability =
-    drawn_occurrence_editability (tree, parent, pid, claims, walk);
+    drawn_occurrence_editability (tree, parent, pid, walk);
   let occurrence : Occurrence =
     occurrence_from_truth (
       pid, EditabilityAndClaim { editability, claims }, walk) ?;

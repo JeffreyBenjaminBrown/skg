@@ -95,7 +95,9 @@ node s wp
 /// claiming, as in a collateral view drawn before s stopped forking
 /// it, vanishes; f, claiming, vanishes and is drawn again claiming
 /// nothing, since s does not fork it, and the next save must not make
-/// s fork it. g, a forker drawn claiming nothing, stays so.
+/// s fork it: drawn afresh, it is an editable forker as such, with its
+/// own forks folder (s there a repeat). g, a forker drawn claiming
+/// nothing, stays so.
 #[test]
 fn in_a_forks_folder_a_member_claims_only_what_its_viewparent_forks () {
   let graph : InRustGraph = graph (&[
@@ -115,7 +117,9 @@ fn in_a_forks_folder_a_member_claims_only_what_its_viewparent_forks () {
 node s
   forksFolder
     node g wp noClaim
-    node f wp noClaim" ); }
+    node f noClaim
+      forksFolder
+        node s wp" ); }
 
 /// A forker its viewparent hides is no member of the forks folder: f,
 /// drawn there claiming nothing before s hid it (in another view, say),

@@ -30,7 +30,7 @@ use crate::graph_straddle::types::Partner;
 use crate::refresh::Walk;
 use crate::refresh::ancestry::{
   CompoundFolderParties, compound_folder_parties, described_node,
-  parent_reads_claims, view_ancestor_gnids};
+  view_ancestor_gnids};
 use crate::refresh::diff_view;
 use crate::refresh::extent::is_chain_parent;
 use crate::skgrepo_sets::SkgrepoRestriction;
@@ -267,10 +267,10 @@ fn content_goal (
 ) -> Goal {
   let graph : &InRustGraph = walk . truth . graph;
   let restriction : &SkgrepoRestriction = walk . truth . restriction;
-  let forker : Option<ID> = forker_of_forkee_as_such (tree, parent);
+  let note : Option<ID> = note_of_member_as_such (tree, parent);
   let unintegrated : &dyn Fn (Vec<ID>) -> Vec<ID> = &|contents : Vec<ID>| -> Vec<ID> {
     less_what_the_forker_integrates (
-      graph, restriction, forker . as_ref (), &contents ) };
+      graph, restriction, note . as_ref (), &contents ) };
   if let Some (goal) = diff_view::content_goal (pid, unintegrated, walk) {
     return goal; }
   let members : Vec<RelPartner<RelationshipMemberKey>> =
@@ -279,48 +279,50 @@ fn content_goal (
   let relRepos : HashMap<ID, SkgrepoName> =
     unknown_or_restricted_members_relRepos (graph, restriction, pid, &members);
   Goal::ordered ( gnid_items (
-    content_goal_gnids ( graph, restriction, &members, forker . as_ref () ),
+    content_goal_gnids ( graph, restriction, &members, note . as_ref () ),
     &relRepos )) }
 
 /// The content an occurrence shows outside the diff view: the members
 /// of its 'contains' list whose records the skgrepo restriction shows
 /// ('members', gated, a raw ID where nothing answers), less what
-/// 'forker' hides or contains when the occurrence is a forkee
-/// as such. The restricted members among them are drawn as Restricted
-/// vognodes. The stats pass counts a forkee's unintegrated content
-/// from it, so that the count is what is drawn.
+/// 'note' hides or contains when the occurrence is a member as such
+/// of the note's forks folder (a forkee or forker as such). The
+/// restricted members among them are drawn as Restricted vognodes.
+/// The stats pass counts a member's unintegrated content from it, so
+/// that the count is what is drawn.
 pub(crate) fn content_goal_gnids (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
   members     : &[RelPartner<RelationshipMemberKey>],
-  forker      : Option<&ID>,
+  note        : Option<&ID>,
 ) -> Vec<ID> {
   let contents : Vec<ID> = members . iter ()
     . map ( |member| member . member . id () . clone () )
     . collect ();
-  less_what_the_forker_integrates (graph, restriction, forker, &contents) }
+  less_what_the_forker_integrates (graph, restriction, note, &contents) }
 
-/// 'contents' less what 'forker' hides or contains, as the truth
-/// has it ('unintegrated_content_gnids'): what a forkee as such
-/// shows of its content. All of 'contents' when there is no
-/// forker.
+/// 'contents' less what 'note' hides or contains, as the truth
+/// has it ('unintegrated_content_gnids'): what a member as such of
+/// the note's forks folder shows of its content (the note being the
+/// forker of a forkee as such, and the forkee of a forker as such).
+/// All of 'contents' when there is no note.
 fn less_what_the_forker_integrates (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
-  forker      : Option<&ID>,
+  note        : Option<&ID>,
   contents    : &[ID],
 ) -> Vec<ID> {
-  let Some (forker) : Option<&ID> = forker
+  let Some (note) : Option<&ID> = note
     else { return contents . to_vec (); };
   unintegrated_content_gnids (
     graph, contents,
     &graph . outbound_gnids_for_relation_gated (
-      forker, NodeRelation::Hides, restriction ),
+      note, NodeRelation::Hides, restriction ),
     &graph . outbound_gnids_for_relation_gated (
-      forker, NodeRelation::Contains, restriction )) }
+      note, NodeRelation::Contains, restriction )) }
 
-/// What a forkee as such shows of its content: its content less
-/// what its forker hides or contains. Inputs preserve raw IDs; extra IDs are
+/// What a member as such shows of its content: its content less
+/// what the note whose forks folder holds it hides or contains. Inputs preserve raw IDs; extra IDs are
 /// resolved before comparing membership, without substituting mirrors.
 fn unintegrated_content_gnids (
   graph               : &InRustGraph,
@@ -334,13 +336,13 @@ fn unintegrated_content_gnids (
   setlike_vector_subtraction (
     setlike_vector_subtraction (contents, &hidden), &contained) }
 
-/// When the occurrence at 'treeid' is a forkee as such (a member of a
-/// forks folder that the folder's relation warrants, as one its
-/// viewparent forks), its forker, the folder's viewparent. Where the
-/// folder reads its members' claims ('parent_reads_claims'), a member
-/// claiming nothing is none: a forker-only member, or a forkee the user
-/// detached.
-pub(crate) fn forker_of_forkee_as_such (
+/// When the occurrence at 'treeid' is a member as such of a forks
+/// folder (a member the folder's relation warrants: a forkee as such,
+/// which its viewparent forks and which claims where the folder reads
+/// claims, or a forker as such, which forks it and claims nothing),
+/// the note whose folder holds it, the folder's viewparent. Either
+/// shows its content less what that note contains or hides.
+pub(crate) fn note_of_member_as_such (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Option<ID> {
@@ -352,9 +354,19 @@ pub(crate) fn forker_of_forkee_as_such (
   if ! matches! ( folder . value () . kind,
                   ViewnodeKind::Folder (Folder::Forks) ) {
     return None; }
-  if parent_reads_claims (tree, folder . id ()) && ! occurrence . claimsMembership {
-    return None; }
   folder . parent () ? . value () . occurrence_gnid () . cloned () }
+
+/// When the occurrence at 'treeid' is a forker as such (a member as
+/// such claiming nothing, 'note_of_member_as_such'), the note whose
+/// forks folder holds it.
+pub(crate) fn note_of_forker_as_such (
+  tree   : &Tree<Viewnode>,
+  treeid : NodeId,
+) -> Option<ID> {
+  let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) : &ViewnodeKind =
+    &tree . get (treeid) ? . value () . kind else { return None; };
+  if occurrence . claimsMembership { return None; }
+  note_of_member_as_such (tree, treeid) }
 
 /// A folder's goal, by kind.
 fn folder_goal (
@@ -386,9 +398,20 @@ fn folder_goal (
     Folder::HiddenInForkPartner => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       Some ( Goal::unordered ( gnid_items (
-        hidden_in_forkee (
-          &occurrence_pid_of (parties . forkee ?) ?,
+        hidden_in_fork_partner (
+          &occurrence_pid_of (parties . container ?) ?,
           &occurrence_pid_of (parties . hider) ?, walk ),
+        &HashMap::new ()))) },
+    Folder::HiddenByForkPartner => {
+      // Under a forker as such only: under a forkee as such (a forker
+      // the user made a forkee) it holds nothing, and goes.
+      let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
+      Some ( Goal::unordered ( gnid_items (
+        if note_of_forker_as_such (tree, parties . hider) . is_some () {
+          hidden_by_fork_partner (
+            &occurrence_pid_of (parties . hider) ?,
+            &occurrence_pid_of (parties . container ?) ?, walk )
+        } else { Vec::new () },
         &HashMap::new ()))) },
     Folder::HiddenOutsideOfForkPartners => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
@@ -540,34 +563,47 @@ pub(crate) fn partnerFolder_members_in_graph (
       viewparent_pid, recorder_role, skgrepo_restriction ) };
   Some (members) }
 
-/// What 'forker' hides in the content of 'forkee', by the
-/// records the skgrepo restriction shows: the goal of the compound
-/// folder 'HiddenInForkPartner' under the forkee as such.
-pub(crate) fn hidden_in_forkee (
-  forkee     : &ID,
-  forker     : &ID,
+/// What 'note' hides in the content of 'member', a member as such of
+/// its forks folder (a forkee or forker as such), by the records the
+/// skgrepo restriction shows: the goal of the compound folder
+/// 'HiddenInForkPartner' under the member.
+pub(crate) fn hidden_in_fork_partner (
+  member     : &ID,
+  note       : &ID,
   walk       : &Walk,
 ) -> Vec<ID> {
   let graph : &InRustGraph = walk . truth . graph;
   let goal : Vec<ID> = goal_list_for_hiddenInForkPartner_folder (
     graph,
     &graph . outbound_gnids_for_relation_gated (
-      forkee, NodeRelation::Contains, walk . truth . restriction ),
+      member, NodeRelation::Contains, walk . truth . restriction ),
     &graph . outbound_gnids_for_relation_gated (
-      forker, NodeRelation::Hides, walk . truth . restriction ));
+      note, NodeRelation::Hides, walk . truth . restriction ));
   resolve_all (&goal, graph) }
 
+/// What 'forker', a forker as such in the forks folder of 'note',
+/// hides of the note's content, by the records the skgrepo
+/// restriction shows: the goal of the compound folder
+/// 'HiddenByForkPartner' under the forker. The same intersection as
+/// the hidden-in folder's, with the parties' roles swapped.
+pub(crate) fn hidden_by_fork_partner (
+  forker     : &ID,
+  note       : &ID,
+  walk       : &Walk,
+) -> Vec<ID> {
+  hidden_in_fork_partner (note, forker, walk) }
+
 /// Goal list for a hiddenInForkPartnerFolder: the intersection of the
-/// forker's hides-list and the forkee's contains-list, in the
+/// hider's hides-list and the container's contains-list, in the
 /// order of the hides list.
 fn goal_list_for_hiddenInForkPartner_folder (
   graph                : &InRustGraph,
-  forkee_contains     : &[ID],
-  forker_hides        : &[ID],
+  container_contains   : &[ID],
+  hider_hides          : &[ID],
 ) -> Vec<ID> {
   let contains_set : HashSet<ID> =
-    resolve_all (forkee_contains, graph) . into_iter () . collect ();
-  forker_hides . iter ()
+    resolve_all (container_contains, graph) . into_iter () . collect ();
+  hider_hides . iter ()
     . filter ( |gnid| contains_set . contains (&graph . pid_else_raw_id (gnid)) )
     . cloned () . collect () }
 

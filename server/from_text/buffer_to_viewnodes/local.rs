@@ -53,8 +53,9 @@ pub fn validate_local_structure (
           validate_alias(tree, treeid),
       ViewnodeKind::Folder (Folder::Alias) =>
           validate_aliasfolder(tree, treeid),
-      ViewnodeKind::Folder (Folder::HiddenInForkPartner) =>
-          validate_hiddenInForkPartner_folder(tree, treeid),
+      ViewnodeKind::Folder (
+        kind @ (Folder::HiddenInForkPartner | Folder::HiddenByForkPartner)) =>
+          validate_folder_under_a_member_as_such(tree, treeid, kind),
       ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners) =>
           validate_hiddenOutsideOfForkPartners_folder(tree, treeid),
       ViewnodeKind::Folder (
@@ -201,37 +202,38 @@ fn validate_flags_folder (
   errors
 }
 
-/// Read the error messages to see what this validates.
-fn validate_hiddenInForkPartner_folder (
+/// Read the error messages to see what this validates. 'kind' is one
+/// of the two compound folders standing under a member as such of a
+/// forks folder: the hidden-in and hidden-by folders.
+fn validate_folder_under_a_member_as_such (
   tree    : &Tree<Viewnode>,
   treeid  : NodeId,
+  kind    : &Folder,
 ) -> Vec<String> {
+  let label : &str = match kind {
+    Folder::HiddenByForkPartner => "HiddenByForkPartnerFolder",
+    _ => "HiddenInForkPartnerFolder", };
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
     |node| node . is_occurrence ())
-    { errors . push(
-        "HiddenInForkPartnerFolder must have an Occurrence parent (the forkee)"
-        . to_string()); }
+    { errors . push( format! (
+        "{} must have an Occurrence parent (a member of a forks folder)", label )); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| node . is_occurrence ()
            || matches! ( &node . kind,
                          ViewnodeKind::Vognode (Vognode::GnidOnly (_)) )))
-    { errors . push(
-        "HiddenInForkPartnerFolder's children can only be Occurrences, tombstones, restricted viewnodes or unknown viewnodes (to hide)."
-        . to_string()); }
+    { errors . push( format! (
+        "{}'s children can only be Occurrences, tombstones, restricted viewnodes or unknown viewnodes (hidden ones).", label )); }
   if !siblings_cannot_include(
     tree, treeid,
     |node| matches!(&node . kind,
-                    ViewnodeKind::Folder (
-                      Folder::HiddenInForkPartner )))
-    { errors . push("HiddenInForkPartnerFolder must be unique among its siblings."
-                    . to_string()); }
+                    ViewnodeKind::Folder (sibling) if sibling == kind ))
+    { errors . push( format! ("{} must be unique among its siblings.", label )); }
   if !partnerFolder_children_have_distinct_gnids(tree, treeid)
-    { errors . push(
-      "HiddenInForkPartnerFolder must not have duplicate Occurrence children."
-        . to_string() ); }
+    { errors . push( format! (
+      "{} must not have duplicate Occurrence children.", label )); }
   errors }
 
 fn validate_hiddenOutsideOfForkPartners_folder (
@@ -557,11 +559,12 @@ fn validate_vognode_identity_and_structure (
   let mut errors : Vec<String> = Vec::new();
   if !id_present {
     errors . push( format!("{} must have an ID.", label) ); }
-  let is_forkee_as_such : bool =
+  let is_member_as_such : bool =
     // A member of a forks folder is the one vognode position that
-    // legitimately carries a hiddenInForkPartnerFolder (the refresh
-    // puts one under a forkee as such); rendering puts the folder
-    // there, so a saved buffer must round-trip it.
+    // legitimately carries a hiddenInForkPartnerFolder or a
+    // hiddenByForkPartnerFolder (the refresh puts them under a forkee
+    // or forker as such); rendering puts the folders there, so a saved
+    // buffer must round-trip them.
     tree . get (treeid)
     . and_then ( |n| n . parent () )
     . map ( |p| matches! ( & p . value () . kind,
@@ -569,8 +572,8 @@ fn validate_vognode_identity_and_structure (
     . unwrap_or (false);
   if !generation_includes_only(
     tree, treeid, 1, true,
-    |node| !cannot_be_child_of_vognode (node, is_forkee_as_such))
-    { errors . push( format!("{} has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInForkPartnerFolder (outside a forks folder's member), or HiddenOutsideOfForkPartnersFolder.", label) ); }
+    |node| !cannot_be_child_of_vognode (node, is_member_as_such))
+    { errors . push( format!("{} has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInForkPartnerFolder or HiddenByForkPartnerFolder (outside a forks folder's member), or HiddenOutsideOfForkPartnersFolder.", label) ); }
   if !claiming_children_have_distinct_gnids(tree, treeid) {
     errors . push( format!("Two claiming children of this {} stand for one node; only one may claim.", label . to_lowercase ()) ); }
   errors }
@@ -620,18 +623,19 @@ fn restoreRel_stands_where_it_may (
 
 fn cannot_be_child_of_vognode (
   node : &Viewnode,
-  parent_is_forkee_as_such : bool,
+  parent_is_member_as_such : bool,
 ) -> bool {
   matches!(&node . kind,
     ViewnodeKind::BufferRoot |
     ViewnodeKind::PropertyMember (
       PropertyMember::Alias { .. } | PropertyMember::ID { .. } | PropertyMember::Flag { .. }) |
     ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners))
-  || ( ! parent_is_forkee_as_such
-       // validate_hiddenin requires a vognode parent; a
-       // forkee-as-such is the position that warrants one.
+  || ( ! parent_is_member_as_such
+       // 'validate_folder_under_a_member_as_such' requires a vognode
+       // parent; a member as such is the position that warrants one.
        && matches!(&node . kind,
-            ViewnodeKind::Folder (Folder::HiddenInForkPartner)) ) }
+            ViewnodeKind::Folder (
+              Folder::HiddenInForkPartner | Folder::HiddenByForkPartner )) ) }
 
 /// Check if an Occurrence has a skgrepo and it exists in the config.
 pub fn has_valid_skgrepo (

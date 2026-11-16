@@ -78,6 +78,7 @@
                  "forksFolder",
                  "hiderFolder", "hiddenFolder",
                  "hiddenInForkPartnerFolder",
+                 "hiddenByForkPartnerFolder",
                  "hiddenOutsideOfForkPartnersFolder",
                  "containerFolder", "mentionerFolder",
                  "acquiredByFolder", "acquiredFolder",

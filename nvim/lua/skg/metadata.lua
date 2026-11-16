@@ -1507,7 +1507,7 @@ M.relRepo_unsupported_folder_atoms = {
   'hiderFolder', 'hiddenFolder',
   'containerFolder', 'mentionerFolder', 'acquiredByFolder',
   'acquiredFolder', 'illegalEditFolder', 'hiddenInForkPartnerFolder',
-  'hiddenOutsideOfForkPartnersFolder' }
+  'hiddenByForkPartnerFolder', 'hiddenOutsideOfForkPartnersFolder' }
 
 ---The partner folder atoms whose members' relationships are writable
 ---from this side, each with its relation's wire name. The folder's

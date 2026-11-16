@@ -90,7 +90,9 @@ fn the_content_of_a_forked_node_shown_raw_is_shown_raw () {
 node r
   node n
     forksFolder
-      node o wp noClaim" ); }
+      node o noClaim
+        forksFolder
+          node n wp" ); }
 
 // A mirror shown in place of an editable occurrence of the node
 // it forks, while another occurrence holds the mirror's one
@@ -154,7 +156,9 @@ node r
           node p wp noClaim folded
         forksFolder
           node a wp noClaim
-          node u wp noClaim" ); }
+          node u noClaim
+            forksFolder
+              node m wp" ); }
 
 #[test]
 fn under_an_owned_root_the_users_fork_is_shown () {
@@ -168,7 +172,9 @@ node p
         containerFolder
           node r wp noClaim folded
         forksFolder
-          node a wp noClaim
+          node a noClaim
+            forksFolder
+              node m wp
           node u wp noClaim" ); }
 
 /// r, in 'theirs', contains e, in 'third', which contains c, in
@@ -193,9 +199,13 @@ node r
       forksFolder
         node c
           forksFolder
-            node d wp noClaim
+            node d noClaim
+              forksFolder
+                node c wp
             node j wp noClaim
-            node u wp noClaim" ); }
+            node u noClaim
+              forksFolder
+                node c wp" ); }
 
 /// A chain of forks stops where the next is not of the perspective:
 /// m is forked by a, in 'theirs', which u, in 'main', forks.
@@ -216,7 +226,9 @@ node r
       node m
         forksFolder
           node a wp noClaim
-      node u wp noClaim" ); }
+      node u noClaim
+        forksFolder
+          node a wp" ); }
 
 /// Whether a foreign root is forked and so shows its content raw
 /// asks of its author's perspective, not the user's: the user's k

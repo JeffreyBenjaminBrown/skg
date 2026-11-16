@@ -43,7 +43,8 @@ fn test_forks_folder_appears_for_forkers(
     // Nodes 11 and 12 fork something, so they get forks folder children.
     // Each forks folder has forkee children showing what the node forks,
     // each drawn editable, a foreign one too (its title and body edits
-    // are refused at save), with its own forks folder holding its forker.
+    // are refused at save), with its own forks folder holding its forker,
+    // a repeat, which counts what it adds to the forkee's content.
     // Nodes 13 and 14 fork nothing, so no forks folder.
     // The 11/12 -> *-sees relationships run from owned "home" nodes to foreign
     // "away" nodes. Their default is the recorder's home: that is writable
@@ -56,13 +57,13 @@ fn test_forks_folder_appears_for_forkers(
       *** (skg forksFolder)
       **** (skg node (gnid 11-sees) (skgRepos (nodeRepo away)) (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) 11-sees
       ***** (skg forksFolder)
-      ****** (skg node (gnid 11) (skgRepos (nodeRepo home)) noClaim writeProtected (view (rels (contains (in 1) (out 1)) (forks (out 1 (ancestors 2)))) (birth (forks out 2)) cycle repoBoundary)) 11
+      ****** (skg node (gnid 11) (skgRepos (nodeRepo home)) noClaim writeProtected (view (rels (contains (in 1) (out 1 (unintegrated 1))) (forks (out 1 (ancestors 2)))) (birth (forks out 2)) cycle repoBoundary)) 11
       *** (skg node (gnid 111) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 111
       ** (skg node (gnid 12) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1))) (forks (out 1))) (birth (contains in 1)))) 12
       *** (skg forksFolder)
       **** (skg node (gnid 12-sees) (skgRepos (nodeRepo away)) (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) 12-sees
       ***** (skg forksFolder)
-      ****** (skg node (gnid 12) (skgRepos (nodeRepo home)) noClaim writeProtected (view (rels (contains (in 1)) (forks (out 1 (ancestors 2)))) (birth (forks out 2)) cycle repoBoundary)) 12
+      ****** (skg node (gnid 12) (skgRepos (nodeRepo home)) noClaim writeProtected (view (rels (contains (in 1) (out 0 (unintegrated 0))) (forks (out 1 (ancestors 2)))) (birth (forks out 2)) cycle repoBoundary)) 12
       ** (skg node (gnid 13) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13
       ** (skg node (gnid 14) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 14
       *** (skg node (gnid 141) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 141

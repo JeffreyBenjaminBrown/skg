@@ -444,13 +444,15 @@ pub fn herald_rule_table () -> HeraldRule {
       // The write-protected folders carry ☮ ("cannot be changed
       // from here"); the editable folders (forksFolder,
       // hiddenOutsideOfForkPartnersFolder, aliasFolder) do not.
-      // The two compound folders name the note whose hides they show
-      // by its ancestor letter (docs/heralds.org, "Ancestor flags and
-      // floors"), styled apart from the words around it. It stands
-      // three generations up in forker > forksFolder > forkee >
+      // The compound folders name the notes whose hides they show by
+      // their ancestor letters (docs/heralds.org, "Ancestor flags and
+      // floors"), styled apart from the words around them. The hider
+      // stands three generations up in note > forksFolder > member >
       // hiddenInForkPartnerFolder, so 'c', and two up in note >
-      // forksFolder > hiddenOutsideOfForkPartnersFolder, so 'b' (see
-      // 'CompoundFolderParties').
+      // forksFolder > hiddenOutsideOfForkPartnersFolder, so 'b'; in
+      // note > forksFolder > forker > hiddenByForkPartnerFolder the
+      // hider is the forker, 'a', and the note containing what it
+      // hides is 'c' (see 'CompoundFolderParties').
       vec! [
       leaf_styled_as ("writeProtected",
                       Folder::HiddenInForkPartner . repr_in_client (), "☮"),
@@ -460,6 +462,19 @@ pub fn herald_rule_table () -> HeraldRule {
                       Folder::HiddenInForkPartner . repr_in_client (), "c"),
       leaf (Folder::HiddenInForkPartner . repr_in_client (),
             "hides them."),
+      // Under a forker as such, what it hides of the note's content:
+      // the forker is the folder's viewparent, 'a', and the note
+      // three generations up, 'c'.
+      leaf_styled_as ("writeProtected",
+                      Folder::HiddenByForkPartner . repr_in_client (), "☮"),
+      leaf_styled_as ("hiddenByForkPartnerFolder_hider",
+                      Folder::HiddenByForkPartner . repr_in_client (), "a"),
+      leaf (Folder::HiddenByForkPartner . repr_in_client (),
+            "hides these, which"),
+      leaf_styled_as ("hiddenByForkPartnerFolder_container",
+                      Folder::HiddenByForkPartner . repr_in_client (), "c"),
+      leaf (Folder::HiddenByForkPartner . repr_in_client (),
+            "contains."),
       leaf_styled_as ("hiddenOutsideOfForkPartnersFolder_hider",
                       Folder::HiddenOutsideOfForkPartners . repr_in_client (), "b"),
       leaf (Folder::HiddenOutsideOfForkPartners . repr_in_client (),

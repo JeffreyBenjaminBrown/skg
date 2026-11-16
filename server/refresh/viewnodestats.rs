@@ -12,7 +12,7 @@ use crate::types::viewnode::{
   GraphnodeStats, Folder, Viewnode, ViewnodeKind, Vognode, Warrant };
 use crate::refresh::ancestry::{
   CompoundFolderParties, compound_folder_parties, required_ancestors};
-use crate::refresh::goal::{content_goal_gnids, forker_of_forkee_as_such};
+use crate::refresh::goal::{content_goal_gnids, note_of_member_as_such};
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 use std::iter::once;
@@ -216,28 +216,28 @@ fn set_herald_strings_in_viewnode (
       container_to_contents, content_to_containers,
       node_pid, anc_pid, *generation ); }
   if ! stands_as_member_here {
-    // A child standing as no member under a forkee-as-such: the
-    // content the forker hides, retained there claiming nothing,
+    // A child standing as no member under a member as such: the
+    // content the note hides, retained there claiming nothing,
     // with its subtree, says so, as the hiddenInForkPartnerFolder's
     // members do.
-    if let Some (forker_pid) =
+    if let Some (note_pid) =
       tree . get (treeid) . unwrap () . parent ()
-      . and_then ( |parent| forker_of_forkee_as_such (tree, parent . id ()) )
+      . and_then ( |parent| note_of_member_as_such (tree, parent . id ()) )
     { if relationship_is_visible (
-        graph, restriction, relRepos, node_pid, &forker_pid,
+        graph, restriction, relRepos, node_pid, &note_pid,
         RelationRole::new (NodeRelation::Hides, BinaryRolePosition::First) )
       { flags . record (NodeRelation::Hides, true, 3); }}}
   let unintegrated : Option<usize> =
-    // A forkee as such counts the nodes its content goal draws as
+    // A member as such counts the nodes its content goal draws as
     // occurrences: nodes the skgrepo restriction shows, as the count of its
     // contents is ('RelationCounts').
     if stands_as_member_here {
-      forker_of_forkee_as_such (tree, treeid) . map ( |forker| {
+      note_of_member_as_such (tree, treeid) . map ( |note| {
         let members : HashSet<ID> = content_goal_gnids (
           graph, restriction,
           &graph . outbound_member_keys_for_relation_gated (
             node_pid, NodeRelation::Contains, restriction ),
-          Some (&forker) )
+          Some (&note) )
           . into_iter ()
           . filter ( |gnid| graph . node_is_shown (gnid, restriction) )
           . collect ();
@@ -451,23 +451,28 @@ fn birth_facts_for_folder (
           role . relation, side_of_role (role), Some (2) ) ],
         None => Vec::new (), },
     // Compound partner folders. In
-    //   forker > forksFolder > forkee
-    //     > hiddenInForkPartnerFolder > member
-    // the forker (generation 4) hides the member, and the
-    // forkee (generation 2) contains it. In
+    //   note > forksFolder > member
+    //     > hiddenInForkPartnerFolder > member of it
+    // the note (generation 4) hides it, and the member as such
+    // (generation 2) contains it; in
+    //   note > forksFolder > forker
+    //     > hiddenByForkPartnerFolder > member of it
+    // the forker (generation 2) hides it, and the note (generation 4)
+    // contains it. In
     //   note > forksFolder
-    //     > hiddenOutsideOfForkPartnersFolder > member
+    //     > hiddenOutsideOfForkPartnersFolder > member of it
     // the note (generation 3) hides it.
-    Folder::HiddenInForkPartner | Folder::HiddenOutsideOfForkPartners => {
+    Folder::HiddenInForkPartner | Folder::HiddenByForkPartner
+      | Folder::HiddenOutsideOfForkPartners => {
       let Some (parties) : Option<CompoundFolderParties> =
         compound_folder_parties (tree, folder_treeid)
         else { return Vec::new (); }; // unsayable, so entombstoned
       once ( BirthFact::new (
           NodeRelation::Hides, Side::In,
           generation_above_a_member (tree, folder_treeid, parties . hider) ))
-        . chain ( parties . forkee . map ( |forkee| BirthFact::new (
+        . chain ( parties . container . map ( |container| BirthFact::new (
             NodeRelation::Contains, Side::In,
-            generation_above_a_member (tree, folder_treeid, forkee) )) )
+            generation_above_a_member (tree, folder_treeid, container) )) )
         . collect () },
     // 'ParentKind::Folder' holds partner folders only.
     Folder::Alias | Folder::ID | Folder::Flags { .. } => Vec::new (),
@@ -505,7 +510,7 @@ fn set_omitted_body (
 /// actual skgrepo ('InRustGraph::relRepo') against its applicable
 /// relationship default. None on any of: the viewnode does not
 /// stand as a member here ('stands_as_member'); a compound partner folder
-/// (HiddenInForkPartner / HiddenOutsideOfForkPartners: no single
+/// (HiddenInForkPartner, HiddenByForkPartner, HiddenOutsideOfForkPartners: no single
 /// 'relation_member_role'); no recorded relationship; a relationship
 /// recorded in a foreign skgrepo; unresolvable homes;
 /// or the skgrepo equalling the default.

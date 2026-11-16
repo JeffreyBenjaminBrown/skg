@@ -16,7 +16,7 @@
 //!   graph-content of E, then it is not a hiderel edit. If the graph
 //!   lacks N (the user typed it there) it joins E's content, when the
 //!   user owns E, and the save is refused otherwise
-//!   ('add_children_typed_under_forkee'). Any other such N is not
+//!   ('add_children_typed_under_member_as_such'). Any other such N is not
 //!   touched: the refresh of the save's rerender makes it vanish.
 //! - A foreign R records no hides: a save that would hide or unhide
 //!   anything in R is refused ('cut_under_a_foreign_forker').

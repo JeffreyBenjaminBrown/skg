@@ -110,7 +110,8 @@ fn n_and_its_fork_partners () -> InRustGraph {
 /// in a containers folder, drawn folded, which leaves out the
 /// member's view-ancestors: under e, the forkee (drawn editable, so
 /// its own forks folder follows, holding n, a repeat), and under f, a
-/// forker claiming nothing, the folder holds q (folded, with its own
+/// forker claiming nothing (editable too, its forks folder holding n),
+/// the folder holds q (folded, with its own
 /// chain), not p, which stands above them. Nothing of the chain
 /// stands directly under either member. (p is write-protected, so
 /// its content does not draw e or f, whose occurrences there would
@@ -133,10 +134,12 @@ node p wp
             node top wp noClaim
         forksFolder
           node n wp noClaim
-      node f wp noClaim
+      node f noClaim
         containerFolder
           node q wp noClaim folded
-            node top wp noClaim" ); }
+            node top wp noClaim
+        forksFolder
+          node n wp" ); }
 
 /// A repeat (an occurrence of a node another occurrence holds the
 /// editability of) in the forks folder shows nothing, not even its

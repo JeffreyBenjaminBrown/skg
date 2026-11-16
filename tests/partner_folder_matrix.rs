@@ -165,6 +165,28 @@ fn without_subtree_of ( buf : &str, fragment : &str ) -> String {
   lines [.. at] . iter () . chain ( lines [at + 1 + below ..] . iter () )
     . copied () . collect::<Vec<&str>> () . join ("\n") + "\n" }
 
+/// The first headline carrying this metadata fragment, with the lines
+/// under it, each ending in a newline.
+fn subtree_of ( buf : &str, fragment : &str ) -> String {
+  let depth = |line : &str| -> usize { line . chars () . take_while ( |c| *c == '*' ) . count () };
+  let lines : Vec<&str> = buf . lines () . collect ();
+  let at : usize = lines . iter () . position ( |l| l . contains (fragment) )
+    . unwrap_or_else ( || panic! ( "no line contains {:?} in:\n{}", fragment, buf ));
+  let below : usize = lines [at + 1 ..] . iter ()
+    . take_while ( |l| depth (l) == 0 || depth (l) > depth (lines [at]) )
+    . count ();
+  lines [at ..= at + below] . iter ()
+    . map ( |line| format! ("{}\n", line) ) . collect () }
+
+/// Swap the two subtrees headed by the lines carrying these metadata
+/// fragments: a forker as such, drawn editable, carries its own folders.
+fn swap_subtrees ( buf : &str, a : &str, b : &str ) -> String {
+  let a_tree : String = subtree_of (buf, a);
+  let b_tree : String = subtree_of (buf, b);
+  buf . replace ( &a_tree, "\u{0}SWAP\u{0}" )
+      . replace ( &b_tree, &a_tree )
+      . replace ( "\u{0}SWAP\u{0}", &b_tree ) }
+
 /// Swap the two whole lines that carry these metadata fragments.
 fn swap_lines ( buf : &str, a : &str, b : &str ) -> String {
   let a_line : String = line_containing (buf, a) . to_string ();
@@ -333,11 +355,12 @@ async fn write_protected_delete (
 //////////////////////////////////////////////////////////////
 // The forks folder's forker-only members: roSub-a and roSub-b fork
 // roSub-owner, which forks nothing. Its forks folder, drawn unasked,
-// holds them claiming nothing. Reordering them keeps the order the
-// view has; a note placed there claiming nothing stays, unwarranted;
-// and deleting one hides it in roSub-owner, so that it leaves the
-// folder for the folder of what roSub-owner hides outside its fork
-// partners. They run in that order: the deletion writes the hide.
+// holds them claiming nothing, each drawn editable with its own forks
+// folder (forkers as such). Reordering them keeps the order the view
+// has; a note placed there claiming nothing stays, unwarranted; and
+// deleting one hides it in roSub-owner, so that it leaves the folder
+// for the folder of what roSub-owner hides outside its fork partners.
+// They run in that order: the deletion writes the hide.
 //////////////////////////////////////////////////////////////
 
 async fn forker_only_members (
@@ -352,21 +375,20 @@ async fn forker_only_members (
       fails . record ("forksFolder/forker-only", format! (
         "a forker-only member must claim nothing: {}", line )); }}
   { let s : &str = "forksFolder/forker-only/reorder";
-    let swapped : String = swap_lines (&buf, "(gnid roSub-a)", "(gnid roSub-b)");
+    let swapped : String = swap_subtrees (&buf, "(gnid roSub-a)", "(gnid roSub-b)");
     let resp : SaveResponse = save (&swapped, config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save reported errors: {:?}", resp . errors)); }
     fails . want_before (s, &resp . saved_view, "(gnid roSub-b)", "(gnid roSub-a)"); }
   { let s : &str = "forksFolder/forker-only/insert";
     let b_line : String = line_containing (&buf, "(gnid roSub-b)") . to_string ();
+    let b_tree : String = subtree_of (&buf, "(gnid roSub-b)");
     let (intruder_line, child_line) : (String, String) =
       intruder_with_child (&b_line, "roSub-x");
     let intruder_line : String = intruder_line . replace (
       "(nodeRepo public))", "(nodeRepo public)) noClaim" );
     let edited : String = buf . replace (
-      &b_line, &format! ("{}
-{}
-{}", b_line, intruder_line, child_line) );
+      &b_tree, &format! ("{}{}\n{}\n", b_tree, intruder_line, child_line) );
     let resp : SaveResponse = save (&edited, config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save reported errors: {:?}", resp . errors)); }
@@ -375,8 +397,7 @@ async fn forker_only_members (
       fails . record (s, format! (
         "the intruder must stay unwarranted, claiming nothing: {}", intruder_after )); } }
   { let s : &str = "forksFolder/forker-only/delete";
-    let a_line : String = line_containing (&buf, "(gnid roSub-a)") . to_string ();
-    let edited : String = buf . replace (&format! ("{}\n", a_line), "");
+    let edited : String = without_subtree_of (&buf, "(gnid roSub-a)");
     let resp : SaveResponse = save (&edited, config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save reported errors: {:?}", resp . errors)); }

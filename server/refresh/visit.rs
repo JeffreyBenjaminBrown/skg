@@ -50,8 +50,9 @@ use crate::refresh::editability::{
 use crate::refresh::extent::{Extent, extent_of_parent};
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, goal_of_parent, has_a_fork_partner,
-  hidden_in_forkee, hidden_outside_of_forkees, member_of_child,
-  forker_of_forkee_as_such, visible_illegal_edits};
+  hidden_by_fork_partner, hidden_in_fork_partner, hidden_outside_of_forkees,
+  member_of_child, note_of_forker_as_such, note_of_member_as_such,
+  visible_illegal_edits};
 use crate::refresh::goal::partnerFolder_members_in_graph;
 use crate::telescope::types::IllegalEdit;
 use crate::refresh::id_rule::{
@@ -115,8 +116,11 @@ pub(crate) fn visit_parent (
 /// shows its forks folder when it has a fork partner, either way, by a
 /// record the skgrepo restriction shows ('has_a_fork_partner'; with
 /// the folder of what it hides outside its fork partners, when that
-/// holds anything); and an editable forkee as such shows the folder of
-/// what its forker hides in it, when that holds anything. Not in the
+/// holds anything); an editable member as such of a forks folder (a
+/// forkee or forker as such) shows the folder of what the note whose
+/// folder holds it hides in it, when that holds anything; and an
+/// editable forker as such shows, after that, the folder of what it
+/// hides of that note's content, when that holds anything. Not in the
 /// diff view.
 fn add_default_folders (
   tree   : &mut Tree<Viewnode>,
@@ -143,13 +147,30 @@ fn add_default_folders (
       if let Some (folder) = last_leading_folder {
         move_after (tree, folder, forks_folder)
           . expect ("add_default_folders: both are children"); }}}
-  if let Some (forker) = forker_of_forkee_as_such (tree, parent) {
-    if child_folder (tree, parent, &Folder::HiddenInForkPartner) . is_none ()
-       && ! hidden_in_forkee (&pid, &forker, walk) . is_empty ()
+  if let Some (note) = note_of_member_as_such (tree, parent) {
+    // The folder of what the note hides in the member goes first; the
+    // folder of what a forker as such hides of the note's content
+    // goes right after it.
+    let hidden_in : Option<NodeId> =
+      if child_folder (tree, parent, &Folder::HiddenInForkPartner) . is_none ()
+         && ! hidden_in_fork_partner (&pid, &note, walk) . is_empty ()
+      { let folder : NodeId = tree . get_mut (parent) . unwrap ()
+          . append ( viewnode_of ( ViewnodeKind::Folder (Folder::HiddenInForkPartner) ))
+          . id ();
+        move_to_first_child (tree, parent, folder)
+          . expect ("add_default_folders: the folder was just added");
+        walk . folders_whose_drawn_members_are_folded . insert (folder);
+        Some (folder)
+      } else { child_folder (tree, parent, &Folder::HiddenInForkPartner) };
+    if note_of_forker_as_such (tree, parent) . is_some ()
+       && child_folder (tree, parent, &Folder::HiddenByForkPartner) . is_none ()
+       && ! hidden_by_fork_partner (&pid, &note, walk) . is_empty ()
     { let folder : NodeId = tree . get_mut (parent) . unwrap ()
-        . append ( viewnode_of ( ViewnodeKind::Folder (Folder::HiddenInForkPartner) ))
+        . append ( viewnode_of ( ViewnodeKind::Folder (Folder::HiddenByForkPartner) ))
         . id ();
-      move_to_first_child (tree, parent, folder)
+      match hidden_in {
+        Some (hidden_in) => move_after (tree, hidden_in, folder),
+        None => move_to_first_child (tree, parent, folder), }
         . expect ("add_default_folders: the folder was just added");
       walk . folders_whose_drawn_members_are_folded . insert (folder); }}}
 
@@ -763,7 +784,7 @@ fn draw_item (
         id_rule (gnid, WhereTheHeadlineStands::Under (goal), walk);
       let editability : DrawnEditability = match &answer {
         IdRuleAnswer::Occurrence (pid) =>
-          drawn_occurrence_editability (tree, parent, pid, claims, walk),
+          drawn_occurrence_editability (tree, parent, pid, walk),
         _ => DrawnEditability::WriteProtected, };
       vognode_for_answer (
         answer, gnid, item, EditabilityAndClaim { editability, claims }, walk ) ? },
@@ -1054,7 +1075,8 @@ fn kinds_redrawing (
     Folder::Mentioner              => folders_of_relation (FolderRelation::Mentioners),
     Folder::Alias                  => folders_of_relation (FolderRelation::Aliases),
     Folder::Flags { .. }           => vec! [ Folder::flags () ],
-    Folder::HiddenInForkPartner | Folder::HiddenOutsideOfForkPartners
+    Folder::HiddenInForkPartner | Folder::HiddenByForkPartner
+      | Folder::HiddenOutsideOfForkPartners
       | Folder::AcquiredBy | Folder::Acquired
       | Folder::ID | Folder::IllegalEdit { .. } => Vec::new (), } }
 
@@ -1155,9 +1177,9 @@ fn reinstate_original_after (
 
 /// Whether the occurrence at 'treeid' is shown raw where, from the
 /// perspective of 'owner', another of its mirrors would stand in its
-/// place: at a root, or as a member of a folder that is no forkee as
-/// such ('forker_of_forkee_as_such'): a forker-only member of a
-/// forks folder is raw, as a member of every other folder is.
+/// place: at a root, or as a member of a folder that is no member as
+/// such of a forks folder ('note_of_member_as_such'), as a member of
+/// every other folder is.
 fn is_raw_where_another_mirror_would_stand (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
@@ -1170,7 +1192,7 @@ fn is_raw_where_another_mirror_would_stand (
       ViewnodeKind::BufferRoot => true,
       ViewnodeKind::Folder (folder) =>
         ! folder . members_are_properties ()
-        && forker_of_forkee_as_such (tree, treeid) . is_none (),
+        && note_of_member_as_such (tree, treeid) . is_none (),
       _ => false, } );
   let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) : &ViewnodeKind =
     &node . value () . kind else { return false; };

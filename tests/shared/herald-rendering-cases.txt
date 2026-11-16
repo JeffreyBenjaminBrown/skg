@@ -224,10 +224,14 @@
 (skg forksFolder)
 ---- text: It forks these, or these fork it.
 ---- styles: message*33
-==== folders: hidden in a forkee, its forker the great-grandparent
+==== folders: hidden in a forkee or forker as such, by the note the great-grandparent
 (skg hiddenInForkPartnerFolder)
 ---- text: ☮ It contains these, but c hides them.
 ---- styles: crucial*1 -*1 message*22 -*1 high*1 -*1 message*11
+==== folders: what a forker as such hides of the note three up, which contains it
+(skg hiddenByForkPartnerFolder)
+---- text: ☮ a hides these, which c contains.
+---- styles: crucial*1 -*1 high*1 -*1 message*18 -*1 high*1 -*1 message*9
 ==== folders: hidden outside of what it forks, the note the grandparent
 (skg hiddenOutsideOfForkPartnersFolder)
 ---- text: b hides these, but nothing it forks contains them.

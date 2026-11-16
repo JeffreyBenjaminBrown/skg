@@ -112,11 +112,11 @@ fn the_deep_rows_of_the_hidden_folders_reach_the_forker () {
     let parties : CompoundFolderParties =
       compound_folder_parties (&forest, hidden_in) . unwrap ();
     assert_eq! ( title_at ( Some (parties . hider) ), Some ("node s" . to_string ()) );
-    assert_eq! ( title_at ( parties . forkee ), Some ("node e wp" . to_string ()) );
+    assert_eq! ( title_at ( parties . container ), Some ("node e wp" . to_string ()) );
     let parties : CompoundFolderParties =
       compound_folder_parties (&forest, hidden_outside) . unwrap ();
     assert_eq! ( title_at ( Some (parties . hider) ), Some ("node s" . to_string ()) );
-    assert_eq! ( parties . forkee, None );
+    assert_eq! ( parties . container, None );
     assert_eq! ( title_at ( described_node (&forest, hidden_in) ),
                  Some ("node e wp" . to_string ()) );
     assert_eq! ( title_at ( described_node (&forest, hidden_outside) ),

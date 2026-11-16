@@ -21,7 +21,8 @@ fn folder_kind_rules () {
     Folder::HiddenOutsideOfForkPartners, Folder::Alias ];
   let unordered : Vec<Folder> = vec! [
     Folder::Hider,
-    Folder::HiddenInForkPartner, Folder::Container, Folder::Mentioner,
+    Folder::HiddenInForkPartner, Folder::HiddenByForkPartner,
+    Folder::Container, Folder::Mentioner,
     Folder::AcquiredBy, Folder::Acquired, Folder::ID, Folder::flags () ];
   for folder in &ordered {
     assert! ( folder . goal_is_ordered (), "{:?}", folder ); }
