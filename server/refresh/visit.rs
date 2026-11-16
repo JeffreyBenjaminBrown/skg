@@ -88,7 +88,7 @@ pub(crate) fn visit_parent (
 ) -> Result<(), Box<dyn Error>> {
   consume_editableView_request (tree, parent, walk);
   extend_requested_content (tree, parent, walk);
-  add_containers_folder_to_an_extended_member (tree, parent, walk);
+  add_containers_folder_to_a_standing_member (tree, parent, walk);
   add_default_folders (tree, parent, walk);
   add_illegal_edit_folder (tree, parent, walk);
   add_hidden_outside_folder_to_forks_folder (tree, parent, walk);
@@ -784,7 +784,7 @@ fn reinstate (
 /// carries its chain, but for a member of a forks folder in a content
 /// view, or of a folder of what a member as such contains that the
 /// user keeps elsewhere, which carries it in a containers folder
-/// ('add_containers_folder_under_forks_folder_member'); under a folder
+/// ('add_containers_folder_under_member'); under a folder
 /// the refresh added to be drawn folded, it is drawn folded, and so it
 /// is under one of those kinds that already stood drawn folded
 /// ('stands_drawn_folded').
@@ -807,7 +807,7 @@ fn after_drawing (
   if carries_chain {
     draw_containerward_chain (tree, treeid, walk) ?; }
   if carries_containers_folder {
-    add_containers_folder_under_forks_folder_member (tree, treeid, walk); }
+    add_containers_folder_under_member (tree, treeid, walk); }
   if walk . folders_whose_drawn_members_are_folded . contains (&parent)
      || stands_drawn_folded (tree, parent, treeid) {
     // A folder's collapse lives on its members.
@@ -850,7 +850,7 @@ fn stands_drawn_folded (
 /// member's visit adds stand around it (the integrated-elsewhere
 /// folder, the hidden-in folder and the hidden-by folder before it, a
 /// forks folder asked for after it), and its content follows.
-pub(crate) fn add_containers_folder_under_forks_folder_member (
+pub(crate) fn add_containers_folder_under_member (
   tree   : &mut Tree<Viewnode>,
   member : NodeId,
   walk   : &mut Walk,
@@ -865,25 +865,55 @@ pub(crate) fn add_containers_folder_under_forks_folder_member (
     . prepend ( viewnode_of ( ViewnodeKind::Folder (Folder::Container) )) . id ();
   walk . folders_whose_drawn_members_are_folded . insert (folder); }
 
-/// A member of a content view's forks folder that an editable-view
-/// request extends at its visit, having stood in the buffer before
-/// (as one an older server drew write-protected and bare, extended
-/// by C-c s e on its note), gets the containers folder a freshly drawn
-/// member gets ('add_containers_folder_under_forks_folder_member'),
-/// so that the extended view is the one a fresh view draws. Before the
-/// default folders, which place themselves around it.
-fn add_containers_folder_to_an_extended_member (
+/// A member that stood in the buffer before gets, at its visit, the
+/// containers folder a freshly drawn member gets
+/// ('add_containers_folder_under_member'), so that the view is the
+/// one a fresh view draws:
+/// - a member of a content view's forks folder that an
+///   editable-view request extends (as one an older server drew
+///   write-protected and bare, extended by C-c s e on its note);
+/// - a member of a folder of what a member as such contains that the
+///   user keeps elsewhere, whenever its containers folder would name
+///   a keeper ('names_a_container_outside_its_view_ancestors'): one
+///   whose only keeper was a view-ancestor stood there with none, and
+///   a save can give it another.
+/// Before the default folders, which place themselves around it.
+fn add_containers_folder_to_a_standing_member (
   tree   : &mut Tree<Viewnode>,
   member : NodeId,
   walk   : &mut Walk,
 ) {
-  if walk . is_diff_view () || ! carries_editableView_request (tree, member) { return; }
-  let in_a_forks_folder : bool =
+  if walk . is_diff_view () { return; }
+  let folder : Option<Folder> =
     tree . get (member) . unwrap () . parent ()
-    . is_some_and ( |folder| matches! ( folder . value () . kind,
-                                        ViewnodeKind::Folder (Folder::Forks) ));
-  if in_a_forks_folder {
-    add_containers_folder_under_forks_folder_member (tree, member, walk); }}
+    . and_then ( |parent| match &parent . value () . kind {
+        ViewnodeKind::Folder (folder) => Some (folder . clone ()),
+        _ => None, } );
+  let carries_one : bool = match folder {
+    Some (Folder::Forks) => carries_editableView_request (tree, member),
+    Some (Folder::IntegratedElsewhere) =>
+      names_a_container_outside_its_view_ancestors (tree, member, walk),
+    _ => false, };
+  if carries_one {
+    add_containers_folder_under_member (tree, member, walk); }}
+
+/// Whether a containers folder under the occurrence at 'member'
+/// would hold anything: a container of its node, by a record the
+/// skgrepo restriction shows, that is no view-ancestor of it
+/// ('Folder::omits_view_ancestors').
+fn names_a_container_outside_its_view_ancestors (
+  tree   : &Tree<Viewnode>,
+  member : NodeId,
+  walk   : &Walk,
+) -> bool {
+  let Some (gnid) : Option<&ID> =
+    tree . get (member) . unwrap () . value () . occurrence_gnid ()
+    else { return false; };
+  let view_ancestors : HashSet<ID> = view_ancestor_gnids (tree, member);
+  partnerFolder_members_in_graph (
+    walk . truth . graph, gnid, &Folder::Container, walk . truth . restriction )
+    . is_some_and ( |containers| containers . iter ()
+                    . any ( |container| ! view_ancestors . contains (container) )) }
 
 /// The viewnode that stands for 'item' under 'parent': for a gnid,
 /// what the ID rule says (None if a tombstone, which there is no

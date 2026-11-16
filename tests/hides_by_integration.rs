@@ -29,7 +29,10 @@
 // - under a narrowing that keeps out y's records, what y keeps shows;
 // - moving f1 from F to z makes M fork F and hides nothing;
 // - cutting g1 from G makes M fork G and hides g1; moving it to z
-//   instead hides nothing.
+//   instead hides nothing;
+// - d, kept by M alone and so drawing no containers folder, kept in y
+//   too and then removed from M: the saved view names y, as a fresh
+//   view does.
 
 use std::error::Error;
 use std::collections::BTreeMap;
@@ -79,6 +82,8 @@ fn all_tests
       a_cut_from_an_indirect_member_hides_the_child (&s . config, &mut s . tantivy) . await ?;
       s . reset ("a_move_from_an_indirect_member_into_an_owned_note_hides_nothing", FIXTURES) ?;
       a_move_from_an_indirect_member_into_an_owned_note_hides_nothing (&s . config, &mut s . tantivy) . await ?;
+      s . reset ("a_member_standing_in_the_folder_names_its_new_keeper", FIXTURES) ?;
+      a_member_standing_in_the_folder_names_its_new_keeper (&s . config, &mut s . tantivy) . await ?;
       Ok (( )) } )) }
 
 //
@@ -439,4 +444,32 @@ async fn a_move_from_an_indirect_member_into_an_owned_note_hides_nothing (
   assert_eq! ( members_of_folder_under (&saved, "G", "integratedElsewhereFolder"),
                vec! ["g1", "g2"], "{}", saved );
   is_a_fixpoint (&saved, "M", config, tantivy) . await ?;
+  Ok (( )) }
+
+/// d, which M and x both contain, stands in x's folder of what the
+/// user keeps elsewhere with no containers folder: M, its only keeper,
+/// is a view-ancestor. Another view puts d under y too; then M's view,
+/// drawn before that, removes d from M's content. The saved view
+/// draws d's containers folder, naming y, as a fresh view of M does,
+/// though d stood in the folder without one.
+async fn a_member_standing_in_the_folder_names_its_new_keeper (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let view : String = view_of (config, tantivy, "M") ?;
+  assert! ( members_of_folder_under (&view, "d", "containerFolder") . is_empty (),
+            "{}", view );
+  let y_view : String = view_of (config, tantivy, "y") ?;
+  save_cleanly ( &with_line_after_subtree_of (
+                   &y_view, "y", "** (skg node (gnid d) (skgRepos (nodeRepo theirs))) d" ),
+                 "y", config, tantivy ) . await ?;
+  assert_eq! ( contains_of (config, "y") ?, ids (&["a", "f2", "g2", "d"]), "y keeps d" );
+  let saved : String = save_cleanly (
+    &without_line_at_depth (&view, "d", 2), "M", config, tantivy ) . await ?;
+  assert_eq! ( contains_of (config, "M") ?, ids (&["z"]), "M contains z alone" );
+  assert_eq! ( hides_of (config, "M") ?, ids (&[]), "M hides nothing" );
+  assert_eq! ( members_of_folder_under (&saved, "d", "containerFolder"), vec! ["y"],
+               "d's containers folder names y:\n{}", saved );
+  assert_eq! ( saved, view_of (config, tantivy, "M") ?,
+               "the saved view is a fresh one" );
   Ok (( )) }

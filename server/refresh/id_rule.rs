@@ -29,7 +29,7 @@ use crate::refresh::editability::{
   forget_editable_occurrence, occurrence_from_truth, write_protect_occurrence};
 use crate::refresh::diff_view::fold_body_of_drawn_occurrence;
 use crate::refresh::visit::{
-  add_containers_folder_under_forks_folder_member, children_of, vanish};
+  add_containers_folder_under_member, children_of, vanish};
 use crate::refresh::goal::{Goal, GoalItem, GoalMember};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -243,7 +243,7 @@ fn rekind_to_occurrence (
     walk . hold_editability (pid, child); }
   if stands_in_a_content_views_forks_folder (tree, child, walk) {
     // as a member drawn there is ('after_drawing')
-    add_containers_folder_under_forks_folder_member (tree, child, walk); }
+    add_containers_folder_under_member (tree, child, walk); }
   Ok (( )) }
 
 /// Make the occurrence or gnid-only vognode 'other' at 'child' the

@@ -2190,16 +2190,19 @@ chain, it hangs the member's chain under it
 view's forks folder that is no repeat, it puts a containers folder
 under it instead, and registers the folder so that the members its
 own visit draws are drawn folded ('after_drawing' and
-'add_containers_folder_under_forks_folder_member' in
+'add_containers_folder_under_member' in
 'server/refresh/visit.rs', 'Walk::folders_whose_drawn_members_are_folded').
 Since the member was just drawn, the folder is its first child: an
 editable member's integrated-elsewhere folder, added at its visit,
 goes before it, then its hidden-in folder, then a forker's hidden-by
 folder; a forks folder, where one is asked for (=C-c l f=), and its
 content go after it. A member that stood
-in the buffer before, extended at its visit by an editable-view
-request (=C-c s e= on its note), gets the same folder there
-('add_containers_folder_to_an_extended_member'). A member drawn into
+in the buffer before gets the same folder at its visit
+('add_containers_folder_to_a_standing_member'): in a forks folder,
+when an editable-view request extends it (=C-c s e= on its note); in
+an integrated-elsewhere folder, whenever the folder would name a
+keeper, so that a member whose only keeper was a view-ancestor, given
+another by a save, names it as a fresh view does. A member drawn into
 a compound folder or a containers folder that already stood, all its
 members folded, is drawn folded too, so that the folder stays
 collapsed ('stands_drawn_folded'). The chain is drawn
