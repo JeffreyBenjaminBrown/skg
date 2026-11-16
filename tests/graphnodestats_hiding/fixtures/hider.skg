@@ -1,4 +1,4 @@
 pid: hider
 title: hider
-hidesFromSubs:
+hides:
   - hidden

@@ -3,12 +3,11 @@ title: Title from disk
 aliases:
 - alias 1 on disk
 - alias 2 on disk
-subscribesTo:
+forks:
 - sub_1_on_disk
 - sub_2_on_disk
-hidesFromSubs:
-- hide_1_on_disk
-overrides:
 - override_1_on_disk
 - override_2_on_disk
 - override_3_on_disk
+hides:
+- hide_1_on_disk

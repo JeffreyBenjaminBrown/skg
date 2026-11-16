@@ -1,8 +1,6 @@
 pid: a
 title: a
-subscribesTo:
+forks:
 - b
-hidesFromSubs:
-- b
-overrides:
+hides:
 - b

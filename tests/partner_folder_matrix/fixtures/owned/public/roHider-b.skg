@@ -1,4 +1,4 @@
 pid: roHider-b
 title: roHider-b
-hidesFromSubs:
+hides:
 - roHider-owner

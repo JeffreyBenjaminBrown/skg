@@ -1,6 +1,6 @@
 pid: wSub-owner
 title: wSub-owner
-subscribesTo:
+forks:
 - wSub-a
 - wSub-b
 - wSub-c

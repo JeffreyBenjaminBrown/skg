@@ -2,5 +2,5 @@ pid: b
 title: b
 contains:
 - x
-overrides:
+forks:
 - a

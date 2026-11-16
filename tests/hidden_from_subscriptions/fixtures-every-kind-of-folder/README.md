@@ -16,8 +16,8 @@ I have replaced "E" with "subscribee-".
 ```
 R (subscriber)
 ├── contains: [R1]
-├── subscribesTo: [E1, E2]
-└── hidesFromSubs: [hidden-in-E1, hidden-in-E2, hidden-for-no-reason]
+├── forks: [E1, E2]
+└── hides: [hidden-in-E1, hidden-in-E2, hidden-for-no-reason]
 
 E1 (subscribee)
 └── contains: [hidden-in-E1, E11]   # hidden first, then non-hidden

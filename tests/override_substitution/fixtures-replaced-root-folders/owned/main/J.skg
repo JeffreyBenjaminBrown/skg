@@ -4,9 +4,7 @@ aliases:
   - reply
 contains:
   - L1
-subscribesTo:
+forks:
   - L
-overrides:
-  - L
-hidesFromSubs:
+hides:
   - L2

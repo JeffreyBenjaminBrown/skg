@@ -1,4 +1,4 @@
 pid: other-child
 title: the other child
-overrides:
+forks:
   - child

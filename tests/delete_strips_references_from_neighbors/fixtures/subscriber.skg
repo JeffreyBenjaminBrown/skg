@@ -1,5 +1,5 @@
 pid: subscriber
 title: subscriber
-subscribesTo:
+forks:
 - victim
 - sibling

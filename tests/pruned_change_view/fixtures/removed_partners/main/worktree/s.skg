@@ -1,5 +1,5 @@
 pid: s
 title: s
-subscribesTo:
+forks:
 - s1
 - s3

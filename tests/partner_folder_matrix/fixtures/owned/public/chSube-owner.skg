@@ -1,4 +1,4 @@
 pid: chSube-owner
 title: chSube-owner
-subscribesTo:
+forks:
 - chSube-m

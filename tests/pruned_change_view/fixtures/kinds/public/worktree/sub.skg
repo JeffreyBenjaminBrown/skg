@@ -1,4 +1,4 @@
 pid: sub
 title: sub
-subscribesTo:
+forks:
 - s2

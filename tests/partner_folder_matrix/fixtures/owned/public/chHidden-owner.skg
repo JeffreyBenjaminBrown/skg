@@ -1,4 +1,4 @@
 pid: chHidden-owner
 title: chHidden-owner
-hidesFromSubs:
+hides:
 - chHidden-m

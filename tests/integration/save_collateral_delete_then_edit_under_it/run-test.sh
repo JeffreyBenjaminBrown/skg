@@ -63,9 +63,9 @@ title: "11"
 pid: "11"
 aliases:
   - eleven
-subscribesTo:
+forks:
   - subee
-hidesFromSubs:
+hides:
   - subee-1
   - also-hidden
 EOF

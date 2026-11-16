@@ -2,7 +2,5 @@ pid: f
 title: to reader, as the reader reads it
 contains:
 - d
-subscribesTo:
-- t
-overrides:
+forks:
 - t

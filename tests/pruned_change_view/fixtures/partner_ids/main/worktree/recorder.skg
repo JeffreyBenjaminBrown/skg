@@ -1,5 +1,5 @@
 pid: recorder
 title: recorder
-subscribesTo:
+forks:
 - x2
 - ghost

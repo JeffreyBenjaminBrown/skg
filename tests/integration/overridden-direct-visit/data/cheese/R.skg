@@ -1,6 +1,4 @@
 pid: R
 title: cooking
-overrides:
-  - Z
-subscribesTo:
+forks:
   - Z

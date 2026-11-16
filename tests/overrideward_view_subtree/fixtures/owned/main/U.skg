@@ -1,6 +1,4 @@
 pid: U
 title: cooking the owned way
-subscribesTo:
-  - F
-overrides:
+forks:
   - F

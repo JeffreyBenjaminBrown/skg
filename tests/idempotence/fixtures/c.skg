@@ -1,4 +1,4 @@
 pid: c
 title: c
-subscribesTo:
+forks:
   - d

@@ -1,4 +1,4 @@
 pid: roSub-b
 title: roSub-b
-subscribesTo:
+forks:
 - roSub-owner

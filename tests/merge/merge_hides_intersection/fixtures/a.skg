@@ -1,5 +1,5 @@
 pid: a
 title: "a"
-hidesFromSubs:
+hides:
 - x
 - z

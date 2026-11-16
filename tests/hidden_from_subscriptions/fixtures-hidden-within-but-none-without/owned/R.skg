@@ -2,7 +2,7 @@ title: R
 pid: R
 contains:
 - R1
-subscribesTo:
+forks:
 - E1
-hidesFromSubs:
+hides:
 - H

@@ -1,6 +1,6 @@
 pid: A2
 title: Second subscriber
-subscribesTo:
+forks:
 - B
-hidesFromSubs:
+hides:
 - z

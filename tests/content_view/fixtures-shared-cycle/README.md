@@ -21,13 +21,13 @@ Note: Files 4 and 5 are islands w/r/t the `contains` relationship.
 - **4.skg** contains a link to something not in these fixtures:
   - `[[id:shgulasdghu][test]]`
 
-### Subscription Relationships
-- **2.skg** subscribes to: 4.skg, 5.skg
-- **3.skg** subscribes to: 4.skg (via alias 44), 5.skg (via alias 55)
+### Fork Relationships
+- **2.skg** forks: 4.skg, 5.skg
+- **3.skg** forks: 4.skg (via alias 44), 5.skg (via alias 55)
+- **5.skg** forks: 3.skg, 4.skg
 
-### Hide/Override Relationships
-- **1.skg** hides from its subscriptions: 4.skg, 5.skg (via alias 55)
-- **5.skg** overrides view of: 3.skg, 4.skg
+### Hide Relationships
+- **1.skg** hides from its forks: 4.skg, 5.skg (via alias 55)
 
 ### Aliases
 Multiple IDs can refer to the same file:

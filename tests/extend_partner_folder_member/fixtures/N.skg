@@ -1,9 +1,8 @@
 pid: N
 title: N
-subscribesTo:
+forks:
 - Subscribee
-overrides:
 - Overridden
-hidesFromSubs:
+hides:
 - Hidden
 - SubscribeeHidden

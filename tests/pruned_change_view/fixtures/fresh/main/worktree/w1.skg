@@ -2,5 +2,5 @@ pid: w1
 title: w1
 contains:
 - w1a
-subscribesTo:
+forks:
 - w2

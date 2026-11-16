@@ -2,8 +2,6 @@ pid: R
 title: R
 contains:
   - P
-subscribesTo:
+forks:
   - E
   - F
-overrides:
-  - E

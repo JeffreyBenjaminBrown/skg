@@ -1,6 +1,6 @@
 pid: ovr-sub-overrider
 title: private overrider title must not leak
-overrides:
-- ovr-sub-original
 contains:
 - ovr-sub-child
+forks:
+- ovr-sub-original

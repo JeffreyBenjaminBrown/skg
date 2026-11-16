@@ -1,6 +1,4 @@
 pid: B
 title: boring override
-subscribesTo:
-  - E
-overrides:
+forks:
   - E

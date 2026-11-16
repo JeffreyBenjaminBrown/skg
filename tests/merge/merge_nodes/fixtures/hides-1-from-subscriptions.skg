@@ -1,5 +1,5 @@
 pid: hides-1-from-subscriptions
 title: "hides-1-from-subscriptions"
-hidesFromSubs:
+hides:
 - "1"
 - "11"

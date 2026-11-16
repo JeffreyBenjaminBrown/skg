@@ -6,6 +6,6 @@ body: |-
 contains:
 - 2
 - 33
-hidesFromSubs:
+hides:
 - 4
 - 55

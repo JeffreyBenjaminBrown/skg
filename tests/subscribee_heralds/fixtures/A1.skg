@@ -1,8 +1,8 @@
 pid: A1
 title: First subscriber
-subscribesTo:
+forks:
 - B
 contains:
 - old-x
-hidesFromSubs:
+hides:
 - y

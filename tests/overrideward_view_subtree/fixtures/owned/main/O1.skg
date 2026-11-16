@@ -1,4 +1,4 @@
 pid: O1
 title: owned mutual one
-overrides:
+forks:
 - O2

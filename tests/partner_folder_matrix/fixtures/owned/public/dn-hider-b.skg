@@ -1,4 +1,4 @@
 pid: dn-hider-b
 title: dn-hider-b
-hidesFromSubs:
+hides:
 - dn-owner

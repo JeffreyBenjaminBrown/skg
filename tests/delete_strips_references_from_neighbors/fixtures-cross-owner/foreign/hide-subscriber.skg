@@ -1,6 +1,6 @@
 pid: hide-subscriber
 title: foreign hide subscriber
-subscribesTo:
+forks:
 - hide-subscribee
-hidesFromSubs:
+hides:
 - victim-alt

@@ -1,6 +1,4 @@
 pid: f
 title: f
-subscribesTo:
-- j
-overrides:
+forks:
 - j

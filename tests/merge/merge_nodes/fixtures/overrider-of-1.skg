@@ -1,4 +1,4 @@
 pid: overrider-of-1
 title: "overrider-of-1"
-overrides:
+forks:
 - "1"

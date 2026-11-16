@@ -1,7 +1,7 @@
 pid: child-b-id
 title: Second child, a subscriber
-subscribesTo:
+forks:
 - fred-note-id
-hidesFromSubs:
+hides:
 - fred-detail-id
 - fred-aside-id

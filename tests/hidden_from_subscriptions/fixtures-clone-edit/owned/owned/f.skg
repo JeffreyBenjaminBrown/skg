@@ -3,5 +3,5 @@ title: f
 contains:
 - c
 - x
-subscribesTo:
+forks:
 - o

@@ -1,8 +1,6 @@
 pid: R
 title: R
-subscribesTo:
+forks:
   - E
-overrides:
-  - E
-hidesFromSubs:
+hides:
   - H

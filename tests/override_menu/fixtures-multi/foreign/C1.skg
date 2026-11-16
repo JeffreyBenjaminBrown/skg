@@ -1,4 +1,4 @@
 pid: C1
 title: C1
-overrides:
+forks:
   - C2

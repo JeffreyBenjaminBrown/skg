@@ -1,5 +1,5 @@
 pid: dn-owner
 title: dn-owner
-hidesFromSubs:
+hides:
 - dn-hid-a
 - dn-hid-b

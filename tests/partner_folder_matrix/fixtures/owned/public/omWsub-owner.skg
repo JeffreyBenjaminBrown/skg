@@ -1,5 +1,5 @@
 pid: omWsub-owner
 title: omWsub-owner
-subscribesTo:
+forks:
 - omWsub-active
 - omWsub-inactive

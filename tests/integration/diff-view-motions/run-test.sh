@@ -50,7 +50,7 @@ set_up_test_data () {
     echo "=== Changing the worktree ==="
     rm "$MAIN/m.skg"
     printf 'pid: r2\ntitle: r2\ncontains:\n- a\n' > "$MAIN/r2.skg"
-    printf 'pid: s\ntitle: s\nsubscribesTo:\n- a\n' > "$MAIN/s.skg"
+    printf 'pid: s\ntitle: s\nforks:\n- a\n' > "$MAIN/s.skg"
     printf 'pid: y\ntitle: y2\nbody: |-\n  see [[id:a][a]]\n' > "$MAIN/y.skg"
     echo "✓ Test data ready"
 }

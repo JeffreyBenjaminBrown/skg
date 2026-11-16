@@ -1,6 +1,6 @@
 pid: Hider
 title: Hider
-subscribesTo:
+forks:
 - HiderLeaf
-hidesFromSubs:
+hides:
 - N

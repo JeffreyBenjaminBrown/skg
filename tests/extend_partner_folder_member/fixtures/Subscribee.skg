@@ -1,6 +1,6 @@
 pid: Subscribee
 title: Subscribee
-subscribesTo:
+forks:
 - SubscribeeLeaf
 contains:
 - SubscribeeHidden

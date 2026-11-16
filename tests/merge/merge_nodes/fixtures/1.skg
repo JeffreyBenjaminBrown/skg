@@ -5,10 +5,9 @@ contains:
 - "11"
 - "12"
 - "overlap"
-subscribesTo:
+forks:
 - 1-subscribes-to
-hidesFromSubs:
+- overridden-by-1
+hides:
 - hidden-from-1s-subscriptions
 - hidden-from-subscriptions-of-1-but-in-content-of-2
-overrides:
-- overridden-by-1

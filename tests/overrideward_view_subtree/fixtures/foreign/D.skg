@@ -1,6 +1,4 @@
 pid: D
 title: dangling overrider
-subscribesTo:
-  - gone
-overrides:
+forks:
   - gone

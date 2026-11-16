@@ -1,6 +1,6 @@
 pid: S
 title: S
-subscribesTo:
+forks:
 - N
 - SubscriberLeaf
 contains:

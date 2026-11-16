@@ -1,4 +1,4 @@
 pid: e
 title: e
-subscribesTo:
+forks:
   - b

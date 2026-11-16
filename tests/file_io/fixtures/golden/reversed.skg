@@ -7,7 +7,7 @@ contains:
 - '3'
 - '2'
 - '1'
-subscribesTo:
+forks:
 - '13'
 - '12'
 - '11'

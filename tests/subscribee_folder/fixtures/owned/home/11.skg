@@ -2,5 +2,5 @@ pid: 11
 title: 11
 contains:
   - 111
-subscribesTo:
+forks:
   - 11-sees

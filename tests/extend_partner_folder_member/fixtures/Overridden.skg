@@ -1,4 +1,4 @@
 pid: Overridden
 title: Overridden
-subscribesTo:
+forks:
 - OverriddenLeaf
