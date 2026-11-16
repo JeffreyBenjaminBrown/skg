@@ -1,9 +1,10 @@
 //! This file defines text-claim validation, which is async because
-//! it consults disk. A 'ForkeeTextClaim' is the title/body that
-//! an editable foreign forkee-as-such displayed in the buffer (an
-//! owned one saves them instead); since title/body edits of a foreign
-//! node in that position are forbidden, each claim must match the
-//! node's disk state. Claims for nodes absent from disk are ignored.
+//! it consults disk. A 'MemberAsSuchTextClaim' is the title/body
+//! that an editable foreign member as such of a forks folder (a
+//! forkee or forker as such) displayed in the buffer (an owned one
+//! saves them instead); since title/body edits of a foreign node in
+//! that position are forbidden, each claim must match the node's disk
+//! state. Claims for nodes absent from disk are ignored.
 
 use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -30,6 +31,6 @@ pub fn validate_text_claims (
       if claim . title != from_disk . title
         || claim . body != from_disk . body
       { return Err (Box::new (BufferValidationError::Other (
-          format!( "Cannot edit title/body for node {} ({}), a foreign node in forkee-as-such position. View the node as itself to edit title/body (an edit there forks it).",
+          format!( "Cannot edit title/body for node {} ({}), a foreign node shown as a member of a forks folder. View the node as itself to edit title/body (an edit there forks it).",
                     pid, claim . headline )) )); }}}
   Ok (( )) }

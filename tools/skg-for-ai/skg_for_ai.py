@@ -3761,15 +3761,16 @@ def expand_relRepo_subtree (edited, root, word, headline_of_handle, check):
     return
   def metadata_of (index):
     return outline_metadata (edited, index, headline_of_handle)
-  def forkee_as_such (index):
+  def member_as_such (index):
+    # an occurrence member of a forks folder, claiming or not: its
+    # content is shown in part, and never collected as its list
     metadata = metadata_of (index)
     return ( metadata is not None and headline_kind (metadata) == "node"
-             and not metadata_has_atom (metadata, "noClaim")
              and folder_atom ( metadata_of ( edited [index] . parent ) or
                                [ Symbol ("skg") ] ) == "forksFolder" )
   def prune_below (index):
     return ( metadata_has_atom ( metadata_of (index), "writeProtected" )
-             or forkee_as_such (index) )
+             or member_as_such (index) )
   def relationship_matches (index):
     metadata = metadata_of (index)
     member_kind = headline_kind (metadata)
@@ -3782,7 +3783,7 @@ def expand_relRepo_subtree (edited, root, word, headline_of_handle, check):
       return False
     if headline_kind (parent_metadata) == "node":
       return ( kind == "content" and is_editable_node (parent_metadata)
-               and not forkee_as_such (parent) )
+               and not member_as_such (parent) )
     return ( WRITABLE_FOLDER_RELATIONSHIP_KINDS . get ( folder_atom (parent_metadata) )
              == kind
              and is_editable_node ( metadata_of ( edited [parent] . parent )) )
@@ -4383,8 +4384,9 @@ def predicted_forks (edited, original, headline_of_handle, ownership,
   nothing; making it editable first ('editable', then a save) is the
   gesture, as 'docs/forks.org' says. Only an occurrence in content
   position (a root, or a node's child) forks: a member of a folder
-  does not, and a forkee as such, whose removed children become
-  hides, takes no edit of its title or body."""
+  does not, and a foreign member as such of a forks folder (a forkee
+  or forker as such), whose content is shown in part, takes no edit
+  of its title or body."""
   forks = PredictedForks ()
   owned = [ name for name, is_owned in ownership . items () if is_owned ]
   original_index_of_handle = { headline . handle : index

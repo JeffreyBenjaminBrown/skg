@@ -153,20 +153,20 @@ fn is_written_in (
 
 /// Whether the save writes the contains of the occurrence at 'node':
 /// it is editable, of a node in a skgrepo the user owns, not marked
-/// for deletion, and not itself a forkee as such.
+/// for deletion, and not itself a member as such of a forks folder (a
+/// forkee or forker as such), whose content is shown in part.
 fn saves_its_contains (
   node       : NodeRef<Viewnode>,
   occurrence : &Occurrence,
   config     : &SkgConfig,
 ) -> bool {
-  let forkee_as_such : bool =
-    occurrence . claimsMembership
-    && node . parent () . is_some_and ( |parent| matches! (
+  let member_as_such : bool =
+    node . parent () . is_some_and ( |parent| matches! (
       parent . value () . kind, ViewnodeKind::Folder (Folder::Forks) ));
   ! occurrence . is_writeProtected ()
   && config . skgrepo_is_owned (&occurrence . home_skgrepo)
   && ! matches! ( occurrence . edit_request (), Some (NodeEditRequest::Delete) )
-  && ! forkee_as_such }
+  && ! member_as_such }
 
 fn occurrence_of<'a> (
   node : NodeRef<'a, Viewnode>,

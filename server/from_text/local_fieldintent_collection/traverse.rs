@@ -29,23 +29,24 @@
 //! than erroring.
 //! .
 //! DEFINITION: a vognode is *save-eligible* iff it is an occurrence,
-//! editable, lacks a Delete edit request, and is not in
-//! forkee-as-such position. (Its position may be anywhere else --
-//! including as a member of a write-protected folder, where it is
-//! save-eligible for itself but invisible to the folder's recorder.)
-//! An editable forkee as such is not save-eligible, since it shows its
-//! content in part; but when the user owns it, its title and body are
-//! saved, and a child typed under it joins its content
+//! editable, lacks a Delete edit request, and is no member as such of
+//! a forks folder. (Its position may be anywhere else -- including as
+//! a member of a write-protected folder, where it is save-eligible for
+//! itself but invisible to the folder's recorder.) An editable member
+//! as such is not save-eligible, since it shows its content in part
+//! (less what the note whose folder holds it contains or hides): an
+//! absent child is integrated or hidden by that note, never removed
+//! from the member. But when the user owns the member, its title and
+//! body are saved, and a child typed under it joins its content
 //! ('resolve_visibility'). A foreign one's title and body are text
 //! claims, which must match the disk.
 //! .
-//! DEFINITION: a vognode is *in forkee-as-such position* (a forkee
-//! as such) iff it is a claiming occurrence direct child of a
-//! forksFolder. A child of a forksFolder claiming nothing (a
-//! forker-only member, or a detached forkee) is no member of the
-//! note's 'forks', hence not shown *as* a forkee: it is an ordinary
-//! self-writer that stands there claiming nothing, as under a
-//! write-protected folder.
+//! DEFINITION: a vognode is a *member as such* of a forks folder iff
+//! it is an occurrence direct child of the folder. One that claims is
+//! *in forkee-as-such position* (a forkee as such): the note forks it.
+//! One claiming nothing is *in forker-as-such position* (a forker as
+//! such): a forker-only member, which forks the note and records so in
+//! its own file, or a detached forkee.
 
 use crate::from_text::local_fieldintent_collection::predicates::{
   occurrence_child_counts_as_content,
@@ -54,7 +55,8 @@ use crate::from_text::local_fieldintent_collection::predicates::{
   member_counts_for_partnerFolder };
 use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, DefiningFolderRecorder, LocalContext, FieldIntent,
-  ForksFolderMembers, HiddenOutsideEdit, ForkeeTextClaim, ForkeeVisibility };
+  ForksFolderMembers, HiddenOutsideEdit, MemberAsSuchTextClaim,
+  ForkeeVisibility, ForkerVisibility };
 use crate::types::errors::HeadlineName;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
@@ -97,9 +99,9 @@ fn visit (
           // Carrying the identity of the ghost or gnid-only vognode
           // (write-protected, not save-eligible) keeps a
           // forksFolder found under a ghost meaningful: its
-          // children stay in forkee-as-such position, so their
-          // contents are never read as whole lists, and a foreign
-          // one's title edits bounce via text claims.
+          // children stay members as such, so their contents are
+          // never read as whole lists, and a foreign one's title
+          // edits bounce via text claims.
           gnid               : vognode . gnid() . clone(),
           headline            : node_ref . value () . headline_name (),
           is_editable    : false,
@@ -138,6 +140,16 @@ fn visit (
       recurse_with_uniform_context (
         node_ref, &LocalContext::UnderWriteProtectedFolder, collected, owned), }}
 
+/// What a member as such of a forks folder knows of the note whose
+/// folder holds it (the folder's recorder): its ID, whether it is
+/// editable, and whether it forks the member (a forkee as such) or
+/// not (a forker as such).
+struct MemberAsSuchContext<'a> {
+  note             : &'a ID,
+  note_is_editable : bool,
+  note_forks_it    : bool,
+}
+
 fn visit_occurrence (
   node_ref  : NodeRef<Viewnode>,
   t         : &Occurrence,
@@ -145,12 +157,22 @@ fn visit_occurrence (
   collected : &mut CollectedFieldIntents,
   owned     : IsOwned,
 ) -> Result<(), String> {
-  let forkee_as_such_context : Option<(&ID, bool)> =
+  let member_as_such_context : Option<MemberAsSuchContext> =
     match context {
       LocalContext::ForkeeAsSuchPosition {
         forker, forker_is_editable }
         if t . claimsMembership =>
-        Some (( forker, *forker_is_editable )),
+        Some ( MemberAsSuchContext {
+          note             : forker,
+          note_is_editable : *forker_is_editable,
+          note_forks_it    : true } ),
+      LocalContext::ForkerAsSuchPosition {
+        forkee, forkee_is_editable }
+        if ! t . claimsMembership =>
+        Some ( MemberAsSuchContext {
+          note             : forkee,
+          note_is_editable : *forkee_is_editable,
+          note_forks_it    : false } ),
       _ => None };
   let is_editable : bool =
     ! t . is_writeProtected();
@@ -160,15 +182,15 @@ fn visit_occurrence (
   let is_saveEligible : bool =
     is_editable
     && ! has_delete_request
-    && forkee_as_such_context . is_none();
+    && member_as_such_context . is_none();
   let headline : HeadlineName = node_ref . value () . headline_name ();
   if is_editable {
     // Emission happens only inside this block, because an
     // write-protected vognode emits nothing.
-    match forkee_as_such_context {
-      Some (( forker, forker_is_editable )) => {
+    match member_as_such_context {
+      Some (MemberAsSuchContext { note, note_is_editable, note_forks_it }) => {
         if owned (& t . home_skgrepo) {
-          // An owned forkee as such saves its own title and body,
+          // An owned member as such saves its own title and body,
           // and nothing else of itself: what it shows of its
           // content is partial, so its list is not read here.
           collected . instructionMerge_fieldIntent (
@@ -184,30 +206,38 @@ fn visit_occurrence (
           collected . instructionMerge_fieldIntent (
             &headline,
             t . gnid . clone(),
-            FieldIntent::ForkeeTextClaim (
-              ForkeeTextClaim {
+            FieldIntent::MemberAsSuchTextClaim (
+              MemberAsSuchTextClaim {
                 title    : t . title . clone(),
                 body     : t . body() . cloned(),
                 headline : headline . clone () } )) ?; }
-        if forker_is_editable {
+        if note_is_editable {
           // The at-most-one-writer-per-ID guard: only the
           // forksFolder under the editable instance of a
-          // forker may write its hide edits. The same forker
+          // note may write its hide edits. The same note
           // can recur write-protected elsewhere with its own
           // forksFolder; without this guard those could emit
           // contradictory hide edits for one ID.
+          let visible : Vec<ID> = visible_content_members (node_ref);
           collected . instructionMerge_fieldIntent (
             &headline,
-            forker . clone(),
-            FieldIntent::ForkeeVisibility (
-              ForkeeVisibility {
-                forkee     : t . gnid . clone(),
-                visible    : visible_content_members (node_ref) } )) ?; }
+            note . clone(),
+            if note_forks_it {
+              FieldIntent::ForkeeVisibility (
+                ForkeeVisibility {
+                  forkee : t . gnid . clone(),
+                  visible } )
+            } else {
+              FieldIntent::ForkerVisibility (
+                ForkerVisibility {
+                  forker : t . gnid . clone(),
+                  visible } ) } ) ?; }
         // Delete, NodeMerge and flag edit requests here are
-        // ignored: a forkee as such can affect only its own title
-        // and body (when owned), what its forker hides, and, by a
+        // ignored: a member as such can affect only its own title
+        // and body (when owned), what the note hides, and, by a
         // child typed under it, its own content
-        // ('resolve_visibility').
+        // ('resolve_visibility'). Deleting it from the folder is
+        // read from the folder ('ForksFolderMembers').
       },
       None => {
         if has_delete_request {
@@ -342,7 +372,7 @@ fn visit_aliasFolder (
 /// and the members it shows at all, claiming or not, the signal from
 /// which deleting a forker hides it ('ForksFolderMembers'). A claiming
 /// member stands as a forkee as such; one claiming nothing, as a
-/// member of a write-protected folder.
+/// forker as such.
 fn visit_forks_folder (
   node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
@@ -371,7 +401,9 @@ fn visit_forks_folder (
                 is_saveEligible : recorder . is_saveEligible },
             ViewnodeKind::Vognode (Vognode::Occurrence (t))
               if ! t . claimsMembership =>
-              LocalContext::UnderWriteProtectedFolder,
+              LocalContext::ForkerAsSuchPosition {
+                forkee             : recorder . gnid . clone(),
+                forkee_is_editable : recorder . is_editable },
             _ =>
               // The forker's identity is passed even when the recorder is
               // not save-eligible, because text claims outlive the
@@ -541,10 +573,10 @@ fn content_members (
   contents }
 
 /// This returns the children that the buffer presents as visible
-/// content of one forkee-as-such. The list is not saved as the
-/// forkee's contains; it is the signal from which the
-/// forker's hides/unhides are inferred, downstream. It is not
-/// deduplicated.
+/// content of one member as such of a forks folder. The list is not
+/// saved as the member's contains; it is the signal from which the
+/// note's hides and unhides, and the children typed under the member,
+/// are inferred, downstream. It is not deduplicated.
 fn visible_content_members (
   node_ref : NodeRef<Viewnode>,
 ) -> Vec<ID> {

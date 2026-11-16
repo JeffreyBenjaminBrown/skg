@@ -20,6 +20,14 @@
 //!   touched: the refresh of the save's rerender makes it vanish.
 //! - A foreign R records no hides: a save that would hide or unhide
 //!   anything in R is refused ('cut_under_a_foreign_forker').
+//! - An E the graph lacks (typed there) has no list to lose: what it
+//!   shows is its contains ('set_contains_of_new_member_as_such').
+//! .
+//! A forker F shown as such in the forks folder of a note N gives a
+//! signal of its own ('ForkerVisibility'), read by the
+//! forker-visibility step ('resolve_forker_visibility'): F shows its
+//! content less what N contains or hides, so a child absent there is
+//! never removed from F.
 //! .
 //! The skgrepo restriction limits what can be edited as well as what
 //! can be seen ('server/skgrepo_sets.rs'), so both E's content and R's
@@ -45,7 +53,7 @@ use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::from_text::local_fieldintent_collection::lower::LoweredNodeIntents;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::from_text::local_fieldintent_collection::types::{
-  ForksFolderMembers, HiddenOutsideEdit, ForkeeVisibility };
+  ForksFolderMembers, HiddenOutsideEdit, ForkeeVisibility, ForkerVisibility };
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, members_of};
@@ -55,11 +63,14 @@ use crate::types::save::PostSkgsaveCommitNoticeCandidate;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
-/// The 'visibility' pairs are (forker, signal), as
-/// 'lower_collected_fieldIntents' extracted them from the map.
+/// The 'visibility' pairs are (forker, signal), and the
+/// 'forker_visibility' pairs (the note whose forks folder shows the
+/// forker, signal), as 'lower_collected_fieldIntents' extracted them
+/// from the map.
 pub fn resolve_visibility (
   mut lowered : LoweredNodeIntents,
   visibility  : &[(ID, ForkeeVisibility)],
+  forker_visibility : &[(ID, ForkerVisibility)],
   hidden_outside : &[(ID, HiddenOutsideEdit)],
   forks_folder_members : &[(ID, ForksFolderMembers)],
   graph       : &InRustGraph,
@@ -67,23 +78,25 @@ pub fn resolve_visibility (
   skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result<(LoweredNodeIntents, Vec<PostSkgsaveCommitNoticeCandidate>), Box<dyn Error>> {
   validate_no_overlapping_forkee_hiderel_conflicts (
-    visibility, graph, config, skgrepo_restriction ) ?;
+    visibility, forker_visibility, graph, config, skgrepo_restriction ) ?;
   infer_hides_from_contains_removals (
-    // Before the signal loop below, so that an explicit
-    // forkee-as-such gesture about the same child wins.
-    &mut lowered, visibility, graph, config,
+    // Before the signal loops below, so that an explicit
+    // member-as-such gesture about the same child wins.
+    &mut lowered, visibility, forker_visibility, graph, config,
     skgrepo_restriction ) ?;
   for (forker, signal) in visibility {
     let Some (forkee_from_disk) =
       opt_graphnode_by_gnid (
         graph, config, &signal . forkee ) ?
-    else { continue; };
+    else { lowered . set_contains_of_new_member_as_such (
+             &signal . forkee, &signal . visible );
+           continue; };
     let Some (forker_from_disk) =
       opt_graphnode_by_gnid (
         graph, config, forker ) ?
     else { continue; };
-    add_children_typed_under_forkee (
-      &mut lowered, &forkee_from_disk, &signal . visible,
+    add_children_typed_under_member_as_such (
+      &mut lowered, &forkee_from_disk, MemberAsSuch::Forkee, &signal . visible,
       graph, config, skgrepo_restriction ) ?;
     let forker_contains : HashSet<ID> =
       lowered . forker_contains_after_save (
@@ -117,6 +130,9 @@ pub fn resolve_visibility (
       forker_from_disk,
       &inferred_hides,
       &inferred_unhides ); }
+  resolve_forker_visibility (
+    &mut lowered, forker_visibility, graph, config,
+    skgrepo_restriction ) ?;
   resolve_forks_folder_removals (
     &mut lowered, forks_folder_members, graph, config,
     skgrepo_restriction ) ?;
@@ -137,21 +153,35 @@ fn cut_under_a_foreign_forker (
     "Cannot change what {} ('{}') shows of {} ('{}'), its forkee: {} is foreign, and only a note of your own can fork another and hide what that one contains.",
     forker . pid, forker . title, forkee . pid, forkee . title, forker . pid ) }
 
-/// Each child typed under a forkee E as such (a claiming child the
-/// buffer shows there, of a node the graph lacks, that E's list does
-/// not name) joins E's content, when the user owns E: inserted right
-/// after the sibling it follows in the buffer that E's list names (or
-/// another child typed there), first when none precedes it. E's
+/// Which side of 'forks' a member as such of a note's forks folder
+/// stands on: a forkee as such (the note forks it) or a forker as
+/// such (it claims nothing there).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum MemberAsSuch { Forkee, Forker }
+
+impl MemberAsSuch {
+  fn word (
+    self,
+  ) -> &'static str {
+    match self { MemberAsSuch::Forkee => "forkee",
+                 MemberAsSuch::Forker => "forker", } }}
+
+/// Each child typed under a member M as such (a claiming child the
+/// buffer shows there, of a node the graph lacks, that M's list does
+/// not name) joins M's content, when the user owns M: inserted right
+/// after the sibling it follows in the buffer that M's list names (or
+/// another child typed there), first when none precedes it. M's
 /// contains is read by the records the skgrepo restriction shows, as
 /// the view drew them; disk supplementation keeps the rest where they
-/// stand. Under a foreign E the save is refused: only E's owner can
+/// stand. Under a foreign M the save is refused: only M's owner can
 /// change its content, and making it one's own (forking it) is done
-/// from a view of E as itself. A child the graph has, placed under E
-/// but not named by its list, is no member of E and joins nothing:
+/// from a view of M as itself. A child the graph has, placed under M
+/// but not named by its list, is no member of M and joins nothing:
 /// the save's rerender leaves it out.
-fn add_children_typed_under_forkee (
+fn add_children_typed_under_member_as_such (
   lowered             : &mut LoweredNodeIntents,
-  forkee_from_disk    : &Graphnode,
+  member_from_disk    : &Graphnode,
+  member_as_such      : MemberAsSuch,
   shown               : &[ID],
   graph               : &InRustGraph,
   config              : &SkgConfig,
@@ -161,19 +191,19 @@ fn add_children_typed_under_forkee (
     &|gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
   let mut contains : Vec<ID> =
     members_with_visible_records (
-      &forkee_from_disk . contains, skgrepo_restriction );
+      &member_from_disk . contains, skgrepo_restriction );
   let named : HashSet<ID> =
-    members_of (&forkee_from_disk . contains) . iter () . map (key) . collect ();
+    members_of (&member_from_disk . contains) . iter () . map (key) . collect ();
   let typed : HashSet<&ID> =
     shown . iter ()
     . filter ( |gnid| graph . pid_of (gnid) . is_none ()
                       && ! named . contains (&key (gnid)) )
     . collect ();
   if typed . is_empty () { return Ok (( )); }
-  if ! config . skgrepo_is_owned (&forkee_from_disk . home_skgrepo) {
+  if ! config . skgrepo_is_owned (&member_from_disk . home_skgrepo) {
     return Err ( Box::new ( BufferValidationError::Other ( format! (
-      "Cannot add a child under {} ('{}'), a foreign node shown as a forkee: only its owner can change its content. To add one, make the node your own first: view it as itself, where an edit forks it.",
-      forkee_from_disk . pid, forkee_from_disk . title )))); }
+      "Cannot add a child under {} ('{}'), a foreign node shown as a {}: only its owner can change its content. To add one, make the node your own first: view it as itself, where an edit forks it.",
+      member_from_disk . pid, member_from_disk . title, member_as_such . word () )))); }
   let mut follows : Option<usize> = None; // where the last sibling the list names, or the last typed child, stands
   for gnid in shown {
     if typed . contains (gnid) {
@@ -183,8 +213,133 @@ fn add_children_typed_under_forkee (
     } else if let Some (position) =
       contains . iter () . position ( |member| key (member) == key (gnid) )
     { follows = Some (position); }}
-  lowered . set_contains_of_forkee (forkee_from_disk . clone (), contains);
+  lowered . set_contains_of_member_as_such (member_from_disk . clone (), contains);
   Ok (( )) }
+
+/// The forker-visibility step, for a forker F shown as such in the
+/// forks folder of a note N (it forks N, or N forked it and the user
+/// detached it there). Where F and N are fork partners, F shows its
+/// content less what N contains or hides
+/// ('less_what_the_forker_integrates' in 'server/refresh/goal.rs'),
+/// and otherwise all of it; either way by the records the skgrepo
+/// restriction shows, as the view drew it. So:
+/// - a child typed under F joins F's content, when the user owns F,
+///   and the save is refused otherwise
+///   ('add_children_typed_under_member_as_such');
+/// - a child of F that N hides, shown claiming under F (moved out of
+///   F's folder of what N hides in it), is unhidden in N, as under a
+///   forkee; a foreign N records no hides, so that save is refused;
+/// - a child F showed that the buffer no longer shows claiming under
+///   F was cut from it. A cut from a forker is to make N fork F;
+///   until that is built the save is refused
+///   ('cut_from_a_forker_is_not_yet_read'), so no cut is lost
+///   silently.
+/// A child F does not show (one N contains or hides) is absent from
+/// under F by design, and is never removed from F's list. A forker
+/// the graph lacks (typed there) has no list to lose: what it shows
+/// is its contains ('set_contains_of_new_member_as_such'), as for a
+/// forkee typed there.
+fn resolve_forker_visibility (
+  lowered             : &mut LoweredNodeIntents,
+  signals             : &[(ID, ForkerVisibility)],
+  graph               : &InRustGraph,
+  config              : &SkgConfig,
+  skgrepo_restriction : &SkgrepoRestriction,
+) -> Result<(), Box<dyn Error>> {
+  for (note, signal) in signals {
+    let Some (forker_from_disk) : Option<Graphnode> =
+      opt_graphnode_by_gnid (graph, config, &signal . forker) ?
+      else { lowered . set_contains_of_new_member_as_such (
+               &signal . forker, &signal . visible );
+             continue; };
+    let Some (note_from_disk) : Option<Graphnode> =
+      opt_graphnode_by_gnid (graph, config, note) ?
+      else { continue; };
+    add_children_typed_under_member_as_such (
+      lowered, &forker_from_disk, MemberAsSuch::Forker, &signal . visible,
+      graph, config, skgrepo_restriction ) ?;
+    let key : &dyn Fn (&ID) -> ID =
+      &|gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
+    let visible : HashSet<ID> =
+      signal . visible . iter () . map (key) . collect ();
+    let forker_contains : Vec<ID> =
+      members_with_visible_records (
+        &forker_from_disk . contains, skgrepo_restriction );
+    let note_hides : Vec<ID> = // a restricted hide the buffer could not show, so no save removes it
+      members_with_visible_records (
+        note_from_disk . hides . or_default (), skgrepo_restriction );
+    let shown_before : Vec<ID> = // what the view drew under the forker
+      if are_fork_partners (
+           graph, skgrepo_restriction, &note_from_disk . pid, &forker_from_disk . pid )
+      { let integrated : HashSet<ID> =
+          note_hides . iter ()
+          . chain ( members_with_visible_records (
+                      &note_from_disk . contains, skgrepo_restriction ) . iter () )
+          . map (key) . collect ();
+        forker_contains . iter ()
+          . filter ( |gnid| ! integrated . contains (&key (gnid)) )
+          . cloned () . collect ()
+      } else { forker_contains . clone () };
+    let cut : Vec<ID> = shown_before . into_iter ()
+      . filter ( |gnid| ! visible . contains (&key (gnid)) )
+      . collect ();
+    if ! cut . is_empty () {
+      return Err ( Box::new ( BufferValidationError::Other (
+        cut_from_a_forker_is_not_yet_read (
+          &note_from_disk, &forker_from_disk, &cut ) ))); }
+    let forker_contains_keys : HashSet<ID> =
+      forker_contains . iter () . map (key) . collect ();
+    let inferred_unhides : Vec<ID> = note_hides . iter ()
+      . filter ( |gnid| visible . contains (&key (gnid))
+                        && forker_contains_keys . contains (&key (gnid)) )
+      . cloned () . collect ();
+    if inferred_unhides . is_empty () { continue; }
+    if ! config . skgrepo_is_owned (&note_from_disk . home_skgrepo) {
+      return Err ( Box::new ( BufferValidationError::Other (
+        unhide_under_a_foreign_note (&note_from_disk, &forker_from_disk) ))); }
+    lowered . apply_hiderel_delta_to_forker (
+      note_from_disk, &[], &inferred_unhides ); }
+  Ok (( )) }
+
+/// Whether 'a' and 'b' are fork partners, either way, by a record the
+/// skgrepo restriction shows.
+fn are_fork_partners (
+  graph       : &InRustGraph,
+  restriction : &SkgrepoRestriction,
+  a           : &ID,
+  b           : &ID,
+) -> bool {
+  let b_pid : ID = graph . pid_else_raw_id (b);
+  graph . outbound_gnids_for_relation_gated (a, NodeRelation::Forks, restriction)
+    . iter () . any ( |forkee| graph . pid_else_raw_id (forkee) == b_pid )
+  || graph . inbound_pids_for_relation_gated (a, NodeRelation::Forks, restriction)
+    . contains (&b_pid) }
+
+/// The refusal of a save that cuts 'cut' from 'forker', shown as a
+/// forker in the forks folder of 'note'. Reading such a cut (the note
+/// comes to fork the forker, and hides what it cut unless it contains
+/// it) is not built yet.
+fn cut_from_a_forker_is_not_yet_read (
+  note   : &Graphnode,
+  forker : &Graphnode,
+  cut    : &[ID],
+) -> String {
+  format! (
+    "Cannot cut {} from {} ('{}'), shown as a forker in the forks folder of {} ('{}'): cutting from a forker, which is to make {} fork it, is coming but not yet supported. Put back what was cut (or reload the view) and save again.",
+    cut . iter () . map ( |gnid| gnid . 0 . as_str () ) . collect::<Vec<&str>> () . join (", "),
+    forker . pid, forker . title, note . pid, note . title, note . pid ) }
+
+/// The refusal of a save that shows again, under 'forker' shown as
+/// such, what 'note' hides of its content, where the user does not
+/// own the note: only a note of one's own can record a hide or its
+/// removal.
+fn unhide_under_a_foreign_note (
+  note   : &Graphnode,
+  forker : &Graphnode,
+) -> String {
+  format! (
+    "Cannot change what {} ('{}') hides of {} ('{}'), shown as a forker in its forks folder: {} is foreign, and only a note of your own can hide what another contains.",
+    note . pid, note . title, forker . pid, forker . title, note . pid ) }
 
 /// A note N's forks folder shows a forker of N claiming nothing (a
 /// forker-only member, which N does not fork) and each mutual
@@ -358,10 +513,10 @@ fn apply_hiddenoutside_edits (
 ///   with a visible record had a headline (a restricted viewnode,
 ///   where the skgrepo restriction keeps out its node), so its absence
 ///   is a removal.
-/// - A child the same save explicitly shows through one of F's
-///   forkees (a forkee-as-such signal) is not hidden here:
-///   the explicit forkee-view gesture wins. This runs before
-///   the signal loop, so signal deltas also land last.
+/// - A child the same save explicitly shows through a member as such
+///   of F's forks folder (a forkee or forker as such) is not hidden
+///   here: the explicit gesture wins. This runs before the signal
+///   loops, so signal deltas also land last.
 /// - A node with no disk entry removes nothing (a fork clone's
 ///   creation-time hides are computed in 'build_fork_clone').
 /// - Only what the skgrepo restriction shows explains or blocks a
@@ -372,6 +527,7 @@ fn apply_hiddenoutside_edits (
 fn infer_hides_from_contains_removals (
   lowered                : &mut LoweredNodeIntents,
   visibility             : &[(ID, ForkeeVisibility)],
+  forker_visibility      : &[(ID, ForkerVisibility)],
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
   skgrepo_restriction    : &SkgrepoRestriction,
@@ -394,10 +550,13 @@ fn infer_hides_from_contains_removals (
     let removed : Vec<ID> = {
       let new_contains_set : HashSet<&ID> =
         new_contains . iter () . collect ();
-      let signal_visible : HashSet<&ID> = // children the same save explicitly shows through a fork of this forker
+      let signal_visible : HashSet<&ID> = // children the same save explicitly shows through a member as such of this forker's forks folder
         visibility . iter ()
         . filter ( |(pid, _)| *pid == forker_pid )
         . flat_map ( |(_, signal)| signal . visible . iter () )
+        . chain ( forker_visibility . iter ()
+                  . filter ( |(pid, _)| *pid == forker_pid )
+                  . flat_map ( |(_, signal)| signal . visible . iter () ))
         . collect ();
       forker_contains . iter ()
         . filter ( |gnid| ! new_contains_set . contains (gnid) )
@@ -482,9 +641,12 @@ pub(crate) fn member_it_stands_for (
 /// against all forkee branches under the forker.
 /// Rejects the save if one forkee says "hide it"
 /// and another says "show it". A forkee's content is read by the
-/// records the skgrepo restriction shows, as the view drew it.
+/// records the skgrepo restriction shows, as the view drew it. A
+/// forker as such under the same note says only "show it", of each
+/// child of its own it shows: a child absent there is no hide.
 fn validate_no_overlapping_forkee_hiderel_conflicts (
   visibility          : &[(ID, ForkeeVisibility)],
+  forker_visibility   : &[(ID, ForkerVisibility)],
   graph               : &InRustGraph,
   config              : &SkgConfig,
   skgrepo_restriction : &SkgrepoRestriction,
@@ -493,6 +655,14 @@ fn validate_no_overlapping_forkee_hiderel_conflicts (
   // because the conflict is per forker/forkee-content pair,
   // not just per viewchild shown in the buffer.
   let mut seen : HashMap<(ID, ID), bool> = HashMap::new();
+  for (note, signal) in forker_visibility {
+    let Some (forker_from_disk) : Option<Graphnode> =
+      opt_graphnode_by_gnid (graph, config, &signal . forker) ?
+      else { continue; };
+    for content_gnid in members_with_visible_records (
+      &forker_from_disk . contains, skgrepo_restriction ) {
+      if signal . visible . contains (&content_gnid) {
+        seen . insert ((note . clone (), content_gnid), true); }}}
   for (forker, signal) in visibility {
     let forkee_from_disk : Graphnode =
       match opt_graphnode_by_gnid (

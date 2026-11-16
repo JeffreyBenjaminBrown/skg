@@ -3,7 +3,7 @@
 
 use skg::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, FieldIntentsForOneId, FieldIntent,
-  ForkeeTextClaim, ForkeeVisibility };
+  MemberAsSuchTextClaim, ForkeeVisibility };
 use skg::types::errors::HeadlineName;
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::viewnode::ViewnodeId;
@@ -125,8 +125,8 @@ fn combineable_intents_always_combine () {
           visible    : vec![] } )) . unwrap(); }
   acc . instructionMerge_fieldIntent (
     &emitter (), ID::from ("forker"),
-    FieldIntent::ForkeeTextClaim (
-      ForkeeTextClaim {
+    FieldIntent::MemberAsSuchTextClaim (
+      MemberAsSuchTextClaim {
         title    : "t" . to_string(),
         body     : None,
         headline : emitter () } )) . unwrap();

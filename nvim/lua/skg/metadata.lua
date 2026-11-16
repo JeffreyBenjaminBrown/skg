@@ -1882,7 +1882,7 @@ end
 ---The lines of the relationships of KIND in the subtree at
 ---LINE_NUMBER, that headline included. Recurses only where edits still
 ---affect the graph: below an occurrence that claims membership and is
----neither write-protected nor a forkee as such, and below a
+---neither write-protected nor a member as such of a forks folder, and below a
 ---writable folder; a noClaim occurrence, a write-protected folder and
 ---every other non-vognode are pruned with their subtrees. Mirrors
 ---skg--relRepo-recursive-targets.
@@ -1928,8 +1928,8 @@ end
 ---Is the headline at LINE_NUMBER an occurrence claiming membership,
 ---an unknown viewnode or a restricted viewnode, whose
 ---relationship to its view-parent is of KIND and is collected at save from this position?
----For 'content', the view-parent is an editable occurrence not in
----forkee-as-such position; for 'forkee', it is the writable
+---For 'content', the view-parent is an editable occurrence that is no
+---member as such of a forks folder; for 'forkee', it is the writable
 ---forksFolder with an editable viewparent, and the headline claims (a
 ---member claiming nothing forks the viewparent; its record is its
 ---own). Mirrors
@@ -1948,7 +1948,7 @@ function M.relationship_kind_matches_p (line_number, kind)
   if M.occurrence_sexp_p(parent_sexp) then
     return kind == 'content'
            and not M.node_write_protected_p(parent_sexp)
-           and not M.forkee_as_such_at_line_p(parent) end
+           and not M.member_as_such_at_line_p(parent) end
   if M.non_vognode_atom_present_p(parent_sexp, 'forksFolder') then
     return kind == 'forkee' and M.folder_viewparent_editable_p(parent) end
   return false
@@ -1956,7 +1956,7 @@ end
 
 ---Should the walk not descend below the occurrence at LINE_NUMBER,
 ---whose metadata is METADATA_SEXP? A write-protected node's contains
----is not collected at save, and a forkee-as-such member's
+---is not collected at save, and a member as such's
 ---viewchildren are hide and unhide signals, not writable relationships.
 ---Mirrors skg--relRepo-prune-below-p.
 ---@param line_number integer
@@ -1964,17 +1964,17 @@ end
 ---@return boolean
 function M.relRepo_prune_below_p (line_number, metadata_sexp)
   return M.node_write_protected_p(metadata_sexp)
-         or M.forkee_as_such_at_line_p(line_number)
+         or M.member_as_such_at_line_p(line_number)
 end
 
 ---@param line_number integer
----@return boolean is the headline an occurrence claiming membership
----under a forksFolder, a forkee as such (one claiming nothing forks the
----folder's viewparent, or was detached)? Mirrors
----skg--forkee-as-such-at-point-p.
-function M.forkee_as_such_at_line_p (line_number)
+---@return boolean is the headline a member as such of a forksFolder:
+---an occurrence member of one, a forkee as such if it claims, a forker
+---as such if it claims nothing? Either shows its content in part.
+---Mirrors skg--member-as-such-at-point-p.
+function M.member_as_such_at_line_p (line_number)
   local meta = M.metadata_sexp_at_line_or_nil(line_number)
-  if not (M.occurrence_sexp_p(meta) and M.claims_membership_p(meta)) then
+  if not M.occurrence_sexp_p(meta) then
     return false end
   local parent = M.parent_line(line_number)
   return parent ~= nil and M.non_vognode_atom_present_p(

@@ -78,11 +78,13 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
     nodeMerge_pairs (&collected);
   let (resolved, post_skgsave_commit_notice_candidates)
     : (lower::LoweredNodeIntents, Vec<PostSkgsaveCommitNoticeCandidate>) = {
-    let LoweringOutput { intents, visibility, hidden_outside, forks_folder_members } =
+    let LoweringOutput { intents, visibility, forker_visibility,
+                         hidden_outside, forks_folder_members } =
       lower_collected_fieldIntents (collected)
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     resolve_visibility (
-      intents, &visibility, &hidden_outside, &forks_folder_members,
+      intents, &visibility, &forker_visibility,
+      &hidden_outside, &forks_folder_members,
       graph, config, skgrepo_restriction ) ? };
   let with_disk : NodeInstructions_with_Repomoves =
     build_diskSupplemented_nodeInstructions (
@@ -162,7 +164,9 @@ fn orphan_warnings (
 /// Whether the save creates a node from 'node', an editable occurrence
 /// without a delete request whose gnid the graph lacks, and its parent
 /// reads no claims. (A claiming child of a forks folder is a
-/// forkee as such, which the save does not create.)
+/// forkee as such, which the save does not create. A child typed under
+/// an editable member as such has a parent that reads claims: it
+/// joins the member's content, or the save is refused.)
 fn is_created_as_an_orphan (
   viewforest : &ViewForest,
   node       : NodeRef<Viewnode>,

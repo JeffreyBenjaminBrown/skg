@@ -27,6 +27,9 @@ pub enum LocalContext {
   ForkeeAsSuchPosition { // The node is a claiming direct child of a forksFolder: a forkee as such.
     forker                   : ID,
     forker_is_editable       : bool, },
+  ForkerAsSuchPosition { // The node is a direct child of a forksFolder claiming nothing: a forker as such.
+    forkee                   : ID,
+    forkee_is_editable       : bool, },
   HiddenOutsidePosition { // The one derived-but-editable compound partner folder under a forksFolder.
     forker           : ID,
     is_saveEligible  : bool, },
@@ -43,14 +46,14 @@ pub struct DefiningFolderRecorder {
   pub gnid              : ID,
   pub headline        : HeadlineName, // the recorder's occurrence, which emits the folder's fieldIntents
   pub is_editable     : bool, // True iff the recorder is an editable occurrence.
-  pub is_saveEligible : bool, // True iff the recorder is an editable occurrence, carries no Delete request, and is not in forkee-as-such position.
+  pub is_saveEligible : bool, // True iff the recorder is an editable occurrence, carries no Delete request, and is no member of a forks folder.
 }
 
 /// A FieldIntent is what one visit can emit. Each emission
 /// pairs one of these with a target ID, and the pair is
 /// instructionMerged into the accumulator.
 /// The first seven kinds are exclusive (at most one per ID); the
-/// last four are combineable (any number per ID). That distinction is
+/// last five are combineable (any number per ID). That distinction is
 /// the shape of 'FieldIntentsForOneId': each exclusive kind gets an
 /// Option slot there, and each combineable kind gets a Vec slot.
 /// .
@@ -81,8 +84,9 @@ pub enum FieldIntent {
   SetFlag     { flag : Flag, value : bool },
   // The remaining kinds are combineable.
   ForkeeVisibility (ForkeeVisibility),
+  ForkerVisibility (ForkerVisibility),
   HiddenOutsideEdit  (HiddenOutsideEdit),
-  ForkeeTextClaim  (ForkeeTextClaim),
+  MemberAsSuchTextClaim (MemberAsSuchTextClaim),
   ForksFolderMembers (ForksFolderMembers),
 }
 
@@ -109,6 +113,19 @@ pub struct ForkeeVisibility {
   pub visible    : Vec<ID>, // These are the nodes *not* to hide.
 }
 
+/// This is an unresolved signal: the buffer presents 'visible' as
+/// the visible content of 'forker', shown as such in the forks folder
+/// of the note it forks. That content is shown in part (less what the
+/// note contains or hides), so it is never read as the forker's whole
+/// list: a child typed there joins it, a child the note hides shown
+/// there is unhidden, and a child cut from it is refused, for now
+/// ('resolve_forker_visibility').
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ForkerVisibility {
+  pub forker     : ID,
+  pub visible    : Vec<ID>, // These are the nodes *not* cut.
+}
+
 /// The explicitly submitted visible-outside subset for one forker.
 /// Unlike direct relationship sets it carries no skgrepo request: hide
 /// skgrepos are derived after forks and visibility are resolved.
@@ -118,11 +135,12 @@ pub struct HiddenOutsideEdit {
 }
 
 /// This is a validation-only signal: the buffer claims this title
-/// and body for a node shown in forkee-as-such position.
-/// Downstream validation errors unless they match disk, because
-/// title/body edits in that position are forbidden.
+/// and body for a foreign node shown as a member of a forks folder (a
+/// forkee or forker as such). Downstream validation errors unless
+/// they match disk, because title/body edits of a foreign node in
+/// that position are forbidden.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ForkeeTextClaim {
+pub struct MemberAsSuchTextClaim {
   pub title    : String,
   pub body     : Option<String>,
   pub headline : HeadlineName, // the occurrence claiming them
@@ -145,9 +163,10 @@ pub struct FieldIntentsForOneId {
   pub node_merge     : Option<ID>, // This holds the acquiree.
   pub flag       : Option<(Flag, bool)>,
   pub visibility     : Vec<ForkeeVisibility>,  // This slot is combineable.
+  pub forker_visibility : Vec<ForkerVisibility>, // This slot is combineable.
   pub hidden_outside : Vec<HiddenOutsideEdit>,     // This slot is combineable.
   pub forks_folder_members : Vec<ForksFolderMembers>, // This slot is combineable.
-  pub text_claims    : Vec<ForkeeTextClaim>,   // This slot is combineable, and is consumed only by validation.
+  pub text_claims    : Vec<MemberAsSuchTextClaim>,   // This slot is combineable, and is consumed only by validation.
 }
 
 /// This is the traversal's output.
@@ -192,7 +211,7 @@ impl CollectedFieldIntents {
   ///   and Save for same ID";
   /// - 'nodeMerge' and 'flag' are mutually exclusive, including
   ///   when duplicate occurrences of an ID emit them separately;
-  /// - 'visibility' and 'text_claims' coexist with anything,
+  /// - the visibility signals and 'text_claims' coexist with anything,
   ///   including 'delete' (resolution ignores deleted forkers).
   /// An error lists the viewnode IDs of the occurrences that emitted
   /// exclusive fieldIntents for the ID, 'emitter' (the occurrence
@@ -206,8 +225,9 @@ impl CollectedFieldIntents {
   ) -> Result<(), String> {
     if ! matches! ( intent,
                     FieldIntent::ForkeeVisibility (_)
+                    | FieldIntent::ForkerVisibility (_)
                     | FieldIntent::HiddenOutsideEdit (_)
-                    | FieldIntent::ForkeeTextClaim (_)
+                    | FieldIntent::MemberAsSuchTextClaim (_)
                     | FieldIntent::ForksFolderMembers (_) )
     { let emitters : &mut Vec<HeadlineName> =
         self . exclusive_emitters . entry (target . clone ())
@@ -227,10 +247,13 @@ impl CollectedFieldIntents {
       FieldIntent::ForkeeVisibility (v) => {
         entry . visibility . push (v);
         Ok (( )) },
+      FieldIntent::ForkerVisibility (v) => {
+        entry . forker_visibility . push (v);
+        Ok (( )) },
       FieldIntent::HiddenOutsideEdit (edit) => {
         entry . hidden_outside . push (edit);
         Ok (( )) },
-      FieldIntent::ForkeeTextClaim (c) => {
+      FieldIntent::MemberAsSuchTextClaim (c) => {
         entry . text_claims . push (c);
         Ok (( )) },
       FieldIntent::ForksFolderMembers (members) => {
@@ -292,8 +315,9 @@ impl CollectedFieldIntents {
               "flag", &target, emitters) },
           FieldIntent::Delete { .. }
             | FieldIntent::ForkeeVisibility (_)
+            | FieldIntent::ForkerVisibility (_)
             | FieldIntent::HiddenOutsideEdit (_)
-            | FieldIntent::ForkeeTextClaim (_)
+            | FieldIntent::MemberAsSuchTextClaim (_)
             | FieldIntent::ForksFolderMembers (_) =>
             unreachable! ("handled by the outer match"), }}}}
 }

@@ -361,7 +361,7 @@ fn writeProtected_relRepo_request_errors (
     { let headline : HeadlineName = node_ref . value () . headline_name ();
       errors . push ( BufferValidationError::Other ( with_org_subheadlines (
         &format! (
-          "relRepo request on write-protected node {} that no editable node collects:\n- Its view-parent is write-protected (or marked for deletion, or a forkee shown as such), or it is not a member of that view-parent.\n- Make the relRepo request from a view where the view-parent is editable.\n",
+          "relRepo request on write-protected node {} that no editable node collects:\n- Its view-parent is write-protected (or marked for deletion, or shown as a member of a forks folder), or it is not a member of that view-parent.\n- Make the relRepo request from a view where the view-parent is editable.\n",
           t . gnid . 0 ),
         &[ headline ] ))); }} }
 
@@ -401,20 +401,20 @@ fn relRepo_request_is_collected (
 /// As the save-eligibility of
 /// 'from_text/local_fieldintent_collection/traverse.rs', at the
 /// tree validation stage: an editable occurrence, not marked for
-/// deletion, not in forkee-as-such position (a claiming member of a
-/// forks folder).
+/// deletion, and no member as such of a forks folder (a forkee as
+/// such, claiming, or a forker as such, claiming nothing), whose
+/// content is shown in part.
 #[allow(non_snake_case)]
 fn is_saveEligible_occurrence (
   node_ref : NodeRef<Viewnode>,
 ) -> bool {
   let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
     &node_ref . value () . kind else { return false; };
-  let is_forkee_as_such : bool =
-    t . claimsMembership
-    && node_ref . parent ()
-       . map ( |p| matches! ( &p . value () . kind,
-                 ViewnodeKind::Folder (Folder::Forks) ))
-       . unwrap_or (false);
+  let is_member_as_such : bool =
+    node_ref . parent ()
+    . map ( |p| matches! ( &p . value () . kind,
+              ViewnodeKind::Folder (Folder::Forks) ))
+    . unwrap_or (false);
   ! t . is_writeProtected ()
   && ! matches! ( t . edit_request (), Some (&NodeEditRequest::Delete) )
-  && ! is_forkee_as_such }
+  && ! is_member_as_such }

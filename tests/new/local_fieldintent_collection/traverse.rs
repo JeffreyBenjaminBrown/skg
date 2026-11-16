@@ -8,8 +8,8 @@ use indoc::indoc;
 use skg::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
 use skg::types::errors::HeadlineName;
 use skg::from_text::local_fieldintent_collection::types::{
-  CollectedFieldIntents, FieldIntentsForOneId, ForkeeTextClaim,
-  ForkeeVisibility };
+  CollectedFieldIntents, FieldIntentsForOneId, MemberAsSuchTextClaim,
+  ForkeeVisibility, ForkerVisibility };
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::tree::forest::ViewForest;
@@ -146,7 +146,7 @@ fn foreign_forkee_as_such_emits_a_text_claim () {
   assert_eq!( e . contains, None );
   assert_eq!(
     e . text_claims,
-    vec![ ForkeeTextClaim {
+    vec![ MemberAsSuchTextClaim {
       title    : "e" . to_string(),
       body     : Some ("Forkee body" . to_string()),
       headline : HeadlineName::of ( None, Some (&ID::from ("e")), "e" ) } ]);
@@ -190,27 +190,63 @@ fn folders_under_toDelete_or_writeProtected_recorders_emit_nothing () {
   assert!( collected . by_pid . get (&ID::from ("ghost")) . is_none(),
            "a write-protected vognode and its folders emit nothing" ); }
 
+/// An editable member of the forks folder claiming nothing (a forker
+/// as such) shows its content in part, less what the recorder
+/// contains or hides: it saves its title and body when owned, never
+/// its contains, and the recorder gets the forker-visibility signal of
+/// what it shows. It is no fork of the recorder.
 #[test]
-fn editable_member_of_write_protected_folder_emits_for_itself_only () {
+fn forker_as_such_emits_its_text_and_visibility_but_no_contains () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
       ** (skg forksFolder)
-      *** (skg node (gnid intruder) (skgRepos (nodeRepo main)) noClaim) intruder
-      Intruder body
-      **** (skg node (gnid intruder-child) (skgRepos (nodeRepo main))) intruder child
+      *** (skg node (gnid forker) (skgRepos (nodeRepo main)) noClaim) forker
+      Forker body
+      **** (skg node (gnid forker-child) (skgRepos (nodeRepo main))) forker child
+      **** (skg node (gnid placed) (skgRepos (nodeRepo main)) noClaim) placed
       "} );
-  { let intruder : &FieldIntentsForOneId = entry (&collected, "intruder");
-    assert_eq!( intruder . title_and_body,
-                Some (( "intruder" . to_string(),
-                        Some ("Intruder body" . to_string()) )) );
-    assert_eq!( intruder . contains,
-                Some (vec![(ID::from ("intruder-child"), None)]) ); }
-  { // A member of the forks folder claiming nothing (a forker-only
-    // member) is no fork of the folder's recorder.
-    let recorder : &FieldIntentsForOneId = entry (&collected, "recorder");
+  { let forker : &FieldIntentsForOneId = entry (&collected, "forker");
+    assert_eq!( forker . title_and_body,
+                Some (( "forker" . to_string(),
+                        Some ("Forker body" . to_string()) )) );
+    assert_eq!( forker . contains, None,
+                "its partial list is never read as its contains" );
+    assert!( forker . text_claims . is_empty () ); }
+  { let recorder : &FieldIntentsForOneId = entry (&collected, "recorder");
     assert_eq!( recorder . contains, Some (vec![]) );
-    assert_eq!( recorder . forks, Some (vec![]) ); }}
+    assert_eq!( recorder . forks, Some (vec![]) );
+    assert_eq!( recorder . forker_visibility,
+                vec![ ForkerVisibility {
+                  forker  : ID::from ("forker"),
+                  visible : vec![ID::from ("forker-child")] } ]);
+    assert!( recorder . visibility . is_empty () ); }
+  { // Its editable children emit their own instructions.
+    let child : &FieldIntentsForOneId = entry (&collected, "forker-child");
+    assert!( child . title_and_body . is_some() ); }}
+
+/// A foreign forker as such emits only a text claim; under a
+/// write-protected recorder, no visibility signal.
+#[test]
+fn foreign_forker_as_such_emits_a_text_claim () {
+  let collected : CollectedFieldIntents =
+    collected_from_org_owning_main ( indoc! {"
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
+      ** (skg forksFolder)
+      *** (skg node (gnid forker) (skgRepos (nodeRepo theirs)) noClaim) forker
+      **** (skg node (gnid forker-child) (skgRepos (nodeRepo theirs))) forker child
+      "} );
+  let forker : &FieldIntentsForOneId = entry (&collected, "forker");
+  assert_eq!( forker . title_and_body, None );
+  assert_eq!( forker . contains, None );
+  assert_eq!(
+    forker . text_claims,
+    vec![ MemberAsSuchTextClaim {
+      title    : "forker" . to_string(),
+      body     : None,
+      headline : HeadlineName::of ( None, Some (&ID::from ("forker")), "forker" ) } ]);
+  assert!( collected . by_pid . get (&ID::from ("recorder")) . is_none (),
+           "a write-protected recorder receives no signal" ); }
 
 #[test]
 fn editable_child_of_tombstone_emits () {
@@ -293,7 +329,7 @@ fn editable_forkee_under_writeProtected_forker_claims_without_visibility () {
       "} );
   assert_eq!(
     entry (&collected, "e") . text_claims,
-    vec![ ForkeeTextClaim {
+    vec![ MemberAsSuchTextClaim {
       title    : "e" . to_string(),
       body     : None,
       headline : HeadlineName::of ( None, Some (&ID::from ("e")), "e" ) } ]);

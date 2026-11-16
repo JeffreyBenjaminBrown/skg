@@ -19,7 +19,7 @@
 
 use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, ForksFolderMembers, HiddenOutsideEdit, FieldIntentsForOneId,
-  ForkeeVisibility };
+  ForkeeVisibility, ForkerVisibility };
 use crate::types::misc::{
   ID, MSV, RelPartner, SkgrepoName, members_msv, members_of,
   rel_partners_at_relRepo, rel_partners_at_relRepo_msv };
@@ -279,6 +279,7 @@ pub struct LoweredNodeIntents {
 pub struct LoweringOutput {
   pub intents        : LoweredNodeIntents,
   pub visibility     : Vec<(ID, ForkeeVisibility)>, // Each pair is (forker, signal); the list is in forker first-emission order.
+  pub forker_visibility : Vec<(ID, ForkerVisibility)>, // Each pair is (the note whose forks folder shows the forker as such, signal), in the note's first-emission order.
   pub hidden_outside : Vec<(ID, HiddenOutsideEdit)>,
   pub forks_folder_members : Vec<(ID, ForksFolderMembers)>, // Each pair is (the note the forks folder describes, its members).
 }
@@ -316,6 +317,14 @@ pub fn lower_collected_fieldIntents (
       for signal in &entry . visibility {
         visibility . push (( pid . clone(), signal . clone() )); }}
     visibility };
+  let forker_visibility : Vec<(ID, ForkerVisibility)> = {
+    let mut signals : Vec<(ID, ForkerVisibility)> = Vec::new ();
+    for pid in &order {
+      let entry : &FieldIntentsForOneId = by_pid . get (pid)
+        . ok_or ( "lower_collected_fieldIntents: order names a PID missing from the map" . to_string () ) ?;
+      for signal in &entry . forker_visibility {
+        signals . push ((pid . clone (), signal . clone ())); }}
+    signals };
   let hidden_outside : Vec<(ID, HiddenOutsideEdit)> = {
     let mut edits : Vec<(ID, HiddenOutsideEdit)> = Vec::new ();
     for pid in &order {
@@ -357,7 +366,7 @@ pub fn lower_collected_fieldIntents (
     { return Err ( format!(
         "lower_collected_fieldIntents: entry for {} has field intents but no title/body",
         pid )); }}
-  Ok (LoweringOutput { intents, visibility, hidden_outside, forks_folder_members }) }
+  Ok (LoweringOutput { intents, visibility, forker_visibility, hidden_outside, forks_folder_members }) }
 
 /// This assumes the entry is lowerable: it holds a delete or a
 /// title/body, having been named by 'lowerable_order'.
@@ -483,29 +492,45 @@ impl LoweredNodeIntents {
           forker_from_disk . hides . or_default () ),
     }}
 
-  /// This sets the contains of 'forkee', shown as such, to
-  /// 'contains': on its Save nodeIntent (an owned forkee as such
-  /// emits one for its title and body), or on one from its disk
-  /// state if it has none. A Delete nodeIntent is left untouched.
-  pub fn set_contains_of_forkee (
+  /// This sets the contains of 'member', a member as such of a forks
+  /// folder (a forkee or forker as such), to 'contains': on its Save
+  /// nodeIntent (an owned member as such emits one for its title and
+  /// body), or on one from its disk state if it has none. A Delete
+  /// nodeIntent is left untouched.
+  pub fn set_contains_of_member_as_such (
     &mut self,
-    forkee   : Graphnode,
+    member   : Graphnode,
     contains : Vec<ID>,
   ) {
     let contains : MSV<(ID, Option<SkgrepoName>)> =
       MSV::Specified ( contains . into_iter ()
                        . map ( |gnid| (gnid, None) ) . collect () );
-    match self . by_pid . get_mut (&forkee . pid) {
+    match self . by_pid . get_mut (&member . pid) {
       Some (NodeIntent::Save (intent)) => {
         intent . contains = contains; },
       Some (NodeIntent::Delete (_)) => {},
       None => {
         let mut intent : NodeIntent =
-          NodeIntent::graph_save_from_graphnode (forkee . clone ());
+          NodeIntent::graph_save_from_graphnode (member . clone ());
         if let NodeIntent::Save (save) = &mut intent {
           save . contains = contains; }
-        self . order . push (forkee . pid . clone ());
-        self . by_pid . insert (forkee . pid, intent); }, }}
+        self . order . push (member . pid . clone ());
+        self . by_pid . insert (member . pid, intent); }, }}
+
+  /// This sets the contains of 'member', a member as such of a forks
+  /// folder that the graph lacks (the user typed it there), to
+  /// 'contains', on its Save nodeIntent (an owned one emits one for
+  /// its title and body). It has no list on disk, so what it shows is
+  /// all of it. One without a Save nodeIntent (a foreign one) is left
+  /// alone.
+  pub fn set_contains_of_new_member_as_such (
+    &mut self,
+    member   : &ID,
+    contains : &[ID],
+  ) {
+    if let Some (NodeIntent::Save (intent)) = self . by_pid . get_mut (member) {
+      intent . contains = MSV::Specified (
+        contains . iter () . map ( |gnid| (gnid . clone (), None) ) . collect () ); }}
 
   /// This applies inferred hides/unhides to the forker's
   /// nodeIntent, creating a Save nodeIntent from its disk state if it has

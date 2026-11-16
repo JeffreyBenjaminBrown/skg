@@ -493,8 +493,8 @@ The walk starts at the node at point (inclusive: its own relationship to
 its view-parent counts when it matches) and recurses only on
 viewchildren that affect their viewparents: member
 occurrences and writable folders. It prunes below write-protected nodes
-and forkee-as-such members (their viewchildren's relationships are not
-collected at save), and prunes write-protected folders and other non-vognodes
+and members as such of a forks folder (their viewchildren's
+relationships are not collected at save), and prunes write-protected folders and other non-vognodes
 entirely.
 
 Like other metadata edits, this only modifies the buffer; it does
@@ -595,7 +595,7 @@ subtree at point, the headline at point included, whose relationship
 to its view-parent is of KIND (`content' or `forkee'; see
 `skg--relationship-kind-matches-p'). Recurses only
 where edits still affect the graph: it prunes below write-protected
-nodes and forkee-as-such members, prunes noClaim
+nodes and members as such of a forks folder, prunes noClaim
 nodes -- except the walk's root, which the
 user chose deliberately -- and prunes non-vognodes other than the
 writable forksFolder. Returns how many headlines it applied CHOICE to."
@@ -656,11 +656,11 @@ command, but does not edit anything."
   "Non-nil iff the headline at point is a true occurrence, an
 unknown viewnode or a restricted viewnode whose
 relationship to its view-parent is of KIND, writable-and-collected
-from this position: for `content', the view-parent must be a
-editable occurrence not in forkee-as-such position (an
-write-protected or forkee-as-such parent's contains is not
-collected at save, so a relRepo request under one would be
-inert); for `forkee', the viewparent must be the writable
+from this position: for `content', the view-parent must be an
+editable occurrence that is no member as such of a forks folder (a
+write-protected parent's contains is not collected at save, nor is
+a forkee or forker as such's, which shows its content in part, so a
+relRepo request under one would be inert); for `forkee', the viewparent must be the writable
 forksFolder with an editable viewparent, and the headline must claim
 \(a member claiming nothing forks the viewparent; its record is its own)."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
@@ -674,7 +674,7 @@ forksFolder with an editable viewparent, and the headline must claim
                    ((skg--occurrence-sexp-p parent-sexp)
                     (and (eq kind 'content)
                          (not (skg--node-write-protected-p parent-sexp))
-                         (not (skg--forkee-as-such-at-point-p))))
+                         (not (skg--member-as-such-at-point-p))))
                    ((skg--non-vognode-atom-present-p parent-sexp
                                                   'forksFolder)
                     (and (eq kind 'forkee)
@@ -685,19 +685,18 @@ forksFolder with an editable viewparent, and the headline must claim
   "Non-nil iff the walk should not descend below the occurrence
 headline at point (with METADATA-SEXP its parsed metadata): an
 write-protected node's contains is not collected at save, and a
-forkee-as-such member's viewchildren are hide/unhide signals,
+member as such's viewchildren are hide/unhide signals,
 not writable relationships."
   (or (skg--node-write-protected-p metadata-sexp)
-      (skg--forkee-as-such-at-point-p)))
+      (skg--member-as-such-at-point-p)))
 
-(defun skg--forkee-as-such-at-point-p ()
-  "Non-nil iff the headline at point sits in forkee-as-such
-position, a forkee as such: an occurrence member of a forksFolder that
-claims (one claiming nothing forks the folder's viewparent, or was
-detached)."
+(defun skg--member-as-such-at-point-p ()
+  "Non-nil iff the headline at point is a member as such of a
+forksFolder: an occurrence member of one, a forkee as such if it
+claims, a forker as such if it claims nothing. Either shows its
+content in part, less what the folder's viewparent contains or hides."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (skg--occurrence-sexp-p meta)
-         (skg--claims-membership-p meta)
          (save-excursion
            (and (org-up-heading-safe)
                 (skg--non-vognode-atom-present-p

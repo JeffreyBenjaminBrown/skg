@@ -266,10 +266,14 @@ async fn delete_in_foreign_forkee_rerenders_as_unknown (
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
+    // A member of a forks folder ignores a delete request (a member
+    // as such saves only its title and body), so the victim is deleted
+    // as a root of its own.
     &mut stream, indoc! {"
       * (skg node (gnid forker) (skgRepos (nodeRepo foreign))) foreign forker
       ** (skg forksFolder)
-      *** (skg node (gnid victim) (skgRepos (nodeRepo owned)) noClaim (editRequest delete)) victim
+      *** (skg node (gnid victim) (skgRepos (nodeRepo owned)) noClaim writeProtected) victim
+      * (skg node (gnid victim) (skgRepos (nodeRepo owned)) (editRequest delete)) victim
     "}, config, tantivy, &graph,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);

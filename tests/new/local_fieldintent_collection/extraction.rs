@@ -1064,7 +1064,7 @@ async fn foreign_forkee_as_such_title_edit_is_rejected (
           buffer_error,
           BufferValidationError::Other (msg)
             if msg . contains ("Cannot edit title/body")
-               && msg . contains ("forkee-as-such")
+               && msg . contains ("a member of a forks folder")
                && msg . contains ("e")),
         "expected foreign forkee-as-such title edit rejection, got {:?}",
         buffer_error);

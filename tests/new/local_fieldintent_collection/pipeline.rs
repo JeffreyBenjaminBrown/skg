@@ -180,6 +180,9 @@ async fn pipeline_write_protected_folder_member_edits (
 ) -> Result<(), Box<dyn Error>> {
   // This tests the new recursion surface: editable members of
   // write-protected folders (and their subtrees) save their own edits.
+  // The intruder, claiming nothing in the forks folder, is a forker as
+  // such the graph lacks: having no list on disk, it contains what it
+  // shows.
       let input : &str =
         indoc! {"
             * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
