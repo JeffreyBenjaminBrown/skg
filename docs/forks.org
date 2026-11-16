@@ -1,7 +1,8 @@
 * Forks
 
-A *fork* turns a /foreign/ node — one in a skgrepo you do *not* own,
-hence write-protected — into an editable *clone* in a skgrepo you /do/ own.
+The *fork operation* turns a /foreign/ node — one in a skgrepo you do *not* own,
+hence write-protected — into an editable *clone* in a skgrepo you /do/ own,
+which forks it (so the clone is a fork of the original).
 The clone keeps a live link to the original, so the original's later
 additions still reach you, but your edits never touch the original.
 
@@ -25,7 +26,8 @@ unchanged editable foreign node forks nothing; saving it is a no-op.)
 
 The save does not skgsave-commit blindly. The server first returns a
 *fork-confirmation buffer* and asks you to approve. The buffer opens
-with a foldable instructions headline, then two levels per fork: each
+with a foldable instructions headline, then two levels per fork
+operation: each
 top headline is the *clone-to-be* (your edited title), and under it
 is the *original* it forks (its real id and foreign skgrepo,
 write-protected). One headline cannot honestly stand

@@ -235,9 +235,11 @@ As in TypeDB, a *relation* is a kind of relationship: =contains=,
 container contains content, mentioner linksTo mentioned, forker forks
 forkee, hider hides hidden. A forks B says two things: A shows
 B's content that A neither contains nor hides (see "forkee as
-such"), and A and B are mirrors (see "mirror"). =hides= means
-"hides from its forks": the hider keeps the hidden node out of what
-the hider shows of its forkees. A *relationship* is one instance of a relation: this
+such"), and A and B are mirrors (see "mirror"). =hides= means, for
+now, "hides from what it forks": the hider keeps the hidden node out
+of what the hider shows of its forkees (plan 2,
+'TODO/every-mirror/2_plan.org', decision 8, widens it to what it shows
+of every fork partner). A *relationship* is one instance of a relation: this
 node contains that one. (Graph theory would call it an edge; we don't,
 because the word is opaque to newcomers.)
 
@@ -511,14 +513,15 @@ folder* (=hiddenInForkPartnerFolder=) stands under S inside N's forks
 folder, where S is a forkee as such, and holds N's hides that S
 contains, in the order of N's hides list. The *hidden-outside
 compound partner folder* (=hiddenOutsideOfForkPartnersFolder=, label
-"b hides these, but nothing it forks or that forks it contains
-them.") stands last in N's forks folder and holds N's hides that no
-forkee contains, in the order of N's hides list; a forker N hides
-stands there, since the forks folder does not draw it, and removing
-it there unhides it. Its membership reads N's forkees' content only:
-plan 2 ('TODO/every-mirror/2_plan.org', decision 8) makes N's hides
-apply to its forkers' content too, and this folder's membership with
-them. Both read each relationship by the records the skgrepo
+"b hides these, but nothing it forks contains them.") stands last in
+N's forks folder and holds N's hides that no forkee contains, in the
+order of N's hides list; a forker N hides stands there, since the
+forks folder does not draw it, and removing it there unhides it. Its
+membership reads N's forkees' content only: plan 2
+('TODO/every-mirror/2_plan.org', decision 8) makes N's hides apply to
+its forkers' content too, and this folder's membership and label
+with them. The note whose hides a compound folder shows is its
+*hider* ('CompoundFolderParties::hider'). Both read each relationship by the records the skgrepo
 restriction shows: under a skgrepo narrowing, a hide of H that S
 contains only by a restricted record stands in the hidden-outside
 folder, and a hide recorded in a restricted section stands in
@@ -610,9 +613,10 @@ explains.
 
 A *role tree* is what a view shows of a node's partners in one role
 (see "relation, relationship, member, membership, partner"): for the
-content role, the node's content; for every other role, the members
-of the node's partner folder of that role, each with its
-containerward chain. A role, unlike a relation, is directed, so a
+content role, the node's content; for either role of 'forks', the
+members of the node's forks folder that play that role; for every
+other role, the members of the node's partner folder of that role,
+each with its containerward chain. A role, unlike a relation, is directed, so a
 role tree goes one way.
 
 The adjectives containerward, contentward, mentionerward,
@@ -940,15 +944,22 @@ counting down from its root, is the opposite direction.
 
 *** mirror, and a perspective's skgrepo list
 
-A *fork* of a note N, here, is a note that forks N (see "clone,
-and the fork operation" for the gesture that makes one). The
+A *fork*, bare, is a note that forks another: a *fork of* N is a
+note that forks N (see "clone, and the fork operation" for the
+gesture that makes one, which is always "the fork operation", never
+bare "a fork"). A note's *forks*, as in "its forks" (the name of its
+forks folder), are its fork partners, either way: the notes it forks
+and the notes that fork it. So "its forks" is wider than "the forks
+of it"; where only one direction is meant, say "its forkees" or "its
+forkers", or "what it forks". The
 *mirrors* of N are N and every note joined to N by a path of
 'forks' relationships, followed in either direction, every
 relationship's relRepo and every note's home skgrepo on the path shown
 by the skgrepo restriction ('mirrors_of' in
 'server/dbs/in_rust_graph/mirrors.rs'). Two forks of one note are
 mirrors of each other, and a cycle of forks is no special case. (Not
-"mirror" as a plain verb, as in "the save is its mirror".)
+"mirror" in its other senses: the save is its mirror, a Neovim
+function mirrors an Emacs one, a server mirror.)
 
 A *perspective's skgrepo list* is the order in which the perspective
 of an owner O ranks a note's mirrors: O's skgrepos most private first,
@@ -980,6 +991,13 @@ naming the original it stands for. A viewnode's
 collected ID is what it contributes to its parent's saved lists:
 the fact's original if present, else its own ID -- so saving a
 view that shows R in place of N keeps N in the parent's contains.
+The headline bearing the fact is its *bearer* (not its "carrier",
+which names the node holding an ID; see "recorder, carrier"). The
+*tamper check* (also "tamper validation") is the save's refusal of a
+fact whose bearer is no mirror of the original it names
+('inPlaceOf_part_errors' in
+'server/from_text/buffer_to_viewnodes/validate_tree.rs'), since the
+fact is load-bearing text a hand edit could forge.
 
 A node is *shown raw* where it stands as itself, not replaced by the
 mirror shown for it. Only content substitutes, so a view root, a
@@ -1007,6 +1025,27 @@ its roots included. 'C-c v o' (Neovim
 draw it differently ('skg-cycle-perspective'; 'docs/api-and-formats.org',
 "Set perspective"). A foreign owner is named by the first of its skgrepos the
 config declares: "tracy's perspective".
+
+*** the fork rules
+
+The *fork rules* are rules 4 to 6 of the hard validation constraints
+('docs/data-model_technical.org'), which a save of an owned note must
+keep and the graph is checked against at startup: its home skgrepo is
+one the config names; it forks, contains and hides nothing of itself;
+and it neither contains what it forks, nor what forks it, nor forks
+what contains it ('server/dbs/in_rust_graph/fork_rules.rs',
+'ForkRuleViolation'). Most of them are about forks, whence the name;
+the skgrepo rule and the self-containment and self-hide rules are
+checked with them because they read the same records of the notes a
+save touches. A violation a foreign note's record takes part in is a
+startup warning (a "fork rule warning"), not a refusal.
+
+*** retired keys
+
+The *retired keys* are the '.skg' keys a server refuses to read since
+November 2026: 'subscribesTo', 'overrides' and 'hidesFromSubs', and
+the October 2026 names of the first two ('RETIRED_SKG_KEYS';
+'docs/api-and-formats.org', "The .skg file format").
 
 *** skgrepo, home skgrepo, skgrepo-set, gitrepo
 

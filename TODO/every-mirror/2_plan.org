@@ -868,6 +868,23 @@ Questions: Q11, Q12. Decision 8.
   hiderel, the visibility step); 'docs/data-model_technical.org';
   'docs/sharing-model.org'; 'docs/forks.org'; 'docs/heralds.org' (the
   hidden-outside label, if plan 1 left it otherwise).
+- The labels return to the wide wording once the membership widens
+  (the review of plan 1 narrowed them to what plan 1 built): the
+  hidden-outside folder's "b hides these, but nothing it forks
+  contains them." becomes "b hides these, but nothing it forks or
+  that forks it contains them."; the hidden and hider folders' "It
+  hides these from what it forks." and "These hide it from what they
+  fork." become "It hides these from its forks." and "These hide it
+  from their forks." ("its forks": its fork partners, either way,
+  'docs/glossary.org', "mirror"). 'server/heralds.rs', then
+  'tests/shared/herald-rules.sexp' (emitted), the pinned copies
+  ('tests/shared/herald-rendering-cases.txt', the AI tool's
+  'HERALD_PHRASES_HOLDING_HANDLE_WORDS' and 'test-expected/'), and the
+  docs quoting them ('docs/glossary.org', 'docs/heralds.org',
+  'docs/diff-view.org', 'docs/sharing-model.org',
+  'docs/data-model_friendly.org', the AI tool's README). The
+  glossary's "=hides= means, for now, ..." and
+  'NodeRelation::Hides''s comment widen with them.
 - Run the suites as slice 1 does.
 
 ** TODO Slice 5: a cut from a forker as such makes my node fork it

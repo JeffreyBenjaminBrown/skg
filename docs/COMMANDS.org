@@ -1322,8 +1322,9 @@ skgrepos ranks the mirrors it shows. Each switch names the
 perspective it shows; it redraws the
 buffer, and refuses while it has unsaved edits.
 
-Where a node stands as another's content and someone has forked
-it, a view may show one fork in its place. A fresh view is drawn from its
+Where a node stands as another's content and it has mirrors (notes
+joined to it by forks, either way), a view may show one of its mirrors
+in its place. A fresh view is drawn from its
 root authors' perspective: under a root of yours, yours; under a root
 someone else wrote, that author's, throughout the tree, so you see
 what they would see, and your own forks of their nodes do not show

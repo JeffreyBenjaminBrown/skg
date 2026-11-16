@@ -180,7 +180,7 @@ skgrepo restriction, say).  A re-pointed occurrence's folders are
 drawn afresh for the node it now shows, as a re-pointed root's are
 ('redraw_folders'), since those it held describe the node it showed
 before.  When the original itself becomes the
-mirror shown, the refresh shows the carrier as itself, without the
+mirror shown, the refresh shows the headline that bore the part as itself, without the
 fact, unwarranted and so claiming nothing, and reinstates the
 original beside it.  The buffer whose save creates a fork has the post-save
 exception described below.
@@ -229,14 +229,15 @@ visit to =F= still opens raw =F=, in accordance with the exact-visit rule.
 *** The =inPlaceOf= part
 
 A substituted viewnode carries =(inPlaceOf N)=, where =N= is the
-original node for which the displayed carrier substitutes.  The part
+original node for which the displayed viewnode substitutes.  The part
 is load-bearing during save: the viewnode contributes =N= to its parent's
-stored relationship list rather than the carrier's ID.  Editing the
-carrier's title, body, or folders still edits the carrier itself.
+stored relationship list rather than its own ID.  Editing the
+viewnode's title, body, or folders still edits the node it shows.
 
-The server rejects a forged or stale part whose carrier is not a
-mirror of =N=, naming the mirror the tree's perspective would show.
-Any mirror is honest: which one the refresh shows depends on the
+The server rejects a forged or stale part whose bearer (the headline
+bearing it) is not a mirror of =N=, naming the mirror the tree's
+perspective would show (the tamper check).
+Any mirror may bear it: which one the refresh shows depends on the
 perspective and the skgrepo restriction.  The check reads the mirrors
 under no skgrepo restriction, so that a part which was honest when
 rendered does not become invalid merely because the skgrepo
@@ -274,7 +275,7 @@ unchanged.
 
 =skg-fork-node= (=C-c m f=) explicitly forks an owned node, commonly to
 add a more-private layer such as =D= over =C=.  Forking a substituted
-viewnode forks the carrier on screen and therefore deepens the chain.
+viewnode forks the node shown on screen and therefore deepens the chain.
 Either gesture is refused on a note you already fork, naming your fork
 of it ('docs/forks.org', "Once forked: the fork operation's guard");
 a second owned fork made otherwise (by a nodeMerge, in a forks

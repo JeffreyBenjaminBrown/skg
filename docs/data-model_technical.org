@@ -548,8 +548,8 @@ forker N hides is not drawn in it: it stands in the folder of what N
 hides outside its fork partners, which the forks folder holds last.
 
 **** What each member shows
-The birth facts follow the sides on which the member stands
-(=forks_folder_member_sides= in =server/refresh/viewnodestats.rs=):
+The birth facts follow the roles in which the member stands
+(=forks_folder_member_roles= in =server/refresh/viewnodestats.rs=):
 =(forks in 2)= where it claims (where the folder reads no claims,
 where the graph says N forks it), =(forks out 2)= where the graph's
 warrant and a visible record say it forks N; a mutual carries both,

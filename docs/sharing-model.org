@@ -28,7 +28,7 @@ If E does not contain N, and you make N a viewchild of E, N will persist in your
 
 Title and body edits to E should be made from some view that does not present E as a forkee as such. (C-c g RET from E will open such a view.) Skg rejects title/body edits to a forkee as such, regardless of who owns the forkee.
 
-Two generated folders show what R currently hides. Under E, the hidden-in folder (=hiddenInForkPartnerFolder=, "c hides them.") lists what R hides that E contains; it is a write-protected display, and editing it is not how you hide or unhide forked content. To hide something, remove it from E's immediate visible graph-content in R's forks folder. To unhide it, put it back there. Last in R's forks folder, the hidden-outside folder (=hiddenOutsideOfForkPartnersFolder=, "b hides these, but nothing it forks or that forks it contains them.") lists what R hides that no forkee contains, a forker R hides among them; it is editable, and removing a member there unhides it (=glossary.org=, "compound partner folder").
+Two generated folders show what R currently hides. Under E, the hidden-in folder (=hiddenInForkPartnerFolder=, "c hides them.") lists what R hides that E contains; it is a write-protected display, and editing it is not how you hide or unhide forked content. To hide something, remove it from E's immediate visible graph-content in R's forks folder. To unhide it, put it back there. Last in R's forks folder, the hidden-outside folder (=hiddenOutsideOfForkPartnersFolder=, "b hides these, but nothing it forks contains them.") lists what R hides that no forkee contains, a forker R hides among them; it is editable, and removing a member there unhides it (=glossary.org=, "compound partner folder").
 
 ** Forking: seeing your version where the original would appear
 
@@ -45,7 +45,7 @@ Any number of notes, owned or not, may fork one node, and forks may form chains 
 
 The node Skg shows for =N= is the mirror of =N= (=N= or a note joined to it by =forks= relationships, either way) that the perspective's list of skgrepos ranks first; within one skgrepo, an owned chain shows its end (=docs/mirrors.org=, "Mirror substitution"). Under a skgrepo restriction that keeps out the chain's end, the shown node is a /middle/ of the chain; its =(inPlaceOf N)= part is still honest, as any mirror's is, and the save still round-trips =N= into the container's contains.
 
-When you ask for a brand-new content view of a node, Skg opens the requested node itself, shown raw. It does not show a fork in the root's place, until you switch the view to an author's perspective (=C-c v o=), which shows that author's mirror of the root, as of every other node. Fork facts remain visible in the heralds (the =K= token); automatic substitution applies only when the original occurs as recursive content.
+When you ask for a brand-new content view of a node, Skg opens the requested node itself, shown raw. It does not show one of the root's mirrors in its place, until you switch the view to an author's perspective (=C-c v o=), which shows that author's mirror of the root, as of every other node. Fork facts remain visible in the heralds (the =K= token); automatic substitution applies only when the original occurs as recursive content.
 
 ** The forks folder: what a note forks, and what forks it
 
@@ -54,7 +54,7 @@ A view of a note N shows, unasked wherever N has one, its =forksFolder= ("It for
 A member claims membership exactly when N forks it, and the save sets N's =forks= to the claiming members. So:
 - typing a note into the folder makes N fork it;
 - deleting a forkee stops N forking it;
-- deleting a forker-only member hides it in N: it leaves the forks folder for the folder of what N hides outside its fork partners ("b hides these, but nothing it forks or that forks it contains them."), the last thing in the forks folder; removing it from there unhides it, and it is drawn in the forks folder again;
+- deleting a forker-only member hides it in N: it leaves the forks folder for the folder of what N hides outside its fork partners ("b hides these, but nothing it forks contains them."), the last thing in the forks folder; removing it from there unhides it, and it is drawn in the forks folder again;
 - deleting a mutual stops N forking it and hides it, likewise; detaching it (=C-c s t=) only stops the fork, and it stands on as a forker, claiming nothing;
 - attaching a forker-only member (=C-c s a=) makes N fork it: a mutual;
 - deleting a member shown as "restricted" (a note the skgrepo restriction keeps out) changes nothing: the save leaves the forks and hides involving it as they are, and the member is drawn again.

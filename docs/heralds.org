@@ -81,8 +81,8 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 ** Relationship heralds
 *** Letters and sides
 The relations, in display order, are =C= contains, =L= links to, =K=
-forks (the K of forK; =F= is the flags count), and =H= hides (from its
-forks). A relation's token has an in-side before its letter and
+forks (the K of forK; =F= is the flags count), and =H= hides (from
+what it forks). A relation's token has an in-side before its letter and
 an out-side after it. The in-side counts nodes that relate to this node
 ("N nodes contain it"); the out-side counts nodes this node relates to
 ("it contains N nodes"). =2C3= thus means two containers and three
@@ -193,15 +193,17 @@ omitted from the buffer. =⟳= marks a cycle.
 The forks folder reads =It forks these, or these fork it.=, with no ☮:
 it is editable. The labels of the two folders of what a note hides
 name that note by its ancestor letter (see [[*Ancestor flags and floors][Ancestor flags and floors]]),
-shown high (the style keys 'hiddenInForkPartnerFolder_forker' and
-'hiddenOutsideOfForkPartnersFolder_forker' in
+shown high (the style keys 'hiddenInForkPartnerFolder_hider' and
+'hiddenOutsideOfForkPartnersFolder_hider' in
 'shared/herald-styles.json'). Under a forkee as such, the note
 forking it is the great-grandparent (the note, its forks folder, the
 forkee, the folder): =☮ It contains these, but c hides them.= In the
 forks folder itself, it is the grandparent: =b hides these, but
-nothing it forks or that forks it contains them.= (Its membership
-counts only what b's forkees contain; plan 2 widens it to its
-forkers, 'TODO/every-mirror/2_plan.org', decision 8.)
+nothing it forks contains them.= (Its membership counts only what b's
+forkees contain; plan 2 widens it, and the label, to its forkers,
+'TODO/every-mirror/2_plan.org', decision 8.) The hider and hidden
+folders read =☮ These hide it from what they fork.= and =☮ It hides
+these from what it forks.=
 
 The bare atom =noClaim= (a child that does not affect its parent's
 membership on save) has no glyph of its own. Under an editable parent

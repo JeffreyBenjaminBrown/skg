@@ -1917,12 +1917,12 @@ viewparent carries none: where the viewparent's claims are read, one
 claiming nothing; in a write-protected folder, one the folder's
 relation does not warrant; under a write-protected occurrence, every
 child ('stands_as_member' in =server/refresh/viewnodestats.rs=). A
-member of a forks folder stands on each side of 'forks' it plays
-('forks_folder_member_sides'): as a forkee where it claims (where the
+member of a forks folder stands in each role of 'forks' it plays
+('forks_folder_member_roles'): as a forkee where it claims (where the
 folder reads no claims, where the graph says the folder's viewparent
 forks it), and as a forker where the graph's warrant and a visible
 record say it forks the viewparent, whatever it claims. A mutual
-stands on both, and carries both facts; a detached forkee on
+stands in both, and carries both facts; a detached forkee in
 neither, and carries none.
 
 | Birth                            | Facts                                                        |
@@ -2060,11 +2060,11 @@ appears, extraction collects N rather than the carrying node's own
 ID, so a container's contains list round-trips to the original
 instead of being rewritten to the mirror. Edits to the shown
 node itself (title, body, folders) still save to the shown node.
-A buffer whose part the server would not have rendered (the carrier
-is no mirror of N, under no skgrepo restriction) aborts the save with
-an explanation naming the mirror the tree's perspective would show.
-Any mirror is an honest carrier, whichever perspective or skgrepo
-restriction drew it. A
+A buffer whose part the server would not have rendered (the headline
+bearing it is no mirror of N, under no skgrepo restriction) aborts
+the save with an explanation naming the mirror the tree's perspective
+would show. Any mirror may bear the part, whichever perspective or
+skgrepo restriction drew it. A
 switch of the skgrepo restriction that makes a
 shown substitute's skgrepo restricted makes it vanish, with its
 subtree (the fact does not survive, and nothing stands where the
@@ -2072,8 +2072,8 @@ substitute stood), and the refresh draws the original it stood for,
 which disk supplementation preserves in its container's contains. A
 restricted original whose record is visible stands as a restricted
 viewnode, never substituted. When the original itself becomes the
-mirror shown, the refresh reinstates it beside the carrier, which,
-unwarranted as itself, vanishes.
+mirror shown, the refresh reinstates it beside the headline that
+bore the part, which, unwarranted as itself, vanishes.
 
 A mirror shown in N's place carries a birth fact for the relation
 between them: =(forks out)= when it reaches N by forker steps only
