@@ -356,8 +356,10 @@ So far there are these endpoints:
          member of a partner's content nor a mirror of one, as a
          note's own fork of it is), =it was hidden already= (or
          ='M', which it stands for, was hidden already=), ='S' still
-         contains 'M', which it stands for=, or =this save shows it
-         under 'E'= (an explicit gesture in the forks folder won).
+         contains 'M', which it stands for=, =this save shows it
+         under 'E'= (an explicit gesture in the forks folder won), or
+         =this save places it under 'E'= (R moved under a member as
+         such E, whose content it joins).
        Each quoted name is a title, as the save leaves it. A fork's
        clone counts as a forker with no hides on disk, named =the
        fork 'T'=, since it has its original's title; a node the save

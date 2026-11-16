@@ -76,6 +76,10 @@ pub fn hide_report_lines (
         restriction, &member . relRepo ))
       . map ( |member| key (&member . member) )
       . collect () };
+  let contains_after_save : HashMap<ID, Vec<ID>> = // each saved note's content as the plan leaves it
+    saved . iter ()
+    . map ( |node| ( node . pid . clone (), visible_members (&node . contains) ))
+    . collect ();
   let mut changes : Vec<String> = Vec::new ();
   let mut nothings : Vec<String> = Vec::new ();
   for node in &saved {
@@ -138,7 +142,17 @@ pub fn hide_report_lines (
         graph, restriction, child, &all_content ) . map ( |member| key (&member) );
       let it_or = |member : &ID| -> String {
         if member == child { "it" . to_string () } else { label (member) } };
+      let placed_under : Vec<String> = // the fork partners this save places the child under
+        partner_contents . iter ()
+        . filter ( |(partner, content_before)|
+                   ! content_before . contains (child)
+                   && contains_after_save . get (partner)
+                      . is_some_and ( |content_after| content_after . contains (child) ))
+        . map ( |(partner, _)| label (partner) )
+        . collect ();
       let why : String = match stands_for {
+        _ if ! placed_under . is_empty () => format! (
+          "this save places it under {}", placed_under . join (" and ") ),
         None => format! (
           "it is no content of {}, nor a mirror of any",
           partner_contents . iter ()

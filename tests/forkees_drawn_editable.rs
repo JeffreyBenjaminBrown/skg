@@ -23,8 +23,10 @@ use std::error::Error;
 use std::collections::BTreeMap;
 
 use crate::view_and_save_helpers::{
-  children_of, depth, ids, line_of, moved_after, node, refusal_of, save_cleanly,
+  children_of, depth, ids, line_of, moved_after, node, refusal_of, save, save_cleanly,
   skg_files, under, view_of, with_line_after_subtree_of, without_subtree_of};
+use skg::metadata_canon::without_viewnode_ids;
+use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
@@ -209,14 +211,20 @@ async fn a_child_typed_under_a_foreign_forkee_is_refused (
 /// content right after e1, as a headline typed there does
 /// ('docs/forks.org', "Adding a child under a member as such"); N no
 /// longer contains it, and hides nothing new (no fork partner
-/// contained it). The saved view shows it under E.
+/// contained it), and the save says where it went. The saved view
+/// shows it under E.
 async fn a_node_moved_under_an_owned_forkee_joins_its_content (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let view : String = view_of (config, tantivy, "N") ?;
   let moved : String = moved_after (&view, "n1", "e1");
-  let saved : String = save_cleanly (&moved, "N", config, tantivy) . await ?;
+  let response : SaveResponse = save (&moved, "N", config, tantivy) . await ?;
+  assert! ( response . errors . is_empty (), "{:?}", response . errors );
+  assert_eq! ( response . hides,
+               vec! [ "Hides nothing: 'n1' left 'N', but this save places it under 'E'." ],
+               "the save says where n1 went" );
+  let saved : String = without_viewnode_ids (&response . saved_view);
   assert_eq! ( members_of (& node (config, "E") ? . contains),
                ids (&["e1", "n1", "H", "e2"]),
                "n1 joins E's content after e1" );
