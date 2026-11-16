@@ -542,7 +542,8 @@ fn mark_claims (
 /// 'parent', vanishes from it rather than staying marked: the folder
 /// no longer stands for it by any record, visible or not
 /// ('unhidden_in_the_hides_folder'), or by design
-/// ('view_ancestor_in_its_folder').
+/// ('view_ancestor_in_its_folder',
+/// 'is_hidden_by_folder_of_no_forker_as_such').
 fn leaves_its_write_protected_folder (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
@@ -551,7 +552,24 @@ fn leaves_its_write_protected_folder (
 ) -> bool {
   unhidden_in_the_hides_folder (tree, parent, child, walk)
   || view_ancestor_in_its_folder (tree, parent, child)
-  || is_hidden_by_the_forks_folders_viewparent (tree, parent, child, walk) }
+  || is_hidden_by_the_forks_folders_viewparent (tree, parent, child, walk)
+  || is_hidden_by_folder_of_no_forker_as_such (tree, parent) }
+
+/// Whether 'parent' is a folder of what a fork partner hides of the
+/// note's content ('Folder::HiddenByForkPartner') whose viewparent is
+/// no forker as such. That folder is drawn under a forker as such
+/// only; under a forker a cut made a forkee (now claiming) it holds
+/// nothing, so its members vanish and it goes, as a fresh view would
+/// not draw it.
+fn is_hidden_by_folder_of_no_forker_as_such (
+  tree   : &Tree<Viewnode>,
+  parent : NodeId,
+) -> bool {
+  let folder : NodeRef<Viewnode> = tree . get (parent) . unwrap ();
+  matches! ( folder . value () . kind,
+             ViewnodeKind::Folder (Folder::HiddenByForkPartner) )
+  && folder . parent () . map_or (
+       true, |member| note_of_forker_as_such (tree, member . id ()) . is_none () ) }
 
 /// Whether 'child' stands in the forks folder at 'parent' for a note
 /// the folder's viewparent hides, by a record the skgrepo restriction

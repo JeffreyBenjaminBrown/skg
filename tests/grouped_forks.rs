@@ -51,6 +51,8 @@ mod forkees_drawn_editable;
 mod forkers_drawn_editable;
 #[path = "cuts_from_forkers.rs"]
 mod cuts_from_forkers;
+#[path = "forks_meet.rs"]
+mod forks_meet;
 
 #[path = "hides_apply_to_every_fork_partner.rs"]
 mod hides_apply_to_every_fork_partner;
