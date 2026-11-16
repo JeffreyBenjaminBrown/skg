@@ -1,0 +1,562 @@
+#+title: every-mirror plan 1: the probe pass
+#+startup: overview
+
+* How this was run
+On 2026-11-16, after slice 9 (HEAD '1144a129'), with 'target/debug/skg'
+('cargo build --bin skg') and isolated servers on ports 24800 to 24804,
+each on scratch data under 'tests/results/every-mirror/probes-plan1/'.
+No full test suite was running. The live servers on 1730 and 1761 were
+never touched. Every scratch server was stopped by its PID and its port
+was confirmed free afterwards. The scratch data has been deleted.
+What stays is under 'tests/results/every-mirror/probes-plan1/':
+- 'transcripts/fixtures-old-format/{s1,s2,s3}': the fixtures as
+  written, in the old format ('subscribesTo', 'overrides',
+  'hidesFromSubs'), with their configs.
+- 'transcripts/sN-migrate.txt': the migration tool's output on each
+  scratch copy.
+- 'transcripts/sN-final-skg-files.txt': every '.skg' file at the end.
+- 'transcripts/s1/', 's2/', 's3/': each view, edit and save. A step
+  folder holds 'before.compact.org' and 'before.full.org' (what the
+  server drew), 'sent.compact.org' (the edited buffer) and 'save.out'
+  (the save report and the server's answer), plus the rerendered view.
+- 'bin/': the helper scripts ('lib.sh', 'step.sh', and 'wire.py' for
+  raw socket requests).
+
+The fixtures:
+- s1 is for ranking. The skgrepos are owned 'pub' and 'priv', foreign
+  'bob', and foreign 'alice' and 'alicepriv'. 'alice' and 'alicepriv'
+  are one owner, chained by 'OTHER_SKGREPO_DEPENDENCIES.toml', with
+  'alicepriv' the more private. They are declared in the order pub,
+  bob, alice, alicepriv, priv. Root 'P' (pub) contains n1, n2, n3, n6,
+  n7, n8, n10, m11a and n12.
+- s2 is for the forks folder and the rules. It has owned 'main' and
+  foreign 'fr', and 'main' is a gitrepo with the migrated fixture
+  committed. N forks [E1, M1, E2]. M1 forks N. R1 forks N and E1. R2
+  forks N. Z forks foreign F. C contains N. There is also a foreign
+  ForkerContained pair in each direction (oE/fR and oR/fE).
+- s3 is for the old HEAD and the restriction. It has owned 'pub' and
+  'priv', each a gitrepo whose HEAD is in the old format. A (pub) and
+  B (priv) fork each other.
+
+* Summary
+34 behaviors probed: 31 matched and 3 did not.
+- Not matched: switching perspective leaves stale forks-folder members
+  on a re-pointed occurrence (a real bug). The rendered form of the
+  out-side forker count, 'K2b' where the plan and 'docs/heralds.org'
+  say 'Kb3' (minor). Deleting the 'restricted' placeholder of a hidden
+  mutual stops the fork without hiding it (not foreseen by the plan).
+- Matched, but flagged: search suppression over transitive mirrors
+  hid 6 of 8 hits for one ordinary word.
+
+* 1. Migration of fixture data: forks in files
+** Sent
+'migrate.py --dry-run', then the run, over each owner's skgrepos of s1
+(owned: 'me/pub me/priv'; then bob's; then alice's two), then a second
+run over all of them. The fixture had a paired relationship, an
+override-only one ('x7'), a subscribe-only one ('y7', listed twice), a
+self-subscription ('selfy'), a 'hidesFromSubs' ('f1pub'), and a
+subscribe-only mutual ('m11b').
+** Received
+- Owned: "15 files changed; 6 paired, 7 subscribe-only, 1
+  override-only; duplicates dropped: 1; self-forks dropped: 1 (selfy
+  named its own ID selfy); 'hidesFromSubs' keys renamed 'hides': 1".
+  The dry run reported the same counts.
+- The second run: "0 files changed".
+- 'transcripts/s1-migrate.diff': every change is a key renamed to
+  'forks' or 'hides', or an 'overrides' list removed. 'x7' now holds
+  'forks: [n7]', 'y7' holds 'n7' once, and 'selfy' has no list. In
+  'f1pub', 'forks' comes before 'hides'.
+** Verdict
+MATCH. One observation, outside the plan: the "git -C DIR commit -am"
+hint is printed for every DIR inside any work tree
+('is_in_a_gitrepo' uses 'rev-parse --is-inside-work-tree'). That
+includes a gitignored folder inside the skg repository itself, where
+following the hint would commit the skg repository's tracked changes.
+On real data each skgrepo is its own gitrepo, so this only bites
+scratch copies like these.
+
+* 2. Old-format files refused at startup, with the report
+** Sent
+The unmigrated s1 fixture, served on port 24800. Then a separate
+one-file skgrepo holding the October key 'overrides_view_of', on port
+24802.
+** Received
+- The server exits: "Found 19 unreadable file(s)".
+- 'initialization-error_unreadable-skg-files.org' names all 19 files
+  by path ('transcripts/s0-report.org'). Each says which keys it holds,
+  e.g. "holds 'subscribesTo', 'overrides', 'hidesFromSubs'".
+- Owned files say "run tools/migrate-forks-2026-11/migrate.py over
+  your skgrepos (its README.org says how), then commit each".
+- Foreign files say "this skgrepo's owner should run ... until they
+  have, you may remove it from skgconfig.toml".
+- The October key is refused the same way
+  ('transcripts/s0b-october-key-report.org').
+** Verdict
+MATCH. A minor wording issue: for an October key the report says to
+run the November tool. That tool refuses such a file ("run
+tools/migrate-skg-keys-2026-10/migrate.py first") and exits 1
+('transcripts/s0b-migrate-october.txt'), so the user gets there, but
+one step later.
+
+* 3. Old-format HEAD refused by the diff view
+** Sent
+In s3, both gitrepos were committed in the old format, the worktrees
+were migrated, and the server was started (port 24804). Then the
+'diff' command.
+** Received
+"Cannot open the diff view: The HEAD of skgrepo 'pub' holds keys
+retired in November 2026, in 1 file(s): A.skg (holds 'subscribesTo',
+'overrides'). If you have run tools/migrate-forks-2026-11/migrate.py
+over the worktree, commit the migration first: git -C me/pub commit
+-am 'Migrate to forks'"
+('transcripts/s3/head-old/diff.out').
+** Verdict
+MATCH. It names only the first such skgrepo, 'pub', though 'priv'
+was also unmigrated at HEAD; after committing 'pub' the user would
+meet the second refusal.
+
+* 4. Forks on the wire
+** Sent
+'view P' on s1 ('transcripts/s1/view_P.full.org') and raw requests
+on s2 ('transcripts/s2/20-wire-set-perspective.txt').
+** Received
+- A substituted occurrence: '(skg (vnid 0b) node (gnid f1priv) ...
+  (inPlaceOf n1) (view (rels (forks (out 1))) (birth (forks out))
+  ...))'.
+- A forks folder: '(skg (vnid 0c) forksFolder)'.
+- A forker-only member: 'noClaim writeProtected (view (rels (forks
+  (out 1 (ancestors 2)))) (birth (forks out 2)))'.
+- A mutual: '(birth (forks in 2) (forks out 2))'.
+- 'hides' appears in rels as '(hides (out 1))'.
+- 'set perspective' answers '((response-type perspective) (view-id
+  "content-view:ROOT") (perspective "owner of fr") (perspective-name
+  "fr's perspective"))', then rerender-lock, rerender-view and
+  rerender-done.
+- The old 'set overrides followed' gets '(response-type error)
+  ... Unsupported request type'.
+** Verdict
+MATCH.
+
+* 5. Old buffer atoms refused at save
+** Sent
+The view of Z (s2) saved raw three times: with 'forksFolder' replaced
+by 'subscribeeFolder'; with '(overridesHere F)' added to the root;
+and with the root's rels key changed to '(subscribesTo (out 1))'
+('transcripts/s2/22-old-atoms/').
+** Received
+- The first: "Parse error ... Unknown top-level value:
+  subscribeeFolder".
+- The second: "Unknown metadata key: overridesHere".
+- The third: saved. The '(view ...)' part is display-only and was
+  ignored; Z still forks F.
+** Verdict
+MATCH. The silently accepted old rels key does no harm, since the
+server redraws that part.
+
+* 6. Ranking: the user's skgrepos most private first
+** Sent
+'view P' on s1. n1 (alice) is forked by f1pub (pub) and f1priv
+(priv). Then the same view through a daemon restricted to 'pub'
+('transcripts/s1/restricted/').
+** Received
+- Unrestricted: '** f1priv (my private fork of n1) ⟨0b Kĥ1 ⌂:priv⟩'.
+- Restricted to pub: '** f1pub (my public fork of n1) ⟨0b Kĥ1 H1⟩'.
+  Also n8 and n10 are shown raw, with no forks folder, since their
+  forks are in priv.
+** Verdict
+MATCH.
+
+* 7. Ranking: a foreign owner's skgrepos most private first
+** Sent
+n12 (alice) is forked by au12 (alice) and ap12 (alicepriv). 'view P',
+then the perspective switched to alice's.
+** Received
+- The user's perspective shows 'au12', since alice's skgrepo comes
+  first by declaration and Q3 rule 2 applies.
+- Alice's perspective shows '** ap12 alice private fork of n12 ⟨1g
+  Kĥ1 ⌂:alicepriv⟩' ('transcripts/s1/view_P.press2.compact.org').
+** Verdict
+MATCH.
+
+* 8. Ranking: a third author's mirror where the owner has none
+** Sent
+n2 (alice), forked only by bob's b2. 'view P', from the user's
+perspective.
+** Received
+'** b2 bob forks n2 ⟨0f Kĥ1 ⌂:bob⟩', with '(inPlaceOf n2)'.
+** Verdict
+MATCH.
+
+* 9. Ranking: transitive mirrors
+** Sent
+- n3 (alice), where b3 (bob) forks n3 and u3 (priv) forks b3: 'view
+  P'.
+- On s2, ROOT switched to fr's perspective.
+** Received
+- n3 shows '** u3 forks bob's b3 ⟨0j Kĥ1 ⌂:priv⟩' with '(birth (forks
+  out))'. Under bob's perspective it shows b3.
+- Under fr's perspective, N (owned, unforked by anything foreign)
+  shows as foreign F, '(inPlaceOf N)'. The path runs N ← R2 ↔ Y → F
+  ← Z: every step is a fork, in either direction.
+** Verdict
+MATCH (Q2 as settled: transitive in both directions). Section 31
+shows what this closure does to search.
+
+* 10. Ranking: Q3 ties
+** Sent
+'view P' on s1. The cases:
+- n6 with "d6 forks c6 forks n6", c6 and d6 in pub (rule 2).
+- n7 (pub), forked by x7 and y7 in pub (rule 3).
+- m11a ↔ m11b mutual in pub (rule 3).
+- n8, forked by y8 and x8, both in priv (rule 4, least pid).
+- n10, where x10 forks n10 and y10 and z10 fork x10, all in priv
+  (rule 4, nearest).
+** Received
+- n6 shows 'd6 forks c6'.
+- 'n7 mine ⟨0p 2K⟩' is shown raw.
+- 'm11a mutual ⟨1d 1K1⟩' is shown raw.
+- n8 shows 'x8 forks n8'.
+- n10 shows 'x10 forks n10 ⟨0x 2Kĥ1⟩'.
+** Verdict
+MATCH, for all five.
+
+* 11. The perspective cycle (set perspective)
+** Sent
+On 'view P' (s1), 'perspective SIDECAR' four times; on s2 'set
+perspective' "next" twice, raw.
+** Received
+- s1: root authors' → "Showing bob's perspective." → "Showing alice's
+  perspective." → "Showing each root author's perspective (yours)."
+  ('transcripts/s1/perspective-cycle.txt').
+- The user's own perspective is not in the cycle, since it draws P as
+  the root authors' do.
+- Bob comes before alice, in declaration order.
+- s2: "fr's perspective", then back to "each root author's perspective
+  (yours)".
+** Verdict
+MATCH. The fourth press on s1 was refused by the AI tool, which
+reported edits that had not been made; section 12 explains why.
+
+* 12. Switching perspective leaves stale forks-folder members (bug)
+** Sent
+'view P' (s1), then perspective alice, then root-authors. It
+reproduces in two steps ('transcripts/s1/repro/'), and also after the
+full cycle.
+** Received
+When a raw occurrence is re-pointed to a mirror, it keeps its vnid and
+its forks folder. The old note's members stay in that folder, with
+their old claims, re-judged against the new note:
+- Under u3 (re-pointed from raw n3), b3, which u3 forks, is drawn
+  'noClaim' and warranted:
+  '(skg (vnid 2f) node (gnid b3) ... noClaim writeProtected (view
+  (rels (forks (in 1 (ancestors 2)) (out 1)))))'.
+  That is exactly a pending detachment, and the AI tool shows
+  'detach' in its handle. d6's forkee c6 is drawn the same way.
+- Under f1priv: f1priv itself and its sibling f1pub stay, unwarranted
+  ('⊥☮'). The same happens under b2 (b2 itself) and under x8 (x8
+  itself and y8).
+- On s2, after the first switch, F '(inPlaceOf N)' keeps N's forker
+  M1 ('noWarrant') and N's emptied hidden-outside folder. F
+  '(inPlaceOf Y)' keeps R2 and F itself ('noWarrant').
+- A save of this buffer unchanged writes nothing.
+- A save with u3's title edited
+  ('transcripts/s1/save-after-cycle-edit.*') is refused: "A node this
+  save would write changed after the buffer was rendered: ... ID: u3
+  - Changed since this buffer was rendered: the forks." The stale
+  noClaim baseline is what triggers it. u3.skg keeps 'forks: [b3]'.
+- The AI tool then refuses any further perspective press, because it
+  takes the drawn 'detach' for an unsaved edit.
+- A fresh view of P draws everything correctly.
+- Returning to an original drawn as itself
+  ('transcripts/s2/20-wire-set-perspective.txt', the second switch)
+  reinstates it with fresh folders and is clean.
+** Verdict
+NOT MATCHED. Behavior 3 says the refresh re-points the carrier, and
+'docs/mirrors.org' says a re-pointed root's folders are drawn afresh.
+A re-pointed content occurrence instead keeps the forks folder it had
+and its members' claims. No data was lost, because the stale-baseline
+guard caught it. But in the affected buffer the user cannot edit the
+mirror shown, and the error blames another save.
+
+* 13. SelfFork
+** Sent
+In the view of N (s2), '*** N ⟨node:N⟩' typed into N's forks folder
+('transcripts/s2/03-SelfFork/').
+** Received
+"1 complete-graph validation error(s): * node N forks itself; a note
+may not fork itself". Nothing was saved.
+** Verdict
+MATCH.
+
+* 14. SelfContains
+** Sent
+'** N ⟨node:N⟩' typed as a child of N ('04-SelfContains').
+** Received
+"node N contains itself; a note may not contain itself".
+** Verdict
+MATCH.
+
+* 15. SelfHides
+** Sent
+R2 was hidden again, so that the hidden-outside folder was drawn.
+Then '**** N ⟨node:N⟩' was typed into that folder ('08b-SelfHides').
+** Received
+"node N hides itself; a note may not hide itself".
+** Verdict
+MATCH.
+
+* 16. ForkeeContained
+** Sent
+'** E1 ⟨node:E1⟩' typed as a child of N, which forks E1
+('05-ForkeeContained').
+** Received
+"node N both forks and contains node E1; a note may not contain a note
+it forks".
+** Verdict
+MATCH.
+
+* 17. ForkerContained, both ways
+** Sent
+- '** R1 ⟨node:R1⟩' typed as a child of N, where R1 forks N
+  ('06-...').
+- '*** C ⟨node:C⟩' typed into N's forks folder, where C contains N
+  ('07-...').
+** Received
+- "node N contains node R1, which forks it; a note may not contain a
+  note that forks it, nor fork a note that contains it".
+- "node C contains node N, which forks it; ...".
+** Verdict
+MATCH. Q9's reverse is refused too.
+
+* 18. A foreign record's part in a violation warns at startup
+** Sent
+The s2 fixture: owned oE contains foreign fR, which forks oE; owned oR
+forks foreign fE, which contains oR. Then the startup, a 'server
+warnings' request, and an edit of oE's title ('16-...').
+** Received
+- The server started.
+- The log and the 'server warnings' response both say: "node oE
+  contains node fR, which forks it; ... Node fR is foreign, so the
+  server starts anyway, but a save of the other, owned note is refused
+  while this holds". The same is said for fE/oR
+  ('transcripts/s2/server-warnings.txt').
+- The edit of oE was refused with the ForkerContained error.
+** Verdict
+MATCH.
+
+* 19. Q6: forking a note one already forks
+** Sent
+The view of b3 (bob's; u3 already forks it), with its title edited and
+'--fork-into pub' ('transcripts/s1/fork/').
+** Received
+"Cannot fork a node you already fork: - Foreign node: b3 - Your fork
+of it: u3 - Edit that fork instead. To fork it a second time
+deliberately, make another note of yours fork it."
+** Verdict
+MATCH.
+
+* 20. Two owned forks of one note
+** Sent
+'forest forks Y', then '*** F ⟨node:F⟩' typed into Y's empty forks
+folder, while Z already forks F ('15-two-owned-forks').
+** Received
+- "saved, 0 errors". Y.skg has 'forks: [F]' and Z.skg keeps its own.
+- F is drawn '2bK', with Y and Z as its forkers.
+** Verdict
+MATCH. Aside: the newly placed F is drawn editable (no '☮'), with a
+forks folder of its own, whereas fresh views draw forkees as such
+write-protected.
+
+* 21. The one forks folder, drawn unasked, in the settled order
+** Sent
+'view N' (s2); 'view Y' (no partners); 'view b3' (s1).
+** Received
+- In N, the forks folder is drawn unasked with E1 '2bK', M1 'bKb', E2
+  'bK', R1 'K2b', R2 'Kb'. That is the forkees in N's 'forks' order,
+  with the mutual where the list puts it, then the forkers.
+- In Y, no forks folder.
+- In b3, the forkee n3, then the forker u3.
+- On a restricted view, a note whose partners are all hidden has no
+  forks folder (section 6).
+- After an attach, R1 stays where it stood. After a detach, the
+  mutual M1 moves after the last forkee.
+** Verdict
+MATCH (Q11, Q14).
+
+* 22. Heralds bK, Kb, bKb
+** Sent
+'view N' (s2).
+** Received
+- 'bK', '2bK' (N and R1 fork E1), 'Kb', and 'bKb' on a mutual.
+- Birth facts: '(forks in 2)' on a claiming member, '(forks out 2)'
+  on a forker, both on a mutual.
+- R1, which forks N and E1, shows 'K2b'. As a mutual it shows
+  'bK2b'.
+** Verdict
+NOT MATCHED, in one form only. The plan (behavior 5) and
+'docs/heralds.org' ("Birth") say a forker-only member with other
+forkees shows 'Kb3', its other forkees counted after the 'b'. The
+renderer writes the total before the ancestor letter, 'K2b', as it
+does for 'C9a'. Probably the documentation should change, not the
+code; it is cosmetic.
+
+* 23. Q12: deleting a forker hides it; the hidden-outside folder lists it; unhiding there
+** Sent
+- The R2 line deleted from N's forks folder ('01-delete-forker-R2').
+- Then R2 removed from the hidden-outside folder
+  ('02-unhide-R2-in-hidden-outside').
+** Received
+- The first save reported "Hides 'R2 note (forks N)' from 'N note'".
+  N.skg gained 'hides: [R2]'. R2 is gone from the forks folder and is
+  listed under '⟨0m b hides these, but nothing it forks or that forks
+  it contains them.⟩' as '⟨0n ☮ Kc cH folded⟩'.
+- The second save reported "Stops hiding 'R2 note (forks N)'". N.skg
+  lost 'hides', and R2 is drawn in the forks folder again ('Kb').
+- A fresh view also draws the hidden-outside folder with R2 while it
+  is hidden.
+** Verdict
+MATCH.
+
+* 24. Q12: detaching a forker
+** Sent
+'detach' in R1's handle, while R1 was forker-only ('09-...').
+** Received
+The AI tool refuses: "carries 'detach', but claims nothing already."
+Nothing was sent.
+** Verdict
+MATCH (the clients' behavior).
+
+* 25. Q12: attaching a forker
+** Sent
+'attach' in R1's handle ('10-...').
+** Received
+Saved. N.skg 'forks: [E1, M1, E2, R1]', and R1 is redrawn as 'bK2b'.
+** Verdict
+MATCH.
+
+* 26. Q12: a relRepo request on a forker
+** Sent
+- 'relRepo:main' in M1's handle (M1 is forker-only by then).
+- The same request raw, as '(editRequest (relRepo main))' on M1's
+  headline ('23-...').
+** Received
+- The tool refuses: "this member of the forksFolder claims nothing:
+  it forks the view-parent and records that in its own file; attach
+  it first".
+- The server refuses the raw save: "relRepo request on M1, a member
+  of a forks folder that claims nothing".
+** Verdict
+MATCH.
+
+* 27. Q13: detaching a mutual
+** Sent
+'detach' in M1's handle while M1 was mutual ('11-detach-mutual-M1').
+** Received
+- N.skg 'forks: [E1, E2, R1]'. M1 still forks N.
+- The rerender and a fresh view show M1 as 'Kb', after the last forkee
+  and claiming nothing, with no pending 'detach'.
+** Verdict
+MATCH.
+
+* 28. Q13: deleting a mutual
+** Sent
+R1's line deleted while R1 was mutual ('12-delete-mutual-R1').
+** Received
+- "Hides 'R1 note (forks N and E1)' from 'N note'".
+- N.skg 'forks: [E1, E2]' and 'hides: [R2, R1]'. R1.skg is unchanged.
+- R1 is now in the hidden-outside folder.
+** Verdict
+MATCH.
+
+* 29. Deleting and detaching a forkee-only member
+** Sent
+E2's line deleted ('13-...'); 'detach' in E1's handle ('14-...').
+** Received
+- After the deletion, N stops forking E2, and E2 is not hidden.
+- After the detach, N.skg has no 'forks', and E1 stays in the view as
+  '⊥☮ 1K'.
+** Verdict
+MATCH.
+
+* 30. The 'hides' key
+** Sent
+The migration over 'f1pub', and every save of N.
+** Received
+- 'hides:' is in the files. The migration report says "'hidesFromSubs'
+  keys renamed 'hides': 1". The server writes 'hides:'.
+- The rels show '(hides ...)'. The hidden folder is labelled "It hides
+  these from its forks.".
+- Startup refuses 'hidesFromSubs' (section 2).
+** Verdict
+MATCH.
+
+* 31. Search: enrichment and suppression
+** Sent
+'search note' on s2, at the end of the run
+('transcripts/s2/21-search/').
+** Received
+Two hits: 'E1 note' (with its forks folder, folded) and 'E2 note'.
+Eight titles contain "note". N, M1, R1, R2, Y and Z were suppressed:
+with E1 and foreign F, they form one mirror class by the transitive
+closure. R1 forks N and E1, R2 and Y fork each other, and Y and Z
+both fork F.
+** Verdict
+MATCH with behavior 3 ('suppressed_result_gnids') and Q2 as written,
+but flagged for Jeff. Through chains of mutuals and siblings, an
+ordinary search hides notes whose only tie to the shown hit is a fork
+several steps away. Y and Z are not forks of E1 in any sense a reader
+would expect.
+
+* 32. The diff view's one 'its forks changed' folder
+** Sent
+'diff' after the s2 edits ('17-diff'); a new mutual pair Y ↔ R2
+('18a', '18b'), then 'diff', then 'processed rel' on R2 under Y, then
+'diff' again ('19-diff-mutual').
+** Received
+- Each changed folder is labelled 'its forks changed', with neither
+  "(this file)" nor "(other files)".
+- Under N: E1 '~-', M1 '~-' (N stopped forking it; M1 still forks N),
+  and E2 '~-'.
+- R2 under Y carries '(leaves 2 rel)', both sides.
+- 'processed rel' wrote two 'Forks' marks (R2→Y and Y→R2), and both
+  occurrences show '~+✓'.
+** Verdict
+MATCH. An open observation: after that mark, Y's 'M' shows '✓' under
+F's folder ('(leaves 2 node rel) (processed node)') but not under
+R2's ('(leaves 3 node rel) (processed rel)'). This may be the
+per-side keying working as designed; it is worth a look in the diff
+view's review.
+
+* 33. Not foreseen: a mutual pair under a skgrepo restriction
+** Sent
+s3: A (pub) ↔ B (priv). A daemon restricted to 'pub', then:
+- A's title edited and saved;
+- the '⟨0e restricted⟩' placeholder (with its chain line) deleted from
+  A's forks folder and saved ('transcripts/s3/restricted/').
+** Received
+- Under the restriction, A's forks folder holds a 'restricted'
+  placeholder (with Q as its chain).
+- The title edit saved, and A.skg kept 'forks: [B]'.
+- The placeholder deletion saved, "Removed: ⟨0e⟩ (restricted)". A.skg
+  lost 'forks' and gained no 'hides'.
+- Unrestricted, B is now drawn in A's forks folder as a forker ('Kb').
+** Verdict
+The unrelated edit MATCHES: a hidden fork survives a restricted save.
+The deletion is NOT MATCHED with Q13, which says a deleted mutual
+stops the fork and is hidden, so that it leaves the folder. Here the
+fork stopped, but B was not hidden and reappears as a forker. Whether
+deleting a placeholder should change a relationship to a note the
+restriction hides at all is a question for Jeff.
+
+* 34. Not foreseen: a fork of a fork across three authors
+** Sent
+The view of bob's b2 (which forks alice's n2), its title edited,
+saved with '--fork-into pub' and '--yes' ('transcripts/s1/fork/').
+Then 'view P' from each perspective.
+** Received
+- The fork confirmation, then "saved". The clone's file holds only
+  'forks: [b2]', written once (behavior 1, "The fork operation").
+- In P, n2 shows as the clone from the user's perspective, b2 from
+  bob's, and n2 itself from alice's.
+** Verdict
+MATCH.

@@ -1,0 +1,301 @@
+#+title: Review of plan 1 (every-mirror): its terms, and plan citations in code
+#+date: 2026-11-16
+
+Read-only review of 'git diff 4c56ab5b..1144a129' and of the tree at
+1144a129, per 'coding-advice/plans.org' ("After each plan, before the
+next") and 'coding-advice/names.org'. Findings run from most to least
+important. Each gives file:line and a one-line proposed fix.
+
+* Question 1: terms coined or reused
+** 1. "fork" and "its forks" mean three different things, and the glossary contradicts itself
+The glossary defines "a *fork* of a note N" as "a note that forks N",
+which is a forker ('docs/glossary.org:943'; also
+'server/dbs/in_rust_graph/mirrors.rs:4', 'docs/mirrors.org:86'). By that
+definition N's forks are N's forkers. But "hides from its forks" uses
+"its forks" for the hider's forkees:
+- 'docs/glossary.org:238-240' ('=hides= means "hides from its forks":
+  the hider keeps the hidden node out of what the hider shows of its
+  forkees')
+- 'server/dbs/in_rust_graph/relation_accessors.rs:35'
+- the folder labels 'server/heralds.rs:470' ("It hides these from its
+  forks.") and 'server/heralds.rs:472' ("These hide it from their forks.")
+- 'docs/heralds.org:83-84', 'docs/data-model_friendly.org:58',
+  'tools/skg-for-ai/README.org' ("'H' hides (from its forks)")
+- 'server/nodeMerge/nodeMergeInstructionTriple.rs:232'
+  ('gnids_shown_through_forks', meaning through forkees)
+- 'tests/hidden_nodes.rs:107,179,348,595,703', 'tests/merge/merge_nodes.rs:159'
+
+A third reading takes "its forks" to mean fork partners: the diff
+view's changed-folder label "its forks changed"
+('shared/herald-styles.json:111', 'docs/heralds.org:306',
+'docs/glossary.org:1600'), and Jeff's own name for the folder
+('TODO/every-mirror/1_plan.org', Q8). A fourth uses "a fork" for the
+fork operation ('docs/forks.org:3' bolds "*fork*" as the gesture;
+'docs/forks.org:28' "two levels per fork"; see finding 12). The
+labels a user reads are where this does the most harm: under the
+glossary's definition, "It hides these from its forks" says the
+opposite of what the code does in plan 1.
+- Fix: add a glossary entry for the bare word "fork", keep "a fork of
+  N = a note that forks N", never write a bare "its forks", and
+  relabel the two hide folders "It hides these from what it forks." /
+  "These hide it from what they fork." (or "from its fork partners"
+  once plan 2 widens hides to both directions).
+
+** 2. User docs say "a fork" stands in a node's place; the code can also show the node's forkee or a sibling
+The mirror shown can be a forkee of N ('Side::In' in
+'server/dbs/in_rust_graph/mirrors.rs:239-251'). It can also be a
+sibling: another fork of what N forks (rule 4 of "Which mirror
+stands"). The foreign owner's half of 'jeffs_example_from_both_perspectives'
+('tests/dbs/in_rust_graph/mirrors.rs:96') shows n in f's place, where f
+forks n. Yet these places say a fork stands in:
+- 'docs/COMMANDS.org:1323-1324' and 'docs/COMMANDS-nvim.org:1296-1297'
+  ("someone has forked it, a view may show one fork in its place")
+- 'tools/skg-for-ai/README.org:195-198' ("the view may show the fork in
+  its place", "Whose forks count is the perspective")
+- 'docs/sharing-model.org:48' ("It does not show a fork in the root's
+  place")
+- Fix: say "one of its mirrors" (and "whose skgrepo list ranks the
+  mirrors"), as 'docs/heralds.org:169' already does.
+
+** 3. The compound folders' names, label and parties lie in plan 1
+- 'hiddenOutsideOfForkPartnersFolder' says, and its label says, "b hides
+  these, but nothing it forks or that forks it contains them."
+  ('server/heralds.rs:466'). Its membership reads only what the forkees
+  contain: 'hidden_outside_of_forkees' at 'server/refresh/goal.rs:580',
+  and the glossary admits it at 'docs/glossary.org:516-520'. So a hide
+  that a forker contains is listed there, and the label is false for
+  it until plan 2.
+- 'hiddenInForkPartnerFolder' is drawn only under a forkee as such
+  ('server/refresh/goal.rs:543-546'). "Fork partner" in its name
+  promises plan 2's behaviour.
+- 'CompoundFolderParties::forker' ('server/refresh/ancestry.rs:148', doc
+  at ':137-145') and the style keys 'hiddenInForkPartnerFolder_forker' and
+  'hiddenOutsideOfForkPartnersFolder_forker' ('shared/herald-styles.json:80-81',
+  'docs/heralds.org:194-195') name the note whose hides the folder
+  shows. That note is a hider. In the hidden-outside folder it need not
+  fork anything: a note with only forkers, hiding one of them, has the
+  folder too ('docs/glossary.org:514-516').
+- Fix: rename the field and the two style keys 'hider'. Until plan 2
+  lands, either word the hidden-outside label by what it reads
+  ("nothing it forks contains them") or record the lie as a
+  'TODO/problems.org' entry.
+
+** 4. 'side_of_mirror_shown' gives one direction two opposite names
+'server/dbs/in_rust_graph/mirrors.rs:233-238' says 'Side::Out' is
+when 'shown' reaches 'original' "by forker steps only (it forks a note
+that ... forks 'original')". The code decides that with
+'reaches_by_forkee_steps (shown, original)'
+('server/dbs/in_rust_graph/mirrors.rs:247, 253-255'), whose doc calls
+the same forker-to-forkee walk "forkee steps". "Forker steps" and
+"forkee steps" are coined in the same module for one direction. The
+glossary already has the word: "forkeeward" ('docs/glossary.org:618-620').
+- Fix: rename the function 'reaches_forkeeward' and make the docstring
+  say "'Side::Out' when 'shown' reaches 'original' forkeeward, 'Side::In'
+  when 'original' reaches 'shown' forkeeward".
+
+** 5. "fork rules" is defined in no glossary entry, and covers rules that are not about forks
+- The term is used as a term in 'docs/api-and-formats.org:835' ("one per
+  violation of the fork rules"), in the startup warnings
+  ('fork_rule_warnings', 'server/main.rs:157-183', 'server/dbs/init.rs:44-79')
+  and across 'server/dbs/in_rust_graph/fork_rules.rs'. No glossary entry
+  defines it.
+- 'ForkRuleViolation' ('server/dbs/in_rust_graph/fork_rules.rs:37-55')
+  includes 'UnknownSkgrepo', 'SelfContains' and 'SelfHides'. None of
+  these is a rule about forks: they are rules 4 and 5 of "Hard
+  validation constraints" ('docs/data-model_technical.org:70-72').
+- 'server/dbs/in_rust_graph/fork_rules.rs:7-9' says "a note it forks is
+  the same note as it". Skg's word for that is mirror, not "same note".
+  Mirrors are distinct notes that may stand in each other's places.
+- Fix: add a glossary entry ("the fork rules: rules 4 to 6 of the hard
+  validation constraints") or rename the module 'owned_note_rules'.
+  Reword the sentence as "a note it forks is its mirror, which may
+  stand in its place".
+
+** 6. "mirror" collides with other senses that the glossary's caveat does not list
+- 'docs/networking-and-scale.org:15': "their fans might have to set up
+  mirrors" means copies of a server. The progress record notes this
+  and leaves it ('TODO/every-mirror/progress.org:1761').
+- Neovim and Emacs docstrings use the verb for "is the twin of", about
+  58 times: 'nvim/lua/skg/folds.lua:44,203,230,237',
+  'nvim/lua/skg/metadata.lua:81,1972', 'nvim/lua/skg/buffer.lua:47',
+  'nvim/lua/skg/id_search.lua:17,326', 'nvim/lua/skg/config.lua:54,56',
+  'elisp/skg-config.el:188-189', 'elisp/skg-id-search.el:27', among others.
+- The glossary's caveat names only "the save is its mirror"
+  ('docs/glossary.org:951').
+- Fix: widen the caveat to "(Not 'mirror' as a plain verb: the save
+  is its mirror, a Neovim function mirrors an Emacs one, a server
+  mirror.)". Or say "replica" in the essay and "Twin of" in new client
+  docstrings.
+
+** 7. "honest carrier" reuses the glossary's "carrier" in another sense
+In the glossary, "carrier" means the node that has an ID as its PID
+or an extra ID ('docs/glossary.org:1809-1810'). This plan carried
+forward and widened a second sense: the headline that bears an
+'(inPlaceOf N)' part.
+- 'docs/api-and-formats.org:2066' ("Any mirror is an honest carrier")
+- 'server/types/viewnode.rs:390' ("the carrier must be a mirror of N")
+- 'server/from_text/buffer_to_viewnodes/validate_tree.rs:180,209'
+- 'server/types/errors.rs:144,357'
+- the "honest carrier" lines in 'tests/mirror_substitution.rs'
+- Fix: say "the headline bearing the part" (variable 'bearer') and
+  keep "carrier" for IDs.
+
+** 8. The introspect tool still speaks of overrides; slice 9's sweep left it out
+Slice 3 renamed the counters, but some prose survives.
+- 'tools/introspect/profile-with-org-report/how-it-works.toml:30'
+  ("affected identity and override proofs")
+- 'tools/introspect/profile-with-org-report/generate_report.py:515'
+  ("override checks")
+- 'tools/introspect/profile-with-org-report/README.org:19' ("override
+  scope/steps")
+- Fix: say "fork-rule checks" / "fork-rule scope". Add 'tools/' (less
+  the migration tools) to the sweep's grep.
+
+** 9. Variable names left from the retired words
+- 'followed' holds a perspective (from "overrides followed"):
+  'elisp/skg-buffer.el:161-166', 'elisp/skg-request-perspective.el:59,67',
+  'nvim/lua/skg/buffer.lua:160-178', 'nvim/lua/skg/perspective.lua:79',
+  'tools/skg-for-ai/skg_for_ai.py:905'.
+- 'here' holds whether '(inPlaceOf ...)' is present (from
+  "overridesHere"): 'elisp/heralds-minor-mode.el:551-552',
+  'nvim/lua/skg/heralds.lua:391-400',
+  'tools/skg-for-ai/skg_for_ai.py:1884-1887'.
+- 'subs' holds the post-save forkees:
+  'server/from_text/local_fieldintent_collection/resolve_visibility.rs:348'.
+- Fix: rename them 'perspective', 'in_place_of' and 'forkees'.
+
+** 10. "forkerward" and "forkeeward" are defined but unused, and "role tree" no longer fits 'forks'
+- 'docs/glossary.org:618-620' lists forkerward and forkeeward, which
+  replaced overriderward and overriddenward in this plan. No code or
+  other doc uses them; finding 4 is where one is needed.
+- The role-tree definition ('docs/glossary.org:611-615': "the members of
+  the node's partner folder of that role") has no single-role folder to
+  point to for either role of 'forks': the forks folder holds both.
+- Fix: add "for 'forks', the forks folder's members of that side" to
+  the definition, and use "forkeeward" in 'mirrors.rs' (finding 4).
+
+** 11. 'hidden_in_its_forks_folder' names the opposite of what it tests
+'server/refresh/visit.rs:535-541' tests whether a child is a note that
+the folder's viewparent hides. Such a note is not drawn in the forks
+folder; it stands in the hidden-outside folder. The name also echoes
+the hidden-in compound folder.
+- Fix: rename it 'is_hidden_by_the_forks_folders_viewparent'.
+
+** 12. "forks" still means fork operations in places
+- The plan settled that the gesture is always called "the fork
+  operation" ('docs/glossary.org:1260-1288'; the glossary's own lines
+  were fixed at ':2146' and ':2272').
+- Still "forks": 'elisp/skg-request-save.el:1239' and
+  'nvim/lua/skg/save.lua:1360' ("the forks approved"),
+  'tests/shared/git_fixture.rs:255,265',
+  'tests/fork_merge_delete_under_a_narrowing.rs:253',
+  'docs/forks.org:3' (bold "*fork*" as the gesture) and
+  'docs/forks.org:28'.
+- Fix: say "the fork operations approved". Open 'docs/forks.org' with
+  "The *fork operation* turns ...".
+
+** 13. Two words for a forks-folder member's role: "side" and "role"
+- 'ForksFolderMemberSides { as_forkee, as_forker }'
+  ('server/refresh/viewnodestats.rs:142-149') and
+  'FORKS_FOLDER_MEMBER_ROLES' ('server/types/viewnode.rs:763') hold the
+  same distinction.
+- 'server/types/viewnode.rs:900-902' says "each reader of a member's
+  role asks the member's side". "Side" already names the herald's
+  in-side and out-side ('docs/heralds.org:84-87').
+- Fix: rename it 'ForksFolderMemberRoles' (and the function) and keep
+  "side" for herald sides.
+
+** 14. Coined terms the glossary does not record
+- "retired keys" ('server/dbs/filesystem/retired_keys.rs',
+  'RETIRED_SKG_KEYS'; the plan marks it "(coined)").
+- "tamper check" and "tamper validation" ('server/types/viewnode.rs:389',
+  'server/from_text/buffer_to_viewnodes/validate_tree.rs:174').
+- Related: 'hides_from_its_subscriptions' still loads as an alias of
+  'hides' ('server/types/nodes/fs.rs:63'), while its successor
+  'hidesFromSubs' is refused ('server/dbs/filesystem/retired_keys.rs:20').
+  The older name's "subscriptions" is now the only accepted spelling
+  of the old words.
+- Fix: add one-line glossary entries for the two coined terms, or
+  point the glossary at 'docs/api-and-formats.org' ("The keys retired
+  in November 2026") and "Mirror substitution and the inPlaceOf part".
+
+** 15. Stale comments a reader could take as rules
+- 'server/heralds.rs:444-446': "the editable folders (forksFolder,
+  aliasFolder)" leaves out 'hiddenOutsideOfForkPartnersFolder', which
+  is editable.
+  - Fix: add it to the list.
+- 'elisp/skg-request-views.el:46': "both folders of the relation", but
+  'forks' has one.
+  - Fix: write "the relation's folders".
+- 'tests/content_view.rs:131-132': "each forks folder has the forked
+  IDs as its children", but it also holds forkers.
+  - Fix: write "the note's fork partners".
+- 'tests/mirror_substitution.rs:1574-1576': "(Before 2026-11-15 ...)" is
+  history in a docstring.
+  - Fix: drop it, or state the rule it guards.
+
+** 16. "subscribe" in an essay
+'docs/skg-enables-deep-sharing.org:11-16' ("Subscribe granularly")
+describes, in the relation's old name, what is now forking. The
+progress record leaves it as Jeff's essay
+('TODO/every-mirror/progress.org:1656-1658').
+- Fix: Jeff's call. Either keep it as everyday English, or retitle it
+  "Fork granularly".
+
+** Terms that checked out
+- "mirror", "mirror shown", "mirror substitution", "a perspective's
+  skgrepo list": each is defined once ('docs/glossary.org:941-995',
+  'docs/mirrors.org:84-118'), and the code agrees ('mirrors_of',
+  'mirror_shown', 'perspective_skgrepo_list').
+- "perspective": the type 'Perspective', the wire's "set perspective",
+  'skg-cycle-perspective' and 'CyclePerspective', and the AI tool's
+  'perspective' command and sidecar key all match. The only
+  exceptions are finding 9's variables.
+- "forks folder", "fork partner", "forker-only member", "mutual":
+  defined at 'docs/glossary.org:479-501', used consistently in the
+  server, both clients ('forksFolder', 'C-c l f', '<localleader>lf')
+  and the AI tool ('forest forks').
+- "forkee as such": defined at 'docs/glossary.org:569-592'. The
+  clients' tests ('elisp/skg-metadata.el:693',
+  'nvim/lua/skg/metadata.lua:1974') match the server's. "Forker as
+  such" appears nowhere, as intended.
+- "inPlaceOf" / 'in_place_of': consistent across the server, both
+  clients, 'shared/' and the AI tool. 'overridesHere' is gone.
+- 'K', the herald letter: consistent in 'shared/relations.json',
+  'docs/heralds.org' and the AI tool.
+
+* Question 2: code that cites anything under 'TODO/'
+No code this plan added cites a 'TODO/' path, a plan by name, a slice
+or 'progress.org'. It does cite the plan's question Q3 (whose rules
+now live in 'docs/mirrors.org', "Which mirror stands", and the module
+comment of 'server/dbs/in_rust_graph/mirrors.rs:13-23'):
+- 'tests/content_view.rs:130' and 'tests/content_view.rs:181' ("Q3, rule 2")
+- 'tests/dbs/in_rust_graph/mirrors.rs:133,142,150,162' ("Q3, rule 1" to "rule 4")
+- 'tests/mirror_substitution.rs:288' and 'tests/mirror_substitution.rs:320' ("Q3, rule 3")
+- Fix: write "rule N of 'docs/mirrors.org', \"Which mirror stands\"".
+
+It also cites a conversation rather than a rule:
+- 'tests/dbs/in_rust_graph/mirrors.rs:7' ("as in Jeff's example"),
+  ':90-95' (a quotation of Jeff) and ':96' ('jeffs_example_from_both_perspectives')
+- Fix: state the rule the example shows. Rename the test
+  'each_owner_ranks_its_own_skgrepos_first'.
+
+Not hits: the 'Q2' and 'Q3' in 'tests/integration/fork-owned/' are
+node IDs. "At the plan" at 'tests/mirror_substitution.rs:1620' means
+the save plan.
+
+** Earlier citations, not this plan's
+- 'server/refresh/editability.rs:277' ("plan 04.1")
+- 'server/serve/handlers/stage_and_commit.rs:281' ("Decision 4 of the plan")
+- 'tests/pruned_change_view/commit_processed.rs:535' ("decision 4")
+- Fix: state the rule each one cites.
+
+** Docs that cite 'TODO/' (not code, but they break when the plan moves to 'TODO/DONE/')
+- 'docs/glossary.org:519'
+- 'docs/heralds.org:201-202'
+- 'docs/data-model_technical.org:586'
+- 'docs/sharing-model.org:62'
+
+Each points to 'TODO/every-mirror/2_plan.org', decision 8.
+- Fix: say "hides apply to the forkees' content only, for now" with
+  no path, and let plan 2 change the sentence.
