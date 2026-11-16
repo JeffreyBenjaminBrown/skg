@@ -56,7 +56,8 @@ A member claims membership exactly when N forks it, and the save sets N's =forks
 - deleting a forkee stops N forking it;
 - deleting a forker-only member hides it in N: it leaves the forks folder for the folder of what N hides outside its fork partners ("b hides these, but nothing it forks or that forks it contains them."), the last thing in the forks folder; removing it from there unhides it, and it is drawn in the forks folder again;
 - deleting a mutual stops N forking it and hides it, likewise; detaching it (=C-c s t=) only stops the fork, and it stands on as a forker, claiming nothing;
-- attaching a forker-only member (=C-c s a=) makes N fork it: a mutual.
+- attaching a forker-only member (=C-c s a=) makes N fork it: a mutual;
+- deleting a member shown as "restricted" (a note the skgrepo restriction keeps out) changes nothing: the save leaves the forks and hides involving it as they are, and the member is drawn again.
 A forker-only member's record of its fork is in its own file, so the relRepo gesture refuses on it; to make it stop forking N, edit it, not N.
 
 What N's hides apply to is, so far, its forkees' content only; [[file:../TODO/every-mirror/2_plan.org][plan 2 of every-mirror]] (decision 8) makes them apply to its forkers' content too.

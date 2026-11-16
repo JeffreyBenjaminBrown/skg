@@ -126,9 +126,11 @@ pub fn resolve_visibility (
 /// record the skgrepo restriction shows, that N does not fork after the
 /// save (a deleted mutual's fork the same save ends), that the folder
 /// no longer shows, and that N does not hide already, joins N's hides.
-/// A forker the restriction keeps out was never drawn, so it is never
-/// hidden here. Only an owned N is written. This runs before the edits
-/// of the hidden-outside folder, which may unhide it again.
+/// A forker whose record the restriction keeps out was never drawn,
+/// and one whose node it keeps out stood as a restricted viewnode,
+/// whose line edits no relationship, so neither is hidden here. Only
+/// an owned N is written. This runs before the edits of the
+/// hidden-outside folder, which may unhide it again.
 fn resolve_forks_folder_removals (
   lowered             : &mut LoweredNodeIntents,
   signals             : &[(ID, ForksFolderMembers)],
@@ -157,7 +159,8 @@ fn resolve_forks_folder_removals (
       . into_iter ()
       . filter ( |forker| ! shown . contains (forker)
                           && ! forked_after_save . contains (forker)
-                          && ! hidden . contains (forker) )
+                          && ! hidden . contains (forker)
+                          && ! graph . node_is_restricted (forker, skgrepo_restriction) )
       . collect ();
     if ! deleted_forkers . is_empty () {
       lowered . apply_hiderel_delta_to_forker (
@@ -185,7 +188,9 @@ fn members_with_visible_records (
 /// member, as an occurrence or a gnid-only vognode, so the submitted
 /// folder is the whole set of hides with a visible record outside the
 /// forkees, and a folder saved under a skgrepo restriction never unhides a
-/// member it could not show. What counts as inside is what the folder's goal
+/// member it could not show. Nor does it unhide a member it showed as a
+/// restricted viewnode (its node kept out): deleting that line changes
+/// no relationship to the note it stands for. What counts as inside is what the folder's goal
 /// subtracts ('goal_list_for_hiddenOutsideOfForkPartners_folder'): the content
 /// of each forkee by the records the skgrepo restriction shows.
 fn apply_hiddenoutside_edits (
@@ -231,6 +236,9 @@ fn apply_hiddenoutside_edits (
       forker_from_disk . hides . or_default ()
       . iter ()
       . filter (|member| is_visible (member))
+      // A hide of a node the restriction keeps out stood as a
+      // restricted viewnode, whose line edits no hide.
+      . filter (|member| ! graph . node_is_restricted (&member . member, skgrepo_restriction))
       .map (|member| key (&member . member))
       .filter (|member_key| ! inside . contains (member_key))
       .collect ();

@@ -144,11 +144,12 @@ fn a_save_under_a_restriction_keeps_every_hide_and_member (
       Ok (( )) } ) }
 
 /// As above, but the line of the Restricted vognode hh is deleted
-/// before the save: that one hide goes, and the records the
-/// skgrepo restriction keeps out (r's hide of hp, its containment of
-/// hc) stay as they were.
+/// from the folder of what r hides outside its forkees before the
+/// save. A restricted vognode's line edits no relationship to the
+/// note it stands for: every hide stays, and the save's rerender
+/// draws hh there again.
 #[test]
-fn deleting_a_restricted_vognodes_line_removes_its_record_alone (
+fn deleting_a_restricted_vognodes_line_in_the_hidden_outside_folder_changes_no_record (
 ) -> Result<(), Box<dyn Error>> {
   let case : tempfile::TempDir = tempfile::TempDir::new () ?;
   write_fixture_where_r_hides (case . path (), &["hh", "hv"], PrivateSectionOfR::Written) ?;
@@ -164,13 +165,15 @@ fn deleting_a_restricted_vognodes_line_removes_its_record_alone (
         . to_string ();
       let edited : String = switched . replacen ( &format! ("{}\n", hh_line), "", 1 );
       assert_ne! ( edited, switched );
-      save_under (f, &edited, &public) ?;
+      let saved : SaveResponse = save_under (f, &edited, &public) ?;
       let r : GraphnodeInRust = node_in_graph (f, "r");
       assert_eq! ( sorted ( members_of ( r . hides . or_default () )),
-                   vec! [ ID::from ("hp"), ID::from ("hv") ],
-                   "the hide of hh goes; that of hp, recorded in r's private \
-                    section, stays" );
+                   vec! [ ID::from ("hh"), ID::from ("hp"), ID::from ("hv") ],
+                   "every hide stays" );
       assert_r_keeps_its_members (f);
+      assert_eq! ( children_of_the_hidden_outside_folder (&saved . saved_view),
+                   vec! [ "restricted hh" . to_string (), "node hv" . to_string () ],
+                   "hh is drawn there again:\n{}", saved . saved_view );
       Ok (( )) } ) }
 
 /// r contains x, private, and forks e, which contains x too;
@@ -703,9 +706,9 @@ fn save_view_cleanly_under (
 /// r hides s1 and hh, private, from its forks, recording both in
 /// its public file. Under "public", with the folder of what r hides
 /// requested, hh stands as a restricted headline there and in the
-/// folder of what r hides outside its forkees. Its line deleted
-/// from the second and the view saved, r no longer hides hh, and the
-/// first folder's restricted headline goes.
+/// folder of what r hides outside its forkees. A save of another view
+/// of r, unrestricted, stops r hiding hh; the first view, rerendered
+/// under "public", loses both of hh's restricted headlines.
 #[test]
 fn a_restricted_headline_whose_record_a_save_removed_goes_quietly (
 ) -> Result<(), Box<dyn Error>> {
@@ -721,32 +724,36 @@ fn a_restricted_headline_whose_record_a_save_removed_goes_quietly (
   with_git_fixture (
     case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
     |f| {
-      let public : SkgrepoRestriction =
+      let mut public : SkgrepoRestriction =
         SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
+      let unrestricted : SkgrepoRestriction =
+        SkgrepoRestriction::unrestricted (&f . config);
       let opened : String = open_view_of_r (f, &public) ?;
       let requested : String = save_under (
         f, &opened . replacen (
           "node (gnid r)", "node (gnid r) (viewRequests (folder hides))", 1 ),
         &public ) ? . saved_view;
-      let hh_lines : Vec<usize> = requested . lines () . enumerate ()
-        . filter ( |(_, line)| line . contains ("restricted (gnid hh)") )
-        . map ( |(index, _)| index )
-        . collect ();
-      assert_eq! ( hh_lines . len (), 2,
-                   "hh stands in both folders:\n{}", requested );
+      assert_eq! ( requested . lines ()
+                   . filter ( |line| line . contains ("restricted (gnid hh)") ) . count (),
+                   2, "hh stands in both folders:\n{}", requested );
       assert_eq! ( children_of_the_hidden_outside_folder (&requested),
                    vec! [ "restricted hh" . to_string () ],
                    "{}", requested );
-      let edited : String = requested . lines () . enumerate ()
-        . filter ( |(index, _)| *index != hh_lines [1] )
-        . map ( |(_, line)| format! ("{}\n", line) )
+      let other_view : &str = "unrestricted view of r";
+      let unrestricted_view : String =
+        open_content_view (f, "r", other_view, &unrestricted) ?;
+      let without_hh : String = unrestricted_view . lines ()
+        . filter ( |line| ! line . contains ("(gnid hh)") )
+        . map ( |line| format! ("{}\n", line) )
         . collect ();
-      let saved : SaveResponse = save_under (f, &edited, &public) ?;
+      assert_ne! ( without_hh, unrestricted_view );
+      save_view_cleanly_under (f, other_view, &without_hh, &unrestricted) ?;
       assert_eq! ( members_of ( node_in_graph (f, "r") . hides . or_default () ),
                    vec! [ ID::from ("s1") ],
                    "r no longer hides hh" );
-      assert! ( ! saved . saved_view . contains ("(gnid hh)"),
-                "hh's restricted headline goes:\n{}", saved . saved_view );
+      let rerendered : String = switch (f, &mut public, "public") ?;
+      assert! ( ! rerendered . contains ("(gnid hh)"),
+                "hh's restricted headlines go:\n{}", rerendered );
       Ok (( )) } ) }
 
 /// r, public, records the alias "r public alias" in its public file

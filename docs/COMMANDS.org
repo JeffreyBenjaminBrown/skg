@@ -480,7 +480,9 @@ partners, when it hides any. Typing a member in, or attaching a
 forker (C-c s a), makes this node fork it. Deleting a member it forks
 stops the fork; detaching a mutual stops only the fork; deleting a
 mutual or a forker also hides it, so that it moves to the
-hidden-outside folder, whence deleting it unhides it.
+hidden-outside folder, whence deleting it unhides it. Deleting a
+"restricted" member (one the skgrepo restriction keeps out), in
+either folder, changes nothing, and it is drawn again.
 *** C-c l p : skg-show-folderOf-flags
 Shows the write-protected =flagsFolder=. It lists only true node-file
 flags as titleless viewnodes whose heralds carry their labels, in canonical

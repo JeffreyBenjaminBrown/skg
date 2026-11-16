@@ -2847,10 +2847,14 @@ the members whose records are
 restricted, and a node's aliases whose records are restricted. A
 restricted viewnode keeps its member in the list while
 it claims, and deleting its line removes the record, as deleting an
-unknown viewnode's does. The folder of what a forker hides outside its
+unknown viewnode's does, but in the forks folder: there deleting a
+restricted viewnode changes no relationship to the note it stands
+for, so the save keeps N's fork of it, hides nothing, and the
+rerender draws it again. The folder of what a forker hides outside its
 forkees replaces the hides with a visible record, each of which
-it showed, as an occurrence, an unknown viewnode or a restricted viewnode; a
-hide recorded in a restricted section is never replaced. Which hides
+it showed, as an occurrence or an unknown viewnode; a
+hide recorded in a restricted section is never replaced, and
+deleting a restricted viewnode there unhides nothing. Which hides
 stand outside the forkees is what the visible records say: a
 hide of a node a forkee contains only by a restricted record
 stands in that folder, and its line edits the hide. A forkee

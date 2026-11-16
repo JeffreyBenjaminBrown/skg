@@ -188,7 +188,9 @@ fn supplement_nodeSaveIntent_from_disk (
 /// (the API doc's "Restricted-skgrepo nodes"): the anchored
 /// 'weave' for the order-meaningful 'contains', 'forks' and
 /// 'aliases' (the alias folder omits an alias whose record is
-/// restricted).  A field is replaced only when the merge
+/// restricted). A fork of a node the restriction keeps out is kept
+/// too, though its record is visible: its restricted viewnode's line
+/// edits no relationship.  A field is replaced only when the merge
 /// changed it, so an untouched field keeps its MSV shape (and the
 /// noop filter can still recognize an unchanged node).
 fn preserve_invisible_members (
@@ -203,8 +205,13 @@ fn preserve_invisible_members (
     SkgrepoRestriction::member_record_is_visible (
       restriction, &disk_node . contains, gnid ) };
   let forks_visible : &dyn Fn (&ID) -> bool = &|gnid : &ID| -> bool {
+    // A forks-folder member whose node the restriction keeps out
+    // stood as a restricted viewnode, and deleting one changes no
+    // relationship to the note it stands for, so it is kept as if
+    // unseen.
     SkgrepoRestriction::member_record_is_visible (
-      restriction, disk_node . forks . or_default (), gnid ) };
+      restriction, disk_node . forks . or_default (), gnid )
+    && ! graph . node_is_restricted (gnid, restriction) };
   // Rendering may canonicalize a resolvable extra ID to its primary PID.  The
   // comparison key says that is the same relationship, but the disk spelling
   // is load-bearing: restore it before the weave so an untouched round trip

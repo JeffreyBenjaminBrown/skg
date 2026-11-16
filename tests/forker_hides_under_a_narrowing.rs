@@ -170,6 +170,55 @@ fn a_hide_of_what_the_forkee_contains_restrictedly_stands_outside_and_its_edits_
                    "e's private section still contains h" );
       Ok (( )) } ) }
 
+/// r forks e and b by records in its public file; b, homed in
+/// "private", forks r. Under "public" r's forks folder shows b as a
+/// restricted viewnode. Deleting that line changes no relationship to
+/// the note it stands for: r still forks b and hides nothing, b's file
+/// is unchanged, and the save's rerender draws the restricted viewnode
+/// again.
+#[test]
+fn deleting_a_restricted_viewnode_from_the_forks_folder_changes_no_relationship (
+) -> Result<(), Box<dyn Error>> {
+  under_public (
+    &[ ("r", "pid: r\ntitle: r\nforks:\n- e\n- b\n"),
+       ("e", "pid: e\ntitle: e\n") ],
+    &[ ("b", "pid: b\ntitle: b\nforks:\n- r\n") ],
+    |f, public| {
+      let files_before : BTreeMap<String, String> = skg_files (f) ?;
+      let requested : String = forks_folder_requested (f, public) ?;
+      assert! ( requested . lines () . any ( |line| is_restricted_line_of (line, "b") ),
+                "b stands in r's forks folder as a restricted viewnode:\n{}", requested );
+      let saved : String = save (f, &without_restricted_line (&requested, "b"), public) ?;
+      assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
+      assert! ( saved . lines () . any ( |line| is_restricted_line_of (line, "b") ),
+                "the restricted viewnode is drawn again:\n{}", saved );
+      Ok (( )) } ) }
+
+/// r forks e and hides hpriv by records in its public file; hpriv is
+/// homed in "private". Under "public" the folder of what r hides
+/// outside its forkees shows hpriv as a restricted viewnode. Deleting
+/// that line unhides nothing: r still hides hpriv, and the save's
+/// rerender draws the restricted viewnode again.
+#[test]
+fn deleting_a_restricted_viewnode_from_the_hidden_outside_folder_unhides_nothing (
+) -> Result<(), Box<dyn Error>> {
+  under_public (
+    &[ ("r", "pid: r\ntitle: r\nforks:\n- e\nhides:\n- hpriv\n"),
+       ("e", "pid: e\ntitle: e\n") ],
+    &[ ("hpriv", "pid: hpriv\ntitle: hpriv\n") ],
+    |f, public| {
+      let files_before : BTreeMap<String, String> = skg_files (f) ?;
+      let requested : String = forks_folder_requested (f, public) ?;
+      assert_eq! ( members_of_the_hidden_outside_folder (&requested), vec! ["hpriv"] );
+      assert! ( requested . lines () . any ( |line| is_restricted_line_of (line, "hpriv") ),
+                "hpriv stands there as a restricted viewnode:\n{}", requested );
+      let saved : String = save (
+        f, &without_restricted_line (&requested, "hpriv"), public) ?;
+      assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
+      assert_eq! ( members_of_the_hidden_outside_folder (&saved), vec! ["hpriv"],
+                   "the restricted viewnode is drawn again" );
+      Ok (( )) } ) }
+
 //
 // The fixture and the operations
 //
@@ -246,6 +295,23 @@ fn without_member_line (
 ) -> String {
   edit_line ( view, &format! ("**** (skg folded node (gnid {})", gnid), |_| String::new () )
     . lines () . filter ( |line| ! line . is_empty () )
+    . map ( |line| format! ("{}\n", line) ) . collect () }
+
+/// Whether 'line' is the restricted viewnode standing for 'gnid'.
+fn is_restricted_line_of (
+  line : &str,
+  gnid : &str,
+) -> bool {
+  line . contains ( &format! ("restricted (gnid {})", gnid) ) }
+
+/// 'view' without the line of the restricted viewnode standing for
+/// 'gnid'.
+fn without_restricted_line (
+  view : &str,
+  gnid : &str,
+) -> String {
+  view . lines ()
+    . filter ( |line| ! is_restricted_line_of (line, gnid) )
     . map ( |line| format! ("{}\n", line) ) . collect () }
 
 /// 'view' with a new member, n, first in the hidden-outside folder.

@@ -581,7 +581,13 @@ the edits of the hidden-outside folder, which run last. So:
 - deleting a mutual ends N's fork of it and hides it;
 - detaching a mutual ends N's fork of it only: it stands as a
   forker, claiming nothing;
-- attaching a forker-only member makes N fork it: a mutual.
+- attaching a forker-only member makes N fork it: a mutual;
+- deleting a restricted viewnode (a member whose node the skgrepo
+  restriction keeps out), from the forks folder or the hidden-outside
+  folder, changes no relationship to the note it stands for: the
+  save leaves the forks and hides involving it as they are, and the
+  rerender draws it again ('preserve_invisible_members' in
+  'supplement_from_disk.rs', and the two steps above).
 The hidden-outside folder's membership reads N's forkees' content
 only; plan 2 ('TODO/every-mirror/2_plan.org', decision 8) makes N's
 hides apply to what it shows of its forkers too, and that folder's

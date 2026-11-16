@@ -304,6 +304,17 @@ impl InRustGraph {
   ) -> bool {
     self . gnid_presence_gated (gnid, restriction) == GnidPresence::Present }
 
+  /// Whether the graph has the node 'gnid' names and the skgrepo
+  /// restriction keeps it out ('gnid_presence_gated' answers
+  /// 'Restricted'): where a visible record names it, the view draws a
+  /// restricted viewnode.
+  pub fn node_is_restricted (
+    &self,
+    gnid        : &ID,
+    restriction : &SkgrepoRestriction,
+  ) -> bool {
+    self . gnid_presence_gated (gnid, restriction) == GnidPresence::Restricted }
+
   /// Stored outbound members for one relationship whose relRepo the
   /// skgrepo restriction shows ('outbound_rel_partners_for_relation').
   pub fn outbound_rel_partners_for_relation_gated (
