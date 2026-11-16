@@ -17,6 +17,12 @@ under "Scope", says where each of its preconditions is met.
 Each names the slices it affects and the answer they will follow
 ("provisional") unless Jeff gives another.
 ** Q1. A perspective's skgrepo list
+*** Settled by Jeff (2026-11-16): most private first
+A perspective's list is its owner's skgrepos most private first (the
+reverse of the config's owned order), then every other skgrepo in the
+config's declaration order. This replaces the provisional answer
+below. A third author's mirror may stand in for a note when the
+perspective's owner has none (Jeff: "yes good").
 Slices 2 and 3. Jeff's rule (decision 4, quoted under "Agreed
 behavior") ranks mirrors by "my list of skgrepos". Which list is it,
 for a perspective whose owner is O?
@@ -47,6 +53,7 @@ owned chain D (private) forks C (public) forks N (foreign) will show C,
 not D. The alternative is to rank an owner's own skgrepos most private
 first. Jeff's "(my X, my Y, your X, your Y)" does not say which X is.
 ** Q2. Which notes are a note's mirrors
+*** Settled by Jeff (2026-11-16): as provisional, transitive in both directions
 Slices 2 and 3.
 *** Provisional
 The mirrors of N are N and every note joined to N by a path of
@@ -100,6 +107,7 @@ visible overriders of each original drawn where substitution acts; it
 will take the owners of every visible mirror of each such original.
 The root authors' perspective stays the default of a fresh view.
 ** Q5. A skgrepo the server meets in the old format
+*** Settled by Jeff (2026-11-16): as provisional; everything is migrated at once
 Slice 5. No dual reading ('coding-advice/no-legacy-support.org').
 *** Provisional
 A worktree '.skg' file holding a top-level key 'subscribesTo' or
@@ -139,6 +147,16 @@ would more often be an accident. A deliberate second fork is made by
 listing the note in an owned note's forks folder (claiming), which nothing
 refuses.
 ** Q7. A note forking itself
+*** Settled by Jeff (2026-11-16), and widened
+As provisional, and more: "Also self-containment would be silly, and
+self-hide. Self-link is okay though." So a save that leaves an owned
+note containing itself, or hiding itself, is refused too, by the same
+check ('SelfContains', 'SelfHides' beside 'SelfFork'; neither has a
+rule today), and the nodeMerge drops the merged note's own IDs from
+its 'hides' as it does from 'contains' and 'forks'. A link to itself
+stays legal. No note in any skgrepo either server reads contains,
+hides, subscribes to or overrides itself today (counted read-only by
+file pid), so the migration meets none.
 Slice 3. Today an owned self-override is refused as a one-node
 'OwnedOverrideCycle' ('validate_override_invariants', via
 'resolve_override', which meets the input again). Removing the cycle
@@ -210,15 +228,19 @@ becomes 'perspective', its sidecar key 'overrides_followed' becomes
 'server/dbs/in_rust_graph/mirrors.rs' for 'override_resolution.rs';
 'substitute_mirrors' for 'substitute_overriders'.
 ** Q10. Renaming 'hidesFromSubs' (new)
+*** Settled by Jeff (2026-11-16): the new name is 'hides'
+"let's just go with hides. The five-character word." Everywhere this
+plan said 'hidesFromForks' it now says 'hides', and
+'NodeRelation::Hides'; Q10 holds.
 Slices 1, 5 and 7. Decision 8 makes a note's hides apply to what it
 shows of every fork partner, its forkers' content as well as its
 forkees'; "Subs" (subscriptions, the forkee side) would then lie.
 *** Provisional
-Rename it 'hidesFromForks' ("hides from its forks", both directions):
+Rename it 'hides' ("hides from its forks", both directions):
 the key in '.skg' files in slice 5, where the migration already
 rewrites every file (the tool renames the key from slice 1 on; 10 files
 hold it: 3 in 'data/claude/public', 7 in 'data/jeff/public'), and
-'NodeRelation::HidesFromForks', the relation name on the wire and in
+'NodeRelation::Hides', the relation name on the wire and in
 'shared/relations.json', and every code name in slice 7. The hider and
 hidden folders keep their atoms; their labels become "It hides these
 from its forks." and "These hide it from their forks." 'hidesFromSubs'
@@ -360,7 +382,7 @@ is met here:
 *** 1. One relation, 'forks'; the hides relation keeps its meaning, maybe renamed
 Slice 5 (files, graph, 'NodeRelation', 'shared/relations.json', the
 wire's relation keys); slice 6 (the folder and request names). The
-hides relation is renamed 'hidesFromForks' if Q10 holds (slices 5 and
+hides relation is renamed 'hides' if Q10 holds (slices 5 and
 7); plan 2 carries the change of what it applies to (decision 8).
 *** 2. One forks folder; the override folders go
 Slice 4 deletes the override folders; slice 6 makes the subscribee and
@@ -475,7 +497,7 @@ forked by it.
 ** retired keys (coined)
 'subscribesTo' and 'overrides' as top-level '.skg' keys, and their
 predecessors 'subscribes_to' and 'overrides_view_of'.
-** hidesFromSubs, maybe 'hidesFromForks'
+** hidesFromSubs, maybe 'hides'
 Q10. Until slice 5 the plan says 'hidesFromSubs'; after it, the name
 Q10 settles.
 ** false friends: not this plan's words
@@ -1268,7 +1290,7 @@ a view shows must not change unless a slice's behavior says so.
 * Implementation sequence
 ** TODO Slice 1: the one-time migration tool
 Questions: Q7 (self-forks dropped), Q10 (if it holds, the tool also
-renames the key 'hidesFromSubs' to 'hidesFromForks', and counts it).
+renames the key 'hidesFromSubs' to 'hides', and counts it).
 - 'tools/migrate-forks-2026-11/migrate.py' as behavior 2 says, with
   'README.org': what it does, the counts of behavior 2 for Jeff's and
   Claude's skgrepos, the commit line, and the order of the
@@ -1414,7 +1436,7 @@ fixtures' migration; the clients and the AI tool.
   'subscribesTo' is), decomposition and invariants; the retired-key
   refusal where behavior 2 says, with its report; the per-file
   collection in 'read_skg_sections_from_folder' for this error. If
-  Q10 holds, the hides field reads and writes the key 'hidesFromForks'
+  Q10 holds, the hides field reads and writes the key 'hides'
   and 'hidesFromSubs' is a retired key; the field and the relation keep
   their code names until slice 7.
 - The graph: relmap 'forkers_of'; 'NodeRelation::Forks' with roles
@@ -1539,8 +1561,8 @@ precondition 3.
   'hidden_outside_of_subscribees', 'subscriber_from_disk' and kin, the
   pitfall's "The save's subscription names") in the forkee, forker and
   fork-partner vocabulary.
-- If Q10 holds: 'hidesFromSubs' as 'hidesFromForks' and
-  'NodeRelation::HidesFromSubs' as 'NodeRelation::HidesFromForks'
+- If Q10 holds: 'hidesFromSubs' as 'hides' and
+  'NodeRelation::HidesFromSubs' as 'NodeRelation::Hides'
   everywhere (133 files held the name on 2026-11-16), with the wire's
   relation key, 'shared/relations.json', the clients and the AI tool;
   the hider and hidden folders' labels.

@@ -183,7 +183,7 @@ Plan 1's "What plan 2 needs from this plan" says where each is met.
    wire, 'NodeRelation' and 'shared/relations.json'. The hides relation
    keeps its meaning ("hides from what it forks") until this plan
    widens it (decision 8, slice 4), under the name plan 1's Q10 gives
-   it ('hidesFromSubs' or 'hidesFromForks'; this plan writes
+   it ('hidesFromSubs' or 'hides'; this plan writes
    'hidesFromSubs').
 2. One partner folder of 'forks', 'Folder::Forks' (atom 'forksFolder'),
    replaces today's 'Folder::Subscribee' and 'Folder::Subscriber'; the
