@@ -102,8 +102,8 @@ parent reads claims: one that another view's save removed from its
 parent's content, say. A member that one view's save added is drawn
 into every other view that shows its list, as a fresh view draws its
 members: editable where no other occurrence of its node is and the
-node budget allows, and then with its forks folder when it has a
-fork partner, either way, the skgrepo restriction shows. A headline
+node budget allows, and then, unless it is a member of a forks
+folder, with its forks folder when it has a fork partner, either way, the skgrepo restriction shows. A headline
 standing for a node the save deleted vanishes from every content
 view, with whatever stood under it; in the diff view it becomes the
 node's ghost.
@@ -198,8 +198,9 @@ are bumped in the ranking via their prominence multiplier.
 The hits come best first, each a write-protected headline showing
 its node's title. Under each hang, folded, its containers folder,
 whose members carry their own containers up to the roots, and,
-when there are any, its forks folder, the nodes it forks and those
-that fork it, each with its own containers folder. A hit found through an alias shows those
+when there are any, its forks folder, flat: the nodes it forks, those
+that fork it, then its other mirrors, each with its own containers
+folder. A hit found through an alias shows those
 folders collapsed and its alias folder open, holding all of the
 node's aliases, the matching one among them. The search buffer
 arrives whole, in one answer, and is an ordinary view.
@@ -376,8 +377,10 @@ will open a new view from the ID it finds there,
 or go to the content view of it that was already open if that exists
 (a buffer of the diff view does not count: the node gets a new view).
 
-The requested node itself is always the raw root. Recursive content
-below it can still use mirror substitution. Fork facts remain
+The requested node itself is the root, as itself: a fresh view is
+drawn from the root homes, where the root's own skgrepo decides. A
+perspective switch (=C-c v o=) may show another mirror there.
+Content below it substitutes. Fork facts remain
 visible in its heralds (the K token).
 
 If you're not sure whether the cursor is on something visitable
@@ -624,7 +627,7 @@ makes those children its content again.
 Called on a node that is already editable,
 it extends the node's content editable,
 up to 'initial_node_limit' extensions,
-and the forkees as such in its forksFolder too
+and the members as such in its forksFolder too
 (one an earlier server drew write-protected, say).
 A buffer may carry only one such request per node.
 It does not save; the request takes effect at the next save.

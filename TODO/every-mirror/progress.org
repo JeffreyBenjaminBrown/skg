@@ -4045,3 +4045,181 @@ The slice's headline in '3_plan.org' is DONE.
 - Test renamed: 'hidden_from_forks::test_moving_foreign_forkee_content_elsewhere_still_hides'
   is 'test_moving_foreign_forkee_content_into_another_owned_note_does_not_hide'.
   New: 'hides_by_integration::*'.
+** Slice 4: the sweep, and the record
+*** Commits
+- 64cd5e1c every-mirror plan 3 slice 4: a stale buffer does not hide
+  what a member set aside (the correction carried from slice 3)
+- 52d8edab every-mirror plan 3 slice 4: the diff view counts what a
+  member draws
+- 4871dae8 every-mirror plan 3 slice 4: comments and messages name
+  every member
+- (the commit carrying this record) every-mirror plan 3 slice 4: docs,
+  record, DONE
+*** Suites
+- The correction's tests first: the new
+  'members_as_such_and_stale_buffers::a_stale_buffer_does_not_hide_what_its_integrated_folder_showed'
+  and '...::a_stale_buffer_does_not_hide_again_what_another_view_unhid'
+  (each saves the stale view with an edit of M, then, afresh, of z).
+  Before the fix both failed: the edit of M was refused, "A node this
+  save would write changed after the buffer was rendered ... the
+  hides" (the baseline, extracted against the new graph, read the
+  child as cut, so M was a stale write). With the fix's collection
+  disabled they fail the same way; with it, both pass. One extraction
+  test, 'forkee_hiderel_intent_ignores_hidden_folder_contents', now
+  pins the new field (an expected adaptation; it gained a kept
+  child).
+- The new 'refresh::tests::diff_view::in_the_diff_view_a_member_counts_what_it_draws_kept_elsewhere_included'
+  fails without the count change ('(unintegrated 1)' where the member
+  draws two) and passes with it.
+- 'bash/nextest.sh': 1275 of 1275 after the correction, 1276 of 1276
+  after the count change. The AI tool's tests (after 'cargo build
+  --bin skg'): PASS after the correction.
+- 'bash/integration-tests.sh': 78 of 78 (both clients), first run.
+- 'bash/all-tests.sh', first run, after the sweep's edits: all pass:
+  Emacs 503 of 503, Neovim pass, nextest 1276 of 1276, doctests, team
+  tools, AI reader, integration 78 of 78. Only docs and this record
+  changed after it.
+- No failure needed classifying but the expected adaptation above.
+- End to end, per '/verify', on 'target/debug/skg' as the full run
+  built it, scratch data under '/tmp/claude-1000/every-mirror-p3-slice4/':
+  - The correction (port 27851, the fixture of
+    'tests/hides_by_integration.rs'): two connections. The first opens
+    M (a in x's folder of what the user keeps elsewhere); the second
+    removes a from y; the first, stale, saves M retitled: saved, no
+    "Left as the graph has it", M retitled and hiding nothing. Then
+    the first cuts c (M hides c, c in x's hidden-in folder), the
+    second unhides c from its own view of M, and the first, stale,
+    saves z retitled: saved, no warning, M hides nothing.
+  - The final check (port 27852): plan 2's forks-meet data
+    ('tests/integration/forks-meet/data/main') with a foreign skgrepo
+    "theirs" added, holding Q ("Q, a lantern"), which forks N and
+    contains X4 and W. R's view: one forks folder, flat, N (forkee),
+    then T and Q (indirect, claiming nothing, by home); N keeps X1 to
+    X3 in its folder of what the user keeps elsewhere and shows X4;
+    saved unchanged, nothing written. Cutting X4 from N: R hides X4
+    ("Hides 'X4' from 'R', as content of 'N' and 'Q, a lantern'."),
+    X4 in N's hidden-in folder. Moving Y from T under R's own X1: X1
+    contains Y, R forks T and hides nothing new, Y stands in T's
+    folder of what the user keeps elsewhere; saved unchanged, nothing
+    written. Shelf's view (root homes): N as itself; "next": "skgrepo
+    theirs", Q in N's place; "next": the root homes (main passed
+    over); "owner of theirs" refused. A search for "lantern": the hit
+    Q with one flat forks folder (N, R, T), nothing nested.
+  Each server was stopped by its PID, its port checked free, the
+  scratch data deleted; transcripts in
+  '/tmp/claude-1000/every-mirror-p3-slice4/transcript/' (stale.txt,
+  forks-meet.txt), the driver scripts beside them in 'scripts/'.
+Logs: 'tests/results/every-mirror/slice4-plan3/'
+(correction-test-before-fix.log, correction-test-without-fix.log,
+correction-test.log, nextest-correction.log, ai-tool-correction.log,
+diff-count-test.log, nextest-diff-count.log, integration.out, and the
+full run's all-tests.out, all-tests-ALL.org and all-tests-*.log).
+'tests/results/every-mirror/' was copied out before 'bash/all-tests.sh'
+and put back after it.
+*** Deviations from the plan's "how"
+**** The correction: what the buffer sets aside is carried by the signals
+Each visibility signal ('ForkeeVisibility', 'ForkerVisibility') now
+carries 'in_kept_or_hidden_folder': the members the buffer shows in the
+member's integrated-elsewhere and hidden-in folders
+('members_of_kept_and_hidden_folders' in 'traverse.rs'). The
+forkee-visibility step leaves them out of what the view drew, the
+forker-visibility step out of what was cut, and the conflict check
+skips them. The graph's reading stays too: a child is set aside if
+either says so.
+**** What the gap was, and the older one
+With a baseline (both clients), the stale save did not write the
+hide: the baseline, extracted against the new graph, read the child
+as cut too, so the note was a stale graphnode, and the save either
+left it as the graph has it with a spurious warning (an edit
+elsewhere) or refused (an edit of the note itself). Without a baseline
+(skg-for-ai's default, the empty one) the hide was written. The same
+reading closes the older gap for hides another view removed: the
+second test pins it, and it behaved the same way before the fix.
+**** A consequence: moving a child into those folders by hand hides nothing
+Both folders are write-protected displays, and no doc names moving a
+content child into one as a gesture; before, such a move read as a
+cut and hid the child. Now it reads as set aside: nothing is hidden,
+and the redraw puts the child back among the member's content. The
+buffer cannot tell that move from a stale view.
+**** The diff view's count
+Made to agree with the drawing rather than listed in 'TODO/problems.org':
+'set_viewnodestats_in_viewforest' takes 'is_diff_view' (the tail passes
+'Walk::is_diff_view'), and 'content_goal_gnids' takes
+'kept_elsewhere_counts', false there.
+**** The sweep was surveyed by four read-only agents, judged here
+The glossary, forks.org, mirrors.org, sharing-model.org and
+data-model_friendly.org were read whole by survey agents, the other
+docs and the plan-3 code files by grep and context; each hit was
+judged and edited here. Edited: 'docs/glossary.org' (the relation
+entry, partner folder, compound partner folder, mirror, clone, the
+chain as drawn, forker as such, cut, the forkee-visibility step,
+hiderel, what a member shows), 'docs/forks.org' (the egg examples drew
+the forks folder beside the clone, not under it; the "Cutting from a
+forker" After view lacked y in theirs' kept folder; several "hides"
+without the owned-note exception; a paragraph on stale views),
+'docs/mirrors.org' (direct visits are no longer "raw"; the one-level
+rule's positions), 'docs/sharing-model.org', 'docs/data-model_friendly.org',
+'docs/data-model_technical.org', 'docs/api-and-formats.org' (a fresh
+view's root is no longer "raw", its children substitute; indirect
+members in the hide report, the hidden-outside folder and the
+removal inference; the set-aside rule), 'docs/heralds.org' (the
+'(unintegrated)' count), both COMMANDS docs (a search hit's flat
+folder; the root; a member added elsewhere draws no forks folder; C-c
+s e passes to every member as such), the AI tool's README (a cut's
+exception). Citations of 'docs/glossary.org', "hides", now name the
+entry it lives under.
+**** The grep the plan names
+'git grep -n -i -E "root author|RootAuthors|Perspective::Owner|owner of"'
+over server, elisp, nvim, tools/skg-for-ai, tests, shared and docs
+(Jeff's two essays left out) leaves these, each kept:
+- 'docs/api-and-formats.org' 1433, 'tools/skg-for-ai/README.org' 531,
+  'skg_for_ai.py' 948, 'test_skg_for_ai.py' 182-189,
+  'server/serve/handlers/save_buffer.rs' 1469,
+  'tests/mirror_substitution.rs' 1166 and 1214: the old names, listed
+  as refused (or, in skg-for-ai's sidecars, read as the default).
+- 'docs/telescopes.org' 194, 'server/telescope/types.rs' 113-114: the
+  owner of a skgrepo's sections, not a perspective.
+No "nested" forks-folder wording remained anywhere.
+**** TODO/problems.org
+No entry there was one this plan fixed, so none moved. Added: "A
+fork's creation-time hides ignore what the user keeps elsewhere"
+(slice 3's unfinished item) and "The hidden-outside save's notice
+checks forkees only" (found by the sweep:
+'post_skgsave_commit_hiddenoutside_warnings' asks the note's forkees,
+not its forks folder's members). The entry "A stale-buffer warning
+names the note when only its forker changed" gained a note: this
+slice fixed its sibling case, a child set aside in a member's folder;
+a child added to the member since the buffer was drawn still reads as
+cut.
+**** Left as worded
+The forks folder's label "It forks these, or these fork it."
+('server/heralds.rs', copied in 'skg_for_ai.py') does not cover
+indirect members; labels are Jeff's to reword (decision E). The test
+file header of 'members_as_such_and_stale_buffers.rs', which names
+the correction's tests, landed in the count commit (52d8edab).
+*** Fixtures changed
+None. The new stale-buffer tests reuse 'tests/hides_by_integration/fixtures/'
+through 'fixture_from' (copied to a temporary folder); the diff-view
+count test builds its graph in memory.
+*** Unfinished
+- The label above, for Jeff.
+- The two new 'TODO/problems.org' entries.
+- The plan's review ("Verification and completion": a terms agent and
+  a probe agent) is the orchestrator's.
+*** DONE
+The slice's headline in '3_plan.org' is DONE; plan 3's four slices
+are DONE.
+*** Names coined or changed
+- New field 'in_kept_or_hidden_folder' on 'ForkeeVisibility' and
+  'ForkerVisibility'; new 'members_of_kept_and_hidden_folders'
+  ('traverse.rs').
+- New parameter 'is_diff_view' on 'set_viewnodestats_in_viewforest'
+  (and its recursion and 'set_herald_strings_in_viewnode');
+  'content_goal_gnids' takes 'kept_elsewhere_counts'.
+- Tests: 'members_as_such_and_stale_buffers::a_stale_buffer_does_not_hide_what_its_integrated_folder_showed',
+  '...::a_stale_buffer_does_not_hide_again_what_another_view_unhid'
+  (with the helper 'integration_fixture'),
+  'refresh::tests::diff_view::in_the_diff_view_a_member_counts_what_it_draws_kept_elsewhere_included'.
+- Terms: "set aside" (of a child the buffer shows in a member's
+  integrated-elsewhere or hidden-in folder: not cut), in the glossary's
+  "cut" entry and 'docs/forks.org'.

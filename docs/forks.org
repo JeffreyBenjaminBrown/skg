@@ -97,8 +97,9 @@ you own. =C=:
   [[file:./mirrors.org][mirrors.org]], "Mirror substitution");
 - *hides* any child of =N= that your forking edit /deleted/, so what
   you dismissed does not come straight back as unintegrated forked
-  content (below). Later deletions from =C= hide likewise — see
-  "Editing the clone", below.
+  content (below). Later deletions from =C= hide likewise, unless
+  another note of yours keeps the child — see "Editing the clone",
+  below.
 
 =C='s skgrepo is the one the confirmation flow settles on: specified by
 your edit, or picked at the prompt (see above). When nothing specified
@@ -194,11 +195,11 @@ instead, marked as standing in for the original:
 ,* mysticism                         (yours)
 ,** common objects with mystical associations
 ,*** eggy mysticism      «Kĥ» (shown in place of Egg Man's "mystical")
+,**** forksFolder
+,***** mystical          (the forkee as such; no content so far)
+,****** ☮ It contains these, and you keep them elsewhere.
+,******* Which came first, the chicken or the egg?   (folded)
 ,**** Which came first, the chicken or the egg?
-,*** forksFolder
-,**** mystical           (the forkee as such; no content so far)
-,***** ☮ It contains these, and you keep them elsewhere.
-,****** Which came first, the chicken or the egg?   (folded)
 #+end_example
 
 When Egg Man later extends =mystical=:
@@ -216,13 +217,13 @@ forkee as such:
 
 #+begin_example
 ,*** eggy mysticism      «Kĥ»
+,**** forksFolder
+,***** mystical
+,****** ☮ It contains these, and you keep them elsewhere.
+,******* Which came first, the chicken or the egg?   (folded)
+,****** Egg limpia (curanderismo)     (unintegrated)
+,****** The philosophical egg         (unintegrated)
 ,**** Which came first, the chicken or the egg?
-,*** forksFolder
-,**** mystical
-,***** ☮ It contains these, and you keep them elsewhere.
-,****** Which came first, the chicken or the egg?   (folded)
-,***** Egg limpia (curanderismo)     (unintegrated)
-,***** The philosophical egg         (unintegrated)
 #+end_example
 
 Since [[file:./tree-folding-is-powerful.org][branches can be folded]], even
@@ -254,10 +255,13 @@ put it.
 
 An indirect member is treated as a forker-only member is: it claims
 nothing; it shows what your note neither contains nor hides of its
-content; deleting it from the folder hides it in your note, and it
+content, and no other note of yours contains (see "What you keep
+elsewhere"); deleting it from the folder hides it in your note, and it
 stands then in the folder of what your note hides outside its fork
 partners, where removing it unhides it; cutting a child from it makes
-your note fork it and hide the child (see "Cutting from a forker");
+your note fork it and hide the child, unless your note, or another
+note of yours, keeps the child after the save (see "Cutting from a
+forker");
 and its heralds have no =b= flag toward your note, since it neither
 forks your note nor is forked by it. Every member explains a hide
 alike: a hide of something only an indirect member contains stands
@@ -323,9 +327,17 @@ but 'z' keeps it."). A cut from a member claiming nothing still makes
 your note fork it (see "Cutting from a forker"), whether or not it
 hides anything ('tests/hides_by_integration.rs').
 
+A child the saved buffer shows in a member's folder of what you keep
+elsewhere, or of what your note hides in it, was not cut from the
+member. That matters for a stale view: after another view stopped
+keeping the child (or unhid it), the graph says the member shows it,
+and the view still shows it set aside; the save reads it as the view
+shows it, hides nothing, and writes nothing of your note for it
+('tests/members_as_such_and_stale_buffers.rs').
+
 The diff view keeps its forks folders as they were: a member there
-shows what you keep elsewhere among its content, and no such folder
-is drawn. A buffer drawn before this rule shows such children under a
+shows what you keep elsewhere among its content, and counts it among
+what it shows ('(unintegrated N)'), and no such folder is drawn. A buffer drawn before this rule shows such children under a
 member, claiming; the next refresh leaves them out, and a save of it
 before then hides nothing it did not draw.
 
@@ -381,8 +393,8 @@ save is refused ('server/serve/handlers/save_staleness.rs').
 
 A note that forks yours stands in your note's forks folder too, as a
 /forker as such/, claiming nothing, showing what it adds to your
-note: its content less what yours contains or hides; so does an
-indirect member (see "Every mirror, flat"). Cutting a child
+note: its content less what yours contains or hides, and less what
+another note of yours contains; so does an indirect member (see "Every mirror, flat"). Cutting a child
 from it (deleting the child's headline there, whether or not you
 paste it elsewhere) makes your note fork it: a forker as such that a
 cut is made from becomes a forkee too. Your note hides
@@ -405,6 +417,8 @@ nothing; theirs is a mutual, claiming, among the forkees:
 ,* x                    (yours, editable)
 ,** forksFolder
 ,*** x                  (theirs, bKb)
+,**** ☮ It contains these, and you keep them elsewhere.
+,***** y                (folded)
 ,**** z
 ,** y
 #+end_example
@@ -501,7 +515,7 @@ the forker claimed nothing, ends the fork, as any detachment does.
 ** Editing the clone: deletions become hides
 
 Suppose the clone =C= and the original =N= both contain a child =X=,
-and you delete =X= from =C= (or move it elsewhere). Without more, =X=
+and you delete =X= from =C= (or move it out of your notes). Without more, =X=
 would immediately resurface under =C= as unintegrated forked
 content — you removed it, =N= still contains it. So the save records a
 hide: =C= now =hides= =X=, and the forks folder
@@ -520,15 +534,16 @@ hides =X= there too ("Hides 'X' from 'C', as content of 'F'."), and
 not in the folder of what =C= hides outside its fork partners. A
 forker =C= hides is drawn nowhere, so it explains no hide; the floor
 of a hide's privacy still counts its records, since a reader of the
-hide sees them all the same ('docs/glossary.org', "hides").
+hide sees them all the same ('docs/glossary.org', "hides" under
+"relation, relationship, member, membership, partner").
 
 A removed child stands for the member of =N='s contents that is its
 mirror (=docs/mirrors.org=, "Mirrors"). If =N= contains =X= and
 someone forked =X= into =X'= (=X'= forks =X=), =N='s contents
 still name =X=, as every container's do; =X'= is shown in its place
 only where the perspective ranks it first. So removing =X'= from
-=C= hides =X=, just as removing =X= would, unless =C= still contains
-=X=. That is how you dismiss the author's reply under a note of yours:
+=C= hides =X=, just as removing =X= would, unless =C=, or another
+note of yours, contains =X= after the save. That is how you dismiss the author's reply under a note of yours:
 the reply is the author's fork of your note, so place it in =C=,
 save, remove it and save again. Containing =X'= does not integrate
 =X=, though: while =C= holds =X'=, =X= still shows as unintegrated, and
@@ -556,11 +571,13 @@ list keeps =N=, the save asks to fork nothing, and the redrawn view
 shows in that place the mirror of =N= that perspective now ranks
 first: =N= again, unless another fork of it ranks before =N=. (Not in a forkee's content in a
 forks folder, the list of what a note of yours has not integrated:
-there the deletion hides =N= from your note, as below.)
+there the deletion hides =N= from your note, as below, unless another
+note of yours keeps it.)
 
 Under a note of your own, deleting =C= where it is drawn in =N='s
 place takes =N= out of your note as well, and, where your note
-forks =N='s container, hides =N= from it: there the list is
+forks =N='s container, hides =N= from it, unless another note of yours
+keeps =N=: there the list is
 yours to change, and the deletion is read as the removal of =N= too.
 To keep =N= in your note, delete =C= from a view where it is not drawn
 in =N='s place, such as a view of =C= itself.

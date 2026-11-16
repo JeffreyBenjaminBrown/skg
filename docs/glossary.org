@@ -234,8 +234,9 @@ As in TypeDB, a *relation* is a kind of relationship: =contains=,
 =linksTo=, =forks=, =hides=. Each names its two roles:
 container contains content, mentioner linksTo mentioned, forker forks
 forkee, hider hides hidden. A forks B says two things: A shows
-B's content that A neither contains nor hides (see "forkee as
-such"), and A and B are mirrors (see "mirror"). =hides= means
+B's content that A neither contains nor hides, nor the user keeps in
+another note of theirs (see "forkee as such" and "integrated"), and A
+and B are mirrors (see "mirror"). =hides= means
 "hides from its forks": the hider keeps the hidden node out of what
 it shows of every member its forks folder shows, a note it forks, one
 forking it, or an indirect member, that it does not hide
@@ -420,8 +421,9 @@ skgrepo gesture ('skg-set-repo' with =C-u=, =C-u C-c s s=;
 Recall that viewnodes and graphnodes are distinct.
 Some viewnodes correspond to individual graphnodes.
 Other viewnodes mediate a relationship between their parent and their children.
-For instance, a 'forks folder' viewnode contains its parent's fork
-partners, the nodes its parent forks and those that fork it:
+For instance, a 'forks folder' viewnode contains its parent's
+mirrors: the nodes its parent forks, those that fork it, and those
+joined to it only through other mirrors:
 #+begin_example
   * note
   ** forks folder
@@ -458,9 +460,10 @@ recorders that record its parent; for forking, one folder lists both:
    ordinary viewchildren.
 2. A mentionedFolder would be silly: the links are already visible in
    the node's own text.
-3. One folder, 'Folder::Forks', holds the note's *fork partners* (the
-   nodes it forks, and the nodes that fork it), each once, whichever
-   roles it plays: see "the forks folder".
+3. One folder, 'Folder::Forks', holds every mirror of the note, each
+   once: its *fork partners* (the nodes it forks, and the nodes that
+   fork it), whichever roles each plays, and its indirect members: see
+   "the forks folder".
 
 The four compound partner folders (see "compound partner folder")
 each join several relationships -- forking, containment, and hiding:
@@ -473,7 +476,7 @@ each join several relationships -- forking, containment, and hiding:
 - a *hiddenByForkerFolder*, under a forker as such, lists what
   that forker hides of the note's content;
 - a *hiddenOutsideOfForkPartnersFolder*, last in a forks folder, lists
-  the nodes its parent hides that no fork partner the folder shows
+  the nodes its parent hides that no member the folder shows
   contains, a forker it hides among them.
 
 The diff view adds two more, for nodeMerges since HEAD:
@@ -559,8 +562,9 @@ does is in 'docs/data-model_technical.org', "The forks folder".
 A compound partner folder is a partner folder whose membership joins
 more than one relationship, as against the ordinary partner folders,
 which read one relation role. There are four. Three join three
-nodes -- a note N, a fork partner S and a hidden node H -- by "N
-forks S" or "S forks N", by a hide of H, and by a containment of H.
+nodes -- a note N, a member S of N's forks folder and a hidden node
+H -- by S's membership there (N forks S, S forks N, or S is a mirror
+of N through others), by a hide of H, and by a containment of H.
 The fourth, the *integrated-elsewhere folder*
 (=integratedElsewhereFolder=, label "☮ It contains these, and you
 keep them elsewhere."), stands under S where S is a member as such of
@@ -732,7 +736,7 @@ its integrated-elsewhere folder (see "compound partner folder"). For
 a forker that is what it adds to N; one that adds nothing shows
 nothing but its folders. In the diff view, which draws no
 integrated-elsewhere folder, a member shows its content less what N
-contains or hides alone.
+contains or hides alone, and its '(unintegrated COUNT)' counts that.
 
 *** integrated, the user's graph, kept elsewhere
 
@@ -756,12 +760,14 @@ redundant is kept, and stands in the hidden-in folder
 
 A forker as such is drawn as a forkee as such is: in a content view,
 under an editable N, editable unless it is a repeat or the budget is
-spent, with its own default folders, and an editable-view request on
+spent, with the default folders of a member as such (no forks folder
+unasked), and an editable-view request on
 N passes to one standing write-protected. Under it stand the folder
 of what N hides in it and, where it forks N, the folder of what it
 hides of N's content (see "compound partner folder"). The save reads it as it reads a
 forkee as such, never as its whole list: an absent child is one N
-contains or hides, never removed from the forker. Its title and body
+contains or hides, or the user keeps elsewhere, never removed from the
+forker. Its title and body
 are saved when the user owns it, and refused when it is foreign; a
 child placed under it (typed, or moved there) joins its content when
 the user owns it, and is refused otherwise; its delete, nodeMerge and flag requests are
@@ -811,7 +817,11 @@ To *cut* a child from a member as such (a forkee or forker as such) is
 to delete its headline from under the member and save, whether or not
 it is pasted elsewhere. A cut child is one the member's list names,
 and the view showed there, that the buffer no longer shows claiming
-under it. The member's own list never changes: a cut edits the note
+under it, nor in the member's folder of what the user keeps elsewhere
+or of what the note hides in it: a stale buffer may still show a child
+there after another view stopped keeping it, or unhid it, and the
+save reads that child as set aside, not cut. The member's own list
+never changes: a cut edits the note
 whose forks folder holds the member. A cut from a forkee hides the
 child in the note unless the note, or a note of the user's graph but
 the member, contains it after the save (see "integrated" and "the
@@ -830,9 +840,11 @@ the save that, for a forkee as such shown editable under its
 forker (the note that forks it), reads what the buffer shows of
 the forkee's content and rewrites the forker's hides to match: content shown there,
 claiming, is unhidden, and content the view drew there (what the
-forker neither hid nor integrated before the save, by the graph) and
-no longer shows, which neither the forker nor an owned note but the
-forkee contains after the save, is hidden ('resolve_visibility' in
+forker neither hid nor integrated before the save, by the graph, and
+the buffer does not show in the forkee's folder of what the user
+keeps elsewhere or of what the forker hides in it) and no longer
+shows, which neither the forker nor an owned note but the forkee
+contains after the save, is hidden ('resolve_visibility' in
 'server/from_text/local_fieldintent_collection/resolve_visibility.rs').
 It reads the forkee's content and the forker's hides by the
 records the skgrepo restriction shows, as the view drew them, so a
@@ -1189,11 +1201,12 @@ counting down from its root, is the opposite direction.
 A *fork*, bare, is a note that forks another: a *fork of* N is a
 note that forks N (see "clone, and the fork operation" for the
 gesture that makes one, which is always "the fork operation", never
-bare "a fork"). A note's *forks*, as in "its forks" (the name of its
-forks folder), are its fork partners, either way: the notes it forks
-and the notes that fork it. So "its forks" is wider than "the forks
-of it"; where only one direction is meant, say "its forkees" or "its
-forkers", or "what it forks". The
+bare "a fork"). A note's *forks*, as in "its forks", are its fork
+partners, either way: the notes it forks and the notes that fork it.
+So "its forks" is wider than "the forks of it"; where only one
+direction is meant, say "its forkees" or "its forkers", or "what it
+forks". Its forks folder, named for them, holds its indirect members
+too ("the forks folder"). The
 *mirrors* of N are N and every note joined to N by a path of
 'forks' relationships, followed in either direction, every
 relationship's relRepo and every note's home skgrepo on the path shown
@@ -1561,10 +1574,11 @@ wherever N would appear, from the perspective of C's skgrepo, or of
 one that holds no mirror of N where C's is declared first). Children of N
 that the forking edit deleted become C's
 =hides=, and thereafter any child removed from
-an owned note's contains that some fork partner its forks folder
-shows still contains (a forkee, or a forker it does not hide) is
-hidden likewise on save, so that it does not come back under that
-partner (re-adding it unhides). The fork operation
+an owned note's contains that some member its forks folder shows
+still contains (a forkee, a forker it does not hide, or an indirect
+member) is hidden likewise on save, so that it does not come back
+under that member, unless another note of yours keeps it then (see
+"integrated"; re-adding it unhides). The fork operation
 refuses to fork a node you already fork, naming your fork of it:
 silently making a second clone would more often be an accident. A
 deliberate second fork is made by having another note of yours fork
@@ -2179,9 +2193,10 @@ own visit draws are drawn folded ('after_drawing' and
 'add_containers_folder_under_forks_folder_member' in
 'server/refresh/visit.rs', 'Walk::folders_whose_drawn_members_are_folded').
 Since the member was just drawn, the folder is its first child: an
-editable member's hidden-in folder, added at its visit, goes before
-it, and so does a forker's hidden-by folder, after the hidden-in
-folder; its forks folder and content go after it. A member that stood
+editable member's integrated-elsewhere folder, added at its visit,
+goes before it, then its hidden-in folder, then a forker's hidden-by
+folder; a forks folder, where one is asked for (=C-c l f=), and its
+content go after it. A member that stood
 in the buffer before, extended at its visit by an editable-view
 request (=C-c s e= on its note), gets the same folder there
 ('add_containers_folder_to_an_extended_member'). A member drawn into
@@ -2631,7 +2646,7 @@ into a more public telescope section. Hoist /moves/ text to home.
 
 A relationship of the relation =hides=, which a '.skg' file
 records under the key 'hides': the hider keeps the hidden node out of
-what it shows of its fork partners (see "relation, relationship,
+what it shows of every member of its forks folder (see "relation, relationship,
 member, membership, partner"). See [[file:./data-model_technical.org][the technical data model]] for the hiding
 relationship.
 

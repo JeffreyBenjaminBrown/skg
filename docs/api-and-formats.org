@@ -172,11 +172,11 @@ So far there are these endpoints:
     VIEW_ID))=, naming that view, and the client switches to its
     buffer; nothing is rendered. A node that is a root only of buffers
     of the diff view gets a new content view.
-  - The requested node opens as itself, shown raw. Because the raw root
-    is a node shown raw where another mirror could stand, its immediate children are also shown
-    raw (one level); substitution resumes at the grandchildren. See
-    "Mirror substitution" below. Fork facts can be inspected in
-    the heralds (the K token).
+  - The requested node opens as itself: the view's perspective is the
+    root homes, where the root's own home skgrepo decides, and there
+    the node stands as itself. Its content substitutes as any
+    content does. See "Mirror substitution" below. Fork facts can be
+    inspected in the heralds (the K token).
 
 ** Close view
   - Request: =((request . "close view") (view-id . "VIEW_ID"))=. Each
@@ -345,9 +345,9 @@ So far there are these endpoints:
        line each, in words the server chooses
        ('hide_report_lines' in 'server/from_text/hide_report.rs'):
        - =Hides 'M' from 'S', as content of 'E'.= for each member M
-         the save adds to note S's =hides=, naming each fork partner
-         E of S its forks folder shows (a note S forks, or a forker S
-         does not hide) whose content holds M (the clause is absent
+         the save adds to note S's =hides=, naming each member
+         E of S's forks folder (a note S forks, or a forker or an
+         indirect member S does not hide) whose content holds M (the clause is absent
          for a hide outside every such partner);
        - =Stops hiding 'M' from 'S', as content of 'E'.= for each it
          removes;
@@ -1744,7 +1744,9 @@ keeps elsewhere, write-protected, its members folded, each with a
 that forks the note its nonempty =hiddenByForkerFolder= (what it
 hides of the note's content), after them; a cut from either kind
 hides only what no note the user owns but the member contains after
-the save;
+the save, and a child the saved buffer shows in either of the first
+two folders is no cut, though the graph changed since the buffer was
+drawn;
 =hiddenOutsideOfForkPartnersFolder=, when nonempty, stands last in
 every =forksFolder= of a content view; emptied by a save, it goes
 from the redrawn view, as from a fresh one. Use a
@@ -2924,8 +2926,8 @@ unknown viewnode's does, but in the forks folder: there deleting a
 restricted viewnode changes no relationship to the note it stands
 for, so the save keeps N's fork of it, hides nothing, and the
 rerender draws it again. The folder of what a note hides outside its
-fork partners (the members its forks folder shows, forkees and
-forkers) replaces the hides with a visible record, each of which
+fork partners (the members its forks folder shows, forkees,
+forkers and indirect members) replaces the hides with a visible record, each of which
 it showed, as an occurrence or an unknown viewnode; a
 hide recorded in a restricted section is never replaced, and
 deleting a restricted viewnode there unhides nothing. Which hides
@@ -3007,9 +3009,9 @@ principle as follows.
     on record is any fork partner the graph has, whatever the skgrepo
     restriction, a forker the hider hides included: the floor asks
     who can read the hide, not what a view draws. Removals infer hides only from
-    what the set shows: the note's visible forks and forkers (less
-    the forkers it hides), their contents by visible records, and its
-    visible hides, so that re-adding a member drops no restricted
+    what the set shows: the note's visible forks, forkers and
+    indirect members (less those it hides), their contents by visible
+    records, and its visible hides, so that re-adding a member drops no restricted
     hide of it.
   - A fork copies into its clone only the records the set shows, each
     at the more private of its relRepo, when owned, and the clone's

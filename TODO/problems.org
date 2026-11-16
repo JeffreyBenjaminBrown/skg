@@ -6,6 +6,27 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* A fork's creation-time hides ignore what the user keeps elsewhere (2026-11-16)
+  Found by every-mirror plan 3, slice 3 (its record, "Unfinished").
+  'build_fork_clone' ('server/from_text/fork.rs') hides in the clone
+  every child the forking edit deleted, without asking whether the
+  same save puts that child in another owned note. Such a hide is
+  redundant (the child would stand in the forkee's folder of what the
+  user keeps elsewhere anyway) and harmless (it stands in the
+  hidden-in folder instead, and moving it out unhides it), but it is
+  the one hide the save still writes for a child the user keeps.
+* The hidden-outside save's notice checks forkees only (2026-11-16)
+  Found by every-mirror plan 3, slice 4's sweep.
+  'post_skgsave_commit_hiddenoutside_warnings'
+  ('server/serve/handlers/save_buffer.rs') says that a hide typed
+  into the folder of what a note hides outside its fork partners
+  "moved to HiddenInForkPartnerFolder" only when one of the note's
+  forkees contains the hidden node. Since every-mirror plan 2 a
+  forker-only member's content explains a hide too, and since plan 3
+  an indirect member's: a hide typed there of something only such a
+  member contains is drawn in that member's hidden-in folder, and the
+  save says nothing of the move. The check should read the folder's
+  members ('fork_partners_shown').
 * A stale-buffer warning names the note when only its forker changed (2026-11-16)
   Found by the probe pass of every-mirror plan 2 ('TODO/every-mirror/review-2-probes.org',
   observation of 35). Client A holds N's view, where R, a forker as
@@ -22,7 +43,11 @@
   as such's partial content is read against the member's list as it
   is now. Nothing is lost or made up; the warning and the refusal are
   wrong. A fix would read a member as such's cuts in the baseline
-  against what that baseline drew, not against the graph.
+  against what that baseline drew, not against the graph. (Every-mirror
+  plan 3, slice 4, did so for a child the buffer shows in the member's
+  folder of what the user keeps elsewhere, or of what the note hides
+  in it; a child added to the member since the buffer was drawn is
+  still read as cut.)
 * An opened view keeps the server's fold atoms as text (2026-11-12)
   'skg-open-org-buffer-from-text' ('elisp/skg-buffer.el'), which
   both the content view and the diff view open through, inserts the

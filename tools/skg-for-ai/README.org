@@ -1446,8 +1446,10 @@ folder, a forkee or a forker as such, is drawn editable under an
 editable node, unless the view already shows its node editable (a
 repeat); its title and body save when you own it, and a foreign
 one's are refused; a child removed from under it is hidden instead,
-and from under a forker the node also comes to fork it (see "Placing
-an existing node"); a headline typed under it, or an existing node
+unless the node, or another node you own, contains it after the save
+(moving it into a node of yours hides nothing), and from under a
+forker the node also comes to fork it (see "Placing an existing
+node"); a headline typed under it, or an existing node
 moved there, joins its content when you own it, and is refused under
 a foreign one.
 

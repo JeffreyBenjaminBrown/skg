@@ -25,7 +25,7 @@ derived text links.
 | =overPrivateText_telescope= | =bool= | True when the selected title or body came from a section below the home skgrepo.  Release decisions use this conservative folded fact. |
 | =aliases= | =MSV<RelPartner<String>>= | Search aliases and the skgrepo at which each is recorded. |
 | =contains= | =Vec<RelPartner<ID>>= | Ordered content children and each relationship's relRepo. |
-| =forks= | =MSV<RelPartner<ID>>= | Ordered nodes this node forks, with relRepos: their content it does not contain or hide shows under it, and each is its mirror.  Stored under the '.skg' key 'forks'. |
+| =forks= | =MSV<RelPartner<ID>>= | Ordered nodes this node forks, with relRepos: their content it does not contain or hide, and the user keeps in no other owned note, shows under it, and each is its mirror.  Stored under the '.skg' key 'forks'. |
 | =hides= | =MSV<RelPartner<ID>>= | Nodes suppressed when reached through what this node forks, with relRepos. |
 | =flags= | =Vec<Flag>= | Node flags: import provenance (=Had_ID_Before_Import=, =Was_Overloaded=) and behavior settings such as =NoSearchMatching=. |
 | =linksTo= | =Vec<ID>= on =GraphnodeInRust= | Outbound Org =id:= links parsed from title/body text.  Derived rather than serialized as a graph field. |
@@ -47,7 +47,7 @@ that hand-authored or temporarily incomplete graphs remain representable.
 | Relationship | First role | Second role | Semantics |
 |--------------+------------+-------------+-----------|
 | =contains= | container | contained | Ordered document/content nesting. |
-| =forks= | forker | forkee | The forker shows the forkee's content that the forker neither contains nor hides, and the two are mirrors: either may stand in the other's place where mirror substitution acts.  The fork operation's clone forks its original. |
+| =forks= | forker | forkee | The forker shows the forkee's content that the forker neither contains nor hides, nor the user keeps in another owned note, and the two are mirrors: either may stand in the other's place where mirror substitution acts.  The fork operation's clone forks its original. |
 | =hides= | hider | hidden | Suppresses the hidden node only when it would be reached through what the hider forks. |
 | =linksTo= | mentioner | mentioned | Plain Org ID links derived from text. |
 
@@ -409,11 +409,13 @@ forkee's visible record shows the hidden node as its content, and
 no hide is written of a member that only a restricted record
 explains. The inference of hides from a removal
 (=infer_hides_from_contains_removals=) reads the same way: the
-note's visible forks and forkers (the fork partners its forks folder
-shows, =fork_partners_shown=), their content by visible records, and
-its visible hides. A child removed from the note that such a partner
-still contains is hidden, a forker's content as a forkee's, so that
-it does not come back under that partner. So does the hiding of a forker deleted from a
+note's visible forks, forkers and indirect members (the members its
+forks folder shows, =fork_partners_shown=), their content by visible
+records, and its visible hides. A child removed from the note that
+such a member still contains is hidden, a forker's content as a
+forkee's, so that it does not come back under that member, unless
+the note, or another owned note but that member, contains it after
+the save. So does the hiding of a forker deleted from a
 forks folder (=resolve_forks_folder_removals=): only a forker whose
 record the skgrepo restriction shows was drawn, so only such a one
 is hidden for its absence.
@@ -501,8 +503,9 @@ text calls them the ladder):
 7. substitution: in a content view, under an editable occurrence, a
    member is shown as the mirror shown for it, with =(inPlaceOf
    N)=, except where P is itself shown raw where another mirror would
-   stand (a root, or a member of a folder that is no member as such
-   of a forks folder, a forkee or forker as such);
+   stand (a root whose perspective would show another mirror, or a
+   member of a folder that is no member as such of a forks folder, a
+   forkee or forker as such);
    when the original itself becomes the mirror shown, the
    carrier loses the part and the original is reinstated beside it
    (=docs/api-and-formats.org=, "Mirror substitution and the
@@ -670,7 +673,9 @@ joined to N is not hidden. So:
 - in a forkee as such E, drawn editable: E's title and body are saved
   when the user owns E, and refused (a text claim) when it is foreign;
   cutting one of E's children (one the view drew there, by the graph
-  before the save) hides it in N unless N, or a note the user owns
+  before the save, that the buffer shows neither under E nor in E's
+  folder of what the user keeps elsewhere or of what N hides in it)
+  hides it in N unless N, or a note the user owns
   but E, contains it after the save, and a child N hides,
   shown claiming under E, is unhidden (the forkee-visibility step), a
   save that would hide or unhide anything in a foreign N being
@@ -682,7 +687,8 @@ joined to N is not hidden. So:
   or refused as E's are, and a child placed under F joins F's
   content as under E; a child N hides, shown claiming under F, is
   unhidden; a child F showed that the buffer no longer shows under
-  F was cut from it (what F showed is read as its content less what
+  F, nor in F's folder of what the user keeps elsewhere or of what N
+  hides in it, was cut from it (what F showed is read as its content less what
   N contains or hides and what the user kept elsewhere, wherever F is
   a mirror of N, 'is_mirror_of', an indirect member included), which
   makes N fork F (a mutual now, where F forks N) and hides the child

@@ -817,7 +817,7 @@ Decision C; behavior 3.
   'docs/sharing-model.org'; both COMMANDS docs; the AI tool's README.
 - Run the suites as slice 1 does.
 
-** TODO Slice 4: the sweep, and the record
+** DONE Slice 4: the sweep, and the record
 *** Corrections carried from slice 3
 **** A stale buffer must not hide what its integrated folder showed
 Slice 3 reads what the view drew from the graph at save time. If an

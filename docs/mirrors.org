@@ -20,8 +20,10 @@ its members among a more public section's with anchors, as =contains=
 does ('docs/api-and-formats.org', "The .skg file format").
 
 =R= forks =N= says two things.  =R= shows =N='s content that =R=
-neither contains nor hides: in =R='s forks folder, claiming, =N= is a
-forkee as such ('docs/glossary.org', "forkee as such").  And
+neither contains nor hides, nor keeps in another note of the user's:
+in =R='s forks folder, claiming, =N= is a forkee as such
+('docs/glossary.org', "forkee as such"; 'docs/forks.org', "What you
+keep elsewhere").  And
 =R= and =N= are mirrors, so either may stand in the other's place
 (see "Mirror substitution").  So a fork shown, editable, in its
 original's place draws, by default, its forks folder with the
@@ -42,7 +44,10 @@ or contain a note that forks it.
 
 ** Direct visits are exact
 
-Visiting an ID opens that exact node as the raw root of a content view.
+Visiting an ID opens that exact node as the root of a content view:
+from the root homes, its default perspective, the root's own home
+skgrepo decides, and there the node stands as itself (see "Which
+mirror stands").
 It does not redirect to a fork and does not stop at a choice
 buffer.  Re-visiting an ID that is already a root switches to its open
 content view proper, never to a buffer of the diff view.  A node whose home skgrepo the current
@@ -212,8 +217,10 @@ substitute:
 - ghosts.
 
 When a node for which another mirror would stand is deliberately
-shown raw ('is_raw_where_another_mirror_would_stand'), its immediate
-content children are also shown raw.  Substitution resumes at
+shown raw ('is_raw_where_another_mirror_would_stand': a root whose
+perspective would show another mirror, or a member of a folder but a
+member as such of a forks folder), its immediate content children are
+also shown raw.  Substitution resumes at
 the grandchildren.  This one-level rule makes the raw node show its own
 children rather than another mirror's interpretation of them.
 
@@ -241,7 +248,7 @@ the buffer is thereafter registered as rooted at =K= rather than =F=.
 
 Collateral rerenders do not apply the root exception; their content
 occurrences substitute as every refresh's do.  A later independent direct
-visit to =F= still opens raw =F=, in accordance with the exact-visit rule.
+visit to =F= still opens =F= itself, in accordance with the exact-visit rule.
 
 *** The =inPlaceOf= part
 
@@ -302,9 +309,10 @@ folder, or in a note's file) is saved.
 
 The forks folder is editable: a member typed there makes its
 viewparent fork it, and a forkee removed from it ends that =forks=
-relationship; a forker, or another mirror (an indirect member),
-removed from it is hidden by its viewparent (sharing-model.org, "The
-forks folder").  Raw or imported =.skg= data can contain =forks= facts
+relationship (a mutual removed from it is hidden too); a forker, or
+another mirror (an indirect member), removed from it is hidden by its
+viewparent (sharing-model.org, "The forks folder: what a note forks,
+and what forks it").  Raw or imported =.skg= data can contain =forks= facts
 too.
 
 ** Merge behavior
@@ -368,7 +376,9 @@ The other relationship-driven presentation paths do not have the same
 problem:
 
 - =contains= memberships are relRepo-gated before the refresh computes a
-  content goal, including the contains-minus-hides treatment of a forkee as such;
+  content goal, including what a member as such of a forks folder
+  shows (its content less what the note contains or hides, and less
+  what the user keeps elsewhere);
 - =hides= and the containment memberships used to
   derive the hidden-in and hidden-outside folders are gated in the
   refresh's goals;
