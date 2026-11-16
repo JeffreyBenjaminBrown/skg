@@ -1,0 +1,5 @@
+#+title: every-mirror: the record of the run
+
+* Plan 1
+Started 2026-11-16 08:15 UTC, when Jeff said go; Claude orchestrates,
+one agent per slice.

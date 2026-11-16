@@ -1,13 +1,21 @@
 #+title: Plan 1 of every-mirror: one relation, 'forks', and the mirror a perspective shows
 #+startup: overview
 
-* Status: not to be executed yet; Jeff is still discussing
-The open questions below come first because they are the live part
-of this document. A slice may launch only once Jeff has answered, or
-accepted the provisional answer of, every question that slice names.
-An answer that differs from the provisional one becomes a correction
-under that slice's headline before its launch
-('coding-advice/orchestration.org', "Triage before each launch").
+* Status: being executed, since 2026-11-16 08:15 UTC
+Jeff said "yes to all" and "Please execute!" on 2026-11-16: every open
+question below is settled, by his answer where it says "Settled", and
+otherwise by its provisional answer. Q13's provisional answer (a
+deleted mutual: stop forking it and hide it) is settled as drawn in
+his inbox.
+
+Two rules bind every slice, beyond the pitfalls. Two live servers run
+'target/release/skg' under a loop that reruns that binary when it
+exits: Jeff's on port 1730 and Claude's on 1761, each reading real
+data in the old format. So nothing in this run builds into
+'target/release', starts or stops those servers, or connects to those
+ports; the suites use 'target/debug' and their own ports. And the
+migration tool is never run on 'data/': each owner runs it on their
+own skgrepos after the run, as slice 9's handoff says.
 
 Plan 2 ('TODO/every-mirror/2_plan.org', the display of mirrors) runs
 after this one and depends on it; "What plan 2 needs from this plan",
