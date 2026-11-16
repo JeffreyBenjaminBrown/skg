@@ -97,15 +97,15 @@ So far there are these endpoints:
       from the hits ('build_search_viewforest', then
       'draw_search_buffer'), the same code every view is drawn
       with: each hit asks for its containers folder ('(folder
-      containers)'), and holds an empty subscribee and subscriber
-      folder when that folder's goal has members, and an empty
-      alias folder when an alias of its node matched; the refresh
+      containers)'), and holds an empty forks folder when that
+      folder's goal has members, and an empty alias folder when an
+      alias of its node matched; the refresh
       fills the folders and draws each containers folder member's
       containerward chain.
     - Under each hit hang its containers folder, whose members carry
-      the containerward chain; its subscribee folder, the visible
-      nodes it forks; and its subscriber folder, the visible
-      nodes that fork it. A folder with no member is not drawn. The
+      the containerward chain; and its forks folder, the visible
+      nodes it forks and then those that fork it (those it hides
+      aside). A folder with no member is not drawn. The
       members are write-protected. Everything under a hit is folded,
       so that the hit shows collapsed; but a hit found through an
       alias shows its folders, each collapsed except its alias
@@ -116,7 +116,7 @@ So far there are these endpoints:
       and 2 say and then to the least pid; if it is owned, every other
       hit among them is suppressed at the top level, and one it
       forks or that forks it reappears in its
-      subscribee or subscriber folder ('suppressed_result_gnids'); a
+      forks folder ('suppressed_result_gnids'); a
       suppressed hit that is its mirror only through other notes (a
       sibling fork, say) reappears in neither. A foreign hit
       suppresses nothing.
@@ -351,14 +351,14 @@ So far there are these endpoints:
          subscriber's own fork of it is), =it was hidden already= (or
          ='M', which it stands for, was hidden already=), ='S' still
          contains 'M', which it stands for=, or =this save shows it
-         under 'E'= (an explicit gesture in the subscribee folder won).
+         under 'E'= (an explicit gesture in the forks folder won).
        Each quoted name is a title, as the save leaves it. A fork's
        clone counts as a subscriber with no hides on disk, named =the
        fork 'T'=, since it has its original's title; a node the save
        deletes is named in no line. Only records the skgrepo
        restriction shows count. The hides are computed from the save's
        plan against the graph, so they are what the plan writes,
-       whatever gesture asked for them (a removal, a subscribee-folder
+       whatever gesture asked for them (a removal, a forks-folder
        edit, a hidden folder's edit, a forking edit); what merges,
        restore requests and delete propagation add after the plan is
        not reported. When the server withholds the save's rerender
@@ -1661,7 +1661,9 @@ preserved and displayed but does not alter the parent's membership on
 save. A member carries nothing, and so does a view root. The atom is
 meaningful only where the save reads the claims of the viewparent's
 children: under an editable occurrence, and under an editable folder
-(subscribee, hidden-outside, alias) of one. Under any
+(forks, hidden-outside, alias) of one. In the forks folder a member
+claims exactly when the folder's viewparent forks it: a forker-only
+member, drawn there by the refresh, carries =noClaim=. Under any
 other viewparent ('docs/glossary.org', "claims membership", lists
 them) no child claims, whatever it carries, and the server writes no
 =noClaim= there.
@@ -1690,21 +1692,23 @@ the graph"). Request forms:
 
 In a content view, an occurrence that an editable-view request
 extends -- a fresh view's roots, and the editable content the request
-draws or shows under them -- shows its nonempty =subscribeeFolder=, but
-no other top-level relation folder, unasked. This applies both to
-ordinary positions and to nodes extended as members of relation
-folders. An editable subscribee-as-such additionally includes its
-nonempty =hiddenInSubscribeeFolder=; =hiddenOutsideOfSubscribeeFolder=,
-when nonempty, is part of the subscriber's =subscribeeFolder=. Use a
+draws or shows under them -- shows its =forksFolder= where it has a
+fork partner, either way, but no other top-level relation folder,
+unasked. This applies both to ordinary positions and to nodes
+extended as members of relation folders. An editable forkee as such
+additionally includes its nonempty =hiddenInForkPartnerFolder=;
+=hiddenOutsideOfForkPartnersFolder=, when nonempty, stands last in
+every =forksFolder= of a content view. Use a
 folder request for the other relation folders; their potential
 contents remain advertised by the node's heralds. The diff view draws
 no folder unasked but where something changed.
 
-- =(folder RELNAME)= — build both folders of the relation, populated from the
+- =(folder RELNAME)= — build the folders of the relation, populated from the
   graph. RELNAME is =aliases=,
-  =hidesFromSubs=, =subscribesTo= (the folders of =forks=), =containers=
+  =hidesFromSubs= (the hider and hidden folders), =forks= (the one
+  =forksFolder=, both sides of the relation), =containers=
   or =mentioners=.
-  The editable folder (=subscribeeFolder= / =aliasFolder=)
+  The editable folder (=forksFolder= / =aliasFolder=)
   appears even when empty (its editable "add here" surface); an empty
   write-protected folder is pruned. =containers= and =mentioners= each
   build one write-protected folder (=containerFolder=,
@@ -1789,7 +1793,9 @@ one on a ghost:
   relationship sits at its default relRepo. The relationship belongs to the
   view-parent (or a writable folder's viewparent), so a write-protected headline
   may carry this request too; the save refuses it only when nothing editable
-  writes that relationship, e.g. under a write-protected parent.
+  writes that relationship, e.g. under a write-protected parent, and on
+  a member of a forks folder that claims nothing, whose fork of the
+  folder's viewparent its own file records.
   An alias and an unknown viewnode likewise show their relationship's relRepo
   in =(skgRepos (relRepo NAME))=, which the save does not read as a
   request, and carry a request only in =(editRequest ...)=; copying the
@@ -1895,7 +1901,7 @@ claiming nothing under a subscribee-as-such -- content its subscriber
 hides, which the refresh keeps there, unwarranted, while it holds a
 subtree or the user keeps it -- also counts the subscriber, three
 generations up, on its =hidesFromSubs= incoming side, as a
-=hiddenInSubscribeeFolder= member does.
+=hiddenInForkPartnerFolder= member does.
 
 =(props (aliases K) (extraIds K) (flags K))= holds the property
 counts, each present only when nonzero; =(props ...)= is absent when
@@ -1910,22 +1916,32 @@ for a node shown in place of a node it forks, which carries
 viewparent carries none: where the viewparent's claims are read, one
 claiming nothing; in a write-protected folder, one the folder's
 relation does not warrant; under a write-protected occurrence, every
-child ('stands_as_member' in =server/refresh/viewnodestats.rs=).
+child ('stands_as_member' in =server/refresh/viewnodestats.rs=). A
+member of a forks folder stands on each side of 'forks' it plays
+('forks_folder_member_sides'): as a forkee where it claims (where the
+folder reads no claims, where the graph says the folder's viewparent
+forks it), and as a forker where the graph's warrant and a visible
+record say it forks the viewparent, whatever it claims. A mutual
+stands on both, and carries both facts; a detached forkee on
+neither, and carries none.
 
 | Birth                            | Facts                                                        |
 |----------------------------------+--------------------------------------------------------------|
 | ordinary content                 | =(contains in 1)=                                            |
-| subscribee-folder member         | =(forks in 2)=                                               |
-| subscriber-folder member         | =(forks out 2)=                                              |
+| forks-folder forkee (claiming)   | =(forks in 2)=                                               |
+| forks-folder forker              | =(forks out 2)=                                              |
+| forks-folder mutual              | =(forks in 2) (forks out 2)=                                 |
 | hidden-folder member             | =(hidesFromSubs in 2)=                        |
 | hider-folder member              | =(hidesFromSubs out 2)=                       |
 | container-folder member          | =(contains out 2)=                            |
 | mentioner-folder member          | =(linksTo out 2)=                             |
-| hidden-in-subscribee member      | =(hidesFromSubs in 4) (contains in 2)=        |
-| hidden-outside-subscribee member | =(hidesFromSubs in 3)=                        |
+| hidden-in-fork-partner member    | =(hidesFromSubs in 4) (contains in 2)=        |
+| hidden-outside member            | =(hidesFromSubs in 3)=                        |
 | mirror shown (overridesHere)     | =(forks out)= or =(forks in)=                                |
 A member of an acquisition folder carries none: a nodeMerge is no
-relation.
+relation. In a forks folder the relationship heralds tell the sides
+apart: a forkee shows =bK= (its viewparent's viewparent, 'b', forks
+it), a forker =Kb=, a mutual =bKb= ('docs/heralds.org').
 See [[file:./heralds.org][heralds.org]] for the rendered notation and styles.
 
 The graph counts fold into these forms (=forks= / =hidesFromSubs=
@@ -1937,7 +1953,10 @@ Two facts of a headline's relationship to its viewparent are not view
 facts. The skgrepo recording it, when its privacy was deliberately
 raised above the relationship's default, is the =(relRepo NAME)= of
 the headline's =(skgRepos ...)= (the =contains= relationship to a
-content child, or the folder's relation for a partner folder member);
+content child, or the folder's relation for a partner folder member;
+for a member of a forks folder, its viewparent's record of the fork
+where it claims, else its own record of forking the viewparent, on
+which a relRepo request is refused);
 ugly herald "~NAME", shown immediately before the ⌂. A relationship
 recorded in a foreign skgrepo never carries it: a foreign skgrepo has
 no privacy rank, and only its own node records the relationship. It is recomputed
@@ -2025,7 +2044,8 @@ independent single-root request for F still opens raw F.
 
 Moreover, the immediate children of any node shown raw where another
 of its mirrors would stand -- a partner folder member other than a
-subscribee, or a view root -- are also shown raw
+forkee as such (a claiming member of a forks folder), or a view
+root -- are also shown raw
 ('is_raw_where_another_mirror_would_stand'): the user is looking at
 the original, so its children are the original's, not the mirror's.
 This is one level deep -- substitution resumes at the grandchildren --
@@ -2514,9 +2534,9 @@ served by Rust (see "Herald rules" above; the table lives in
 Partner folders are represented in Rust as
 =ViewnodeKind::Folder (Folder)=, but their external metadata
 remains the established bare non-vognode atom:
-=subscribeeFolder=, =subscriberFolder=,
-=hiderFolder=, =hiddenFolder=, =hiddenInSubscribeeFolder=,
-=hiddenOutsideOfSubscribeeFolder=, =containerFolder=, =mentionerFolder=,
+=forksFolder=,
+=hiderFolder=, =hiddenFolder=, =hiddenInForkPartnerFolder=,
+=hiddenOutsideOfForkPartnersFolder=, =containerFolder=, =mentionerFolder=,
 or, in the diff view only, =acquiredByFolder= or =acquiredFolder=;
 and, outside the diff view, =illegalEditFolder=.
 
@@ -2748,7 +2768,8 @@ a change when some member of it carries a change of its relationship
 to the folder's viewparent: a =(rel ...)= part, or a =(relRepoMove
 ...)= under it. The clients compute that from the members, and label
 such a folder "its X changed (this file)" or "(other files)" (see the
-glossary's "in, out"), with ✓ when every changed membership is processed:
+glossary's "in, out") -- the forks folder, whose members play either
+side, "its forks changed" -- with ✓ when every changed membership is processed:
 a member's =(rel ...)= is processed when it carries =(processed ...)= naming
 =rel= if its =(leaves ...)= lists =rel=, and any =(processed ...)=
 otherwise; a relRepo move is processed when it carries =(processed ...)=.

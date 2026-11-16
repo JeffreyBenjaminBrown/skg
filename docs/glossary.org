@@ -265,8 +265,11 @@ viewnode, a restricted viewnode, an alias or an ID;
 'docs/api-and-formats.org', "Content view"). It means something
 only where the save reads the claims of its viewparent's children:
 under an editable occurrence, and under an editable folder
-(subscribee, hidden-outside-of-subscribee, alias) of one
-('parent_reads_claims' in 'server/refresh/ancestry.rs').
+(forks, hidden-outside, alias) of one
+('parent_reads_claims' in 'server/refresh/ancestry.rs'). In the
+forks folder a claim says "the folder's viewparent forks it", so a
+forker-only member, drawn there by the refresh, claims nothing (see
+"the forks folder").
 
 Every other viewparent *reads no claims*. This is the one list of
 them, which the user docs cite: a write-protected occurrence; a
@@ -304,7 +307,11 @@ save in another view removed, one whose record alone a
 skgrepo narrowing keeps out, a child a viewnode merge moved there. A child
 there that claims nothing is one the user marked =noClaim= to
 detach it: a *pending detachment*, herald "detach", which the next
-save takes out of the list. No wire says it; each client sees it and
+save takes out of the list. In the forks folder a member claiming
+nothing is a pending detachment only where the folder's viewparent
+still forks it on disk (its '(rels (forks (in ...)))' names ancestor
+generation 2): a detached forkee or mutual, not a forker-only member.
+No wire says it; each client sees it and
 writes the atom =pendingDetachment= into the metadata it hands the
 herald rules ('docs/heralds.org', "What the server serves, and what
 the clients add"). 'docs/data-model_technical.org', "The
@@ -388,18 +395,20 @@ skgrepo gesture ('skg-set-repo' with =C-u=, =C-u C-c s s=;
 Recall that viewnodes and graphnodes are distinct.
 Some viewnodes correspond to individual graphnodes.
 Other viewnodes mediate a relationship between their parent and their children.
-For instance, a 'subscribee folder' viewnode contains the nodes its parent forks:
+For instance, a 'forks folder' viewnode contains its parent's fork
+partners, the nodes its parent forks and those that fork it:
 #+begin_example
-  * subscriber
-  ** subscribee folder
-  *** subscribee
-  *** subscribee
+  * note
+  ** forks folder
+  *** forkee
+  *** forker
 #+end_example
 
 In that example, the first viewnode represents a graphnode,
-as do the last two. The subscriber forks the two subscribees.
-The second viewnode, though, corresponds to nothing in the graph.
-It exists only to name the relationship between its children and its parent.
+as do the last two. The note forks the forkee, and the forker forks
+the note. The second viewnode, though, corresponds to nothing in the
+graph. It exists only to name the relationship between its children
+and its parent.
 
 A *partner folder* is the general concept. In code it is a variant of
 'Folder', an enum that also holds the three property folders (see
@@ -408,29 +417,33 @@ Recall that there are four relations in the graph:
 containment, link, forking, and hiding.
 Because a node can be on either side of each relationship --
 it can be the container or the content, the hider or the hidden, etc. --
-there are many kinds of partner folder. Each lists, as its children,
-the nodes that play one role toward its parent. For each relation,
+there are many kinds of partner folder. Most list, as their children,
+the nodes that play one role toward their parent. For each relation,
 one folder could list the members its parent records, and another the
-recorders that record its parent:
+recorders that record its parent; for forking, one folder lists both:
 
 | relation      | members its parent records | recorders of its parent |
 |---------------+----------------------------+-------------------------|
 | containment   | not implemented[1]         | containerFolder         |
 | link          | not implemented[2]         | mentionerFolder         |
-| forking       | subscribeeFolder           | subscriberFolder        |
+| forking       | forksFolder[3]             | forksFolder[3]          |
 | hiding        | hiddenFolder               | hiderFolder             |
 
 1. A contentFolder would be silly: a node's contents are already its
    ordinary viewchildren.
 2. A mentionedFolder would be silly: the links are already visible in
    the node's own text.
+3. One folder, 'Folder::Forks', holds the note's *fork partners* (the
+   nodes it forks, and the nodes that fork it), each once, whichever
+   roles it plays: see "the forks folder".
 
 The two compound partner folders (see "compound partner folder")
 each join three relationships -- forking, hiding and containment:
-- a *hiddenInSubscribeeFolder*, under a subscribee as such, lists that
-  subscribee's contents which the subscriber hides;
-- a *hiddenOutsideOfSubscribeeFolder*, under a subscribeeFolder, lists
-  the nodes its parent hides that no subscribee contains.
+- a *hiddenInForkPartnerFolder*, under a forkee as such, lists that
+  forkee's contents which its forker hides;
+- a *hiddenOutsideOfForkPartnersFolder*, last in a forks folder, lists
+  the nodes its parent hides that no forkee contains, a forker it
+  hides among them.
 
 The diff view adds two more, for nodeMerges since HEAD:
 - an *acquiredByFolder* ("it was acquired by"), under an acquiree's
@@ -438,8 +451,8 @@ The diff view adds two more, for nodeMerges since HEAD:
 - an *acquiredFolder* ("it acquired"), under an acquirer, holds the
   ghosts of the nodes it acquired.
 
-Membership edits in the subscribee and
-hidden-outside-of-subscribee folders are graph edits. The others are
+Membership edits in the forks and hidden-outside folders (and the
+alias folder, a property folder) are graph edits. The others are
 write-protected: their membership follows from the graph (see
 "write-protected set"), and they carry the ☮ herald on their folder
 headline, meaning "this folder cannot be changed from here" -- the
@@ -448,34 +461,65 @@ same sense ☮ (=writeProtected=) carries on a node.
 *Default presentation is intentionally narrow.* An occurrence that an
 editable-view request extends -- a fresh content view's roots, and
 the editable content the request draws under them -- gets its
-nonempty =subscribeeFolder= automatically ('add_default_folders' in
-'server/refresh/visit.rs'), and a fresh content view a
+=forksFolder= automatically where it has a fork partner, either way,
+by a record the skgrepo restriction shows ('add_default_folders' and
+'has_a_fork_partner' in 'server/refresh/'), and a fresh content view a
 =containerFolder= on each root that has containers, which the view's
 stub asks for ('stub_of_fresh_content_view' in
 'server/update_buffer.rs'). The other relation folders require an
 explicit folder request (the =C-c l= commands), even when their
 herald counts say they would be nonempty. The same rule applies when
 a member of any partner folder is extended as editable. An editable
-subscribee-as-such also gets its nonempty =hiddenInSubscribeeFolder=;
+forkee as such also gets its nonempty =hiddenInForkPartnerFolder=;
 this is the hidden-in compound partner folder specific to how that
-subscriber sees the subscribee. The diff view draws no default
+forker sees the forkee. The diff view draws no default
 folder. Under each member of a partner folder hangs its
 containerward chain (see "foldering, the containerward chain, chain
 node").
+
+*** the forks folder, fork partner, forker-only member, mutual
+
+The *forks folder* ('Folder::Forks', atom =forksFolder=, label "It
+forks these, or these fork it.") is the one partner folder of the
+relation 'forks'. Under an occurrence of a note N it holds N's *fork
+partners*: each note N forks, and each that forks N, by records the
+skgrepo restriction shows, each once. A *mutual* forks N and is
+forked by it; a *forker-only member* forks N and is not forked by it.
+
+Its goal ('forks_folder_goal' in 'server/refresh/goal.rs') is N's
+forkees in the order of N's 'forks' list (mutuals among them where
+the list puts them), then its forker-only members less those N hides,
+which keep the order the view has them in, always after the last
+forkee ('Goal::ordered_then_unordered'). A forker N hides stands in
+the hidden-outside folder instead, which the forks folder holds last.
+
+The folder is editable, and a member's claim there says "N forks
+it": a forkee or a mutual claims, a forker-only member claims
+nothing ('GoalItem::claimable'), and the save reads the claiming
+members as N's 'forks'. The heralds tell the sides apart: a forkee
+shows =bK=, a forker-only member =Kb=, a mutual =bKb=. What deleting,
+detaching or attaching a member does is in
+'docs/data-model_technical.org', "The forks folder".
 
 *** compound partner folder
 
 A compound partner folder is a partner folder whose membership joins
 more than one relationship, as against the ordinary partner folders,
 which read one relation role. There are two, and each joins three
-nodes -- a subscriber N, a subscribee S and a hidden node H -- by
-"N forks S", "N hides H" and "S contains H". The *hidden-in
-compound partner folder* (=hiddenInSubscribeeFolder=) stands under S
-inside N's subscribee folder and holds N's hides that S contains, in
-the order of N's hides list. The *hidden-outside compound partner
-folder* (=hiddenOutsideOfSubscribeeFolder=) stands in N's subscribee
-folder beside the subscribees and holds N's hides that no subscribee
-contains. Both read each relationship by the records the skgrepo
+nodes -- a note N, a forkee S and a hidden node H -- by "N forks S",
+"N hides H" and "S contains H". The *hidden-in compound partner
+folder* (=hiddenInForkPartnerFolder=) stands under S inside N's forks
+folder, where S is a forkee as such, and holds N's hides that S
+contains, in the order of N's hides list. The *hidden-outside
+compound partner folder* (=hiddenOutsideOfForkPartnersFolder=, label
+"b hides these, but nothing it forks or that forks it contains
+them.") stands last in N's forks folder and holds N's hides that no
+forkee contains, in the order of N's hides list; a forker N hides
+stands there, since the forks folder does not draw it, and removing
+it there unhides it. Its membership reads N's forkees' content only:
+plan 2 ('TODO/every-mirror/2_plan.org', decision 8) makes N's hides
+apply to its forkers' content too, and this folder's membership with
+them. Both read each relationship by the records the skgrepo
 restriction shows: under a skgrepo narrowing, a hide of H that S
 contains only by a restricted record stands in the hidden-outside
 folder, and a hide recorded in a restricted section stands in
@@ -505,46 +549,50 @@ kept where it stands.  If the
 refresh finds that a real member is missing from the view, it
 reinstates that member (see "reinstated").
 
-For instance, if nodes R and T fork node N, the user might land
+For instance, if nodes R and T hide node N, the user might land
 at a view like the following:
 #+begin_example
   * N
-  ** subscriberFolder
+  ** hiderFolder
   *** R
   *** T
 #+end_example
-The subscriberFolder ("folder of subscribers") is a write-protected set.
-Thus the user could flip the order of R and T in the subscriberFolder,
+The hiderFolder ("folder of hiders") is a write-protected set.
+Thus the user could flip the order of R and T in the hiderFolder,
 and this change would be respected in the display, but have no effect
-in the graph. The user could insert X under subscriberFolder,
+in the graph. The user could insert X under hiderFolder,
 but because it is a write-protected set, X claims nothing there: it
 is shown unwarranted (⊥), and has no effect on N.
-(If the user wants X to fork N, they must modify X, not N.)
+(If the user wants X to hide N, they must modify X, not N.)
 The user could delete R, but it is reinstated as soon as they save,
-because, again, the subscriberFolder is a write-protected set.
+because, again, the hiderFolder is a write-protected set.
 
 *** "subscribee as such"
 
 In Skg some nodes fork others: the forker forks the forkee.
 (See [[file:./data-model_technical.org][the technical data model]].)
-Where a forker's forkees are listed under it, the forker is called the
-"subscriber" and each forkee a "subscribee".
+Where a forker's forkees are listed under it, the code calls the
+forker the "subscriber" and each forkee a "subscribee".
 A node that plays the forkee role can be viewed as an ordinary node,
-or /as/ a subscribee. In the latter case it appears
-underneath the relevant subscriber, in a 'subscribeeFolder':
+or /as/ a forkee. In the latter case it appears
+underneath the relevant forker, claiming, in its 'forksFolder':
 #+begin_example
-  * subscriber
-  ** subscribeeFolder
-  *** subsribee1
-  *** subsribee2
+  * forker
+  ** forksFolder
+  *** forkee1
+  *** forkee2
   ...
 #+end_example
 
-In the above view, subscribee1 and subscribee2 are both "subscribees as such":
-They are not just subscribees, but they are being shown /as/ subscribees.
-This changes the way edits are interpreted:
-Edits to a "subscribee as such" can only affect
-what the relevant subscriber hides, nothing else.
+In the above view, forkee1 and forkee2 are both "subscribees as
+such" (forkees as such): a member of a forks folder that claims (and,
+in the refresh, that the graph warrants). They are not just forkees,
+but they are being shown /as/ forkees. This changes the way edits are
+interpreted: edits to a forkee as such can only affect what the
+relevant forker hides, nothing else. A member of the folder claiming
+nothing -- a forker-only member, or a forkee the user detached -- is
+no forkee as such: it is an ordinary node standing there, as under a
+write-protected folder.
 
 *** the subscribee-visibility step
 
@@ -584,7 +632,7 @@ and its siblings, the =C-c l= commands) draws one; a fresh content
 view draws a containers folder on each root; the search enrichment
 (what a text search draws under each hit, in the one message that
 answers it) draws a containers folder under each hit, its
-subscribee and subscriber folders when it has such relatives, and its
+forks folder when it has fork partners, and its
 alias folder when an alias of its node matched.
 
 The *containerward chain* is the one tree that goes on below a
@@ -693,8 +741,8 @@ occurrence of its node. Its buffer is the *search buffer*, a synonym
 the docs and the code use for the search view. The *enrichment* (the search enrichment) is
 what the search draws under each hit, with the refresh every view is
 drawn with: its containers folder, whose members carry the
-containerward chain; its subscribee and subscriber folders, when it
-has such relatives; and, for a hit found through an alias, its alias
+containerward chain; its forks folder, when it has fork partners;
+and, for a hit found through an alias, its alias
 folder, the one folder not folded. Under a skgrepo restriction that
 excludes overPrivateText telescopes, what the enrichment would draw
 of such a node is a tombstone. See 'docs/api-and-formats.org', "Text
@@ -1550,7 +1598,8 @@ A partner, alias, ID or flags folder the diff view shows because its
 membership changed since HEAD. It is written as its bare folder atom,
 holds the members of either graph, each tagged with the three kinds
 of change, and reads "its X changed (this file)" or "(other files)"
-(see "in, out"), with ✓ when every changed membership is processed: each
+(see "in, out") -- the forks folder, which holds both sides, reads
+"its forks changed" -- with ✓ when every changed membership is processed: each
 client sees the change in the members and draws that label in place
 of the folder's own.
 
@@ -1682,8 +1731,9 @@ it) and *in* to its member. In the diff view, a folder of out-relationships
 that changed, an *out-folder*, is labelled "its ... changed (this
 file)", and one of in-relationships, an *in-folder*, "its ... changed
 (other files)" ('docs/diff-view.org', "the in-folders and
-out-folders"). Changeset markers
-carry no suffix.
+out-folders"). The forks folder is neither: its members play either
+side, so its label, "its forks changed", carries no suffix. Changeset
+markers carry no suffix.
 
 ** Terms of the implementation
 The words of the code, its comments and the technical docs. A user
@@ -1765,7 +1815,7 @@ The node that has an ID, as its PID or as an extra ID, is that ID's
 
 How a folder (see "partner folder") is built. It is the
 =ViewnodeKind::Folder= variant and the payload type =Folder=, one
-enum for the ten partner folders and the three property folders.
+enum for the nine partner folders and the three property folders.
 “Folder” here describes an org non-vognode that groups viewnodes; it
 does not mean a filesystem directory.  “Role col”, “relation col”,
 and bare “sharing col” are retired names for the general concept.
@@ -1776,22 +1826,25 @@ refresh, the save and the heralds consult, so a new kind cannot
 acquire inconsistent treatment in different layers:
 - =is_editable=: the save reads the folder's membership, so a member
   typed or removed there edits the graph. These are
-  =subscribeeFolder=, =aliasFolder= and
-  =hiddenOutsideOfSubscribeeFolder= (whose visible member set is an
-  explicit edit of that subset of the hides; the hides' relRepos stay
-  derived). An absent folder means "no opinion" (its field lowers to
+  =forksFolder= (whose claiming members are the note's 'forks'; its
+  forker-only members claim nothing, and deleting one hides it),
+  =aliasFolder= and =hiddenOutsideOfForkPartnersFolder= (whose
+  visible member set is an explicit edit of that subset of the hides;
+  the hides' relRepos stay derived). An absent folder means "no opinion" (its field lowers to
   =MSV::Unspecified=, filled from disk); a present-but-empty one, an
   explicit empty set (=MSV::Specified(vec![])=). Every other folder is
   write-protected: its membership follows from the graph, and the
   refresh redraws it from the graph (see [[*write-protected set][write-protected set]]).
 - =goal_is_ordered=: the viewparent's own file records the members'
   order, which the warranted members take: the editable folders and
-  =hiddenFolder=. In every other folder the refresh moves no child:
-  the inbound folders =subscriberFolder=,
+  =hiddenFolder=. In the forks folder only the forkees take it; its
+  forker-only members follow them in the order the view has
+  ('Goal::ordered_then_unordered'). In every other folder the refresh
+  moves no child: the inbound folders
   =hiderFolder=, =containerFolder= and =mentionerFolder= (the folders
   of =C-c l c= and =C-c l m=; the other side of each is the node's
   content, or its links, shown without a folder),
-  =hiddenInSubscribeeFolder= (derived from hide state), the diff
+  =hiddenInForkPartnerFolder= (derived from hide state), the diff
   view's =acquiredByFolder= and =acquiredFolder= (derived from the
   graph straddle, and save-inert), and =idFolder= and =flagsFolder=.
 - =members_are_properties=: the alias, ID and flags folders.

@@ -250,11 +250,16 @@ where the interleaved diff of the two lists puts it (below). The
 content changeset marker, "its content changed", gathers the
 relationship leaves of the content list.
 *** the in-folders and out-folders
-A changed set of containers, mentioners, forkers or
+A changed set of containers, mentioners or
 hiders adds a write-protected folder labelled "its other containers changed
-(other files)" and so on; a changed set of forkees or
-hidden nodes adds the existing folder labelled "its subscribees
-changed (this file)" and so on. A containers folder is drawn only
+(other files)" and so on; a changed set of hidden nodes adds the
+folder labelled "the nodes it hides changed (this file)". The forks
+folder holds both sides of 'forks', so it is neither an in-folder nor
+an out-folder: a change of a fork the node records, or of one
+recorded by a note that forks it, adds the one forks folder,
+labelled "its forks changed". The changed folders stand in the order
+containers, mentioners, forks, hiders, hidden ('PARTNER_FOLDERS' in
+'server/diff_view/changes.rs'). A containers folder is drawn only
 when a container not above the node in the view gained or lost it,
 and, as in every view, leaves out the node's view-ancestors: the
 node's headline under its parent already carries that containment
@@ -265,7 +270,7 @@ other properties, so a modified member shows ☮ M, and 'node' with
 'rel' there marks its file, and the existence of its relationship to
 the folder's viewparent, of the folder's kind. The two compound partner
 folders ("It contains these, but c hides them" and "b hides these,
-but subscribes to nothing that contains them") show no change and carry no '(rel ...)'. Under each
+but nothing it forks or that forks it contains them") show no change and carry no '(rel ...)'. Under each
 member of a changed folder hangs its containerward chain, as in every
 view, so that the user sees where the member sits: the member's
 containers as write-protected occurrences, theirs under them, up to
@@ -344,8 +349,9 @@ gnid the commit left an extra ID of its acquirer becomes an
 occurrence of the acquirer, in place.
 
 The goal orders what it warrants where the graph records an order
-(content, aliases, the subscribee and hidden folders);
-every other child stays right after the sibling it followed. So a
+(content, aliases, the hidden folder, and the forks folder's
+forkees, after which its forker-only members keep the order the view
+has); every other child stays right after the sibling it followed. So a
 buffer saves back to itself, and a view other than the one saved
 follows a reorder saved elsewhere.
 ** Removed members
@@ -562,6 +568,13 @@ containment to each member's 'rel'; where it stands alone, as in a
 folder, 'node' and 'rel' together name its whole file. Every leaf is
 thus named by some headline without a walk; a reordering is no leaf.
 
+A member of a forks folder stands for either side of 'forks', or
+both: its 'rel' names the side or sides that changed
+('relationships_to_viewparent' returns both under a forks folder, and
+only a changed one is a leaf). So a mutual whose two sides both
+changed carries '(leaves 2 rel)', and a processed mark on it marks
+both; it is processed only when both are.
+
 A changeset marker gathers relationships: 'rel' names them, and
 'node' the own leaves (existence, text, home skgrepo, aliases, extra
 IDs, flags) of their members, one level down: the content members
@@ -644,16 +657,19 @@ earlier change", with "unprocessed" or "processed" for the filtered forms).
 They skip a write-protected occurrence (☮; a ghost is not skipped)
 standing directly in a folder whose changed label says "(other
 files)", the folders 'folder_heralds.other_files' in
-'shared/herald-styles.json' lists: its other containers, mentioners,
-subscribers and hiders. Each such member records its
+'shared/herald-styles.json' lists: its other containers, mentioners
+and hiders. Each such member records its
 relationship to the folder's viewparent in its own file, so every
 change it carries is a leaf it records, and in a buffer extended to
 every change its node has an editable occurrence, where the refresh
 draws every leaf the node records: its node changes on its headline
 or under it, its relationships among its content or in a folder of
 its own file. A ghost is visited because a deleted node's ghost
-draws no partner folders: a deleted subscriber's =forks= relationship stands
-only on its ghost in the subscribers folder. A member made editable
+draws no partner folders: a deleted forker's =forks= relationship stands
+only on its ghost in the forks folder. They skip likewise a
+write-protected occurrence standing directly in a forks folder that
+is born only of '(forks out 2)': a forker, which records that fork
+in its own file; they visit a forkee or a mutual there. A member made editable
 inside such a folder (C-c s e) is not skipped, nor is anything under
 it, since its changes are then drawn there. So in a buffer extended
 to every change, the plain motions reach each change. Under a skipped
@@ -719,8 +735,9 @@ write-protected (herald "restore membership"). The command and the
 save both refuse it anywhere else, by where the headline stands, with
 "Only a removed membership can be restored". On a ghost it refuses with "This
 node is deleted; restore it first (skg-restore-deleted-node)". The save
-re-adds the one relationship the headline stands for (the processed
-requests' 'relationship_to_viewparent' names it), as HEAD recorded it:
+re-adds the relationship the headline stands for (the processed
+requests' 'relationships_to_viewparent' names it; under a forks
+folder, each side of 'forks' HEAD records), as HEAD recorded it:
 at its index in the recorder's list at HEAD, clamped, in the skgrepo
 that recorded it. A request whose headline stands for no relationship
 (as under an acquisition folder), whose relationship is a link, has a

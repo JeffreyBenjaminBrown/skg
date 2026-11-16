@@ -67,7 +67,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | home skgrepo heralds | normal      | =⌂:LABEL=                                                                     |
 |                      | ugly        | =~NAME=, a relRepo more private than the default                              |
 | labels               | message     | folder labels, =alias=, =ID=, flag rows                                       |
-|                      | high        | the subscriber's ancestor letter in two folder labels; see below              |
+|                      | high        | the hiding note's ancestor letter in two folder labels; see below            |
 | requests             | nonstandard | =delete=, =merge:...=, =detach=, =restore node=, =restore membership=, =request:~NAME=, =request:...= flags, =req:...= views, =request:processed...= |
 | change facts         | nonstandard | =∃+ ∃- M ~+ ~-=, =+ -= on a leaf, ~Δ⌂=a~                                        |
 |                      | go          | =✓= processed                                                                 |
@@ -101,7 +101,7 @@ Each side has a tier, which says how much it deserves attention.
 
 Most normal sides are normal because their members are usually visible
 elsewhere: as viewchildren, in the text, or in the hidden-in and
-hidden-outside-subscribee folders.
+hidden-outside folders.
 
 *** Ancestor flags and floors
 Lowercase flags name tracked ancestors: =a= is the viewparent, =b=
@@ -154,9 +154,15 @@ The letter of a relation that put this occurrence here is shown low;
 its counts keep their own styles. An occurrence can have more than one
 birth relation. A side whose only members are ancestors that the birth
 relation already accounts for has tier low: =aC= (the parent is the sole
-container) shows the 'a' low. A subscribee's =bK= (its subscriber, which
-forks it, is the grandparent) shows the 'b' medium, because of b's
-floor; a subscriber-folder member shows =Kb=.
+container) shows the 'a' low. In the forks folder, whose viewparent
+is each member's grandparent 'b', the heralds tell the sides apart:
+a forkee shows =bK= (b forks it), with any other forkers counted
+before the letter (=2bK=: b and one more fork it), and the 'b' medium,
+because of b's floor; a forker-only member shows =Kb= (it forks b),
+with its other forkees counted after (=Kb3=); a mutual shows =bKb=.
+The birth letter follows the side that stands as a member: =(forks
+in 2)= on a member that claims, =(forks out 2)= on one that forks b,
+both on a mutual.
 
 Immediately after =K=, a crucial =ĥ= (precomposed h with circumflex)
 means this occurrence stands in the place of one of its mirrors. =2Kĥ3= is an
@@ -181,20 +187,28 @@ write-protected position: a node, a ghost, a folder, or a flag row.
 On a node, =B= rides the ☮ when the node's body exists but is
 omitted from the buffer. =⟳= marks a cycle.
 
-The labels of the two folders of what a subscriber hides name the
-subscriber by its ancestor letter (see [[*Ancestor flags and floors][Ancestor flags and floors]]),
-shown high. Under a subscribee, the subscriber is the great-grandparent
-(subscriber, its subscribee folder, the subscribee, the folder):
-=☮ It contains these, but c hides them.= In the subscribee folder
-itself, it is the grandparent: =b hides these, but subscribes to
-nothing that contains them.=
+The forks folder reads =It forks these, or these fork it.=, with no ☮:
+it is editable. The labels of the two folders of what a note hides
+name that note by its ancestor letter (see [[*Ancestor flags and floors][Ancestor flags and floors]]),
+shown high (the style keys 'hiddenInForkPartnerFolder_forker' and
+'hiddenOutsideOfForkPartnersFolder_forker' in
+'shared/herald-styles.json'). Under a forkee as such, the note
+forking it is the great-grandparent (the note, its forks folder, the
+forkee, the folder): =☮ It contains these, but c hides them.= In the
+forks folder itself, it is the grandparent: =b hides these, but
+nothing it forks or that forks it contains them.= (Its membership
+counts only what b's forkees contain; plan 2 widens it to its
+forkers, 'TODO/every-mirror/2_plan.org', decision 8.)
 
 The bare atom =noClaim= (a child that does not affect its parent's
 membership on save) has no glyph of its own. Under an editable parent
 a child the graph warrants and that claims nothing is one the user
 marked =noClaim= to detach it: it shows =detach= until the next save
 takes it out of its parent's list. The client sees that from the
-parent, since the child's own metadata cannot say it. =detach= is
+parent, since the child's own metadata cannot say it. In a forks
+folder a forker-only member claims nothing too; there a pending
+detachment is only a member whose =(rels (forks (in ...)))= names
+ancestor generation 2, which its grandparent still forks. =detach= is
 styled as a request, and listed with them above, but it is none:
 detaching writes only the =noClaim= atom, and the save reads that as
 it reads any claim.
@@ -287,8 +301,8 @@ and body= (or =old title=, =old body=) with its =body diff=, =⌂ -OLD
 +NEW= for a home skgrepo move, =relationship moved from OLD to NEW=, and the
 changeset markers =its content changed=, =some content relationships
 changed skgrepo= and =order-only change=. A folder shown because its
-membership changed reads =its X changed (this file)= or =(other files)=,
-with =✓= when every changed membership is processed; the server writes the
+membership changed reads =its X changed (this file)= or =(other files)=
+(the forks folder, of both sides, =its forks changed=), with =✓= when every changed membership is processed; the server writes the
 folder as its bare atom, and the client sees the change in its
 members and draws that label, from 'folder_heralds' in
 'shared/herald-styles.json', in place of the folder's own. The
@@ -338,8 +352,8 @@ the lens or in its place:
   some member's relationship to the folder's viewparent changed, and
   whether every such change is processed, and then draws the folder's
   herald itself instead of the lens's: ☮ when the folder is
-  write-protected, its changed label ("its X changed (this file)" or
-  "(other files)"), and ✓ when processed, from 'folder_heralds' in
+  write-protected, its changed label ("its X changed (this file)",
+  "(other files)", or "its forks changed"), and ✓ when processed, from 'folder_heralds' in
   'shared/herald-styles.json'.
 The conformance test counts =pendingDetachment= among the atoms the
 metadata may hold ('client_computed_atoms' in 'server/heralds.rs'),

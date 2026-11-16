@@ -20,11 +20,11 @@ its members among a more public section's with anchors, as =contains=
 does ('docs/api-and-formats.org', "The .skg file format").
 
 =R= forks =N= says two things.  =R= shows =N='s content that =R=
-neither contains nor hides: under =R='s subscribee folder, =N= is a
+neither contains nor hides: in =R='s forks folder, claiming, =N= is a
 subscribee as such ('docs/glossary.org', "subscribee as such").  And
 =R= and =N= are mirrors, so either may stand in the other's place
 (see "Mirror substitution").  So a fork shown, editable, in its
-original's place draws, by default, its subscribee folder with the
+original's place draws, by default, its forks folder with the
 original in it, and
 two notes that fork one note can stand in each other's places.
 
@@ -53,15 +53,15 @@ particular, selecting a node in search results or a partner folder
 opens the selected node itself.
 
 The root's ordinary =K= relationship herald reports its visible
-=forks= facts, and the subscribee and subscriber folders show them
-(=C-c l s=).
+=forks= facts, and its forks folder shows them (=C-c l f=; drawn
+unasked on an editable occurrence with a fork partner).
 
 ** Partner folders in search results
 
 Search hits are raw, write-protected, non-content roots.  In the
-search enrichment, each result N gains, folded, its subscribee folder
-(the nodes N forks) and its subscriber folder (the nodes that
-fork N), each drawn only when it has a member.  The members are
+search enrichment, each result N gains, folded, its forks folder
+(the nodes N forks, then the nodes that fork N), drawn only when it
+has a member.  The members are
 write-protected, and show N's direct =forks= relatives only.  Node
 visibility and the relationship's relRepo both gate them.
 
@@ -156,20 +156,17 @@ re-pointed where it stands; from the root authors', it shows that node raw again
 ('substitute_roots' in =server/refresh/visit.rs=). A re-pointed root's
 folders are drawn afresh for the node it now shows, as a fresh view of
 it draws them ('redraw_folders'): its containers folder; where the root
-is editable, its subscribee folder with its count where it forks;
+is editable, its forks folder where it has a fork partner;
 and, where each other folder the old root held stood (mentioners,
-aliases, forkees, ...), that folder for the new node and the
-other folder of its relation, hidden in
+aliases, forks, ...), the folders of its relation for the new node,
+hidden in
 the root if the old one was (its members are drawn anew, unfolded),
 unless it would be empty and is one the user could type
-into, whose emptiness would say the user asked for it. (An editable
-root's subscribee folder brings no subscriber folder, since the root
-draws it unasked; a write-protected root's brings both, as a search
-hit draws both.) A
+into, whose emptiness would say the user asked for it. A
 write-protected root, such as a search hit, stays so and gains no
 content. An ID folder is not redrawn, since no request draws one. So
 from the user's perspective a view of a foreign note the user forked
-shows the fork's subscribee folder, counting what the user has
+shows the fork's forks folder, its original there counting what the user has
 neither filed nor hidden. Since the view's root is now the fork,
 asking to view that fork on the same connection lands in this
 view, as following a link to any open root does.
@@ -278,14 +275,15 @@ add a more-private layer such as =D= over =C=.  Forking a substituted
 viewnode forks the carrier on screen and therefore deepens the chain.
 Either gesture is refused on a note you already fork, naming your fork
 of it ('docs/forks.org', "Once forked: the fork operation's guard");
-a second owned fork made otherwise (by a nodeMerge, in a subscribee
+a second owned fork made otherwise (by a nodeMerge, in a forks
 folder, or in a note's file) is saved.
 
 *** Direct editing and imported data
 
-The subscribee folder is editable: a member typed there makes its
-viewparent fork it, and a member removed from it ends that =forks=
-relationship.  Raw or imported =.skg= data can contain =forks= facts
+The forks folder is editable: a member typed there makes its
+viewparent fork it, and a forkee removed from it ends that =forks=
+relationship; a forker removed from it is hidden by its viewparent
+(sharing-model.org, "The forks folder").  Raw or imported =.skg= data can contain =forks= facts
 too.
 
 ** Merge behavior
@@ -338,9 +336,9 @@ omit, and a restricted note in the middle of a path cuts it.
 
 *** Other relationships
 
-Initial construction of the default =subscribeeFolder= also obtains its
-members through the generic directional, relRepo-gated accessor before
-deciding whether the folder would be empty.  A private =forks= relationship between
+Initial construction of the default =forksFolder= also asks the
+relRepo-gated accessors, in both directions, whether the note has a
+fork partner ('has_a_fork_partner') before drawing the folder.  A private =forks= relationship between
 two public nodes therefore creates neither a member nor an empty default
 folder in a public-only view.  An explicitly requested editable folder may
 still be created empty, as intended.

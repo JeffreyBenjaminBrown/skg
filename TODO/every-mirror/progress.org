@@ -910,3 +910,274 @@ since the tool renames marks to 'Hides', which the code reads only
 from slice 7 on. Visible to Jeff once migrated, as decided: a former
 subscription-only note is a mirror, and so are sibling forks of one
 note, so either may stand in the other's place.
+** Slice 6: one forks folder
+*** Commits
+- 2bfefa91 every-mirror plan 1 slice 6: one forks folder, in the server, the clients and the AI tool
+- (the commit carrying this record) every-mirror plan 1 slice 6: docs, record, DONE
+*** Suites
+- 'bash/nextest.sh': 1243 of 1243 pass (1238 before the slice, plus
+  the 5 new tests: 'forks_folder::all_tests', the two
+  'pruned_change_view::forks_folder' tests, two in
+  'refresh::tests::claims'). Its first run, with the mechanical
+  renames made, had 22 failures (1216 of 1238); every one an expected
+  fixture adaptation (listed under "Tests adapted"), but
+  'partner_folder_order::a_member_added_elsewhere_follows_the_kept_ones',
+  a new failure the change caused: a drawn forker-only member was
+  appended after a note the user placed in the folder, where an
+  unordered folder draws it after the last member. Fixed in
+  'reinstate' ('Goal::keeps_the_views_order'). The second run had
+  1 failure, 'refresh::tests::reinstate' (expected: the hidden-outside
+  folder, now added to every forks folder).
+- The AI tool's tests (after 'cargo build --bin skg'): PASS. Its first
+  run had 13 failures: seven expected-output diffs and the
+  'R_SHOWING_*' strings (expected adaptations: labels, one folder, the
+  default forks folder), and five behavior checks plus one downstream
+  of them, new: the label "It forks these, or these fork it." holds
+  the handle word 'fork' (see Deviations).
+- 'bash/emacs-tests.sh' 503 of 503; 'bash/nvim-tests.sh' no failure.
+  First runs, both green.
+- 'bash/integration-tests.sh': 38 of 38 (the Emacs pass), first run.
+- 'bash/all-tests.sh', first run: all pass: build, Emacs 503 of 503,
+  Neovim (no failure), nextest 1243 of 1243, doctests, team tools, AI
+  reader, integration 76 of 76 (both clients).
+- Also, per the '/verify' skill, an isolated 'target/debug' server on
+  a scratch port with scratch data (N forks E and M, M and F fork N, N
+  hides H), twice: before the last server edits (port 24756) and
+  again right before the code commit (port 24757). A fresh view of N
+  drew the forks folder unasked: E and M claiming, F 'noClaim', the
+  hidden-outside folder last with H. Deleting M wrote 'forks: [E]',
+  'hides: [H, M]' ("Hides 'M' from 'N'.") and drew M in the
+  hidden-outside folder; deleting F hid it likewise; removing F there
+  unhid it ("Stops hiding 'F' from 'N'.") and drew it in the forks
+  folder again, claiming nothing; attaching F wrote 'forks: [E, F]';
+  detaching it wrote 'forks: [E]' and hid nothing; a relRepo request
+  on F was refused ("relRepo request on F, a member of a forks folder
+  that claims nothing") and wrote nothing; an unchanged save wrote
+  nothing; deleting E ended the fork and hid nothing. Each server was
+  stopped by its PID, its port checked free, its scratch folder
+  deleted (transcripts under 'verify/' and 'verify-before-commit/').
+Logs: 'tests/results/every-mirror/slice6-plan1/' (nextest-first.log,
+nextest-2.log, nextest.log, ai-tool-first.log, ai-tool-update.log,
+ai-tool.log, emacs-first.log, emacs.log, nvim-first.log, nvim.log,
+integration.log, all-tests.out, all-tests-ALL.org, verify/,
+verify-before-commit/).
+*** Names, for the slices after
+- 'Folder::Subscribee' and 'Folder::Subscriber' are one kind,
+  'Folder::Forks' (atom 'forksFolder', label "It forks these, or
+  these fork it."). 'Folder::HiddenInSubscribee' is
+  'Folder::HiddenInForkPartner' ('hiddenInForkPartnerFolder', label
+  unchanged); 'Folder::HiddenOutsideOfSubscribee' is
+  'Folder::HiddenOutsideOfForkPartners'
+  ('hiddenOutsideOfForkPartnersFolder', label "b hides these, but
+  nothing it forks or that forks it contains them."). Their style keys
+  end in '_forker'.
+- 'FolderRelation::SubscribesTo' is 'FolderRelation::Forks'; the
+  request '(folder subscribesTo)' is '(folder forks)'.
+- New: 'FORKS_FOLDER_MEMBER_ROLES' ('server/types/viewnode.rs');
+  'GoalItem::claimable', 'Goal::ordered_then_unordered',
+  'Goal::keeps_the_views_order', 'forks_folder_goal',
+  'forker_only_members', 'has_a_fork_partner' ('goal.rs');
+  'diff_view::forks_folder_goal'; 'add_hidden_outside_folder_to_forks_folder',
+  'hidden_in_its_forks_folder' ('visit.rs'); 'ForksFolderMemberSides',
+  'forks_folder_member_sides', 'birth_facts_of_fork_sides'
+  ('viewnodestats.rs'); 'FieldIntent::ForksFolderMembers' and
+  'ForksFolderMembers' ('types.rs'), 'LoweringOutput::forks_folder_members',
+  'resolve_forks_folder_removals' ('resolve_visibility.rs');
+  'is_forks_folder_member_claiming_nothing' ('validate_tree.rs');
+  'relationships_to_viewparent' (was 'relationship_to_viewparent',
+  now returning every side), 'PARTNER_FOLDERS' ('changes.rs', for
+  'IN_FOLDERS' and 'OUT_FOLDERS').
+- 'kinds_redrawing' takes no 'root_is_editable' again.
+- 'Folder::relation_member_role' answers None for 'Folder::Forks';
+  every caller handles the forks folder before asking (below).
+- Kept for slice 7: 'subscriber_of_subscribee_as_such' (now claim-aware),
+  'visit_subscribee_folder' (now the forks folder's visit),
+  'LocalContext::SubscribeeAsSuchPosition', 'hidden_in_subscribee',
+  'hidden_outside_of_subscribees', the parse's
+  'is_subscribee_as_such' and the clients' as-such predicates.
+*** What each reader of the kind's role and editability does for 'Folder::Forks'
+The pitfall "One folder kind with two roles" asks for this list.
+- 'relation_member_role' answers None for the forks folder, and no
+  caller reaches it with one: 'folder_goal' sends it to
+  'forks_folder_goal' (and the diff view's 'forks_folder_goal'), never
+  to 'partnerFolder_goal'; 'partnerFolder_members_in_graph' answers
+  for it first; 'birth_facts' takes a member's facts from its sides
+  ('forks_folder_member_sides'), and 'birth_facts_for_folder' gives
+  the kind none; 'set_relRepo' picks the recorder by the member's
+  side (N where it claims, else the member); 'changed_partner_folder_kinds'
+  treats a None role as the forks folder, changed when either side
+  did; 'relationships_to_viewparent' (the processed-mark and restore
+  leaf keys) gives both sides ('FORKS_FOLDER_MEMBER_ROLES').
+- 'is_editable' is true: 'parent_reads_claims' reads its members'
+  claims where N is editable, and 'draw_item' and 'warrant_of_child'
+  confine a claim to a claimable item; 'folder_goes_when_empty' keeps
+  it when empty; 'redraw_folders' redraws it where N has a fork
+  partner ('has_members' asks 'has_a_fork_partner'); the diff view's
+  removed-member filter keeps, as for any editable folder, only a
+  removed member one of the two graphs has.
+*** Deviations from the plan's "how"
+**** Logs under 'tests/results/every-mirror/slice6-plan1/'
+As the launch brief said.
+**** Q12 and Q13 as Jeff settled them, not as the agreed-behavior text and the slice's test list say
+The slice's test list says deleting M draws it again claiming
+nothing, and deleting F changes nothing and F is drawn again. The
+settled subheadings win: deleting a forker-only member hides it
+(Q12), deleting a mutual ends the fork and hides it (Q13), and the
+tests pin that ('tests/forks_folder.rs'). The save reads, for each
+save-eligible note with a forks folder in the buffer, every member
+that folder shows, claiming or not ('FieldIntent::ForksFolderMembers',
+a combineable signal): a note that forks N by a record the skgrepo
+restriction shows, that N does not fork after the save, that the
+folder no longer shows and that N does not hide already, joins N's
+hides ('resolve_forks_folder_removals'). "Where the baseline showed
+it" is read as the existing subscribee-visibility step reads it,
+against the graph, not the client's baseline text: the
+update-relevant neighborhood redraws N's views when a forker appears,
+so a buffer is stale only as it is for that step. The hide report
+says "Hides 'F' from 'N'."
+**** What the hidden-outside folder does for hidden forkers (for plan 2)
+Its membership is unchanged: N's hides less what N's forkees contain
+(by visible records). A hidden forker is in it simply because no
+forkee contains it; one a forkee contains stands in that forkee's
+hidden-in folder instead (an edge case plan 2's decision 8 settles).
+What this slice adds: the forks folder's goal leaves out every
+forker N hides ('forker_only_members'); an unwarranted member claiming
+nothing that N hides vanishes from a forks folder, so a collateral
+view drawn before the hide loses it ('hidden_in_its_forks_folder', in
+'mark_claims' and 'leaves_its_write_protected_folder'); every forks
+folder of a content view gets the hidden-outside folder when N hides
+something outside its partners, not only one the request or the
+default drew ('add_hidden_outside_folder_to_forks_folder'), so that
+the forker just hidden appears there; and removing it there unhides
+it through the existing 'apply_hiddenoutside_edits', which runs after
+the new removal step. The diff view's forks folder goal does not
+leave out hidden forkers. 'apply_hiddenoutside_edits',
+'infer_hides_from_contains_removals', the floors and the hidden-in
+folder still read N's forkees only: plan 2's decision 8.
+**** Q11's order: one goal with an ordered head and an unordered tail
+'Goal' gained 'unordered_from': the forkees take their list's order;
+every forker-only item shares the position after the last forkee, so
+the (stable) reorder keeps them in the order the view has them, and
+a drawn one follows the last child the goal names, as in an
+unordered folder ('Goal::keeps_the_views_order').
+**** Members of a forks folder are drawn write-protected
+As members of every folder are ('drawn_occurrence_editability'); a
+member made editable gets its own default folders, its own forks
+folder among them (an editable forkee shows its forker N there,
+claiming nothing, as plan 2's "R's view" anticipates).
+**** A forker that stops forking N stays, unwarranted
+As a subscriber-folder member did (the plan: "drawn and saved as a
+subscriber-folder member is today"). It shows when a content
+occurrence is re-pointed to another mirror and keeps the forks folder
+it had: the original's forker stands in the mirror's folder, marked
+noWarrant, until the user removes it (removing it hides nothing,
+since it forks nothing of N's). Vanishing it would also vanish a note
+the user placed there, which the matrix pins as staying.
+**** A relRepo request on a member claiming nothing
+Refused at validation for any such member, editable or not
+('is_forks_folder_member_claiming_nothing'), with its own message.
+**** The diff view's labels and motions
+'shared/herald-styles.json': the forks folder is in no 'other_files'
+list; its changed label is "its forks changed"; the clients' plain
+motions skip a write-protected member born only of '(forks out 2)'
+(said in the file's comment). A restoreRel request on a forks folder
+member restores each side HEAD records.
+**** Tests moved to the hider folder
+Tests that used the subscriber folder as an example of a
+write-protected folder now use the hider folder:
+'partner_folder_warnings' (its fixtures r and t hide n instead of
+forking it), 'subscribee_folder_empty_persists' (the removed empty
+folder), the clients' generic write-protected examples.
+**** The AI tool's handle words
+The label "It forks these, or these fork it." holds 'fork', the fork
+operation's request word; the AI tool now strips listed herald
+phrases before reading a handle's words
+('HERALD_PHRASES_HOLDING_HANDLE_WORDS'). The slice's client fork
+also renamed the relRepo walk's kind 'subscribee' to 'forkee' in all
+three clients, which slice 5's record left to this slice.
+**** Docs and clients written by delegated agents
+'docs/' (but the COMMANDS docs) by one agent from a brief of this
+slice's facts, the clients, the AI tool, their tests and the COMMANDS
+docs by another; both checked by spot reading and by the suites.
+*** Tests adapted (expected fixture adaptations)
+Every one follows Q14 (a forks folder drawn unasked on an occurrence
+an editable-view request extends, when its note has any fork
+partner), the one folder (decision 9), its claims (forker-only
+members print 'noClaim'), or Q12 and Q13.
+- Mechanically, every Rust test's atoms, kinds, the request
+  '(folder forks)', the labels; 'tests/shared/herald-rules.sexp'
+  regenerated; comments naming the old folders.
+- Forks folders newly drawn unasked: 'tests/refresh/substitution.rs'
+  (three outlines), 'tests/hidden_from_subscriptions.rs' (each
+  editable forkee as such shows its forks folder holding R, four
+  expected views), 'tests/override_substitution.rs' (R, M, a clone
+  and L's forker now stand as forker-only members; each assertion now
+  says where, not "not at all"), 'tests/extend_partner_folder_member.rs'
+  (Overrider and S in N's folder; forksFolder no longer an "exotic"
+  folder), 'tests/partner_folder_matrix.rs' (dn-owner's and
+  omSub-owner's folders), 'tests/refresh/reinstate.rs' (the
+  hidden-outside folder now in every forks folder).
+- The two folders made one: 'tests/partner_folder_matrix.rs' (the
+  subscriber folder's write-protected scenarios became the forker-only
+  scenarios: reorder kept, a placed note claiming nothing stays,
+  deletion hides; the chain spec of the subscriber folder is drawn by
+  default), the diff-view tests (members print 'noClaim', ghosts
+  included; the member searched for in its folder, not first),
+  'tests/new/local_fieldintent_collection/{traverse, extraction,
+  pipeline}.rs' (their "intruder" members claim nothing, and the
+  recorder's 'forks' is read as empty), 'tests/unit/viewnode.rs'.
+- Moved to the hider folder: 'tests/partner_folder_warnings.rs',
+  'tests/subscribee_folder_empty_persists.rs' (its second case).
+- Clients and AI tool: listed in their part of "Suites".
+*** Tests added
+- 'tests/forks_folder.rs' (fixture 'tests/forks_folder/fixtures/'):
+  E, M, F in that order with the hidden-outside folder last, their
+  rels and births (=bK=, =bKb=, =Kb=); an unchanged save writes
+  nothing; a typed member is forked; deleting E ends the fork; deleting
+  M ends the fork and hides it (Q13); detaching M ends the fork only;
+  deleting F hides it, and removing it from the hidden-outside folder
+  unhides it (Q12); attaching F makes it a mutual; a relRepo request
+  on F is refused.
+- 'tests/refresh/claims.rs': a claiming member the viewparent no
+  longer forks vanishes, a claiming forker is drawn again claiming
+  nothing, a forker drawn claiming nothing stays (the collateral
+  case); a forker the viewparent hides vanishes into the
+  hidden-outside folder.
+- 'tests/pruned_change_view/forks_folder.rs' (fixture
+  'tests/pruned_change_view/fixtures/forks_folder/', Q15): one changed
+  forks folder holding an unchanged forkee, a mutual with both sides
+  added '(leaves 2 rel)', an added forkee, and an added forker
+  claiming nothing; a mutual is processed only when both its leaves
+  are marked.
+- Clients: the pending-detachment predicate in a forks folder (a
+  detached forkee and a detached mutual yes, a forker-only member no)
+  and the relRepo refusal on a member claiming nothing, in Emacs,
+  Neovim and the AI tool; 'C-c l f' / 'lf' bound and 'C-c l s' / 'ls'
+  unbound.
+*** Fixtures changed
+- New: 'tests/forks_folder/fixtures/', 'tests/pruned_change_view/fixtures/forks_folder/'.
+- 'tests/partner_folder_warnings/fixtures/{r,t}.skg': they hide n
+  (the test moved to the hider folder).
+- 'tools/skg-for-ai/test-expected/': seven compact views (labels, one
+  folder, the default forks folder under 'overridden-id');
+  'forest-subscribesTo_fred-note-id.compact.org' renamed
+  'forest-forks_fred-note-id.compact.org'.
+*** Unfinished, and notes for later slices and Jeff
+- Plan 2 (decision 8) owns what hides apply to: the hidden-outside
+  folder still subtracts only forkees' content, the hidden-in folder
+  is drawn only under a forkee as such, and the hide inference from
+  contains removals and the floors read forkees only.
+- The stale-forker wart above (a forker of the original kept,
+  unwarranted, in a re-pointed mirror's forks folder).
+- A forker deleted in one buffer while another buffer still shows it
+  claiming nothing: the other buffer's next refresh drops it (it is
+  hidden); a forker another view made a mutual, still drawn claiming
+  nothing in a buffer, reads there as a pending detachment, and saving
+  that buffer ends the fork. Both follow from the buffer being the
+  user's statement, as for any pending detachment.
+- The editable forkee as such now always shows a forks folder holding
+  at least its forker (plan 2 draws forkers otherwise).
+- Old buffers and the AI tool's saved views holding the old atoms are
+  refused at save and must be reopened (pitfall "Old buffers").
+*** DONE
+The slice's headline in '1_plan.org' is DONE.

@@ -1536,7 +1536,7 @@ fixtures' migration; the clients and the AI tool.
 - This slice changes what the server writes into buffers: run the
   suites as slice 2 does.
 
-** TODO Slice 6: one forks folder
+** DONE Slice 6: one forks folder
 Questions: Q8 (the folder, the compound folders, the request, the
 keys, the labels), Q11, Q12, Q13, Q14, Q15. Decision 9; behavior 5
 says what the folder is, and the pitfalls "One folder kind with two

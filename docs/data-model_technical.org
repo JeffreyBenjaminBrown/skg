@@ -300,8 +300,8 @@ membership* when the save will read it as a member of its
 viewparent's list. That is declared: the bare atom =noClaim= says no,
 its absence yes (=claimsMembership= on the occurrence, the ghost, the
 unknown viewnode, the restricted viewnode, the alias and the ID). The save reads claims only under an
-editable occurrence, and under an editable folder (subscribee,
-hidden-outside-of-subscribee, alias) of one
+editable occurrence, and under an editable folder (forks,
+hidden-outside, alias) of one
 (=parent_reads_claims= in =server/refresh/ancestry.rs=); under any
 other viewparent no child claims, whatever it carries, and the
 server writes no =noClaim= there. A child *is warranted* when the
@@ -326,11 +326,19 @@ warranted and claims nothing (a *pending detachment*, herald
 are the user's to make, and a claim the truth does not warrant the
 refresh does not mark but removes, with the child that made it.
 
+In the forks folder a claim says "the folder's viewparent forks it".
+A goal item there may refuse a claim (=GoalItem::claimable= false, a
+forker-only member's): a child claiming it is unwarranted
+(=warrant_of_child=), and vanishes, and the item is drawn again
+claiming nothing (=draw_item=). So a member claims exactly when the
+note forks it, and a save of the view never makes the note fork a
+forker it only showed.
+
 *** The goal
 A parent's *goal* is what the truth says its children should be
 (=goal_of_parent= in =server/refresh/goal.rs=): for an occurrence's
-content, its =contains= list in file order (for a subscribee shown as
-such, less what its subscriber hides or already contains); for a node
+content, its =contains= list in file order (for a forkee shown as
+such, less what its forker hides or already contains); for a node
 of the containerward chain, its containers; for a folder, its
 partners in the folder's relation, or the compound folders' derived
 lists; for a property folder, the node's aliases, IDs or true flags.
@@ -342,9 +350,12 @@ over, since the view already shows that container
 Each item names a gnid, by the pid its list entry resolves to or the
 raw ID when nothing answers to it, or a property value. The goal is
 ordered where the viewparent's own file records the order (content,
-aliases, and the subscribee, hidden and
-hidden-outside-of-subscribee folders: =Folder::goal_is_ordered=), and
-unordered elsewhere. In the diff view the goal is the union
+aliases, and the forks, hidden and hidden-outside folders:
+=Folder::goal_is_ordered=), and unordered elsewhere. The forks
+folder's goal is ordered only in part: its forkees lead, in the
+order of the note's 'forks' list, and its forker-only members, which
+no list orders, follow them all, in the order the view has them
+(=Goal::ordered_then_unordered=, "The forks folder" below). In the diff view the goal is the union
 of the parent's lists in the two graphs of the straddle, an item only
 HEAD's list holds being warranted by HEAD. A parent whose position
 implies no relationship (the buffer root, a tombstone, an unknown
@@ -385,7 +396,10 @@ no hide is written of a member that only a restricted record
 explains. The inference of hides from a removal
 (=infer_hides_from_contains_removals=) reads the same way: the
 subscriber's visible forks, their content by visible records,
-and its visible hides.
+and its visible hides. So does the hiding of a forker deleted from a
+forks folder (=resolve_forks_folder_removals=): only a forker whose
+record the skgrepo restriction shows was drawn, so only such a one
+is hidden for its absence.
 
 The rule has a converse for what the save creates: no record lands in
 a section the skgrepo restriction keeps out unless the graph already
@@ -458,12 +472,14 @@ text calls them the ladder):
 6. reorder: where the goal is ordered, the children it names take its
    order, and every other child rides right after the sibling it
    followed; where it is not, nothing moves, and a drawn item follows
-   the last child the goal names;
+   the last child the goal names (as does a drawn forker-only member
+   of a forks folder, all of which share the position after the last
+   forkee: =Goal::keeps_the_views_order=);
 7. substitution: in a content view, under an editable occurrence, a
    member is shown as the mirror shown for it, with =(overridesHere
    N)=, except where P is itself shown raw where another mirror would
-   stand (a root, or a member of a folder other than the subscribee
-   folder); when the original itself becomes the mirror shown, the
+   stand (a root, or a member of a folder that is no forkee as such);
+   when the original itself becomes the mirror shown, the
    carrier loses the part and the original is reinstated beside it
    (=docs/api-and-formats.org=, "Override substitution and the
    overridesHere part");
@@ -479,25 +495,97 @@ left with no child is entombstoned, unless the save reads its
 membership or it is the flags folder, which stays visible when empty
 ('folder_goes_when_empty').
 
-A content view draws some folders unasked, as it always has
-(=add_default_folders=): an occurrence that an editable-view request
-extends, a fresh view's roots and every occurrence the refresh draws
-editable among them, shows its subscribee folder
-when it forks something the skgrepo restriction shows, and the
-folder of what it hides outside its subscribees inside that, when it
-hides something there; an editable subscribee shown as such shows the
-folder of what its subscriber hides in it, when that holds anything.
+A content view draws some folders unasked (=add_default_folders=): an
+occurrence that an editable-view request extends, a fresh view's
+roots and every occurrence the refresh draws editable among them,
+shows its forks folder when it has a fork partner, either way, by a
+record the skgrepo restriction shows (=has_a_fork_partner=); an
+editable forkee shown as such shows the folder of what its forker
+hides in it, when that holds anything. And every forks folder of a
+content view holds, last, the folder of what its viewparent hides
+outside its fork partners, when it hides something there
+(=add_hidden_outside_folder_to_forks_folder=), so that a forker a
+save hid stands there.
 
 *** The ancestry table
 =required_ancestry= (=server/refresh/ancestry.rs=) gives each kind of
 descriptor the ancestors it may stand under, nearest first: a folder
 under an occurrence (the acquired-by folder under a ghost; the
-hidden-outside folder in a subscribee folder; the hidden-in folder
-under a subscribee in a subscribee folder); a property member in its
+hidden-outside folder in a forks folder; the hidden-in folder under
+a member of a forks folder); a property member in its
 property folder; a change viewnode under an occurrence or a ghost,
 and a body diff under an old text. A descriptor whose ancestors are
 not those is unsayable. A vognode has no row: an occurrence is never
 unsayable.
+
+*** The forks folder
+The forks folder ('Folder::Forks', =forksFolder=) under an occurrence
+of a note N holds N's fork partners, each once: the notes N forks
+(forkees) and those that fork it, by records the skgrepo restriction
+shows. A *mutual* both forks N and is forked by it; a *forker-only
+member* forks N and is not forked by it.
+
+**** Its goal and its claims
+Its goal (=forks_folder_goal= in =server/refresh/goal.rs=) is N's
+forkees in the order of N's 'forks' list, each claimable, with the
+relRepo of each unknown or restricted one; then its forker-only
+members (=forker_only_members=): the notes that fork N, in graph
+order, less those N forks or hides, each unclaimable
+(=GoalItem::claimable= false). The forkees take the list's order;
+the forker-only members keep the order the view has them in, after
+the last forkee (=Goal::ordered_then_unordered=). So a member claims
+exactly when N forks it: a forkee or a mutual claims, a forker-only
+member claims nothing. A member claiming what N no longer forks
+(another view's save removed the fork) is unwarranted and vanishes,
+and, if it still forks N, is drawn again claiming nothing. A member
+claiming nothing that N forks is a pending detachment, as anywhere; a
+forker-only member is none.
+
+The folder is editable: it stays when empty, and is drawn unasked
+where N has a fork partner either way ('add_default_folders'); a
+request for it is '(folder forks)' ('FolderRelation::Forks'). A
+forker N hides is not drawn in it: it stands in the folder of what N
+hides outside its fork partners, which the forks folder holds last.
+
+**** What each member shows
+The birth facts follow the sides on which the member stands
+(=forks_folder_member_sides= in =server/refresh/viewnodestats.rs=):
+=(forks in 2)= where it claims (where the folder reads no claims,
+where the graph says N forks it), =(forks out 2)= where the graph's
+warrant and a visible record say it forks N; a mutual carries both,
+a detached forkee neither. Its relRepo fact is N's record of the fork
+where it claims, else its own record of forking N. A relRepo request
+on a member claiming nothing is refused at validation
+(=is_forks_folder_member_claiming_nothing= in
+=server/from_text/buffer_to_viewnodes/validate_tree.rs=): its record
+is in its own file.
+
+**** What a save reads there
+The save's traversal (=visit_subscribee_folder= in
+=server/from_text/local_fieldintent_collection/traverse.rs=) reads
+the folder's claiming members as N's 'forks', and visits a claiming
+member as a forkee as such and one claiming nothing as a member of a
+write-protected folder. It also emits a signal,
+=FieldIntent::ForksFolderMembers=, listing every vognode the folder
+shows, claiming or not, but those marked for deletion. Visibility
+resolution then hides in N each note that forks N by a visible
+record, that the folder no longer shows, that N does not fork after
+the save, and that N does not hide already
+(=resolve_forks_folder_removals= in =resolve_visibility.rs=), before
+the edits of the hidden-outside folder, which run last. So:
+- typing a member there, claiming, makes N fork it;
+- deleting a forkee ends N's fork of it;
+- deleting a forker-only member hides it in N, and it leaves the
+  forks folder for the hidden-outside folder; removing it there
+  unhides it, and it is drawn in the forks folder again;
+- deleting a mutual ends N's fork of it and hides it;
+- detaching a mutual ends N's fork of it only: it stands as a
+  forker, claiming nothing;
+- attaching a forker-only member makes N fork it: a mutual.
+The hidden-outside folder's membership reads N's forkees' content
+only; plan 2 ('TODO/every-mirror/2_plan.org', decision 8) makes N's
+hides apply to what it shows of its forkers too, and that folder's
+membership with them.
 
 *** The extent and the node budget
 The *extent* is how much of P's goal the refresh draws

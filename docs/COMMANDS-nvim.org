@@ -117,8 +117,8 @@ parent reads claims: one that another view's save removed from its
 parent's content, say. A member that one view's save added is drawn
 into every other view that shows its list, as a fresh view draws its
 members: editable where no other occurrence of its node is and the
-node budget allows, and then with its subscribee folder when it
-forks something the skgrepo restriction shows. A headline
+node budget allows, and then with its forks folder when it has a
+fork partner, either way, the skgrepo restriction shows. A headline
 standing for a node the save deleted vanishes from every content
 view, with whatever stood under it; in the diff view it becomes the
 node's ghost.
@@ -445,21 +445,30 @@ mentioners build one, as do aliases and flags, which are no relation).
 Under each member of a partner folder hangs its containerward chain
 (see <localleader>lc). The write-protected folder ☮
 marks a folder you cannot change from here. Every command auto-saves.
-Without such a request, an editable node shows only its nonempty
-subscribeeFolder (plus the nonempty hiddenInSubscribeeFolder on an editable
-subscribee-as-such); the heralds advertise other nonempty relations.
+Without such a request, an editable node shows only its forksFolder,
+where it has a fork partner, either way (plus the nonempty
+hiddenInForkPartnerFolder on an editable forkee as such); the heralds
+advertise other nonempty relations.
 *** <localleader>la : :SkgShowFolderOfAliases
 The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:
 type an alias in and save.
 *** <localleader>lh : :SkgShowFolderOfHidesFromSubs
 The hiderFolder and hiddenFolder -- both write-protected (☮). Hiding is edited from
-a subscribee-as-such, never from these folders. On a node that neither
+a forkee as such, the forks folder, or the folder of what a note hides
+outside its fork partners, never from these folders. On a node that neither
 hides nor is hidden, nothing appears.
-*** <localleader>ls : :SkgShowFolderOfSubscribesTo
-The subscribeeFolder (the nodes this node forks -- editable, shown
-even when empty) and the subscriberFolder (the nodes that fork
-this one -- write-protected, ☮).
+*** <localleader>lf : :SkgShowFolderOfForks
+The forksFolder, editable and shown even when empty: first the nodes
+this node forks, in its list's order, each claiming membership (=bK=;
+a mutual, which also forks this node, =bKb=); then the nodes that fork
+this one and that it neither forks nor hides, each claiming nothing
+(=Kb=); last, the folder of what this node hides outside its fork
+partners, when it hides any. Typing a member in, or attaching a
+forker (<localleader>sa), makes this node fork it. Deleting a member
+it forks stops the fork; detaching a mutual stops only the fork;
+deleting a mutual or a forker also hides it, so that it moves to the
+hidden-outside folder, whence deleting it unhides it.
 *** <localleader>lp : :SkgShowFolderOfFlags
 Shows the write-protected, true-only flags folder as titleless viewnodes whose
 heralds carry their labels, in canonical order.
@@ -689,7 +698,7 @@ It first asks, with Neovim's selection menu, which role the
 view-children should play toward their viewparents: one entry per
 role of the schema's four node-node relations. Only two roles are
 settable from the child's position -- =content= (ordinary content)
-and =forkee= (a subscribeeFolder member); choosing any other role
+and =forkee= (a claiming forksFolder member); choosing any other role
 says why its relationship cannot be set from there.
 
 It then prompts for a skgrepo over every skgrepo, plus the
@@ -700,8 +709,7 @@ the save's floor check validates each relationship.
 The walk recurses only on viewchildren that are members: member
 occurrences, and the two editable folders. It sets an unknown
 viewnode or a restricted viewnode too, where it stands as such a
-member. It prunes below write-protected nodes and subscribee-as-such
-members, and prunes write-protected folders, ghosts and other
+member. It prunes below write-protected nodes and forkees as such, and prunes write-protected folders, ghosts and other
 non-vognodes entirely. A pending delete, nodeMerge or flag request
 anywhere in the walk refuses the whole gesture before any edit
 ("Cannot request a relRepo where a delete, merge or flag request is
@@ -826,9 +834,10 @@ skg://commit-message". (Emacs: C-c r C.)
 Moves the cursor to the next headline with change facts after it: a headline
 whose metadata carries a '(leaves ...)' change fact, the server's count of
 the changes it names. It skips a ☮ occurrence (not a ghost) standing directly in a
-folder labelled "... (other files)" (its other containers, mentioners,
-subscribers or hiders changed): that member records the
-relationship in its own file, and its change is drawn, and visited,
+folder labelled "... (other files)" (its other containers, mentioners
+or hiders changed), and one standing in the forks folder born only of
+forking the viewparent ('(birth (forks out 2))'): that member records
+the relationship in its own file, and its change is drawn, and visited,
 where its node stands editable. <localleader>rnC visits those too.
 The cursor lands at the start of the headline's
 line. It does not wrap: past the last one it says "No
@@ -1309,7 +1318,7 @@ and where no other perspective would show the buffer differently.
 The roots are replaced too: from an author's perspective, a root that
 author forks shows that author's fork, standing where the root stood,
 with the cursor still on it if it was, and with its own folders, as
-a fresh view of it would draw them (its containers, its subscribee
+a fresh view of it would draw them (its containers, its forks
 folder and count, and any other folder you had opened there); from the
 root authors', the node you opened, as it is. The buffer keeps its name. In a search
 buffer, the hits are its roots. See =docs/override.org=.
