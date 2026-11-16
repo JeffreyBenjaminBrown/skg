@@ -77,7 +77,6 @@ fn every_kind_atom (
   let folders : Vec<Folder> = vec! [
     Folder::Alias, Folder::ID, Folder::flags (),
     Folder::Subscribee, Folder::Subscriber,
-    Folder::Overridden, Folder::Overrider,
     Folder::Hider, Folder::Hidden,
     Folder::HiddenInSubscribee,
     Folder::HiddenOutsideOfSubscribee,
@@ -87,7 +86,6 @@ fn every_kind_atom (
     match folder {
       Folder::Alias | Folder::ID | Folder::Flags { .. }
         | Folder::Subscribee | Folder::Subscriber
-        | Folder::Overridden | Folder::Overrider
         | Folder::Hider | Folder::Hidden
         | Folder::HiddenInSubscribee
         | Folder::HiddenOutsideOfSubscribee

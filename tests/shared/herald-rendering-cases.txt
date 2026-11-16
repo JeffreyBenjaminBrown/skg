@@ -98,7 +98,7 @@
 (skg node (gnid x) (overridesHere y) (view (rels (overrides (out 1 (ancestors 8))))))
 ---- text: Oĥh
 ---- styles: normal*1 crucial*1 medium*1
-==== birth: links and overrides, an overriders folder's member
+==== birth: links and overrides
 (skg node (gnid x) (view (rels (linksTo (in 5 (substantive 2)) (out 3)) (overrides (out 1))) (birth (overrides out 2))))
 ---- text: 2/5L3 O1
 ---- styles: high*1 medium*2 normal*2 -*1 low*1 medium*1

@@ -1,8 +1,8 @@
 // cargo nextest run --test grouped_overrides -E 'test(collateral_partner_folder::)'
 //
 // Two cells of the relationship matrix ('docs/sharing-model.org', "The
-// write-protected folders: who subscribes to, overrides, or hides this
-// node") that need an open collateral view and the collateral rerender
+// write-protected folders: who subscribes to or hides this node") that
+// need an open collateral view and the collateral rerender
 // stream:
 //
 // 1. collateral folder-membership update: a view of N shows a

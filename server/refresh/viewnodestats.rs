@@ -380,7 +380,6 @@ fn birth_facts_for_folder (
 ) -> Vec<BirthFact> {
   match folder {
     Folder::Subscribee | Folder::Subscriber
-    | Folder::Overridden | Folder::Overrider
     | Folder::Hider | Folder::Hidden
     | Folder::Container | Folder::Mentioner
     | Folder::AcquiredBy | Folder::Acquired =>

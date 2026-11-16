@@ -609,36 +609,6 @@ own relationship to its view-parent."
        (should (string-match-p "(relRepo trusted)"
                                (test--line-of-id "b")))))))
 
-(ert-deftest test-recursive-walk-overridden-and-member-content ()
-  "An overriddenFolder member matches kind `overridden'; the member's
-own content children (the member being editable) match kind
-`content' through the folder."
-  (let ((tree (concat
-               "* (skg node (gnid anchor) (skgRepos (nodeRepo public))) anchor\n"
-               "** (skg overriddenFolder)\n"
-               "*** (skg node (gnid o) (skgRepos (nodeRepo public))) o\n"
-               "**** (skg node (gnid oc) (skgRepos (nodeRepo public))) oc\n")))
-    (test--with-skg-content-view
-     tree test--config-public-private-trusted
-     (lambda ()
-       (goto-char (point-min))
-       (should (= 1 (skg--set-relRepo-recursive-walk
-                     'overridden "private")))
-       (should (string-match-p "(relRepo private)"
-                               (test--line-of-id "o")))
-       (should-not (string-match-p "relRepo"
-                                   (test--line-of-id "oc")))))
-    (test--with-skg-content-view
-     tree test--config-public-private-trusted
-     (lambda ()
-       (goto-char (point-min))
-       (should (= 1 (skg--set-relRepo-recursive-walk
-                     'content "private")))
-       (should (string-match-p "(relRepo private)"
-                               (test--line-of-id "oc")))
-       (should-not (string-match-p "relRepo"
-                                   (test--line-of-id "o")))))))
-
 (ert-deftest test-recursive-walk-prunes-write-protected-folder ()
   "A write-protected folder's whole branch is pruned: even a editable
 member's content children are not reached."
@@ -705,7 +675,7 @@ the subtree, while preserving derived facts."
 ;; --- The kind menu: skg--select-relationship-kind ---
 
 (ert-deftest test-relationship-kind-menu-settable-roles ()
-  "The menu tree offers exactly the three writable kinds, one per
+  "The menu tree offers exactly the two writable kinds, one per
 writable position, and covers all five schema relations."
   (should (equal (mapcar #'car (skg--relationship-kind-menu-tree))
                  '("contains" "linksTo" "subscribesTo"
@@ -715,7 +685,7 @@ writable position, and covers all five schema relations."
                                (apply #'append
                                       (mapcar #'cdr
                                               (skg--relationship-kind-menu-tree)))))
-                 '(content subscribee overridden))))
+                 '(content subscribee))))
 
 (defun test--choose-menu-role (role-line)
   "In the relationship-kind menu buffer, move to ROLE-LINE and choose it."

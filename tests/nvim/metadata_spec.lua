@@ -616,7 +616,7 @@ describe('skg.metadata keybinding surface', function ()
     assert.are.equal('RequestWriteProtected', by_lhs['sw'])
     assert.are.equal('RequestWriteProtectedRecursive', by_lhs['sW'])
     assert.are.equal('ShowFolderOfAliases', by_lhs['la'])
-    assert.are.equal('ShowFolderOfOverrides', by_lhs['lo'])
+    assert.is_nil(by_lhs['lo'])
     assert.are.equal('ShowFolderOfSubscribesTo', by_lhs['ls'])
     assert.are.equal('ShowFolderOfFlags', by_lhs['lp'])
     assert.is_nil(by_lhs['cb'])
@@ -922,24 +922,6 @@ describe('skg.metadata relRepo gesture', function ()
     assert.is_truthy(text_of_id('b'):find('(relRepo trusted)', 1, true))
   end)
 
-  it("walks an overridden member and its content", function ()
-    local tree = {
-      '* (skg node (gnid anchor) (skgRepos (nodeRepo public))) anchor',
-      '** (skg overriddenFolder)',
-      '*** (skg node (gnid o) (skgRepos (nodeRepo public))) o',
-      '**** (skg node (gnid oc) (skgRepos (nodeRepo public))) oc' }
-    buffer_with(tree)
-    assert.are.equal(1, metadata.set_relRepo_recursive_walk(
-      1, 'overridden', 'private'))
-    assert.is_truthy(text_of_id('o'):find('(relRepo private)', 1, true))
-    assert.is_falsy(text_of_id('oc'):find('relRepo'))
-    buffer_with(tree)
-    assert.are.equal(1, metadata.set_relRepo_recursive_walk(
-      1, 'content', 'private'))
-    assert.is_truthy(text_of_id('oc'):find('(relRepo private)', 1, true))
-    assert.is_falsy(text_of_id('o'):find('relRepo'))
-  end)
-
   it('prunes a write-protected folder', function ()
     buffer_with({
       '* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder',
@@ -977,7 +959,7 @@ describe('skg.metadata relRepo gesture', function ()
     assert.is_falsy(buffer_text():find('editRequest'))
   end)
 
-  it('offers the three writable kinds among the five relations', function ()
+  it('offers the two writable kinds among the five relations', function ()
     local tree = metadata.relationship_kind_menu_tree()
     local relations, kinds = {}, {}
     for _, relation in ipairs(tree) do
@@ -987,7 +969,7 @@ describe('skg.metadata relRepo gesture', function ()
     end
     assert.are.same({ 'contains', 'linksTo', 'subscribesTo',
                       'hidesFromSubs', 'overrides' }, relations)
-    assert.are.same({ 'content', 'subscribee', 'overridden' }, kinds)
+    assert.are.same({ 'content', 'subscribee' }, kinds)
   end)
 
   it('chooses a settable kind and refuses the others', function ()

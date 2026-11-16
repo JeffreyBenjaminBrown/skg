@@ -1452,7 +1452,7 @@ end
 ---cannot carry this request. Mirrors
 ---skg--relRepo-unsupported-folder-atoms.
 M.relRepo_unsupported_folder_atoms = {
-  'subscriberFolder', 'overriderFolder', 'hiderFolder', 'hiddenFolder',
+  'subscriberFolder', 'hiderFolder', 'hiddenFolder',
   'containerFolder', 'mentionerFolder', 'acquiredByFolder',
   'acquiredFolder', 'illegalEditFolder', 'hiddenInSubscribeeFolder',
   'hiddenOutsideOfSubscribeeFolder' }
@@ -1462,8 +1462,7 @@ M.relRepo_unsupported_folder_atoms = {
 ---viewparent records the relationship to each member.
 ---Mirrors skg--writable-folder-relations.
 M.writable_folder_relations = {
-  { atom = 'subscribeeFolder', relation = 'subscribesTo' },
-  { atom = 'overriddenFolder', relation = 'overrides' } }
+  { atom = 'subscribeeFolder', relation = 'subscribesTo' } }
 
 ---The menu entry that removes the pending '(editRequest (relRepo
 ---...))' request instead of setting one. For a relationship already on
@@ -1663,8 +1662,8 @@ end
 ---For each relation role in 'shared/relations.json', as the
 ---relationship-kind menu of M.set_relRepo_recursive shows it: the role
 ---the view-child would play toward its view-parent; the kind the walk
----dispatches on ('content', 'subscribee' or 'overridden') for the three
----roles whose relationship is writable from the child's position, else
+---dispatches on ('content' or 'subscribee') for the two roles whose
+---relationship is writable from the child's position, else
 ---false; and a description, which says why when it is not. Mirrors
 ---skg--relationship-role-menu-prose.
 M.relationship_role_menu_prose = {
@@ -1685,9 +1684,9 @@ M.relationship_role_menu_prose = {
   hidden = { kind = false, description =
     'Hide repos are derived at save, floored at the most public explaining subscription; the hiddenFolder is write-protected.' },
   overrider = { kind = false, description =
-    'An overriderFolder member: the overrides relationship belongs to the member (the overrider), not to the view-parent. Write-protected from here.' },
-  overridden = { kind = 'overridden', description =
-    "A member of the view-parent's overriddenFolder. Sets the repo of each overrides relationship from the view-parent." } }
+    'No folder shows the overrides relation; only the fork operation records it, so there is nothing to set from here.' },
+  overridden = { kind = false, description =
+    'No folder shows the overrides relation; only the fork operation records it, so there is nothing to set from here.' } }
 
 ---The relationship-kind menu: one entry { relation, roles } per
 ---relation in 'shared/relations.json', each role { role, kind,
@@ -1716,7 +1715,7 @@ local relRepo_namespace =
 ---Set the relRepo of every matching relationship in the subtree at
 ---point. First a menu of the relation roles (M.select_relationship_kind)
 ---asks which role the view-children should play toward their
----view-parents; only 'content', 'subscribee' and 'overridden' are
+---view-parents; only 'content' and 'subscribee' are
 ---settable from the child's position. Then a prompt over the whole
 ---ladder, plus the no-override choice, which removes the pending
 ---requests instead. No per-relationship default is fetched: the
@@ -1875,8 +1874,8 @@ end
 ---an unknown viewnode or a restricted viewnode, whose
 ---relationship to its view-parent is of KIND and is collected at save from this position?
 ---For 'content', the view-parent is an editable occurrence not in
----subscribee-as-such position; for 'subscribee' and 'overridden', it is
----the matching writable folder with an editable viewparent. Mirrors
+---subscribee-as-such position; for 'subscribee', it is the writable
+---subscribeeFolder with an editable viewparent. Mirrors
 ---skg--relationship-kind-matches-p.
 ---@param line_number integer
 ---@param kind string
@@ -1895,8 +1894,6 @@ function M.relationship_kind_matches_p (line_number, kind)
            and not M.subscribee_as_such_at_line_p(parent) end
   if M.non_vognode_atom_present_p(parent_sexp, 'subscribeeFolder') then
     return kind == 'subscribee' and M.folder_viewparent_editable_p(parent) end
-  if M.non_vognode_atom_present_p(parent_sexp, 'overriddenFolder') then
-    return kind == 'overridden' and M.folder_viewparent_editable_p(parent) end
   return false
 end
 

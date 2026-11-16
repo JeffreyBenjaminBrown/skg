@@ -61,8 +61,8 @@ fn subtree_for_node_in_folder (
             .unwrap_or (false)
     { matches . push (i); }
     if let Some (folder) = [
-      "subscribeeFolder", "subscriberFolder", "overriddenFolder",
-      "overriderFolder", "hiderFolder", "hiddenFolder",
+      "subscribeeFolder", "subscriberFolder",
+      "hiderFolder", "hiddenFolder",
       "hiddenInSubscribeeFolder", "hiddenOutsideOfSubscribeeFolder",
     ] . into_iter () . find ( |folder| line . contains (folder) )
     { folder_stack . push ((depth, folder)); }}
@@ -105,8 +105,8 @@ fn add_editable_view_requests_to_folder_members (
         " writeProtected (viewRequests editableView) " ) ); }
     else { output . push (line . to_string ()); }
     if let Some (folder) = [
-      "subscribeeFolder", "subscriberFolder", "overriddenFolder",
-      "overriderFolder", "hiderFolder", "hiddenFolder",
+      "subscribeeFolder", "subscriberFolder",
+      "hiderFolder", "hiddenFolder",
       "hiddenInSubscribeeFolder", "hiddenOutsideOfSubscribeeFolder",
     ] . into_iter () . find ( |folder| line . contains (folder) )
     { folder_stack . push ((depth, folder)); }}
@@ -160,8 +160,7 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
       assert! ( n_view . contains ("subscribeeFolder"),
         "N's nonempty subscribeeFolder should be shown initially:\n{}",
         n_view );
-      for exotic in [ "subscriberFolder", "overriddenFolder",
-                       "overriderFolder", "hiderFolder", "hiddenFolder" ] {
+      for exotic in [ "subscriberFolder", "hiderFolder", "hiddenFolder" ] {
         assert! ( ! n_view . contains (exotic),
           "{} should require an explicit folder request:\n{}",
           exotic, n_view ); }
@@ -169,21 +168,18 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
       let requested_folders : String = n_view . replacen (
         "node ",
         "node (viewRequests (folder subscribesTo) \
-         (folder overrides) (folder hidesFromSubs))", 1 );
+         (folder hidesFromSubs))", 1 );
       let with_folders : String =
         save (&requested_folders, config, tantivy, &graph)
         . await ? . saved_view;
       for folder in [ "subscribeeFolder", "subscriberFolder",
-                      "overriddenFolder", "overriderFolder",
                       "hiderFolder", "hiddenFolder" ] {
         assert! ( with_folders . contains (folder),
           "the explicit requests should show {}:\n{}", folder, with_folders ); }
 
-      let members : [(&str, &str); 6] = [
+      let members : [(&str, &str); 4] = [
         ("Subscribee", "subscribeeFolder"),
         ("S", "subscriberFolder"),
-        ("Overridden", "overriddenFolder"),
-        ("Overrider", "overriderFolder"),
         ("Hidden", "hiddenFolder"),
         ("Hider", "hiderFolder") ];
       let extended_request : String =
@@ -197,8 +193,7 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
         assert! ( subtree . contains ("subscribeeFolder"),
           "editable partner folder member {} should get its nonempty \
            subscribeeFolder:\n{}", gnid, saved );
-        for exotic in [ "subscriberFolder", "overriddenFolder",
-                         "overriderFolder", "hiderFolder", "hiddenFolder" ] {
+        for exotic in [ "subscriberFolder", "hiderFolder", "hiddenFolder" ] {
           assert! ( ! subtree . contains (exotic),
             "editable partner folder member {} should not get {} by \
              default:\n{}", gnid, exotic, saved ); }}

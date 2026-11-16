@@ -371,8 +371,7 @@ fn relRepo_request_is_collected (
     Some (parent) => match &parent . value () . kind {
       ViewnodeKind::Vognode (Vognode::Occurrence (_)) =>
         is_saveEligible_occurrence (parent),
-      ViewnodeKind::Folder (
-        Folder::Subscribee | Folder::Overridden ) =>
+      ViewnodeKind::Folder (Folder::Subscribee) =>
         parent . parent ()
         . map ( is_saveEligible_occurrence )
         . unwrap_or (false),

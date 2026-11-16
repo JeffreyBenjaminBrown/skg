@@ -133,7 +133,6 @@ FOREST_VIEW_REQUESTS = {
   "containers"    : None,
   "mentioners"    : "(folder mentioners)",
   "subscribesTo"  : "(folder subscribesTo)",
-  "overrides"     : "(folder overrides)",
   "hidesFromSubs" : "(folder hidesFromSubs)",
   "aliases"       : "(folder aliases)",
   "flags"         : "flags" }
@@ -3232,13 +3231,12 @@ def words_with_a_subtree_form (headline):
 # The writable partner folders, each with the kind of relationship
 # 'relRepo:NAME subtree' sets from it ('skg--writable-folder-relations'
 # in 'elisp/skg-metadata.el').
-WRITABLE_FOLDER_RELATIONSHIP_KINDS = { "subscribeeFolder" : "subscribee",
-                                       "overriddenFolder" : "overridden" }
+WRITABLE_FOLDER_RELATIONSHIP_KINDS = { "subscribeeFolder" : "subscribee" }
 # The partner folders whose members' relationships belong to the other
 # end, so that no relRepo can be set from there
 # ('skg--relRepo-unsupported-folder-atoms').
 RELREPO_UNSUPPORTED_FOLDERS = (
-  "subscriberFolder", "overriderFolder", "hiderFolder", "hiddenFolder",
+  "subscriberFolder", "hiderFolder", "hiddenFolder",
   "containerFolder", "mentionerFolder", "acquiredByFolder",
   "acquiredFolder", "illegalEditFolder", "hiddenInSubscribeeFolder",
   "hiddenOutsideOfSubscribeeFolder" )
@@ -3703,7 +3701,7 @@ def expand_relRepo_subtree (edited, root, word, headline_of_handle, check):
   """'relRepo:NAME subtree', the clients' 'skg-set-relRepo-recursive'
   ('C-c s R'), for the kind of relationship its headline names: on a
   node its content relationships, on a subscribee folder the
-  subscriptions, on an overridden folder the overrides, the walk of
+  subscriptions, the walk of
   'skg--relRepo-recursive-targets'. The headline itself takes it only
   when its own relationship is of that kind."""
   root_metadata = headline_of_handle [ edited [root] . handle ] . metadata
@@ -3715,7 +3713,7 @@ def expand_relRepo_subtree (edited, root, word, headline_of_handle, check):
       f"Error: ⟨{edited [root] . handle}⟩ on line "
       f"{edited [root] . compact_line_number} of the compact view carries "
       f"'{word} subtree', which applies on a node (its content "
-      "relationships), a subscribee folder or an overridden folder." )
+      "relationships) or a subscribee folder." )
     return
   def metadata_of (index):
     return outline_metadata (edited, index, headline_of_handle)

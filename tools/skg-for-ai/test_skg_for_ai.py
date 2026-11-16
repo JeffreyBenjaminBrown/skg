@@ -143,7 +143,6 @@ TOOL_RUNS = [
   for kind, node_id in [ ( "containers",    "shared-id" ),
                          ( "mentioners",    "child-b-id" ),
                          ( "subscribesTo",  "fred-note-id" ),
-                         ( "overrides",     "overridden-id" ),
                          ( "hidesFromSubs", "fred-aside-id" ),
                          ( "aliases",       "overridden-id" ),
                          ( "flags",         "overrider-id" ) ] ]

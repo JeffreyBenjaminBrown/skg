@@ -41,7 +41,7 @@ pub struct NodeSaveIntent {
   pub home_skgrepo      : SkgrepoName,
   pub title             : String,
   pub body              : Option<String>,
-  // contains / subscribesTo / overrides pair each member
+  // contains / subscribesTo pair each member
   // with an Option<RepoName>: Some when the buffer's headline
   // carried an '(editRequest (relRepo NAME))' request (see
   // 'RelationshipEditRequest::RelRepo', 'FieldIntent'); None means
@@ -77,7 +77,6 @@ pub struct RequestedRelRepos {
   pub contains          : HashMap<ID, SkgrepoName>,
   pub aliases           : HashMap<String, SkgrepoName>,
   pub subscribesTo      : HashMap<ID, SkgrepoName>,
-  pub overrides         : HashMap<ID, SkgrepoName>,
 }
 
 /// Strip the per-member explicit-repo payload down to plain IDs, by
@@ -217,7 +216,6 @@ impl NodeSaveIntent {
           . map ( |skgrepo| (text . clone (), skgrepo) ) )
         . collect (),
       subscribesTo      : collect (self . subscribesTo . or_default ()),
-      overrides         : collect (self . overrides . or_default ()),
     }}
 
   pub fn into_graphnode (
@@ -348,7 +346,6 @@ pub fn lower_collected_fieldIntents (
     if leftover . contains . is_some()
       || leftover . aliases       . is_some()
       || leftover . subscribesTo . is_some()
-      || leftover . overrides     . is_some()
       || leftover . node_merge    . is_some()
       || leftover . flag      . is_some()
     { return Err ( format!(
@@ -389,8 +386,9 @@ fn lower_one_entry (
         subscribesTo                 :
           msv_from_slot (entry . subscribesTo),
         hidesFromSubs                : MSV::Unspecified,
-        overrides                    :
-          msv_from_slot (entry . overrides),
+        // No buffer position edits 'overrides': disk supplementation
+        // keeps the node's own.
+        overrides                    : MSV::Unspecified,
         flags                    : Vec::new(),
         flag_request             : entry . flag,
       })) }} }

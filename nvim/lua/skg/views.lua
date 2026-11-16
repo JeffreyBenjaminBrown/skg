@@ -26,7 +26,6 @@ end
 ---The folder commands, generated like the elisp macro does.
 local command_rows = {
   { 'show_folderOf_aliases', '(folder aliases)' },
-  { 'show_folderOf_overrides', '(folder overrides)' },
   { 'show_folderOf_hidesFromSubs', '(folder hidesFromSubs)' },
   { 'show_folderOf_subscribesTo', '(folder subscribesTo)' },
   { 'show_folderOf_flags', 'flags' },

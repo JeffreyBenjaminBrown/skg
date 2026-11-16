@@ -47,9 +47,6 @@ mod idempotence;
 #[path = "restricted_suppression.rs"]
 mod restricted_suppression;
 
-#[path = "overridden_as_such.rs"]
-mod overridden_as_such;
-
 #[path = "overrideward_view_subtree.rs"]
 mod overrideward_view_subtree;
 
@@ -58,6 +55,9 @@ mod override_substitution;
 
 #[path = "partner_folder_matrix.rs"]
 mod partner_folder_matrix;
+
+#[path = "subscribee_as_such_extension.rs"]
+mod subscribee_as_such_extension;
 
 #[path = "partner_folder_order.rs"]
 mod partner_folder_order;

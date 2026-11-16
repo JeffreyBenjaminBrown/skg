@@ -295,9 +295,9 @@ fn filter_match_groups_to_unrestricted_skgrepos (
 /// made of the hits ('build_search_viewforest'), the same code every
 /// view is drawn with. Each hit (a root standing for one of
 /// 'search_results') is a write-protected occurrence asking for its
-/// containers folder, and holds the folder of the nodes that override
-/// it and the folder of the nodes it overrides, each only when it
-/// would have members ('stub_root_of_hit'), and, when it was found
+/// containers folder, and holds the folder of the nodes it subscribes
+/// to and the folder of the nodes that subscribe to it, each only when
+/// it would have members ('stub_root_of_hit'), and, when it was found
 /// through an alias, its alias folder; the refresh fills the folders,
 /// each member of the containers folder with its containerward chain,
 /// and titles each hit from the graph. What the refresh drew under
@@ -339,10 +339,10 @@ pub fn draw_search_buffer (
 
 /// Make the hit at 'hit' a root of the search's stub: a
 /// write-protected occurrence asking for its containers folder,
-/// holding, after any alias folder it has, a folder of the nodes that
-/// override it and then one of the nodes it overrides, each only when
-/// the folder's own goal, the one the refresh fills it from, has
-/// members.
+/// holding, after any alias folder it has, a folder of the nodes it
+/// subscribes to and then one of the nodes that subscribe to it, each
+/// only when the folder's own goal, the one the refresh fills it from,
+/// has members.
 fn stub_root_of_hit (
   viewforest  : &mut ViewForest,
   hit         : NodeId,
@@ -358,7 +358,7 @@ fn stub_root_of_hit (
     occurrence . view_requests . insert (
       ViewRequest::Folder (FolderRelation::Containers) );
     occurrence . gnid . clone () };
-  for folder in [ Folder::Overrider, Folder::Overridden ] {
+  for folder in [ Folder::Subscribee, Folder::Subscriber ] {
     if partnerFolder_members_in_graph (graph, &gnid, &folder, restriction)
        . is_some_and ( |members| ! members . is_empty () ) {
       viewforest . get_mut (hit) . unwrap ()

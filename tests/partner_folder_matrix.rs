@@ -2,7 +2,7 @@
 //
 // The batched relationship-matrix target
 // ('docs/sharing-model.org', "The write-protected folders: who
-// subscribes to, overrides, or hides this node"). One test function builds
+// subscribes to or hides this node"). One test function builds
 // one database of mutually independent subgraphs (IDs prefixed by
 // scenario), then runs the matrix scenarios serially against it: de
 // novo omission of unrequested write-protected folders, and -- after explicit
@@ -27,7 +27,7 @@ use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::run_with_skgrepo_set_test_db;
+use skg::test_utils::{run_with_skgrepo_set_test_db, save_added_overrides};
 use skg::types::misc::SkgrepoName;
 use skg::test_utils::graph_handle_from_config;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
@@ -162,7 +162,7 @@ fn swap_lines ( buf : &str, a : &str, b : &str ) -> String {
 /// member's indentation, plus a child one level deeper, so the repair
 /// marks it noClaim rather than removing it. Built fresh
 /// (not cloned from a member line) so it never inherits a foreign
-/// skgrepo -- the overriderFolder's members are foreign.
+/// skgrepo from a folder whose members are foreign.
 fn intruder_with_child (
   member_line : &str,
   intruder_gnid : &str,
@@ -189,15 +189,11 @@ struct FolderSpec {
   intruder : &'static str, // a public node to place in the folder, claiming nothing
 }
 
-const WRITE_PROTECTED_FOLDERS : [FolderSpec; 6] = [
+const WRITE_PROTECTED_FOLDERS : [FolderSpec; 5] = [
   FolderSpec { atom : "subscriberFolder", recorder : "roSub-owner",
             relation : "subscribesTo",
             member_a : "roSub-a", member_b : "roSub-b",
             intruder : "roSub-x" },
-  FolderSpec { atom : "overriderFolder", recorder : "roOvr-owner",
-            relation : "overrides",
-            member_a : "roOvr-a", member_b : "roOvr-b",
-            intruder : "roOvr-x" },
   FolderSpec { atom : "hiderFolder", recorder : "roHider-owner",
             relation : "hidesFromSubs",
             member_a : "roHider-a", member_b : "roHider-b",
@@ -324,7 +320,7 @@ async fn write_protected_delete (
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
-// De-novo omission of the six unrequested write-protected folders
+// De-novo omission of the unrequested write-protected folders
 //////////////////////////////////////////////////////////////
 
 async fn denovo_omits_unrequested_write_protected_folders (
@@ -333,7 +329,7 @@ async fn denovo_omits_unrequested_write_protected_folders (
 ) -> Result<(), Box<dyn Error>> {
   let s : &str = "denovo/write-protected-folders";
   let buf : String = render ("dn-owner", config) . await ?;
-  for atom in ["subscriberFolder", "overriderFolder",
+  for atom in ["subscriberFolder",
                "hiderFolder", "hiddenFolder", "mentionerFolder"] {
     fails . want_absent (s, &buf, &format! ("(skg {})", atom)); }
   // But a root shows its containers folder, with the containerward
@@ -368,8 +364,6 @@ fn relationship_matrix
           &mut fails, spec, config, tantivy, &graph) . await ?;
       }
       editable_subscribeeFolder (&mut fails, config) . await ?;
-      editable_overriddenFolder (
-        &mut fails, config, tantivy, &graph ) . await ?;
       hiddenFolder_delete_does_not_unhide (
         &mut fails, config, tantivy, &graph ) . await ?;
       omission_scenarios (&mut fails, config) . await ?;
@@ -399,15 +393,11 @@ struct ChainFolderSpec {
   relation : Option<&'static str>, // None: drawn by default
 }
 
-const CHAIN_FOLDERS : [ChainFolderSpec; 8] = [
+const CHAIN_FOLDERS : [ChainFolderSpec; 6] = [
   ChainFolderSpec { atom : "subscriberFolder", owner : "chSubr-owner",
                     member : "chSubr-m", relation : Some ("subscribesTo") },
   ChainFolderSpec { atom : "subscribeeFolder", owner : "chSube-owner",
                     member : "chSube-m", relation : None },
-  ChainFolderSpec { atom : "overriderFolder", owner : "chOvrr-owner",
-                    member : "chOvrr-m", relation : Some ("overrides") },
-  ChainFolderSpec { atom : "overriddenFolder", owner : "chOvrd-owner",
-                    member : "chOvrd-m", relation : Some ("overrides") },
   ChainFolderSpec { atom : "hiderFolder", owner : "chHider-owner",
                     member : "chHider-m", relation : Some ("hidesFromSubs") },
   ChainFolderSpec { atom : "hiddenFolder", owner : "chHidden-owner",
@@ -513,29 +503,15 @@ async fn folder_request_scenarios (
     format! (
       "* (skg node (gnid {}) (skgRepos (nodeRepo public)) (viewRequests (folder {}))) {}\n",
       recorder, rel, recorder ) };
-  { // (folder overrides) on wSub-owner, which overrides nothing and is
-    // overridden by nothing: the editable overriddenFolder appears empty
-    // (the "add an override here" surface); the write-protected overriderFolder
-    // does not appear (empty write-protected folders are pruned).
-    let s : &str = "folder-request/overrides-empty";
-    let resp : SaveResponse = save (
-      &request_buf ("wSub-owner", "overrides"),
-      config, tantivy, graph) . await ?;
-    if ! resp . errors . is_empty () {
-      fails . record (s, format! ("save errors: {:?}", resp . errors)); }
-    fails . want_contains (s, &resp . saved_view, "(skg overriddenFolder)");
-    fails . want_absent  (s, &resp . saved_view, "overriderFolder"); }
-  { // (folder overrides) on wOvr-owner, which overrides wOvr-a and wOvr-b:
-    // the overriddenFolder appears populated with both.
-    let s : &str = "folder-request/overrides-populated";
-    let resp : SaveResponse = save (
-      &request_buf ("wOvr-owner", "overrides"),
-      config, tantivy, graph) . await ?;
-    if ! resp . errors . is_empty () {
-      fails . record (s, format! ("save errors: {:?}", resp . errors)); }
-    fails . want_contains (s, &resp . saved_view, "(skg overriddenFolder)");
-    fails . want_contains (s, &resp . saved_view, "(gnid wOvr-a)");
-    fails . want_contains (s, &resp . saved_view, "(gnid wOvr-b)"); }
+  { // No folder shows overrides: '(folder overrides)' names no
+    // folder relation, so the save refuses the buffer.
+    let s : &str = "folder-request/overrides-refused";
+    match save ( &request_buf ("wOvr-owner", "overrides"),
+                 config, tantivy, graph) . await {
+      Ok (resp) if resp . errors . is_empty () =>
+        fails . record (s, format! (
+          "expected a refusal, got the view:\n{}", resp . saved_view )),
+      Ok (_) | Err (_) => {}, } }
   { // (folder subscribesTo) on wSub-owner: subscribeeFolder populated (a,b,c).
     let s : &str = "folder-request/subscribes-populated";
     let resp : SaveResponse = save (
@@ -558,7 +534,7 @@ async fn folder_request_scenarios (
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
-// Editable folders (subscribeeFolder, overriddenFolder): the membership
+// The editable subscribeeFolder: the membership
 // edits land on disk. Checked through buffer_to_validated_saveplan,
 // which builds (but does not write) the plan, so we read the
 // would-be Graphnode for the recorder.
@@ -628,60 +604,6 @@ async fn editable_subscribeeFolder (
         fails . record (s, format! (
           "after insert, subscribesTo wrong: {:?}", n . subscribesTo)); },
       None => fails . record (s, "no SaveNode for wSub-owner" . into ()), } }
-  Ok (( )) }
-
-fn override_set ( n : &Graphnode ) -> Vec<ID> {
-  match &n . overrides {
-    MSV::Specified (gnids) => { let mut v = members_of (gnids); v . sort (); v }
-    MSV::Unspecified => Vec::new (), } }
-
-async fn editable_overriddenFolder (
-  fails : &mut Fails,
-  config : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-  graph : &InRustGraphHandle,
-) -> Result<(), Box<dyn Error>> {
-  let buf : String = render_with_requested_relation_folders (
-    "wOvr-owner", "overrides", config, tantivy, graph ) . await ?;
-  let stars : usize = folder_member_stars (&buf, "(gnid wOvr-a)");
-  { // reorder is harmless: order-free set unchanged
-    let s : &str = "overriddenFolder/reorder";
-    let reordered : String =
-      swap_lines (&buf, "(gnid wOvr-a)", "(gnid wOvr-b)");
-    let nodes : Vec<NodeInstruction> =
-      saveplan_nodes (&reordered, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
-    match saved_node_by_gnid (&nodes, "wOvr-owner") {
-      Some (n) => if override_set (n) != vec![
-          ID::from ("wOvr-a"), ID::from ("wOvr-b")] {
-        fails . record (s, format! (
-          "reorder changed the override set: {:?}", n . overrides)); },
-      None => fails . record (s, "no SaveNode for wOvr-owner" . into ()), } }
-  { // delete one: remove a -> [b]
-    let s : &str = "overriddenFolder/delete";
-    let a_line : String =
-      line_containing (&buf, "(gnid wOvr-a)") . to_string ();
-    let edited : String = buf . replace (&format! ("{}\n", a_line), "");
-    let nodes  : Vec<NodeInstruction> =
-      saveplan_nodes (&edited, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
-    match saved_node_by_gnid (&nodes, "wOvr-owner") {
-      Some (n) => if override_set (n) != vec![ID::from ("wOvr-b")] {
-        fails . record (s, format! (
-          "after delete, override set wrong: {:?}", n . overrides)); },
-      None => fails . record (s, "no SaveNode for wOvr-owner" . into ()), } }
-  { // insert a member: add c -> {a,b,c}
-    let s : &str = "overriddenFolder/insert";
-    let b_line : String =
-      line_containing (&buf, "(gnid wOvr-b)") . to_string ();
-    let edited : String = buf . replace (
-      &b_line, &format! ("{}\n{}", b_line, member_line (stars, "wOvr-c")) );
-    let nodes : Vec<NodeInstruction> =
-      saveplan_nodes (&edited, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
-    match saved_node_by_gnid (&nodes, "wOvr-owner") {
-      Some (n) => if override_set (n) != vec![
-          ID::from ("wOvr-a"), ID::from ("wOvr-b"), ID::from ("wOvr-c")] {
-        fails . record (s, format! (
-          "after insert, override set wrong: {:?}", n . overrides)); },
-      None => fails . record (s, "no SaveNode for wOvr-owner" . into ()), } }
   Ok (( )) }
 
 /// Deleting a member from the write-protected hiddenFolder must not unhide it
@@ -781,38 +703,36 @@ async fn omission_scenarios (
 //////////////////////////////////////////////////////////////
 // Function 2 (each its own database, since each must observe the
 // disk after a save): a save adding a second owned overrider of a note
-// saves; a save making a note override itself is refused, and disk is
-// unchanged. The buffers are hand-written rather than rendered.
+// saves (through the save's graph update: no buffer position edits
+// overrides); a buffer save making a note subscribe to itself, which
+// the fork rules read as forking itself, is refused, and disk is
+// unchanged. The buffer is hand-written rather than rendered.
 //////////////////////////////////////////////////////////////
 
 #[test]
-fn buffer_save_admits_a_second_owned_overrider
+fn a_save_admits_a_second_owned_overrider
   () -> Result<(), Box<dyn Error>> {
   run_with_skgrepo_set_test_db (
     "skg-test-partner-folder-matrix-second-overrider",
     "tests/partner_folder_matrix/fixtures-monogamy/skgconfig.toml",
     "/tmp/tantivy-test-partner-folder-matrix-second-overrider",
     |config, tantivy| Box::pin ( async move {
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
-      // mono-r1 already overrides mono-target on disk; this buffer
+      // mono-r1 already overrides mono-target on disk; this save
       // makes mono-r2 override it too.
-      let buffer : &str = indoc! {"
-        * (skg node (gnid mono-r2) (skgRepos (nodeRepo public))) mono-r2
-        ** (skg overriddenFolder)
-        *** (skg node (gnid mono-target) (skgRepos (nodeRepo public)) writeProtected) mono-target
-      "};
-      save (buffer, config, tantivy, &graph) . await ?;
+      save_added_overrides (
+        &ID::from ("mono-r2"), &[ ID::from ("mono-target") ],
+        config, tantivy ) . await ?;
       let r2 : Graphnode =
         graphnode_by_gnid (
-          &graph . load_full (), config, &ID::from ("mono-r2") ) ?;
+          &graph_handle_from_config (config) ? . load_full (),
+          config, &ID::from ("mono-r2") ) ?;
       assert_eq! ( members_msv (&r2 . overrides) . or_default (),
                    &[ ID::from ("mono-target") ],
                    "the save must write mono-r2's override" );
       Ok (( )) } )) }
 
 #[test]
-fn buffer_save_refuses_a_self_override
+fn buffer_save_refuses_a_self_subscription
   () -> Result<(), Box<dyn Error>> {
   run_with_skgrepo_set_test_db (
     "skg-test-partner-folder-matrix-self-override",
@@ -823,14 +743,14 @@ fn buffer_save_refuses_a_self_override
         graph_handle_from_config (config) ?;
       let buffer : &str = indoc! {"
         * (skg node (gnid mono-r2) (skgRepos (nodeRepo public))) mono-r2
-        ** (skg overriddenFolder)
+        ** (skg subscribeeFolder)
         *** (skg node (gnid mono-r2) (skgRepos (nodeRepo public)) writeProtected) mono-r2
       "};
       let result : Result<SaveResponse, Box<dyn Error>> =
         save (buffer, config, tantivy, &graph) . await;
       let err : Box<dyn Error> = match result {
         Ok (_)  => panic! (
-          "a save making a note override itself must be refused"),
+          "a save making a note subscribe to itself must be refused"),
         Err (e) => e, };
       let save_error : &SaveError =
         err . downcast_ref::<SaveError> ()
@@ -849,10 +769,55 @@ fn buffer_save_refuses_a_self_override
         graphnode_by_gnid (
           &skg::test_utils::graph_handle_from_config (config)? . load_full (),
           config, &ID::from ("mono-r2") ) ?;
-      let overrides_empty : bool = match &r2 . overrides {
+      let subscriptions_empty : bool = match &r2 . subscribesTo {
         MSV::Unspecified       => true,
         MSV::Specified (gnids)   => gnids . is_empty (), };
-      assert! ( overrides_empty,
-        "a refused save must not write mono-r2's override relationship: {:?}",
-        r2 . overrides );
+      assert! ( subscriptions_empty,
+        "a refused save must not write mono-r2's subscription: {:?}",
+        r2 . subscribesTo );
+      Ok (( )) } )) }
+
+/// Owned E contains foreign R, which subscribes to (forks) E: the
+/// server starts on this, with a warning ('init_refusal.rs'), but a
+/// save that leaves the pair is refused, naming both notes; a save
+/// that ends it saves.
+#[test]
+fn a_save_leaving_an_owned_note_containing_its_foreign_forker_is_refused
+  () -> Result<(), Box<dyn Error>> {
+  run_with_skgrepo_set_test_db (
+    "skg-test-partner-folder-matrix-foreign-forker",
+    "tests/partner_folder_matrix/fixtures-foreign-forker/skgconfig.toml",
+    "/tmp/tantivy-test-partner-folder-matrix-foreign-forker",
+    |config, tantivy| Box::pin ( async move {
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (config) ?;
+      let keeping_r : &str = indoc! {"
+        * (skg node (gnid E) (skgRepos (nodeRepo public))) E, retitled
+        ** (skg node (gnid R) (skgRepos (nodeRepo foreign)) writeProtected) R
+      "};
+      let err : Box<dyn Error> =
+        match save (keeping_r, config, tantivy, &graph) . await {
+          Ok (resp) => panic! (
+            "a save leaving E containing R must be refused: {:?}",
+            resp . saved_view ),
+          Err (e) => e, };
+      assert! ( matches! (
+                  err . downcast_ref::<SaveError> (),
+                  Some (SaveError::BufferValidationErrors { errors, .. })
+                    if errors . iter () . any ( |e| matches! (
+                      e, BufferValidationError::OverrideInvariantViolation (message)
+                        if message . contains ("node E contains node R, which forks it") ))),
+                "expected the pair named: {}", err );
+      let dropping_r : &str = indoc! {"
+        * (skg node (gnid E) (skgRepos (nodeRepo public))) E, retitled
+      "};
+      let resp : SaveResponse =
+        save (dropping_r, config, tantivy, &graph) . await ?;
+      assert! ( resp . errors . is_empty (), "{:?}", resp . errors );
+      let e : Graphnode =
+        graphnode_by_gnid (
+          &graph_handle_from_config (config) ? . load_full (),
+          config, &ID::from ("E") ) ?;
+      assert! ( members_of (&e . contains) . is_empty (),
+        "the save ending the pair writes E without R: {:?}", e . contains );
       Ok (( )) } )) }

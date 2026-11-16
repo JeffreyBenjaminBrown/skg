@@ -586,8 +586,8 @@ pub enum ChangesetMarkerKind {
 }
 
 /// A viewnode grouping the children of one kind of relationship of
-/// its viewparent: the twelve partner folders, whose members are
-/// nodes (ten relation roles, the two compound partner folders, and
+/// its viewparent: the ten partner folders, whose members are
+/// nodes (six relation roles, the two compound partner folders, and
 /// the diff view's two acquisition folders), and the three property
 /// folders, whose members are the viewparent's aliases, IDs and true
 /// flags.
@@ -595,8 +595,6 @@ pub enum ChangesetMarkerKind {
 pub enum Folder {
   Subscribee, // Collects subscribees its parent subscribes to. Writable.
   Subscriber, // Collects nodes that subscribe to its parent. Write-protected (editable from the other side of the relationship).
-  Overridden, // Collects nodes whose view its parent overrides. Writable.
-  Overrider, // Collects nodes that override its parent's view. Write-protected (editable from the other side of the relationship).
   Hider, // Collects nodes that hide its parent. Write-protected (editable from the other side of the relationship).
   // This folder is not itself hidden. Its children represent the nodes hidden
   // by the node represented by its parent. The relationships are write-protected
@@ -661,7 +659,6 @@ impl RelationshipEditRequest {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FolderRelation {
   Aliases,
-  Overrides,
   HidesFromSubs,
   SubscribesTo,
   // These two build one write-protected folder each: their other
@@ -671,9 +668,8 @@ pub enum FolderRelation {
 }
 
 impl FolderRelation {
-  pub const ALL : [FolderRelation; 6] = [
+  pub const ALL : [FolderRelation; 5] = [
     FolderRelation::Aliases,
-    FolderRelation::Overrides,
     FolderRelation::HidesFromSubs,
     FolderRelation::SubscribesTo,
     FolderRelation::Containers,
@@ -684,7 +680,6 @@ impl FolderRelation {
   ) -> &'static str {
     match self {
       FolderRelation::Aliases                   => "aliases",
-      FolderRelation::Overrides                 => "overrides",
       FolderRelation::HidesFromSubs             => "hidesFromSubs",
       FolderRelation::SubscribesTo              => "subscribesTo",
       FolderRelation::Containers                => "containers",
@@ -776,7 +771,7 @@ impl Folder {
 
   /// Whether the folder's goal has an order the view follows: the
   /// viewparent's own file records the members in order (the
-  /// subscribee, overridden, hidden and alias folders), or the folder
+  /// subscribee, hidden and alias folders), or the folder
   /// is the compound partner folder of what the subscriber hides
   /// outside its subscribees, in the order of the subscriber's hides
   /// list. False when other nodes' files record the members, or they
@@ -784,26 +779,26 @@ impl Folder {
   /// members already have.
   pub fn goal_is_ordered (&self) -> bool {
     match self {
-      Folder::Subscribee | Folder::Overridden | Folder::Hidden
+      Folder::Subscribee | Folder::Hidden
         | Folder::HiddenOutsideOfSubscribee | Folder::Alias
         | Folder::IllegalEdit { .. } => true,
-      Folder::Subscriber | Folder::Overrider | Folder::Hider
+      Folder::Subscriber | Folder::Hider
         | Folder::HiddenInSubscribee
         | Folder::Container | Folder::Mentioner
         | Folder::AcquiredBy | Folder::Acquired
         | Folder::ID | Folder::Flags { .. } => false, } }
 
   /// Whether the save reads the folder's membership, so that a member
-  /// typed or removed there edits the graph: the subscribee,
-  /// overridden and alias folders, and the compound partner folder of
+  /// typed or removed there edits the graph: the subscribee and alias
+  /// folders, and the compound partner folder of
   /// what the subscriber hides outside its subscribees. Every other
   /// folder is write-protected: its members are edited from the other
   /// side of the relationship, or derived.
   pub fn is_editable (&self) -> bool {
     match self {
-      Folder::Subscribee | Folder::Overridden
+      Folder::Subscribee
         | Folder::HiddenOutsideOfSubscribee | Folder::Alias => true,
-      Folder::Subscriber | Folder::Overrider | Folder::Hider
+      Folder::Subscriber | Folder::Hider
         | Folder::Hidden | Folder::HiddenInSubscribee
         | Folder::Container | Folder::Mentioner
         | Folder::AcquiredBy | Folder::Acquired
@@ -832,8 +827,6 @@ impl Folder {
     match self {
       Folder::Subscribee                => "subscribeeFolder",
       Folder::Subscriber                => "subscriberFolder",
-      Folder::Overridden                => "overriddenFolder",
-      Folder::Overrider                 => "overriderFolder",
       Folder::Hider                     => "hiderFolder",
       Folder::Hidden                    => "hiddenFolder",
       Folder::HiddenInSubscribee        => "hiddenInSubscribeeFolder",
@@ -854,14 +847,13 @@ impl Folder {
     Folder::all () . into_iter ()
       . find ( |folder| folder . repr_in_client () == s ) }
 
-  /// Every kind of folder: the twelve partner folders, the three
+  /// Every kind of folder: the ten partner folders, the three
   /// property folders, a flags folder with no text, and an
   /// illegal-edit folder with none.
-  pub fn all () -> [Folder; 16] {
+  pub fn all () -> [Folder; 14] {
     fn guard ( folder : &Folder ) { // compile error here = update the list below
       match folder {
         Folder::Subscribee | Folder::Subscriber
-        | Folder::Overridden | Folder::Overrider
         | Folder::Hider | Folder::Hidden
         | Folder::HiddenInSubscribee
         | Folder::HiddenOutsideOfSubscribee
@@ -871,7 +863,6 @@ impl Folder {
         | Folder::IllegalEdit { .. } => () }}
     let _ = guard;
     [ Folder::Subscribee, Folder::Subscriber,
-      Folder::Overridden, Folder::Overrider,
       Folder::Hider, Folder::Hidden,
       Folder::HiddenInSubscribee,
       Folder::HiddenOutsideOfSubscribee,
@@ -905,12 +896,6 @@ impl Folder {
       Folder::Subscriber =>
         Some (RelationRole::new (
           NodeRelation::SubscribesTo, BinaryRolePosition::First)),
-      Folder::Overridden =>
-        Some (RelationRole::new (
-          NodeRelation::Overrides, BinaryRolePosition::Second)),
-      Folder::Overrider =>
-        Some (RelationRole::new (
-          NodeRelation::Overrides, BinaryRolePosition::First)),
       Folder::Hider =>
         Some (RelationRole::new (
           NodeRelation::HidesFromSubs, BinaryRolePosition::First)),

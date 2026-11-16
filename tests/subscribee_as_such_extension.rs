@@ -1,16 +1,12 @@
-// cargo nextest run --test grouped_overrides -E 'test(overridden_as_such::)'
+// cargo nextest run --test grouped_overrides -E 'test(subscribee_as_such_extension::)'
 //
-// The overridden-as-such exception
-// ('docs/override.org', "overriddenFolder: what this node overrides"),
-// on the R/E/G/H example: R subscribes to and overrides E,
-// R hides H, E contains G and H. Extended with X overriding G, so
-// the no-cascade decision is observable:
-// - extending E under the subscribeeFolder applies R's hides (no H)
-//   and the general substitution rule (G is shown as X, marked);
-// - extending E under the overriddenFolder applies neither: full
-//   contains, raw G and raw H -- the user asked for the original.
-// The folder members themselves (each E copy) are always shown raw: folders
-// never substitute.
+// Extending a subscribee as such, on the R/E/G/H example: R
+// subscribes to and overrides E, R hides H, E contains G and H.
+// Extended with X overriding G, so substitution below the
+// subscribee as such is observable: extending E under the
+// subscribeeFolder applies R's hides (no H) and the general
+// substitution rule (G is shown as X, marked). The folder member
+// itself (E) is shown raw: folders never substitute.
 
 use skg::test_utils::save_and_rerender;
 use std::error::Error;
@@ -24,15 +20,12 @@ use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  let fixtures : &str = "tests/overridden_as_such/fixtures";
+  let fixtures : &str = "tests/subscribee_as_such_extension/fixtures";
   run_with_shared_test_stores (
-    "skg-test-overridden-as-such",
+    "skg-test-subscribee-as-such-extension",
     |s| Box::pin ( async move {
       s . reset ("subscribee_as_such_extension_hides_and_substitutes", fixtures) ?;
       subscribee_as_such_extension_hides_and_substitutes (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("overridden_as_such_extension_is_raw_and_unhidden", fixtures) ?;
-      overridden_as_such_extension_is_raw_and_unhidden (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("folder_members_never_substitute", fixtures) ?;
       folder_members_never_substitute (
@@ -65,8 +58,6 @@ fn lines_by_enclosing_folder (
       let line_without_viewnode_id : String = without_viewnode_ids (line);
       if line_without_viewnode_id . contains ("(skg subscribeeFolder)")
         { stack . push ((depth, "subscribeeFolder")); }
-      else if line_without_viewnode_id . contains ("(skg overriddenFolder)")
-        { stack . push ((depth, "overriddenFolder")); }
       else if line_without_viewnode_id . contains ("(skg hiddenInSubscribeeFolder)")
         { stack . push ((depth, "hiddenInSubscribeeFolder")); }}}
   result }
@@ -78,17 +69,10 @@ async fn extend_e_under (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<String, Box<dyn Error>> {
-  let (de_novo, _pids, _tree) =
+  let (view_with_folder, _pids, _tree) =
     multi_root_view (
       config, Some (tantivy),
       &[ ID::from ("R") ] ) ?;
-  let view_with_folder : String =
-    if folder == "overriddenFolder" {
-      let request : String = de_novo . replacen (
-        "node ",
-        "node (viewRequests (folder overrides))", 1 );
-      save_and_rerender (&request, config, tantivy) . await ?
-    } else { de_novo };
   let edited : String =
     { let mut out : Vec<String> = Vec::new ();
       for (line_col, line) in lines_by_enclosing_folder (&view_with_folder) {
@@ -130,58 +114,26 @@ async fn subscribee_as_such_extension_hides_and_substitutes (
         "H shows in the hiddenInSubscribeeFolder:\n{}", view );
       Ok (( )) }
 
-async fn overridden_as_such_extension_is_raw_and_unhidden (
-  config : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-) -> Result<(), Box<dyn Error>> {
-      (
-        graph_handle_from_config (config) ? );
-      let view : String =
-        extend_e_under ("overriddenFolder", config, tantivy)
-        . await ?;
-      let tagged : Vec<(&str, &str)> =
-        lines_by_enclosing_folder (&view);
-      assert! ( tagged . iter () . any ( |(c, l)|
-                  *c == "overriddenFolder"
-                  && l . contains ("(gnid G)")
-                  && ! l . contains ("overridesHere") ),
-        "the bypass: G is shown raw (not as X) below an \
-         overridden-as-such:\n{}", view );
-      assert! ( tagged . iter () . any ( |(c, l)|
-                  *c == "overriddenFolder"
-                  && l . contains ("(gnid H)") ),
-        "no hides apply: H is shown below the overridden-as-such \
-         (hides are scoped to subscriptions):\n{}", view );
-      assert! ( ! view . contains ("(gnid X)"),
-        "X appears nowhere in this extension:\n{}", view );
-      Ok (( )) }
-
 async fn folder_members_never_substitute (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       (
         graph_handle_from_config (config) ? );
-      let (de_novo, _pids, _tree) =
+      let (view, _pids, _tree) =
         multi_root_view (
           config, Some (tantivy),
           &[ ID::from ("R") ] ) ?;
-      let request : String = de_novo . replacen (
-        "node ",
-        "node (viewRequests (folder overrides))", 1 );
-      let view : String =
-        save_and_rerender (&request, config, tantivy) . await ?;
-      // R overrides E, yet both folder copies of E are shown raw: the
-      // subscribeeFolder shows the graph fact "R subscribes to E" and
-      // the overriddenFolder shows "R overrides E"; substituting
-      // inside either would obscure the fact displayed.
+      // R overrides E, yet the folder copy of E is shown raw: the
+      // subscribeeFolder shows the graph fact "R subscribes to E";
+      // substituting inside it would obscure the fact displayed.
       let e_lines : Vec<&str> =
         view . lines ()
         . filter ( |l| l . contains ("(gnid E)") )
         . collect ();
-      assert_eq! ( e_lines . len (), 2,
-        "E appears under both folders:\n{}", view );
+      assert_eq! ( e_lines . len (), 1,
+        "E appears under the subscribee folder:\n{}", view );
       assert! ( e_lines . iter () . all (
                   |l| ! l . contains ("overridesHere") ),
-        "neither copy is substituted:\n{}", view );
+        "it is not substituted:\n{}", view );
       Ok (( )) }

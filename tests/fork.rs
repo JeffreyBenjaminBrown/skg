@@ -1098,7 +1098,7 @@ async fn fork_fixture_files (
 
 /// Round-trip: after the fork, reopening P shows the clone in N's
 /// place, carrying (overridesHere N), with the default subscribeeFolder
-/// listing N but no unrequested overriddenFolder. The load-bearing property:
+/// listing N. The load-bearing property:
 /// P's stored
 /// 'contains' is not rewritten to the clone -- it still lists N, so the
 /// fact round-trips and a save never silently re-points containers at
@@ -1135,9 +1135,6 @@ async fn fork_round_trip (
     "the shown substitute must be the clone {}:\n{}", clone_gnid . 0, p_view );
   assert! ( p_view . contains ("subscribeeFolder"),
     "the clone (a subscriber of N) shows a subscribeeFolder:\n{}", p_view );
-  assert! ( ! p_view . contains ("overriddenFolder"),
-    "the clone's overriddenFolder should require an explicit request:\n{}",
-    p_view );
 
   // The load-bearing round-trip: P's stored contains was not rewritten
   // to the clone; it still lists N (the fact collected N, not C).

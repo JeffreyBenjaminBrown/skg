@@ -250,7 +250,7 @@ write-protected -- the save would refuse that edit. Returns
       (cons (skg--change-repo-at-point new-skgrepo) nil))))
 
 (defconst skg--relRepo-unsupported-folder-atoms
-  '(subscriberFolder overriderFolder hiderFolder hiddenFolder
+  '(subscriberFolder hiderFolder hiddenFolder
     containerFolder mentionerFolder acquiredByFolder acquiredFolder
     illegalEditFolder
     hiddenInSubscribeeFolder hiddenOutsideOfSubscribeeFolder)
@@ -264,8 +264,7 @@ the relationship belongs to the other end, so setting its repo here would
 be meaningless.")
 
 (defconst skg--writable-folder-relations
-  '((subscribeeFolder . "subscribesTo")
-    (overriddenFolder . "overrides"))
+  '((subscribeeFolder . "subscribesTo"))
   "The partner folder atoms whose members' relationships are writable
 from this side, each mapped to its relation's wire name
 (NodeRelation::relation_name, server/dbs/in_rust_graph/
@@ -440,16 +439,16 @@ next save will do with the relationship."
     ("hidden" nil
      "Hide repos are derived at save, floored at the most public explaining subscription; the hiddenFolder is write-protected.")
     ("overrider" nil
-     "An overriderFolder member: the overrides relationship belongs to the member (the overrider), not to the view-parent. Write-protected from here.")
-    ("overridden" overridden
-     "A member of the view-parent's overriddenFolder. Sets the repo of each overrides relationship from the view-parent."))
+     "No folder shows the overrides relation; only the fork operation records it, so there is nothing to set from here.")
+    ("overridden" nil
+     "No folder shows the overrides relation; only the fork operation records it, so there is nothing to set from here."))
   "For each relation role in 'shared/relations.json',
 (ROLE-NAME KIND-OR-NIL DESCRIPTION), as the relationship-kind menu of
 `skg-set-relRepo-recursive' shows it. ROLE-NAME is the role the
 VIEW-CHILD would play toward its view-parent. KIND-OR-NIL is the
-symbol the walk dispatches on (`content', `subscribee' or
-`overridden') for the three roles whose relationship is writable from the
-child's buffer position, and nil for the rest; DESCRIPTION then
+symbol the walk dispatches on (`content' or `subscribee') for the two
+roles whose relationship is writable from the child's buffer
+position, and nil for the rest; DESCRIPTION then
 explains why the relationship cannot be set from that position.")
 
 (defun skg--relationship-kind-menu-tree ()
@@ -476,10 +475,10 @@ subtree at point.
 First presents an org-menu of the schema's five node-node relations
 (level-1 headlines) and their roles (level-2 headlines); pick, with
 RET, the role the view-children should play toward their
-view-parents. Only three roles are settable from the child's
-position: `content' (ordinary content), `subscribee' (a
-subscribeeFolder member) and `overridden' (an overriddenFolder member);
-RET on any other role explains why it cannot be set from there.
+view-parents. Only two roles are settable from the child's
+position: `content' (ordinary content) and `subscribee' (a
+subscribeeFolder member); RET on any other role explains why it
+cannot be set from there.
 
 Then prompts for a repo over the whole ladder, plus the
 no-override choice that instead removes existing `(relRepo ...)'
@@ -590,13 +589,13 @@ explains the refusal; q aborts."
   "Apply CHOICE (a repo name, or
 `skg--relRepo-no-override') to every headline in the
 subtree at point, the headline at point included, whose relationship
-to its view-parent is of KIND (`content', `subscribee' or
-`overridden'; see `skg--relationship-kind-matches-p'). Recurses only
+to its view-parent is of KIND (`content' or `subscribee'; see
+`skg--relationship-kind-matches-p'). Recurses only
 where edits still affect the graph: it prunes below write-protected
 nodes and subscribee-as-such members, prunes noClaim
 nodes -- except the walk's root, which the
-user chose deliberately -- and prunes non-vognodes other than the two
-writable folders. Returns how many headlines it applied CHOICE to."
+user chose deliberately -- and prunes non-vognodes other than the
+writable subscribeeFolder. Returns how many headlines it applied CHOICE to."
   (let ((targets (skg--relRepo-recursive-targets kind)))
     ;; Do not let a late conflict leave earlier targets edited.  This
     ;; preflight is deliberately before the first metadata rewrite.
@@ -658,8 +657,8 @@ from this position: for `content', the view-parent must be a
 editable occurrence not in subscribee-as-such position (an
 write-protected or subscribee-as-such parent's contains is not
 collected at save, so a relRepo request under one would be
-inert); for `subscribee' and `overridden', the viewparent must be
-the matching writable folder with an editable viewparent."
+inert); for `subscribee', the viewparent must be the writable
+subscribeeFolder with an editable viewparent."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (or (and (skg--occurrence-sexp-p meta)
                   (skg--claims-membership-p meta))
@@ -675,10 +674,6 @@ the matching writable folder with an editable viewparent."
                    ((skg--non-vognode-atom-present-p parent-sexp
                                                   'subscribeeFolder)
                     (and (eq kind 'subscribee)
-                         (skg--folder-viewparent-editable-p)))
-                   ((skg--non-vognode-atom-present-p parent-sexp
-                                                  'overriddenFolder)
-                    (and (eq kind 'overridden)
                          (skg--folder-viewparent-editable-p)))
                    (t nil))))))))
 

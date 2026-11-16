@@ -76,10 +76,6 @@ fn all_tests
                  "tests/delete_strips_references_from_neighbors/fixtures-cross-owner") ?;
       delete_in_foreign_subscribee_rerenders_as_unknown (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("delete_in_foreign_overridden_rerenders_as_unknown",
-                 "tests/delete_strips_references_from_neighbors/fixtures-cross-owner") ?;
-      delete_in_foreign_overridden_rerenders_as_unknown (
-        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("delete_in_foreign_hiddenoutside_rerenders_as_unknown",
                  "tests/delete_strips_references_from_neighbors/fixtures-cross-owner") ?;
       delete_in_foreign_hiddenoutside_rerenders_as_unknown (
@@ -287,37 +283,6 @@ async fn delete_in_foreign_subscribee_rerenders_as_unknown (
   assert! (fresh . contains ("unknown (gnid victim-alt)"),
     "the raw foreign subscribee must retain the deleted node's extra ID as \
      Unknown: {}", fresh);
-  Ok (( ))
-}
-
-async fn delete_in_foreign_overridden_rerenders_as_unknown (
-  config : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-) -> Result<(), Box<dyn Error>> {
-  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream, indoc! {"
-      * (skg node (gnid overrider) (skgRepos (nodeRepo foreign))) foreign overrider
-      ** (skg overriddenFolder)
-      *** (skg node (gnid victim) (skgRepos (nodeRepo owned)) (editRequest delete)) victim
-    "}, config, tantivy, &graph,
-    &Err (String::new ()), &mut views_state ) . await ?;
-  assert! (response . errors . is_empty (), "{:?}", response . errors);
-  assert! ( ! response . saved_view . lines () . next () . unwrap_or ("")
-              . contains ("(gnid overrider)"),
-    "the buffer whose foreign root was forked must immediately be rooted at the fork: {}",
-    response . saved_view);
-  let original : Graphnode = graphnode_from_pid_and_skgrepo (
-    config, ID::from ("overrider"), &SkgrepoName::from ("foreign")) ?;
-  assert! (members_msv (&original . overrides)
-           . into_vec ()
-           . contains (&ID::from ("victim-alt")),
-    "the foreign original's raw override relationship must survive deletion");
   Ok (( ))
 }
 

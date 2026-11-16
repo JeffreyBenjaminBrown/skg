@@ -15,7 +15,12 @@
 //!
 //! The whole graph is checked at startup and rebuild
 //! ('validate_override_invariants'); a save checks only the notes whose
-//! answer it can change ('derive_affected_override_scope').
+//! answer it can change ('derive_affected_override_scope'). A save
+//! that leaves a violation is refused. Startup and rebuild refuse only
+//! a violation that owned records alone make: one that a foreign
+//! note's record takes part in ('foreign_note_taking_part') is a
+//! warning there, since only a hand edit of the owned note could
+//! otherwise mend what a foreign author did.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
@@ -180,6 +185,30 @@ fn violations_of_owned_note (
           forkee : pid . clone () } ); }}
   violations }
 
+/// The foreign note, if any, whose record takes part in 'violation'.
+/// The self-rules and 'ForkeeContained' read only the owned note's
+/// own records. 'ForkerContained' reads the forker's fork and the
+/// forkee's contents, and the rules check it from either note, so
+/// either may be foreign.
+pub fn foreign_note_taking_part (
+  config    : &SkgConfig,
+  graph     : &InRustGraph,
+  violation : &OverrideInvariantViolation,
+) -> Option<ID> {
+  let is_foreign = |pid : &ID| -> bool {
+    graph . nodes . get (pid) . is_some_and ( |node|
+      ! config . skgrepo_is_owned (&node . home_skgrepo) ) };
+  match violation {
+    OverrideInvariantViolation::ForkerContained { forker, forkee } =>
+      [ forker, forkee ] . into_iter ()
+      . find ( |pid| is_foreign (pid) )
+      . cloned (),
+    OverrideInvariantViolation::UnknownSkgrepo { .. }
+      | OverrideInvariantViolation::SelfFork { .. }
+      | OverrideInvariantViolation::SelfContains { .. }
+      | OverrideInvariantViolation::SelfHides { .. }
+      | OverrideInvariantViolation::ForkeeContained { .. } => None, }}
+
 /// The members 'pid' records under 'relation', each as the pid of the
 /// note it names, else as the raw ID: how the graph's recorderward
 /// relmaps key them.
@@ -220,3 +249,12 @@ pub fn describe_override_invariant_violation (
     OverrideInvariantViolation::ForkerContained { forker, forkee } =>
       format! ("node {} contains node {}, which forks it (subscribes to or overrides it); a note may not contain a note that forks it, nor fork a note that contains it", forkee, forker),
   }}
+
+/// A violation that 'foreign' takes part in, as a startup warning.
+pub fn describe_violation_a_foreign_note_takes_part_in (
+  violation : &OverrideInvariantViolation,
+  foreign   : &ID,
+) -> String {
+  format! (
+    "{}. Node {} is foreign, so the server starts anyway, but a save of the other, owned note is refused while this holds",
+    describe_override_invariant_violation (violation), foreign ) }

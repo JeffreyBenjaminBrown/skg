@@ -190,7 +190,6 @@ pub fn required_ancestry (
     ViewnodeKind::Folder (folder) => match folder {
       Folder::Alias | Folder::ID | Folder::Flags { .. }
         | Folder::Subscribee | Folder::Subscriber
-        | Folder::Overridden | Folder::Overrider
         | Folder::Hider | Folder::Hidden
         | Folder::Container | Folder::Mentioner
         | Folder::Acquired | Folder::IllegalEdit { .. } => ANC_OCCURRENCE,

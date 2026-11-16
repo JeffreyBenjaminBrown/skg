@@ -829,18 +829,14 @@ fn a_tombstone_does_not_collide_with_content () {
 
 #[test]
 fn duplicate_members_of_defining_folders_pass_validation () {
-  // Defining folders (SubscribeeFolder, OverriddenFolder; aliases were always
-  // exempt) silently deduplicate at emission instead of bouncing the
-  // save.
+  // Defining folders (SubscribeeFolder; aliases were always exempt)
+  // silently deduplicate at emission instead of bouncing the save.
   let input : &str =
     indoc! {"
       * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
       ** (skg subscribeeFolder)
       *** (skg node (gnid dup) (skgRepos (nodeRepo main)) writeProtected) dup
       *** (skg node (gnid dup) (skgRepos (nodeRepo main)) writeProtected) dup
-      ** (skg overriddenFolder)
-      *** (skg node (gnid dup2) (skgRepos (nodeRepo main)) writeProtected) dup2
-      *** (skg node (gnid dup2) (skgRepos (nodeRepo main)) writeProtected) dup2
     "};
   let (viewforest, parsing_errors, _warnings_viewforest, _supplied)
     : (ViewForest, Vec<BufferValidationError>, Vec<String>, WhatTheParseSupplied)
@@ -930,8 +926,8 @@ fn a_gnid_only_vognode_of_either_kind_stands_in_every_partner_folder_and_the_acq
   let config : SkgConfig = validation_config ();
   for kind in ["unknown", "restricted"] {
     let mut inputs : Vec<(String, String)> =
-      [ "subscribeeFolder", "subscriberFolder", "overriddenFolder",
-        "overriderFolder", "hiderFolder", "hiddenFolder",
+      [ "subscribeeFolder", "subscriberFolder",
+        "hiderFolder", "hiddenFolder",
         "containerFolder", "mentionerFolder" ]
       . iter ()
       . map ( |folder| (

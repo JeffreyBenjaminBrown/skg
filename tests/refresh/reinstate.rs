@@ -98,11 +98,11 @@ fn an_empty_write_protected_folder_goes_and_an_empty_editable_one_stays () {
   let input : String = formatdoc! ("
     * {} p
     ** (skg containerFolder)
-    ** (skg overriddenFolder)
+    ** (skg subscribeeFolder)
     ", occurrence_metadata ("p", "") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
-  overriddenFolder" ); }
+  subscribeeFolder" ); }
 
 #[test]
 fn a_subscribee_as_such_shows_what_its_subscriber_neither_hides_nor_contains () {
@@ -205,7 +205,7 @@ fn a_buffer_of_many_kinds_is_a_fixpoint () {
     ** {} s
     *** (skg subscribeeFolder)
     * {} c1
-    ", occurrence_metadata ("p", "(viewRequests (folder containers) flags (folder overrides))"),
+    ", occurrence_metadata ("p", "(viewRequests (folder containers) flags)"),
        occurrence_metadata ("c", "writeProtected"),
        occurrence_metadata ("q", "writeProtected"),
        occurrence_metadata ("s", "(viewRequests (folder subscribesTo))"),
@@ -216,7 +216,6 @@ node p
   containerFolder
     node q wp noClaim
       node top wp noClaim
-  overriddenFolder
   flagsFolder
   aliasFolder
     alias alias

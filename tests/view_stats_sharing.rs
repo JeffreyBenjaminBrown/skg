@@ -6,12 +6,10 @@
 // floors"):
 // - grandparentOverrides ("gO"): a subscribee-as-such whose folder recorder
 //   also overrides it;
-// - grandparentSubscribes ("gS"): an overriddenFolder member whose folder
-//   recorder also subscribes to it;
 // - overridesParent ("Op"): a node shown under a vognode it overrides.
-// One fixture serves all three: R subscribes to E and F and overrides
-// E (so E under R's subscribeeFolder carries gO and under R's
-// overriddenFolder carries gS, while F carries neither); R contains P,
+// One fixture serves both: R subscribes to E and F and overrides
+// E (so E under R's subscribeeFolder carries gO, while F does not);
+// R contains P,
 // P contains C, and C overrides P (so C as content of P carries Op,
 // and C as a view root does not). Each stat round-trips through a
 // save (the viewStats parser errors on unknown atoms, so this also
@@ -51,7 +49,7 @@ fn lines_containing<'a> (
 
 /// The folder (by its metadata atom) most recently opened above each
 /// E line. The fixture shows E only as a folder member, so this
-/// attributes each E copy to its folder regardless of folder order.
+/// attributes each E copy to its folder.
 fn e_lines_by_enclosing_folder (
   buf : &str,
 ) -> Vec<(&'static str, &str)> {
@@ -59,7 +57,6 @@ fn e_lines_by_enclosing_folder (
   let mut result : Vec<(&'static str, &str)> = Vec::new ();
   for line in buf . lines () {
     if without_viewnode_ids (line) . contains ("subscribeeFolder)") { current_folder = "subscribeeFolder"; }
-    else if without_viewnode_ids (line) . contains ("overriddenFolder)") { current_folder = "overriddenFolder"; }
     else if line . contains ("(gnid E)") {
       result . push ((current_folder, line)); }}
   result }
@@ -70,14 +67,13 @@ fn assert_sharing_stats_in_view_of_R (
 ) {
   let e_lines : Vec<(&'static str, &str)> =
     e_lines_by_enclosing_folder (buf);
-  assert_eq! ( e_lines . len (), 2,
-    "{}: E should appear under both the subscribeeFolder and the \
-     overriddenFolder:\n{}", label, buf );
+  assert_eq! ( e_lines . len (), 1,
+    "{}: E should appear under the subscribeeFolder:\n{}", label, buf );
   // In the semantic wire the parent-relative stats are relationships to
   // E's grandparent R (generation 2): R both subscribes to and overrides
   // E. Under a folder, the folder relation is E's birth; the
-  // other (the old gO/gS sharing stat) shows as an ordinary relation.
-  // Both carry (ancestors 2). The folders differ by which relation is birth.
+  // other (the old gO sharing stat) shows as an ordinary relation.
+  // Both carry (ancestors 2).
   for (folder, line) in &e_lines {
     match *folder {
       "subscribeeFolder" => {
@@ -86,13 +82,6 @@ fn assert_sharing_stats_in_view_of_R (
         assert! ( line . contains ("(overrides")
                   && line . contains ("(ancestors 2)"),
           "{}: E-as-subscribee also shows gO (R overrides E, gen 2):\n{}",
-          label, buf ); },
-      "overriddenFolder" => {
-        assert! ( line . contains ("(birth (overrides in 2))"),
-          "{}: E-as-overridden is born of the override:\n{}", label, buf );
-        assert! ( line . contains ("(subscribesTo")
-                  && line . contains ("(ancestors 2)"),
-          "{}: E-as-overridden also shows gS (R subscribes E, gen 2):\n{}",
           label, buf ); },
       other => panic! (
         "{}: E shown outside any folder ({:?}):\n{}", label, other, buf ),
@@ -131,16 +120,11 @@ async fn sharing_view_stats_appear_and_roundtrip (
 ) -> Result<(), Box<dyn Error>> {
       (
         graph_handle_from_config (config) ? );
-      let (initial, _pids, _tree)
+      let (de_novo, _pids, _tree)
         : (String, Vec<ID>, _) =
         multi_root_view (
           config, Some (tantivy),
           &[ ID ("R" . to_string ()) ] ) ?;
-      let folder_request : String = initial . replacen (
-        "node ",
-        "node (viewRequests (folder overrides))", 1 );
-      let de_novo : String =
-        save_and_rerender (&folder_request, config, tantivy) . await ?;
       assert_sharing_stats_in_view_of_R (&de_novo, "de novo");
       let saved : String = // The save parses the buffer, so this also pins the parse arms.
         save_and_rerender (&de_novo, config, tantivy) . await ?;

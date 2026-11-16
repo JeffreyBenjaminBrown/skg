@@ -136,12 +136,12 @@ and leave the headline's own metadata alone."
   "A sample of the C-c l (folders) bindings. No C-c p prefix is bound:
 the folder commands are the way to show a node's partners."
   (dolist (pair '(("C-c l a" . skg-show-folderOf-aliases)
-                  ("C-c l o" . skg-show-folderOf-overrides)
                   ("C-c l s" . skg-show-folderOf-subscribesTo)
                   ("C-c l c" . skg-show-folderOf-containers)
                   ("C-c l m" . skg-show-folderOf-mentioners)))
     (should (eq (lookup-key skg-content-view-mode-map (kbd (car pair)))
                 (cdr pair))))
+  (should-not (lookup-key skg-content-view-mode-map (kbd "C-c l o")))
   (should-not (lookup-key skg-content-view-mode-map (kbd "C-c p"))))
 
 (ert-deftest test-skg-folder-change-processed ()

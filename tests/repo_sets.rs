@@ -920,10 +920,8 @@ async fn restricted_save_preserves_invisible_override_targets (
   // ('docs/api-and-formats.org', "Restricted-skgrepo nodes: omission,
   // retention, and save preservation"): a node overrides [ovr-visible,
   // ovr-inactive] where ovr-inactive's skgrepo, and the section of
-  // ovr-owner that records it, are restricted. Rendering
-  // restricted shows only ovr-visible; the set-difference merge must keep
-  // ovr-inactive across a restricted save, even when the visible member is
-  // deleted.
+  // ovr-owner that records it, are restricted. No buffer position
+  // edits overrides, so a restricted save of the node keeps both.
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           &config, SkgrepoName::from ("public") )?;
@@ -932,38 +930,16 @@ async fn restricted_save_preserves_invisible_override_targets (
           MSV::Specified (gnids) => {
             let mut v : Vec<ID> = members_of (gnids); v . sort (); v }
           MSV::Unspecified => Vec::new (), } };
-      { // Unmodified restricted save: the invisible target is preserved.
-        // (If the merge reproduces disk exactly the recorder is a no-op and
-        // emits no SaveNode -- which is itself preservation.)
-        let unmodified = indoc! {"
-          * (skg node (gnid ovr-owner) (skgRepos (nodeRepo public))) ovr-owner
-          ** (skg overriddenFolder)
-          *** (skg node (gnid ovr-visible) (skgRepos (nodeRepo public)) writeProtected) ovr-visible
+      { // A restricted save that retitles the node keeps both targets.
+        let retitled = indoc! {"
+          * (skg node (gnid ovr-owner) (skgRepos (nodeRepo public))) ovr-owner, retitled
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
-            unmodified, &config, &restriction ) ?
-          . 1 . node_instructions;
-        if let Some (NodeInstruction::Save (SaveNode (recorder))) =
-          instructions . iter () . find ( |i| matches! (
-            i, NodeInstruction::Save (SaveNode (n))
-              if n . pid == ID::from ("ovr-owner") )) {
-          assert! (
-            override_set (recorder) . contains (&ID::from ("ovr-inactive")),
-            "unmodified restricted save dropped the invisible override \
-             target: {:?}", recorder . overrides ); } }
-      { // Delete the visible member: disk holds exactly [ovr-inactive].
-        let deleted = indoc! {"
-          * (skg node (gnid ovr-owner) (skgRepos (nodeRepo public))) ovr-owner
-          ** (skg overriddenFolder)
-        "};
-        let instructions : Vec<NodeInstruction> =
-          buffer_to_validated_saveplan (
-            deleted, &config, &restriction ) ?
+            retitled, &config, &restriction ) ?
           . 1 . node_instructions;
         assert_eq! (
           override_set ( saved_node_by_gnid (&instructions, "ovr-owner") ),
-          vec![ID::from ("ovr-inactive")],
-          "deleting the visible override member must leave exactly the \
-           invisible one" ); }
+          vec![ID::from ("ovr-inactive"), ID::from ("ovr-visible")],
+          "a restricted save must keep every override target" ); }
       Ok (( )) }

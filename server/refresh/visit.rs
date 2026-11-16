@@ -890,7 +890,7 @@ fn redraw_folders (
   let mut drawn : Vec<Folder> = Vec::new ();
   for (treeid, folder) in folders {
     let folded : bool = tree . get (treeid) . unwrap () . value () . foldAndFocus . folded;
-    for kind in kinds_redrawing (&folder) {
+    for kind in kinds_redrawing (&folder, was_editable) {
       if drawn . iter () . any ( |done| discriminant (done) == discriminant (&kind) )
          || ( kind . is_editable () && ! has_members (&pid, &kind, walk) )
       { continue; }
@@ -912,20 +912,24 @@ fn redraw_folders (
 /// The folders that stand, for the node a re-pointed root now shows,
 /// where a folder of the kind of 'folder' stood: those a request for
 /// its relation draws, both sides of a partner relation ('(folder
-/// overrides)' draws the overridden and overrider folders), but for
-/// the subscribee folder alone, which a root shows by default where
-/// its node subscribes, and which the user's request would have drawn
-/// with a subscriber folder. None for the folders drawn inside others
+/// hidesFromSubs)' draws the hider and hidden folders), but for the
+/// subscribee folder of an editable root, alone, which such a root
+/// shows by default where its node subscribes, and which the user's
+/// request would have drawn with a subscriber folder. (A
+/// write-protected root, such as a search hit, shows a subscribee
+/// folder only by request or beside its subscriber folder
+/// ('stub_root_of_hit').) None for the folders drawn inside others
 /// or only in the diff view, for the illegal-edit folder, which each
 /// visit draws, and for the ID folder, which no request draws.
 fn kinds_redrawing (
-  folder : &Folder,
+  folder           : &Folder,
+  root_is_editable : bool,
 ) -> Vec<Folder> {
   match folder {
-    Folder::Subscribee             => vec! [ Folder::Subscribee ],
+    Folder::Subscribee if root_is_editable
+                                   => vec! [ Folder::Subscribee ],
+    Folder::Subscribee             => folders_of_relation (FolderRelation::SubscribesTo),
     Folder::Subscriber             => folders_of_relation (FolderRelation::SubscribesTo),
-    Folder::Overridden | Folder::Overrider
-                                   => folders_of_relation (FolderRelation::Overrides),
     Folder::Hider | Folder::Hidden => folders_of_relation (FolderRelation::HidesFromSubs),
     Folder::Container              => folders_of_relation (FolderRelation::Containers),
     Folder::Mentioner              => folders_of_relation (FolderRelation::Mentioners),
@@ -1089,7 +1093,7 @@ fn request_stays (
 
 /// Where the folders a request adds stand among those added at one
 /// visit, first first: the containers folder, the mentioners, the
-/// aliases, then the subscription, override and hiding folders, the
+/// aliases, then the subscription and hiding folders, the
 /// flags last. (A node's view requests are a set.)
 fn folder_request_rank (
   request : &ViewRequest,
@@ -1099,12 +1103,11 @@ fn folder_request_rank (
     ViewRequest::Folder (FolderRelation::Mentioners)    => 1,
     ViewRequest::Folder (FolderRelation::Aliases)       => 2,
     ViewRequest::Folder (FolderRelation::SubscribesTo)  => 3,
-    ViewRequest::Folder (FolderRelation::Overrides)     => 4,
-    ViewRequest::Folder (FolderRelation::HidesFromSubs) => 5,
-    ViewRequest::Flags                                  => 6,
+    ViewRequest::Folder (FolderRelation::HidesFromSubs) => 4,
+    ViewRequest::Flags                                  => 5,
     ViewRequest::Editable | ViewRequest::WriteProtected
       | ViewRequest::WriteProtectedSubtree
-      | ViewRequest::Fork                               => 7, } }
+      | ViewRequest::Fork                               => 6, } }
 
 /// The folders a '(folder RELNAME)' request adds: both of the
 /// relation's, or the one whose other side the node shows without a
@@ -1114,7 +1117,6 @@ fn folders_of_relation (
 ) -> Vec<Folder> {
   match relation {
     FolderRelation::Aliases       => vec! [ Folder::Alias ],
-    FolderRelation::Overrides     => vec! [ Folder::Overridden, Folder::Overrider ],
     FolderRelation::HidesFromSubs => vec! [ Folder::Hider, Folder::Hidden ],
     FolderRelation::SubscribesTo  => vec! [ Folder::Subscribee, Folder::Subscriber ],
     FolderRelation::Containers    => vec! [ Folder::Container ],

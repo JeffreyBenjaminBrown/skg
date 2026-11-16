@@ -108,12 +108,9 @@ async fn pipeline_basic_mixed_tree (
             ** (skg node (gnid independent) (skgRepos (nodeRepo main)) noClaim) independent
             ** (skg subscribeeFolder)
             *** (skg node (gnid s1) (skgRepos (nodeRepo main)) writeProtected) s1
-            ** (skg overriddenFolder)
-            *** (skg node (gnid o1) (skgRepos (nodeRepo main)) writeProtected) o1
             * (skg node (gnid explicit) (skgRepos (nodeRepo main))) explicit
             ** (skg aliasFolder) aliases
             ** (skg subscribeeFolder)
-            ** (skg overriddenFolder)
             * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
             "};
       let (plan, nodeMerge_acquisitions)
@@ -139,17 +136,13 @@ async fn pipeline_basic_mixed_tree (
                       "first alias" . to_string(),
                       "second alias" . to_string()]) );
         assert_eq!( members_msv (&root . subscribesTo),
-                    MSV::Specified (vec![ID::from ("s1")]) );
-        assert_eq!( members_msv (&root . overrides),
-                    MSV::Specified (vec![ID::from ("o1")]) ); }
+                    MSV::Specified (vec![ID::from ("s1")]) ); }
       { let explicit : &Graphnode =
           saved_node_by_gnid (&plan . node_instructions, "explicit");
         // Present-but-empty folders are explicit emptiness.
         assert_eq!( explicit . aliases,
                     MSV::Specified (vec![]) );
         assert_eq!( explicit . subscribesTo,
-                    MSV::Specified (vec![]) );
-        assert_eq!( explicit . overrides,
                     MSV::Specified (vec![]) ); }
       assert!( plan . skgrepo_moves . is_empty() );
       assert!( nodeMerge_acquisitions . is_empty() );

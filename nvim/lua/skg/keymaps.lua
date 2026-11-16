@@ -62,8 +62,6 @@ M.commands = {
                                   desc = 'Goto in git parent, closing this buffer' },
   ShowFolderOfAliases = { module = 'skg.views', fn = 'show_folderOf_aliases',
                             desc = 'Request the alias folder (auto-saves)' },
-  ShowFolderOfOverrides = { module = 'skg.views', fn = 'show_folderOf_overrides',
-                              desc = 'Request the override folders (auto-saves)' },
   ShowFolderOfHidesFromSubs = { module = 'skg.views', fn = 'show_folderOf_hidesFromSubs',
                           desc = 'Request the hide folders (auto-saves)' },
   ShowFolderOfSubscribesTo = { module = 'skg.views', fn = 'show_folderOf_subscribesTo',
@@ -348,7 +346,6 @@ M.content_view_bindings = {
   { 'GM', 'GotoInGitParentAndCloseThis' }, -- C-c G M
   { 'gv', 'GotoViewnodeId' },            -- C-c g v
   { 'la', 'ShowFolderOfAliases' },       -- C-c l a
-  { 'lo', 'ShowFolderOfOverrides' },     -- C-c l o
   { 'lh', 'ShowFolderOfHidesFromSubs' }, -- C-c l h
   { 'ls', 'ShowFolderOfSubscribesTo' },  -- C-c l s
   { 'lp', 'ShowFolderOfFlags' },         -- C-c l p

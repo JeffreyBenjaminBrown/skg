@@ -299,7 +299,7 @@ pub fn check_candidate (
     . map_err ( |e| format! (
       "Nothing was committed: the commit could not be read back: {}", e )) ?;
   let nodes : Vec<Graphnode> = snapshot . nodes . into_values () . collect ();
-  let (candidate, _telescope_warnings) = validated_graph (config, &nodes)
+  let (candidate, _telescope_warnings, _fork_rule_warnings) = validated_graph (config, &nodes)
     . map_err ( |e| format! (
       "Nothing was committed: the commit would not validate: {}",
       e . replace ('\n', " ") )) ?;

@@ -131,7 +131,8 @@ fn only_atom_bearing_relations_are_accepted (
 ) {
   assert! ( relation_from_client_string ("contains") . is_ok () );
   assert! ( relation_from_client_string ("subscribesTo") . is_ok () );
-  assert! ( relation_from_client_string ("overrides") . is_ok () );
+  assert! ( relation_from_client_string ("overrides") . is_err (),
+    "no buffer position shows an override's record" );
   assert! ( relation_from_client_string (
     "hidesFromSubs") . is_err (),
     "hides have no explicit-repo path" );

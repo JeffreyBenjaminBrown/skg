@@ -123,7 +123,6 @@ and hide INTERNAL from M-x completion."
   (progn;; show folders (C-c l): request a local
     ;; view change the server fulfills on save. Each command auto-saves.
     (define-key map (kbd "C-c l a") #'skg-show-folderOf-aliases)
-    (define-key map (kbd "C-c l o") #'skg-show-folderOf-overrides)
     (define-key map (kbd "C-c l h") #'skg-show-folderOf-hidesFromSubs)
     (define-key map (kbd "C-c l s") #'skg-show-folderOf-subscribesTo)
     (define-key map (kbd "C-c l p") #'skg-show-folderOf-flags)

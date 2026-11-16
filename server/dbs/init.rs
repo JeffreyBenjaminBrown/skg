@@ -41,9 +41,11 @@ pub struct InitContextHandoff {
 /// Tantivy from that exact node vector. There is intentionally no marker or
 /// incremental branch: both session-lifetime stores are reconstructed at startup, so
 /// files deleted while the server was stopped cannot leave orphaned records.
+/// Also returns the fork-rule warnings ('validated_graph'), for the
+/// startup warnings.
 pub fn initialize_dbs (
   config : &SkgConfig,
-) -> (SkgEnv, InitContextHandoff, Vec<Graphnode>) {
+) -> (SkgEnv, InitContextHandoff, Vec<Graphnode>, Vec<String>) {
   retire_stale_tantivy_generation_directories (&config . tantivy_folder);
   tracing::info! ("Reading authoritative .skg files from all repos...");
   let (nodes, load_violations)
@@ -52,7 +54,7 @@ pub fn initialize_dbs (
     . unwrap_or_else (|e| {
       tracing::error! ("Failed to read .skg files: {}", e);
       std::process::exit (1); });
-  let (mut graph, mut graph_warnings) = validated_graph (config, &nodes)
+  let (mut graph, mut graph_warnings, fork_rule_warnings) = validated_graph (config, &nodes)
     . unwrap_or_else (|e| {
       tracing::error! ("Complete graph validation failed:\n{}", e);
       std::process::exit (1); });
@@ -74,7 +76,7 @@ pub fn initialize_dbs (
   if let Err (e) = write_dependencies_manifests (config) {
     tracing::warn! (
       error = %e, "could not write OTHER_SKGREPO_DEPENDENCIES.toml manifests" ); }
-  (env, handoff, nodes)
+  (env, handoff, nodes, fork_rule_warnings)
 }
 
 fn env_and_handoff_from_nodes (

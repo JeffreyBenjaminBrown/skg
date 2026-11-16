@@ -26,13 +26,11 @@ use std::hash::Hash;
 /// The folders of a node's recorders (its in-set changed when one
 /// was added or removed), then those of the relationships it records
 /// (changed when one was added, removed or moved to another skgrepo).
-const IN_FOLDERS : [Folder; 5] = [
+const IN_FOLDERS : [Folder; 4] = [
   Folder::Container, Folder::Mentioner,
-  Folder::Subscriber, Folder::Overrider,
-  Folder::Hider ];
-const OUT_FOLDERS : [Folder; 3] = [
-  Folder::Subscribee, Folder::Overridden,
-  Folder::Hidden ];
+  Folder::Subscriber, Folder::Hider ];
+const OUT_FOLDERS : [Folder; 2] = [
+  Folder::Subscribee, Folder::Hidden ];
 
 /// What the change leaves that mention a node say changed about it,
 /// grouped by aspect: what the diff view draws ahead of its content

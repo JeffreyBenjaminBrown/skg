@@ -342,7 +342,6 @@ fn folder_goal (
           &occurrence_pid_of (parties . subscriber) ?, walk ),
         &HashMap::new ()))) },
     Folder::Subscribee | Folder::Subscriber
-      | Folder::Overridden | Folder::Overrider
       | Folder::Hider | Folder::Hidden
       | Folder::Container | Folder::Mentioner => {
       let goal : Goal = partnerFolder_goal (kind, &described_pid () ?, walk) ?;
@@ -395,7 +394,7 @@ pub(crate) fn partnerFolder_members_in_graph (
     if recorder_role . is_first_role () { // the folder shows a list in the recorder's file
       // Preserve an unresolved ID through this outbound surface. The
       // canonical-pid accessor below is right for the inverse folders,
-      // but would erase an unknown from the writable overriddenFolder.
+      // but would erase an unknown from the writable subscribeeFolder.
       graph . outbound_member_keys_for_relation_gated (
         viewparent_pid, member_role . relation, skgrepo_restriction )
         . into_iter ()

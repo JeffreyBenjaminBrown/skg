@@ -139,6 +139,63 @@ fn canonical_entry_includes_the_fork_rules_and_telescope_orientation () {
       relation : "overrides", .. })) . count (), 2);
 }
 
+/// Owned e contains foreign f, which subscribes to (forks) e: a
+/// foreign record takes part, so it is a warning naming both notes and
+/// which is foreign, not an error.
+#[test]
+fn an_owned_note_containing_its_foreign_forker_is_a_warning () {
+  let mut e = node ("e", "public");
+  e . contains = vec![ RelPartner::at_relRepo (
+    SkgrepoName::from ("public"), ID::from ("f")) ];
+  let mut f = node ("f", "foreign");
+  f . subscribesTo = MSV::Specified (vec![ RelPartner::at_relRepo (
+    SkgrepoName::from ("foreign"), ID::from ("e")) ]);
+  let report = validate_complete_graph (&config (), &[e, f]);
+  assert! (report . is_valid (), "{:?}", report . errors);
+  assert_eq! (report . fork_rule_warnings . len (), 1,
+              "{:?}", report . fork_rule_warnings);
+  let warning : &str = &report . fork_rule_warnings [0];
+  assert! (warning . contains ("node e contains node f, which forks it")
+           && warning . contains ("Node f is foreign"),
+           "{}", warning);
+}
+
+/// Owned r subscribes to (forks) foreign e, which contains r: a
+/// warning naming e as foreign.
+#[test]
+fn an_owned_note_forking_its_foreign_container_is_a_warning () {
+  let mut r = node ("r", "public");
+  r . subscribesTo = MSV::Specified (vec![ RelPartner::at_relRepo (
+    SkgrepoName::from ("public"), ID::from ("e")) ]);
+  let mut e = node ("e", "foreign");
+  e . contains = vec![ RelPartner::at_relRepo (
+    SkgrepoName::from ("foreign"), ID::from ("r")) ];
+  let report = validate_complete_graph (&config (), &[r, e]);
+  assert! (report . is_valid (), "{:?}", report . errors);
+  assert_eq! (report . fork_rule_warnings . len (), 1,
+              "{:?}", report . fork_rule_warnings);
+  assert! (report . fork_rule_warnings [0] . contains ("Node e is foreign"),
+           "{}", report . fork_rule_warnings [0]);
+}
+
+/// Owned e contains owned r, which subscribes to (forks) e: owned
+/// records alone make the violation, so it is an error.
+#[test]
+fn an_owned_note_containing_its_owned_forker_is_an_error () {
+  let mut e = node ("e", "public");
+  e . contains = vec![ RelPartner::at_relRepo (
+    SkgrepoName::from ("public"), ID::from ("r")) ];
+  let mut r = node ("r", "public");
+  r . subscribesTo = MSV::Specified (vec![ RelPartner::at_relRepo (
+    SkgrepoName::from ("public"), ID::from ("e")) ]);
+  let report = validate_complete_graph (&config (), &[e, r]);
+  assert_eq! (report . errors, vec![
+    CompleteGraphError::Override (
+      OverrideInvariantViolation::ForkerContained {
+        forker : ID::from ("r"), forkee : ID::from ("e") }) ]);
+  assert! (report . fork_rule_warnings . is_empty ());
+}
+
 #[test]
 fn save_candidate_is_rejected_before_publication () {
   let current = InRustGraph::from_graphnodes (&[

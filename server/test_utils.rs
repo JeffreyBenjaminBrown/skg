@@ -9,17 +9,18 @@ use crate::dbs::filesystem::not_nodes::{
   read_foreign_manifests_into_config,
   validate_skgrepo_paths_creating_owned_ones_if_needed};
 
+use crate::dbs::filesystem::one_node::graphnode_from_gnid;
 use crate::dbs::init::{create_empty_tantivy_index, empty_in_ram_tantivy_index};
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
-use crate::types::env::SkgEnv;
+use crate::types::env::{SkgEnv, new_mutation_gate};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::refresh::{Truth, Walk};
 use crate::refresh::chain::draw_containerward_chain;
 use crate::refresh::mode::RefreshMode;
 use crate::update_buffer::multi_root_view_via_runtime;
 use crate::from_text::strandeds::StrandedsReview;
-use crate::save::DeleteFrom;
+use crate::save::{DeleteFrom, update_graph_minus_nodeMerges};
 use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo, org_to_viewforest};
 use crate::org_to_text::viewforest_to_string;
@@ -501,6 +502,30 @@ pub async fn save_and_rerender (
   assert! ( response . errors . is_empty (),
     "save must not error; got: {:?}", response . errors );
   Ok ( response . saved_view ) }
+
+/// Save, through the save's graph update (which checks the fork
+/// rules), the node 'pid' as disk has it but with 'overrides' added to
+/// its overrides, each recorded at its home. No buffer position edits
+/// overrides; only the fork operation writes them, so a test that
+/// needs an owned note to come to override another saves it here.
+pub async fn save_added_overrides (
+  pid       : &ID,
+  overrides : &[ID],
+  config    : &SkgConfig,
+  tantivy   : &TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle =
+    graph_handle_from_config (config) ?;
+  let mut node : Graphnode = graphnode_from_gnid (config, pid) ?;
+  let mut members : Vec<RelPartner<ID>> =
+    node . overrides . or_default () . to_vec ();
+  members . extend ( rel_partners_at_relRepo (
+    &node . home_skgrepo, overrides . to_vec () ));
+  node . overrides = MSV::Specified (members);
+  update_graph_minus_nodeMerges (
+    vec! [ NodeInstruction::Save (SaveNode (node)) ], &[],
+    config . clone (), tantivy, &graph, &new_mutation_gate () ) . await ?;
+  Ok (( )) }
 
 /// Drive the full prepared-save conflict path with explicit buffer snapshots.
 pub async fn update_from_and_rerender_buffer_with_snapshots_test (

@@ -22,7 +22,7 @@ pub enum LocalContext {
   TopLevel, // The node is a child of the BufferRoot.
   UnderVognode { // The node's parent is an occurrence, a ghost, an unknown, or a tombstone.
     parent_if_editable : Option<ID>, }, // This is Some iff the parent is save-eligible.
-  UnderDefiningFolder ( // The node is inside an aliasFolder, a subscribeeFolder, or an overriddenFolder.
+  UnderDefiningFolder ( // The node is inside an aliasFolder or a subscribeeFolder.
     DefiningFolderRecorder ),
   SubscribeeAsSuchPosition { // The node is a direct child of a subscribeeFolder.
     subscriber               : ID,
@@ -49,7 +49,7 @@ pub struct DefiningFolderRecorder {
 /// A FieldIntent is what one visit can emit. Each emission
 /// pairs one of these with a target ID, and the pair is
 /// instructionMerged into the accumulator.
-/// The first eight kinds are exclusive (at most one per ID); the
+/// The first seven kinds are exclusive (at most one per ID); the
 /// last three are combineable (any number per ID). That distinction is
 /// the shape of 'FieldIntentsForOneId': each exclusive kind gets an
 /// Option slot there, and each combineable kind gets a Vec slot.
@@ -58,7 +58,7 @@ pub struct DefiningFolderRecorder {
 /// They are the self-emissions, and lowering a map entry to a
 /// NodeInstruction needs to know which skgrepo's file it concerns.
 /// .
-/// 'SetContains' / 'SetSubscribesTo' / 'SetOverrides' pair each
+/// 'SetContains' / 'SetSubscribesTo' pair each
 /// member with an Option<RepoName>: Some when the position's
 /// headline carried an explicit '(editRequest (relRepo NAME))'
 /// request (the 'skg-set-relRepo' gesture), None meaning
@@ -76,7 +76,6 @@ pub enum FieldIntent {
   SetContains     (Vec<(ID, Option<SkgrepoName>)>),
   SetAliases      (Vec<(String, Option<SkgrepoName>)>),
   SetSubscribesTo (Vec<(ID, Option<SkgrepoName>)>),
-  SetOverrides    (Vec<(ID, Option<SkgrepoName>)>),
   Delete          { skgrepo : SkgrepoName },
   NodeMerge       { acquiree : ID },
   SetFlag     { flag : Flag, value : bool },
@@ -129,7 +128,6 @@ pub struct FieldIntentsForOneId {
   pub contains       : Option<Vec<(ID, Option<SkgrepoName>)>>,
   pub aliases        : Option<Vec<(String, Option<SkgrepoName>)>>,
   pub subscribesTo   : Option<Vec<(ID, Option<SkgrepoName>)>>,
-  pub overrides      : Option<Vec<(ID, Option<SkgrepoName>)>>,
   pub delete         : bool,
   pub node_merge     : Option<ID>, // This holds the acquiree.
   pub flag       : Option<(Flag, bool)>,
@@ -157,7 +155,6 @@ impl FieldIntentsForOneId {
       || self . contains      . is_some()
       || self . aliases       . is_some()
       || self . subscribesTo . is_some()
-      || self . overrides     . is_some()
       || self . node_merge    . is_some()
       || self . flag      . is_some() }}
 
@@ -259,10 +256,6 @@ impl CollectedFieldIntents {
             fill_exclusive_slot (
               &mut entry . subscribesTo, members,
               "subscribesTo", &target, emitters),
-          FieldIntent::SetOverrides (members) =>
-            fill_exclusive_slot (
-              &mut entry . overrides, members,
-              "overrides", &target, emitters),
           FieldIntent::NodeMerge { acquiree } => {
             if entry . flag . is_some() {
               return Err ( with_org_subheadlines (

@@ -486,7 +486,8 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
       for m in v . iter_mut () {
         let submitted : ID = m . member . clone ();
         m . relRepo = resolve_skgrepo (
-          disk, &submitted, &explicit . overrides,
+          // No buffer position requests an override's relRepo.
+          disk, &submitted, &HashMap::new (),
           "overrides") ?;
         m . member = raw_disk_member (disk, &submitted); }} }
   { let disk : &[RelPartner<ID>] =

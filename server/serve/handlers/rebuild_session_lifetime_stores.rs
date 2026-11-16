@@ -79,7 +79,7 @@ pub fn rebuild_session_lifetime_stores_in_place (
       : (Vec<Graphnode>, Vec<(ID, TelescopeViolation)>) =
       read_all_skg_files_from_skgrepos_collecting_violations (&fresh_config)
       . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
-    let (mut fresh_graph, mut graph_warnings) =
+    let (mut fresh_graph, mut graph_warnings, fork_rule_warnings) =
       validated_graph (&fresh_config, &nodes)
       . map_err (|e| format! ("Complete graph validation failed:\n{}", e)) ?;
     fresh_graph . record_illegal_edits (&load_violations);
@@ -121,6 +121,7 @@ pub fn rebuild_session_lifetime_stores_in_place (
         error = %e, "could not write OTHER_SKGREPO_DEPENDENCIES.toml manifests" ); }
     let warnings : Vec<String> =
       config_warnings . into_iter ()
+      . chain ( fork_rule_warnings )
       . chain ( foreign_section_warnings (&fresh_config) )
       . chain ( restart_only_warnings )
       . collect ();

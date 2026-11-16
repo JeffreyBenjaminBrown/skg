@@ -26,7 +26,6 @@
       "letter": "O", "display_position": 3,
       "roles": [ "overrider", "overridden" ],
       "recorded_by": "overrider",
-      "folders": { "overrider": "overriderFolder",
-                   "overridden": "overriddenFolder" } }
+      "folders": { "overrider": null, "overridden": null } }
   ]
 }

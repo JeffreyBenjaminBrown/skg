@@ -33,8 +33,8 @@ impl GraphStraddle {
         config, &head_identity ) ?;
     let nodes : Vec<Graphnode> =
       git_snapshot . nodes . into_values () . collect ();
-    let (before, _telescope_warnings)
-      : (InRustGraph, Vec<(ID, TelescopeViolation)>) =
+    let (before, _telescope_warnings, _fork_rule_warnings)
+      : (InRustGraph, Vec<(ID, TelescopeViolation)>, Vec<String>) =
       validated_graph (config, &nodes)
       . map_err ( |e| format! ("At HEAD: {}", e) ) ?;
     Ok ( GraphStraddle::new (

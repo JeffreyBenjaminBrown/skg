@@ -1,14 +1,16 @@
 // cargo nextest run --test grouped_overrides -E 'test(overrideward_view_subtree::)'
 //
-// The override folders under search hits, and suppression in search
-// results ('docs/override.org', "Override folders in search results").
+// The subscription folders under search hits, and suppression in
+// search results ('docs/override.org', "Partner folders in search
+// results").
 //
 // Fixture (tests/overrideward_view_subtree/fixtures): owned skgrepo
-// "main" holds U, which overrides foreign F, which overrides foreign
-// G; foreign M1 and M2 mutually override; foreign B overrides foreign
-// E; foreign D overrides "gone", which no file defines; owned O1 and
-// O2 mutually override. The config marks "foreign" with
-// 'foreign = true'; "main" is owned.
+// "main" holds U, which subscribes to and overrides foreign F, which
+// overrides foreign G; foreign M1 and M2 mutually override; foreign B
+// subscribes to and overrides foreign E; foreign D subscribes to and
+// overrides "gone", which no file defines; owned O1 and O2 mutually
+// override. The config marks "foreign" with 'foreign = true'; "main"
+// is owned.
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -50,22 +52,22 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
         &graph, &s . config, &restriction ) ?;
       an_owned_mutual_pair_both_matching_shows_one_hit (
         &graph, &s . config, &restriction ) ?;
-      a_hit_shows_the_nodes_it_overrides_in_a_folder (
+      a_hit_shows_the_nodes_it_subscribes_to_in_a_folder (
         &graph, &s . config, &restriction ) ?;
       end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
         &graph, &s . config, &restriction ) ?;
-      a_hit_overriding_an_absent_node_shows_it_in_a_folder (
+      a_hit_subscribing_to_an_absent_node_shows_it_in_a_folder (
         &graph, &s . config, &restriction ) ?;
       Ok (( )) } )) }
 
 /// End-to-end: replay production's search (suppression, the hits as a
 /// stub, then the refresh of the stub, which draws the enrichment) and
 /// check the rendered buffer. The suppressed F is
-/// absent from the top level and reappears in U's overridden folder,
-/// carrying its override heralds -- U, two levels up, overrides it.
-/// G, which F overrides, is not shown: the search buffer's override
-/// folders hold direct relatives only, and only its containers
-/// folder's members carry anything.
+/// absent from the top level and reappears in U's subscribee folder,
+/// since U subscribes to it, carrying its heralds -- U, two levels up,
+/// subscribes to and overrides it. G, which F overrides, is not shown:
+/// the search buffer's partner folders hold direct relatives only, and
+/// only its containers folder's members carry anything.
 fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
   graph  : &InRustGraph,
   config : &SkgConfig,
@@ -97,19 +99,19 @@ fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
       . unwrap_or (0) };
   assert_eq! ( level_of ("cooking the owned way"), 1,
     "U is the top-level result.\n{}", buffer );
-  assert_eq! ( level_of ("folded overriddenFolder"), 2,
-    "U's overridden folder hangs under it, folded.\n{}", buffer );
+  assert_eq! ( level_of ("folded subscribeeFolder"), 2,
+    "U's subscribee folder hangs under it, folded.\n{}", buffer );
   assert_eq! ( level_of ("cooking, forked once"), 3,
-    "F (suppressed) reappears in U's overridden folder.\n{}", buffer );
+    "F (suppressed) reappears in U's subscribee folder.\n{}", buffer );
   assert_eq! ( level_of ("cooking, the original"), 0,
     "G, which F overrides, is not shown.\n{}", buffer );
   let line : String = buffer . lines ()
     . find ( |l| l . contains ("cooking, forked once") )
     . unwrap_or ("") . to_string ();
   assert! ( line . contains ("(overrides (in 1 (ancestors 2))")
-            && line . contains ("(birth (overrides in 2))"),
-    "F must render its override heralds -- U, two levels up, overrides \
-     it -- proving graphStats were fetched for it: {}", line );
+            && line . contains ("(birth (subscribesTo in 2))"),
+    "F must render its heralds -- U, two levels up, subscribes to and \
+     overrides it -- proving graphStats were fetched for it: {}", line );
   Ok (( )) }
 
 /// Among hits that are mirrors of one another, every one but the hit
@@ -161,11 +163,11 @@ fn an_owned_mutual_pair_both_matching_shows_one_hit (
                "one of the owned mutual pair is shown, O1" );
   Ok (( )) }
 
-/// U overrides F, which overrides G, and nothing overrides U. So
-/// under U hangs, folded, an overridden folder whose one
-/// write-protected member is F, and no overrider folder. F holds
+/// U subscribes to F, which overrides G, and nothing subscribes to U.
+/// So under U hangs, folded, a subscribee folder whose one
+/// write-protected member is F, and no subscriber folder. F holds
 /// nothing: G is not drawn under it.
-fn a_hit_shows_the_nodes_it_overrides_in_a_folder (
+fn a_hit_shows_the_nodes_it_subscribes_to_in_a_folder (
   graph       : &InRustGraph,
   config      : &SkgConfig,
   restriction : &SkgrepoRestriction,
@@ -184,25 +186,25 @@ fn a_hit_shows_the_nodes_it_overrides_in_a_folder (
   let folders : Vec<NodeRef<Viewnode>> = u . children ()
     . filter ( |c| c . value () . kind . is_partner_folder () )
     . collect ();
-  assert_eq! ( folders . len (), 1, "only the overridden folder" );
+  assert_eq! ( folders . len (), 1, "only the subscribee folder" );
   assert! ( matches! ( &folders [0] . value () . kind,
-                       ViewnodeKind::Folder (Folder::Overridden) )
+                       ViewnodeKind::Folder (Folder::Subscribee) )
             && folders [0] . value () . foldAndFocus . folded,
-            "U's one folder is its overridden folder, folded" );
+            "U's one folder is its subscribee folder, folded" );
   let f : NodeRef<Viewnode> =
     find_child ( folders [0], "F" )
-    . expect ("F (the node U overrides) is in the folder");
+    . expect ("F (the node U subscribes to) is in the folder");
   assert! ( matches! ( &f . value () . kind,
                        ViewnodeKind::Vognode (Vognode::Occurrence (t))
                        if t . is_writeProtected () ),
             "F is a write-protected member" );
   assert! ( f . children () . next () . is_none (), "F holds nothing" );
-  a_hit_shows_the_nodes_that_override_it_in_a_folder (
+  a_hit_shows_the_nodes_that_subscribe_to_it_in_a_folder (
     graph, config, restriction ) }
 
-/// B overrides E, and E overrides nothing. So under E hangs, folded,
-/// an overrider folder whose one member is B.
-fn a_hit_shows_the_nodes_that_override_it_in_a_folder (
+/// B subscribes to E, and E subscribes to nothing. So under E hangs,
+/// folded, a subscriber folder whose one member is B.
+fn a_hit_shows_the_nodes_that_subscribe_to_it_in_a_folder (
   graph       : &InRustGraph,
   config      : &SkgConfig,
   restriction : &SkgrepoRestriction,
@@ -221,21 +223,21 @@ fn a_hit_shows_the_nodes_that_override_it_in_a_folder (
   let folders : Vec<NodeRef<Viewnode>> = e . children ()
     . filter ( |c| c . value () . kind . is_partner_folder () )
     . collect ();
-  assert_eq! ( folders . len (), 1, "only the overrider folder" );
+  assert_eq! ( folders . len (), 1, "only the subscriber folder" );
   assert! ( matches! ( &folders [0] . value () . kind,
-                       ViewnodeKind::Folder (Folder::Overrider) )
+                       ViewnodeKind::Folder (Folder::Subscriber) )
             && folders [0] . value () . foldAndFocus . folded,
-            "E's one folder is its overrider folder, folded" );
+            "E's one folder is its subscriber folder, folded" );
   assert! ( find_child ( folders [0], "B" ) . is_some (),
-            "B (which overrides E) is in the folder" );
+            "B (which subscribes to E) is in the folder" );
   Ok (( )) }
 
-/// D overrides "gone", which is on disk, in D's file, but not in the
-/// graph. The stub asks the overridden folder's own goal, the one the
-/// refresh fills it from, whether the folder has members, so D's
-/// overridden folder is drawn, holding the unknown that stands for
+/// D subscribes to "gone", which is on disk, in D's file, but not in
+/// the graph. The stub asks the subscribee folder's own goal, the one
+/// the refresh fills it from, whether the folder has members, so D's
+/// subscribee folder is drawn, holding the unknown that stands for
 /// "gone".
-fn a_hit_overriding_an_absent_node_shows_it_in_a_folder (
+fn a_hit_subscribing_to_an_absent_node_shows_it_in_a_folder (
   graph       : &InRustGraph,
   config      : &SkgConfig,
   restriction : &SkgrepoRestriction,
@@ -253,8 +255,8 @@ fn a_hit_overriding_an_absent_node_shows_it_in_a_folder (
     find_result_root ( &tree, "D" ) . expect ("D is a result root");
   let folder : NodeRef<Viewnode> = d . children ()
     . find ( |c| matches! ( &c . value () . kind,
-                            ViewnodeKind::Folder (Folder::Overridden) ))
-    . expect ("D's overridden folder is drawn");
+                            ViewnodeKind::Folder (Folder::Subscribee) ))
+    . expect ("D's subscribee folder is drawn");
   let members : Vec<NodeRef<Viewnode>> = folder . children () . collect ();
   assert_eq! ( members . len (), 1, "one member, for \"gone\"" );
   assert! ( matches! ( &members [0] . value () . kind,

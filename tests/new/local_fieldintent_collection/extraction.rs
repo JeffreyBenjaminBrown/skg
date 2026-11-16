@@ -102,8 +102,6 @@ fn unknown_members_write_their_editable_relationship_recorders_only () {
     *** (skg unknown (gnid subscribee-unknown))
     *** (skg hiddenOutsideOfSubscribeeFolder)
     **** (skg unknown (gnid hiddenoutside-unknown))
-    ** (skg overriddenFolder)
-    *** (skg unknown (gnid overridden-unknown))
   "};
   let instructions = nodeInstructions_from_tree (viewnode_tree_as_written (input))
     . expect ("Unknown relationship members are valid in a save");
@@ -113,8 +111,6 @@ fn unknown_members_write_their_editable_relationship_recorders_only () {
   assert_eq! (members_of (&recorder . contains), vec! [ID::from ("content-unknown")]);
   assert_eq! (members_msv (&recorder . subscribesTo),
               MSV::Specified (vec! [ID::from ("subscribee-unknown")]));
-  assert_eq! (members_msv (&recorder . overrides),
-              MSV::Specified (vec! [ID::from ("overridden-unknown")]));
   assert_eq! (hiddenoutside_edits_from_tree (viewnode_tree_as_written (input)),
               vec! [(ID::from ("recorder"),
                     skg::from_text::local_fieldintent_collection::types::HiddenOutsideEdit {
@@ -426,54 +422,6 @@ fn extraction_collects_subscribees_without_hidden_branches (
     ! save_gnids (&instructions) . contains (&ID::from ("subscribee"))); }
 
 #[test]
-fn extraction_collects_overridden_folder (
-) {
-  let input: &str =
-    indoc! {"
-            * (skg node (gnid overrider) (skgRepos (nodeRepo main))) overrider
-            ** (skg overriddenFolder)
-            *** (skg node (gnid overridden-a) (skgRepos (nodeRepo main))) overridden A
-            *** (skg node (gnid overridden-b) (skgRepos (nodeRepo main))) overridden B
-        "};
-
-  let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
-  let instructions: Vec<NodeInstruction> =
-    nodeInstructions_from_tree (viewforest) . unwrap();
-
-  assert_eq!(
-    save_gnids (&instructions),
-    // OverriddenFolder members are self-writers: their membership is
-    // read for the parent's overrides, and they also save
-    // their own vognodes. This is part of the new recursion surface.
-    vec![ID::from ("overrider"),
-         ID::from ("overridden-a"),
-         ID::from ("overridden-b")]);
-  assert_eq!(
-    members_msv (&saved_node_by_gnid (&instructions, "overrider") . overrides),
-    MSV::Specified (vec![
-      ID::from ("overridden-a"),
-      ID::from ("overridden-b")])); }
-
-#[test]
-fn empty_overridden_folder_means_empty_override_set (
-) {
-  let input: &str =
-    indoc! {"
-            * (skg node (gnid overrider) (skgRepos (nodeRepo main))) overrider
-            ** (skg overriddenFolder)
-        "};
-
-  let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
-  let instructions: Vec<NodeInstruction> =
-    nodeInstructions_from_tree (viewforest) . unwrap();
-
-  assert_eq!(
-    saved_node_by_gnid (&instructions, "overrider") . overrides,
-    MSV::Specified (vec![])); }
-
-#[test]
 fn write_protected_folder_members_save_themselves_but_not_their_recorder (
 ) {
   let input: &str =
@@ -481,8 +429,6 @@ fn write_protected_folder_members_save_themselves_but_not_their_recorder (
             * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
             ** (skg subscriberFolder)
             *** (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
-            ** (skg overriderFolder)
-            *** (skg node (gnid overrider) (skgRepos (nodeRepo main))) overrider
             ** (skg hiderFolder)
             *** (skg node (gnid hider) (skgRepos (nodeRepo main))) hider
             ** (skg hiddenFolder)
@@ -500,7 +446,6 @@ fn write_protected_folder_members_save_themselves_but_not_their_recorder (
     // the recorder is unaffected by any of these write-protected folders.
     vec![ID::from ("recorder"),
          ID::from ("subscriber"),
-         ID::from ("overrider"),
          ID::from ("hider"),
          ID::from ("hidden")]);
   assert_eq!(
@@ -1350,42 +1295,6 @@ fn toDelete_member_is_excluded_from_subscribees (
     MSV::Specified (vec![ID::from ("keep")])); }
 
 #[test]
-fn toDelete_member_is_excluded_from_overriddens (
-) {
-  let input : &str =
-    indoc! {"
-            * (skg node (gnid overrider) (skgRepos (nodeRepo main))) overrider
-            ** (skg overriddenFolder)
-            *** (skg node (gnid keep) (skgRepos (nodeRepo main))) keep
-            *** (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
-        "};
-  let viewforest : Tree<Viewnode> =
-    viewnode_tree_as_written (input);
-  let instructions : Vec<NodeInstruction> =
-    nodeInstructions_from_tree (viewforest) . unwrap ();
-  assert_eq!(
-    members_msv (&saved_node_by_gnid (&instructions, "overrider") . overrides),
-    MSV::Specified (vec![ID::from ("keep")])); }
-
-#[test]
-fn independent_member_is_excluded_from_overriddens (
-) {
-  let input : &str =
-    indoc! {"
-            * (skg node (gnid overrider) (skgRepos (nodeRepo main))) overrider
-            ** (skg overriddenFolder)
-            *** (skg node (gnid keep) (skgRepos (nodeRepo main))) keep
-            *** (skg node (gnid bystander) (skgRepos (nodeRepo main)) noClaim) bystander
-        "};
-  let viewforest : Tree<Viewnode> =
-    viewnode_tree_as_written (input);
-  let instructions : Vec<NodeInstruction> =
-    nodeInstructions_from_tree (viewforest) . unwrap ();
-  assert_eq!(
-    members_msv (&saved_node_by_gnid (&instructions, "overrider") . overrides),
-    MSV::Specified (vec![ID::from ("keep")])); }
-
-#[test]
 fn duplicate_members_of_defining_folders_are_silently_deduplicated (
 ) {
   // Defining folders never squawk about repeats: emission
@@ -1401,10 +1310,6 @@ fn duplicate_members_of_defining_folders_are_silently_deduplicated (
             *** (skg node (gnid s1) (skgRepos (nodeRepo main)) writeProtected) s1
             *** (skg node (gnid s2) (skgRepos (nodeRepo main)) writeProtected) s2
             *** (skg node (gnid s1) (skgRepos (nodeRepo main)) writeProtected) s1
-            ** (skg overriddenFolder)
-            *** (skg node (gnid o1) (skgRepos (nodeRepo main)) writeProtected) o1
-            *** (skg node (gnid o2) (skgRepos (nodeRepo main)) writeProtected) o2
-            *** (skg node (gnid o1) (skgRepos (nodeRepo main)) writeProtected) o1
         "};
   let viewforest : Tree<Viewnode> =
     viewnode_tree_as_written (input);
@@ -1418,17 +1323,13 @@ fn duplicate_members_of_defining_folders_are_silently_deduplicated (
       "echo" . to_string(), "other" . to_string()]));
   assert_eq!(
     members_msv (&recorder . subscribesTo),
-    MSV::Specified (vec![ID::from ("s1"), ID::from ("s2")]));
-  assert_eq!(
-    members_msv (&recorder . overrides),
-    MSV::Specified (vec![ID::from ("o1"), ID::from ("o2")])); }
+    MSV::Specified (vec![ID::from ("s1"), ID::from ("s2")])); }
 
-// The next four tests pin the editable-folder membership semantics that
+// The next three tests pin the editable-folder membership semantics that
 // the relationship matrix asks for at the cheapest seam:
 // subscribeeFolder order and one-member removal persist to
-// subscribesTo; overriddenFolder order does not matter (the
-// set-difference merge depends on this); and the write-protected hiddenFolder
-// never writes the recorder's hides.
+// subscribesTo; and the write-protected hiddenFolder never writes the
+// recorder's hides.
 
 #[test]
 fn reordering_subscribees_reorders_subscribesTo (
@@ -1472,36 +1373,6 @@ fn removing_one_subscribee_keeps_the_rest (
   assert_eq!(
     members_msv (&saved_node_by_gnid (&instructions, "recorder") . subscribesTo),
     MSV::Specified (vec![ID::from ("a"), ID::from ("c")])); }
-
-#[test]
-fn reordering_overridden_folder_is_harmless (
-) {
-  // overrides is order-free (the set-difference merge relies
-  // on this). overriddenFolder members [b, a] (a reorder of [a, b]) emit
-  // the same set, and nothing else about the recorder changes.
-  let input : &str =
-    indoc! {"
-            * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
-            ** (skg overriddenFolder)
-            *** (skg node (gnid b) (skgRepos (nodeRepo main))) b
-            *** (skg node (gnid a) (skgRepos (nodeRepo main))) a
-        "};
-  let viewforest : Tree<Viewnode> =
-    viewnode_tree_as_written (input);
-  let instructions : Vec<NodeInstruction> =
-    nodeInstructions_from_tree (viewforest) . unwrap ();
-  let recorder : &Graphnode =
-    saved_node_by_gnid (&instructions, "recorder");
-  let overridden : Vec<ID> = match &recorder . overrides {
-    MSV::Specified (gnids) => members_of (gnids),
-    other => panic! (
-      "expected Specified override set, got {:?}", other), };
-  assert_eq!(overridden . len(), 2);
-  assert!(overridden . contains (&ID::from ("a")));
-  assert!(overridden . contains (&ID::from ("b")));
-  assert_eq!(members_of (&recorder . contains), Vec::<ID>::new());
-  assert_eq!(recorder . subscribesTo, MSV::Unspecified);
-  assert_eq!(recorder . hidesFromSubs, MSV::Unspecified); }
 
 #[test]
 fn deleting_from_hiddenFolder_emits_no_hide_change (

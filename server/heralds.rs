@@ -442,7 +442,7 @@ pub fn herald_rule_table () -> HeraldRule {
           crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]) ],
       // The write-protected folders carry ☮ ("cannot be changed
-      // from here"); the editable folders (subscribeeFolder, overriddenFolder,
+      // from here"); the editable folders (subscribeeFolder,
       // aliasFolder) do not.
       // The two compound folders name the subscriber by its ancestor
       // letter (docs/heralds.org, "Ancestor flags and floors"), styled
@@ -472,11 +472,6 @@ pub fn herald_rule_table () -> HeraldRule {
             "It hides these from its subscriptions."),
       write_protected_leaves (Folder::Hider . repr_in_client (),
             "These hide it from their subscriptions."),
-      vec! [
-      leaf (Folder::Overridden . repr_in_client (),
-            "It overrides the view of these.") ],
-      write_protected_leaves (Folder::Overrider . repr_in_client (),
-            "These override the view of it."),
       write_protected_leaves (Folder::Container . repr_in_client (),
             "These also contain it."),
       write_protected_leaves (Folder::Mentioner . repr_in_client (),

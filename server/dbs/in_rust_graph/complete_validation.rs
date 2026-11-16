@@ -2,8 +2,9 @@
 //!
 //! This is the canonical home for whole-graph constraints. It separates hard
 //! errors (the candidate must
-//! not be swapped in) from telescope warnings (the data remains loadable but
-//! deserves repair), and returns both in deterministic order.
+//! not be swapped in) from warnings (the data remains loadable but
+//! deserves repair): telescope warnings, and the fork rules' violations
+//! a foreign note takes part in. It returns each in deterministic order.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::internal_index_validation::{
@@ -11,6 +12,7 @@ use crate::dbs::in_rust_graph::internal_index_validation::{
 };
 use crate::dbs::in_rust_graph::override_invariants::{
   OverrideInvariantViolation, describe_override_invariant_violation,
+  describe_violation_a_foreign_note_takes_part_in, foreign_note_taking_part,
   validate_override_invariants,
 };
 use crate::telescope::invariants::{TelescopeViolation, validate_all_telescopes};
@@ -36,6 +38,9 @@ pub struct CompleteGraphValidation {
   pub graph : InRustGraph,
   pub errors : Vec<CompleteGraphError>,
   pub warnings : Vec<(ID, TelescopeViolation)>,
+  /// The fork rules' violations a foreign note takes part in
+  /// ('foreign_note_taking_part'), described.
+  pub fork_rule_warnings : Vec<String>,
 }
 
 impl CompleteGraphValidation {
@@ -44,7 +49,8 @@ impl CompleteGraphValidation {
 
 /// Validate all facts requiring the complete set: identity, configured homes,
 /// the rules of owned notes' forks, contents and hides
-/// ('override_invariants.rs'), internal graph indexes, and telescope provenance/privacy.
+/// ('override_invariants.rs'; a violation a foreign note takes part in
+/// is a warning), internal graph indexes, and telescope provenance/privacy.
 /// Relationship roles themselves are represented by distinct typed fields;
 /// dangling member IDs are deliberately retained and are not errors.
 pub fn validate_complete_graph (
@@ -98,9 +104,14 @@ pub fn validate_complete_graph (
     CompleteGraphError::DuplicatePrimaryId { .. }
     | CompleteGraphError::DuplicateExtraId { .. }
     | CompleteGraphError::PrimaryExtraCollision { .. }));
+  let mut fork_rule_warnings : Vec<String> = Vec::new ();
   if identity_is_unambiguous {
-    errors . extend (validate_override_invariants (config, &graph)
-      . into_iter () . map (CompleteGraphError::Override));
+    for violation in validate_override_invariants (config, &graph) {
+      match foreign_note_taking_part (config, &graph, &violation) {
+        Some (foreign) => fork_rule_warnings . push (
+          describe_violation_a_foreign_note_takes_part_in (
+            &violation, &foreign )),
+        None => errors . push (CompleteGraphError::Override (violation)), }}
     errors . extend (validate_internal_indexes (&graph)
       . into_iter () . map (CompleteGraphError::InternalIndex)); }
   errors . sort_by_key (error_sort_key);
@@ -108,7 +119,7 @@ pub fn validate_complete_graph (
   let mut warnings = validate_all_telescopes (config, &graph);
   warnings . sort_by (|(pid_a, a), (pid_b, b)|
     pid_a . cmp (pid_b) . then_with (|| a . to_string () . cmp (&b . to_string ())));
-  CompleteGraphValidation { graph, errors, warnings }
+  CompleteGraphValidation { graph, errors, warnings, fork_rule_warnings }
 }
 
 fn error_sort_key (error : &CompleteGraphError) -> (u8, String, String) {
@@ -153,14 +164,15 @@ pub fn format_complete_graph_errors (errors : &[CompleteGraphError]) -> String {
 }
 
 /// Convenience gate for startup/rebuild callers: preserve the independently
-/// constructed graph and warnings only when no hard error was found.
+/// constructed graph, its telescope warnings and its fork-rule warnings
+/// only when no hard error was found.
 pub fn validated_graph (
   config : &SkgConfig,
   nodes : &[Graphnode],
-) -> Result<(InRustGraph, Vec<(ID, TelescopeViolation)>), String> {
+) -> Result<(InRustGraph, Vec<(ID, TelescopeViolation)>, Vec<String>), String> {
   let report = validate_complete_graph (config, nodes);
   if report . errors . is_empty () {
-    Ok ((report . graph, report . warnings))
+    Ok ((report . graph, report . warnings, report . fork_rule_warnings))
   } else {
     Err (format_complete_graph_errors (&report . errors)) }
 }

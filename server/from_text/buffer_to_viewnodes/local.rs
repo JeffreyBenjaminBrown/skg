@@ -62,8 +62,6 @@ pub fn validate_local_structure (
           | Folder::Hider
           | Folder::Container
           | Folder::Mentioner
-          | Folder::Overridden
-          | Folder::Overrider
           | Folder::Subscriber))
         => validate_relation_folder(tree, treeid, role),
       ViewnodeKind::Folder (Folder::Subscribee) =>
@@ -323,11 +321,7 @@ fn validate_relation_folder (
                     ViewnodeKind::Folder (r)
                     if r == partnerFolder))
     { errors . push(format!("{} must be unique among its siblings.", label)); }
-  if *partnerFolder != Folder::Overridden
-    // overriddenFolder is a defining folder: duplicate members are silently
-    // deduplicated at emission rather than bouncing the save. The
-    // write-protected roles keep the check.
-    && !partnerFolder_children_have_distinct_gnids(tree, treeid) {
+  if !partnerFolder_children_have_distinct_gnids(tree, treeid) {
     errors . push(format!(
       "{} must not have duplicate Occurrence children.", label)); }
   errors }

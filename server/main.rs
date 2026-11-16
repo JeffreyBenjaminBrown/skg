@@ -153,12 +153,15 @@ fn main() -> Result<(), Box<dyn Error>> {
                              mentioned_gnids,
                              map_to_content,
                              map_to_containers },
-        nodes )
-      : (SkgEnv, InitContextHandoff, Vec<Graphnode>) =
+        nodes,
+        fork_rule_warnings )
+      : (SkgEnv, InitContextHandoff, Vec<Graphnode>, Vec<String>) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span! (
         "initialize_dbs") . entered ();
       initialize_dbs (&config) };
   drop (nodes); // 'initialize_dbs' checked and used them; nothing here needs them.
+  for warning in &fork_rule_warnings {
+    tracing::warn! ("{}", warning); }
   let manifest_warnings : Vec<String> =
     foreign_section_warnings (&config);
   for warning in &manifest_warnings {
@@ -177,8 +180,8 @@ fn main() -> Result<(), Box<dyn Error>> {
   for warning in &watcher_warnings {
     tracing::warn! ("{}", warning); }
   env . runtime . record_startup_warnings (
-    config_warnings . into_iter () . chain (manifest_warnings)
-      . chain (watcher_warnings) . collect () );
+    config_warnings . into_iter () . chain (fork_rule_warnings)
+      . chain (manifest_warnings) . chain (watcher_warnings) . collect () );
 
   init_done . store (true, Ordering::Release);
   busysignal_handle . join ()

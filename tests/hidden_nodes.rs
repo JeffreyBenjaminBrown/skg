@@ -560,8 +560,9 @@ fn a_save_under_the_narrowing_then_a_widening_keep_rs_private_record (
 
 /// r's private section records that r subscribes to s, hides s1 from
 /// its subscribers and overrides o, each a public graphnode. The view
-/// of r asks for its overrides and hidesFromSubs folders; the
-/// subscribee folder is drawn by default.
+/// of r asks for its hidesFromSubs folders; the subscribee folder is
+/// drawn by default. No folder shows the override, which the save
+/// keeps from disk.
 #[test]
 fn a_narrowing_and_a_widening_keep_rs_private_subscription_and_override_records (
 ) -> Result<(), Box<dyn Error>> {
@@ -575,11 +576,11 @@ fn a_narrowing_and_a_widening_keep_rs_private_subscription_and_override_records 
         &opened, "* (skg node (gnid r)",
         |line| line . replacen (
           "node (gnid r)",
-          "node (gnid r) (viewRequests (folder overrides) (folder hidesFromSubs))", 1 ));
+          "node (gnid r) (viewRequests (folder hidesFromSubs))", 1 ));
       let all : SkgrepoRestriction =
         SkgrepoRestriction::unrestricted (&f . config);
       let shown : String = save_view_cleanly_under (f, VIEW, &asking, &all) ? . saved_view;
-      for member in [ "(gnid s)", "(gnid o)", "(gnid s1)" ] {
+      for member in [ "(gnid s)", "(gnid s1)" ] {
         assert! ( shown . contains (member), "unrestricted {} shows:\n{}", member, shown ); }
       Ok (shown) },
     VIEW, |_f, _restriction| Ok (( )) ) }
@@ -654,11 +655,10 @@ fn round_trip_keeps_the_private_record (
       let opened : String = open (f) ?;
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
       let narrowed : String = switch_skgrepo_set (f, &mut restriction, "public", view) ? . 0;
-      // pc, a member of r; s, of its subscribee folder; o, of its
-      // overridden folder. (The hidden folder, write-protected, reads
-      // no claims: its member s1 stays, unwarranted, with its chain.)
-      for member in [ "** (skg node (gnid pc)", "*** (skg node (gnid s)",
-                      "*** (skg node (gnid o)" ] {
+      // pc, a member of r; s, of its subscribee folder. (The hidden
+      // folder, write-protected, reads no claims: its member s1 stays,
+      // unwarranted, with its chain.)
+      for member in [ "** (skg node (gnid pc)", "*** (skg node (gnid s)" ] {
         assert! ( ! without_viewnode_ids (&narrowed) . lines ()
                     . any ( |line| line . starts_with (member) ),
                   "narrowed, {} vanishes:\n{}", member, narrowed ); }

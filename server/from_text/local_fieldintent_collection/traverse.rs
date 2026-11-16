@@ -22,7 +22,7 @@
 //!   'claiming_children_have_distinct_gnids', and write-protected-folder
 //!   members have distinct IDs per
 //!   'partnerFolder_children_have_distinct_gnids'. The defining folders
-//!   (aliasFolder, subscribeeFolder, overriddenFolder) may contain
+//!   (aliasFolder, subscribeeFolder) may contain
 //!   duplicates; emission dedups them silently.
 //! Collection performs no ancestry re-verification. On shapes that
 //! validation precludes, it stays total, emitting nothing rather
@@ -112,7 +112,7 @@ fn visit (
         node_ref, &LocalContext::TopLevel, collected, owned),
     ViewnodeKind::Folder (Folder::Alias) =>
       visit_aliasFolder (node_ref, context, collected, owned),
-    // The three arms below, with the alias folder's above, are exactly
+    // The two arms below, with the alias folder's above, are exactly
     // the editable folders ('Folder::is_editable'): the
     // ones whose membership the save reads. The catch-all folder arm
     // after them covers the write-protected ones.
@@ -120,8 +120,6 @@ fn visit (
       visit_subscribee_folder (node_ref, context, collected, owned),
     ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) =>
       visit_hiddenOutside_folder (node_ref, context, collected, owned),
-    ViewnodeKind::Folder (Folder::Overridden) =>
-      visit_overridden_folder (node_ref, context, collected, owned),
     ViewnodeKind::Folder (Folder::ID)
       | ViewnodeKind::Folder (Folder::Flags { .. })
       | ViewnodeKind::PropertyMember (_)
@@ -250,11 +248,10 @@ fn recurse_under_vognode (
     let child_context : LocalContext =
       match &child . value() . kind {
         ViewnodeKind::Folder (Folder::Alias)
-          // The two partner folders here are the relation-role ones
+          // The partner folder here is the relation-role one
           // whose goal is ordered; the write-protected folders fall to
           // the UnderWriteProtectedFolder arm below.
-          | ViewnodeKind::Folder (Folder::Subscribee)
-          | ViewnodeKind::Folder (Folder::Overridden) =>
+          | ViewnodeKind::Folder (Folder::Subscribee) =>
           match &recorder {
             Some (o) =>
               LocalContext::UnderDefiningFolder (o . clone()),
@@ -390,26 +387,6 @@ fn visit_hiddenOutside_folder (
     node_ref, &LocalContext::UnderWriteProtectedFolder, collected, owned)
 }
 
-fn visit_overridden_folder (
-  node_ref  : NodeRef<Viewnode>,
-  context   : &LocalContext,
-  collected : &mut CollectedFieldIntents,
-  owned     : IsOwned,
-) -> Result<(), String> {
-  if let LocalContext::UnderDefiningFolder (recorder) = context {
-    if recorder . is_saveEligible {
-      collected . instructionMerge_fieldIntent (
-        &recorder . headline,
-        recorder . gnid . clone(),
-        FieldIntent::SetOverrides (
-          partnerFolder_members (node_ref) )) ?; }}
-  recurse_with_uniform_context (
-    node_ref,
-    // The members are self-writers; their membership was read just
-    // above, and they form no one's contains.
-    &LocalContext::UnderVognode { parent_if_editable : None },
-    collected, owned) }
-
 /// As 'dedup_vector', but dedups members carrying skgrepos by ID alone
 /// (first occurrence wins) rather than by the full (ID, skgrepo) pair: a
 /// duplicate ID with a different skgrepo request must still
@@ -425,8 +402,8 @@ fn dedup_members_by_gnid (
       result . push ((gnid, skgrepo)); }}
   result }
 
-/// This returns the members of an overriddenFolder or a
-/// subscribeeFolder: its occurrence children that pass the partner
+/// This returns the members of a subscribeeFolder: its occurrence
+/// children that pass the partner
 /// folder membership predicate, and its claiming gnid-only vognodes
 /// and ghosts ('claiming_gnid_only_or_ghost_member'),
 /// silently deduplicated (by ID; see 'dedup_members_by_gnid'),
@@ -435,10 +412,9 @@ fn dedup_members_by_gnid (
 /// '(editRequest (relRepo NAME))' request, if any (see 'FieldIntent').
 /// Tombstones contribute nothing. A member whose record the
 /// skgrepo restriction keeps out has no headline: the folder omits it from
-/// display, and the save preserves it (the set-difference merge for
-/// overrides; for 'subscribesTo', which is order-meaningful, disk
-/// supplementation's weave restores it at its disk position; see the
-/// API doc's "Restricted-skgrepo nodes").
+/// display, and the save preserves it ('subscribesTo' is
+/// order-meaningful: disk supplementation's weave restores it at its
+/// disk position; see the API doc's "Restricted-skgrepo nodes").
 fn partnerFolder_members (
   node_ref : NodeRef<Viewnode>,
 ) -> Vec<(ID, Option<SkgrepoName>)> {

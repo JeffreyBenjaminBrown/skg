@@ -33,7 +33,7 @@
 // subscribes to and overrides L, contains L1 and hides L2; V, in
 // "main", contains J, and Y, in "main", links to it.
 
-use skg::test_utils::save_and_rerender;
+use skg::test_utils::{save_added_overrides, save_and_rerender};
 use indoc::indoc;
 use std::error::Error;
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
@@ -283,10 +283,11 @@ async fn save_roundtrips_to_original_and_is_a_fixpoint (
          collected-ID orderkey)" );
       Ok (( )) }
 
-/// M, in N's skgrepo, comes to override N beside R. N's three mirrors
-/// tie in that skgrepo, R and M both forked by none of the others, so
-/// N stands as itself (Q3, rule 3), where R stood before the save; and
-/// M, whose mirrors are the same three, stands as itself.
+/// M, in N's skgrepo, comes to override N beside R (saved through the
+/// save's graph update, since no buffer position edits overrides). N's
+/// three mirrors tie in that skgrepo, R and M both forked by none of
+/// the others, so N stands as itself (Q3, rule 3), where R stood before
+/// the save; and M, whose mirrors are the same three, stands as itself.
 async fn a_second_owned_overrider_saves_and_q3s_mirror_stands (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -296,11 +297,8 @@ async fn a_second_owned_overrider_saves_and_q3s_mirror_stands (
   assert! ( marked_lines (&before, "N") . iter ()
             . any ( |l| l . contains ("(gnid R)") ),
             "before the save, R stands in N's place:\n{}", before );
-  save_and_rerender ( indoc! {"
-    * (skg node (gnid M) (skgRepos (nodeRepo main))) M
-    ** (skg overriddenFolder)
-    *** (skg node (gnid N) (skgRepos (nodeRepo main)) writeProtected) N
-  "}, config, tantivy ) . await ?;
+  save_added_overrides (
+    &ID::from ("M"), &[ ID::from ("N") ], config, tantivy ) . await ?;
   assert! ( read_fixture_file (config, "M") . contains ("- N"),
             "M overrides N on disk:\n{}", read_fixture_file (config, "M") );
   let (after, _pids, _tree) =
@@ -315,17 +313,14 @@ async fn a_second_owned_overrider_saves_and_q3s_mirror_stands (
   Ok (( )) }
 
 /// N comes to override R, which overrides N: an owned mutual pair, in
-/// one skgrepo. Each is forked by the other, so N stands as itself
-/// (Q3, rule 3), where R stood before the save.
+/// one skgrepo (saved as above). Each is forked by the other, so N
+/// stands as itself (Q3, rule 3), where R stood before the save.
 async fn an_owned_mutual_pair_saves_and_q3s_mirror_stands (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  save_and_rerender ( indoc! {"
-    * (skg node (gnid N) (skgRepos (nodeRepo main))) N
-    ** (skg overriddenFolder)
-    *** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected) R
-  "}, config, tantivy ) . await ?;
+  save_added_overrides (
+    &ID::from ("N"), &[ ID::from ("R") ], config, tantivy ) . await ?;
   assert! ( read_fixture_file (config, "N") . contains ("- R"),
             "N overrides R on disk:\n{}", read_fixture_file (config, "N") );
   let (after, _pids, _tree) =
@@ -1381,9 +1376,9 @@ async fn a_replaced_root_redraws_the_folders_it_was_asked_for (
 /// folders. Switched to the user's perspective, the hit for foreign L
 /// ("missive") shows J, the user's fork, still write-protected, with
 /// what a search hit for J ("answer") shows: its containers folder and
-/// the overridden folder, folded, and no content or subscribee folder,
-/// which only an editable root draws. Back at the root authors', the
-/// hit shows L's folders again.
+/// its subscribee folder, folded, and no content, which only an
+/// editable root draws. Back at the root authors', the hit shows L's
+/// folders again.
 fn a_replaced_search_hit_stays_a_hit (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1414,7 +1409,6 @@ fn a_replaced_search_hit_stays_a_hit (
   let users : String = switch ("user") ?;
   assert! ( users . lines () . next () . is_some_and (
               |root| root . contains ("(gnid J)") && root . contains ("writeProtected") )
-            && ! users . contains ("subscribeeFolder")
             && line_of_gnid (&users, "L1") . is_none (),
     "from the user's, the hit is J, write-protected, without content:\n{}", users );
   assert_eq! ( without_vnids ( users . lines () . skip (1) ),
