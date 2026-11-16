@@ -88,7 +88,7 @@ Let T be the mirrors whose home skgrepo comes first in the list.
 Rule 4 replaced by "N itself": where my two forks of a foreign N tie,
 N shows raw. Today that case cannot arise (monogamy).
 ** Q4. The perspective cycle (C-c v o)
-Slices 2 and 7. Jeff: "Each buffer can have a point of view equal to
+Slices 2 and 8. Jeff: "Each buffer can have a point of view equal to
 any author of any node forked in that view."
 *** Provisional
 It stays as it is ('perspective_to_show' in
@@ -136,7 +136,7 @@ It keeps it, reworded ("you already fork this note; your fork is X"),
 as a guard of the operation, not an invariant: an edit of a foreign
 note shown raw (a view opened on it) that silently made a second clone
 would more often be an accident. A deliberate second fork is made by
-listing the note in an owned note's forkee folder, which nothing
+listing the note in an owned note's forks folder (claiming), which nothing
 refuses.
 ** Q7. A note forking itself
 Slice 3. Today an owned self-override is refused as a one-node
@@ -161,23 +161,24 @@ containing R.
 Refused too: a save that leaves an owned note containing a note that
 forks it, or forking a note that contains it, is refused, by the same
 check as decision 7.
-** Q8. Names
-Slices 4 to 7. Decision 1 retires 'subscribesTo' and 'overrides'
+** Q8. Names (changed: one forks folder, decision 9)
+Slices 4 to 8. Decision 1 retires 'subscribesTo' and 'overrides'
 everywhere; these names would follow. Provisional, each:
 *** The relation
 'forks' in files, 'NodeRelation::Forks', roles 'forker' and 'forkee',
 'RelationRole::FORKER' and 'RelationRole::FORKEE', the recorderward
 relmap 'forkers_of', 'FieldIntent::SetForks', 'FolderRelation::Forks'
 with relname "forks", the view request '(folder forks)'.
-*** The folders
-'Folder::Forkee' ('forkeeFolder', label "It forks these.") and
-'Folder::Forker' ('forkerFolder', label "These fork it."), singular as
-every folder kind is ('Folder::Subscribee', 'Folder::Container').
-Plan 2 writes 'Folder::Forkees' and 'Folder::Forkers' and defers to
-this plan's names. The compound folders: 'Folder::HiddenInForkee'
-('hiddenInForkeeFolder', label unchanged) and
-'Folder::HiddenOutsideOfForkee' ('hiddenOutsideOfForkeeFolder', label
-"hides these, but forks nothing that contains them.").
+*** The folder
+One kind, 'Folder::Forks', atom 'forksFolder', label "It forks these,
+or these fork it." (Jeff's name for it is "its forks"). Plural, unlike
+the other kinds ('Folder::Container'), because its members play two
+roles and no singular role names them. The compound folders, which
+plan 2 also draws under forkers: 'Folder::HiddenInForkPartner'
+('hiddenInForkPartnerFolder', label unchanged) and
+'Folder::HiddenOutsideOfForkPartners' ('hiddenOutsideOfForkPartnersFolder',
+label "b hides these, but nothing it forks or that forks it contains
+them."; plan 2 makes the membership match the label).
 *** The herald letter
 'K' (for forK), in display position 2. 'F' is taken: =F2= counts true
 flags ('docs/heralds.org'). Tiers as 'subscribesTo' has them: in-side
@@ -198,7 +199,7 @@ for '(overrides-followed . NAME)', the request "set perspective" for
 yours)".
 *** The clients
 'C-c l f' ('skg-show-folderOf-forks', Neovim '<localleader>lf') for
-'C-c l s'; 'C-c l o' goes. 'C-c v o' keeps its key; its command
+'C-c l s', drawing the one forks folder; 'C-c l o' goes. 'C-c v o' keeps its key; its command
 becomes 'skg-cycle-perspective' (Neovim 'CyclePerspective', module
 'skg.perspective'), its buffer variables 'skg-perspective' and
 'skg-perspective-name'. The AI tool's command 'override-perspective'
@@ -208,6 +209,103 @@ becomes 'perspective', its sidecar key 'overrides_followed' becomes
 "mirror substitution" for "override substitution"; the module
 'server/dbs/in_rust_graph/mirrors.rs' for 'override_resolution.rs';
 'substitute_mirrors' for 'substitute_overriders'.
+** Q10. Renaming 'hidesFromSubs' (new)
+Slices 1, 5 and 7. Decision 8 makes a note's hides apply to what it
+shows of every fork partner, its forkers' content as well as its
+forkees'; "Subs" (subscriptions, the forkee side) would then lie.
+*** Provisional
+Rename it 'hidesFromForks' ("hides from its forks", both directions):
+the key in '.skg' files in slice 5, where the migration already
+rewrites every file (the tool renames the key from slice 1 on; 10 files
+hold it: 3 in 'data/claude/public', 7 in 'data/jeff/public'), and
+'NodeRelation::HidesFromForks', the relation name on the wire and in
+'shared/relations.json', and every code name in slice 7. The hider and
+hidden folders keep their atoms; their labels become "It hides these
+from its forks." and "These hide it from their forks." 'hidesFromSubs'
+joins the retired keys.
+*** Alternatives
+- 'hides': shorter, but the glossary reserves "hidden" for this
+  relation against the org-fold sense ("'Hidden' is reserved for
+  hides-from-subscriptions"), and a bare 'hides' reads as that sense.
+- Keep 'hidesFromSubs', redefined; no second key to migrate.
+** Q11. Order within the forks folder (new)
+Slice 6. Jeff, earlier: "Forkees are listed before forkers". The
+forkee part of the folder is the note's own ordered 'forks' list (its
+order is the user's, editable, as the subscribee folder's is:
+'Folder::goal_is_ordered'); the forker part comes from the other
+notes' files, in no order of the note's (as the subscriber folder's:
+'goal_is_ordered' false).
+*** Provisional
+The forkees in the note's 'forks' order, mutuals among them where that
+list puts them, then the forkers that are not forkees, in graph order,
+which the refresh keeps as it finds them (it moves no forker-only
+member, as in an unordered folder), always after the last forkee.
+*** Alternative
+Forkee-only, then mutuals, then forker-only. The folder's order would
+then differ from the list's, and a save would rewrite the list in the
+folder's order, moving the mutuals to its end.
+** Q12. A forker-only member deleted, detached or attached (new)
+Slice 6. What a member's claim means in the one folder is settled by
+the code (behavior 5, "What a claim means there"): a claim says "this
+note forks it". What the user can do to a member it does not fork:
+*** Provisional
+- Deleted: the save reads nothing for it (it claimed nothing), and
+  the refresh draws it again, claiming nothing, as it reinstates a
+  missing member of a write-protected set today.
+- Attached (C-c s a, or a claim typed by hand): the save makes the
+  note fork it, so it becomes a mutual. This is the gesture for
+  forking a forker from the folder.
+- Detached: it already claims nothing; the clients' detach says so
+  and changes nothing ('skg--set-claim' in 'elisp/skg-metadata.el':
+  "This headline claims nothing already; nothing to detach.").
+- A relRepo request (C-c s r) on it: refused, by the clients and the
+  save, since its record is in its own file, as on a subscriber-folder
+  member today.
+** Q13. A mutual deleted or detached (new)
+Slice 6.
+*** Provisional
+The save drops it from the note's 'forks' (it claimed, and is gone or
+claims nothing now), as for any forkee. It still forks the note, so
+the refresh draws it again among the forker-only members, claiming
+nothing. A deleted forkee-only member is gone after the save, as a
+subscribee-folder member is today.
+** Q14. When the forks folder is drawn unasked (new)
+Slice 6. Today 'add_default_folders' ('server/refresh/visit.rs') draws
+the subscribee folder on an editable occurrence an editable-view
+request extends, when the node subscribes to something the skgrepo
+restriction shows; the subscriber folder only on request.
+*** Provisional
+The forks folder is drawn there when the note has any fork partner the
+skgrepo restriction shows, either way. Forkers thus appear by default
+in plan 1 already, each drawn as a subscriber-folder member is today
+(write-protected, with its containerward chain); plan 2 draws them
+otherwise.
+*** Alternative
+Only when the note forks something, as today; its forker-only members
+are then drawn with it.
+** Q15. The diff view and the one folder (new)
+Slice 6. Decision 6 keeps the diff view out of scope beyond renaming,
+but its folder logic assumes one relation side per folder kind:
+'changed_partner_folder_kinds' ('server/diff_view/changes.rs') sorts
+kinds into 'IN_FOLDERS' and 'OUT_FOLDERS' by
+'Folder::relation_member_role'; the processed-mark leaf of a folder
+member is keyed by that one role ('server/diff_view/processed_requests.rs',
+near its call of 'relation_member_role'); and the changed-folder labels
+say "(this file)" or "(other files)" ('folder_heralds.changed_labels'
+and 'other_files' in 'shared/herald-styles.json'). One folder kind with
+two roles breaks each.
+*** Provisional
+In the diff view the forks folder is a changed folder when a
+relationship of either side changed; each member's change leaves are
+keyed by the side or sides that changed (the note's own record when the
+note forks it at HEAD or in the worktree, the member's record when the
+member forks the note at either); a mutual whose two relationships both
+changed carries both leaves, and a processed mark on it marks both. Its
+changed-folder label is "its forks changed", and it is in neither
+'other_files' nor the "(this file)" set; the clients that read
+'other_files' ('elisp/skg-processed.el', its Neovim twin) treat a
+member by its side. This is more than renaming; Jeff accepts or
+narrows it.
 
 * Assignment and authority
 Once released, this plan is a unitary declaration, but for the open
@@ -257,40 +355,44 @@ Deviations from this plan's "how" go there too, with their reasons.
 * Scope
 ** What plan 2 needs from this plan
 'TODO/every-mirror/2_plan.org', "Scope", "Preconditions: what this
-plan assumes plan 1 delivers", lists seven items. Each is met here:
-*** 1. One relation, 'forks'; 'hidesFromSubs' stays
+plan assumes plan 1 delivers", lists seven items, which plan 2 restates for decisions 8 and 9. Each
+is met here:
+*** 1. One relation, 'forks'; the hides relation keeps its meaning, maybe renamed
 Slice 5 (files, graph, 'NodeRelation', 'shared/relations.json', the
-wire's relation keys); slice 6 (the folder and request names).
-'hidesFromSubs' keeps its name and means "hides from what it forks"
-("Vocabulary").
-*** 2. The subscription folders become the forkee and forker folders; the override folders go
-Slice 4 deletes the override folders; slice 6 renames
-'Folder::Subscribee' and 'Folder::Subscriber' as Q8 says, with atoms
-and labels, the forkee folder's membership editable and the forker
-folder's write-protected, as today.
-*** 3. Every behavior of the subscribee folder holds of the forkee folder
-Slice 6 is a rename only: 'add_default_folders', the hidden-in and
-hidden-outside folders, 'resolve_visibility' and
-'infer_hides_from_contains_removals', 'file_subscribee_members_written_in',
-'validate_text_claims', and 'subscriber_of_subscribee_as_such' (to be
-'forker_of_forkee_as_such') keep their behavior, and the tests that
-pin it today pass renamed.
+wire's relation keys); slice 6 (the folder and request names). The
+hides relation is renamed 'hidesFromForks' if Q10 holds (slices 5 and
+7); plan 2 carries the change of what it applies to (decision 8).
+*** 2. One forks folder; the override folders go
+Slice 4 deletes the override folders; slice 6 makes the subscribee and
+subscriber folders one kind, 'Folder::Forks' (decision 9, Q8), each
+partner standing once, a claim there meaning "this note forks it"
+(behavior 5), ordered as Q11 says, drawn unasked as Q14 says.
+*** 3. Every behavior of the subscribee folder holds of the forks folder's claiming members
+Slices 6 and 7: 'add_default_folders', the hidden-in and hidden-outside
+folders, 'resolve_visibility' and 'infer_hides_from_contains_removals',
+'file_subscribee_members_written_in', 'validate_text_claims', and
+'subscriber_of_subscribee_as_such' (to be 'forker_of_forkee_as_such')
+keep their behavior for a member that claims (a forkee as such), and
+the tests that pin it today pass renamed. A member that claims nothing
+(a forker the note does not fork) is drawn and saved as a
+subscriber-folder member is today.
 *** 4. Mutual forks are legal, and substitution on a cycle is defined
 Slice 2 defines substitution over mirrors, where a cycle is no special
 case (Q2, Q3); slice 3 removes 'OwnedOverrideCycle'.
 *** 5. Monogamy
-It goes (decision 2; slice 3). Plan 2's fixtures may put both forkers
-of a note in owned skgrepos, and plan 2's slice 5 test "if plan 1
-keeps monogamy, a cut ... is refused" has no case. The fork operation
-keeps its own check (Q6), which a cut (not an operation) never meets.
+It goes (decision 2; slice 3). Plan 2's fixtures put both forkers of
+a note in owned skgrepos, and a cut that makes a note fork a note
+another owned note forks saves. The fork operation keeps its own check
+(Q6), which a cut (not an operation) never meets.
 *** 6. Substitution re-expressed over 'forks'; members of either forks folder shown raw
 Slices 2 and 5. Members of every partner folder stay raw:
 substitution acts only on content of an editable occurrence and on
 roots ('substitute_overriders' and 'substitute_roots' in
 'server/refresh/visit.rs'), which slice 2 keeps.
 *** 7. Everything else speaks of forks, every suite green
-Slices 4 to 8: the diff view's names, the search enrichment, both
-clients, the AI tool, the docs; slice 8 runs 'bash/all-tests.sh'.
+Slices 4 to 9: the diff view's names (and its folder logic, Q15), the
+search enrichment, both clients, the AI tool, the docs; slice 9 runs
+'bash/all-tests.sh'.
 
 ** In scope
 - One relation 'forks' replacing 'subscribesTo' and 'overrides' in
@@ -306,12 +408,17 @@ clients, the AI tool, the docs; slice 8 runs 'bash/all-tests.sh'.
   with what each refusal also prevented.
 - The renames of the substitution's and the perspective's own names
   (Q8).
+- One partner folder for 'forks' (decision 9), with the per-member
+  claims, warrants, heralds and relRepo rules it needs, and what the
+  diff view needs of it (Q15).
+- The rename of 'hidesFromSubs', if Q10 holds.
 
 ** Out of scope, decided
 - The display of mirrors: plan 2.
-- The diff view, beyond renaming what it shows.
-- Any new folder.
-- Renaming 'hidesFromSubs'.
+- The diff view, beyond renaming what it shows and Q15.
+- Any new folder ('Folder::Forks' replaces two).
+- What a note's hides apply to (decision 8): plan 2, which first shows
+  forkers' content.
 - Running the migration on 'data/': each owner does it, after this
   plan.
 - Fixing 'TODO/problems.org' entries other than those this plan marks.
@@ -328,7 +435,7 @@ gesture that clones a foreign note. It keeps its name and is always
 called "the fork operation"; the note it makes is a *clone*, which
 forks the original. Where the glossary says "forks" for fork
 operations awaiting confirmation ("ask for confirmation (forks, Hoist,
-strandeds, delete-from)", "plus forks and nodeMerges"), slice 8 makes
+strandeds, delete-from)", "plus forks and nodeMerges"), slice 9 makes
 it say "fork operations".
 ** mirror (coined)
 The *mirrors* of a note N: N and the notes Q2 says, under the skgrepo
@@ -342,7 +449,7 @@ declaration orders.
 ** the mirror shown
 For a note N at a position where substitution acts, under a
 perspective: the mirror Q1 and Q3 choose. It stands in N's place,
-marked '(overridesHere N)' until slice 7 and '(inPlaceOf N)' after.
+marked '(overridesHere N)' until slice 8 and '(inPlaceOf N)' after.
 ** mirror substitution
 Today's "override substitution" ('docs/glossary.org', "override
 substitution, and the vocabulary around it"), its rule replaced.
@@ -352,22 +459,25 @@ Unchanged in meaning ('docs/glossary.org', "perspective"): whose
 skgrepo list a view's trees rank by, its root authors' or one
 owner's. Jeff's "point of view" is this word; the plan does not use
 his.
+** fork partner (coined)
+A *fork partner* of N is a note N forks or that forks N: a mirror one
+'forks' relationship away. The compound folders' names use it (Q8).
 ** forkee as such, the forkee-visibility step
-Slice 6's names for "subscribee as such" and "the subscribee-visibility
-step", unchanged in meaning. ("Forker as such" is plan 2's coinage.)
-** forkee folder, forker folder
-Slice 6's names for the subscribee and subscriber folders (Q8).
-Before slice 6 the plan says "subscribee folder" and "subscriber
-folder", their names in the code then.
+Slice 7's names for "subscribee as such" and "the subscribee-visibility
+step", unchanged in meaning: a forkee as such is a member of the forks
+folder that claims, warranted. ("Forker as such" is plan 2's coinage.)
+** forks folder
+The one partner folder of 'forks' (decision 9, Q8): N's fork partners,
+each once. Before slice 6 the plan says "subscribee folder" and
+"subscriber folder", their names in the code then. A *forker-only
+member* forks N and is not forked by it; a *mutual* forks N and is
+forked by it.
 ** retired keys (coined)
 'subscribesTo' and 'overrides' as top-level '.skg' keys, and their
 predecessors 'subscribes_to' and 'overrides_view_of'.
-** hidesFromSubs, kept
-Not renamed (decided): it now means "hides from what it forks"; "Subs"
-survives only in this name. Renaming it would add a second key to the
-migration and touch every hide reader for no change of meaning. Its
-folder labels change: "It hides these from what it forks.", "These
-hide it from what they fork."
+** hidesFromSubs, maybe 'hidesFromForks'
+Q10. Until slice 5 the plan says 'hidesFromSubs'; after it, the name
+Q10 settles.
 ** false friends: not this plan's words
 These contain "subscribe" or "override" in other senses and are not
 renamed: 'tracing_subscriber' and 'tracing-subscriber'
@@ -384,7 +494,8 @@ update" ('elisp/skg-id-search.el'); 'overPrivateText'.
 ** Jeff's decisions (2026-11-16)
 1. One relation, 'forks' ("Forker forks forkee"), replaces both
    'subscribesTo' and 'overrides', everywhere. 'hidesFromSubs' stays,
-   meaning "hides from what it forks".
+   meaning "hides from what it forks" (decision 8 widens that, and Q10
+   asks whether to rename it).
 2. Two notes of one owner may fork the same note: the rule that no
    node is overridden by more than one owned node goes.
 3. Mutual forks are legal (A forks B while B forks A).
@@ -408,6 +519,18 @@ update" ('elisp/skg-id-search.el'); 'overPrivateText'.
    read-only, both 'subscribesTo' and 'overrides' against 'contains'),
    so the migration meets none. Whether the reverse, E containing a
    note that forks it, is refused too is Q9.
+8. Hides are symmetric, verbatim: "no, hides should be symmetric. The
+   'hiddenOut' folder was to show what you hide for no reason. If you
+   hide something from a forker, now that forkers' content is
+   displayed by default, that thing you hide has a reason." (Jeff,
+   later on 2026-11-16.) A note's hides apply to its forkers' content
+   as shown under it, as to its forkees'. Plan 2 carries this, since it
+   is plan 2 that shows forkers' content (its precondition 1 and its
+   behavior on hides); this plan carries only the name (Q10).
+9. One folder, verbatim: "Ooh also let's just use one folder 'its
+   forks', rather than two. The heralds already distinguish forkers
+   from forkees from mutuals." (Jeff, later on 2026-11-16.) This plan
+   makes it (slice 6, behavior 5).
 
 ** 1. The relation 'forks'
 *** In the graph
@@ -417,7 +540,8 @@ update" ('elisp/skg-id-search.el'); 'overPrivateText'.
 'subscribesTo' is (its folder's goal is ordered,
 'Folder::goal_is_ordered'; the telescope weaves it with anchors,
 'server/telescope/compose.rs'), since the subscribee folder, whose
-membership is editable and ordered, becomes the forkee folder.
+membership is editable and ordered, becomes the forkee part of the
+forks folder (Q11).
 *** What it means
 A forks B says both of today's things: A shows B's content that A
 neither contains nor hides, as a subscriber's subscribee as such does
@@ -629,19 +753,113 @@ the touched pids and the nodes a nodeMerge re-keys.
 the request '(folder overrides)', 'C-c l o' and Neovim 'lo', the
 overridden-as-such display (its content raw, without its recorder's
 hides), and the save's 'visit_overridden_folder'. The subscribee
-folder, renamed, is the one place a buffer edits 'forks'.
+folder, and after slice 6 the forks folder, is the one place a buffer
+edits 'forks'.
 *** The search enrichment
-Under each hit, its subscribee folder and subscriber folder (forkee
-and forker folders from slice 6), each when nonempty, in place of the
-two override folders ('stub_root_of_hit').
-*** The subscription folders, renamed
-As Q8. Behavior unchanged (plan 2's precondition 3).
+Under each hit, its forks folder when nonempty (until slice 6 its
+subscribee and subscriber folders), in place of the two override
+folders ('stub_root_of_hit').
+*** One forks folder (decision 9)
+**** What it holds
+'Folder::Forks' under an occurrence of N holds N's fork partners whose
+records the skgrepo restriction shows, each once, ordered as Q11 says.
+A mutual stands once. The hidden-outside folder stands last in it, as
+in the subscribee folder today ('keep_hidden_outside_folder_last').
+**** Mixed editability, and what decides it today
+Today a folder kind is editable or not as a whole: 'Folder::is_editable'
+('server/types/viewnode.rs') decides whether the folder's viewparent
+reads its children's claims ('parent_reads_claims',
+'server/refresh/ancestry.rs'), whether the save reads its membership
+(the dispatch in 'visit', 'server/from_text/local_fieldintent_collection/traverse.rs':
+'visit_subscribee_folder' emits 'SetSubscribesTo' from
+'partnerFolder_members', the claiming members), whether it stays when
+empty ('folder_goes_when_empty', 'server/refresh/visit.rs'), and whether
+an empty one is redrawn ('redraw_folders'). The drawn claim is
+"warranted and the parent reads claims" ('draw_item', 'visit.rs'), and
+a member's role is the kind's one role ('Folder::relation_member_role',
+read by 'partnerFolder_goal' and 'partnerFolder_members_in_graph' in
+'server/refresh/goal.rs', 'birth_facts_for_folder' and 'set_relRepo' in
+'server/refresh/viewnodestats.rs', and the diff view, Q15). The save's
+traversal reads the buffer alone (no graph reaches 'visit'), so the
+only per-member fact it has is what the headline carries: its claim.
+**** What a claim means there
+The forks folder is editable ('is_editable' true): N reads its
+members' claims. A claiming member is one N forks; the save sets N's
+'forks' to its claiming members, as it sets 'subscribesTo' from the
+subscribee folder today. So:
+- The refresh draws a member claiming exactly when N forks it
+  (the claim 'draw_item' gives, with the goal item saying which side the
+  member is on), so a forker-only member is drawn claiming nothing.
+- A claiming member is warranted when N forks it; a member claiming
+  nothing, when either relationship holds. So a member that claims
+  but that N no longer forks (another view's save removed the fork)
+  vanishes, as an unwarranted claiming child does today, and, if it
+  still forks N, the refresh draws it again claiming nothing.
+- A member typed into the folder, claiming, makes N fork it, as today.
+- Deleting or detaching a forkee-only member stops the fork, as today.
+- A forker-only member deleted, detached or attached: Q12.
+- A mutual deleted or detached: Q13.
+- The traversal visits a claiming member as a subscribee as such today
+  ('LocalContext::SubscribeeAsSuchPosition'), and a member claiming
+  nothing as a member of a write-protected folder
+  ('LocalContext::UnderWriteProtectedFolder', a self-writer).
+- Every reader that asks "is this a subscribee as such" by its parent
+  folder ('subscriber_of_subscribee_as_such' in 'goal.rs',
+  'is_saveEligible_occurrence' in 'validate_tree.rs', 'saves_its_contains'
+  in 'file_what_is_written_in.rs', 'is_overridden_and_shown_raw' in
+  'visit.rs', 'skg--subscribee-as-such-at-point-p' in
+  'elisp/skg-metadata.el', 'M.subscribee_as_such_at_line_p' in
+  'nvim/lua/skg/metadata.lua', 'subscribee_as_such' in the AI tool)
+  asks it of a member of the forks folder that claims (and, in the
+  refresh, is warranted).
+- The folder stays when empty and is redrawn where N has members for
+  it, as the subscribee folder is ('folder_goes_when_empty',
+  'redraw_folders'); 'kinds_redrawing' maps it to itself.
+- When drawn unasked: Q14.
+**** What each member shows (the heralds)
+The relationship heralds already tell the sides apart by ancestor
+flags, which come from the graph, not from the claim (the side flags
+of 'GRAPH_RELATIONS' in 'server/refresh/viewnodestats.rs';
+'docs/heralds.org', "Ancestor flags and floors"): the folder's
+viewparent N is at ancestor generation 2, letter 'b'. So, with the
+letter 'K' (Q8):
+- a forkee-only member: =bK= (b forks it), with any other forkers
+  counted before the letter (=2bK=: N and one more fork it);
+- a forker-only member: =Kb= (it forks b), with its other forkees
+  counted after (=Kb3=);
+- a mutual: =bKb=.
+The birth letter (low) follows the side that stands as a member:
+'(forks in 2)' on a member that claims, '(forks out 2)' on a member
+the graph makes a forker of N (that side stands by its warrant, as a
+write-protected folder's member does today: 'stands_as_member',
+'viewnodestats.rs'); a mutual carries both. 'birth_facts_for_folder'
+computes them per member instead of per kind. Today a subscribee
+shows =bS= and a subscriber =Sb= in their two folders
+('docs/api-and-formats.org', the birth table); nothing else is added.
+**** The relRepo of a member
+A claiming member's '(relRepo NAME)' fact and request are N's record
+of the fork, as on a subscribee-folder member today; a member claiming
+nothing shows its own record's, and a relRepo request on it is refused
+(Q12), as on a subscriber-folder member today ('set_relRepo',
+'viewnodestats.rs', which today picks the recorder by
+'relation_member_role'; the clients' relRepo gesture and their
+writable-folder kinds, "The herald table has pinned copies").
+**** The clients' pending detachment
+A pending detachment is, to both clients, a headline that claims
+nothing, is warranted, and stands under a parent that reads claims
+('skg--pending-detachment-p' in 'elisp/skg-metadata.el', its Neovim
+twin 'pending_detachment_p'). Every forker-only member would match. In
+the forks folder a pending detachment is a member claiming nothing
+whose '(rels (forks (in ...)))' names ancestor generation 2 (N forks
+it still, on disk): a detached forkee or mutual. The clients' predicate
+should ask that there; the server writes nothing new.
 
 ** 6. Wire, heralds, clients, AI tool
-Each layer speaks the new names as slices 5 to 7 introduce them.
+Each layer speaks the new names as slices 5 to 8 introduce them.
 '(rels ...)' carries one key 'forks' where it carried 'subscribesTo'
 and 'overrides'; its sides add up the two old ones' members once. The
-=ĥ= herald follows the 'forks' token. Herald labels, changed-folder
+=ĥ= herald follows the 'forks' token. A forks-folder member shows
+=bK=, =Kb= or =bKb= (behavior 5). Herald labels, changed-folder
 labels ('shared/herald-styles.json', "its subscribers changed (other
 files)" and kin) and the AI tool's prose speak of forks. Old buffers,
 and the AI tool's saved views, which hold old atoms, are refused at
@@ -649,12 +867,10 @@ save by the parser and must be reopened (no migration).
 
 ** 7. What stays as it is, and what changes, among the defaults a user sees
 *** Kept
-- A fresh content view: its containers folder on each root, its
-  subscribee (forkee) folder on each editable occurrence an
-  editable-view request extends ('add_default_folders',
-  'stub_of_fresh_content_view').
+- A fresh content view: its containers folder on each root
+  ('stub_of_fresh_content_view').
 - What a subscribee (forkee) as such shows, and the hidden-in and
-  hidden-outside folders.
+  hidden-outside folders (until plan 2 changes them).
 - Where substitution acts; roots shown raw under the root authors'
   perspective; one level of raw children.
 - The root authors' perspective as every fresh view's.
@@ -667,7 +883,9 @@ save by the parser and must be reopened (no migration).
   either direction may, a third author's may.
 - A carrier is re-pointed whenever it is not the mirror shown.
 - Override folders gone; 'C-c l o' gone; 'C-c l s' becomes 'C-c l f'.
-- The search enrichment draws the forkee and forker folders.
+- One forks folder in place of the subscribee and subscriber folders,
+  each partner once, forkers among them, drawn unasked as Q14 says.
+- The search enrichment draws the forks folder.
 - The heralds: one letter =K= for 'S' and 'O'.
 - Two owned forks of one note, and owned mutual forks, are saved.
 - A server refuses to start on an unmigrated skgrepo (Q5).
@@ -881,6 +1099,31 @@ and 'members_are_properties' do not, so check them by hand.
 'NodeRelation::ALL', 'relation_name', 'roles', the flag slots of
 'herald_tokens.rs', and 'GRAPH_RELATIONS' ('viewnodestats.rs') match on
 'NodeRelation'.
+** One folder kind with two roles
+Every reader of 'Folder::relation_member_role' assumes one role per
+kind: 'partnerFolder_goal' and 'partnerFolder_members_in_graph'
+('server/refresh/goal.rs'), 'birth_facts_for_folder' and 'set_relRepo'
+('server/refresh/viewnodestats.rs'), 'changed_partner_folder_kinds'
+('server/diff_view/changes.rs', which 'expect's a role) and the leaf key
+of a folder member ('server/diff_view/processed_requests.rs'). Every
+reader of 'Folder::is_editable' assumes a kind is editable throughout:
+'parent_reads_claims' ('ancestry.rs'), 'folder_goes_when_empty' and
+'redraw_folders' ('visit.rs'), and 'server/refresh/diff_view.rs' (its
+check near line 121). Slice 6 lists, in its record, what each of
+these does for 'Folder::Forks', and keeps 'relation_member_role'
+answering None for it only where every caller handles None as it
+should for a two-role kind (today None means "no relation", which
+'set_relRepo' reads as "no relRepo fact": wrong here). Also: the save
+reads the buffer alone, so the claim is the only per-member fact it
+can act on (behavior 5); a design that needed the save to ask the
+graph which side a member is on would not fit 'visit'.
+** A forker-only member must not claim, or the next save forks it
+If the refresh drew a forker-only member claiming, as 'draw_item' draws
+any warranted member of a folder that reads claims, the next save of
+the view would make N fork it. The goal item must carry the side, and
+'draw_item' claim only for a forkee. The same holds wherever the
+refresh re-kinds or reinstates a member ('id_rule.rs', 'reinstate'):
+grep 'claimsMembership' in 'server/refresh/' and check each writer.
 ** Old buffers and saved AI views
 After slice 4, 5, 6 or 7, a buffer drawn before it holds atoms or
 parts the parser no longer knows, and its save is refused. No
@@ -1024,7 +1267,8 @@ a view shows must not change unless a slice's behavior says so.
 
 * Implementation sequence
 ** TODO Slice 1: the one-time migration tool
-Questions: Q7 (self-forks dropped).
+Questions: Q7 (self-forks dropped), Q10 (if it holds, the tool also
+renames the key 'hidesFromSubs' to 'hidesFromForks', and counts it).
 - 'tools/migrate-forks-2026-11/migrate.py' as behavior 2 says, with
   'README.org': what it does, the counts of behavior 2 for Jeff's and
   Claude's skgrepos, the commit line, and the order of the
@@ -1039,7 +1283,8 @@ Questions: Q7 (self-forks dropped).
   unchanged, nonzero exit; '--dry-run' writes nothing; a second run
   changes nothing; a title or body line that reads like a key is
   untouched; a marks file with one 'SubscribesTo', one 'Overrides' and
-  one 'Contains' mark keeps only the last.
+  one 'Contains' mark keeps only the last; if Q10 holds, a
+  'hidesFromSubs' list renamed, its anchors and members unchanged.
 - Docs: the README only. No server change, so no Rust suite.
 - Run 'python3 tools/migrate-forks-2026-11/test_migrate.py'.
 
@@ -1051,7 +1296,7 @@ data still has no cycle or second owned overrider; foreign data may.
   relation 'overrides' (slice 5 switches it to 'forks', in one place);
   a perspective's skgrepo list (Q1); the mirror shown (Q3);
   'override_follower_of_tree_containing' kept, renamed if Q8 renames
-  the perspective (else in slice 7); a predicate "is a mirror of", for
+  the perspective (else in slice 8); a predicate "is a mirror of", for
   the tamper check. Keep the functions short and named per
   'coding-advice/names.org'.
 - 'substitute_overriders', 'substitute_roots' and
@@ -1160,14 +1405,18 @@ Questions: Q6, Q7.
   suites as slice 2 does.
 
 ** TODO Slice 5: one relation, 'forks', in files, graph, save and wire
-Questions: Q5, Q8 (the relation's names and its letter). Commit in
+Questions: Q5, Q8 (the relation's names and its letter), Q10 (the
+hides key). Commit in
 three parts, each green: the server with its unit and Rust tests; the
 fixtures' migration; the clients and the AI tool.
 - The format: 'GraphnodeOnDisk' 'forks' (behavior 2), 'Graphnode',
   'GraphnodeInRust', the telescope's composition (ordered, woven as
   'subscribesTo' is), decomposition and invariants; the retired-key
   refusal where behavior 2 says, with its report; the per-file
-  collection in 'read_skg_sections_from_folder' for this error.
+  collection in 'read_skg_sections_from_folder' for this error. If
+  Q10 holds, the hides field reads and writes the key 'hidesFromForks'
+  and 'hidesFromSubs' is a retired key; the field and the relation keep
+  their code names until slice 7.
 - The graph: relmap 'forkers_of'; 'NodeRelation::Forks' with roles
   'forker' and 'forkee' in 'OUTBOUND_RELATIONSHIP_TYPES';
   'RelationRole::FORKER' and 'FORKEE'; 'UPDATE_RELEVANT_ORDINARY_RELATIONS';
@@ -1186,7 +1435,7 @@ fixtures' migration; the clients and the AI tool.
   token ('heralds--rel-token', 'rel_chunks' in 'nvim/lua/skg/heralds.lua',
   'relation_token' in the AI tool); 'relationship_heralds' in
   'shared/herald-styles.json' ('side_tiers'; 'overrides_here' keeps its
-  key until slice 7).
+  key until slice 8).
 - Fixtures: run slice 1's tool over every fixture directory holding
   '.skg' files under 'tests/' and 'tools/skg-for-ai/test-fixture/'
   (145 files held the keys on 2026-11-16), then hand-edit the inline
@@ -1216,27 +1465,85 @@ fixtures' migration; the clients and the AI tool.
 - This slice changes what the server writes into buffers: run the
   suites as slice 2 does.
 
-** TODO Slice 6: forkee and forker names
-Questions: Q8 (folders, compound folders, request, keys, labels).
-A rename with no change of behavior: plan 2's precondition 3.
-- 'Folder::Subscribee' and 'Folder::Subscriber' and the compound folder
-  kinds, their atoms, labels and every reader the pitfall "Readers of
-  each renamed atom and field" names; 'FolderRelation::SubscribesTo' as
-  'FolderRelation::Forks' ("forks"); the save's names
+** TODO Slice 6: one forks folder
+Questions: Q8 (the folder, the compound folders, the request, the
+keys, the labels), Q11, Q12, Q13, Q14, Q15. Decision 9; behavior 5
+says what the folder is, and the pitfalls "One folder kind with two
+roles" and "A forker-only member must not claim, or the next save
+forks it" what it touches. Land the claim rule and the goal's side
+with the folder, in one commit: a folder drawn without them would make
+every save fork every forker.
+- 'Folder::Forks' ('forksFolder') replaces 'Folder::Subscribee' and
+  'Folder::Subscriber'; 'FolderRelation::SubscribesTo' becomes
+  'FolderRelation::Forks' ("forks"), drawing the one folder. The
+  compound folders become 'Folder::HiddenInForkPartner' and
+  'Folder::HiddenOutsideOfForkPartners' (atoms per Q8), their
+  memberships unchanged (plan 2 changes them).
+- The goal: N's forkees in list order, then its forker-only members
+  (Q11), each item saying its side; the claim, the warrant, the
+  vanishing of a claiming member N no longer forks, the reinstatement
+  of a forker (Q12, Q13), the birth facts per member, the relRepo fact
+  and request per member, as behavior 5 says. 'add_default_folders'
+  per Q14; 'kinds_redrawing', 'folder_goes_when_empty',
+  'keep_hidden_outside_folder_last' for the one kind.
+- The save: the dispatch in 'visit' sends 'Folder::Forks' to the
+  subscribee folder's visit, which reads the claiming members as N's
+  'forks' (as today) and gives each child its context by its claim
+  (behavior 5). Every "is this a subscribee as such" reader asks it of
+  a claiming member of the forks folder.
+- The diff view: Q15.
+- 'shared/relations.json' (both roles name 'forksFolder'), the herald
+  table and every pinned copy (one label; the two '_subscriber' style
+  keys become '_forker'; 'folder_heralds' lists: the forks folder is
+  not write-protected; 'changed_labels' per Q15),
+  'shared/metadata-fields.json'.
+- Clients: 'skg-show-folderOf-forks' on 'C-c l f' (Neovim 'lf'); the
+  as-such predicates by claim; the pending-detachment predicate as
+  behavior 5 says; the writable and write-protected lists and the
+  relRepo kinds and help, the relRepo gesture refused on a member
+  claiming nothing; 'skg-processed.el' and its twin per Q15. The AI
+  tool likewise (its folder table, lists, 'subscribee_as_such', its
+  writable-kind table).
+- Tests: a note forking E, forked by F, mutual with M: its forks folder
+  holds E (=bK=, claiming), M (=bKb=, claiming), F (=Kb=, claiming
+  nothing), in that order, with the hidden-outside folder last; an
+  unchanged save writes nothing; a typed member makes N fork it;
+  deleting E stops the fork and E is gone; deleting M stops N forking
+  M and M is drawn again claiming nothing (Q13); deleting F changes
+  nothing and F is drawn again (Q12); attaching F makes it mutual
+  (Q12); a collateral view whose N stopped forking E (claiming there)
+  loses E; a relRepo request on F is refused; the pending-detachment
+  herald on a detached E and not on F, in both clients; the diff view
+  over a fixture adding a forkee and a forker (Q15); every test of the
+  two old folders, adapted.
+- Docs: glossary (partner folder and its table, compound partner
+  folder, write-protected set's example (it uses the subscriber
+  folder: take the hider folder), Folder's per-kind rules, claims
+  membership's list of editable folders, "subscribee as such");
+  'docs/data-model_technical.org' (editable folders, the goal);
+  'docs/api-and-formats.org' (view requests, birth table, folder
+  atoms); 'docs/heralds.org' (what a member shows, the labels);
+  'docs/diff-view.org' (Q15); both COMMANDS docs;
+  'docs/sharing-model.org'; the AI tool's README.
+- This slice changes what the server writes into buffers: run the
+  suites as slice 2 does.
+
+** TODO Slice 7: the save's and the goal's names, and the test files
+Questions: Q10. A rename with no change of behavior: plan 2's
+precondition 3.
+- The save's and the refresh's subscription names
   ('SubscribeeVisibility', 'SubscribeeTextClaim',
   'SubscribeeAsSuchPosition', 'visit_subscribee_folder',
   'file_subscribee_members_written_in', 'subscriber_of_subscribee_as_such',
   'less_what_the_subscriber_integrates', 'hidden_in_subscribee',
-  'hidden_outside_of_subscribees', 'subscriber_from_disk' and kin) in
-  the forkee and forker vocabulary; the hider and hidden folders'
-  labels ("Vocabulary", hidesFromSubs).
-- 'shared/relations.json' folders 'forkerFolder' and 'forkeeFolder';
-  herald styles (the two '_subscriber' keys become '_forker') and every
-  pinned copy; 'shared/metadata-fields.json'.
-- Clients: 'skg-show-folderOf-forks' on 'C-c l f' (Neovim 'lf'),
-  'skg--forkee-as-such-at-point-p' and the Neovim twin, the writable
-  and write-protected lists, the relRepo kinds and help.
-  The AI tool: its folder table, lists, 'subscribee_as_such'.
+  'hidden_outside_of_subscribees', 'subscriber_from_disk' and kin, the
+  pitfall's "The save's subscription names") in the forkee, forker and
+  fork-partner vocabulary.
+- If Q10 holds: 'hidesFromSubs' as 'hidesFromForks' and
+  'NodeRelation::HidesFromSubs' as 'NodeRelation::HidesFromForks'
+  everywhere (133 files held the name on 2026-11-16), with the wire's
+  relation key, 'shared/relations.json', the clients and the AI tool;
+  the hider and hidden folders' labels.
 - Test files whose names name the retired relations move with
   'git mv' and their group files: 'subscribee_folder.rs',
   'subscribee_folder_empty_persists.rs', 'subscribee_heralds.rs',
@@ -1244,19 +1551,15 @@ A rename with no change of behavior: plan 2's precondition 3.
   'hidden_from_subscriptions.rs', 'overrideward_view_subtree.rs' and
   their fixture directories; the group 'grouped_overrides' as
   'grouped_forks' (and 'Cargo.toml').
-- Tests: the renamed ones pass unchanged in substance; the herald
-  rendering cases in both clients; a request '(folder forks)' draws
-  both folders.
-- Docs: glossary (the as-such entries, the visibility step, partner
-  folder, compound partner folder, write-protected set's example,
-  Folder's rules, role tree's adjectives); 'docs/data-model_technical.org';
-  'docs/api-and-formats.org'; 'docs/heralds.org'; both COMMANDS docs;
-  'docs/sharing-model.org'; 'docs/diff-view.org' (the changed-folder
-  labels); the AI tool's README.
-- This slice changes what the server writes into buffers: run the
-  suites as slice 2 does.
+- Tests: the renamed ones pass unchanged in substance.
+- Docs: glossary (the as-such entries, the visibility step, hiderel,
+  role tree's adjectives); 'docs/data-model_technical.org';
+  'docs/api-and-formats.org'; 'docs/heralds.org'; the AI tool's README.
+- If Q10 holds this slice changes what the server writes into buffers
+  (the relation key): run the suites as slice 2 does; otherwise
+  'bash/nextest.sh' and the AI tool's tests.
 
-** TODO Slice 7: the substitution's and the perspective's names
+** TODO Slice 8: the substitution's and the perspective's names
 Questions: Q8 (the part, the perspective, the command), Q4.
 - '(overridesHere N)' becomes '(inPlaceOf N)' in the parser, the
   metadata tables, the printer, the heralds (with the style key
@@ -1288,7 +1591,7 @@ Questions: Q8 (the part, the perspective, the command), Q4.
 - This slice changes what the server writes into buffers: run the
   suites as slice 2 does.
 
-** TODO Slice 8: the last sweep, and the handoff
+** TODO Slice 9: the last sweep, and the handoff
 - 'git grep -n -i -E "subscri|overrid"' over 'server', 'shared',
   'elisp', 'nvim', 'tools/skg-for-ai', 'tests', 'bash' and 'docs' (not
   '-old' docs, 'TODO/', or the false friends of "Vocabulary"): each
@@ -1305,7 +1608,7 @@ Questions: Q8 (the part, the perspective, the command), Q4.
 * Verification and completion
 Each slice ends with its suites green but for failures it classifies
 as pre-existing or flaky, its docs, its record in 'progress.org', and
-its headline DONE. After slice 8 the orchestrator runs the review of
+its headline DONE. After slice 9 the orchestrator runs the review of
 'coding-advice/plans.org', "After each plan": one agent on the terms
 the plan's code coined or reused and any 'TODO/' citation in code, and
 one probe agent driving each behavior of "Agreed behavior" against an
