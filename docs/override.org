@@ -26,8 +26,8 @@ two invariants in the opposite direction:
 Thus =R -> N1= and =R -> N2= are legal, as is the linear chain
 =D -> C -> N=.  Two owned nodes overriding the same target are not
 legal.  Foreign data can contain branches or cycles; Skg preserves
-those as displayable graph facts, but never uses foreign overriders for
-automatic substitution.
+them, and mirror substitution, which ranks a note's mirrors by
+skgrepo, has no special case for either (see "Mirror substitution").
 
 ** Direct visits are exact
 
@@ -54,12 +54,15 @@ override N), each drawn only when it has a member.  The members are
 write-protected, and show N's direct override relatives only.  Node
 visibility and the override relation's relRepo both gate them.
 
-Search also groups matching owned override chains.  If an owned
-search hit recursively overrides another matching hit, the overridden
-hit is suppressed at the top level; if the owned hit overrides it
-directly, it reappears in the owned hit's overridden folder.  A foreign
-overrider never suppresses another top-level result, although visible
-foreign override relatives can occur in the folders.
+Search also groups hits that are mirrors of one another (see "Mirror
+substitution").  Among them, the hit the user's skgrepo list ranks
+first stands, ties going as rules 1 and 2 of "Which mirror stands"
+say and then to the least pid; if it is owned, every other hit among
+them is suppressed at the top level, and one it overrides or that
+overrides it directly reappears in one of its two override folders.
+A foreign hit never suppresses another top-level result, although
+visible foreign override relatives can occur in the folders: a
+foreign mutual pair that both match shows both.
 
 ** Override folders
 
@@ -112,49 +115,82 @@ restricted, where its relationship's relRepo is not, as a restricted
 viewnode, which shows nothing of it. Saving the visible subset
 preserves memberships stored in restricted telescope sections.
 
-** Automatic override substitution
+** Mirror substitution
 
 Substitution is a recursive-content rendering rule, not a navigation
-rule.  Where =N= stands as content of an editable occurrence in a
-content view, the refresh asks the resolver, which walks toward owned
-nodes that override it.  For
+rule ('server/dbs/in_rust_graph/mirrors.rs').
+
+*** Mirrors
+
+A /fork/ of a note =N= is a note that overrides =N=.  The /mirrors/
+of =N= are =N= and every note joined to it by a path of override
+relationships, followed in either direction, each relationship's
+relRepo and each note's home skgrepo shown by the skgrepo
+restriction.  So two forks of one note are mirrors of each other, a
+note's forkee is one of its mirrors, and a cycle of forks is no
+special case.
+
+*** Which mirror stands
+
+Where =N= stands as content of an editable occurrence in a content
+view, the refresh shows the mirror of =N= that the perspective's
+skgrepo list ranks first ('mirror_shown').  The list of the
+perspective of an owner =O= ('SkgConfig::perspective_skgrepo_list')
+is =O='s skgrepos, most private first, then every other skgrepo in
+the config's declaration order.  The mirror shown is the one whose
+home skgrepo comes first in that list; where several do, the tie is
+broken thus:
+
+1. One mirror alone in that skgrepo stands.
+2. Otherwise, if exactly one of them is overridden by none of the
+   others, it stands.  An owned chain =D overrides C overrides N=, all
+   in one skgrepo, shows =D=.
+3. Otherwise =N= itself stands, if it is one of them: two forks of =N=
+   in =N='s own skgrepo, or a mutual pair in one skgrepo, show =N= as
+   itself.
+4. Otherwise the one nearest =N= along override relationships, in
+   either direction, and among equals the least pid.
+
+When the mirror shown is =N=, nothing substitutes.  The perspective's
+owner need not own the mirror shown: where =O= has no mirror of =N=,
+the first by declaration order stands, whoever wrote it.  So, for
 
 #+begin_example
 D overrides C overrides N
 #+end_example
 
-a full-repo content view shows =D= where =N= occurs.  If =D='s home
-skgrepo is restricted but =C='s is unrestricted, it shows =C=.  If no owned
-overrider can be shown, it shows =N=.  A monogamy violation makes the
-resolver refuse to choose a branch; a cycle makes it abandon
-substitution and return the originally requested node.
+with =C= and =N= in the user's public skgrepo and =D= in the user's
+private one, an unrestricted view from the user's perspective shows
+=D= where =N= occurs; restricted to the public skgrepo, it shows =C=.
 
-"Owned" here is relative to the owner whose overrides a top-level
-tree of the view follows ('override_follower_of_tree_containing'):
-the user, where the tree's root is a node the user owns (a fork
-included), and otherwise the root's author, throughout the tree,
-beneath a third author's nodes too. A view rooted at a foreign node
-shows what its author would see, the author's own overriders included,
-and not the user's. So a child the user forks in such a view is
-shown there, after the save, as the original; the clone is shown
-where the user's overrides are followed. Editing the foreign root
+*** Perspectives
+
+The perspective of a top-level tree of the view is its root's
+author's ('perspective_owner_of_tree_containing'): the user, where
+the tree's root is a node the user owns (a fork included), and
+otherwise the root's author, throughout the tree, beneath a third
+author's nodes too. A view rooted at a foreign node shows what its
+author would see. So a child the user forks in such a view is shown
+there, after the save, as the mirror the author's list ranks first,
+usually the original (the save warns, naming it); the clone is shown
+where the user's perspective is followed. Editing the foreign root
 itself forks it, and the saved buffer's root becomes the clone (see
-below), so that tree then follows the user's overrides.
+below), so that tree then is drawn from the user's perspective.
 
 A view can be switched among perspectives (Emacs 'C-c v o', Neovim
 '<localleader>vo'; =docs/api-and-formats.org=, "Set overrides
-followed"): the root authors', a fresh view's, and each owner's whose
-overrides would show some position of the view differently, the
-user's among them, each followed in every tree, whoever wrote its
-root. From the user's, a view of a foreign node shows the user's
-overrider wherever the user has one, so a child forked there is
-shown, after the save, as its clone; from a foreign owner's, the view
-shows what that owner would see. The client keeps the perspective for
-its buffer and names it in each save, so the overridesHere tamper
-check asks of the same owner the rerender followed. From one owner's
+followed"): the root authors', a fresh view's, and the user's and
+each owner's of a mirror of some original the view draws where
+substitution acts, whose list would show some position of the view
+differently, each followed in every tree, whoever wrote its root.
+From the user's, a view of a foreign node shows the user's mirror
+wherever the user has one, so a child forked there is shown, after
+the save, as its clone; from a foreign owner's, the view shows what
+that owner would see. The client keeps the perspective for its
+buffer and names it in each save. From one owner's
 perspective the view's roots are substituted too: each root shows
-that owner's overrider of the node it stands for, re-pointed where it
-stands; from the root authors', it shows that node raw again
+the mirror that owner's list ranks first of the node it stands for,
+re-pointed where it stands; from the root authors', it shows that node raw again
 ('substitute_roots' in =server/refresh/visit.rs=). A re-pointed root's
 folders are drawn afresh for the node it now shows, as a fresh view of
 it draws them ('redraw_folders'): its containers folder; where the root
@@ -174,24 +210,29 @@ view, as following a link to any open root does.
 
 Substitution is disabled in the diff view.  Every refresh of a content
 view substitutes, deciding from the buffer and the graph as they are
-now, so a raw content occurrence whose node gains a visible overrider
-shows the overrider at the next save or rerender.  When the override
-goes, the refresh shows the overrider as itself, without the fact,
-unwarranted and so claiming nothing, and reinstates the original
-beside it.  The buffer whose save creates a fork has the post-save
+now, so a raw content occurrence whose node gains a mirror ranked
+before it shows that mirror at the next save or rerender, and an
+occurrence already shown in another's place is re-pointed whenever it
+is not the mirror shown (after a switch of perspective or of the
+skgrepo restriction, say).  When the original itself becomes the
+mirror shown, the refresh shows the carrier as itself, without the
+fact, unwarranted and so claiming nothing, and reinstates the
+original beside it.  The buffer whose save creates a fork has the post-save
 exception described below.
 
 The following positions show the raw node rather than an automatic
 substitute:
 
 - content-view roots and search-result roots, from the root authors'
-  perspective (from one owner's, each shows that owner's overrider);
+  perspective (from one owner's, each shows the mirror that owner's
+  list ranks first);
 - the members of a search result's folders;
 - partner folder members and the containerward chain;
 - ghosts.
 
-When a node with an owned overrider is deliberately shown raw, its
-immediate content children are also shown raw.  Substitution resumes at
+When a node for which another mirror would stand is deliberately
+shown raw ('is_raw_where_another_mirror_would_stand'), its immediate
+content children are also shown raw.  Substitution resumes at
 the grandchildren.  This one-level rule makes the raw node show its own
 children rather than its overrider's interpretation of them.
 
@@ -201,8 +242,8 @@ Once an approved save creates fork =K= from original =F=, the buffer that made
 the edit must not continue to show editable =F=: editing it again would request
 another fork.  The post-save update therefore makes one saved-view-only
 exception to the rule that roots are shown raw from the root authors'
-perspective (a view switched to one owner's perspective shows that owner's
-overrider of each root; see "Automatic override substitution"): a level-one =F= named by
+perspective (a view switched to one owner's perspective shows the mirror of
+each root that owner's list ranks first; see "Mirror substitution"): a level-one =F= named by
 one of this save's exact =ForkSpec=s is rewritten to =K=
 ('replace_saved_view_fork_roots' in =server/rerender_pass.rs=).  A
 recursive-content occurrence of =F= is replaced by its newly visible
@@ -228,10 +269,13 @@ is load-bearing during save: the viewnode contributes =N= to its parent's
 stored relationship list rather than the carrier's ID.  Editing the
 carrier's title, body, or folders still edits the carrier itself.
 
-The server rejects a forged or stale part whose carrier is not on
-=N='s chain of the overriders its tree follows.  The validation walk is intentionally
-visibility-ungated so that a part which was honest when rendered does
-not become invalid merely because the skgrepo restriction changed.
+The server rejects a forged or stale part whose carrier is not a
+mirror of =N=, naming the mirror the tree's perspective would show.
+Any mirror is honest: which one the refresh shows depends on the
+perspective and the skgrepo restriction.  The check reads the mirrors
+under no skgrepo restriction, so that a part which was honest when
+rendered does not become invalid merely because the skgrepo
+restriction changed.
 
 ** Heralds and reasons for placement
 
@@ -245,7 +289,10 @@ override relationship is why this particular viewnode is present beneath
 its org parent.
 
 Substituted viewnodes and override-folder members carry override
-birth information.  A
+birth information: a mirror shown in =N='s place carries
+=(overrides out)= when it reaches =N= by overriding only (it
+overrides a note that ... overrides =N=), =(overrides in)= when by
+being overridden only, and none otherwise (a sibling fork, say).  A
 node can have ordinary =O= facts without a highlighted birth =O= when
 its placement comes from some other relationship.
 
@@ -316,10 +363,11 @@ Override folders, the containerward chain, search grouping, =O=
 relationship counts, and automatic substitution all
 derive their topology from relRepo-gated relationship accessors.
 
-For automatic substitution, an override hop is followable only when the
-relationship's relRepo and the overrider node's home skgrepo are unrestricted and the
-overrider is owned.  A relationship outside the skgrepo restriction
-therefore cannot silently select a node which the corresponding folders and heralds omit.
+For mirror substitution, an override relationship joins two mirrors
+only when its relRepo and both notes' home skgrepos are unrestricted.
+A relationship outside the skgrepo restriction therefore cannot
+silently select a node which the corresponding folders and heralds
+omit, and a restricted note in the middle of a path cuts it.
 
 *** Other relationships
 
@@ -356,9 +404,9 @@ not perform interactive override substitution.
 ** Principal implementation references
 
 - [[file:../server/serve/handlers/single_root_view.rs][exact direct visits]]
-- [[file:../server/dbs/in_rust_graph/override_resolution.rs][owned override substitution]]
+- [[file:../server/dbs/in_rust_graph/mirrors.rs][mirrors, and which one stands]]
 - [[file:../server/dbs/in_rust_graph/override_invariants.rs][owned monogamy and cycle invariants]]
-- [[file:../server/refresh/visit.rs][substitution and raw positions ('substitute_overriders')]]
+- [[file:../server/refresh/visit.rs][substitution and raw positions ('substitute_mirrors')]]
 - [[file:../server/rerender_pass.rs][saved-view fork replacement and collateral rerendering]]
 - [[file:../server/types/views_state.rs][open-view root registration]]
 - [[file:../server/types/viewnode.rs][folder rules and =overridesHere= collection]]

@@ -1338,7 +1338,7 @@ renames the key 'hidesFromSubs' to 'hides', and counts it).
 - Docs: the README only. No server change, so no Rust suite.
 - Run 'python3 tools/migrate-forks-2026-11/test_migrate.py'.
 
-** TODO Slice 2: mirror substitution, over today's 'overrides'
+** DONE Slice 2: mirror substitution, over today's 'overrides'
 Questions: Q1, Q2, Q3, Q4. The invariants stay in force here, so owned
 data still has no cycle or second owned overrider; foreign data may.
 - 'server/dbs/in_rust_graph/mirrors.rs' (Q8) replaces

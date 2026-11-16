@@ -68,3 +68,166 @@ all-at-once dry run counted 3 overrides "recorded in another section",
 which may be such pairings.
 *** DONE
 The slice's headline in '1_plan.org' is DONE.
+** Slice 2: mirror substitution, over today's 'overrides'
+*** Commits
+- 1c7a2ddd every-mirror plan 1 slice 2: mirror substitution, over today's 'overrides'
+- (the commit carrying this record) every-mirror plan 1 slice 2: docs, record, DONE
+*** Suites
+- 'bash/nextest.sh': 1229 of 1229 pass. Its first run, before the
+  test adaptations below, had 3 failures, each an expected adaptation
+  (listed under "Tests whose answer changed").
+- The AI tool's tests ('python3 tools/skg-for-ai/test_skg_for_ai.py',
+  after 'cargo build --bin skg'): PASS.
+- 'bash/integration-tests.sh': 76 of 76 pass.
+- 'bash/all-tests.sh': all pass: build, Emacs 502 of 502, Neovim
+  (no failure), nextest 1229 of 1229, doctests, team tools 9 of 9, AI
+  reader, integration 76 of 76.
+- Also, per the '/verify' skill, an isolated 'target/debug' server on
+  port 24751 with scratch data (P owned contains alice's N, bob's F
+  overrides N; bob declared before alice): a view of P shows F in N's
+  place with '(birth (overrides out))'; a save naming alice's
+  perspective redraws N raw there (F re-pointed); a save with K, no
+  mirror of N, carrying '(overridesHere N)' is refused, naming N as
+  what alice's perspective shows.
+Logs: 'tests/results/every-mirror/slice2-plan1/' (nextest-first.log,
+nextest.log, ai-tool.log, integration.log, all-tests.out,
+all-tests-ALL.org).
+*** Names, for the slices after
+- 'server/dbs/in_rust_graph/override_resolution.rs' is gone; in its
+  place 'server/dbs/in_rust_graph/mirrors.rs': 'MIRROR_RELATION' (the
+  one place slice 5 switches 'Overrides' to 'Forks'; the birth fact
+  reads it too), 'Mirror', 'Mirrors', 'mirrors_of', 'is_mirror_of',
+  'mirror_shown', 'mirror_shown_among', 'first_ranked_mirrors' and
+  'FirstRanked' (Q3's rules 1 and 2), 'mirror_pids_ignoring_restriction'
+  (the neighborhood), 'side_of_mirror_shown' (the birth fact).
+- 'resolve_override', 'OverrideResolution',
+  'carrier_on_override_chain_followed_by', 'followable_overriders_of',
+  'visible_overriders_with_owners_of': gone.
+- 'override_follower_of_tree_containing' is
+  'perspective_owner_of_tree_containing' (in 'mirrors.rs').
+- In 'visit.rs': 'substitute_overriders' is 'substitute_mirrors',
+  'show_overrider' is 'show_mirror', 'is_overridden_and_shown_raw' is
+  'is_raw_where_another_mirror_would_stand'.
+- 'override_walk_from_seeds' ('relation_accessors.rs') is gone.
+- 'stands_for' ('file_what_is_written_in.rs') is gone, inlined into
+  'file_in_subscriber' over 'mirrors_of'.
+- New: 'SkgConfig::perspective_skgrepo_list' ('server/types/misc.rs').
+- New, private, in 'override_invariants.rs': 'walk_owned_overriders'
+  and 'OwnedOverriderWalk', for the owned-cycle check only.
+- 'tests/dbs/in_rust_graph/override_resolution.rs' is
+  'tests/dbs/in_rust_graph/mirrors.rs' (module 'in_rust_graph_mirrors'
+  in 'tests/dbs.rs').
+*** Deviations from the plan's "how"
+**** Logs under 'tests/results/every-mirror/slice2-plan1/'
+As the launch brief said.
+**** The invariants module walks owned overriders itself
+The plan keeps the invariants in force here but removes the resolver
+they walked with. 'override_invariants.rs' got a small private walk
+of owned overriders (the old resolver's, under the user, ungated) for
+'OwnedOverrideCycle'; slice 3 deletes it with that violation.
+**** Names renamed now
+'override_follower_of_tree_containing' was renamed here, since the
+plan says "renamed if Q8 renames the perspective" and Q8 does. The
+substitution's functions in 'visit.rs' took mirror names (Q8 names
+'substitute_mirrors') since they were rewritten. 'OverridesFollowed',
+the wire names and '(overridesHere N)' are untouched (slice 8).
+**** Ties where no original is given
+'member_it_stands_for' has a set of members, not a list (the union of
+several subscribees' contents), so "then the first in the list"
+became "then the least ID". The search's grouping of hits has no
+original N for Q3's rules 3 and 4: a tie left after rules 1 and 2
+goes to the least pid. Reading "as if N were each hit in turn" with
+rule 3 would leave a tied owned mutual pair both shown, against the
+plan's "shows one hit, not none".
+**** The fork warning sees the clone
+'forks_the_view_will_not_show' runs on the graph before the save,
+which lacks the clone, so it ranks the original's mirrors with the
+clone added ('mirror_shown_once_cloned'), and takes the skgrepo
+restriction as a new argument. Its message now says which
+perspective draws the place ("your perspective", "the perspective of
+the owner of 'X'") and what it shows there ("the original", or
+another mirror by title).
+**** The shown mirror's birth fact for a mutual pair
+Where the mirror shown reaches N both ways (mutual forks), it gets
+'(overrides out)'; the plan names no side for that case.
+**** 'candidate_owners' takes the original's own author too
+"The owners of every visible mirror" includes the original itself;
+a candidate whose drawing equals the root authors' is dropped by the
+cycle anyway.
+**** Docs beyond the plan's list
+'docs/sharing-model.org' (the paragraph saying the shown node is the
+end of the owned chain) and 'docs/forks.org' (named by the plan)
+were reworded; the glossary's "clone, and the fork operation" got
+"from your perspective".
+*** Tests whose answer changed (Q1, Q2, Q3, behavior 3)
+- 'tests/override_substitution.rs':
+  'under_an_owned_root_a_foreign_authors_carrier_is_rejected' became
+  'the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror' (A,
+  a sibling of U, is now an honest carrier under P; K, no mirror, is
+  refused, naming U). 'the_tamper_check_follows_the_overrides_the_save_names'
+  became 'the_tamper_check_accepts_a_mirror_whatever_perspective_the_save_names'
+  (U and A are honest under either perspective; the refusal of K
+  names U or A by the perspective, the root case included).
+  'next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_authors'
+  used a view of A as the view no perspective changes; A now has
+  mirrors (its siblings U and B, Q2), so it uses a new note L.
+  'deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_the_original':
+  after U is deleted the user's perspective shows A, M's author's
+  fork, in M's place (Q1: a mirror the user does not own may stand;
+  Q3 rule 2 within 'foreign'), not M; the save's effects are pinned as
+  before.
+- 'tests/fork.rs', 'a_third_partys_reply_in_anothers_unread_list_warns':
+  its fixture declared the user's skgrepo 'third' before the sender's,
+  so under Q1 the reader's perspective would rank the user's clone
+  first and show it, and no warning would fire. The fixture's config
+  now declares 'reader', 'sender', 'third', so the test still pins a
+  hidden fork and its warning.
+- 'tests/dbs/in_rust_graph/relation_accessors.rs':
+  'update_relevant_neighborhood_neither_reverses_nor_mixes_paths'
+  became 'update_relevant_neighborhood_mixes_no_paths': the sibling
+  fork ("reversal", renamed "sibling") is now in the neighborhood (Q2);
+  mixed and two-hop paths are still out.
+  'update_relevant_neighborhood_walks_override_directions_independently'
+  kept its assertion, renamed
+  'update_relevant_neighborhood_holds_every_mirror_of_the_seed'.
+- 'tests/dbs/in_rust_graph/override_resolution.rs' was rewritten as
+  the mirrors' tests; its cases on paths, cycle detection, foreign
+  overriders ignored and refusing a branch have no counterpart under
+  the new rule.
+- 'tests/overrideward_view_subtree.rs': no assertion changed; its
+  suppression test's comments now state the mirror rule (its foreign
+  mutual pair M1, M2 already pins "a foreign mutual pair shows both").
+*** Tests added
+- 'tests/dbs/in_rust_graph/mirrors.rs', 13: Jeff's example (four
+  placements, both perspectives), the two skgrepo lists, a third
+  author's mirror, a foreign two-cycle, Q3's rules one test each, a
+  restricted middle note, a restricted relationship, extra IDs,
+  unknown IDs, 'is_mirror_of' over siblings.
+- 'tests/override_substitution.rs':
+  'a_switch_of_perspective_re_points_a_substituted_content_child';
+  'a_third_authors_mirror_stands_where_the_user_has_none', which also
+  pins the birth facts '(overrides out)' and '(overrides in)'.
+- 'tests/dbs/in_rust_graph/relation_accessors.rs':
+  'update_relevant_neighborhood_of_a_fork_holds_its_sibling'.
+*** Fixtures changed
+- 'tests/override_substitution/fixtures-foreign-root/foreign/L.skg',
+  added: a note with no mirror (see above).
+- 'tests/override_substitution/fixtures-third-author/', new: P and Q
+  owned, N alice's, F bob's forking N, bob declared before alice.
+- 'tests/fork/fixtures-mail-third-party/skgconfig.toml': declaration
+  order (see above).
+*** Unfinished, and notes for later slices
+- A search hit suppressed by a mirror two forks away (a sibling of
+  the hit that stands) reappears in none of that hit's folders: the
+  enrichment draws direct override relatives only. Slices 4 and 6
+  change the enrichment; the forks folder will hold direct partners
+  only, so a sibling stays out of sight there too. A decision for Jeff
+  if it matters.
+- Nothing pins "an owned hit suppresses a foreign hit that forks it",
+  new here (before, a foreign overrider of an owned hit stayed).
+- A grep for 'NodeRelation::Overrides' outside 'relation_accessors.rs'
+  finds only plumbing: stats, restore requests, strandeds, the herald
+  tokens and slots, the relRepo info parse, the diff view's union walk
+  roles, the folder relations.
+*** DONE
+The slice's headline in '1_plan.org' is DONE.

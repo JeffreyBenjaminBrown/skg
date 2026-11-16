@@ -890,25 +890,41 @@ grandparent, counting folders. The '(rels ...)' form's '(ancestors GEN
 show them as a, b, ... z, then {27}. A tree's plain "generation",
 counting down from its root, is the opposite direction.
 
+*** mirror, and a perspective's skgrepo list
+
+A *fork* of a note N, here, is a note that overrides N (see "clone,
+and the fork operation" for the gesture that makes one). The
+*mirrors* of N are N and every note joined to N by a path of
+'overrides' relationships, followed in either direction, every
+relationship's relRepo and every note's home skgrepo on the path shown
+by the skgrepo restriction ('mirrors_of' in
+'server/dbs/in_rust_graph/mirrors.rs'). Two forks of one note are
+mirrors of each other, and a cycle of forks is no special case. (Not
+"mirror" as a plain verb, as in "the save is its mirror".)
+
+A *perspective's skgrepo list* is the order in which the perspective
+of an owner O ranks a note's mirrors: O's skgrepos most private first,
+then every other skgrepo in the config's declaration order
+('SkgConfig::perspective_skgrepo_list'). It is not a privacy rank, nor
+the fold or declaration order.
+
 *** override substitution, and the vocabulary around it
 
 Where a node N stands as content of an editable occurrence in a
-content view, the refresh shows the effective overrider of N instead:
-the end of the chain of owned, currently-visible
-'overrides' relationships leading out of N. The chain is often one
-relationship, but may be longer (an owned chain D overrides C overrides
-N is legal; only a cycle is forbidden), and visibility gating can
-stop it at a middle node when a later link's mentioner is restricted --
-so the shown node is the last visible link, not necessarily the
-chain's end. The resolver is 'resolve_override' in
-'server/dbs/in_rust_graph/override_resolution.rs'. "Owned" is
-relative to the owner whose overrides the occurrence's top-level tree
-follows: the user, unless that tree's root is foreign, in which case
-it is the root's author ('override_follower_of_tree_containing'), or
-one owner in every tree of a view switched to that owner's
+content view, the refresh shows instead the *mirror shown* for N (see
+"mirror"): the mirror whose home skgrepo comes first in the skgrepo
+list of the perspective of the occurrence's top-level tree, ties
+broken as 'docs/override.org', "Which mirror stands", says
+('mirror_shown' in 'server/dbs/in_rust_graph/mirrors.rs'). That
+perspective is the user's, unless the tree's root is foreign, in which
+case it is the root's author's ('perspective_owner_of_tree_containing'),
+or one owner's in every tree of a view switched to that owner's
 perspective, the user's or a foreign owner's ('OverridesFollowed';
-Emacs 'C-c v o'). Other
-override relationships are display-only facts and never substitute.
+Emacs 'C-c v o'). The owner need not own the mirror shown: where the
+owner has no mirror of N, the first by declaration order stands. When
+the mirror shown is N itself, nothing substitutes. An owned chain D
+overrides C overrides N, all in one skgrepo, shows D; visibility
+gating can cut the chain, so that a middle node shows.
 
 The shown substitute carries the fact '(overridesHere N)'
 (the crucial herald =ĥ= after =O=), naming the original it stands for. A viewnode's
@@ -921,29 +937,31 @@ the position that always shows the original; its editable
 extension applies neither the recorder's hides nor substitution to
 its immediate children.
 
-A node is *shown raw* where it stands as itself, not replaced by its
-effective overrider. Only content substitutes, so a view root, a
+A node is *shown raw* where it stands as itself, not replaced by the
+mirror shown for it. Only content substitutes, so a view root, a
 member of a partner folder, a search hit, a chain node and a ghost
 are shown raw, and so, one level down, are the children of most
-overridden nodes shown raw ('docs/api-and-formats.org', "Override
-substitution and the overridesHere part").
+nodes shown raw where another mirror would stand
+('docs/api-and-formats.org', "Override substitution and the
+overridesHere part").
 A view opened on one node always shows the requested node itself,
 shown raw: it is the view's *raw root*, so that its immediate
 children are shown raw too. Switched to one owner's perspective, the
-view shows that owner's overrider of the root instead, standing for
-it ('OverridesFollowed'). In the search buffer, each hit shows its override
+view shows the mirror of the root that owner's skgrepo list ranks
+first instead, standing for it ('OverridesFollowed'). In the search buffer, each hit shows its override
 folders, holding its visible direct override relatives in both
 directions. Override facts also appear in explicitly requested override
 folders.
 
 *** perspective
 
-A view's *perspective* is whose overrides it follows
-('OverridesFollowed'; on the wire "overrides followed"): its root
-authors', as every fresh view's is (each top-level tree follows the
-owner of the node its root stands for), or one owner's in every
-tree, the user's or a foreign owner's, so that the view shows what
-that owner would see, its roots included. 'C-c v o' (Neovim
+A view's *perspective* is whose skgrepo list ranks the mirrors it
+shows (see "mirror"; 'OverridesFollowed'; on the wire "overrides
+followed"): its root authors', as every fresh view's is (each
+top-level tree is drawn from the perspective of the owner of the node
+its root stands for), or one owner's in every tree, the user's or a
+foreign owner's, so that the view shows what that owner would see,
+its roots included. 'C-c v o' (Neovim
 '<localleader>vo') cycles a view through the perspectives that would
 draw it differently ('docs/api-and-formats.org', "Set overrides
 followed"). A foreign owner is named by the first of its skgrepos the
@@ -1204,7 +1222,8 @@ To *fork* a node N is to turn it into an editable *clone* C in a
 skgrepo you own. C copies N's title, body, and child-list (the child IDs
 only — shallow), =subscribesTo= N (so N's later additions surface to C
 as unintegrated subscribed content) and =overrides= N (so
-override substitution shows C wherever N would appear). Children of N
+override substitution shows C wherever N would appear, from your
+perspective). Children of N
 that the forking edit deleted become C's
 =hidesFromSubs=, and thereafter any child removed from
 an owned subscriber's contains that some subscribee still contains is
@@ -1678,11 +1697,12 @@ almost certainly need not read this section.
 For a set of IDs in one graph snapshot, the *update-relevant
 neighborhood* contains the IDs themselves, their immediate neighbors in
 both directions along =contains=, =linksTo=, =subscribesTo=, and
-=hidesFromSubs=, and every node reachable by each of the
-two monotonic override walks. The overriderward and overriddenward walks
-start independently at the original IDs, never reverse direction, and
-never continue from an ordinary neighbor. Thus it includes no mixed
-ordinary/override path and no two-hop ordinary path. Saves compute this
+=hidesFromSubs=, and every mirror of each ID, whatever any skgrepo
+restriction shows (see "mirror"): a change to any relationship among a
+note's mirrors can change which of them stands where another is
+drawn. The mirrors are taken from the original IDs only, never from an
+ordinary neighbor. Thus it includes no mixed ordinary/override path
+and no two-hop ordinary path. Saves compute this
 neighborhood independently in the before and after graph snapshots.
 The collateral redraw of clean views uses the whole neighborhood;
 the dirty-view conflict check uses it without =linksTo=, in both
