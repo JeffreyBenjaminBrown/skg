@@ -3081,3 +3081,321 @@ The slice's headline in '2_plan.org' is DONE.
   'moving_y_from_t_into_n_makes_n_fork_t'; helpers
   'forks_folder_members_of', 'folder_members_under', 'nth_line_of',
   'is_a_fixpoint'); the integration test 'forks-meet'.
+** Review fixes
+What the review of plan 2 ('review-2-terms.org', 'review-2-probes.org')
+found, and what each became. Run on 2026-11-16, after 5f093a37.
+*** Commits
+- 86a7b9fc every-mirror plan 2 review: the save handler's test helpers are shared
+- 3e7690b1 every-mirror plan 2 review: an owned member as such's unspecified contains is the one on disk
+- 46193d78 every-mirror plan 2 review: a redrawn view gives each forks-folder member the graph's claim
+- 1d62aeb2 every-mirror plan 2 review: a node moved under an owned member as such joins its content
+- 198f1dfa every-mirror plan 2 review: names that said forker for the note, or side for a role
+- 61f6bcb0 every-mirror plan 2 review: the folder of what a forker hides is named for the forker
+- bdf97e48 every-mirror plan 2 review: the hidden-outside folder's label says what it holds
+- 5914a370 every-mirror plan 2 review: messages say an edit starts the fork operation
+- e14f82fc every-mirror plan 2 review: one rule explains a hide; the floor's wider set is named apart
+- 0ce5d24f every-mirror plan 2 review: the glossary defines a forker as such by its claim
+- 57d090e8 every-mirror plan 2 review: tests cite the docs, not the plan or a conversation
+- 54489d88 every-mirror plan 2 review: redrawn folders fold, empty and extend as fresh ones
+- 8db52d3c every-mirror plan 2 review: the hide report says where a moved child went
+- 24e84697 every-mirror plan 2 review: problems, the stale warning that names a forker's note
+- (the commit carrying this record) every-mirror plan 2 review: the record
+*** Suites
+All green at the end; every failure on the way was an expected
+fixture adaptation, each listed under "Deviations" or below.
+- As I went, 'cargo nextest run' after each fix: fix 1, 1264 of 1264
+  (with the three new tests, which fail on the old code); fix 2, first
+  run 1263 of 1264, the one failure
+  'refresh::tests::claims::in_a_forks_folder_a_member_claims_only_what_its_viewparent_forks',
+  an expected adaptation (see "Deviations"), then 1266 of 1266; fix 3,
+  first run 1265 of 1266, 'hidden_from_forks' pinning the old Q2
+  reading (adapted), then 1267 of 1267; the renames, 1267 of 1267 after
+  the unit tests' field names; the small fixes, three failures in turn,
+  all expected adaptations ('forker_hides_under_a_narrowing' typed into
+  the emptied hidden-outside folder; two 'forks_folder' outlines
+  pinned an unfolded new member), then 1268 of 1268.
+- After the folder rename and after the label change:
+  'bash/emacs-tests.sh' 503 of 503, 'bash/nvim-tests.sh' no failure,
+  the AI tool's tests PASS; after the label change the AI tool failed
+  first (the new label holds the handle word "fork"; its phrase list
+  now holds the label), then PASS.
+- 'bash/integration-tests.sh': 78 of 78 (39 tests, both clients),
+  first run.
+- 'bash/all-tests.sh', first run, on 24e84697: all pass: build, Emacs
+  503 of 503, Neovim (no failure), nextest 1268 of 1268, doctests,
+  team tools, AI reader, integration 78 of 78.
+- End to end, per '/verify', against an isolated 'target/debug/skg'
+  on port 24951 (scratch data from the probe's s1 fixture), before the
+  fixes and again on the final binary: probes 39 ('p9', 'p9b'), 37
+  ('p6c', 'p6d'), 36 ('p5', 'p5b') and 11 ('p2c'), each as "The
+  probes' findings" says. The server was stopped by its PID, the port
+  checked free, the scratch data deleted.
+Logs: 'tests/results/every-mirror/review-fixes-plan2/' (4b-emacs.log,
+4b-nvim.log, 4b-ai-tool.log, 4c-emacs.log, 4c-nvim.log, 4c-ai-tool.log,
+integration.out, integration-tests.log, all-tests.out,
+all-tests-ALL.org, all-tests-nextest.log, emacs.log, nvim.log,
+ai-reader.log).
+*** The probes' findings
+Each "not matched" was reproduced first, before any code changed, on
+a scratch copy of the probe's s1 fixture (its 'fixture_s1.py' with
+the nodes the probe added while it ran: V, W, U, u1, u2, w1, Box3,
+bx3, byx3, bw1, bw2) and an isolated 'target/debug/skg' on port
+24951, by the probe's own scripts ('p9', 'p9b', 'p6c', 'p6d', 'p5',
+'p5b', 'p2c'): each gave the probe's answer. Transcripts:
+'/tmp/claude-1000/every-mirror-p2-review-fixes/transcripts-before-fixes/'.
+**** 39, the nested forkee read as cut (fixed)
+'forker_contains_after_save' (now 'note_contains_after_save',
+'lower.rs') read any Save's contains; it now reads an unspecified one
+from disk, as its neighbours read forks and hides. The siblings were
+checked: 'forker_forks_after_save', 'forker_hides_after_resolution',
+'add_forkee_to_note' and 'apply_hiderel_delta' already guarded with
+'is_unspecified'; 'nodeSaveIntents_with_specified_contains' takes only
+specified contains; for a node on disk 'into_graphnode' runs after
+'fill_unspecified_contains'; 'claim_forkers_the_save_makes_forkees'
+read the supplemented instructions (and is gone, below). Pinned by
+'tests/members_as_such_and_stale_buffers.rs' (new, in
+'grouped_saves'): V's view saved unchanged with its baseline warns of
+nothing and writes nothing; W retitled there saves; u2 cut from U
+there hides u2 in W alone. And by 'tests/forks_meet.rs': once T is
+N's mutual, a fresh view of R (holding T, N's forkee as such, under
+N) saved unchanged writes nothing. All four fail on the old code.
+Re-run end to end: V's preview with no baseline hides nothing; its
+unchanged save warns of nothing; W's retitle saves; the cut hides u2
+in W. Shelf's view (p8d) holds the same shape as R's and is covered
+by the same fix; it was not re-run.
+**** 36 and 37, false detachments in redrawn views (fixed)
+The claim was kept from the old buffer by 'mark_claims': under an
+editable parent a child claiming nothing stays, as a detachment the
+user wrote. Now, in a content view, a new rung before the warrants
+('claim_forks_folder_members_as_the_graph_does', 'server/refresh/visit.rs')
+gives each member of a forks folder that reads claims, and that the
+folder's goal names, the claim the graph gives it: claiming when the
+note forks it, nothing when it is a forker-only member. A refresh
+only ever draws a buffer the server drew (a collateral view, a
+rerender of a registered view) or one whose gestures a save just
+consumed (the saved view): the only request that carries a buffer's
+text is "save buffer", and a dirty view is never a collateral target.
+So no claim there is a pending gesture, and the rule holds for every
+view: the one saved, each collateral view, and a stale view another
+client saves. A member the goal does not name keeps what it carries,
+as before (a forker that stopped forking N stays, unwarranted, plan
+1's slice 6). The saved view's own patch, 'claim_forkers_the_save_makes_forkees'
+('server/from_text/forkers_made_forkees.rs'), is gone: the refresh
+does it for every view. Pinned by
+'another_clients_stale_view_redraws_a_fork_made_elsewhere_as_a_claim'
+(probe 36, two connections) and
+'a_collateral_view_redraws_a_fork_the_save_made_as_a_claim' (probe
+37, one connection, Box's view a clean other view of bx's save),
+both in 'tests/members_as_such_and_stale_buffers.rs': each redraw
+shows the forker claiming, saves again unchanged with no warning and
+no file written, and saves an edit of the note. Both fail on the old
+code. Re-run end to end: p6c's collateral view of Box3 draws byx3
+'bKb' with no 'detach', saved unchanged warns of nothing, and p6d's
+retitle of bx3 there saves; p5's view A of P, saved after B's cut,
+draws Pf 'bKb' with no 'detach' (the warning that P changed stays,
+rightly), and p5b's save of that redraw warns of nothing.
+'TODO/problems.org''s entry "A buffer that shows a forker as claiming
+nothing can undo a fork another view made" moved to
+'TODO/DONE/problems.org', saying what is still possible: text the
+client sends back itself. Undoing past a save and saving the old text
+(slice 6's case) ends the fork, as a detachment the user writes does;
+its baseline is the redrawn view, so the stale check sees an edit.
+The server cannot tell that from a detachment.
+**** 11, an existing node moved under a member as such (fixed, as decided)
+'add_children_typed_under_member_as_such' is
+'add_children_placed_under_member_as_such': any claiming child the
+member's list does not name joins the member's content after the
+sibling it follows, when the user owns the member, whether typed or
+moved; under a foreign member the save is refused with the typed
+case's message. The stale-buffer check does guard a stale buffer
+reinstating a removed child: confirmed by
+'a_stale_buffer_does_not_put_back_a_child_removed_from_a_member_as_such'
+(A's view showing e2 under E after another view removed e2 from E:
+saved unchanged, or with another node edited, E is left as the graph
+has it, without e2; with E edited, the save is refused). Pinned by
+'a_node_moved_under_an_owned_forkee_joins_its_content' and
+'..._foreign_forkee_is_refused' ('tests/forkees_drawn_editable.rs'),
+'a_node_moved_under_an_owned_forker_joins_its_content' and
+'..._foreign_forker_is_refused' ('tests/forkers_drawn_editable.rs').
+'hidden_from_forks' pinned the old reading in two sub-tests, adapted
+(see "Deviations"). Re-run end to end: a1 cut from A and pasted under
+E after e1 joins E's content [e1, a1, e2, H], A loses it, and the
+redraw shows it under E. Docs: 'docs/forks.org', new section "Adding
+a child under a member as such"; the glossary, 'docs/sharing-model.org'
+(whose "it has no effect on E or R, and the save's rerender leaves it
+out" was the old reading), both COMMANDS docs,
+'docs/api-and-formats.org', 'docs/data-model_technical.org', the AI
+tool's README.
+**** The smaller observations
+- 8, a child newly hidden into a folder that already stood is drawn
+  unfolded (fixed): 'stands_drawn_folded' ('visit.rs') draws a member
+  folded where it joins a compound folder or a containers folder
+  whose other members are all folded. Pinned in
+  'hides_apply_to_every_fork_partner' (X1 folded beside W); two
+  'forks_folder' expectations that pinned the unfolded member were
+  adapted.
+- 19, an emptied hidden-outside folder stays (fixed):
+  'folder_goes_when_empty' is true of that folder too. Pinned by
+  'emptying_the_hidden_outside_folder_lets_it_go' (the redraw is the
+  fresh view). 'forker_hides_under_a_narrowing' used the emptied
+  folder to type a new hide into; it now types the folder again, as
+  a user must in a view drawn when the folder holds nothing.
+- 41, a member extended by C-c s e gets no containers folder (fixed):
+  'add_containers_folder_to_an_extended_member' ('visit.rs'), at the
+  visit of a forks-folder member carrying an editable-view request.
+  Pinned by 'a_member_extended_on_request_gets_its_containers_folder'
+  (the extended view equals the fresh view).
+- 35, a stale-buffer warning names the note when a partner changed:
+  not a small change (the stale check would have to read a member as
+  such's cuts in the baseline against what the baseline drew); listed
+  in 'TODO/problems.org'.
+- Found while re-running 11: its hide report said "Hides nothing: 'a1'
+  left 'A', but it is no content of 'E retitled' or 'F' ...", false
+  once a1 joined E. It now says "but this save places it under 'E'"
+  ('hide_report.rs'; pinned in 'forkees_drawn_editable').
+*** The terms review's findings
+**** 1. "Forker as such" (fixed: defined by the claim)
+The code's reading kept: a forker as such is a member of the forks
+folder claiming nothing. The save reads the buffer alone, and the
+claim is the only per-member fact it has (plan 2's pitfall "A forker
+as such would be save-eligible"); the relation reading would need the
+save to consult the graph to classify a member, and would make a
+detached forkee a forkee as such whose own claim says otherwise. With
+the claims fix above, every view the server draws makes the two
+readings agree; they differ only in a buffer the user edited, for a
+forkee the user detached. The glossary says so; the docs copies that
+describe drawn views ('docs/api-and-formats.org') say "in a view the
+server draws". Renamed: 'note_forks_it' is 'member_claims';
+'ForkerAsSuchPosition { forkee, forkee_is_editable }' is '{ note,
+note_is_editable }'; 'ForkerVisibility::forker' is 'forker_as_such'.
+'MemberAsSuch::Forker' is kept: it names the role as such, and its
+word in messages ("shown as a forker") is true of what the buffer
+shows.
+**** 2. "Forker" names that hold the note (fixed)
+'less_what_the_note_integrates', 'note_contains_after_save',
+'note_forks_after_save', 'note_hides_after_resolution',
+'apply_hiderel_delta_to_hider'; 'hider', 'hider_from_disk',
+'hider_contains', 'hider_pid' in 'infer_hides_from_contains_removals'
+and 'apply_hiddenoutside_edits'; 'HiddenOutsidePosition::hider';
+'add_hidden_outside_folder (.., hider, ..)';
+'hidden_in_fork_partner (container, hider, ..)';
+'unintegrated_content_gnids (.., note_hides, note_contains)'.
+'PostSkgsaveCommitNoticeCandidate::HiddenOutsideAdded { forker }' was
+not in the review's list and is kept.
+**** 3. "Explains" (fixed: one rule, and the floor named apart)
+The nodeMerge reader calls 'fork_partners_shown' (unrestricted, every
+record, as before), so the view, the inference, the hidden-outside
+edits, nodeMerge and the hide report share one rule. The floor keeps
+its wider set on purpose (slice 4's deviation): it asks who can read a
+hide's record, so it counts every fork partner the graph has, hidden
+forkers included, whatever the restriction. It is now called the
+hide's *partners on record* ('hide_skgrepo', 'docs/glossary.org',
+"hides"), not "explanations"; 'docs/forks.org', which said a hidden
+forker "explains no hide", now adds that it still sets a floor;
+'docs/api-and-formats.org' and 'docs/data-model_technical.org' use the
+new term.
+**** 4. The labels (the false one made true; wording Jeff's)
+The hidden-outside label was false where the note hides a forker that
+contains a hidden node. The least change made it true and
+letters-only: "b hides these, but no fork partner shown contains
+them." (server, the emitted rule table, the rendering cases' style
+runs, the AI tool's expected views and its herald-phrase list, since
+the label now holds the handle word "fork", and the docs quoting it).
+The "It" / "a" pair under a forker as such is wording, left for Jeff.
+**** 5. 'HiddenByForkPartner' (fixed)
+'Folder::HiddenByForker', atom 'hiddenByForkerFolder', style keys
+'hiddenByForkerFolder_hider' and '_container', goal 'hidden_by_forker',
+across server, shared tables, both clients, the AI tool, tests and
+docs. Buffers drawn before hold the old atom; no legacy support
+('coding-advice/no-legacy-support.org'): reopening the view redraws it.
+**** 6. 'is_hidden_by_folder_of_no_forker_as_such' (fixed)
+'is_hiddenByForkerFolder_under_no_forker_as_such'.
+**** 7. "What a member shows" (fixed)
+The glossary entry names it also "unintegrated content" and the
+'(unintegrated COUNT ...)' stat; 'gnids_shown_through_fork_partners'
+cites the entry, not "the member-as-such display rule".
+**** 8. "Fork" as the gesture (fixed)
+The text claim's refusal and the placed-child refusal say "where an
+edit starts the fork operation"; so do both COMMANDS docs and
+'docs/sharing-model.org'.
+**** 9. 'cut_under_a_foreign_note' (fixed)
+'refusal_to_change_what_a_foreign_note_hides'; "fork another" only
+for a forker as such ("... only a note of your own can change what it
+hides" for a forkee).
+**** 10. "Side" (fixed)
+"Which role in 'forks' ...".
+**** 11. 'visibility' (fixed)
+'LoweringOutput::forkee_visibility', 'FieldIntentsForOneId::forkee_visibility'
+and the parameters.
+**** 12. "Warranted" (fixed by the glossary)
+The glossary says the refresh asks a warrant, the save position and
+claim alone.
+**** 13. "These also contain it." (kept: wording, Jeff's call)
+**** 14. "Repeat" (fixed by the glossary)
+**** 15. 'hides_apply_to_every_fork_partner' (fixed by its header)
+The file keeps its name; its header says the partners are those shown.
+**** Question 2: citations (fixed)
+The forks tests cite 'docs/forks.org' and the glossary;
+'jeffs_example_forking_a_forker' is
+'a_child_cut_from_a_forker_and_pasted_makes_it_a_mutual'; "Jeff's
+example", "Jeff's 'after'" and "Jeff's picture" are gone from the
+tests; the forks-meet Emacs test states the client behaviour it works
+around; 'docs/forks.org' and 'docs/sharing-model.org' paraphrase the
+plan's "forker-as-such" quote. The older 'TODO/' links in docs the
+review listed as not plan 2's are left.
+*** The current label texts, for Jeff to reword
+As 'server/heralds.rs' emits them ('docs/heralds.org' explains the
+letters); the write-protected folders carry ☮:
+- forksFolder: "It forks these, or these fork it."
+- hiddenInForkPartnerFolder (under a forkee or forker as such): "☮ It
+  contains these, but c hides them."
+- hiddenByForkerFolder (under a forker as such): "☮ a hides these,
+  which c contains."
+- hiddenOutsideOfForkPartnersFolder (last in a forks folder): "b hides
+  these, but no fork partner shown contains them."
+- hiddenFolder: "☮ It hides these from its forks."
+- hiderFolder: "☮ These hide it from their forks."
+- containerFolder (under a forks-folder member too): "☮ These also
+  contain it."
+- mentionerFolder: "☮ These link to it."
+*** Deviations
+- The record of slice 2 named Q2's reading "only a node the graph
+  lacks joins"; the orchestrator's decision replaced it, and two
+  tests that pinned it ('hidden_from_forks''s
+  'test_extra_view_child_under_foreign_forkee_vanishes' and
+  '..._owned_forkee_vanishes') are
+  'test_a_node_placed_under_a_foreign_forkee_is_refused' and
+  'test_a_node_placed_under_an_owned_forkee_joins_it'. The owned one
+  placed e, r's own forkee, under r, which would now make r contain
+  what it forks, refused by the fork rules; it places e11 instead.
+- 'tests/refresh/claims.rs''s
+  'in_a_forks_folder_a_member_claims_only_what_its_viewparent_forks'
+  pinned a claiming forker vanishing and being redrawn claiming
+  nothing; it now stays where it stands, claiming nothing (the graph's
+  claim), and the test adds h, drawn claiming nothing before s came to
+  fork it, which now claims.
+- The handler-level helpers of 'tests/save_stale_buffers.rs' moved to
+  'tests/shared/save_handler_helpers.rs' (with collateral views and
+  clean other views), for the new tests; 'moved_after' joined
+  'tests/shared/view_and_save_helpers.rs'. 'tests/save_rerender_release.rs'
+  keeps its own quasi-duplicate copies of 'fixture' and 'save'.
+- The new tests of claims, stale buffers and the extended member are in
+  one new file, 'tests/members_as_such_and_stale_buffers.rs' (fixture
+  'tests/members_as_such_and_stale_buffers/fixtures/'), since each
+  needs a save with a baseline, which only the handler-level helpers
+  send.
+- The hide report's line for a moved child, beyond the brief (see
+  "The smaller observations").
+- Logs are under 'tests/results/every-mirror/review-fixes-plan2/';
+  'tests/results/every-mirror/' was copied out before
+  'bash/all-tests.sh' and put back after it. The probe re-runs'
+  transcripts are outside 'tests/results/', in
+  '/tmp/claude-1000/every-mirror-p2-review-fixes/' ('transcripts-before-fixes/',
+  'transcripts-after-fixes/', the scripts under 'bin/').
+*** Unfinished
+- 'TODO/problems.org', new: "A stale-buffer warning names the note
+  when only its forker changed" (probe 35).
+- The label wording, the "It" / "a" pair and "These also contain it."
+  (Jeff's).
+- Undo past a save, then save, ends a fork, as any detachment does
+  (by design; in 'TODO/DONE/problems.org').
