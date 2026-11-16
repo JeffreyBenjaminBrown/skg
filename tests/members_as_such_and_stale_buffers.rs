@@ -323,6 +323,108 @@ fn a_stale_buffer_does_not_put_back_a_child_removed_from_a_member_as_such
   Ok (()) }
 
 //
+// A stale buffer and what a member as such showed beside its content
+//
+
+/// The fixture of 'tests/hides_by_integration.rs': M (public) forks
+/// x (theirs: a, b, c, d) and contains d and z; y (private) keeps a.
+fn integration_fixture (
+) -> Result<Fixture, Box<dyn Error>> {
+  fixture_from ( "tests/hides_by_integration/fixtures",
+                 "members-as-such-stale-integration",
+                 &["public", "private", "theirs"] ) }
+
+#[test]
+fn a_stale_buffer_does_not_hide_what_its_integrated_folder_showed
+  () -> Result<(), Box<dyn Error>> {
+  // The first client's view of M shows a, which y keeps, in x's folder
+  // of what the user keeps elsewhere, not as x's content. The second
+  // removes a from y in y's own view, so x would show a now. The
+  // first view, stale, saves an edit of M's title, then of z's: a
+  // stood beside x's content, not in it, so it was not cut there, and
+  // M hides nothing. M is not stale either: its baseline writes
+  // nothing of it, so its edit saves, and no warning names it.
+  for edited in ["M", "z"] {
+    let mut f : Fixture = integration_fixture () ?;
+    let mut first : ViewsState = new_connection ();
+    let mut second : ViewsState = new_connection ();
+    let m_in_first : String = open_view (&mut f, &mut first, "M", "M-first");
+    assert! ( line_of (&m_in_first, "a") . contains ("writeProtected")
+              && m_in_first . contains ("integratedElsewhereFolder)"),
+              "a stands in x's folder of what the user keeps elsewhere:\n{}", m_in_first );
+    let y_in_second : String = open_view (&mut f, &mut second, "y", "y-second");
+    let removal : String = save (
+      &mut f, &mut second, "y-second",
+      &without_subtree_of (&y_in_second, "a"), Some (&y_in_second) );
+    assert! ( saved (&removal), "{}", removal );
+    assert_eq! ( list_in (&file_text (&f, "private", "y"), "contains"), vec! ["f2", "g2"] );
+    let stale_edit : String = save (
+      &mut f, &mut first, "M-first",
+      &retitled (&m_in_first, edited, &format! ("{} retitled", edited)),
+      Some (&m_in_first) );
+    assert! ( saved (&stale_edit), "{}", stale_edit );
+    assert! ( ! warnings_of (&stale_edit) . contains (&left_as_the_graph_has_it ("M", "M")),
+              "M is not stale:\n{}", stale_edit );
+    assert! ( file_text (&f, "public", edited)
+              . contains (&format! ("title: {} retitled", edited)) );
+    assert! ( list_in (&file_text (&f, "public", "M"), "hides") . is_empty (),
+              "M hides nothing:\n{}", file_text (&f, "public", "M") ); }
+  Ok (()) }
+
+#[test]
+fn a_stale_buffer_does_not_hide_again_what_another_view_unhid
+  () -> Result<(), Box<dyn Error>> {
+  // The first client cuts c from x in its view of M: M hides c, and
+  // the redrawn view shows c in x's folder of what M hides in it. The
+  // second, in its own view of M, moves c out of that folder to stand
+  // under x, unhiding it. The first view, stale, saves an edit of M's
+  // title, then of z's: c stood in the hidden folder, not among x's
+  // content, so it was not cut there, and M hides nothing. M is not
+  // stale either, so its edit saves, and no warning names it.
+  for edited in ["M", "z"] {
+    let mut f : Fixture = integration_fixture () ?;
+    let mut first : ViewsState = new_connection ();
+    let mut second : ViewsState = new_connection ();
+    let m_in_first : String = open_view (&mut f, &mut first, "M", "M-first");
+    let cut : String = save (
+      &mut f, &mut first, "M-first",
+      &without_subtree_of (&m_in_first, "c"), Some (&m_in_first) );
+    assert! ( saved (&cut), "{}", cut );
+    assert_eq! ( list_in (&file_text (&f, "public", "M"), "hides"), vec! ["c"] );
+    let m_in_first : String = saved_view (&cut);
+    assert! ( line_of (&m_in_first, "c") . contains ("writeProtected")
+              && m_in_first . contains ("hiddenInForkPartnerFolder)"),
+              "c stands in x's folder of what M hides in it:\n{}", m_in_first );
+    let m_in_second : String = open_view (&mut f, &mut second, "M", "M-second");
+    let moved_out : String = {
+      let x_line : &str = line_of (&m_in_second, "x");
+      let without_folder : String = m_in_second . lines ()
+        . filter ( |line| ! line . contains ("hiddenInForkPartnerFolder)")
+                          && ! line . contains ("(gnid c)") )
+        . map ( |line| format! ("{}\n", line) )
+        . collect ();
+      without_folder . replacen (
+        &format! ("{}\n", x_line),
+        &format! ("{}\n**** (skg node (gnid c) (skgRepos (nodeRepo theirs))) c\n", x_line),
+        1 ) };
+    let unhiding : String = save (
+      &mut f, &mut second, "M-second", &moved_out, Some (&m_in_second) );
+    assert! ( saved (&unhiding), "{}", unhiding );
+    assert! ( list_in (&file_text (&f, "public", "M"), "hides") . is_empty () );
+    let stale_edit : String = save (
+      &mut f, &mut first, "M-first",
+      &retitled (&m_in_first, edited, &format! ("{} retitled", edited)),
+      Some (&m_in_first) );
+    assert! ( saved (&stale_edit), "{}", stale_edit );
+    assert! ( ! warnings_of (&stale_edit) . contains (&left_as_the_graph_has_it ("M", "M")),
+              "M is not stale:\n{}", stale_edit );
+    assert! ( file_text (&f, "public", edited)
+              . contains (&format! ("title: {} retitled", edited)) );
+    assert! ( list_in (&file_text (&f, "public", "M"), "hides") . is_empty (),
+              "M hides nothing:\n{}", file_text (&f, "public", "M") ); }
+  Ok (()) }
+
+//
 // A member extended by an editable-view request
 //
 

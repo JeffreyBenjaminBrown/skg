@@ -220,6 +220,8 @@ fn visit_occurrence (
           // forksFolder; without this guard those could emit
           // contradictory hide edits for one ID.
           let visible : Vec<ID> = visible_content_members (node_ref);
+          let in_kept_or_hidden_folder : Vec<ID> =
+            members_of_kept_and_hidden_folders (node_ref);
           collected . instructionMerge_fieldIntent (
             &headline,
             note . clone(),
@@ -227,12 +229,12 @@ fn visit_occurrence (
               FieldIntent::ForkeeVisibility (
                 ForkeeVisibility {
                   forkee : t . gnid . clone(),
-                  visible } )
+                  visible, in_kept_or_hidden_folder } )
             } else {
               FieldIntent::ForkerVisibility (
                 ForkerVisibility {
                   forker_as_such : t . gnid . clone(),
-                  visible } ) } ) ?; }
+                  visible, in_kept_or_hidden_folder } ) } ) ?; }
         // Delete, NodeMerge and flag edit requests here are
         // ignored: a member as such can affect only its own title
         // and body (when owned), what the note hides, and, by a
@@ -594,3 +596,27 @@ fn visible_content_members (
         claiming_gnid_only_or_ghost_member (child . value ())
         . map ( |(gnid, _)| gnid )), }}
   visible }
+
+/// The members the buffer shows in the folders of one member as such
+/// of a forks folder that set its content aside: what the user keeps
+/// elsewhere ('Folder::IntegratedElsewhere') and what the note hides
+/// in it ('Folder::HiddenInForkPartner'). A child standing there was
+/// not cut from the member, even where the graph changed since the
+/// buffer was drawn (another view stopped keeping it, or unhid it):
+/// the save reads what the buffer showed ('resolve_visibility').
+fn members_of_kept_and_hidden_folders (
+  node_ref : NodeRef<Viewnode>,
+) -> Vec<ID> {
+  node_ref . children ()
+    . filter ( |child| matches! (
+      &child . value () . kind,
+      ViewnodeKind::Folder ( Folder::IntegratedElsewhere
+                             | Folder::HiddenInForkPartner )) )
+    . flat_map ( |folder| folder . children () )
+    . filter_map ( |member| match &member . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
+        Some (t . collected_gnid ()),
+      ViewnodeKind::Vognode (vognode) =>
+        Some (vognode . gnid () . clone ()),
+      _ => None, } )
+    . collect () }

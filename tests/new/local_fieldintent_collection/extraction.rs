@@ -472,6 +472,7 @@ fn forkee_hiderel_intent_collects_visible_content (
        ForkeeVisibility {
          forkee     : ID::from ("forkee"),
          visible    : vec![ID::from ("a"), ID::from ("b")],
+         in_kept_or_hidden_folder : vec![],
        })]); }
 
 #[test]
@@ -494,11 +495,13 @@ fn forkee_hiderel_intents_preserve_forkee_tree_order (
          ForkeeVisibility {
            forkee     : ID::from ("first"),
            visible    : vec![ID::from ("first-child")],
+           in_kept_or_hidden_folder : vec![],
          }),
       (ID::from ("forker"),
          ForkeeVisibility {
            forkee     : ID::from ("second"),
            visible    : vec![ID::from ("second-child")],
+           in_kept_or_hidden_folder : vec![],
          })]); }
 
 #[test]
@@ -519,6 +522,7 @@ fn forkee_hiderel_intent_uses_only_children (
        ForkeeVisibility {
          forkee     : ID::from ("forkee"),
          visible    : vec![ID::from ("child")],
+         in_kept_or_hidden_folder : vec![],
        })]); }
 
 #[test]
@@ -579,6 +583,7 @@ fn forkee_hiderel_intent_excludes_non_content_delete_and_ghost_children (
        ForkeeVisibility {
          forkee     : ID::from ("forkee"),
          visible    : vec![ID::from ("keep")],
+         in_kept_or_hidden_folder : vec![],
        })]); }
 
 #[test]
@@ -589,6 +594,8 @@ fn forkee_hiderel_intent_ignores_hidden_folder_contents (
             * (skg node (gnid forker) (skgRepos (nodeRepo main))) forker
             ** (skg forksFolder)
             *** (skg node (gnid forkee) (skgRepos (nodeRepo main))) forkee
+            **** (skg integratedElsewhereFolder)
+            ***** (skg node (gnid kept) (skgRepos (nodeRepo main))) kept elsewhere child
             **** (skg hiddenInForkPartnerFolder)
             ***** (skg node (gnid hidden-in) (skgRepos (nodeRepo main))) hidden in child
             **** (skg node (gnid visible) (skgRepos (nodeRepo main))) visible
@@ -596,12 +603,16 @@ fn forkee_hiderel_intent_ignores_hidden_folder_contents (
             **** (skg node (gnid hidden-outside) (skgRepos (nodeRepo main))) hidden outside child
             "};
 
+  // What stands in the forkee's folders of what the user keeps
+  // elsewhere and of what the forker hides in it is not visible
+  // content, but set aside there, not cut.
   assert_eq!(
     visibility_pairs_from_org (input),
     vec![(ID::from ("forker"),
        ForkeeVisibility {
          forkee     : ID::from ("forkee"),
          visible    : vec![ID::from ("visible")],
+         in_kept_or_hidden_folder : vec![ID::from ("kept"), ID::from ("hidden-in")],
        })]); }
 
 #[test]

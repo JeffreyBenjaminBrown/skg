@@ -122,7 +122,8 @@ fn combineable_intents_always_combine () {
       FieldIntent::ForkeeVisibility (
         ForkeeVisibility {
           forkee     : ID::from (forkee),
-          visible    : vec![] } )) . unwrap(); }
+          visible    : vec![],
+          in_kept_or_hidden_folder : vec![] } )) . unwrap(); }
   acc . instructionMerge_fieldIntent (
     &emitter (), ID::from ("forker"),
     FieldIntent::MemberAsSuchTextClaim (

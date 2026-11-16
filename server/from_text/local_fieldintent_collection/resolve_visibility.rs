@@ -11,7 +11,10 @@
 //!   so it is removed from the hides of forker R.
 //! - If N is graph-content of E that the view drew under E (R
 //!   neither hid nor integrated it before the save, by the graph:
-//!   'docs/glossary.org', "what a member shows"), E has no viewchild
+//!   'docs/glossary.org', "what a member shows"; nor does the buffer
+//!   show it in E's folder of what the user keeps elsewhere or of what
+//!   R hides in it, which a stale buffer may still do after another
+//!   view changed the graph), E has no viewchild
 //!   with ID N and claimsMembership, N is not graph-content of R after
 //!   the save, and no owned note but E contains N after the save
 //!   ('owned_notes_containing_after_save'), then N is hidden from R. A
@@ -33,8 +36,10 @@
 //! forker-visibility step ('resolve_forker_visibility'): F shows its
 //! content less what N contains or hides and what an owned note but F
 //! contains, so a child absent there is never removed from F. A child
-//! cut from F makes N fork F, and N hides it unless N, or an owned
-//! note but F, contains it after the save.
+//! cut from F (drawn there, and shown neither there nor in F's folder
+//! of what the user keeps elsewhere or of what N hides in it) makes N
+//! fork F, and N hides it unless N, or an owned note but F, contains
+//! it after the save.
 //! .
 //! The skgrepo restriction limits what can be edited as well as what
 //! can be seen ('server/skgrepo_sets.rs'), so both E's content and R's
@@ -133,6 +138,7 @@ pub fn resolve_visibility (
         forker_hides . iter ()
         . chain ( members_with_visible_records (
                     &forker_from_disk . contains, skgrepo_restriction ) . iter () )
+        . chain ( signal . in_kept_or_hidden_folder . iter () )
         . map (key) . collect ();
       forkee_contains . iter ()
         . filter ( |gnid| ! integrated . contains (&key (gnid))
@@ -349,7 +355,10 @@ fn add_children_placed_under_member_as_such (
 ///   F's folder of what N hides in it), is unhidden in N, as under a
 ///   forkee;
 /// - a child F showed that the buffer no longer shows claiming under
-///   F was cut from it. A cut from a forker makes N fork F (so F, if
+///   F, nor in F's folder of what the user keeps elsewhere or of what
+///   N hides in it (where a stale buffer may show a child the graph
+///   has since stopped keeping or hiding), was cut from it. A cut
+///   from a forker makes N fork F (so F, if
 ///   it forks N, becomes a mutual), and N hides each child cut that it
 ///   does not contain after the save, as a cut from a forkee does. A
 ///   forker N already forks (a mutual the user detached there, in the
@@ -410,9 +419,13 @@ fn resolve_forker_visibility (
                                    &forker_from_disk . pid ) )
           . cloned () . collect ()
       } else { forker_contains . clone () };
-    let cut : Vec<ID> = shown_before . into_iter ()
-      . filter ( |gnid| ! visible . contains (&key (gnid)) )
-      . collect ();
+    let cut : Vec<ID> = {
+      let set_aside : HashSet<ID> = // shown in F's folder of what the user keeps elsewhere, or of what N hides in it
+        signal . in_kept_or_hidden_folder . iter () . map (key) . collect ();
+      shown_before . into_iter ()
+        . filter ( |gnid| ! visible . contains (&key (gnid))
+                          && ! set_aside . contains (&key (gnid)) )
+        . collect () };
     let inferred_unhides : Vec<ID> = {
       let forker_contains_keys : HashSet<ID> =
         forker_contains . iter () . map (key) . collect ();
@@ -807,7 +820,9 @@ pub(crate) fn member_it_stands_for (
 /// records the skgrepo restriction shows, as the view drew it: a
 /// child the user kept in an owned note but the forkee before the
 /// save stood in its folder of what the user keeps elsewhere, and
-/// says nothing ('kept_elsewhere_before_save'). A
+/// says nothing ('kept_elsewhere_before_save'), as does a child the
+/// buffer shows in that folder or in the folder of what the forker
+/// hides in it. A
 /// forker as such under the same note says only "show it", of each
 /// child of its own it shows: a child absent there is no hide.
 fn validate_no_overlapping_forkee_hiderel_conflicts (
@@ -842,6 +857,7 @@ fn validate_no_overlapping_forkee_hiderel_conflicts (
       let content_gnid : ID = content_gnid;
       if kept_elsewhere_before_save (
            graph, config, skgrepo_restriction, &content_gnid, &forkee_from_disk . pid )
+         || signal . in_kept_or_hidden_folder . contains (&content_gnid)
       { continue; }
       let key : (ID, ID) =
         (forker . clone(), content_gnid . clone());
