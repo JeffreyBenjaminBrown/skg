@@ -160,7 +160,9 @@ is each member's grandparent 'b', the heralds tell the sides apart:
 a forkee shows =bK= (b forks it), with any other forkers counted
 before the letter (=2bK=: b and one more fork it), and the 'b' medium,
 because of b's floor; a forker-only member shows =Kb= (it forks b),
-with its other forkees counted after (=Kb3=); a mutual shows =bKb=.
+with any other forkees counted before the 'b' too (=K2b=: it forks b
+and one more; on either side the numeral precedes the ancestor flags,
+as in =C9a=); a mutual shows =bKb= (=bK2b= when it forks one more).
 The birth letter follows the side that stands as a member: =(forks
 in 2)= on a member that claims, =(forks out 2)= on one that forks b,
 both on a mutual.
