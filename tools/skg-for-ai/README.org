@@ -1167,8 +1167,8 @@ With 'subtree', as 'C-c s R', it sets every relationship of one kind
 in the subtree: written on a node, its content relationships, its
 own among them when its parent's list holds it; on a forks folder,
 the 'forks' relationships of its claiming members. The walk is the
-clients': it does not go below a write-protected node or a forkee as
-such.
+clients': it does not go below a write-protected node or a member as
+such of a forks folder (a forkee or a forker as such).
 *** 'noSearchMatching' and 'searchMatching'
 'noSearchMatching' keeps the node from matching any search, by its
 title, aliases or body, as 'skg-set-flag-search-matching' ('C-c s x')
@@ -1268,10 +1268,11 @@ Hides 'A detail of Fred's' from 'A second container, outside the view', as conte
 Hides nothing: 'Contained twice' left 'Second child, a forker', but it is no content of 'Fred's note', nor a mirror of any.
 #+end_example
 'Hides' and 'Stops hiding' name what the save adds to or takes from
-the forker's hides, and the forkee whose content holds it.
-'Hides nothing:' is a child that left a note that forks
-something without hiding anything, and the rule that kept it from
-hiding: it is no content of the forkee and a mirror of none of it,
+a note's hides, and the fork partner (a note it forks, or a forker it
+does not hide) whose content holds it. 'Hides nothing:' is a child
+that left a note with such a fork partner without hiding anything,
+and the rule that kept it from hiding: it is no content of the
+partners and a mirror of none of it,
 or what it stands for was hidden already, or is still contained, or
 the same save shows it in the forks folder. A removal from a note
 that forks nothing prints no line. Every word is the
@@ -1384,6 +1385,9 @@ in that folder, stand its children the forker has not integrated;
 removing one there hides it from the forker, as in the clients. A
 note that forks the folder's node, and that it does not fork, stands
 there claiming nothing; removing it hides it in the folder's node.
+Under it, a forker as such, stands what it adds to the folder's
+node's content; removing one of those makes the folder's node fork
+it, and hides the child unless the node contains it after the save.
 
 A placed node takes no other word in its handle, no body and no
 children in the save that places it: it is saved write-protected,
@@ -1409,12 +1413,14 @@ stops with an error, and says how to go on. Write 'editable' in its
 handle and save, which makes it the view's editable occurrence of the
 node, as the clients' 'C-c s e' does; then edit it and save again.
 Only an occurrence in content forks, a root of the view or a node's
-child: a member of a folder does not. A forkee as such, in a forks
-folder, is drawn editable under an editable node; its title and body
-save when you own it, and a foreign one's are refused; a child
-removed from under it is hidden instead (see "Placing an existing
-node"); a headline typed under it joins its content when you own it,
-and is refused under a foreign one.
+child: a member of a folder does not. A member as such of a forks
+folder, a forkee or a forker as such, is drawn editable under an
+editable node, unless the view already shows its node editable (a
+repeat); its title and body save when you own it, and a foreign
+one's are refused; a child removed from under it is hidden instead,
+and from under a forker the node also comes to fork it (see "Placing
+an existing node"); a headline typed under it joins its content when
+you own it, and is refused under a foreign one.
 
 The report says what forks, and where the clone goes:
 #+begin_example
@@ -1717,7 +1723,7 @@ round and its answer reads as it is.
 | C-c g m, M; C-c G m, M     | skg-goto-in-magit, ...-parent                    | Emacs-only by nature (magit); git reads the node's file directly                                                                                              |
 | C-c g v                    | skg-goto-viewnode-id                             | needs nothing: the handle is the viewnode ID; 'grep' finds it                                                                                                 |
 | C-c t r                    | skg-investigate-unknown-node                     | 'raw' only: "investigate unknown node"                                                                                                                        |
-| C-c l a, h, f, p, c, m     | skg-show-folderOf-*                              | 'forest KIND ID'; 'contains ID', 'links-here ID'; in its editable folders '⟨node:ID⟩' forks, and a removal under a forkee as such hides     |
+| C-c l a, h, f, p, c, m     | skg-show-folderOf-*                              | 'forest KIND ID'; 'contains ID', 'links-here ID'; in its editable folders '⟨node:ID⟩' forks, and a removal under a member as such hides     |
 | C-c s e                    | skg-set-editable                                 | 'editable' in the handle                                                                                                                                      |
 | C-c s w, C-c s W           | skg-request-write-protected(-recursive)          | 'write-protect', 'write-protect subtree' in the handle                                                                                                        |
 | C-c s t                    | skg-detach                                       | 'detach' in the handle; removing the headline also takes it out of its parent                                                                                 |

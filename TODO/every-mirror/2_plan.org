@@ -919,7 +919,7 @@ Questions: Q3.
   'docs/forks.org'; both COMMANDS docs.
 - Run the suites as slice 1 does.
 
-** TODO Slice 6: forks of one note meet, end to end
+** DONE Slice 6: forks of one note meet, end to end
 - 'tests/forks_meet.rs' (registered in 'tests/grouped_views.rs', fixtures
   under 'tests/forks_meet/'): behavior 5 whole, both views and every
   save, and the fixpoint.

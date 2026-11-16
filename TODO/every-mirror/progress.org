@@ -2906,3 +2906,178 @@ The slice's headline in '2_plan.org' is DONE.
 - Tests: 'tests/cuts_from_forkers.rs' (its five sub-tests);
   'a_cut_from_an_editable_forker_is_refused' removed.
 - Glossary: new entry "cut".
+** Slice 6: forks of one note meet, end to end
+*** Commits
+- e6299436 every-mirror plan 2 slice 6: the forks tests share their view and save helpers
+- 38f826cf every-mirror plan 2 slice 6: forks of one note meet; a forker made a forkee loses its hidden-by folder
+- d7da5b98 every-mirror plan 2 slice 6: forks of one note meet, through each client's gestures
+- (the commit carrying this record) every-mirror plan 2 slice 6: docs, record, DONE
+*** Suites
+- The helpers' move (e6299436): 'forkees_drawn_editable::',
+  'forkers_drawn_editable::' and 'cuts_from_forkers::', 4 of 4, after
+  two unused imports were removed.
+- 'tests/forks_meet.rs': 1 of 1, first run, with the fix. Checked
+  against the code without it: it fails, "T, now a forkee, has no
+  folder of what it hides of N's content" (X2 stood there marked
+  noWarrant).
+- 'bash/nextest.sh', with the fix and the new test: 1261 of 1261,
+  first run.
+- The AI tool's tests (after 'cargo build --bin skg'): PASS, first run.
+- The new integration test, alone: with Neovim, passed first run.
+  With Emacs, two runs failed on the test's own mistakes before it
+  passed: a regexp that stopped at the first ')' of the metadata, and
+  an expectation that a freshly opened view folds what its 'folded'
+  atoms mark, which the Emacs client does not (see "Deviations").
+- 'bash/integration-tests.sh' (the Emacs pass): 39 of 39 (one new),
+  first run.
+- 'bash/all-tests.sh', first run, on d7da5b98's tree with this
+  commit's docs and two comments: all pass: build, Emacs 503 of 503,
+  Neovim (no failure), nextest 1261 of 1261, doctests, team tools, AI
+  reader, integration 78 of 78 (both clients). No code changed after
+  it.
+- End to end, per '/verify': an isolated 'target/debug/skg' on port
+  24866, scratch data a copy of the integration test's (behavior 5 and
+  Shelf). R's view: N in R's forks folder editable, "2bK", showing X4
+  alone, with Shelf folded in its containers folder; in N's forks
+  folder R a write-protected repeat ("Kb", showing nothing) and T
+  editable ("Kb") showing Y, with Z in its hidden-in folder and X2 in
+  its hidden-by folder, Shelf folded in its containers folder. Saved
+  unchanged: no file changed (md5 of every file), drawn again
+  identical. X4 cut there: "Hides 'X4' from 'R', as content of 'N'.",
+  only R.skg written (hides [X4]); the redrawn view shows X4 in N's
+  hidden-in folder, N showing nothing; saved again, no file changed,
+  drawn identical. N's view: R ("Kb", its hidden-by folder holding X4,
+  since R now hides it) and T ("Kb", Y). Y cut from T and pasted after
+  N's last child: only N.skg written (contains X1 to X4 and Y, forks
+  [T], hides [Z]); the redrawn view shows T first, "bKb", claiming,
+  editable, showing nothing, with Z in its hidden-in folder and no
+  hidden-by folder; then R; Y in N's content; it equals a fresh view
+  of N but for viewnode IDs; saved again, no file changed, drawn
+  identical. Then T's claim removed (a detachment) and saved: N stops
+  forking T, and T, a forker again, gets its hidden-by folder back. The
+  server was stopped by its PID, the port checked free, the scratch
+  data deleted; transcript outside 'tests/results/', in
+  '/tmp/claude-1000/every-mirror-p2s6/verify/transcript.txt' (with
+  'transcript/' and the script 'run.sh').
+Logs: 'tests/results/every-mirror/slice6-plan2/' (nextest-first.log,
+ai-tool.log, integration.out, all-tests.out, all-tests-ALL.org,
+all-tests-nextest.log, emacs.log, nvim.log, ai-reader.log).
+'tests/results/every-mirror/' was copied out before 'bash/all-tests.sh'
+and put back after it.
+*** Deviations from the plan's "how"
+**** A fix the scenario found: a forker made a forkee loses its hidden-by folder
+In N's view, cutting Y from T made T a mutual, but the redrawn view
+kept T's folder of what it hides of N's content (X2), its member
+marked noWarrant: that folder's goal is empty under a member that
+claims (Q9: drawn under a forker as such only), and the refresh keeps
+an unwarranted child where it stands. The glossary already said such
+a folder "holds nothing and goes", and a fresh view drew none, so the
+redrawn view was a fixpoint but not the fresh view, with a false ⊥
+(T does hide X2, and N does contain it). Now the members of a
+'hiddenByForkPartnerFolder' whose viewparent is no forker as such
+vanish by design, as a view-ancestor in a containers folder does
+('is_hidden_by_folder_of_no_forker_as_such', beside
+'view_ancestor_in_its_folder' in 'leaves_its_write_protected_folder',
+'server/refresh/visit.rs'), so the folder empties and goes. The
+detachment that makes a mutual a forker again draws the folder at
+the next visit, as 'add_default_folders' already did.
+**** The Rust test reuses slice 3's fixture, in 'grouped_forks'
+'tests/forkers_drawn_editable/fixtures/' already holds behavior 5,
+with K (a forkee of N) and FF (a foreign forker) added; the launch
+brief asked not to duplicate it, so there is no 'tests/forks_meet/'.
+K and FF stand in N's forks folder throughout, so the test's orders
+are K, FF, R, T before the cut and K, T, FF, R after it. The test is
+registered in 'tests/grouped_forks.rs', with every other forks test,
+not in 'grouped_views'. Its sub-tests: R's view as drawn and saved
+unchanged; X4 cut from N in R's view (only R's file written, R hides
+X4, the redrawn view a fixpoint); Y moved from T into N in N's view
+(N forks K and T, contains Y, hides Z alone; T's file untouched; the
+redrawn view is the fresh view of N and a fixpoint). N's view as
+drawn, saved unchanged, is already pinned by
+'an_unchanged_fresh_view_writes_nothing' there.
+**** The forks tests' helpers are shared
+The line and save helpers that slices 2, 3 and 5 each copied (slice
+5 recorded the quasi-duplication) moved to
+'tests/shared/view_and_save_helpers.rs', used by the three files and
+the new one. Its 'save_cleanly' returns the saved view without
+viewnode IDs, as two of the three copies did; 'tests/forkers_drawn_editable.rs'
+was adapted to it. No assertion changed.
+**** The integration data adds a container
+'tests/integration/forks-meet/data/main/' is behavior 5 (no K, no FF)
+plus Shelf, which contains N and T, so that R's view has containers
+folders to check (under N and under T; R, a repeat, has none).
+**** The integration test also drives N's view
+Beyond the plan's list (R's view, the cut of X4), it opens N's view,
+cuts Y from T and pastes it into N's content, saves, and checks T
+first in N's forks folder, claiming, editable, its herald bKb, then
+R, and Y in N's content: the scenario's last save, through each
+client's gestures. Emacs: 'org-cut-subtree', 'org-paste-subtree' at
+level 2, 'skg-request-save-buffer'. Neovim: 'dd', 'p', ':s' to set
+the stars, ':w'. The heralds checked are what the user sees: the
+Emacs overlay's display string, the Neovim extmark's virtual text
+(N "1C1/4 2bK H1", T "1C1/4 Kb H1", then T "1C4 bKb H1").
+**** Folded, in Emacs, only after a save
+The Emacs client does not act on 'folded' atoms in a view it has just
+opened ('skg-open-org-buffer-from-text'; 'TODO/problems.org' already
+has the entry, which plan 1_3 fixed for Neovim only). So in R's
+fresh view the Emacs test accepts a containers folder's member, and Z
+in T's hidden-in folder, as drawn folded when it is hidden or still
+carries the atom; after the save's redraw it requires the members
+hidden. The Neovim test requires them hidden at once.
+**** The doc sweep
+'git grep -i -E "subscri|overrid"' over 'docs', 'elisp', 'nvim',
+'tools/skg-for-ai', 'server' and 'shared' finds only the categories
+plan 1's slice 9 listed (the '-old' docs, the retired keys, the
+relRepo "no override", plain English); "forkees folder", "forkers
+folder", "mutuals folder", "subscribee folder" and "subscriber
+folder" occur nowhere; the plan's three stale phrases are gone or
+were rewritten by slice 1 ("Under each member of a partner folder
+hangs its containerward chain, under a member of the forksFolder in
+a folded containers folder"). Jeff's essays are left as written.
+Stale text fixed:
+- 'docs/api-and-formats.org': a cut from a forker as such "is
+  refused, for now" (slice 5 left it) now says what the save does;
+  the hide report's lines name fork partners, not forkees (slice 4
+  made the code do so).
+- The AI tool's README: the hide report likewise; the relRepo walk
+  stops below a member as such of either kind; a forker as such in
+  'forest forks' and in "Editing a foreign node forks it"; its
+  command table.
+- 'docs/sharing-model.org': the hidden-in folder's full label.
+- Comments: the module comment of 'server/refresh/goal.rs' and one in
+  'substitute_mirrors' ('visit.rs') said "forkee as such" where the
+  code asks of either kind.
+New text: 'docs/forks.org', "Forks of one note meet" (behavior 5);
+the hidden-by folder going, in the glossary (warranted, 'noWarrant'),
+'docs/data-model_technical.org', 'docs/sharing-model.org' and both
+COMMANDS docs.
+*** Fixtures changed
+- New: 'tests/integration/forks-meet/data/main/' (N, R, T, X1 to X4,
+  Y, Z, Shelf, all owned; the server's
+  'OTHER_SKGREPO_DEPENDENCIES.toml'). Its 'run-test.sh' restores it
+  from git after each run.
+- No other fixture changed.
+*** Unfinished
+Nothing of this slice. For Jeff, not blocking:
+- The Emacs client still opens a view without folding what its
+  'folded' atoms mark ('TODO/problems.org'); with forks folders drawn
+  unasked, every fresh view now opens its members' containers and
+  hidden-in folders unfolded in Emacs, until the first save.
+- While exploring, a save of the pre-save text of N's view, sent
+  again after the save that made T a mutual, ended N's fork of T: in
+  that text T claims nothing, a detachment. A client reaches it only
+  by undoing past a save and saving again; it is the open
+  'TODO/problems.org' entry "A buffer that shows a forker as claiming
+  nothing can undo a fork another view made", within one view.
+*** DONE
+The slice's headline in '2_plan.org' is DONE.
+*** Names coined or changed
+- New: 'is_hidden_by_folder_of_no_forker_as_such' ('server/refresh/visit.rs').
+- Tests: 'tests/shared/view_and_save_helpers.rs' (module
+  'view_and_save_helpers' in 'grouped_forks'), whose 'save_cleanly'
+  returns the saved view without viewnode IDs; 'tests/forks_meet.rs'
+  ('rs_view_shows_n_and_its_forks',
+  'cutting_x4_from_n_in_rs_view_hides_it_in_r',
+  'moving_y_from_t_into_n_makes_n_fork_t'; helpers
+  'forks_folder_members_of', 'folder_members_under', 'nth_line_of',
+  'is_a_fixpoint'); the integration test 'forks-meet'.

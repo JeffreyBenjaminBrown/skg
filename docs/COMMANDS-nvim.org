@@ -475,10 +475,11 @@ refused when it is foreign; a headline typed under it joins its
 content when you own it. A save never reads its partial content as
 its whole list. Deleting one of its children (a cut) makes the
 node fork it, so it becomes a mutual (=bKb=), redrawn claiming, among
-the forkees; the node hides the child unless the node contains it
-after the save, so a child cut there and pasted into the node's own
-content is taken in, hiding nothing. Under a foreign node such a save
-is refused.
+the forkees, without its folder of what it hides of the node's
+content (drawn under a forker only); the node hides the child unless
+the node contains it after the save, so a child cut there and pasted
+into the node's own content is taken in, hiding nothing. Under a
+foreign node such a save is refused.
 *** <localleader>la : :SkgShowFolderOfAliases
 The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:

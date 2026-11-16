@@ -360,7 +360,11 @@ there too. In the write-protected hides folder (=hiddenFolder=) a
 graphnode its viewparent hides by no record vanishes, so that a
 graphnode a save unhid leaves it; a hide the skgrepo restriction
 keeps out stays, unwarranted ('mark_claims' in
-'server/refresh/visit.rs').
+'server/refresh/visit.rs'). In the hidden-by folder
+(=hiddenByForkPartnerFolder=) under a member that is no forker as
+such, a forker a cut made a forkee, every member vanishes, so the
+folder goes, as a fresh view would not draw it
+('is_hidden_by_folder_of_no_forker_as_such').
 The refresh keeps an unwarranted child where it stands; it never
 removes a child.
 

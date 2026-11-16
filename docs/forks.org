@@ -288,6 +288,46 @@ it redraws: otherwise a member your note forks would stand claiming
 nothing, which reads as a pending detachment, and the next save would
 end the fork ('server/from_text/forkers_made_forkees.rs').
 
+*** Forks of one note meet
+
+Two notes R and T, both yours, fork one note N. N contains X1 to X4
+and hides Z; R contains X1, X2, X3; T contains X1, X3, Y, Z and hides
+X2. Each view shows the others, through the forks folders:
+
+#+begin_example
+,* R                    (editable)
+,** forksFolder
+,*** N                  (2bK: R and T fork it; editable)
+,**** forksFolder
+,***** R                (Kb: a repeat, write-protected, showing nothing)
+,***** T                (Kb: editable)
+,****** hiddenInForkPartnerFolder     (Z, folded: N hides it)
+,****** hiddenByForkPartnerFolder     (X2, folded: T hides it)
+,****** Y
+,**** X4                -- what N adds to R
+,** X1
+,** X2
+,** X3
+#+end_example
+
+N shows only X4, what R neither contains nor hides; T shows Y, what
+it adds to N. In N's own view both are forkers as such: R shows
+nothing of its own, and T shows Y as above. Each member of a forks
+folder that is no repeat also carries its containers folder, folded
+(here none, as nothing contains R, N or T).
+
+Cutting X4 from N in R's view hides X4 in R; the redrawn view shows
+X4 in N's folder of what R hides in it. In N's view, cutting Y from T
+and pasting it into N's own content makes N fork T and contain Y,
+hiding nothing new. T is then a mutual (=bKb=), claiming, first in
+N's forks folder, showing nothing (N contains or hides all of T's
+content); R follows; Y stands in N's content. T's folder of what it
+hides of N's content (X2) goes with the change, since that folder is
+drawn under a forker as such only. Each of these saved views, saved
+again unchanged, writes nothing ('tests/forks_meet.rs';
+'tests/integration/forks-meet/' drives the same scenario through each
+client).
+
 ** Editing the clone: deletions become hides
 
 Suppose the clone =C= and the original =N= both contain a child =X=,

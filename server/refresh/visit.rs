@@ -889,7 +889,7 @@ fn keep_hidden_outside_folder_last (
 /// owned root, that author's under a foreign one; or one owner's
 /// throughout, in a view switched to that owner's perspective. Not
 /// where the parent itself is shown raw where another mirror would
-/// stand (a root, or a member of a folder that is no forkee as such):
+/// stand (a root, or a member of a folder that is no member as such):
 /// there its children are raw too. A member already shown in
 /// another's place is re-pointed whenever it is not the mirror shown,
 /// as after a switch of perspective. A re-pointed member's folders

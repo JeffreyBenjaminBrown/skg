@@ -1,6 +1,7 @@
 //! The goal of a parent: what the truth says its children should
 //! contain. For an occurrence's content, its 'contains' list in file
-//! order (for a forkee as such, less what the forker hides or
+//! order (for a member as such of a forks folder, a forkee or a
+//! forker as such, less what the note whose folder holds it hides or
 //! contains); for a node of the containerward chain under a folder's
 //! member, its containers; for a folder, its partners in the folder's
 //! relation (for the containers folder, those the view does not
