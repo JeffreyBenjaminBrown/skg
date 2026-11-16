@@ -61,7 +61,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | relationship sides   | their tier  | counts and ancestor flags; see [[*Relationship heralds][Relationship heralds]]                     |
 | property counts      | boring      | =A3= aliases, =I1= extra IDs, =F2= true flags                                 |
 | position glyphs      | ghost       | =ᗣ= a ghost, or what HEAD alone warrants                                      |
-|                      | crucial     | =☮= write-protected, =⊥= unwarranted, =ĥ= overrides here                      |
+|                      | crucial     | =☮= write-protected, =⊥= unwarranted, =ĥ= in place of another (=inPlaceOf=)   |
 |                      | high        | =B= omitted body                                                              |
 |                      | medium      | =⟳= cycle                                                                     |
 | home skgrepo heralds | normal      | =⌂:LABEL=                                                                     |
@@ -167,11 +167,11 @@ both on a mutual.
 
 Immediately after =K=, a crucial =ĥ= (precomposed h with circumflex)
 means this occurrence stands in the place of one of its mirrors. =2Kĥ3= is an
-example. It comes from the load-bearing 'overridesHere' part; an
+example. It comes from the load-bearing 'inPlaceOf' part; an
 occurrence without that fact has no =ĥ=. The
 eighth ancestor is a plain =h=, so =Kĥh= shows the two glyphs together.
 The fact preserves the original member ID when a substituted view
-is saved. See [[file:override.org][override behavior]].
+is saved. See [[file:mirrors.org][mirror substitution]].
 
 ** Other heralds
 The position glyphs stand first among a headline's heralds, the ☮

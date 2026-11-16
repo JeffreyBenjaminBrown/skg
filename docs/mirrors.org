@@ -140,8 +140,8 @@ itself forks it, and the saved buffer's root becomes the clone (see
 below), so that tree then is drawn from the user's perspective.
 
 A view can be switched among perspectives (Emacs 'C-c v o', Neovim
-'<localleader>vo'; =docs/api-and-formats.org=, "Set overrides
-followed"): the root authors', a fresh view's, and the user's and
+'<localleader>vo'; =docs/api-and-formats.org=, "Set
+perspective"): the root authors', a fresh view's, and the user's and
 each owner's of a mirror of some original the view draws where
 substitution acts, whose list would show some position of the view
 differently, each followed in every tree, whoever wrote its root.
@@ -212,10 +212,10 @@ one of this save's exact =ForkSpec=s is rewritten to =K=
 recursive-content occurrence of =F= is replaced by its newly visible
 substitute =K= at any refresh, as substitution always does.
 
-The content occurrence carries =(overridesHere F)=; the root does not.  The
+The content occurrence carries =(inPlaceOf F)=; the root does not.  The
 root case is not ordinary recursive-content substitution; it is the one-time
 identity transition of the view which performed the fork, and a root marked
-=(overridesHere F)= stands for =F=, which the root authors' perspective shows
+=(inPlaceOf F)= stands for =F=, which the root authors' perspective shows
 raw.  After refreshing that viewforest, the server
 stores it under the same view ID and recomputes the open-view root index, so
 the buffer is thereafter registered as rooted at =K= rather than =F=.
@@ -224,9 +224,9 @@ Collateral rerenders do not apply the root exception; their content
 occurrences substitute as every refresh's do.  A later independent direct
 visit to =F= still opens raw =F=, in accordance with the exact-visit rule.
 
-*** The =overridesHere= part
+*** The =inPlaceOf= part
 
-A substituted viewnode carries =(overridesHere N)=, where =N= is the
+A substituted viewnode carries =(inPlaceOf N)=, where =N= is the
 original node for which the displayed carrier substitutes.  The part
 is load-bearing during save: the viewnode contributes =N= to its parent's
 stored relationship list rather than the carrier's ID.  Editing the
@@ -310,9 +310,9 @@ absent-reference cleanup can remove an exact dangling =forks= partner
 from owned data.
 
 A deleted fork shown in its original's place, marked
-=(overridesHere N)=, under a container the user does not own, still
+=(inPlaceOf N)=, under a container the user does not own, still
 collects =N= for that container's list
-('deleted_overrider_keeps_its_original' in
+('deleted_mirror_keeps_its_original' in
 =server/from_text/local_fieldintent_collection/predicates.rs=): the
 deletion takes the fork out of the graph, not =N= out of the
 container, so the container is not forked, and the rerender draws =N=
@@ -364,7 +364,7 @@ are intentionally full-graph operations rather than skgrepo-set presentation.
 ** Org export
 
 Org export follows the stored, repo-gated =contains= graph.  It does
-not perform interactive override substitution.
+not perform interactive mirror substitution.
 
 ** Principal implementation references
 
@@ -374,7 +374,7 @@ not perform interactive override substitution.
 - [[file:../server/refresh/visit.rs][substitution and raw positions ('substitute_mirrors')]]
 - [[file:../server/rerender_pass.rs][saved-view fork replacement and collateral rerendering]]
 - [[file:../server/types/views_state.rs][open-view root registration]]
-- [[file:../server/types/viewnode.rs][folder rules and =overridesHere= collection]]
+- [[file:../server/types/viewnode.rs][folder rules and =inPlaceOf= collection]]
 - [[file:../server/refresh/visit.rs][on-demand folder construction ('fulfill_view_requests')]]
 - [[file:../server/serve/handlers/text_search.rs][search suppression]]
 - [[file:../server/serve/handlers/text_search.rs][the search results' folders ('draw_search_buffer')]]

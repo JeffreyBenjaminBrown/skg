@@ -1370,3 +1370,155 @@ None; 'a_marks_file_loads_whole_once_the_forks_migration_has_run'
   migrated before slice 7 lands") is satisfied by this commit.
 *** DONE
 The slice's headline in '1_plan.org' is DONE.
+** Slice 8: the substitution's and the perspective's names
+*** Commits
+- 7a2f26d9 every-mirror plan 1 slice 8: the substitution's and the perspective's names
+- (the commit carrying this record) every-mirror plan 1 slice 8: docs, record, DONE
+*** Suites
+All first runs, all green; no failure to classify.
+- 'bash/nextest.sh': 1243 of 1243.
+- The AI tool's tests (after 'cargo build --bin skg'): PASS.
+- 'bash/emacs-tests.sh': 503 of 503. 'bash/nvim-tests.sh': no failure.
+- 'bash/integration-tests.sh': 38 of 38 (the Emacs pass; the renamed
+  'perspective' among them).
+- 'bash/all-tests.sh', on 7a2f26d9: all pass: build, Emacs 503 of 503,
+  Neovim (no failure), nextest 1243 of 1243, doctests, team tools, AI
+  reader, integration 76 of 76 (both clients).
+- Also, per the '/verify' skill, an isolated 'target/debug' server on
+  port 24768 over a scratch copy of 'tests/integration/perspective/data'
+  (foreign R contains M and K; A foreign, U owned, B third's, each fork
+  M; owned P contains M): a view of P drew U with '(inPlaceOf M)'; a
+  save of it editing U's body wrote the body to U.skg and left P.skg
+  'contains: [M]'; a view of R drew A with '(inPlaceOf M)', and the AI
+  tool's 'perspective' command (sending "set perspective") answered
+  "Showing your perspective.", redrew U in M's place, and recorded
+  'perspective': "user" in the sidecar. The old request "set overrides
+  followed" was refused as an unsupported request type, and a save
+  carrying '(overridesHere M)' as "Unknown metadata key: overridesHere",
+  nothing written. Stopped by its PID, the port checked free, the
+  scratch folder deleted (transcripts under 'verify/').
+Logs: 'tests/results/every-mirror/slice8-plan1/' (nextest-first.log,
+ai-tool.log, emacs.log, nvim.log, integration.log, all-tests.out,
+all-tests-ALL.org, verify/).
+*** Names, for the slices after
+- The part '(overridesHere N)' is '(inPlaceOf N)'; the field
+  'overridesHere' is 'in_place_of' on 'Occurrence', 'OccurrenceMetadata'
+  and the parse's written parts; 'overridesHere_part_errors' is
+  'inPlaceOf_part_errors'; 'BufferValidationError::OverridesHere_Mismatch'
+  is 'InPlaceOf_Mismatch'; 'deleted_overrider_keeps_its_original' is
+  'deleted_mirror_keeps_its_original'. The style key
+  'relationship_heralds.overrides_here' ('shared/herald-styles.json') is
+  'in_place_of'.
+- 'OverridesFollowed' is 'Perspective' (variants 'RootAuthors',
+  'Owner'); 'ViewState::overrides_followed' is 'perspective';
+  'OpenViews::set_overrides_followed' / 'overrides_followed_by_view' are
+  'set_perspective' / 'perspective_of_view';
+  'Perspective::name_of_owners_overrides' is 'name_of_owners_perspective';
+  the 'RerenderMode::ContentView' and 'Walk' field and every parameter
+  'overrides_followed' are 'perspective'.
+- The handler module 'server/serve/handlers/overrides_followed.rs' is
+  'perspective.rs'; 'handle_set_overrides_followed_request' is
+  'handle_set_perspective_request', 'send_overrides_followed_response'
+  'send_perspective_response'; 'RequestType::SetOverridesFollowed' is
+  'SetPerspective'; 'TcpToClient::OverridesFollowed' is 'Perspective'
+  (response type 'perspective'). In 'save_buffer.rs',
+  'overrides_followed_from_save_request' is 'perspective_from_save_request'.
+- The wire: "set overrides followed" is "set perspective";
+  '(overrides-followed . NAME)' is '(perspective . NAME)' in that
+  request, its answer and the save; the privacy challenge's operation
+  'overrides-followed-switch' is 'perspective-switch'. The messages:
+  "your perspective", "tracy's perspective", "each root author's
+  perspective (tracy's, yours)"; refusals "No other perspective would
+  show this buffer differently from its root authors'.", "The diff
+  view shows no mirror in place of another, so it has no perspective.",
+  "The request names no perspective ('perspective').", "Your perspective
+  would show this buffer as its root authors' do, ...".
+- Emacs: 'elisp/skg-request-override-perspective.el' is
+  'skg-request-perspective.el'; 'skg-override-perspective' is
+  'skg-cycle-perspective' (C-c v o), its handler
+  'skg--cycle-perspective-handler'; buffer variables 'skg-perspective'
+  and 'skg-perspective-name'; 'skg--set-override-perspective' is
+  'skg--set-perspective', 'skg--override-perspective-mode-line'
+  'skg--perspective-mode-line'. The stream label is "cycle perspective".
+- Neovim: module 'skg.override_perspective' is 'skg.perspective',
+  'override_perspective' is 'cycle_perspective'; the command
+  'OverridePerspective' is 'CyclePerspective' (':SkgCyclePerspective',
+  '<localleader>vo'); 'vim.b.skg_perspective', 'vim.b.skg_perspective_name';
+  'buffer.set_perspective', 'buffer.perspective_mode_line'.
+- The AI tool: the command 'override-perspective' is 'perspective'
+  ('perspective SIDECAR [PERSPECTIVE]'; 'command_perspective'); the
+  sidecar key 'overrides_followed' is 'perspective' ('perspective_name'
+  unchanged); 'DEFAULT_OVERRIDES_FOLLOWED' is 'DEFAULT_PERSPECTIVE',
+  'overrides_followed_of_sidecar' is 'perspective_of_sidecar', the
+  'save_buffer' keyword is 'perspective'.
+- Tests: 'tests/override_substitution.rs' and its fixture directory are
+  'tests/mirror_substitution.rs' and 'tests/mirror_substitution/'; the
+  integration test 'overrides-followed' is 'perspective';
+  'tests/elisp/test-skg-override-perspective.el' is
+  'test-skg-perspective.el'; 'tests/nvim/override_perspective_spec.lua'
+  is 'perspective_spec.lua'.
+- Docs: 'docs/override.org' is 'docs/mirrors.org'; the section "Set
+  overrides followed" is "Set perspective", "Override substitution and
+  the overridesHere part" is "Mirror substitution and the inPlaceOf part".
+*** Deviations from the plan's "how"
+**** Logs under 'tests/results/every-mirror/slice8-plan1/'
+As the launch brief said.
+**** The clients' message says "Showing", not "Perspective:"
+With the server's names now "your perspective" and the like, the
+clients' and the AI tool's "Perspective: your perspective." would
+repeat itself; they say "Showing your perspective." (and the AI tool's
+compact view, "# Showing your perspective (each root author's
+perspective is the default)."). The mode line keeps ":NAME"
+("SKG:your perspective").
+**** The AI tool's command
+The plan names it ('override-perspective' becomes 'perspective'); so
+done, and it works (its tests and the end-to-end check drove it).
+**** The field is 'in_place_of', as the plan says
+Not 'inPlaceOf' after the wire atom, as 'overridesHere' was, nor the
+problems entry's 'drawn_in_place_of'.
+**** Prose and test names beyond the names
+Comments and docstrings about the part, the substitution and the
+perspective in the files the renames touched now say mirror and
+perspective ("a shown mirror stands for the original", "drawn from
+its root authors' perspective"). Test functions on the perspective in
+'tests/mirror_substitution.rs' ('a_forked_foreign_root_follows_the_users_perspective'
+and kin) and two in the AI tool's tests
+('check_switching_perspective_*') were renamed with them; other test
+internals keep the old words, as slice 7 left them.
+*** Tests adapted (expected fixture adaptations)
+Every test text naming '(overridesHere N)', the wire's
+'overrides-followed', "set overrides followed", the old client names,
+the messages above, or the moved files' paths: among them
+'tests/mirror_substitution.rs', 'tests/refresh/substitution.rs',
+'tests/metadata_grammar.rs', 'tests/metadata_fields_table.rs',
+'tests/save_rerender_release.rs', the shared herald and metadata-editor
+cases, the elisp and Neovim perspective and heralds tests, the
+integration tests 'fork', 'fork-chain', 'fork-owned' and
+'perspective', and the AI tool's tests. No assertion of behavior
+changed.
+*** Tests added
+None: the slice renames.
+*** Fixtures changed
+Moved, contents unchanged: 'tests/override_substitution/' to
+'tests/mirror_substitution/', 'tests/integration/overrides-followed/'
+to 'tests/integration/perspective/'.
+*** Unfinished, and notes for later slices and Jeff
+- Slice 9's sweep: 'tests/extend_raw_overridden_children.rs', the
+  invariants module ('override_invariants.rs', 'OverrideInvariantViolation',
+  'CompleteGraphError::Override' and kin), the integration test
+  'overridden-direct-visit', and the override and subscription words in
+  test internals and in prose this slice did not touch (172 lines of
+  "overrid" remain in 'server', 'elisp', 'nvim', 'shared' and the AI
+  tool, most of them the invariants module, false friends, and "overrider"
+  in comments outside the part).
+- Old buffers holding '(overridesHere N)' are refused at save
+  ("Unknown metadata key: overridesHere") and must be reopened; the AI
+  tool's saved sidecars holding 'overrides_followed' read as the root
+  authors' perspective, and their views, holding the old part, are
+  refused at save and must be fetched again (its README already says
+  so of any atom the server no longer knows).
+- 'TODO/problems.org''s "Architecture note: 'drawn in place of
+  another node' is override-specific data" was marked 'FIX PLANNED: '
+  in the code commit and moved to 'TODO/DONE/problems.org' in the last.
+*** DONE
+The slice's headline in '1_plan.org' is DONE.

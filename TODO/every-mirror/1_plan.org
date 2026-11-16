@@ -1636,7 +1636,7 @@ precondition 3.
   (the relation key): run the suites as slice 2 does; otherwise
   'bash/nextest.sh' and the AI tool's tests.
 
-** TODO Slice 8: the substitution's and the perspective's names
+** DONE Slice 8: the substitution's and the perspective's names
 Questions: Q8 (the part, the perspective, the command), Q4.
 - '(overridesHere N)' becomes '(inPlaceOf N)' in the parser, the
   metadata tables, the printer, the heralds (with the style key

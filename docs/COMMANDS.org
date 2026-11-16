@@ -377,7 +377,7 @@ or go to the content view of it that was already open if that exists
 (a buffer of the diff view does not count: the node gets a new view).
 
 The requested node itself is always the raw root. Recursive content
-below it can still use override substitution. Fork facts remain
+below it can still use mirror substitution. Fork facts remain
 visible in its heralds (the K token).
 
 If you're not sure whether the cursor is on something visitable
@@ -1314,31 +1314,32 @@ the skgrepo-sets available, and =M-x skg-show-skgrepo-restriction=
 shows the skgrepo restriction alone, each marking the most private
 skgrepo " (no restriction)": "Skgrepo restriction: public; available:
 public, private (no restriction)".
-*** C-c v o : skg-override-perspective
-Shows this view from the next perspective: whose overrides it
-follows. Each switch names the perspective it shows; it redraws the
+*** C-c v o : skg-cycle-perspective
+Shows this view from the next perspective: whose list of
+skgrepos ranks the mirrors it shows. Each switch names the
+perspective it shows; it redraws the
 buffer, and refuses while it has unsaved edits.
 
 Where a node stands as another's content and someone has forked
-it, a view may show one fork in its place. A fresh view shows its
-root authors' overrides: under a root of yours, yours; under a root
+it, a view may show one fork in its place. A fresh view is drawn from its
+root authors' perspective: under a root of yours, yours; under a root
 someone else wrote, that author's, throughout the tree, so you see
 what they would see, and your own forks of their nodes do not show
 there. That is the first perspective. The others are yours and each
-other author's whose overrides would show some node of the buffer
+other author's whose perspective would show some node of the buffer
 differently, each followed in every tree, whoever wrote its root, so
 that you can read the buffer as that author would. Yours comes first,
 then the others in the order the config declares their skgrepos;
 after the last, the root authors' again. A perspective that would
 show the buffer as the root authors' do is skipped. The cycle is
 computed afresh at each switch, from what the buffer shows then. An
-author is named by a skgrepo of theirs: "tracy's overrides".
+author is named by a skgrepo of theirs: "tracy's perspective".
 
 Shown from yours, a node of another's you fork there is shown, after
 the save, as your clone. Shown from another author's, a node you edit
 there is forked as anywhere, and the redraw shows that author's
 version again, unedited; your clone shows from yours. The mode name names any perspective but the
-root authors': "SKG:your overrides", "SKG:tracy's overrides". The
+root authors': "SKG:your perspective", "SKG:tracy's perspective". The
 buffer keeps its perspective through its saves and the redraws the
 server sends unasked. The switch is refused in a buffer of the diff
 view, which shows no fork in place of what it forks, and
@@ -1349,7 +1350,7 @@ with the cursor still on it if it was, and with its own folders, as
 a fresh view of it would draw them (its containers, its forks
 folder and count, and any other folder you had opened there); from the
 root authors', the node you opened, as it is. The buffer keeps its name. In a search
-buffer, the hits are its roots. See =docs/override.org=.
+buffer, the hits are its roots. See =docs/mirrors.org=.
 
 *** C-c v r : skg-readable-ids-mode
 This changes how node IDs are displayed.

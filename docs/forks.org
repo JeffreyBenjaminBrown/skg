@@ -8,7 +8,7 @@ additions still reach you, but your edits never touch the original.
 See also [[file:./sharing-model.org][the sharing model]] for the underlying
 relations (=forks=,
 =hides=) and =glossary.org= ("clone, and the fork operation",
-"forkee as such", "override substitution").
+"forkee as such", "mirror substitution").
 
 ** The implicit gesture: editing a foreign node
 
@@ -91,7 +91,7 @@ you own. =C=:
   root's author would see, so =N= stays there, unedited, until you
   switch the view to your perspective, =C-c v o=, as the save's
   warning says; see
-  [[file:./override.org][override.org]], "Mirror substitution");
+  [[file:./mirrors.org][mirrors.org]], "Mirror substitution");
 - *hides* any child of =N= that your forking edit /deleted/, so what
   you dismissed does not come straight back as unintegrated forked
   content (below). Later deletions from =C= hide likewise — see
@@ -139,12 +139,12 @@ of any length are legal, and so are cycles (see
 [[file:./sharing-model.org][the sharing model]]). When all skgrepos are unrestricted,
 viewing =N='s container shows the chain's end =D=, where =D= is in
 =C='s skgrepo or a more private one (your perspective ranks your
-skgrepos most private first; see [[file:./override.org][override.org]],
+skgrepos most private first; see [[file:./mirrors.org][mirrors.org]],
 "Which mirror stands"); restrict the
 skgrepo-set to hide =D='s skgrepo and the same view shows the middle =C=
 instead — either way =N= stays in the container's contents. If you point
 =skg-fork-node= at a node that is /itself/ a shown substitute (one
-carrying an =overridesHere= part), it forks the node on screen — the
+carrying an =inPlaceOf= part), it forks the node on screen — the
 fork shown — deepening the chain, never re-forking the node it stands for.
 
 If you already fork the node, =skg-fork-node= is rejected by the same
@@ -261,7 +261,7 @@ And it holds for any owned note that forks something, not just
 clones.)
 
 A removed child stands for the member of =N='s contents that is its
-mirror (=docs/override.org=, "Mirrors"). If =N= contains =X= and
+mirror (=docs/mirrors.org=, "Mirrors"). If =N= contains =X= and
 someone forked =X= into =X'= (=X'= forks =X=), =N='s contents
 still name =X=, as every container's do; =X'= is shown in its place
 only where the perspective ranks it first. So removing =X'= from

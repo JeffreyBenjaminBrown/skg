@@ -18,7 +18,7 @@ Containment and links differ in two ways:
 ** Each node of a document is a separate file.
 This is unusual -- in most applications, the entire tree of text would be a single document. The one-file model has the advantage that a document can be easily read without special software. But the Skg model makes it possible to share granularly (see [[file:./sharing-model.org][the sharing model]], and [[file:./diffs-are-clearer-in-skg.org][easy to understand changes]].
 ** The forks relationship
-A file F can fork file O. Visiting O directly still opens O itself as the raw root. Fork facts can be inspected in the heralds. Separately, wherever O would appear as recursive /content/ of a node already in view, F can be shown in its place automatically; this is /override substitution/ (see [[file:./sharing-model.org][the sharing model]]).
+A file F can fork file O. Visiting O directly still opens O itself as the raw root. Fork facts can be inspected in the heralds. Separately, wherever O would appear as recursive /content/ of a node already in view, F can be shown in its place automatically; this is /mirror substitution/ (see [[file:./sharing-model.org][the sharing model]]).
 
 Forking is useful for both sharing and privacy, as is explained below.
 

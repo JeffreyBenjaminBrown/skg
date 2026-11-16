@@ -187,13 +187,13 @@ committing".
 does not make editable, as the clients' 'C-c r u' does, and writes
 the buffer again; see "Reviewing and committing".
 
-'override-perspective SIDECAR' shows a view from the next perspective,
-whose overrides it follows, as the clients' 'skg-override-perspective'
+'perspective SIDECAR' shows a view from the next perspective,
+as the clients' 'skg-cycle-perspective'
 ('C-c v o' in Emacs) does, and writes the view again;
-'override-perspective SIDECAR PERSPECTIVE' switches to the one named:
+'perspective SIDECAR PERSPECTIVE' switches to the one named:
 'root-authors', 'user', or a foreign skgrepo's name, for its owner.
 Where a node stands as content and a fork of it exists (a note that
-forks it, or one joined to it by forks: a mirror, 'docs/override.org',
+forks it, or one joined to it by forks: a mirror, 'docs/mirrors.org',
 "Mirrors"), the view may show the fork in its place, marked 'ĥ' after
 its 'K' ('⟨0b Kĥ1⟩'). Whose forks count is the perspective: a
 fresh view follows each tree's root author's (under a root of yours,
@@ -203,9 +203,9 @@ view as that author would. The cycle holds the root authors', then
 yours and each other author's whose forks would show the view
 differently, in a fixed order; the server computes it afresh at each
 switch. It prints the server's name for the perspective,
-'Perspective: your overrides.' or 'Perspective: tracy's overrides.' or
-'Perspective: each root author's overrides (tracy's).', then the
-paths; the sidecar records the perspective ('overrides_followed' and
+'Showing your perspective.' or 'Showing tracy's perspective.' or
+'Showing each root author's perspective (tracy's).', then the
+paths; the sidecar records the perspective ('perspective' and
 'perspective_name'), the compact view's summary names it unless it is
 the root authors', and every later save of the view names it, as the
 server needs, whoever then rewrites the files. Like the clients, it
@@ -307,7 +307,7 @@ same and remove the entry. The tool has no cursor, so pasting is
 writing what it prints into a compact view.
 
 Options, after the command: '--port N' for every command ('save',
-'extend', 'close' and 'override-perspective' require the sidecar's; a
+'extend', 'close' and 'perspective' require the sidecar's; a
 command run through a daemon's folder talks to the daemon's server
 unless it names one);
 '--yes' for
@@ -316,7 +316,7 @@ for 'save' (see "Retyped headlines"); '--fork-into REPO' for 'save'
 (see "Forking"); '--hoist', '--delete-from visible|all' and
 '--strandeds reset|keep' for 'save', answering the server's questions
 (see "The server's answer"); '--show-overPrivateText' for the view
-commands, 'save', 'restrict' and 'override-perspective' (see "The skgrepo
+commands, 'save', 'restrict' and 'perspective' (see "The skgrepo
 restriction and overPrivateText"); '--regex', '--body' and '--operators' for
 'search'; '--host-root PATH' for 'import'; '--leave-links' for
 'delete-references'; '--foreign shown|hidden' for 'restrict'; for the
@@ -339,7 +339,7 @@ agent's shell starts fresh on every call) wrote to that server, and
 'commit --all --yes' git-committed his unfinished changes. So a
 command that needs a server and is given no port, by '--port',
 'SKG_PORT', its sidecar ('save', 'extend', 'close',
-'override-perspective') or a daemon answering in its '--out-dir'
+'perspective') or a daemon answering in its '--out-dir'
 folder, is refused before it connects to anything: it prints one line
 saying to name the server with '--port PORT' or 'SKG_PORT', and exits
 1. 'daemon' needs a port too. Commands that need no server run
@@ -496,8 +496,8 @@ flags, so a container not above it in this view); those forked
 ("forked N") and those forking ("forking M"); the links, their distinct targets, and how many
 of those resolve; and the server's errors and warnings, which the
 sidecar lists. A view shown from a perspective other than its root authors'
-('override-perspective') names it on the line after the first,
-'# Perspective: your overrides (each root author's overrides are the
+('perspective') names it on the line after the first,
+'# Showing your perspective (each root author's perspective is the
 default).'; a view shown from the default has no such line.
 
 Whether a skgrepo is owned or foreign comes from the server's 'repos'
@@ -519,17 +519,17 @@ nodes changed in foreign skgrepos), and how many headlines show a
 change, processed and not.
 ** The sidecar
 'BASE.view.json' records the view ID, the command and its request (for
-a buffer of the diff view, the buffer's name), the view's perspective,
-whose overrides it follows ('overrides_followed': "root authors", a
-fresh view's, "user" or "owner of NAME", after 'override-perspective';
+a buffer of the diff view, the buffer's name), the view's perspective
+('perspective': "root authors", a
+fresh view's, "user" or "owner of NAME", after 'perspective';
 and 'perspective_name', the server's name for it), the port, the two files' names, the server's errors and warnings, whether
 the compact view has a summary, and whether the view is closed: it
 is closed unless a daemon holds it (see "The daemon"). 'save' sends
 the edited view against this view ID, with the full view as its
-baseline, to this port, naming the perspective, '(overrides-followed . "user")' say, when
+baseline, to this port, naming the perspective, '(perspective . "user")' say, when
 the sidecar's is not the root authors',
 and renders the summary again when there was one. A save, a daemon's
-rewrite of the files and the daemon's stop keep 'overrides_followed';
+rewrite of the files and the daemon's stop keep 'perspective';
 a view written afresh into the same files has the default. A sidecar
 without it follows the root authors'.
 
@@ -571,7 +571,7 @@ overPrivateText ('docs/glossary.org'). Under a restriction the server
 asks before it releases such text: before a view ('view', 'forest'
 and the others), a save's re-rendered view, the rerender of the
 held views a new restriction asks for, or that of a view switched by
-'override-perspective', it names the telescopes and
+'perspective', it names the telescopes and
 withholds the text. '--show-overPrivateText' approves, and the tool
 sends the request again with their IDs (for a save, it asks for the
 withheld rerender instead; see "The server's answer"); without it, the tool prints
@@ -627,7 +627,7 @@ rebuilt) logs it and stops, since the server has forgotten its views.
 While a daemon runs for a port, every command for that port runs
 through it, whatever folder it writes into: a view command ('view',
 'search', 'forest', 'contains', 'links-here', 'diff', 'new'), and
-'save', 'extend', 'close' and 'override-perspective', whose port is their
+'save', 'extend', 'close' and 'perspective', whose port is their
 sidecar's, and
 'commit', but for 'commit --all' without '--yes'. A command's port is the one its '--port' or
 'SKG_PORT' names, or the sidecar's. A command that names no port and
@@ -744,8 +744,8 @@ lines is joined into one with ' | '. The events:
   real path joined to it elsewhere ('/home/me/notes/view_ID').
 - 'saved BASE', 'saved new root TITLE', 'extended BASE', for the
   commands that write to the graph; 'perspective of BASE: NAME' (the
-  server's name for it, 'your overrides', say) for
-  'override-perspective'.
+  server's name for it, 'your perspective', say) for
+  'perspective'.
 - 're-rendered BASE because CAUSE; CHANGES': the daemon rewrote a
   view's files. CAUSE is "of 'COMMAND' on the daemon's connection" for
   a collateral rerender or one after a 'commit' through the daemon,
@@ -997,15 +997,15 @@ without '--yes', shows the server's warning with it, and with
 daemon rewrites the view of the node that named it.
 
 Last, on an eighth server over a copy of the data of
-'tests/integration/overrides-followed/' (foreign R contains M and K;
+'tests/integration/perspective/' (foreign R contains M and K;
 A, foreign, U, owned, and B, of a second foreign owner "third", each
-fork M; P, owned, contains M), it checks 'override-perspective'.
+fork M; P, owned, contains M), it checks 'perspective'.
 On a command's own connection, the view of R shows A in M's place;
-'override-perspective' (the next) shows U, its summary line and its
+'perspective' (the next) shows U, its summary line and its
 sidecar saying so; a switch to 'user' is refused for P's view, whose
 root is owned, and any switch for R's once its compact view has an
 edit to U's body; the save of that edit names the perspective
-(without it the server would refuse U's '(overridesHere M)'), writing
+(without it the server would refuse U's '(inPlaceOf M)'), writing
 the body and still showing U; 'third' shows B; the next after it is
 the root authors' again, showing A. Through a daemon, the switch is
 logged; a save of U's own view retitles it, and the daemon's rewrite
@@ -1737,7 +1737,7 @@ round and its answer reads as it is.
 | C-c v b                    | skg-org-body-toggle                              | Emacs-only by nature                                                                                                                                          |
 | C-c v m                    | skg-view-metadata                                | Emacs-only by nature: the full view shows the metadata; its requests are handle words                                                                         |
 | C-c v a                    | skg-view-ancestry                                | Emacs-only by nature: the compact view's nesting                                                                                                              |
-| C-c v o                    | skg-override-perspective                         | 'override-perspective SIDECAR [PERSPECTIVE]'; the sidecar keeps the perspective, which each save names                                                        |
+| C-c v o                    | skg-cycle-perspective                            | 'perspective SIDECAR [PERSPECTIVE]'; the sidecar keeps the perspective, which each save names                                                                 |
 | C-c v d                    | skg-diffView-open                                | 'diff'                                                                                                                                                        |
 | C-c v e                    | skg-view-new-empty                               | 'new TITLE REPO'                                                                                                                                              |
 | C-c v h                    | skg-view-heralds-mode                            | needs nothing: the compact view shows heralds, the full view metadata                                                                                         |

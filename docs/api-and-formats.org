@@ -111,7 +111,7 @@ So far there are these endpoints:
       alias shows its folders, each collapsed except its alias
       folder, which shows all of the node's aliases, the matching one
       among them. Among hits that are mirrors of one another
-      (=docs/override.org=, "Mirrors"), the one the user's skgrepo
+      (=docs/mirrors.org=, "Mirrors"), the one the user's skgrepo
       list ranks first stands, ties going as that document's rules 1
       and 2 say and then to the least pid; if it is owned, every other
       hit among them is suppressed at the top level, and one it
@@ -168,7 +168,7 @@ So far there are these endpoints:
   - The requested node opens as itself, shown raw. Because the raw root
     is a node shown raw where another mirror could stand, its immediate children are also shown
     raw (one level); substitution resumes at the grandchildren. See
-    "Override substitution" below. Fork facts can be inspected in
+    "Mirror substitution" below. Fork facts can be inspected in
     the heralds (the K token).
 
 ** Close view
@@ -255,14 +255,14 @@ So far there are these endpoints:
       no buffer has refuses the save, and nothing is written. Both
       clients keep the name in each buffer of the diff view they open
       and send it on its saves, as skg-for-ai does.
-    - =(overrides-followed . "user"|"owner of SKGREPO")= is optional:
-      it names the perspective the saved buffer was drawn from, whose
-      overrides it follows, when that is not its root authors' (see
-      "Set overrides followed"). The save checks the buffer's
-      =(overridesHere N)= parts against, and rerenders it following,
-      the overrides it names, and the connection keeps the perspective
+    - =(perspective . "user"|"owner of SKGREPO")= is optional:
+      it names the perspective the saved buffer was drawn from,
+      when that is not its root authors' (see
+      "Set perspective"). The save checks the buffer's
+      =(inPlaceOf N)= parts against, and rerenders it from,
+      the perspective it names, and the connection keeps the perspective
       for the view, for the rerenders it starts itself. Without it, or
-      with =(overrides-followed . "root authors")=, the buffer follows
+      with =(perspective . "root authors")=, the buffer is drawn from
       its root authors'. A held view's earlier perspective yields to
       the one its save names, which is how a buffer the server lost in
       a restart regains it. Any other value, an owned or unknown
@@ -281,7 +281,7 @@ So far there are these endpoints:
       the errors that would refuse the save, worded as a
       save-result's, when it would be refused. A request the server
       refuses before reading its plan (a bad envelope, a bad
-      =overrides-followed=) is answered =save-preview= too. It asks no
+      =perspective=) is answered =save-preview= too. It asks no
       question, so a preview of a save that would fork, Hoist, ask
       about strandeds or about deletes says only what it would hide;
       it writes nothing, registers no view, rerenders none, and
@@ -538,7 +538,7 @@ So far there are these endpoints:
     every dirty client view, the server parses and unions
     dependencies from its clean baseline, current text, and registered viewforest
     when present. A dependency is a graphnode the view holds a viewnode of: an
-    occurrence, the original an occurrence's =(overridesHere N)= names, a gnid-only viewnode, a
+    occurrence, the original an occurrence's =(inPlaceOf N)= names, a gnid-only viewnode, a
     ghost, or an ID property member. A merge request's target and a link's
     target are not dependencies merely by being named there: the request or
     the link holds no copy of the target, so a save that changes the target
@@ -1405,13 +1405,13 @@ one automatically.
     =rerender-done=.
   - =server/serve/handlers/rerender_views.rs=.
 
-** Set overrides followed
-  - Request: =((request . "set overrides followed") (view-id .
-    "VIEW_ID") (overrides-followed . "next"|PERSPECTIVE)
+** Set perspective
+  - Request: =((request . "set perspective") (view-id .
+    "VIEW_ID") (perspective . "next"|PERSPECTIVE)
     (approved-overPrivateText-pids "PID" ...))=. =view-id= and
-    =overrides-followed= are required; the approval is optional.
+    =perspective= are required; the approval is optional.
   - Switches the open view's perspective: whose skgrepo list ranks the
-    mirrors it shows ("Override substitution and the overridesHere
+    mirrors it shows ("Mirror substitution and the inPlaceOf
     part" below). A
     PERSPECTIVE is ="root authors"=, as every fresh view shows (each
     top-level tree is drawn from the author of its root's); ="user"=, the
@@ -1431,7 +1431,7 @@ one automatically.
     are the user and the owners of the visible mirrors of each
     original drawn where substitution acts (a root, or a node standing
     as content of an editable occurrence; its original is its
-    =(overridesHere N)=, else itself), in the root authors' drawing
+    =(inPlaceOf N)=, else itself), in the root authors' drawing
     and in the view's own; so the cycle found from any perspective
     holds every member found from the root authors'. An owner whose
     mirrors stand only beneath a node another perspective puts in
@@ -1444,7 +1444,7 @@ one automatically.
     graph changed, or a save named it) is followed by the next one
     still in it, and the root authors' are always reached. A named
     PERSPECTIVE must be in the cycle ('perspective_to_show' in
-    =server/serve/handlers/overrides_followed.rs=). The cycle is never
+    =server/serve/handlers/perspective.rs=). The cycle is never
     drawn whole: a request draws the root authors' view, then, for
     ="next"=, the owners tried in rank order from the first ranked
     after the view's perspective, stopping at the first that draws the
@@ -1453,17 +1453,17 @@ one automatically.
     view once, and once more for each owner tried: twice where the
     first owner ranked after the view's perspective is in the cycle,
     once where none is ranked after it.
-  - Response: =((response-type overrides-followed) (view-id
-    "VIEW_ID") (overrides-followed PERSPECTIVE) (perspective-name
+  - Response: =((response-type perspective) (view-id
+    "VIEW_ID") (perspective PERSPECTIVE) (perspective-name
     "NAME"))=, naming the view, the perspective it now shows, and how
-    a message to the user names it: ="your overrides"=, ="tracy's
-    overrides"=, or ="each root author's overrides (tracy's,
+    a message to the user names it: ="your perspective"=, ="tracy's
+    perspective"=, or ="each root author's perspective (tracy's,
     yours)"=, the root authors named in the order of their first
     roots. A rerender stream (see "Rerender all views") of that one
     view follows. Each client records the perspective for the buffer
     when the answer arrives, names it to the user, marks it unless it
     is the root authors', and sends it on the buffer's saves ("Save
-    buffer", =overrides-followed=).
+    buffer", =perspective=).
   - Refusals carry the view's unchanged perspective, its name, and the
     reason in =(content "...")=, followed by an empty rerender stream,
     since the clients lock their buffers before sending the request: a
@@ -1479,10 +1479,10 @@ one automatically.
     before it sends the request.
   - Under a restricted set, overPrivateText content without exact
     approval returns LP =overPrivateText-telescope-confirmation= with
-    =(operation overrides-followed-switch)= and the exact PIDs,
+    =(operation perspective-switch)= and the exact PIDs,
     followed by an empty rerender stream, in place of the answer; the
     view keeps its choice. A retry with those PIDs is released.
-  - =server/serve/handlers/overrides_followed.rs=.
+  - =server/serve/handlers/perspective.rs=.
 
 ** skgrepo-sets
   - Skgrepo-sets are the prefixes of the config's privacy ladder, the
@@ -1937,7 +1937,7 @@ neither, and carries none.
 | mentioner-folder member          | =(linksTo out 2)=                             |
 | hidden-in-fork-partner member    | =(hides in 4) (contains in 2)=                |
 | hidden-outside member            | =(hides in 3)=                                |
-| mirror shown (overridesHere)     | =(forks out)= or =(forks in)=                                |
+| mirror shown (inPlaceOf)     | =(forks out)= or =(forks in)=                                |
 A member of an acquisition folder carries none: a nodeMerge is no
 relation. In a forks folder the relationship heralds tell the sides
 apart: a forkee shows =bK= (its viewparent's viewparent, 'b', forks
@@ -1961,9 +1961,9 @@ ugly herald "~NAME", shown immediately before the ⌂. A relationship
 recorded in a foreign skgrepo never carries it: a foreign skgrepo has
 no privacy rank, and only its own node records the relationship. It is recomputed
 at every rendering, and the save never reads it as a request, which
-is =(editRequest (relRepo NAME))=. And =(overridesHere N)=, crucial
+is =(editRequest (relRepo NAME))=. And =(inPlaceOf N)=, crucial
 =ĥ= immediately after the =K= token, is a load-bearing declared part,
-documented in "Override substitution and the overridesHere part"
+documented in "Mirror substitution and the inPlaceOf part"
 below.
 
 ** Node flags
@@ -1977,13 +1977,13 @@ therefore blocks direct title, alias, body, regexp, operator, and
 field-qualified matches, but is not an access-control boundary and does not
 remove graph context.
 
-** Override substitution and the overridesHere part
+** Mirror substitution and the inPlaceOf part
 
 Where a node N stands as content of an editable occurrence in a
 content view, the refresh shows instead the mirror of N that the
 perspective's skgrepo list ranks first, never in the diff view
 ('substitute_mirrors' in =server/refresh/visit.rs=;
-=docs/override.org=, "Mirror substitution", says what N's mirrors are
+=docs/mirrors.org=, "Mirror substitution", says what N's mirrors are
 and how a tie is broken). The mirrors of N are N and the notes joined
 to it by =forks= relationships, followed either way, under the
 skgrepo restriction; the list of an owner's perspective is that
@@ -2008,18 +2008,18 @@ the tree, beneath a third author's nodes too
 =server/dbs/in_rust_graph/mirrors.rs=). A view rooted at a foreign
 node shows what its author would see; the user's mirrors stand there
 only where the author's list ranks them first, until the view is
-switched to the user's perspective ("Set overrides followed"), after
+switched to the user's perspective ("Set perspective"), after
 which every tree is drawn from the user's, whoever wrote its root; or
 to a foreign owner's, after which every tree is drawn from that
 owner's. The owner need not own the mirror shown: where it has none
 of N, the first by declaration order stands, whoever wrote it.
 
-A root stands for its original: the node its =(overridesHere N)=
+A root stands for its original: the node its =(inPlaceOf N)=
 names, else itself. From the root authors' perspective it shows that
 original raw, so a fresh view, and a view switched back, shows the
 node asked for; and its author is the tree's root author. From one
 owner's perspective it shows the mirror of the original that owner's
-list ranks first, marked =(overridesHere N)= unless it is the
+list ranks first, marked =(inPlaceOf N)= unless it is the
 original ('substitute_roots' in =server/refresh/visit.rs=). The root is
 re-pointed where it stands, keeping its viewnode ID, so point on it
 stays there both ways; its children follow from its own visit. A
@@ -2033,8 +2033,8 @@ The buffer whose approved save creates a fork is the post-save exception. A
 root named by one of that save's exact =ForkSpec=s is rewritten from original F
 to clone K, and an existing recursive-content occurrence in the saved viewforest
 may likewise be replaced by its newly visible substitute. The content
-occurrence carries =(overridesHere F)=; the root carries nothing, since the
-view is re-rooted at K, and a root marked =(overridesHere F)= would be read
+occurrence carries =(inPlaceOf F)=; the root carries nothing, since the
+view is re-rooted at K, and a root marked =(inPlaceOf F)= would be read
 as a perspective's stand-in for F, which the root authors' show raw. The
 refreshed viewforest remains under the same view ID, and the open-view root
 index is recomputed from it, so that buffer is thereafter registered as
@@ -2054,7 +2054,7 @@ so a node whose only other mirror is invisible under the skgrepo
 restriction is shown raw too, and so are its children.
 
 A substituted viewnode carries the keyed form
-=(overridesHere N)= -- crucial =ĥ= immediately after =K= -- naming the original it
+=(inPlaceOf N)= -- crucial =ĥ= immediately after =K= -- naming the original it
 stands for. The part is load-bearing at save: wherever it
 appears, extraction collects N rather than the carrying node's own
 ID, so a container's contains list round-trips to the original
@@ -2435,7 +2435,7 @@ Every headline has one shape:
 The parts are of two classes. The declared parts are what the client
 is responsible for and the save reads: the kind, the viewnode ID, the
 position atoms, =(gnid ID)=, =(skgRepos ...)=, =noClaim=,
-=writeProtected=, =(overridesHere ID)=, =(viewRequests ...)= and
+=writeProtected=, =(inPlaceOf ID)=, =(viewRequests ...)= and
 =(editRequest ...)=. The derived facts are what the server computes
 at every rendering and nobody reads back: everything in =(view ...)=
 (see "Stats metadata: the view facts" above) and in =(diff ...)=
@@ -2448,7 +2448,7 @@ writes =(skg folded)= on a headline that has no metadata yet. Each kind
 takes only its own declared parts:
 #+begin_example
 node [(gnid ID)] [(skgRepos [(nodeRepo R)] [(relRepo R)])]
-     [noClaim] [writeProtected] [(overridesHere ID)]
+     [noClaim] [writeProtected] [(inPlaceOf ID)]
      [(editRequest [REQUEST] [PROCESSED])] [(viewRequests ...)]
      [(view ...)] [(diff ...)]
 ghost (gnid ID) (skgRepos (nodeRepo R)) [noClaim]

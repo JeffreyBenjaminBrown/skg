@@ -88,7 +88,7 @@ that leaves such a pair is still refused, so a save of the owned note
 succeeds only once it ends the pair.
 
 Any number of notes, owned or not, may fork one note, and forks may form
-cycles: mirror substitution ([[file:override.org][override.org]], "Mirror
+cycles: mirror substitution ([[file:mirrors.org][mirrors.org]], "Mirror
 substitution") ranks a note's mirrors and has no cycle case.
 
 Relationship roles are enforced by distinct Rust fields.  A node has exactly
@@ -476,13 +476,13 @@ text calls them the ladder):
    of a forks folder, all of which share the position after the last
    forkee: =Goal::keeps_the_views_order=);
 7. substitution: in a content view, under an editable occurrence, a
-   member is shown as the mirror shown for it, with =(overridesHere
+   member is shown as the mirror shown for it, with =(inPlaceOf
    N)=, except where P is itself shown raw where another mirror would
    stand (a root, or a member of a folder that is no forkee as such);
    when the original itself becomes the mirror shown, the
    carrier loses the part and the original is reinstated beside it
-   (=docs/api-and-formats.org=, "Override substitution and the
-   overridesHere part");
+   (=docs/api-and-formats.org=, "Mirror substitution and the
+   inPlaceOf part");
 8. requests: each child's view requests are fulfilled and dropped
    (=writeProtectedView=, =writeProtectedSubtreeView=, =(folder
    REL)=, =flags=); =fork= stays for the save. An edit request is carried through untouched unless the

@@ -169,7 +169,7 @@ refresh so:
   at HEAD, drawn as any content is;
 - the change viewnodes of each editable occurrence are recomputed in
   place (below), and each child is tagged with its change;
-- content is shown without override substitution: the view shows
+- content is shown without mirror substitution: the view shows
   raw graph facts;
 - no default folder is drawn; a folder appears where something
   changed, or where the buffer holds one;

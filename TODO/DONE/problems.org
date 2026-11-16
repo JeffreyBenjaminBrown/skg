@@ -1,3 +1,29 @@
+* Architecture note: "drawn in place of another node" is override-specific data (noted 2026-06-10; fixed 2026-11-16)
+  Fixed in every-mirror plan 1, slice 8: the part is '(inPlaceOf N)',
+  the field 'in_place_of' on the occurrence, named for what it says (a
+  viewnode drawn in place of another node), not for overrides. No reason
+  enum was added: mirror substitution is still its one consumer. The
+  entry as it stood:
+   Override substitution (TODO/DONE/full-schema/
+   11_override-rendering-and-navigation.org, executed 2026-06-11)
+   lets a viewnode stand in for a different graphnode than the one
+   whose ID it carries: the buffer draws overrider R where the
+   container's contains list says N. The representation is
+   'ViewNodeStats.overridesHere : Option<ID>' (and a parallel field
+   on 'InactiveNode', for substitutes a skgrepo-set switch retains),
+   carrying the original's ID -- data, not the earlier-planned
+   bool-plus-convention, which was rejected 2026-06-11 because
+   inverting the resolution at save time is ambiguous when one
+   overrider stands for two members of the same parent. Save
+   extraction, the content distinctness validators and the content
+   reconciler's orderkey all read it through 'collected_id ()'.
+
+   The name is override-specific. If a second substitution-like
+   feature ever appears (redirects, merge previews, etc.), do not
+   add a second marker field beside it; generalize this one (e.g.
+   rename to 'drawn_in_place_of', adding a reason enum if consumers
+   need distinguishing). Deferred until that second consumer exists
+   (Jeff, 2026-06-10).
 * String-typed relation lookups fail silently (noticed during the herald-colors renames, 2026-10-04; fixed 2026-11-16)
   Fixed in every-mirror plan 1, slice 5, when 'subscribesTo' and
   'overrides' became 'forks': 'find_related_nodes' now panics on an
