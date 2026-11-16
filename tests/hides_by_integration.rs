@@ -32,7 +32,7 @@
 //   instead hides nothing;
 // - d, kept by M alone and so drawing no containers folder, kept in y
 //   too and then removed from M: the saved view names y, as a fresh
-//   view does.
+//   view does; put back under M, it names none again.
 // One reads a view of x, foreign, instead: what x contains of M's
 // content is x's own, so M draws it neither as content nor in its
 // folder of what the user keeps elsewhere.
@@ -457,7 +457,9 @@ async fn a_move_from_an_indirect_member_into_an_owned_note_hides_nothing (
 /// is a view-ancestor. Another view puts d under y too; then M's view,
 /// drawn before that, removes d from M's content. The saved view
 /// draws d's containers folder, naming y, as a fresh view of M does,
-/// though d stood in the folder without one.
+/// though d stood in the folder without one. Put back under M, d is a
+/// repeat there again, and its containers folder goes, as a fresh
+/// view draws none.
 async fn a_member_standing_in_the_folder_names_its_new_keeper (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -478,6 +480,15 @@ async fn a_member_standing_in_the_folder_names_its_new_keeper (
                "d's containers folder names y:\n{}", saved );
   assert_eq! ( saved, view_of (config, tantivy, "M") ?,
                "the saved view is a fresh one" );
+  let again : String = save_cleanly (
+    &with_line_after_subtree_of (
+      &saved, "z", "** (skg node (gnid d) (skgRepos (nodeRepo theirs))) d" ),
+    "M", config, tantivy ) . await ?;
+  assert_eq! ( contains_of (config, "M") ?, ids (&["z", "d"]), "M contains d again" );
+  assert! ( members_of_folder_under (&again, "d", "containerFolder") . is_empty (),
+            "d, a repeat of M's own d again, names no keeper:\n{}", again );
+  assert_eq! ( again, view_of (config, tantivy, "M") ?,
+               "and that saved view is a fresh one too" );
   Ok (( )) }
 
 /// A view of x, foreign: M, a forker-only member of its forks folder,

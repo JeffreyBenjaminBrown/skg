@@ -2233,7 +2233,9 @@ in the buffer before gets the same folder at its visit
 when an editable-view request extends it (=C-c s e= on its note); in
 an integrated-elsewhere folder, whenever the folder would name a
 keeper, so that a member whose only keeper was a view-ancestor, given
-another by a save, names it as a fresh view does. A member drawn into
+another by a save, names it as a fresh view does; and a member there
+that has become a repeat loses its containers folder, as a fresh view
+draws none under a repeat. A member drawn into
 a compound folder or a containers folder that already stood, all its
 members folded, is drawn folded too, so that the folder stays
 collapsed ('stands_drawn_folded'). The chain is drawn

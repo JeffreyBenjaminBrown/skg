@@ -88,7 +88,7 @@ pub(crate) fn visit_parent (
 ) -> Result<(), Box<dyn Error>> {
   consume_editableView_request (tree, parent, walk);
   extend_requested_content (tree, parent, walk);
-  add_containers_folder_to_a_standing_member (tree, parent, walk);
+  add_containers_folder_to_a_standing_member (tree, parent, walk) ?;
   add_default_folders (tree, parent, walk);
   add_illegal_edit_folder (tree, parent, walk);
   add_hidden_outside_folder_to_forks_folder (tree, parent, walk);
@@ -876,26 +876,38 @@ pub(crate) fn add_containers_folder_under_member (
 ///   user keeps elsewhere, whenever its containers folder would name
 ///   a keeper ('names_a_container_outside_its_view_ancestors'): one
 ///   whose only keeper was a view-ancestor stood there with none, and
-///   a save can give it another.
+///   a save can give it another. Such a member that has become a
+///   repeat ('Walk::is_a_repeat': the note, say, contains it now)
+///   loses the containers folder it had, as a fresh view draws none
+///   there.
 /// Before the default folders, which place themselves around it.
 fn add_containers_folder_to_a_standing_member (
   tree   : &mut Tree<Viewnode>,
   member : NodeId,
   walk   : &mut Walk,
-) {
-  if walk . is_diff_view () { return; }
+) -> Result<(), Box<dyn Error>> {
+  if walk . is_diff_view () { return Ok (( )); }
   let folder : Option<Folder> =
     tree . get (member) . unwrap () . parent ()
     . and_then ( |parent| match &parent . value () . kind {
         ViewnodeKind::Folder (folder) => Some (folder . clone ()),
         _ => None, } );
-  let carries_one : bool = match folder {
-    Some (Folder::Forks) => carries_editableView_request (tree, member),
-    Some (Folder::IntegratedElsewhere) =>
-      names_a_container_outside_its_view_ancestors (tree, member, walk),
-    _ => false, };
-  if carries_one {
-    add_containers_folder_under_member (tree, member, walk); }}
+  match folder {
+    Some (Folder::Forks) => {
+      if carries_editableView_request (tree, member) {
+        add_containers_folder_under_member (tree, member, walk); }},
+    Some (Folder::IntegratedElsewhere) => {
+      let is_a_repeat : bool =
+        tree . get (member) . unwrap () . value () . occurrence_gnid ()
+        . is_some_and ( |gnid| walk . is_a_repeat (gnid, member) );
+      match child_folder (tree, member, &Folder::Container) {
+        Some (containers_folder) if is_a_repeat =>
+          vanish (tree, containers_folder, walk) ?,
+        None if names_a_container_outside_its_view_ancestors (tree, member, walk) =>
+          add_containers_folder_under_member (tree, member, walk),
+        _ => {}, }},
+    _ => {}, }
+  Ok (( )) }
 
 /// Whether a containers folder under the occurrence at 'member'
 /// would hold anything: a container of its node, by a record the
