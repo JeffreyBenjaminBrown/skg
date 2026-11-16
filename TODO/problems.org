@@ -6,6 +6,16 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* A buffer that shows a forker as claiming nothing can undo a fork another view made (2026-11-16)
+Found by every-mirror plan 1 slice 6 (its record, "Unfinished"). In
+the forks folder a member that claims nothing is a forker the note
+does not fork. If another view makes the note fork it (a mutual), and
+this buffer still shows it claiming nothing, the clients read it as a
+pending detachment, and saving this buffer stops the fork. Whether the
+collateral rerender reaches this buffer first in every case is not
+checked. Related: a forker that no longer forks the note stays in the
+folder, marked unwarranted, when a content node is re-pointed to
+another mirror and keeps its old forks folder.
 * A headline typed under an editable subscribee as such is created, then lost (2026-11-16)
 Found while planning 'TODO/every-mirror/2_plan.org' (its Q2), by
 reading the code, not yet by a probe. Under a subscribee shown
