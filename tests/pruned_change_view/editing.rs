@@ -211,11 +211,13 @@ fn register_content_view_of (
   Ok (text) }
 
 /// The diff view shows the graph as stored: a member that a
-/// mirror would stand in place of in an ordinary view is shown as itself.
+/// mirror would stand in place of in an ordinary view is shown as
+/// itself. p and r, which forks n, are in "main"; n is in "base", so
+/// an ordinary view of p, drawn from "main", shows r in n's place.
 #[test]
 fn mirror_substitution_is_off (
 ) -> Result<(), Box<dyn Error>> {
-  with_fixture ("mirrors", &["main"], |f| {
+  with_fixture ("mirrors", &["main", "base"], |f| {
     let (ordinary_view, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from ("p") ] ) ?;
     assert! ( ordinary_view . contains ("(inPlaceOf n)"),

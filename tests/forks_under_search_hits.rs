@@ -8,8 +8,9 @@
 // "main" holds U, which forks foreign F, which forks foreign G;
 // foreign M1 and M2 mutually fork; foreign B forks foreign E; foreign
 // D forks "gone", which no file defines; owned O1 and O2 mutually
-// fork. The config marks "foreign" with 'foreign = true'; "main"
-// is owned.
+// fork; Priv, in owned "private", forks Pub, in "main". The config
+// marks "foreign" with 'foreign = true'; "main" and "private" are
+// owned, "main" the more public, being declared first.
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -50,6 +51,8 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
       suppression_anchors_at_owned (
         &graph, &s . config, &restriction ) ?;
       an_owned_mutual_pair_both_matching_shows_one_hit (
+        &graph, &s . config, &restriction ) ?;
+      among_owned_hits_the_more_public_stands (
         &graph, &s . config, &restriction ) ?;
       a_hit_shows_the_nodes_it_forks_in_a_folder (
         &graph, &s . config, &restriction ) ?;
@@ -118,7 +121,8 @@ fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
   Ok (( )) }
 
 /// Among hits that are mirrors of one another, every one but the hit
-/// the user's skgrepo list ranks first is suppressed, if that one is
+/// the user's own skgrepo list (the first owned skgrepo, then
+/// declaration order) ranks first is suppressed, if that one is
 /// owned: owned U suppresses F and G, its mirrors. Where the hit
 /// ranked first is foreign, nothing is: the foreign mutual pair M1 and
 /// M2, and E with its foreign fork B, all stay.
@@ -164,6 +168,25 @@ fn an_owned_mutual_pair_both_matching_shows_one_hit (
     suppressed_result_gnids ( &matches, &graph, config, restriction );
   assert_eq! ( suppressed, HashSet::from ([ ID::from ("O2") ]),
                "one of the owned mutual pair is shown, O1" );
+  Ok (( )) }
+
+/// Two owned hits, mirrors of one another: Priv, in "private", forks
+/// Pub, in "main". The user's own list ranks "main", the first owned
+/// skgrepo declared and so the more public, first, so Pub stands and
+/// Priv is suppressed.
+fn among_owned_hits_the_more_public_stands (
+  graph  : &InRustGraph,
+  config : &SkgConfig,
+  restriction : &SkgrepoRestriction,
+) -> Result<(), Box<dyn Error>> {
+  let matches : MatchGroups = [
+    hit ("Priv", "private", "the private one"),
+    hit ("Pub",  "main",    "the public one"),
+  ] . into_iter () . collect ();
+  let suppressed : HashSet<ID> =
+    suppressed_result_gnids ( &matches, &graph, config, restriction );
+  assert_eq! ( suppressed, HashSet::from ([ ID::from ("Priv") ]),
+               "the public Pub stands; the private Priv is suppressed" );
   Ok (( )) }
 
 /// U forks F, which forks G, and nothing forks U.

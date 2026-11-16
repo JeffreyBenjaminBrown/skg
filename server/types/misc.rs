@@ -740,25 +740,30 @@ impl SkgConfig {
       . filter ( |name| self . skgrepo_is_owned (name) )
       . collect () }
 
-  /// The skgrepo list of 'owner''s perspective, by which mirror
+  /// The skgrepo list of the perspective of 'skgrepo', by which mirror
   /// substitution ranks a note's mirrors
-  /// ('server/dbs/in_rust_graph/mirrors.rs'): the skgrepos 'owner'
-  /// owns ('skgrepo_owner'), most private first (the reverse of their
-  /// fold order, which for the user's is the privacy ladder and for a
-  /// foreign owner's is what its manifests say), then every other
-  /// skgrepo in declaration order.
+  /// ('server/dbs/in_rust_graph/mirrors.rs'): 'skgrepo', then every
+  /// other skgrepo in declaration order, whose owned entries run most
+  /// public first.
   pub fn perspective_skgrepo_list (
     &self,
-    owner : &SkgrepoOwner,
+    skgrepo : &SkgrepoName,
   ) -> Vec<SkgrepoName> {
-    let (owners, others) : (Vec<SkgrepoName>, Vec<SkgrepoName>) = (
-      self . ordered_skgrepos () . into_iter ()
-        . filter ( |name| &self . skgrepo_owner (name) == owner )
-        . rev () . collect (),
-      self . skgrepos_in_declaration_order () . into_iter ()
-        . filter ( |name| &self . skgrepo_owner (name) != owner )
-        . collect () );
-    owners . into_iter () . chain (others) . collect () }
+    std::iter::once ( skgrepo . clone () )
+      . chain ( self . skgrepos_in_declaration_order () . into_iter ()
+                . filter ( |name| name != skgrepo ) )
+      . collect () }
+
+  /// The skgrepo whose perspective stands where nothing names one: the
+  /// first owned skgrepo in declaration order (the most public), else
+  /// the first skgrepo declared, else none (an empty name, holding
+  /// nothing).
+  pub fn default_perspective_skgrepo (
+    &self,
+  ) -> SkgrepoName {
+    self . first_owned_skgrepo_in_config_order ()
+      . or_else ( || self . skgrepos_in_declaration_order () . into_iter () . next () )
+      . unwrap_or_default () }
 
   /// Record what the foreign manifests say ('ForeignManifestOrder'),
   /// and the fold order of the foreign skgrepos that follows.

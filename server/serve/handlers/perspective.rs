@@ -20,7 +20,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::mirrors::{
-  Mirror, mirrors_of, perspective_owner_of_tree_containing};
+  Mirror, mirrors_of, perspective_skgrepo_of_tree_containing};
 use crate::org_to_text::viewforest_to_string;
 use crate::rerender_pass::{
   DiffViewBufferRerender, RerenderMode, RerenderPassContext, RerenderedView,
@@ -37,7 +37,7 @@ use crate::serve::util::{
 use crate::sexp_string::quote_sexp_string;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::misc::{ID, SkgConfig, SkgrepoOwner};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode, Warrant};
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::{Perspective, ViewState, ViewforestId, ViewnodeIdRecord};
@@ -47,9 +47,9 @@ use std::net::TcpStream;
 use std::str::Chars;
 use std::sync::Arc;
 
-/// How a message names the root authors' perspective where its
-/// authors go unnamed ('perspective_name').
-const ROOT_AUTHORS_UNNAMED : &str = "each root author's perspective";
+/// How a message names the root homes' perspective where its
+/// skgrepos go unnamed ('perspective_name').
+const ROOT_HOMES_UNNAMED : &str = "the perspective of each root's home skgrepo";
 
 /// What a "set perspective" request asks for.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -75,7 +75,7 @@ pub fn handle_set_perspective_request (
       Err (_) => {
         refuse_unwinding (
           stream, "", &Perspective::default (),
-          ROOT_AUTHORS_UNNAMED,
+          ROOT_HOMES_UNNAMED,
           "The request names no view ('view-id')." );
         return; }};
   let current : Perspective =
@@ -90,7 +90,7 @@ pub fn handle_set_perspective_request (
         let current_name : String = views_state . open_views . views
           . get (&viewforest_id)
           . map ( |state| perspective_name (&current, state, &runtime) )
-          . unwrap_or_else ( || ROOT_AUTHORS_UNNAMED . to_string () );
+          . unwrap_or_else ( || ROOT_HOMES_UNNAMED . to_string () );
         refuse_unwinding (
           stream, &viewforest_id . repr_in_client (), &current,
           &current_name, &reason );
@@ -128,7 +128,7 @@ pub fn requested_perspective (
   Perspective::from_wire_name (&name, config)
     . map (RequestedPerspective::Named)
     . ok_or_else ( || format! (
-      "'perspective' must be \"next\", \"root authors\", \"user\" or \"owner of SKGREPO\" (a foreign skgrepo), not {:?}.",
+      "'perspective' must be \"next\", \"root homes\" or \"skgrepo SKGREPO\" (a skgrepo the config lists), not {:?}.",
       name )) }
 
 /// The perspective the view 'viewforest_id', now showing 'current',
@@ -136,18 +136,18 @@ pub fn requested_perspective (
 /// why it cannot be switched: the connection does not hold it; it is a
 /// buffer of the diff view (which substitutes no mirrors); "next"
 /// finds no perspective but the one shown; or a named perspective is
-/// not in the view's cycle. The root authors' is always in the cycle,
+/// not in the view's cycle. The root homes' is always in the cycle,
 /// so the way back is never refused.
 ///
-/// The view's cycle of perspectives is the root authors', then each
-/// owner whose perspective draws the view otherwise than the root
-/// authors' do, in the order 'perspective_rank' gives. Each owner is
+/// The view's cycle of perspectives is the root homes', then each
+/// skgrepo whose perspective draws the view otherwise than the root
+/// homes' does, in the order 'perspective_rank' gives. Each skgrepo is
 /// judged by drawing the view from it, from what the connection holds,
-/// and comparing the text with the root authors' drawing
+/// and comparing the text with the root homes' drawing
 /// ('view_drawn_from'), so a perspective that would change nothing is
-/// left out exactly. The owners tried are those 'candidate_owners'
-/// finds in the root authors' drawing and in the view's own, so that a
-/// member found from the root authors' is found from every
+/// left out exactly. The skgrepos tried are those 'candidate_skgrepos'
+/// finds in the root homes' drawing and in the view's own, so that a
+/// member found from the root homes' is found from every
 /// perspective, whichever path led there. The cycle is never drawn
 /// whole: "next" draws candidates in rank order, from the first ranked
 /// after 'current', and stops at the first that is in the cycle
@@ -170,34 +170,36 @@ fn perspective_to_show (
     return Err ( "The diff view shows no mirror in place of another, so it has no perspective." . to_string () ); }
   let draw = |perspective : &Perspective| -> Result<RerenderedView, String> {
     view_drawn_from (perspective, viewforest_id, state, env, runtime, restriction) };
-  let root_authors : RerenderedView = draw (&Perspective::RootAuthors) ?;
-  let mut candidates : Vec<SkgrepoOwner> =
-    candidate_owners (&root_authors . viewforest, &runtime . config, &runtime . graph, restriction);
-  for owner in candidate_owners (&state . viewforest, &runtime . config, &runtime . graph, restriction) {
-    if ! candidates . contains (&owner) { candidates . push (owner); }}
+  let root_homes : RerenderedView = draw (&Perspective::RootHomes) ?;
+  let mut candidates : Vec<SkgrepoName> =
+    candidate_skgrepos (&root_homes . viewforest, &runtime . graph, restriction);
+  for skgrepo in candidate_skgrepos (&state . viewforest, &runtime . graph, restriction) {
+    if ! candidates . contains (&skgrepo) { candidates . push (skgrepo); }}
   let candidates : Vec<Perspective> =
-    candidates . into_iter () . map (Perspective::Owner) . collect ();
+    candidates . into_iter () . map (Perspective::Skgrepo) . collect ();
   let in_the_cycle = |perspective : &Perspective|
     -> Result<Option<RerenderedView>, String> {
     let drawn : RerenderedView = draw (perspective) ?;
-    Ok ( ( drawn . text != root_authors . text ) . then_some (drawn) ) };
+    Ok ( ( drawn . text != root_homes . text ) . then_some (drawn) ) };
   match requested {
     RequestedPerspective::Next =>
       match first_ranked_after (current, candidates, &runtime . config, in_the_cycle) ? {
         Some (next) => Ok (next),
-        None if *current == Perspective::RootAuthors =>
-          Err ( "No other perspective would show this buffer differently from its root authors'." . to_string () ),
-        None => Ok (( Perspective::RootAuthors, root_authors )), },
-    RequestedPerspective::Named (Perspective::RootAuthors) =>
-      Ok (( Perspective::RootAuthors, root_authors )),
+        None if *current == Perspective::RootHomes =>
+          Err ( format! ( "No other perspective would show this buffer differently from {}.",
+                          ROOT_HOMES_UNNAMED )),
+        None => Ok (( Perspective::RootHomes, root_homes )), },
+    RequestedPerspective::Named (Perspective::RootHomes) =>
+      Ok (( Perspective::RootHomes, root_homes )),
     RequestedPerspective::Named (named) => {
       let drawn : Option<RerenderedView> =
         if candidates . contains (&named) { in_the_cycle (&named) ? } else { None };
       match drawn {
         Some (drawn) => Ok (( named, drawn )),
         None => Err ( format! (
-          "{} would show this buffer as its root authors' do, so it is not one of its perspectives.",
-          capitalized ( &perspective_name (&named, state, runtime) ))), }}, }}
+          "{} would show this buffer as {} does, so it is not one of its perspectives.",
+          capitalized ( &perspective_name (&named, state, runtime) ),
+          ROOT_HOMES_UNNAMED )), }}, }}
 
 /// The view 'state', 'viewforest_id', drawn from 'perspective', in
 /// memory, from what the connection holds for it, exactly as its
@@ -224,31 +226,28 @@ fn view_drawn_from (
   Ok ( RerenderedView { viewforest_id : viewforest_id . clone (),
                         text, viewforest, viewnode_id_record } ) }
 
-/// The owners whose perspective might draw 'forest' otherwise than
-/// the root authors' do: the user, and the owner of each visible
-/// mirror of each original 'forest' draws at a position where
-/// substitution acts ('substitute_mirrors' and 'substitute_roots'
-/// in 'server/refresh/visit.rs'). An owner with no mirror of any such
+/// The skgrepos whose perspective might draw 'forest' otherwise than
+/// the root homes' does: the home of each visible mirror of each
+/// original 'forest' draws at a position where substitution acts
+/// ('substitute_mirrors' and 'substitute_roots' in
+/// 'server/refresh/visit.rs'). A skgrepo with no mirror of any such
 /// original ranks each one's mirrors by declaration order alone; its
 /// perspective is not offered, since it mostly draws what a candidate
-/// does (the user's, where the user has no mirror). A position drawn only
-/// beneath a node another perspective puts in place is not read, so
-/// an owner whose mirrors stand only there is found from that
-/// perspective.
-fn candidate_owners (
+/// does. A position drawn only beneath a node another perspective puts
+/// in place is not read, so a skgrepo whose mirrors stand only there
+/// is found from that perspective.
+fn candidate_skgrepos (
   forest      : &ViewForest,
-  config      : &SkgConfig,
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
-) -> Vec<SkgrepoOwner> {
-  let mut owners : Vec<SkgrepoOwner> = vec! [ SkgrepoOwner::User ];
+) -> Vec<SkgrepoName> {
+  let mut skgrepos : Vec<SkgrepoName> = Vec::new ();
   for node in forest . nodes () {
     let Some (original) : Option<ID> = original_at_substitution_position (graph, node)
       else { continue; };
     for Mirror { home, .. } in mirrors_of (graph, restriction, &original) . members {
-      let owner : SkgrepoOwner = config . skgrepo_owner (&home);
-      if ! owners . contains (&owner) { owners . push (owner); }} }
-  owners }
+      if ! skgrepos . contains (&home) { skgrepos . push (home); }} }
+  skgrepos }
 
 /// The original a substitution at 'node' would stand for, if 'node'
 /// is a position where substitution acts: an occurrence that is a
@@ -269,30 +268,28 @@ fn original_at_substitution_position (
     None => ( at_a_root || occurrence . viewStats . warrant == Warrant::ByGraph )
       . then ( || graph . pid_else_raw_id (&occurrence . gnid) ), }}
 
-/// Where 'perspective' stands in every cycle: the root authors' first,
-/// then the user's, then each foreign owner's in the declaration order
-/// of the skgrepo that names it. Every cycle is ordered so, so the
-/// perspective after one is well defined even when the cycle changes
-/// between requests.
+/// Where 'perspective' stands in every cycle: the root homes' first,
+/// then each skgrepo's in declaration order. Every cycle is ordered
+/// so, so the perspective after one is well defined even when the
+/// cycle changes between requests.
 fn perspective_rank (
   perspective : &Perspective,
   config      : &SkgConfig,
 ) -> usize {
   match perspective {
-    Perspective::RootAuthors => 0,
-    Perspective::Owner (SkgrepoOwner::User) => 1,
-    Perspective::Owner (SkgrepoOwner::Foreign (name)) =>
-      2 + config . skgrepos_in_declaration_order () . iter ()
-        . position ( |declared| declared == name )
-        . unwrap_or (usize::MAX - 2), }}
+    Perspective::RootHomes => 0,
+    Perspective::Skgrepo (skgrepo) =>
+      1 + config . skgrepos_in_declaration_order () . iter ()
+        . position ( |declared| declared == skgrepo )
+        . unwrap_or (usize::MAX - 1), }}
 
 /// The perspective after 'current' in the cycle, if it is not the
-/// root authors': the first of 'candidates' ranked after 'current'
+/// root homes': the first of 'candidates' ranked after 'current'
 /// ('perspective_rank') that 'in_the_cycle' admits, with what it
 /// returned (the view drawn from it). Candidates are tried in rank
 /// order, and none after the first admitted, so a press draws only
 /// the candidates between 'current' and the next. None means the next
-/// wraps to the root authors'. Since the cycle is computed afresh at
+/// wraps to the root homes'. Since the cycle is computed afresh at
 /// each request, 'current' may have left it; the next is then still
 /// the first member ranked after it.
 pub fn first_ranked_after<T> (
@@ -312,31 +309,32 @@ pub fn first_ranked_after<T> (
   Ok (None) }
 
 /// How a message to the user names 'perspective' in the view 'state':
-/// "your perspective", "NAME's perspective", or "each root author's
-/// perspective" with the root authors named, in the order of their
-/// first roots ("each root author's perspective (NAME's, yours)").
+/// "the perspective of LABEL" ('Perspective::name_of_skgrepos_perspective'),
+/// or "the perspective of each root's home skgrepo" with those
+/// skgrepos named, in the order of their first roots ("the perspective
+/// of each root's home skgrepo (tracy, main)").
 pub fn perspective_name (
   perspective : &Perspective,
   state       : &ViewState,
   runtime     : &RuntimeGeneration,
 ) -> String {
   match perspective {
-    Perspective::Owner (owner) =>
-      Perspective::name_of_owners_perspective (owner),
-    Perspective::RootAuthors => {
-      let mut authors : Vec<SkgrepoOwner> = Vec::new ();
+    Perspective::Skgrepo (skgrepo) =>
+      Perspective::name_of_skgrepos_perspective (skgrepo, &runtime . config),
+    Perspective::RootHomes => {
+      let mut homes : Vec<SkgrepoName> = Vec::new ();
       for root in state . viewforest . roots () {
-        let author : SkgrepoOwner = perspective_owner_of_tree_containing (
+        let home : SkgrepoName = perspective_skgrepo_of_tree_containing (
           &runtime . config, &runtime . graph,
-          &Perspective::RootAuthors, root );
-        if ! authors . contains (&author) { authors . push (author); }}
-      let names : Vec<String> = authors . iter ()
-        . map ( |author| match author {
-          SkgrepoOwner::User => "yours" . to_string (),
-          SkgrepoOwner::Foreign (name) => format! ("{}'s", name . 0), } )
+          &Perspective::RootHomes, root );
+        if ! homes . contains (&home) { homes . push (home); }}
+      let labels : Vec<String> = homes . iter ()
+        . map ( |home| runtime . config . skgrepos . get (home)
+                . map ( |configured| configured . herald_label () . to_string () )
+                . unwrap_or_else ( || home . 0 . clone () ))
         . collect ();
-      if names . is_empty () { ROOT_AUTHORS_UNNAMED . to_string () }
-      else { format! ( "{} ({})", ROOT_AUTHORS_UNNAMED, names . join (", ") ) }}, }}
+      if labels . is_empty () { ROOT_HOMES_UNNAMED . to_string () }
+      else { format! ( "{} ({})", ROOT_HOMES_UNNAMED, labels . join (", ") ) }}, }}
 
 fn capitalized (
   text : &str,
@@ -384,19 +382,18 @@ fn send_perspective_response (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::types::misc::SkgrepoName;
   use std::collections::HashMap;
 
-  fn foreign (
+  fn skgrepo (
     name : &str,
   ) -> Perspective {
-    Perspective::Owner ( SkgrepoOwner::Foreign ( SkgrepoName::from (name) )) }
+    Perspective::Skgrepo ( SkgrepoName::from (name) ) }
 
   /// The next perspective is the first in the cycle ranked after the
-  /// current one, wrapping to the root authors'. A current perspective
+  /// current one, wrapping to the root homes'. A current perspective
   /// that has left the cycle (it would now show nothing differently)
   /// is followed by the first member ranked after it, so no member is
-  /// skipped and the root authors' are always reached. Only the
+  /// skipped and the root homes' is always reached. Only the
   /// candidates from the current one's rank up to the next are tried,
   /// whatever order they come in.
   #[test]
@@ -405,7 +402,7 @@ mod tests {
     config . skgrepo_order = [ "main", "alice", "bob", "carol" ] . iter ()
       . map ( |name| SkgrepoName::from (*name) ) . collect ();
     let candidates : Vec<Perspective> = vec! [
-      foreign ("carol"), foreign ("bob"), Perspective::user (), foreign ("alice") ];
+      skgrepo ("carol"), skgrepo ("bob"), skgrepo ("main"), skgrepo ("alice") ];
     let next = |current : &Perspective, cycle : &[Perspective]|
       -> (Perspective, Vec<Perspective>) {
       let mut tried : Vec<Perspective> = Vec::new ();
@@ -414,26 +411,26 @@ mod tests {
         |candidate| { tried . push ( candidate . clone () );
                       Ok ( cycle . contains (candidate) . then_some (()) ) } )
         . unwrap ();
-      ( found . map ( |(next, ())| next ) . unwrap_or (Perspective::RootAuthors),
+      ( found . map ( |(next, ())| next ) . unwrap_or (Perspective::RootHomes),
         tried ) };
     let cycle : Vec<Perspective> = vec! [
-      Perspective::RootAuthors, Perspective::user (),
-      foreign ("alice"), foreign ("carol") ];
-    assert_eq! ( next (&Perspective::RootAuthors, &cycle),
-                 ( Perspective::user (), vec! [ Perspective::user () ] ),
+      Perspective::RootHomes, skgrepo ("main"),
+      skgrepo ("alice"), skgrepo ("carol") ];
+    assert_eq! ( next (&Perspective::RootHomes, &cycle),
+                 ( skgrepo ("main"), vec! [ skgrepo ("main") ] ),
                  "only the next is drawn" );
-    assert_eq! ( next (&Perspective::user (), &cycle) . 0, foreign ("alice") );
-    assert_eq! ( next (&foreign ("carol"), &cycle),
-                 ( Perspective::RootAuthors, vec! [] ),
+    assert_eq! ( next (&skgrepo ("main"), &cycle) . 0, skgrepo ("alice") );
+    assert_eq! ( next (&skgrepo ("carol"), &cycle),
+                 ( Perspective::RootHomes, vec! [] ),
                  "nothing is ranked after the last; nothing is drawn" );
-    assert_eq! ( next (&foreign ("alice"), &cycle),
-                 ( foreign ("carol"), vec! [ foreign ("bob"), foreign ("carol") ] ),
+    assert_eq! ( next (&skgrepo ("alice"), &cycle),
+                 ( skgrepo ("carol"), vec! [ skgrepo ("bob"), skgrepo ("carol") ] ),
                  "bob, not in the cycle, is drawn and passed over" );
-    assert_eq! ( next (&foreign ("bob"), &cycle) . 0,
-                 foreign ("carol"), "bob left the cycle; carol is ranked after him" );
-    assert_eq! ( next (&foreign ("bob"), &cycle [..2]) . 0,
-                 Perspective::RootAuthors );
-    assert_eq! ( next (&Perspective::RootAuthors, &[ Perspective::RootAuthors ]) . 0,
-                 Perspective::RootAuthors,
+    assert_eq! ( next (&skgrepo ("bob"), &cycle) . 0,
+                 skgrepo ("carol"), "bob left the cycle; carol is ranked after it" );
+    assert_eq! ( next (&skgrepo ("bob"), &cycle [..2]) . 0,
+                 Perspective::RootHomes );
+    assert_eq! ( next (&Perspective::RootHomes, &[ Perspective::RootHomes ]) . 0,
+                 Perspective::RootHomes,
                  "a cycle of one leads nowhere; the request is refused" ); }
 }

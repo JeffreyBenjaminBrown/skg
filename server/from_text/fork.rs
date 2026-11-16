@@ -12,13 +12,13 @@
 
 use crate::dbs::in_rust_graph::mirrors::{
   MIRROR_RELATION, Mirror, Mirrors, mirror_shown_among, mirrors_of,
-  perspective_owner_of_tree_containing};
+  perspective_skgrepo_of_tree_containing};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::org_to_text::skgRepos_form;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName, SkgrepoOwner, members_of, rel_partners_at_relRepo};
+use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
   Flag, Graphnode, flag_is_true};
 use crate::types::save::{ForkSpec, SaveNode};
@@ -470,14 +470,20 @@ pub fn build_fork_clone (
   }}
 
 /// One warning per fork the saved view will go on hiding: a fork of a
-/// node edited, below a root, in a tree whose perspective
-/// ('perspective_owner_of_tree_containing') will show another mirror
-/// of it than the clone ('mirror_shown_once_cloned'), as a view rooted
-/// at another's note does unless switched to the user's perspective.
-/// There the rerender draws that mirror, without the edit, so without
-/// a word the edit would seem lost: the clone is in the user's
-/// skgrepo, and no note contains it. (A fork of a root re-roots the
-/// view at the clone, so it shows.)
+/// node edited in a tree whose perspective
+/// ('perspective_skgrepo_of_tree_containing') will show another mirror
+/// of it than the clone ('mirror_shown_once_cloned'), as a view drawn
+/// from a skgrepo other than the clone's does where that skgrepo, or
+/// one declared before the clone's, holds a mirror. There the rerender
+/// draws that mirror, without the edit, so without a word the edit
+/// would seem lost: the clone is in the user's skgrepo, and no note
+/// contains it. A fork of a root re-roots the view at the clone
+/// ('replace_saved_view_fork_roots'), so under the root homes it
+/// shows; a view switched to a skgrepo substitutes it like any root.
+/// The warning says how to see the fork: the perspective of its own
+/// skgrepo, if that shows it; else none does, since that skgrepo holds
+/// another mirror that stands there (the original itself, when the
+/// fork is cloned into the original's skgrepo).
 pub fn forks_the_view_will_not_show (
   viewforest         : &ViewForest,
   graph              : &InRustGraph,
@@ -495,37 +501,51 @@ pub fn forks_the_view_will_not_show (
     let Some (edited) : Option<NodeRef<Viewnode>> = edited else { continue; };
     let is_root : bool = edited . parent () . is_some_and ( |parent|
       matches! ( parent . value () . kind, ViewnodeKind::BufferRoot ));
-    if is_root { continue; }
-    let owner : SkgrepoOwner = perspective_owner_of_tree_containing (
+    if is_root && *perspective == Perspective::RootHomes {
+      continue; } // the re-rooted view stands in the clone's home, so shows it
+    let skgrepo : SkgrepoName = perspective_skgrepo_of_tree_containing (
       config, graph, perspective, edited );
-    let shown : ID = mirror_shown_once_cloned (config, graph, restriction, &owner, spec);
+    let stands_for : &ID = // a re-rooted root stands for the clone itself
+      if is_root { &spec . clone . 0 . pid } else { &spec . original_gnid };
+    let shown : ID = mirror_shown_once_cloned (
+      config, graph, restriction, &skgrepo, stands_for, spec );
     if shown == spec . clone . 0 . pid { continue; }
-    let perspective_named : String = match &owner {
-      SkgrepoOwner::User => "your perspective" . to_string (),
-      SkgrepoOwner::Foreign (name) =>
-        format! ("the perspective of the owner of '{}'", name . 0), };
     let what_it_shows : String =
       if shown == spec . original_gnid { "the original" . to_string () }
       else { format! ( "'{}', another of its mirrors",
                        graph . nodes . get (&shown)
                        . map ( |node| node . title . clone () )
                        . unwrap_or_else ( || shown . 0 . clone () )) };
+    let shown_from_the_clones_home : bool =
+      mirror_shown_once_cloned (
+        config, graph, restriction, &spec . clone . 0 . home_skgrepo,
+        stands_for, spec )
+      == spec . clone . 0 . pid;
+    let how_to_see_it : &str =
+      if shown_from_the_clones_home {
+        "To see your fork, switch the view's perspective (C-c v o)." }
+      else { "No perspective shows your fork there: its skgrepo holds \
+              another of the mirrors, which stands there. It stands in \
+              the forks folder of what is shown." };
     warnings . push ( format! (
       "Your edit of '{}' forked it into your skgrepo '{}', but this view \
        is drawn there from {}, so it goes on showing {} there, without \
-       your edit. To see your fork, switch the view's perspective (C-c v o).",
-      spec . original_title, spec . clone . 0 . home_skgrepo, perspective_named,
-      what_it_shows )); }
+       your edit. {}",
+      spec . original_title, spec . clone . 0 . home_skgrepo,
+      Perspective::name_of_skgrepos_perspective (&skgrepo, config),
+      what_it_shows, how_to_see_it )); }
   warnings }
 
-/// The mirror 'owner''s perspective will show in place of the original
-/// 'spec' forks, once the clone is saved: the original's mirrors, and
-/// the clone, which forks it.
+/// The mirror the perspective of 'skgrepo' will show, once the clone
+/// is saved, where 'stands_for' (the original 'spec' forks, or the
+/// clone) stood: among the original's mirrors, and the clone, which
+/// forks it.
 fn mirror_shown_once_cloned (
   config      : &SkgConfig,
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
-  owner       : &SkgrepoOwner,
+  skgrepo     : &SkgrepoName,
+  stands_for  : &ID,
   spec        : &ForkSpec,
 ) -> ID {
   let clone : &Graphnode = &spec . clone . 0;
@@ -533,7 +553,7 @@ fn mirror_shown_once_cloned (
   mirrors . members . push ( Mirror {
     pid : clone . pid . clone (), home : clone . home_skgrepo . clone (), distance : 1 } );
   mirrors . forks . insert (( clone . pid . clone (), spec . original_gnid . clone () ));
-  mirror_shown_among (config, owner, &spec . original_gnid, &mirrors) }
+  mirror_shown_among (config, skgrepo, stands_for, &mirrors) }
 
 #[cfg(test)]
 #[allow(non_snake_case)]

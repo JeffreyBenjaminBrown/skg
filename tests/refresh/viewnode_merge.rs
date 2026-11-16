@@ -211,7 +211,7 @@ fn the_merged_siblings_relationship_request_is_carried () {
   assert_eq! ( occurrence . relationshipEditRequest,
                Some ( RelationshipEditRequest::RelRepo ( SkgrepoName::from ("private") )) ); }
 
-/// p contains n, which o forks. Under p, o stands for n
+/// p contains n, in 'private', which o forks. Under p, o stands for n
 /// ('inPlaceOf'), write-protected, and beside it n itself is
 /// editable: the two stand for one gnid, so they merge into o's place.
 fn a_mirror_beside_its_editable_original (
@@ -223,12 +223,12 @@ fn a_mirror_beside_its_editable_original (
     ** {} n
     ", first_roots, occurrence_metadata ("p", ""),
        occurrence_metadata ("o", "writeProtected (inPlaceOf n)"),
-       occurrence_metadata ("n", "noClaim") ) }
+       occurrence_metadata_in_with ("private", "n", "noClaim") ) }
 
 fn forked () -> InRustGraph {
   graph (&[
     Graphnode { contains : ids (&["n"]), .. node ("p") },
-    node ("n"),
+    node_in ("private", "n"),
     Graphnode { forks : msv_ids (&["n"]), .. node ("o") }, ]) }
 
 #[test]

@@ -2,14 +2,18 @@
 
 # Integration test for cycling a view's perspective
 # ('docs/api-and-formats.org', "Set perspective").
-# Foreign R contains M and K; A, also foreign, U, owned, and B, of a
-# second foreign owner, "third", each fork M. The client opens R,
-# which shows A in M's place; switches the view to the next
-# perspective, the user's, which shows U there; is refused the switch
-# while the buffer has unsaved edits; saves, which keeps the
-# perspective; switches to the next, third's, which shows B; and to
-# the next, which is the root authors' again. The data is copied to a
-# scratch folder first, so the save writes nothing tracked.
+# R, in foreign skgrepo "foreign", contains M, in foreign skgrepo
+# "origin", and K; A, in "foreign", U, in owned "main", and B, in
+# foreign "third", each fork M. The client opens R, drawn from R's
+# home, "foreign", which shows A in M's place; switches the view to
+# the next perspective, main's, which shows U there; is refused the
+# switch while the buffer has unsaved edits; saves, which keeps the
+# perspective; switches to the next, third's, which shows B; to the
+# next, origin's, which shows M itself; and to the next, which is the
+# root homes again. Then it opens M and cycles its root through
+# foreign's, main's and third's forks of it, and back. The data is
+# copied to a scratch folder first, so the save writes nothing
+# tracked.
 
 set -e  # Exit on any error
 
@@ -21,7 +25,7 @@ source "$TEST_DIR/../test-lib.sh"
 echo "=== SKG Perspective Integration Test ==="
 
 WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/skg-perspective-XXXXXX")
-cp -r "$TEST_DIR/data/foreign" "$TEST_DIR/data/owned" "$TEST_DIR/data/third" "$WORK_DIR/"
+cp -r "$TEST_DIR/data/foreign" "$TEST_DIR/data/owned" "$TEST_DIR/data/third" "$TEST_DIR/data/origin" "$WORK_DIR/"
 trap 'cleanup; rm -rf "$WORK_DIR"' EXIT
 
 AVAILABLE_PORT=$(find_available_port)
@@ -45,6 +49,11 @@ path = "$WORK_DIR/owned/main"
 [[repos]]
 name = "third"
 path = "$WORK_DIR/third"
+foreign = true
+
+[[repos]]
+name = "origin"
+path = "$WORK_DIR/origin"
 foreign = true
 EOF2
 

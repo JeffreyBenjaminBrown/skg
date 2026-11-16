@@ -81,7 +81,7 @@ pub fn buffer_to_validated_saveplan_in_graph (
   // _with_fork_repos entry below. No baseline: nothing is stale.
   buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     buffer_text, graph, config, skgrepo_restriction, &HashMap::new (),
-    &WhatTheBaselineShows::default (), Perspective::RootAuthors )
+    &WhatTheBaselineShows::default (), Perspective::RootHomes )
     }
 
 /// As 'buffer_to_validated_saveplan', but with the per-fork clone
@@ -354,7 +354,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos (
   let graph = crate::dbs::in_rust_graph::InRustGraph::from_graphnodes (&nodes);
   buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     buffer_text, &graph, config, skgrepo_restriction, fork_skgrepos,
-    &WhatTheBaselineShows::default (), Perspective::RootAuthors ) }
+    &WhatTheBaselineShows::default (), Perspective::RootHomes ) }
 
 /// One nonfatal warning per dangling link this save writes: a
 /// '[[id:X][label]]' in a saved title or body where X is neither in

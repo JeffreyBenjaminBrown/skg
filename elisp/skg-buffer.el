@@ -142,10 +142,9 @@ that buffer of the diff view.")
 
 (defvar-local skg-perspective nil
   "This view's perspective, as the server names it on the wire: nil
-for its root authors' (a tree rooted at a node of yours is drawn from
-yours, one rooted at another's node from that author's), as every
-fresh view is; \"user\" for yours, or \"owner
-of NAME\" for another owner's, in every tree.
+for its root homes (each tree is drawn from its root's home
+skgrepo), as every fresh view is; \"skgrepo NAME\" for the skgrepo
+NAME's, in every tree.
 `skg-cycle-perspective' sets it once the server has switched the
 view. A save sends it as (perspective . NAME), so that the
 server checks and redraws the buffer as it was drawn, and keeps it for
@@ -154,22 +153,22 @@ the redraws it starts itself, even after a restart.")
 
 (defvar-local skg-perspective-name nil
   "How the server named this view's perspective, for the mode line:
-\"your perspective\", say, or \"tracy's perspective\". Nil while the
-view shows its root authors'.")
+\"the perspective of tracy\", say. Nil while the view shows its root
+homes.")
 (put 'skg-perspective-name 'permanent-local t)
 
 (defun skg--set-perspective (perspective name)
   "Record that this view shows the PERSPECTIVE, the server's
-wire name, which the server calls NAME. The root authors' perspective
-is recorded as nil, so that it stays unmarked and unsaid."
-  (let ((default (or (null perspective) (equal perspective "root authors"))))
+wire name, which the server calls NAME. The root homes are recorded
+as nil, so that they stay unmarked and unsaid."
+  (let ((default (or (null perspective) (equal perspective "root homes"))))
     (setq skg-perspective (unless default perspective))
     (setq skg-perspective-name (unless default name))))
 
 (defun skg--perspective-mode-line ()
   "The mode line's mark for a view shown from a perspective other
-than its root authors': the mode name reads \"SKG:your perspective\",
-say, there, and \"SKG\" elsewhere."
+than its root homes: the mode name reads \"SKG:the perspective of
+tracy\", say, there, and \"SKG\" elsewhere."
   (when skg-perspective
     (concat ":" (or skg-perspective-name skg-perspective))))
 

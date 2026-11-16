@@ -3,15 +3,18 @@
 -- foreign N into a public clone C (implicit fork), then run
 -- skg.views.fork_node on the shown substitute C and rotate
 -- its clone to a private skgrepo, forming the chain D forks C
--- forks N. Viewing N's container then shows the chain end D,
--- marked (inPlaceOf N), and the save accepts that chain-end
+-- forks N. Viewing N's container from its home, public, then shows
+-- C; switched to the perspective of private, it shows the chain end
+-- D, marked (inPlaceOf N), and the save accepts that chain-end
 -- carrier.
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(90)
 
 local content_view = require('skg.single_root_content_view')
+local lock = require('skg.lock')
 local metadata = require('skg.metadata')
+local perspective = require('skg.perspective')
 local save = require('skg.save')
 local view_requests = require('skg.views')
 
@@ -118,9 +121,25 @@ metadata.change_repo_at_line(clone_line_2, 'private')
 save.approve_fork()
 print('the public clone was forked into a private clone (skgRepos (nodeRepo rotated))')
 
--- 7. Reopen P (all skgrepos unrestricted): the chain end D -- a private-repo
---    node -- is now shown in N's place, still marked (inPlaceOf N).
+-- 7. Reopen P (all skgrepos unrestricted): drawn from P's home,
+--    public, it shows C in N's place. Cycled to the perspective of
+--    private (passing foreign's, which shows N itself), the chain end
+--    D -- a private-repo node -- is shown in N's place, still marked
+--    (inPlaceOf N).
 p_buf = reopen_P()
+T.check(T.wait_for(function ()
+    return T.buffer_text(p_buf):find('(nodeRepo public)) (inPlaceOf N)', 1, true)
+  end, 10), "from P's home, public, C was not shown for N")
+vim.api.nvim_set_current_buf(p_buf)
+for _ = 1, 3 do
+  if vim.b[p_buf].skg_perspective == 'skgrepo private' then break end
+  perspective.cycle_perspective()
+  T.wait_for(function ()
+    return vim.b[p_buf].skg_perspective ~= nil and lock.stream_in_progress == nil
+  end, 10)
+end
+T.check(vim.b[p_buf].skg_perspective == 'skgrepo private',
+        'the view never reached the perspective of private')
 local function chain_end_shown ()
   for _, line in ipairs(vim.api.nvim_buf_get_lines(p_buf, 0, -1, false)) do
     if line:find('(inPlaceOf N)', 1, true)

@@ -6,7 +6,10 @@
 // forkee as such is observable: E, drawn editable under the
 // forksFolder, applies R's hides (no H) and the general
 // substitution rule (G is shown as X, marked). The folder member
-// itself (E) is shown raw: folders never substitute.
+// itself (E) is shown raw: folders never substitute. R and X are in
+// skgrepo "main", E, G and H in "base", so that a view of R, drawn
+// from "main", would put R in E's place and X in G's (a note stands
+// as itself in its own skgrepo).
 
 use std::error::Error;
 

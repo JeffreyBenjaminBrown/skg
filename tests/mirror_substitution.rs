@@ -9,20 +9,26 @@
 //
 // Fixture (tests/mirror_substitution/fixtures, single skgrepo
 // "main", owned): Q contains P and P2; P contains N and M;
-// R forks N and contains W; S forks E; E contains N.
+// R forks N and contains W; S forks E; E contains N. In one skgrepo
+// N always stands as itself.
 //
-// The multi-repo fixture (fixtures-multi) adds the ownership and
+// The apart fixture (fixtures-apart) is the same graph with N homed
+// in a second owned skgrepo, "base", so that a view of P, drawn from
+// "main", shows R in N's place.
+//
+// The multi-repo fixture (fixtures-multi) adds the skgrepo and
 // visibility gates: FR (skgrepo "foreign", not owned) forks
 // N1; R2 (skgrepo "other", owned) forks N2; N3 lives in
 // "other" while P3 and its fork R3 live in "main".
 //
 // The foreign-root fixture (fixtures-foreign-root) gives a view its
-// root's author's perspective: R (skgrepo "foreign", not
-// owned) contains M and K; A, also foreign, and U, in "main", each
-// fork M; P, in "main", contains M, and W, in "main", contains U.
-// A second foreign owner,
-// "third", forks M with B and K with T. Foreign F2 contains M2,
-// which contains N2; U2, in "main", forks M2, and T2, third's, N2.
+// root's home skgrepo's perspective: R (skgrepo "foreign", not owned)
+// contains M (skgrepo "origin", foreign) and K (foreign); A, in
+// "foreign", and U, in "main", each fork M; P, in "main", contains M,
+// and W, in "main", contains U. A third foreign skgrepo, "third",
+// forks M with B and K with T. Foreign F2 contains M2, which contains
+// N2; U2, in "main", forks M2, and T2, third's, N2. The config
+// declares foreign, main, third, origin.
 //
 // The replaced-root-folders fixture (fixtures-replaced-root-folders)
 // gives a foreign root and the user's fork of it different folders:
@@ -46,9 +52,9 @@ use skg::test_utils::{
   run_with_shared_test_stores,
   graph_handle_from_config};
 use skg::test_utils::{
-  multi_root_view, multi_root_view_with_skgrepo_set};
+  multi_root_view, multi_root_view_from_perspective, multi_root_view_with_skgrepo_set};
 use skg::types::errors::{BufferValidationError, SaveError};
-use skg::types::misc::{ID, SkgConfig, SkgrepoName, SkgrepoOwner, TantivyIndex, members_of};
+use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
 use skg::types::views_state::{OpenViews, Perspective, ViewforestId};
@@ -81,10 +87,11 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-mirror-substitution",
     |s| Box::pin ( async move {
-      s . reset ("de_novo_rendering_shows_the_mirror_marked", fixtures) ?;
+      let apart : &str = "tests/mirror_substitution/fixtures-apart";
+      s . reset ("de_novo_rendering_shows_the_mirror_marked", apart) ?;
       de_novo_rendering_shows_the_mirror_marked (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("save_roundtrips_to_original_and_is_a_fixpoint", fixtures) ?;
+      s . reset ("save_roundtrips_to_original_and_is_a_fixpoint", apart) ?;
       save_roundtrips_to_original_and_is_a_fixpoint (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("extraction_honors_inPlaceOf", fixtures) ?;
@@ -96,9 +103,9 @@ fn all_tests
       s . reset ("an_owned_mutual_pair_saves_and_the_original_stands", fixtures) ?;
       an_owned_mutual_pair_saves_and_the_original_stands (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset_from_config ("ownership_and_visibility_gate_substitution",
+      s . reset_from_config ("the_perspectives_skgrepo_and_visibility_gate_substitution",
                              "tests/mirror_substitution/fixtures-multi/skgconfig.toml") ?;
-      ownership_and_visibility_gate_substitution (
+      the_perspectives_skgrepo_and_visibility_gate_substitution (
         &s . config ) . await ?;
       s . reset_from_config ("chain_half_visible_keeps_the_original",
                              "tests/mirror_substitution/fixtures-chain/skgconfig.toml") ?;
@@ -106,11 +113,11 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       let foreign_root : &str =
         "tests/mirror_substitution/fixtures-foreign-root";
-      s . reset ("a_view_follows_the_perspective_of_its_roots_author", foreign_root) ?;
-      a_view_follows_the_perspective_of_its_roots_author (
+      s . reset ("a_view_follows_the_perspective_of_its_roots_home", foreign_root) ?;
+      a_view_follows_the_perspective_of_its_roots_home (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("under_a_foreign_root_a_save_roundtrips_its_authors_mirror", foreign_root) ?;
-      under_a_foreign_root_a_save_roundtrips_its_authors_mirror (
+      s . reset ("under_a_foreign_root_a_save_roundtrips_its_homes_mirror", foreign_root) ?;
+      under_a_foreign_root_a_save_roundtrips_its_homes_mirror (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror", foreign_root) ?;
       the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror (
@@ -118,11 +125,11 @@ fn all_tests
       s . reset ("under_a_foreign_root_a_forked_child_is_shown_as_the_original", foreign_root) ?;
       under_a_foreign_root_a_forked_child_is_shown_as_the_original (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_forked_foreign_root_follows_the_users_perspective", foreign_root) ?;
-      a_forked_foreign_root_follows_the_users_perspective (
+      s . reset ("a_forked_foreign_root_follows_its_clones_home", foreign_root) ?;
+      a_forked_foreign_root_follows_its_clones_home (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_switched_view_follows_the_users_perspective_until_switched_back", foreign_root) ?;
-      a_switched_view_follows_the_users_perspective_until_switched_back (
+      s . reset ("a_switched_view_follows_a_skgrepos_perspective_until_switched_back", foreign_root) ?;
+      a_switched_view_follows_a_skgrepos_perspective_until_switched_back (
         &s . config, &mut s . tantivy ) ?;
       s . reset ("a_switch_of_perspective_re_points_a_substituted_content_child", foreign_root) ?;
       a_switch_of_perspective_re_points_a_substituted_content_child (
@@ -131,12 +138,12 @@ fn all_tests
                  "tests/mirror_substitution/fixtures-re-pointed-child") ?;
       a_re_pointed_content_child_draws_its_forks_folder_afresh (
         &s . config, &mut s . tantivy ) ?;
-      s . reset ("a_third_authors_mirror_stands_where_the_user_has_none",
+      s . reset ("the_first_declared_mirror_stands_where_the_perspectives_skgrepo_holds_none",
                  "tests/mirror_substitution/fixtures-third-author") ?;
-      a_third_authors_mirror_stands_where_the_user_has_none (
+      the_first_declared_mirror_stands_where_the_perspectives_skgrepo_holds_none (
         &s . config, &mut s . tantivy ) ?;
-      s . reset ("a_switch_to_the_users_perspective_is_refused_where_it_would_change_nothing", foreign_root) ?;
-      a_switch_to_the_users_perspective_is_refused_where_it_would_change_nothing (
+      s . reset ("a_switch_to_a_skgrepo_is_refused_where_it_would_change_nothing", foreign_root) ?;
+      a_switch_to_a_skgrepo_is_refused_where_it_would_change_nothing (
         &s . config, &mut s . tantivy ) ?;
       s . reset ("next_cycles_through_every_perspective_that_shows_the_view_differently", foreign_root) ?;
       next_cycles_through_every_perspective_that_shows_the_view_differently (
@@ -144,14 +151,14 @@ fn all_tests
       s . reset ("a_perspective_stays_in_the_cycle_where_another_hides_what_it_forks", foreign_root) ?;
       a_perspective_stays_in_the_cycle_where_another_hides_what_it_forks (
         &s . config, &mut s . tantivy ) ?;
-      s . reset ("the_root_authors_are_named_in_the_order_of_their_first_roots", foreign_root) ?;
-      the_root_authors_are_named_in_the_order_of_their_first_roots (
+      s . reset ("the_root_homes_are_named_in_the_order_of_their_first_roots", foreign_root) ?;
+      the_root_homes_are_named_in_the_order_of_their_first_roots (
         &s . config, &mut s . tantivy ) ?;
-      s . reset ("next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_authors", foreign_root) ?;
-      next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_authors (
+      s . reset ("next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_homes", foreign_root) ?;
+      next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_homes (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_perspective_replaces_the_root_and_the_root_authors_restore_it", foreign_root) ?;
-      a_perspective_replaces_the_root_and_the_root_authors_restore_it (
+      s . reset ("a_perspective_replaces_the_root_and_the_root_homes_restore_it", foreign_root) ?;
+      a_perspective_replaces_the_root_and_the_root_homes_restore_it (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_replaced_root_shows_its_own_containers", foreign_root) ?;
       a_replaced_root_shows_its_own_containers (
@@ -167,8 +174,8 @@ fn all_tests
       s . reset ("a_replaced_search_hit_stays_a_hit", replaced_root_folders) ?;
       a_replaced_search_hit_stays_a_hit (
         &s . config, &mut s . tantivy ) ?;
-      s . reset ("a_save_following_the_users_perspective_shows_a_new_fork_in_place", foreign_root) ?;
-      a_save_following_the_users_perspective_shows_a_new_fork_in_place (
+      s . reset ("a_save_following_a_skgrepos_perspective_shows_a_new_fork_in_place", foreign_root) ?;
+      a_save_following_a_skgrepos_perspective_shows_a_new_fork_in_place (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_held_view_follows_whatever_its_save_names", foreign_root) ?;
       a_held_view_follows_whatever_its_save_names (
@@ -176,8 +183,8 @@ fn all_tests
       s . reset ("the_tamper_check_accepts_a_mirror_whatever_perspective_the_save_names", foreign_root) ?;
       the_tamper_check_accepts_a_mirror_whatever_perspective_the_save_names (
         &s . config ) ?;
-      s . reset ("deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_the_original", foreign_root) ?;
-      deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_the_original (
+      s . reset ("deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_another_mirror", foreign_root) ?;
+      deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_another_mirror (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_deleted_mirror_keeps_its_original_but_a_removed_one_does_not", foreign_root) ?;
       a_deleted_mirror_keeps_its_original_but_a_removed_one_does_not (
@@ -219,15 +226,12 @@ async fn node_instructions_from (
          buffer, config, &SkgrepoRestriction::unrestricted (config) )  ?
        . 1 . node_instructions ) }
 
+/// The text of 'pid''s .skg file in the skgrepo "main".
 fn read_fixture_file (
   config : &SkgConfig,
   pid    : &str,
 ) -> String {
-  let path : std::path::PathBuf =
-    config . skgrepos . values () . next () . unwrap ()
-    . path . join ( format! ("{}.skg", pid) );
-  std::fs::read_to_string (&path)
-    . unwrap_or_else ( |e| panic! ("reading {:?}: {}", path, e) ) }
+  read_skgrepo_file (config, "main", pid) }
 
 async fn de_novo_rendering_shows_the_mirror_marked (
   config : &SkgConfig,
@@ -286,22 +290,24 @@ async fn save_roundtrips_to_original_and_is_a_fixpoint (
          collected-ID orderkey)" );
       Ok (( )) }
 
-/// M, in N's skgrepo, comes to fork N beside R (saved through the
-/// save's graph update). N's
-/// three mirrors tie in that skgrepo, R and M both forked by none of
-/// the others, so N stands as itself (rule 3 of 'docs/mirrors.org',
-/// "Which mirror stands"), where R stood before
-/// the save; and M, whose mirrors are the same three, stands as itself.
-/// R and M stand in N's forks folder, forkers claiming nothing.
+/// In its own skgrepo a note stands as itself, however many of its
+/// forks are there (rule 2 of 'docs/mirrors.org', "Which mirror
+/// stands"): a view of P, drawn from "main", shows N, R only in its
+/// forks folder. M, in N's skgrepo, comes to fork N beside R (saved
+/// through the save's graph update); N's three mirrors tie there, and
+/// N still stands as itself, and M, whose mirrors are the same three,
+/// as itself. R and M stand in N's forks folder, forkers claiming
+/// nothing.
 async fn a_second_owned_fork_saves_and_the_original_stands (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let (before, _pids, _tree) =
     multi_root_view ( config, Some (tantivy), &[ ID::from ("P") ] ) ?;
-  assert! ( marked_lines (&before, "N") . iter ()
-            . any ( |l| l . contains ("(gnid R)") ),
-            "before the save, R stands in N's place:\n{}", before );
+  assert! ( marked_lines (&before, "N") . is_empty ()
+            && before . lines () . filter ( |l| l . contains ("(gnid R)") )
+               . all ( |l| l . contains ("(birth (forks out 2))") ),
+            "before the save, N stands as itself, R only in its forks folder:\n{}", before );
   save_added_forks (
     &ID::from ("M"), &[ ID::from ("N") ], config, tantivy ) . await ?;
   assert! ( read_fixture_file (config, "M") . contains ("- N"),
@@ -321,9 +327,8 @@ async fn a_second_owned_fork_saves_and_the_original_stands (
   Ok (( )) }
 
 /// N comes to fork R, which forks N: an owned mutual pair, in
-/// one skgrepo (saved as above). Each is forked by the other, so N
-/// stands as itself (rule 3 of 'docs/mirrors.org', "Which mirror
-/// stands"), where R stood before the save; R
+/// one skgrepo (saved as above). N stands as itself there (rule 2 of
+/// 'docs/mirrors.org', "Which mirror stands"); R
 /// is drawn in N's forks folder, a mutual, born of both sides.
 async fn an_owned_mutual_pair_saves_and_the_original_stands (
   config  : &SkgConfig,
@@ -485,38 +490,55 @@ async fn extraction_honors_inPlaceOf (
           "S does not file N" ); }
       Ok (( )) }
 
-async fn ownership_and_visibility_gate_substitution (
+/// Which mirror stands is the perspective's skgrepo's choice, and
+/// the skgrepo restriction gates it. FR, foreign, forks N1, which P1's
+/// home, "main", holds: from the root homes N1 stands as itself; from
+/// foreign's perspective FR stands. R2, in "other", forks N2, in
+/// "main": from the root homes N2 stands; from other's, R2, unless
+/// the skgrepo restriction keeps "other" out.
+async fn the_perspectives_skgrepo_and_visibility_gate_substitution (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       (
         graph_handle_from_config (config) ? );
-      { // A foreign fork never substitutes.
+      let unrestricted : SkgrepoRestriction = SkgrepoRestriction::unrestricted (config);
+      { // A foreign fork stands only from its own skgrepo's perspective.
         let (view, _pids, _tree) =
           multi_root_view (
             config, None,
             &[ ID::from ("P1") ] ) ?;
         assert! ( marked_lines (&view, "N1") . is_empty (),
-          "FR is foreign; N1 is shown raw:\n{}", view );
-        assert! ( view . contains ("(gnid N1)"), "{}", view ); }
+          "from the root homes, N1, in P1's home, is shown raw:\n{}", view );
+        assert! ( view . contains ("(gnid N1)"), "{}", view );
+        let foreigns : String = multi_root_view_from_perspective (
+          config, &[ ID::from ("P1") ], &unrestricted, skgrepo ("foreign") ) ? . 0;
+        let marked : Vec<&str> = marked_lines (&foreigns, "N1");
+        assert! ( marked . len () == 1 && marked [0] . contains ("(gnid FR)"),
+          "from foreign's perspective FR stands in N1's place:\n{}", foreigns ); }
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           config, SkgrepoName ("main" . to_string ())) ?;
-      { // A restricted owned fork does not substitute.
-        let (view, _pids, _tree) =
-          multi_root_view_with_skgrepo_set (
-            config, None,
-            &[ ID::from ("P2") ], &restriction ) ?;
-        assert! ( marked_lines (&view, "N2") . is_empty (),
-          "R2's repo is restricted; N2 is shown raw:\n{}", view );
-        assert! ( view . contains ("(gnid N2)"), "{}", view ); }
-      { // The same fork substitutes when its skgrepo is unrestricted.
+      { // From the root homes, N2, in P2's home, stands as itself.
         let (view, _pids, _tree) =
           multi_root_view (
             config, None,
             &[ ID::from ("P2") ] ) ?;
+        assert! ( marked_lines (&view, "N2") . is_empty ()
+                  && view . contains ("(gnid N2)"),
+          "from the root homes N2 is shown raw:\n{}", view ); }
+      { // From other's perspective R2 substitutes, unrestricted.
+        let view : String = multi_root_view_from_perspective (
+          config, &[ ID::from ("P2") ], &unrestricted, skgrepo ("other") ) ? . 0;
         let marked : Vec<&str> = marked_lines (&view, "N2");
         assert_eq! ( marked . len (), 1, "{}", view );
         assert! ( marked [0] . contains ("(gnid R2)"), "{}", view ); }
+      { // A restricted owned fork does not substitute, even from its
+        // own skgrepo's perspective.
+        let view : String = multi_root_view_from_perspective (
+          config, &[ ID::from ("P2") ], &restriction, skgrepo ("other") ) ? . 0;
+        assert! ( marked_lines (&view, "N2") . is_empty (),
+          "R2's repo is restricted; N2 is shown raw:\n{}", view );
+        assert! ( view . contains ("(gnid N2)"), "{}", view ); }
       { // The skgrepo restriction beats substitution: restricted original,
         // recorded in an unrestricted section, unrestricted fork
         // -> the original stands as a Restricted vognode, and the
@@ -561,57 +583,59 @@ async fn save_under_set (
     "save must not error; got: {:?}", response . errors );
   Ok ( response . saved_view ) }
 
-/// A half-visible owned chain: D forks C forks N, with the
-/// end D in skgrepo 'other'. Unrestricted the END D substitutes for N;
-/// under 'main' (hiding 'other') the middle C substitutes. Saving the
-/// half-visible view accepts the middle mirror bearing the part (it is on N's chain)
-/// and keeps N in P's contains; an off-chain fact is rejected.
+/// An owned chain D forks C forks N, D in skgrepo "other", C and N in
+/// "main" with P, which contains N. From the root homes ("main") N
+/// stands as itself, unrestricted or not: the chain kept in N's
+/// skgrepo shows N. From other's perspective the chain end D stands;
+/// under "main" (keeping "other" out), N again, tying with C there.
+/// A buffer in which the chain's middle C bears N's part, saved under
+/// "main", is accepted (C is on N's chain) and keeps N in P's
+/// contains; an off-chain fact is rejected.
 async fn chain_half_visible_keeps_the_original (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       (
         graph_handle_from_config (config) ? );
-      { // Unrestricted, the chain end D is shown in N's place.
-        let (view, _p, _t) =
-          multi_root_view (
-            config, Some (tantivy),
-            &[ ID::from ("P") ] ) ?;
-        let marked : Vec<&str> = marked_lines (&view, "N");
-        assert_eq! ( marked . len (), 1,
-          "one substitute for N unrestricted:\n{}", view );
-        assert! ( marked [0] . contains ("(gnid D)"),
-          "the chain end D is shown unrestricted:\n{}", view ); }
       let main_set : SkgrepoRestriction =
         SkgrepoRestriction::named (
           config, SkgrepoName ("main" . to_string ())) ?;
-      let view_main : String = {
-        // Under 'main', D's skgrepo 'other' is restricted, so the middle
-        // C is shown instead.
+      let unrestricted : SkgrepoRestriction = SkgrepoRestriction::unrestricted (config);
+      for set in [ &unrestricted, &main_set ] {
+        // From the root homes, N stands as itself.
         let (view, _p, _t) =
           multi_root_view_with_skgrepo_set (
             config, Some (tantivy),
-            &[ ID::from ("P") ], &main_set ) ?;
+            &[ ID::from ("P") ], set ) ?;
+        assert! ( marked_lines (&view, "N") . is_empty ()
+                  && view . contains ("(gnid N)"),
+          "from the root homes N stands as itself:\n{}", view ); }
+      { // From other's perspective, unrestricted, the chain end D.
+        let view : String = multi_root_view_from_perspective (
+          config, &[ ID::from ("P") ], &unrestricted, skgrepo ("other") ) ? . 0;
         let marked : Vec<&str> = marked_lines (&view, "N");
-        assert_eq! ( marked . len (), 1,
-          "one substitute for N under main:\n{}", view );
-        assert! ( marked [0] . contains ("(gnid C)"),
-          "the chain middle C is shown under main:\n{}", view );
-        view };
-      { // Saving the half-visible view accepts the middle bearer and
-        // keeps N (not C) in P's contains.
+        assert! ( marked . len () == 1 && marked [0] . contains ("(gnid D)"),
+          "from other's perspective the chain end D stands:\n{}", view ); }
+      { // Under 'main', other's D is kept out; N and C tie in "main".
+        let view : String = multi_root_view_from_perspective (
+          config, &[ ID::from ("P") ], &main_set, skgrepo ("other") ) ? . 0;
+        assert! ( marked_lines (&view, "N") . is_empty ()
+                  && view . contains ("(gnid N)"),
+          "under main, from other's perspective, N stands as itself:\n{}", view ); }
+      { // Saving a buffer whose middle bearer C stands for N keeps N
+        // (not C) in P's contains.
+        let buffer = indoc! {"
+          * (skg node (gnid P) (skgRepos (nodeRepo main))) P
+          ** (skg node (gnid C) (skgRepos (nodeRepo main)) writeProtected (inPlaceOf N)) C
+        "};
         let saved : String =
-          save_under_set (&view_main, config, tantivy, &main_set)
+          save_under_set (buffer, config, tantivy, &main_set)
           . await ?;
-        assert_eq! ( marked_lines (&saved, "N") . len (), 1,
-          "the rerendered saved view still shows a marked substitute \
-           for N:\n{}", saved );
-        let p_file : String = {
-          let main_path : &std::path::Path =
-            & config . skgrepos
-              . get ( &SkgrepoName::from ("main") ) . unwrap () . path;
-          std::fs::read_to_string ( main_path . join ("P.skg") )
-            . unwrap () };
+        assert! ( marked_lines (&saved, "N") . is_empty ()
+                  && saved . contains ("(gnid N)"),
+          "the rerendered saved view, drawn from the root homes, shows N \
+           itself:\n{}", saved );
+        let p_file : String = read_skgrepo_file (config, "main", "P");
         assert! ( p_file . contains ("- N"),
           "P still contains N after the half-visible save:\n{}", p_file );
         assert! ( ! p_file . contains ("- C"),
@@ -681,11 +705,12 @@ fn claiming_line_of_gnid<'a> (
   let fact : String = format! ("(gnid {})", gnid);
   view . lines () . find ( |l| l . contains (&fact) && ! l . contains ("noClaim") ) }
 
-/// R, foreign, contains M; A, of R's author, and U, the user's, each
-/// fork M; P, owned, contains M. A view of R shows A in M's
-/// place, a view of P shows U, and a view of both shows each under
-/// its own root.
-async fn a_view_follows_the_perspective_of_its_roots_author (
+/// R, in "foreign", contains M, in "origin"; A, in "foreign", and U,
+/// in "main", each fork M; P, in "main", contains M. A view of R
+/// shows A in M's place, a view of P shows U, and a view of both
+/// shows each under its own root: each tree is drawn from its root's
+/// home skgrepo.
+async fn a_view_follows_the_perspective_of_its_roots_home (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -697,18 +722,18 @@ async fn a_view_follows_the_perspective_of_its_roots_author (
   assert_eq! ( marked . len (), 2, "{}", view );
   assert! ( marked [0] . starts_with ("** ")
             && marked [0] . contains ("(gnid A)"),
-    "under R, R's author's A is shown in M's place:\n{}", view );
+    "under R, A, in R's home, is shown in M's place:\n{}", view );
   assert! ( ! marked [0] . contains ("writeProtected"),
     "and editable, so the substitution is the editable kind:\n{}", view );
   assert! ( marked [1] . starts_with ("** ")
             && marked [1] . contains ("(gnid U)"),
-    "under P, the user's U is shown in M's place:\n{}", view );
+    "under P, U, in P's home, is shown in M's place:\n{}", view );
   Ok (( )) }
 
 /// Saving a view of foreign R, unchanged, where A stands for M, writes
 /// nothing to R, passes the inPlaceOf tamper check, and is a
 /// fixpoint.
-async fn under_a_foreign_root_a_save_roundtrips_its_authors_mirror (
+async fn under_a_foreign_root_a_save_roundtrips_its_homes_mirror (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -730,8 +755,8 @@ async fn under_a_foreign_root_a_save_roundtrips_its_authors_mirror (
 
 /// The tamper check accepts any mirror of the original as its
 /// bearer, whichever the tree's perspective would show: under owned
-/// P, whose tree is drawn from the user's perspective (which shows U
-/// in M's place), A, a fork of M by M's own author, carrying
+/// P, whose tree is drawn from "main" (which shows U in M's place),
+/// A, a fork of M in "foreign", carrying
 /// '(inPlaceOf M)', saves. K, no mirror of M, carrying it, aborts
 /// the save, the refusal naming U, the mirror shown.
 async fn the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror (
@@ -757,12 +782,13 @@ async fn the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror (
       other . map ( |v| v . len () ) ), }
   Ok (( )) }
 
-/// Intended: under a foreign root the view shows what the root's
-/// author would see, so a child of R the user edits there, which
-/// forks it into the user's clone, is shown afterward as the
-/// original, unedited, and not as the clone. The clone is shown where
-/// the view is drawn from the user's perspective (under an owned root, or
-/// under a fork of R: 'a_forked_foreign_root_follows_the_users_perspective').
+/// Intended: under a foreign root the view is drawn from the root's
+/// home skgrepo, so a child of R the user edits there, which forks it
+/// into the user's clone, is shown afterward as the original,
+/// unedited, and not as the clone; the save's plan warns so. The
+/// clone is shown where the view is drawn from the clone's skgrepo
+/// (under an owned root, or under a fork of R:
+/// 'a_forked_foreign_root_follows_its_clones_home').
 async fn under_a_foreign_root_a_forked_child_is_shown_as_the_original (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -775,6 +801,17 @@ async fn under_a_foreign_root_a_forked_child_is_shown_as_the_original (
   assert! ( ! k_line . contains ("writeProtected"), "{}", view );
   let edited : String = view . replace (
     k_line, &k_line . replace (") K", ") K-edited") );
+  { // The plan warns that the view goes on showing the original.
+    let graph : InRustGraph = InRustGraph::from_graphnodes (
+      &read_all_skg_files_from_skgrepos (config) ? );
+    let (_, _, warnings) = buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
+      &edited, &graph, config, &SkgrepoRestriction::unrestricted (config),
+      &HashMap::new (), &WhatTheBaselineShows::default (), Perspective::RootHomes ) ?;
+    assert! ( warnings . iter () . any ( |w|
+                w . contains ("Your edit of 'K'")
+                && w . contains ("from the perspective of foreign")
+                && w . contains ("goes on showing the original") ),
+      "{:?}", warnings ); }
   let saved : String = save_and_rerender (&edited, config, tantivy) . await ?;
   let clone : Graphnode = owned_fork_on_disk (config, "K") ?;
   assert_eq! ( clone . title, "K-edited", "the edit forked K" );
@@ -806,11 +843,13 @@ async fn under_a_foreign_root_a_forked_child_is_shown_as_the_original (
   Ok (( )) }
 
 /// Editing foreign root R forks it; the saved view is re-rooted at the
-/// user's clone of R, which stands for nothing (no '(inPlaceOf
-/// R)': the root authors' would show R raw in its place), and beneath
-/// it the user's perspective is followed: U, not A, is shown in M's
-/// place.
-async fn a_forked_foreign_root_follows_the_users_perspective (
+/// user's clone of R, which stands for nothing (no '(inPlaceOf R)'),
+/// and beneath it the clone's home, "main", decides: U, not A, is
+/// shown in M's place. The save's plan warns of nothing, since the
+/// clone, a root in its own home, is shown; had the view been
+/// switched to "foreign", R would stand in its clone's place, and the
+/// plan warns so.
+async fn a_forked_foreign_root_follows_its_clones_home (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -822,6 +861,23 @@ async fn a_forked_foreign_root_follows_the_users_perspective (
             && ! r_line . contains ("writeProtected"), "{}", view );
   let edited : String = view . replacen (
     r_line, &r_line . replace (") R", ") R-edited"), 1 );
+  { // A fork of a root warns only where the re-rooted view would not
+    // show the clone.
+    let graph : InRustGraph = InRustGraph::from_graphnodes (
+      &read_all_skg_files_from_skgrepos (config) ? );
+    let warnings_from = |perspective : Perspective|
+      -> Result<Vec<String>, Box<dyn Error>> {
+      let (_, _, warnings) = buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
+        &edited, &graph, config, &SkgrepoRestriction::unrestricted (config),
+        &HashMap::new (), &WhatTheBaselineShows::default (), perspective ) ?;
+      Ok ( warnings . into_iter ()
+           . filter ( |w| w . contains ("Your edit of 'R'") ) . collect () ) };
+    assert! ( warnings_from (Perspective::RootHomes) ? . is_empty () );
+    let switched : Vec<String> = warnings_from ( skgrepo ("foreign") ) ?;
+    assert! ( switched . len () == 1
+              && switched [0] . contains ("from the perspective of foreign")
+              && switched [0] . contains ("goes on showing the original"),
+      "{:?}", switched ); }
   let saved : String = save_and_rerender (&edited, config, tantivy) . await ?;
   let clone : Graphnode = owned_fork_on_disk (config, "R") ?;
   let root_line : &str = saved . lines () . next () . unwrap ();
@@ -897,10 +953,10 @@ fn switch_request_naming (
     "((request . \"set perspective\") (view-id . \"{}\") (perspective . \"{}\"))",
     view_id, named ) }
 
-fn owner_of (
-  skgrepo : &str,
+fn skgrepo (
+  name : &str,
 ) -> Perspective {
-  Perspective::Owner ( SkgrepoOwner::Foreign ( SkgrepoName::from (skgrepo) )) }
+  Perspective::Skgrepo ( SkgrepoName::from (name) ) }
 
 /// The one rerendered view's text among 'messages', if one was sent.
 fn rerendered_text (
@@ -910,36 +966,36 @@ fn rerendered_text (
     . find ( |message| message . contains ("(response-type rerender-view)") )
     . and_then ( |message| extract_string_field_from_sexp (message, "content") ) }
 
-/// A view of foreign R shows A, R's author's, in M's place. Switched
-/// to the user's perspective, it is rerendered with U, the user's, there
-/// instead; the answer names the view and the choice; a foreign redraw
-/// (the "rerender views" a reload asks for) keeps it. Switched back,
-/// it shows A again.
-fn a_switched_view_follows_the_users_perspective_until_switched_back (
+/// A view of foreign R shows A, in R's home, in M's place. Switched
+/// to the perspective of "main", it is rerendered with U, in "main",
+/// there instead; the answer names the view and the choice; a foreign
+/// redraw (the "rerender views" a reload asks for) keeps it. Switched
+/// back, it shows A again.
+fn a_switched_view_follows_a_skgrepos_perspective_until_switched_back (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let (mut views_state, env, view) : (ViewsState, SkgEnv, String) =
     connection_holding_a_view_of (config, tantivy, "R", &[ ID::from ("R") ]) ?;
   assert! ( line_of_gnid (&view, "A") . is_some_and ( |l| l . contains ("(inPlaceOf M)") ),
-    "a fresh view of R follows R's author:\n{}", view );
+    "a fresh view of R follows R's home:\n{}", view );
   let messages : Vec<String> = messages_answering (
-    &switch_request ("R", Perspective::user ()),
+    &switch_request ("R", skgrepo ("main")),
     &mut views_state, &env, config, handle_set_perspective_request );
   let answer : &String = messages . first () . unwrap ();
   assert! ( answer . contains ("(response-type perspective)")
             && extract_string_field_from_sexp (answer, "view-id") . as_deref () == Some ("R")
-            && extract_string_field_from_sexp (answer, "perspective") . as_deref () == Some ("user")
+            && extract_string_field_from_sexp (answer, "perspective") . as_deref () == Some ("skgrepo main")
             && extract_string_field_from_sexp (answer, "content") . is_none (),
     "the answer names the view and the new choice: {:?}", messages );
   let switched : String = rerendered_text (&messages)
     . ok_or_else ( || format! ("the view is rerendered: {:?}", messages) ) ?;
   assert! ( line_of_gnid (&switched, "U") . is_some_and ( |l| l . contains ("(inPlaceOf M)") )
             && claiming_line_of_gnid (&switched, "A") . is_none (),
-    "switched, the user's U stands in M's place:\n{}", switched );
+    "switched, main's U stands in M's place:\n{}", switched );
   assert_eq! ( views_state . open_views . perspective_of_view (
                  &ViewforestId::from_client_string ("R" . to_string ()) ),
-               Perspective::user () );
+               skgrepo ("main") );
   let redrawn : String = rerendered_text ( &messages_answering (
     "((request . \"rerender views\") (view-ids \"R\"))",
     &mut views_state, &env, config, handle_rerender_views_request ))
@@ -947,19 +1003,19 @@ fn a_switched_view_follows_the_users_perspective_until_switched_back (
   assert! ( line_of_gnid (&redrawn, "U") . is_some (),
     "a redraw the user did not ask for keeps the choice:\n{}", redrawn );
   let back : String = rerendered_text ( &messages_answering (
-    &switch_request ("R", Perspective::RootAuthors),
+    &switch_request ("R", Perspective::RootHomes),
     &mut views_state, &env, config, handle_set_perspective_request ))
     . ok_or ("switching back rerenders the view") ?;
   assert! ( line_of_gnid (&back, "A") . is_some_and ( |l| l . contains ("(inPlaceOf M)") )
             && claiming_line_of_gnid (&back, "U") . is_none (),
-    "switched back, R's author's A stands in M's place again:\n{}", back );
+    "switched back, A, in R's home, stands in M's place again:\n{}", back );
   Ok (( )) }
 
 /// Every mirror may bear the part, so a content child already
 /// shown in another's place is re-pointed whenever the view's
 /// perspective ranks another mirror first: a view of owned P shows U,
-/// the user's, in M's place; switched to third's perspective, B; to
-/// M's own author's, A; back to the root authors', U again.
+/// in P's home, in M's place; switched to third's perspective, B; to
+/// foreign's, A; back to the root homes', U again.
 fn a_switch_of_perspective_re_points_a_substituted_content_child (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -968,9 +1024,9 @@ fn a_switch_of_perspective_re_points_a_substituted_content_child (
     connection_holding_a_view_of (config, tantivy, "P", &[ ID::from ("P") ]) ?;
   assert! ( line_of_gnid (&view, "U") . is_some_and ( |l| l . contains ("(inPlaceOf M)") ),
     "a fresh view of P shows the user's U in M's place:\n{}", view );
-  for (perspective, shown) in [ ( owner_of ("third"), "B" ),
-                                ( owner_of ("foreign"), "A" ),
-                                ( Perspective::RootAuthors, "U" ) ] {
+  for (perspective, shown) in [ ( skgrepo ("third"), "B" ),
+                                ( skgrepo ("foreign"), "A" ),
+                                ( Perspective::RootHomes, "U" ) ] {
     let switched : String = rerendered_text ( &messages_answering (
       &switch_request ("P", perspective . clone ()),
       &mut views_state, &env, config, handle_set_perspective_request ))
@@ -990,7 +1046,7 @@ fn a_switch_of_perspective_re_points_a_substituted_content_child (
 /// holding N, which it forks, and U, which forks it. No folder holds
 /// the note it describes or an unwarranted member, and U's forkee F
 /// claims (drawn claiming nothing, a client would read it as a pending
-/// detachment). Back at the root authors', the view is drawn as the
+/// detachment). Back at the root homes', the view is drawn as the
 /// fresh view drew it, and a second round of switches draws the same
 /// views again.
 fn a_re_pointed_content_child_draws_its_forks_folder_afresh (
@@ -1003,10 +1059,10 @@ fn a_re_pointed_content_child_draws_its_forks_folder_afresh (
     "a fresh view of P shows U in N's place, its forks folder holding F:\n{}", view );
   for _round in 0 .. 2 {
     for (perspective, shown, members) in [
-      ( owner_of ("alice"),       "N", vec! [ "F" ] ),
-      ( owner_of ("bob"),         "F", vec! [ "N", "U" ] ),
-      ( owner_of ("alice"),       "N", vec! [ "F" ] ),
-      ( Perspective::RootAuthors, "U", vec! [ "F" ] ) ] {
+      ( skgrepo ("alice"),       "N", vec! [ "F" ] ),
+      ( skgrepo ("bob"),         "F", vec! [ "N", "U" ] ),
+      ( skgrepo ("alice"),       "N", vec! [ "F" ] ),
+      ( Perspective::RootHomes, "U", vec! [ "F" ] ) ] {
       let switched : String = rerendered_text ( &messages_answering (
         &switch_request ("P", perspective . clone ()),
         &mut views_state, &env, config, handle_set_perspective_request ))
@@ -1016,10 +1072,10 @@ fn a_re_pointed_content_child_draws_its_forks_folder_afresh (
         perspective, shown, switched );
       assert! ( ! switched . contains ("noWarrant"),
         "from {:?}, no member is unwarranted:\n{}", perspective, switched );
-      if perspective == Perspective::RootAuthors {
+      if perspective == Perspective::RootHomes {
         assert_eq! ( without_vnids ( switched . lines () ),
                      without_vnids ( view . lines () ),
-          "back at the root authors', the view is drawn as the fresh view drew it" ); }}}
+          "back at the root homes', the view is drawn as the fresh view drew it" ); }}}
   assert! ( line_of_gnid (&view, "F") . is_some_and ( |line| ! line . contains ("noClaim") ),
     "U's forkee F claims, so is no pending detachment:\n{}", view );
   Ok (( )) }
@@ -1059,15 +1115,15 @@ fn headline_depth (
 ) -> usize {
   line . chars () . take_while ( |c| *c == '*' ) . count () }
 
-/// Where the perspective's owner has no mirror of a note, the first
-/// mirror by declaration order stands, whoever wrote it: P, the
-/// user's, contains N, alice's, which bob's F forks; the config
+/// Where the perspective's skgrepo holds no mirror of a note, the
+/// first mirror by declaration order stands, whoever owns it: P, in
+/// "main", contains N, alice's, which bob's F forks; the config
 /// declares bob's skgrepo before alice's, so a view of P shows F in
 /// N's place, born of its forking N ('(birth (forks out))'). From
 /// alice's perspective N shows raw there; and under Q, which contains
 /// F, N stands in F's place, born of being forked by it
 /// ('(birth (forks in))').
-fn a_third_authors_mirror_stands_where_the_user_has_none (
+fn the_first_declared_mirror_stands_where_the_perspectives_skgrepo_holds_none (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -1076,9 +1132,9 @@ fn a_third_authors_mirror_stands_where_the_user_has_none (
   let marked : Vec<&str> = marked_lines (&view, "N");
   assert! ( marked . len () == 1 && marked [0] . contains ("(gnid F)")
             && marked [0] . contains ("(birth (forks out))"),
-    "the user has no mirror of N, so bob's F, declared first, stands:\n{}", view );
+    "main holds no mirror of N, so bob's F, declared first, stands:\n{}", view );
   let alices : String = rerendered_text ( &messages_answering (
-    &switch_request ("P", owner_of ("alice")),
+    &switch_request ("P", skgrepo ("alice")),
     &mut views_state, &env, config, handle_set_perspective_request ))
     . ok_or ("the switch to alice's perspective rerenders the view") ?;
   assert! ( marked_lines (&alices, "N") . is_empty ()
@@ -1087,7 +1143,7 @@ fn a_third_authors_mirror_stands_where_the_user_has_none (
   let (mut views_state, env, _view) : (ViewsState, SkgEnv, String) =
     connection_holding_a_view_of (config, tantivy, "Q", &[ ID::from ("Q") ]) ?;
   let alices_q : String = rerendered_text ( &messages_answering (
-    &switch_request ("Q", owner_of ("alice")),
+    &switch_request ("Q", skgrepo ("alice")),
     &mut views_state, &env, config, handle_set_perspective_request ))
     . ok_or ("the switch to alice's perspective rerenders the view of Q") ?;
   let in_fs_place : Vec<&str> = marked_lines (&alices_q, "F");
@@ -1096,48 +1152,55 @@ fn a_third_authors_mirror_stands_where_the_user_has_none (
     "from alice's perspective N, which F forks, stands in F's place:\n{}", alices_q );
   Ok (( )) }
 
-/// A view whose every root the user owns shows the user's perspective
-/// already, so a switch to them is refused, with the reason, the
-/// unchanged perspective and an empty rerender stream; "next" skips
-/// them, to the owners who would show it differently, foreign then
-/// third; a
-/// switch back to the root authors' is not refused. A view the
-/// connection does not hold, and a request naming no perspective,
-/// are refused too.
-fn a_switch_to_the_users_perspective_is_refused_where_it_would_change_nothing (
+/// A view of P, in "main", is drawn from "main" already, so a switch
+/// to "main" is refused, with the reason, the unchanged perspective
+/// and an empty rerender stream; "next" passes it over, to the
+/// skgrepos that would show the view differently, in declaration
+/// order: foreign (A in M's place), third (B), origin (M itself). A
+/// switch back to the root homes is not refused. A view the
+/// connection does not hold, a request naming no perspective, and a
+/// request naming an unknown skgrepo or a name no perspective has
+/// ("user", "owner of foreign", "root authors") are refused too.
+fn a_switch_to_a_skgrepo_is_refused_where_it_would_change_nothing (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let (mut views_state, env, _view) : (ViewsState, SkgEnv, String) =
     connection_holding_a_view_of (config, tantivy, "P", &[ ID::from ("P") ]) ?;
   let owned : Vec<String> = messages_answering (
-    &switch_request ("P", Perspective::user ()),
+    &switch_request ("P", skgrepo ("main")),
     &mut views_state, &env, config, handle_set_perspective_request );
-  assert! ( refusal_of (&owned) . is_some_and ( |reason| reason . contains ("Your perspective would show this buffer as its root authors' do") ),
+  assert! ( refusal_of (&owned) . is_some_and ( |reason| reason . contains (
+              "The perspective of main would show this buffer as the perspective of each root's home skgrepo does") ),
     "{:?}", owned );
   assert! ( extract_string_field_from_sexp (&owned [0], "perspective")
-            . as_deref () == Some ("root authors")
+            . as_deref () == Some ("root homes")
             && extract_string_field_from_sexp (&owned [0], "perspective-name")
-            . as_deref () == Some ("each root author's perspective (yours)"),
+            . as_deref () == Some ("the perspective of each root's home skgrepo (main)"),
     "the refusal carries the unchanged perspective: {:?}", owned );
-  for (expected_wire, expected_mirror) in [ ("owner of foreign", "A"),
-                                            ("owner of third",   "B") ] {
+  for (expected_wire, expected_mirror) in [ ("skgrepo foreign", "A"),
+                                            ("skgrepo third",   "B"),
+                                            ("skgrepo origin",  "M") ] {
     let next : Vec<String> = messages_answering (
       &switch_request_naming ("P", "next"),
       &mut views_state, &env, config, handle_set_perspective_request );
+    let in_ms_place = |text : &str| -> bool {
+      if expected_mirror == "M" {
+        line_of_gnid (text, "M") . is_some_and ( |l| ! l . contains ("inPlaceOf") ) }
+      else { line_of_gnid (text, expected_mirror)
+             . is_some_and ( |l| l . contains ("(inPlaceOf M)") ) }};
     assert! ( extract_string_field_from_sexp (&next [0], "perspective")
               . as_deref () == Some (expected_wire)
-              && rerendered_text (&next) . is_some_and ( |text| line_of_gnid (&text, expected_mirror)
-                   . is_some_and ( |l| l . contains ("(inPlaceOf M)") )),
-      "next skips the user's, which would change nothing, for each foreign owner's in turn: {:?}", next ); }
+              && rerendered_text (&next) . is_some_and ( |text| in_ms_place (&text) ),
+      "next passes over main, which would change nothing, for each other skgrepo in turn: {:?}", next ); }
   let back : Vec<String> = messages_answering (
-    &switch_request ("P", Perspective::RootAuthors),
+    &switch_request ("P", Perspective::RootHomes),
     &mut views_state, &env, config, handle_set_perspective_request );
   assert! ( extract_string_field_from_sexp (&back [0], "content") . is_none ()
             && rerendered_text (&back) . is_some (),
-    "a switch to the root authors' is not refused: {:?}", back );
+    "a switch to the root homes is not refused: {:?}", back );
   let unheld : Vec<String> = messages_answering (
-    &switch_request ("R", Perspective::user ()),
+    &switch_request ("R", skgrepo ("main")),
     &mut views_state, &env, config, handle_set_perspective_request );
   assert! ( refusal_of (&unheld) . is_some_and ( |reason| reason . contains ("does not hold") ),
     "{:?}", unheld );
@@ -1145,10 +1208,12 @@ fn a_switch_to_the_users_perspective_is_refused_where_it_would_change_nothing (
     "((request . \"set perspective\") (view-id . \"P\"))",
     &mut views_state, &env, config, handle_set_perspective_request );
   assert! ( refusal_of (&unnamed) . is_some (), "{:?}", unnamed );
-  let unknown_owner : Vec<String> = messages_answering (
-    &switch_request_naming ("P", "owner of nobody"),
-    &mut views_state, &env, config, handle_set_perspective_request );
-  assert! ( refusal_of (&unknown_owner) . is_some (), "{:?}", unknown_owner );
+  for unknown in [ "skgrepo nobody", "user", "owner of foreign", "root authors" ] {
+    let refused : Vec<String> = messages_answering (
+      &switch_request_naming ("P", unknown),
+      &mut views_state, &env, config, handle_set_perspective_request );
+    assert! ( refusal_of (&refused) . is_some_and ( |reason| reason . contains ("'perspective' must be") ),
+      "{:?} names no perspective: {:?}", unknown, refused ); }
   Ok (( )) }
 
 /// The refusal in 'messages', the answer to a switch: its reason, if
@@ -1168,9 +1233,11 @@ fn refusal_of (
 
 /// "next" cycles a view of foreign R through every perspective that
 /// would show it differently, in a fixed order, the cycle computed
-/// afresh at each request: the root authors' (A in M's place), the
-/// user's (U), third's (B in M's place and T in K's), and back. Each
-/// answer names the perspective as a message to the user would.
+/// afresh at each request: the root homes (A in M's place), then
+/// main's (U), third's (B in M's place and T in K's), origin's (M
+/// itself), and back. Foreign's, R's own home, would draw what the
+/// root homes do, so it is passed over. Each answer names the
+/// perspective as a message to the user would.
 fn next_cycles_through_every_perspective_that_shows_the_view_differently (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1189,23 +1256,25 @@ fn next_cycles_through_every_perspective_that_shows_the_view_differently (
                    . as_deref (), Some (expected_name), "{:?}", messages );
     let text : String = rerendered_text (&messages) . ok_or ("the switch rerenders") ?;
     assert! ( line_of_gnid (&text, shown_for_m)
-              . is_some_and ( |l| l . contains ("(inPlaceOf M)") ),
+              . is_some_and ( |l| if shown_for_m == "M" { ! l . contains ("inPlaceOf") }
+                                  else { l . contains ("(inPlaceOf M)") } ),
       "{} stands in M's place:\n{}", shown_for_m, text );
     Ok (text) };
-  next ("user", "your perspective", "U") ?;
-  let third : String = next ("owner of third", "third's perspective", "B") ?;
+  next ("skgrepo main", "the perspective of main", "U") ?;
+  let third : String = next ("skgrepo third", "the perspective of third", "B") ?;
   assert! ( line_of_gnid (&third, "T") . is_some_and ( |l| l . contains ("(inPlaceOf K)") ),
     "third's T stands in K's place:\n{}", third );
-  next ("root authors", "each root author's perspective (foreign's)", "A") ?;
-  next ("user", "your perspective", "U") ?;
+  next ("skgrepo origin", "the perspective of origin", "M") ?;
+  next ("root homes", "the perspective of each root's home skgrepo (foreign)", "A") ?;
+  next ("skgrepo main", "the perspective of main", "U") ?;
   Ok (( )) }
 
-/// The cycle does not depend on the path taken. In a view of F2, the
-/// user's U2 stands in M2's place and holds nothing; N2, which third
-/// forks, is drawn from the user's perspective only as content of M2,
-/// U2's forkee as such, where it stands raw; third's is the next
-/// after the user's, as found from the root authors' drawing, and a
-/// request naming it from there is not refused.
+/// The cycle does not depend on the path taken. In a view of F2,
+/// switched to "main", main's U2 stands in M2's place and holds
+/// nothing; N2, which third forks, is drawn from main's perspective
+/// only as content of M2, U2's forkee as such, where it stands raw;
+/// third's is the next after main's, as found from the root homes'
+/// drawing, and a request naming it from there is not refused.
 fn a_perspective_stays_in_the_cycle_where_another_hides_what_it_forks (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1217,27 +1286,26 @@ fn a_perspective_stays_in_the_cycle_where_another_hides_what_it_forks (
     &mut views_state, &env, config, handle_set_perspective_request ) };
   let to_user : Vec<String> = switch ("next");
   assert! ( extract_string_field_from_sexp (&to_user [0], "perspective")
-              . as_deref () == Some ("user")
+              . as_deref () == Some ("skgrepo main")
             && rerendered_text (&to_user) . is_some_and ( |text|
                  line_of_gnid (&text, "U2") . is_some ()
                  && line_of_gnid (&text, "N2") . is_some_and ( |l| ! l . contains ("inPlaceOf") ) ),
     "{:?}", to_user );
-  let named : Vec<String> = switch ("owner of third");
+  let named : Vec<String> = switch ("skgrepo third");
   assert! ( refusal_of (&named) . is_none (), "{:?}", named );
-  let back_to_user : Vec<String> = switch ("user");
+  let back_to_user : Vec<String> = switch ("skgrepo main");
   assert! ( refusal_of (&back_to_user) . is_none (), "{:?}", back_to_user );
   let to_third : Vec<String> = switch ("next");
   assert! ( extract_string_field_from_sexp (&to_third [0], "perspective")
-              . as_deref () == Some ("owner of third")
+              . as_deref () == Some ("skgrepo third")
             && rerendered_text (&to_third) . is_some_and ( |text|
                  line_of_gnid (&text, "T2") . is_some_and ( |l| l . contains ("(inPlaceOf N2)") )),
-    "from the user's, the next is third's, which shows T2 in N2's place: {:?}", to_third );
+    "from main's, the next is third's, which shows T2 in N2's place: {:?}", to_third );
   Ok (( )) }
 
-/// A view with several roots names its root authors' perspective by
-/// each author, once, in the order of their first roots: "yours" for
-/// the user.
-fn the_root_authors_are_named_in_the_order_of_their_first_roots (
+/// A view with several roots names its root homes' perspective by
+/// each root's home skgrepo, once, in the order of their first roots.
+fn the_root_homes_are_named_in_the_order_of_their_first_roots (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -1245,22 +1313,22 @@ fn the_root_authors_are_named_in_the_order_of_their_first_roots (
     connection_holding_a_view_of (
       config, tantivy, "RPK", &[ ID::from ("R"), ID::from ("P"), ID::from ("K") ] ) ?;
   messages_answering (
-    &switch_request ("RPK", Perspective::user ()),
+    &switch_request ("RPK", skgrepo ("main")),
     &mut views_state, &env, config, handle_set_perspective_request );
   let back : Vec<String> = messages_answering (
-    &switch_request ("RPK", Perspective::RootAuthors),
+    &switch_request ("RPK", Perspective::RootHomes),
     &mut views_state, &env, config, handle_set_perspective_request );
   assert_eq! ( extract_string_field_from_sexp (&back [0], "perspective-name") . as_deref (),
-               Some ("each root author's perspective (foreign's, yours)"), "{:?}", back );
+               Some ("the perspective of each root's home skgrepo (foreign, main)"), "{:?}", back );
   Ok (( )) }
 
-/// A view in which no one's perspective would show anything
+/// A view in which no skgrepo's perspective would show anything
 /// differently (one of L, which has no mirror and holds nothing) has
 /// a cycle of one, so "next" is refused there. But a
 /// view whose perspective has left its cycle, as a save can leave it
 /// (a save names its buffer's perspective, and it is kept whatever the
-/// cycle is now), goes back to the root authors' on "next".
-async fn next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_authors (
+/// cycle is now), goes back to the root homes on "next".
+async fn next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_homes (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -1279,27 +1347,28 @@ async fn next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_autho
       &mut views_state, &SkgrepoRestriction::unrestricted (config),
       true, &HashMap::new (), &HashSet::new (),
       &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
-      owner_of ("third") ) . await ?;
+      skgrepo ("third") ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   assert_eq! ( views_state . open_views . perspective_of_view (&view_id),
-               owner_of ("third") );
+               skgrepo ("third") );
   let back : Vec<String> = messages_answering (
     &switch_request_naming ("L", "next"),
     &mut views_state, &env, config, handle_set_perspective_request );
   assert! ( refusal_of (&back) . is_none ()
             && extract_string_field_from_sexp (&back [0], "perspective")
-               . as_deref () == Some ("root authors"),
+               . as_deref () == Some ("root homes"),
     "{:?}", back );
   Ok (( )) }
 
-/// The root too: a view of M, which A (M's own author's), U (the
-/// user's) and B (third's) each fork, shows M raw from the root
-/// authors' perspective, as a fresh view does, and each owner's
-/// fork of it from that owner's, marked '(inPlaceOf M)'. The
-/// root is re-pointed where it stands, so it keeps its viewnode ID
-/// both ways, and the root authors' perspective shows M raw again. A
-/// save through the replaced root edits the mirror, not M.
-async fn a_perspective_replaces_the_root_and_the_root_authors_restore_it (
+/// The root too: a view of M, which A (foreign's), U (main's) and B
+/// (third's) each fork, shows M raw from the root homes, as a fresh
+/// view does, M standing in its own home, "origin"; and each
+/// skgrepo's fork of it from that skgrepo's perspective, marked
+/// '(inPlaceOf M)', in declaration order. The root is re-pointed where
+/// it stands, so it keeps its viewnode ID both ways, and the root
+/// homes show M raw again. A save through the replaced root edits the
+/// mirror, not M.
+async fn a_perspective_replaces_the_root_and_the_root_homes_restore_it (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -1316,16 +1385,16 @@ async fn a_perspective_replaces_the_root_and_the_root_authors_restore_it (
     assert_eq! ( extract_string_field_from_sexp (&messages [0], "perspective")
                    . as_deref (), Some (expected_wire), "{:?}", messages );
     Ok ( root_line ( &rerendered_text (&messages) . ok_or ("the switch rerenders") ? )) };
-  for (wire, shown) in [ ("user", "U"), ("owner of foreign", "A"), ("owner of third", "B") ] {
+  for (wire, shown) in [ ("skgrepo foreign", "A"), ("skgrepo main", "U"), ("skgrepo third", "B") ] {
     let root : String = next (wire) ?;
     assert! ( root . contains ( &format! ("(vnid 0a) node (gnid {})", shown) )
               && root . contains ("(inPlaceOf M)"),
       "from {}, the root is {}, standing for M: {}", wire, shown, root ); }
-  let back : String = next ("root authors") ?;
+  let back : String = next ("root homes") ?;
   assert! ( back . contains ("(vnid 0a) node (gnid M)") && ! back . contains ("inPlaceOf"),
-    "the root authors' show M raw again: {}", back );
+    "the root homes show M raw again: {}", back );
   let switched : String = { let messages : Vec<String> = messages_answering (
-      &switch_request ("M", Perspective::user ()),
+      &switch_request ("M", skgrepo ("main")),
       &mut views_state, &env, config, handle_set_perspective_request );
     rerendered_text (&messages) . ok_or ("the switch rerenders") ? };
   let edited : String = switched . replacen (") U\n", ") U, retitled\n", 1);
@@ -1338,24 +1407,24 @@ async fn a_perspective_replaces_the_root_and_the_root_authors_restore_it (
       &mut views_state, &SkgrepoRestriction::unrestricted (config),
       true, &HashMap::new (), &HashSet::new (),
       &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
-      Perspective::user () ) . await ?;
+      skgrepo ("main") ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   assert! ( read_skgrepo_file (config, "main", "U") . contains ("title: U, retitled"),
     "the save edits U" );
-  assert! ( read_skgrepo_file (config, "foreign", "M") . contains ("title: M"),
+  assert! ( read_skgrepo_file (config, "origin", "M") . contains ("title: M"),
     "and leaves M" );
   assert! ( root_line (&response . saved_view) . contains ("(gnid U)")
             && root_line (&response . saved_view) . contains ("(inPlaceOf M)")
             && response . saved_view . contains ("U, retitled"),
-    "the saved view is still shown from the user's perspective:\n{}", response . saved_view );
+    "the saved view is still shown from main's perspective:\n{}", response . saved_view );
   Ok (( )) }
 
 /// A replaced root's containers folder is the replacement's: a view
-/// of M lists P and R, which contain M. From the user's perspective
-/// the root is U, and its folder lists W, which contains U, as a fresh
+/// of M lists P and R, which contain M. From main's perspective the
+/// root is U, and its folder lists W, which contains U, as a fresh
 /// view of U would, and nothing of M's; from foreign's it is A, which
 /// nothing contains, so there is no folder; and back at the root
-/// authors', M's folder is drawn as the fresh view drew it.
+/// homes, M's folder is drawn as the fresh view drew it.
 fn a_replaced_root_shows_its_own_containers (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1374,7 +1443,7 @@ fn a_replaced_root_shows_its_own_containers (
       &mut views_state, &env, config, handle_set_perspective_request );
     assert! ( refusal_of (&messages) . is_none (), "{:?}", messages );
     Ok ( rerendered_text (&messages) . ok_or ("the switch rerenders") ? ) };
-  let users : String = switch ("user") ?;
+  let users : String = switch ("skgrepo main") ?;
   let users_container_folder : Vec<&str> = users . lines ()
     . skip_while ( |l| ! l . contains ("containerFolder") ) . skip (1)
     . take_while ( |l| l . starts_with ("***") )
@@ -1382,30 +1451,30 @@ fn a_replaced_root_shows_its_own_containers (
   assert! ( users_container_folder . len () == 1
             && users_container_folder [0] . contains ("(gnid W)")
             && ! users . contains ("noWarrant"),
-    "from the user's, U's folder lists W, which contains U, and nothing of M's \
+    "from main's, U's folder lists W, which contains U, and nothing of M's \
      (M's containers show only under M, in U's forks folder, since U \
      forks M):\n{}", users );
   assert_eq! ( without_vnids ( users . lines () . skip (1) ),
                without_vnids ( fresh_view_of_u . lines () . skip (1) ),
     "U's folder is drawn as a fresh view of U draws it" );
-  let foreigns : String = switch ("owner of foreign") ?;
+  let foreigns : String = switch ("skgrepo foreign") ?;
   assert! ( line_of_gnid (&foreigns, "A") . is_some ()
             && ! foreigns . lines () . any ( |l| l . starts_with ("** ")
                                                 && l . contains ("containerFolder") ),
     "from foreign's, A, which nothing contains, has no containers folder \
      (M, in its forks folder, has its own):\n{}", foreigns );
-  let back : String = switch ("root authors") ?;
+  let back : String = switch ("root homes") ?;
   assert_eq! ( without_vnids ( back . lines () ), without_vnids ( view . lines () ),
-    "back at the root authors', M's folder is drawn again as the fresh view drew it" );
+    "back at the root homes, M's folder is drawn again as the fresh view drew it" );
   Ok (( )) }
 
 /// A replaced root's default folders are the replacement's: a view
 /// of foreign L shows its forks folder holding J, which forks it,
-/// claiming nothing. From the user's perspective the root is J, the
+/// claiming nothing. From main's perspective the root is J, the
 /// user's fork of L, and it is drawn as a fresh view of J draws it:
 /// its containers folder, and its forks folder holding L, claiming,
 /// counting the one child of L that J neither contains nor hides. Back
-/// at the root authors', L is drawn again as the fresh view drew it.
+/// at the root homes, L is drawn again as the fresh view drew it.
 fn a_replaced_root_shows_its_own_default_folders (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1423,26 +1492,26 @@ fn a_replaced_root_shows_its_own_default_folders (
       &mut views_state, &env, config, handle_set_perspective_request );
     assert! ( refusal_of (&messages) . is_none (), "{:?}", messages );
     Ok ( rerendered_text (&messages) . ok_or ("the switch rerenders") ? ) };
-  let users : String = switch ("user") ?;
+  let users : String = switch ("skgrepo main") ?;
   assert! ( users . contains ("forksFolder")
             && line_of_gnid (&users, "L") . is_some_and (
                  |line| line . contains ("(unintegrated 1)") )
             && ! users . contains ("noWarrant"),
-    "from the user's, J shows its forks folder, L in it with its count:\n{}", users );
+    "from main's, J shows its forks folder, L in it with its count:\n{}", users );
   assert_eq! ( without_vnids ( users . lines () . skip (1) ),
                without_vnids ( fresh_view_of_j . lines () . skip (1) ),
     "J's folders are drawn as a fresh view of J draws them" );
-  let back : String = switch ("root authors") ?;
+  let back : String = switch ("root homes") ?;
   assert_eq! ( without_vnids ( back . lines () ), without_vnids ( view . lines () ),
-    "back at the root authors', L is drawn again as the fresh view drew it" );
+    "back at the root homes, L is drawn again as the fresh view drew it" );
   Ok (( )) }
 
 /// A folder the user asked for on a root that a perspective replaces
 /// is drawn again for the replacement: L's view, given its mentioners
 /// and aliases folders, lists X, which links to L, and L's alias
-/// "letter". From the user's perspective the root is J, and those
+/// "letter". From main's perspective the root is J, and those
 /// folders list Y, which links to J, and J's alias "reply", with
-/// nothing of L's; back at the root authors', L's again.
+/// nothing of L's; back at the root homes, L's again.
 async fn a_replaced_root_redraws_the_folders_it_was_asked_for (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1461,7 +1530,7 @@ async fn a_replaced_root_redraws_the_folders_it_was_asked_for (
       &mut views_state, &SkgrepoRestriction::unrestricted (config),
       true, &HashMap::new (), &HashSet::new (),
       &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
-      Perspective::RootAuthors ) . await ?;
+      Perspective::RootHomes ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   let asked : String = response . saved_view;
   let shows_ls = |text : &str| -> bool {
@@ -1477,24 +1546,24 @@ async fn a_replaced_root_redraws_the_folders_it_was_asked_for (
       &mut views_state, &env, config, handle_set_perspective_request );
     assert! ( refusal_of (&messages) . is_none (), "{:?}", messages );
     Ok ( rerendered_text (&messages) . ok_or ("the switch rerenders") ? ) };
-  let users : String = switch ("user") ?;
+  let users : String = switch ("skgrepo main") ?;
   assert! ( users . contains ("mentionerFolder") && users . contains ("aliasFolder")
             && shows_js (&users)
             && line_of_gnid (&users, "X") . is_none ()
             && ! users . contains (") letter")
             && ! users . contains ("noWarrant"),
-    "from the user's, J's folders list Y and \"reply\", and nothing of L's:\n{}", users );
-  let back : String = switch ("root authors") ?;
+    "from main's, J's folders list Y and \"reply\", and nothing of L's:\n{}", users );
+  let back : String = switch ("root homes") ?;
   assert_eq! ( without_vnids ( back . lines () ), without_vnids ( asked . lines () ),
-    "back at the root authors', L's folders are drawn again" );
+    "back at the root homes, L's folders are drawn again" );
   Ok (( )) }
 
 /// A search hit is a write-protected root that shows only its
-/// folders. Switched to the user's perspective, the hit for foreign L
+/// folders. Switched to main's perspective, the hit for foreign L
 /// ("missive") shows J, the user's fork, still write-protected, with
 /// what a search hit for J ("answer") shows: its containers folder and
 /// its forks folder, folded, and no content, which only an
-/// editable root draws. Back at the root authors', the hit shows L's
+/// editable root draws. Back at the root homes, the hit shows L's
 /// folders again.
 fn a_replaced_search_hit_stays_a_hit (
   config  : &SkgConfig,
@@ -1523,17 +1592,17 @@ fn a_replaced_search_hit_stays_a_hit (
       &mut views_state, &env, config, handle_set_perspective_request );
     assert! ( refusal_of (&messages) . is_none (), "{:?}", messages );
     Ok ( rerendered_text (&messages) . ok_or ("the switch rerenders") ? ) };
-  let users : String = switch ("user") ?;
+  let users : String = switch ("skgrepo main") ?;
   assert! ( users . lines () . next () . is_some_and (
               |root| root . contains ("(gnid J)") && root . contains ("writeProtected") )
             && line_of_gnid (&users, "L1") . is_none (),
-    "from the user's, the hit is J, write-protected, without content:\n{}", users );
+    "from main's, the hit is J, write-protected, without content:\n{}", users );
   assert_eq! ( without_vnids ( users . lines () . skip (1) ),
                without_vnids ( fresh_hit_j . lines () . skip (1) ),
     "J's folders are drawn as a search hit for J draws them" );
-  let back : String = switch ("root authors") ?;
+  let back : String = switch ("root homes") ?;
   assert_eq! ( without_vnids ( back . lines () ), without_vnids ( hit_l . lines () ),
-    "back at the root authors', the hit shows L's folders again" );
+    "back at the root homes, the hit shows L's folders again" );
   Ok (( )) }
 
 /// The lines, each without its '(vnid ID)'.
@@ -1547,20 +1616,20 @@ fn without_vnids<'a> (
       None => line . to_string (), } )
     . collect () }
 
-/// In a view of foreign R drawn from the user's perspective, editing
+/// In a view of foreign R drawn from main's perspective, editing
 /// R's child K forks it, and the save's rerender shows the clone, with
 /// the edit, in K's place, as '(inPlaceOf K)', K standing only in
 /// the clone's forks folder (the folder K's occurrence carried, now
 /// the clone's); U still stands in M's place. The connection keeps the
 /// choice the save named.
-async fn a_save_following_the_users_perspective_shows_a_new_fork_in_place (
+async fn a_save_following_a_skgrepos_perspective_shows_a_new_fork_in_place (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let (mut views_state, mut env, _view) : (ViewsState, SkgEnv, String) =
     connection_holding_a_view_of (config, tantivy, "R", &[ ID::from ("R") ]) ?;
   let switched : String = rerendered_text ( &messages_answering (
-    &switch_request ("R", Perspective::user ()),
+    &switch_request ("R", skgrepo ("main")),
     &mut views_state, &env, config, handle_set_perspective_request ))
     . ok_or ("the switch rerenders the view") ?;
   let k_line : &str = line_of_gnid (&switched, "K")
@@ -1575,7 +1644,7 @@ async fn a_save_following_the_users_perspective_shows_a_new_fork_in_place (
       &mut views_state, &SkgrepoRestriction::unrestricted (config),
       true, &HashMap::new (), &HashSet::new (),
       &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
-      Perspective::user () ) . await ?;
+      skgrepo ("main") ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   let clone : Graphnode = owned_fork_on_disk (config, "K") ?;
   let saved : &str = &response . saved_view;
@@ -1589,16 +1658,17 @@ async fn a_save_following_the_users_perspective_shows_a_new_fork_in_place (
     "U still stands in M's place:\n{}", saved );
   assert_eq! ( views_state . open_views . perspective_of_view (
                  &ViewforestId::from_client_string ("R" . to_string ()) ),
-               Perspective::user () );
+               skgrepo ("main") );
   Ok (( )) }
 
-/// Under foreign R, U, the user's, and A, R's author's, each carrying
+/// Under foreign R, U, main's, and A, foreign's, each carrying
 /// '(inPlaceOf M)', may bear it whichever perspective the save
 /// names: each is a mirror of M. K, no mirror of M, is refused under
-/// either, the refusal naming the mirror the named perspective shows.
-/// A root standing for another node has that node's author: K standing
-/// for M at the root names A, M's author's mirror, under the root
-/// authors' perspective, and U under the user's.
+/// either, the refusal naming the mirror the named perspective shows:
+/// A from the root homes (R's home is "foreign"), U from main's. A
+/// root standing for another node has that node's home: K standing
+/// for M at the root names M itself, in its own home "origin", from
+/// the root homes, and U from main's.
 fn the_tamper_check_accepts_a_mirror_whatever_perspective_the_save_names (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
@@ -1617,28 +1687,28 @@ fn the_tamper_check_accepts_a_mirror_whatever_perspective_the_save_names (
             Some ( shown . clone () . unwrap_or ( ID::from ("none") )),
           _ => None, } ),
       _ => None, } };
-  for followed in [ Perspective::user (), Perspective::RootAuthors ] {
+  for followed in [ skgrepo ("main"), Perspective::RootHomes ] {
     assert_eq! ( mismatch_naming (&buffer_showing ("U", "main"), followed . clone ()), None );
     assert_eq! ( mismatch_naming (&buffer_showing ("A", "foreign"), followed . clone ()), None ); }
-  assert_eq! ( mismatch_naming (&buffer_showing ("K", "foreign"), Perspective::user ()),
+  assert_eq! ( mismatch_naming (&buffer_showing ("K", "foreign"), skgrepo ("main")),
                Some ( ID::from ("U") ));
-  assert_eq! ( mismatch_naming (&buffer_showing ("K", "foreign"), Perspective::RootAuthors),
+  assert_eq! ( mismatch_naming (&buffer_showing ("K", "foreign"), Perspective::RootHomes),
                Some ( ID::from ("A") ));
-  { // At the root, K standing for M has M's author, foreign, as its
-    // root author.
+  { // At the root, K standing for M has M's home, "origin", as its
+    // root's home.
     let root_k_standing_for_m : &str =
       "* (skg node (gnid K) (skgRepos (nodeRepo foreign)) (inPlaceOf M)) K\n";
-    assert_eq! ( mismatch_naming (root_k_standing_for_m, Perspective::user ()),
+    assert_eq! ( mismatch_naming (root_k_standing_for_m, skgrepo ("main")),
                  Some ( ID::from ("U") ));
-    assert_eq! ( mismatch_naming (root_k_standing_for_m, Perspective::RootAuthors),
-                 Some ( ID::from ("A") )); }
+    assert_eq! ( mismatch_naming (root_k_standing_for_m, Perspective::RootHomes),
+                 Some ( ID::from ("M") )); }
   Ok (( )) }
 
 /// The client is the authority on its buffer's perspective:
-/// a view the connection holds as following the user's, saved by a
-/// client whose buffer still follows the root authors' (drawn before
+/// a view the connection holds as following main's, saved by a
+/// client whose buffer still follows the root homes (drawn before
 /// the switch, as after a lost answer, or by a client that never
-/// switched), is checked and redrawn following the root authors', and
+/// switched), is checked and redrawn following the root homes, and
 /// the connection takes that choice for it.
 async fn a_held_view_follows_whatever_its_save_names (
   config  : &SkgConfig,
@@ -1647,11 +1717,11 @@ async fn a_held_view_follows_whatever_its_save_names (
   let (mut views_state, mut env, view) : (ViewsState, SkgEnv, String) =
     connection_holding_a_view_of (config, tantivy, "R", &[ ID::from ("R") ]) ?;
   messages_answering (
-    &switch_request ("R", Perspective::user ()),
+    &switch_request ("R", skgrepo ("main")),
     &mut views_state, &env, config, handle_set_perspective_request );
   let view_id : ViewforestId = ViewforestId::from_client_string ("R" . to_string ());
   assert_eq! ( views_state . open_views . perspective_of_view (&view_id),
-               Perspective::user () );
+               skgrepo ("main") );
   let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   let response : SaveResponse =
     update_from_and_rerender_buffer_with_approvals (
@@ -1659,32 +1729,32 @@ async fn a_held_view_follows_whatever_its_save_names (
       &mut views_state, &SkgrepoRestriction::unrestricted (config),
       true, &HashMap::new (), &HashSet::new (),
       &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
-      Perspective::RootAuthors ) . await ?;
+      Perspective::RootHomes ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   assert! ( line_of_gnid (&response . saved_view, "A")
             . is_some_and ( |l| l . contains ("(inPlaceOf M)") ),
-    "the save is redrawn following R's author:\n{}", response . saved_view );
+    "the save is redrawn following R's home:\n{}", response . saved_view );
   assert_eq! ( views_state . open_views . perspective_of_view (&view_id),
-               Perspective::RootAuthors );
+               Perspective::RootHomes );
   Ok (( )) }
 
 /// The user takes back a fork where it stands in place of another's
-/// original: a view of foreign R, switched to the user's perspective,
+/// original: a view of foreign R, switched to main's perspective,
 /// shows U in M's place, and 'delete' is written on U. The save
 /// deletes U and nothing else: it asks to fork nothing, R keeps M, and
-/// the redrawn view shows in U's place the mirror of M that the user's
-/// perspective now ranks first: A, M's author's fork of it, in M's
-/// skgrepo, which the user's list ranks above third's. Deleting a
+/// the redrawn view shows in U's place the mirror of M that main's
+/// perspective now ranks first: A, in "foreign", which main's list
+/// ranks above third's and origin's, by declaration order. Deleting a
 /// mirror shown in its original's place deletes the mirror, not the
 /// original's membership, so it edits no foreign parent.
-async fn deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_the_original (
+async fn deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_another_mirror (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let (mut views_state, mut env, _view) : (ViewsState, SkgEnv, String) =
     connection_holding_a_view_of (config, tantivy, "R", &[ ID::from ("R") ]) ?;
   let switched : String = rerendered_text ( &messages_answering (
-    &switch_request ("R", Perspective::user ()),
+    &switch_request ("R", skgrepo ("main")),
     &mut views_state, &env, config, handle_set_perspective_request ))
     . ok_or ("the switch rerenders the view") ?;
   let u_line : &str = line_of_gnid (&switched, "U")
@@ -1702,7 +1772,7 @@ async fn deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows
       &mut views_state, &SkgrepoRestriction::unrestricted (config),
       false, &HashMap::new (), &HashSet::new (),
       &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
-      Perspective::user () ) . await ?;
+      skgrepo ("main") ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   assert! ( response . fork_confirmation . is_none (),
     "deleting one's own fork asks to fork nothing:\n{}", response . saved_view );
@@ -1716,7 +1786,7 @@ async fn deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows
   assert! ( line_of_gnid (saved, "A")
             . is_some_and ( |l| l . starts_with ("** ")
                                 && l . contains ("(inPlaceOf M)") ),
-    "A, M's author's fork, is shown in U's place:\n{}", saved );
+    "A, foreign's fork, is shown in U's place:\n{}", saved );
   assert! ( line_of_gnid (saved, "U") . is_none (), "{}", saved );
   Ok (( )) }
 
@@ -1734,7 +1804,7 @@ fn a_deleted_mirror_keeps_its_original_but_a_removed_one_does_not (
     buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       buffer, &graph, config, &SkgrepoRestriction::unrestricted (config),
       &HashMap::new (), &WhatTheBaselineShows::default (),
-      Perspective::user () ) . map ( |(_, plan, _)| plan ) };
+      skgrepo ("main") ) . map ( |(_, plan, _)| plan ) };
   let deletes_u = |instructions : &[NodeInstruction]| -> bool {
     instructions . iter () . any ( |i| matches! (
       i, NodeInstruction::Delete (d) if d . gnid == ID::from ("U") )) };

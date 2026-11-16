@@ -15,7 +15,8 @@ use crate::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::mirrors::{
-  FirstRanked, Mirror, Mirrors, first_ranked_mirrors, mirrors_of};
+  Mirror, Mirrors, first_ranked_mirrors, mirrors_of,
+  the_only_one_forked_by_none_of_the_others};
 use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::refresh::{Truth, refresh_content_viewforest};
@@ -32,7 +33,7 @@ use crate::serve::handlers::text_release::{
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::views_state::{ViewforestId, ViewnodeIdRecord, pids_from_viewforest};
-use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName, SkgrepoOwner};
+use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
@@ -335,14 +336,14 @@ pub fn draw_search_buffer (
   refresh_content_viewforest (
     viewforest, viewnode_id_record,
     &Truth { graph, config, restriction },
-    Perspective::RootAuthors ) ?;
+    Perspective::RootHomes ) ?;
   let mut asked : HashSet<NodeId> = HashSet::new ();
   while request_forks_folders_toward_suppressed_hits (
           viewforest, &hits, graph, restriction, suppressed, &mut asked ) {
     refresh_content_viewforest (
       viewforest, viewnode_id_record,
       &Truth { graph, config, restriction },
-      Perspective::RootAuthors ) ?; }
+      Perspective::RootHomes ) ?; }
   for hit in &hits {
     fold_what_was_drawn_under_hit (viewforest, *hit);
     fold_nested_forks_folders (viewforest, *hit); }
@@ -663,11 +664,11 @@ pub fn group_matches_by_gnid (
 
 /// The result ids to drop from the top level because another hit,
 /// owned, is a mirror of them ('server/dbs/in_rust_graph/mirrors.rs')
-/// that the user's perspective ranks first. Among the hits that are
-/// mirrors of one another, under the skgrepo restriction, the one the
-/// user's skgrepo list ranks first stands ('first_ranked_mirrors',
-/// counting only the hits; where they tie, the least pid); if it is
-/// owned, every other hit among them is suppressed. A foreign hit
+/// that the user's own skgrepo list ranks first. Among the hits that
+/// are mirrors of one another, under the skgrepo restriction, the one
+/// that list ranks first stands ('hit_standing_among', counting only
+/// the hits); if it is owned, every other hit among them is
+/// suppressed. So among owned hits the most public stands. A foreign hit
 /// never suppresses -- so a pure-foreign mutual pair shows both, and a
 /// "boring" foreign fork does not hide the node it forks. A suppressed
 /// hit one fork from its suppressor reappears in one of its partner
@@ -720,15 +721,20 @@ fn hits_among_mirrors_of (
   Mirrors { members, forks } }
 
 /// Which of 'hits', hits that are mirrors of one another, the user's
-/// skgrepo list ranks first, ties going to the least pid.
+/// own skgrepo list ranks first: the perspective of the config's
+/// first owned skgrepo in declaration order (the most public;
+/// 'SkgConfig::default_perspective_skgrepo'), then the others in
+/// declaration order. Several there tie: the only one none of the
+/// others forks stands, else the least pid.
 fn hit_standing_among (
   config : &SkgConfig,
   hits   : &Mirrors,
 ) -> Option<ID> {
-  match first_ranked_mirrors (config, &SkgrepoOwner::User, hits) ? {
-    FirstRanked::One (pid) => Some (pid),
-    FirstRanked::Tied (tied) =>
-      tied . into_iter () . map ( |mirror| mirror . pid ) . min (), }}
+  let tied : Vec<Mirror> = first_ranked_mirrors (
+    config, &config . default_perspective_skgrepo (), hits );
+  if tied . len () == 1 { return Some ( tied [0] . pid . clone () ); }
+  the_only_one_forked_by_none_of_the_others (&tied, hits)
+    . or_else ( || tied . into_iter () . map ( |mirror| mirror . pid ) . min () ) }
 
 /// Builds the stub of the search buffer ('draw_search_buffer'): one
 /// root per hit, best first, each a write-protected occurrence titled

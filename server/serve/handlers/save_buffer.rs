@@ -703,14 +703,14 @@ fn named_diffView_buffer_kind_from_request (
 
 /// The request's '(perspective . "NAME")': the perspective the
 /// saved buffer was drawn from ('Perspective::wire_name');
-/// its root authors' without one. A name no choice has refuses the
+/// its root homes without one. A name no choice has refuses the
 /// save.
 fn perspective_from_save_request (
   request : &str,
   config  : &SkgConfig,
 ) -> Result<Perspective, String> {
   match value_from_request_sexp ("perspective", request) {
-    Err (_) => Ok (Perspective::RootAuthors),
+    Err (_) => Ok (Perspective::RootHomes),
     Ok (name) => Perspective::from_wire_name (&name, config)
       . ok_or_else ( || format! (
         "The save request says the buffer was drawn from the perspective {:?}, which names none. Nothing was saved.",
@@ -960,7 +960,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
     viewforest_id_from_request_result, views_state, skgrepo_restriction,
     approved_forks, fork_skgrepos, approved_hoist_pids,
     &StrandedsReview::NotReviewed, DeleteFrom::NotChosen,
-    &[], None, Perspective::RootAuthors ) . await
+    &[], None, Perspective::RootHomes ) . await
 }
 
 pub async fn update_from_and_rerender_buffer_with_approvals (
@@ -1438,7 +1438,7 @@ fn viewforest_ids_of_views_to_lock (
 #[cfg(test)]
 mod perspective_tests {
   use super::*;
-  use crate::types::misc::{Skgrepo, SkgrepoOwner};
+  use crate::types::misc::Skgrepo;
   use std::path::PathBuf;
 
   #[test]
@@ -1451,16 +1451,14 @@ mod perspective_tests {
                   path : PathBuf::from (name), owned } ); }
     let named = |sexp : &str| perspective_from_save_request (
       &format! ("((request . \"save buffer\") (view-id . \"v\"){})", sexp), &config );
-    assert_eq! ( named (""), Ok (Perspective::RootAuthors) );
-    assert_eq! ( named (" (perspective . \"user\")"),
-                 Ok (Perspective::user ()) );
-    assert_eq! ( named (" (perspective . \"root authors\")"),
-                 Ok (Perspective::RootAuthors) );
-    assert_eq! ( named (" (perspective . \"owner of tracy\")"),
-                 Ok ( Perspective::Owner (
-                   SkgrepoOwner::Foreign ( SkgrepoName::from ("tracy") )) ));
-    assert! ( named (" (perspective . \"mine\")") . is_err () );
-    assert! ( named (" (perspective . \"owner of main\")") . is_err (),
-              "an owned skgrepo names no foreign owner" );
-    assert! ( named (" (perspective . \"owner of nobody\")") . is_err () ); }
+    assert_eq! ( named (""), Ok (Perspective::RootHomes) );
+    assert_eq! ( named (" (perspective . \"root homes\")"),
+                 Ok (Perspective::RootHomes) );
+    for skgrepo in [ "main", "tracy" ] {
+      assert_eq! ( named ( &format! (" (perspective . \"skgrepo {}\")", skgrepo )),
+                   Ok ( Perspective::Skgrepo ( SkgrepoName::from (skgrepo) )),
+                   "an owned or a foreign skgrepo" ); }
+    for unknown in [ "mine", "skgrepo nobody", "user", "root authors", "owner of tracy" ] {
+      assert! ( named ( &format! (" (perspective . \"{}\")", unknown )) . is_err (),
+                "{:?} names no perspective", unknown ); }}
 }

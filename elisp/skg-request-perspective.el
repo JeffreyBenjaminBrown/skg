@@ -1,10 +1,11 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Cycle the perspective of the current view: whose list of
-;;; skgrepos ranks the mirrors it shows in a note's place. A fresh view
-;;; is drawn from each root author's perspective; the cycle then holds
-;;; yours and each other owner's whose perspective would show the view
-;;; differently, so that you can read it as that owner would. The
+;;; PURPOSE: Cycle the perspective of the current view: the skgrepo
+;;; whose list of skgrepos ranks the mirrors it shows in a note's
+;;; place. A fresh view is drawn from each root's home skgrepo; the
+;;; cycle then holds each skgrepo home to a mirror in the view whose
+;;; perspective would show the view differently, so that you can
+;;; choose among them (a private and a public fork, say). The
 ;;; server computes the cycle afresh at each request, switches the
 ;;; view to the next perspective and redraws it; the answer names the
 ;;; view and the perspective, and a rerender stream follows, carrying
@@ -18,15 +19,16 @@
 (require 'skg-request-rerender-all-views) ; for skg--send-streaming-request
 
 (defun skg-cycle-perspective (&optional approved-pids)
-  "Show this view from the next perspective: whose list of skgrepos
-ranks the mirrors it shows in a note's place. A fresh view is drawn
-from each root author's perspective: under a root of yours, yours;
-under another's root, that author's. The cycle then holds yours and
-each other owner's whose perspective would show this view
-differently, each in every tree, so that each note shows the mirror
-that owner's skgrepos rank first; after the last, the root authors'
-again. Each switch names the perspective it shows; the mode name
-names it too, unless it is the root authors', and a save keeps it.
+  "Show this view from the next perspective: the skgrepo whose list
+of skgrepos (it, then the config's declaration order) ranks the
+mirrors it shows in a note's place. A fresh view is drawn from each
+root's home skgrepo. The cycle then holds each skgrepo home to a
+mirror in the view whose perspective would show this view
+differently, in declaration order, each in every tree, so that each
+note shows its mirror in that skgrepo, else the first declared;
+after the last, the root homes again. Each switch names the
+perspective it shows; the mode name names it too, unless it is the
+root homes, and a save keeps it.
 Refuses while the buffer has unsaved edits, which the redraw would
 replace. APPROVED-PIDS approve the text a privacy challenge asked
 about."

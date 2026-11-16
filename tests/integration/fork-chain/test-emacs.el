@@ -2,8 +2,9 @@
 ;;; Fork a foreign N into a public clone C (implicit fork), then run
 ;;; skg-fork-node on the shown substitute C and rotate its clone to a
 ;;; private skgrepo, forming the chain D forks C forks N. Viewing
-;;; N's container then shows the chain end D, marked (inPlaceOf N),
-;;; and the save accepts that chain-end carrier.
+;;; N's container from its home, public, then shows C; switched to the
+;;; perspective of private, it shows the chain end D, marked (inPlaceOf
+;;; N), and the save accepts that chain-end carrier.
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../test-wait.el")
@@ -100,9 +101,27 @@
       (skg-approve-fork)))
   (message "✓ the public clone was forked into a private clone (skgRepos (nodeRepo rotated))")
 
-  ;; 7. Reopen P (all skgrepos unrestricted): the chain end D -- a private-repo
-  ;;    node -- is now shown in N's place, still marked (inPlaceOf N).
+  ;; 7. Reopen P (all skgrepos unrestricted): drawn from P's home,
+  ;;    public, it shows C in N's place. Cycled to the perspective of
+  ;;    private (passing foreign's, which shows N itself), the chain end
+  ;;    D -- a private-repo node -- is shown in N's place, still marked
+  ;;    (inPlaceOf N).
   (let ((p-buf (chain-test--reopen-P)))
+    (with-current-buffer p-buf
+      (unless (skg-test-wait-for
+               (lambda () (string-match-p "(nodeRepo public)) (inPlaceOf N)"
+                                          (buffer-string)))
+               10)
+        (test-fail "from P's home, public, C was not shown for N:\n%s"
+                   (buffer-string)))
+      (dotimes (_ 3)
+        (unless (equal skg-perspective "skgrepo private")
+          (skg-cycle-perspective)
+          (skg-test-wait-for
+           (lambda () (and skg-perspective (not skg--stream-in-progress)))
+           10))))
+    (unless (with-current-buffer p-buf (equal skg-perspective "skgrepo private"))
+      (test-fail "the view never reached the perspective of private"))
     (let ((end-shown
            (skg-test-wait-for
             (lambda ()

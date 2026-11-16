@@ -4,7 +4,8 @@
 # - Starts an independent skg server with a single owned skgrepo.
 # - Emacs opens the owned container Q (whose content is the owned M),
 #   runs skg-fork-node on M, and approves: a clone is created (it forks
-#   M) and shown in M's place when Q re-renders.
+#   M). In the one skgrepo, holding both, M stands as itself, so when Q
+#   re-renders the clone stands in M's forks folder.
 # - Also checks that forking a dirty buffer is refused, and that
 #   declining a fork strips the lingering (viewRequests fork) atom and
 #   commits nothing.

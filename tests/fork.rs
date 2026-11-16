@@ -502,9 +502,9 @@ async fn a_reply_deeper_in_an_unread_message_integrates_the_message (
   Ok (( )) }
 
 /// The same mail, read by a third party, who owns neither 't' nor
-/// 'f': 'f' is foreign to it, so its view is drawn from the reader's
-/// perspective, whose skgrepo list ranks the sender's skgrepo (declared
-/// before the third party's) above the third party's. Its reply under
+/// 'f': its view of 'f' is drawn from the perspective of 'f''s home
+/// skgrepo, 'reader', whose skgrepo list ranks the sender's skgrepo
+/// (declared before the third party's) above the third party's. Its reply under
 /// 'm1' forks 'm1' into its own skgrepo; the view goes on drawing the
 /// original, without the reply, and 'f' cannot be written, so nothing
 /// is filed. The save says so, and how to see the fork.
@@ -532,11 +532,11 @@ async fn a_third_partys_reply_in_anothers_unread_list_warns (
                vec! [ ID::from ("d") ], "f is foreign here: nothing is filed" );
   assert! ( subtree_of (&response . saved_view, "m1") . len () == 2
             && ! response . saved_view . contains ("a third party's reply"),
-    "the view is drawn from the reader's perspective: it draws m1 raw, with its question only:\n{}",
+    "the view is drawn from the perspective of reader: it draws m1 raw, with its question only:\n{}",
     response . saved_view );
   assert! ( response . warnings . iter () . any ( |warning|
               warning . contains ("'message one' forked it into your skgrepo 'third'")
-              && warning . contains ("the owner of 'reader'") ),
+              && warning . contains ("from the perspective of reader") ),
     "the save must say where the reply went: {:?}", response . warnings );
   Ok (( )) }
 

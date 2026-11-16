@@ -19,7 +19,7 @@ use skg::test_utils::{
   run_with_skgrepo_set_test_db, search_gnids_for_skgrepo_set_for_test,
   titles_for_skgrepo_set_for_test};
 use skg::dbs::node_lookup::graphnode_from_graph;
-use skg::test_utils::multi_root_view;
+use skg::test_utils::multi_root_view_from_perspective;
 use skg::test_utils::{set_skgrepo_retagging_relRepos, graph_handle_from_config};
 use skg::test_utils::{read_all_lp_messages, skg_env_from_parts};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
@@ -99,8 +99,10 @@ fn all_tests
 ///
 /// Fixtures: public 'ovr-sub-container' -> 'ovr-sub-original' (N);
 /// private 'ovr-sub-mirror' (R) forks ovr-sub-original and
-/// contains the public 'ovr-sub-child' (D). Under "private" (no restriction) R substitutes
-/// for N; switching to "public" makes R restricted.
+/// contains the public 'ovr-sub-child' (D). The view is drawn from
+/// the perspective of "private" (from the root homes, N stands in its
+/// own skgrepo, "public"). Under "private" (no restriction) R
+/// substitutes for N; switching to "public" makes R restricted.
 ///
 /// Installs the explicit graph handle (mirror substitution reads
 /// it), so it assumes per-test process isolation (nextest), like
@@ -117,11 +119,13 @@ fn mirror_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
         skg::test_utils::graph_handle_from_config (config) ? );
 
       // 1. Under "private" (no restriction), R is shown in place of N (substitution).
-      let (view_all, _pids, tree_all)
-        : (String, Vec<ID>, Tree<Viewnode>) =
-        multi_root_view (
-          config, Some (tantivy),
-          &[ ID::from ("ovr-sub-container") ] ) ?;
+      let private_perspective : Perspective =
+        Perspective::Skgrepo ( SkgrepoName::from ("private") );
+      let (view_all, tree_all) : (String, Tree<Viewnode>) =
+        multi_root_view_from_perspective (
+          config, &[ ID::from ("ovr-sub-container") ],
+          &SkgrepoRestriction::unrestricted (config),
+          private_perspective . clone () ) ?;
       assert! (
         view_all . contains ("(inPlaceOf ovr-sub-original)"),
         "unrestricted the mirror should substitute for N:\n{}",
@@ -152,7 +156,7 @@ fn mirror_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
                     viewnode_id_record : ViewnodeIdRecord::default (),
                     extend_at_next_rerender_all : false,
                     skgrepo_restriction_at_last_render : restriction . clone (),
-                    perspective : Perspective::RootAuthors });
+                    perspective : private_perspective });
       let (mut server_stream, _client_stream) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       std::thread::scope ( |scope| {
@@ -395,7 +399,7 @@ async fn skgrepo_set_switch_rerenders_views (
           viewnode_id_record : ViewnodeIdRecord::default (),
           extend_at_next_rerender_all : false,
           skgrepo_restriction_at_last_render : restriction . clone (),
-          perspective : Perspective::RootAuthors, });
+          perspective : Perspective::RootHomes, });
       let (mut server_stream, _client_stream) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       std::thread::scope ( |scope| {

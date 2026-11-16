@@ -1,8 +1,9 @@
--- PURPOSE: Cycle the perspective of the current view: whose list of
--- skgrepos ranks the mirrors it shows in a note's place. A fresh view
--- is drawn from each root author's perspective; the cycle then holds
--- yours and each other owner's whose perspective would show the view
--- differently, so that you can read it as that owner would. The server computes the cycle afresh at each request,
+-- PURPOSE: Cycle the perspective of the current view: the skgrepo
+-- whose list of skgrepos ranks the mirrors it shows in a note's place.
+-- A fresh view is drawn from each root's home skgrepo; the cycle then
+-- holds each skgrepo home to a mirror in the view whose perspective
+-- would show the view differently, so that you can choose among them
+-- (a private and a public fork, say). The server computes the cycle afresh at each request,
 -- switches the view to the next perspective and redraws it; the
 -- answer names the view and the perspective, and a rerender stream
 -- follows, carrying the redrawn buffer, which keeps the cursor and
@@ -11,7 +12,7 @@
 --
 -- DATA USED/ASSUMED: See docs/api-and-formats.org, "Set
 -- perspective". The buffer keeps the perspective in
--- 'vim.b.skg_perspective' (nil for the root authors', else its
+-- 'vim.b.skg_perspective' (nil for the root homes, else its
 -- wire name) and 'vim.b.skg_perspective_name' (the server's
 -- name for it), which 'buffer.set_perspective' sets; each
 -- save sends the first ('save.save_request_sexp') and a fresh view
@@ -25,15 +26,15 @@ local sexpr = require('skg.sexpr.parse')
 
 local M = {}
 
----Show this view from the next perspective: whose list of skgrepos
----ranks the mirrors it shows in a note's place. A fresh view is drawn
----from each root author's perspective: under a root of yours, yours;
----under another's root, that author's. The cycle then holds yours and
----each other owner's whose perspective would show this view
----differently, each in every tree; after the last, the root authors'
----again. Each switch names the perspective it shows;
----'buffer.perspective_mode_line' names it too, unless it is
----the root authors', and a save keeps it.
+---Show this view from the next perspective: the skgrepo whose list of
+---skgrepos (it, then the config's declaration order) ranks the
+---mirrors it shows in a note's place. A fresh view is drawn from each
+---root's home skgrepo. The cycle then holds each skgrepo home to a
+---mirror in the view whose perspective would show this view
+---differently, in declaration order, each in every tree; after the
+---last, the root homes again. Each switch names the perspective it
+---shows; 'buffer.perspective_mode_line' names it too, unless it is
+---the root homes, and a save keeps it.
 ---Refuses while the buffer has unsaved edits, which the redraw would
 ---replace. APPROVED_PIDS approve the text a privacy challenge asked
 ---about.

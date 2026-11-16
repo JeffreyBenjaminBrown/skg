@@ -1,7 +1,8 @@
 // Rung 7: substitution. In a content view a forked node is shown as
 // the mirror its tree's perspective chooses, with '(inPlaceOf ID)',
-// except at a root, in a folder, and as the content of a node shown
-// raw where a mirror would stand. When the fork is gone, the shown
+// except in a folder, and as the content of a node shown raw where a
+// mirror would stand. A note stands as itself in its own skgrepo, so
+// the forked notes here are homed apart from their containers. When the fork is gone, the shown
 // headline loses 'inPlaceOf', becomes unwarranted (so, under an
 // editable parent, 'noClaim'), and the original is reinstated beside
 // it. A shown mirror that
@@ -12,11 +13,11 @@
 use super::*;
 use indoc::formatdoc;
 
-/// p contains n, which o forks.
+/// p contains n, in 'private', which o forks. p and o are in 'main'.
 fn forked () -> InRustGraph {
   graph (&[
     Graphnode { contains : ids (&["n"]), .. node ("p") },
-    node ("n"),
+    node_in ("private", "n"),
     Graphnode { forks : msv_ids (&["n"]), .. node ("o") }, ]) }
 
 #[test]
@@ -34,7 +35,7 @@ node p
 fn a_member_shown_raw_is_shown_as_its_mirror_in_place () {
   let input : String = formatdoc! ("
     * {} p
-    ** (skg (vnid n1) folded node (gnid n) (skgRepos (nodeRepo main))) n
+    ** (skg (vnid n1) folded node (gnid n) (skgRepos (nodeRepo private))) n
     ", occurrence_metadata ("p", "") );
   let run : Run = run_asserting_fixpoint (&input, &forked ());
   assert_eq! ( run . outline (), "\
@@ -78,15 +79,22 @@ node n
   containerFolder
     node q wp noClaim" ); }
 
+/// A root shown raw where another mirror would stand shows its
+/// content raw too: r, in 'theirs', contains n, in 'theirs', which o,
+/// in 'main', forks; s, in 'private', forks r. From the perspective of
+/// 'private' under the restriction to 'main', which keeps 'private'
+/// out, r stands raw where s would stand, and n, which o would
+/// otherwise stand for, is raw.
 #[test]
 fn the_content_of_a_forked_node_shown_raw_is_shown_raw () {
   let graph : InRustGraph = graph (&[
-    Graphnode { contains : ids (&["n"]), .. node ("r") },
-    Graphnode { forks : msv_ids (&["r"]), .. node ("s") },
-    node ("n"),
+    Graphnode { contains : ids (&["n"]), .. node_in ("theirs", "r") },
+    Graphnode { forks : msv_ids (&["r"]), .. node_in ("private", "s") },
+    node_in ("theirs", "n"),
     Graphnode { forks : msv_ids (&["n"]), .. node ("o") }, ]);
-  assert_eq! ( run_asserting_fixpoint (
-    &format! ("* {} r\n", occurrence_metadata ("r", "")), &graph ) . outline (), "\
+  assert_eq! ( run_asserting_fixpoint_from (
+    &format! ("* {} r\n", occurrence_metadata_in ("theirs", "r")), &graph,
+    &main_only (), Perspective::Skgrepo ( SkgrepoName::from ("private") )) . outline (), "\
 node r
   node n
     forksFolder
@@ -102,7 +110,7 @@ node r
 fn a_mirror_editable_elsewhere_is_shown_write_protected () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["n", "q"]), .. node ("p") },
-    node ("n"),
+    node_in ("private", "n"),
     Graphnode { contains : ids (&["o"]), .. node ("q") },
     Graphnode { forks : msv_ids (&["n"]), .. node ("o") }, ]);
   let input : String = formatdoc! ("
@@ -110,7 +118,7 @@ fn a_mirror_editable_elsewhere_is_shown_write_protected () {
     ** {} n
     ** {} q
     * {} o
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("n", ""),
+    ", occurrence_metadata ("p", ""), occurrence_metadata_in ("private", "n"),
        occurrence_metadata ("q", ""), occurrence_metadata ("o", "") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
@@ -119,35 +127,21 @@ node p
     node o wp
 node o" ); }
 
-/// 'node (pid)', but at home in 'skgrepo'.
-fn node_in (
-  skgrepo : &str,
-  pid     : &str,
-) -> Graphnode {
-  Graphnode { home_skgrepo : SkgrepoName::from (skgrepo), .. node (pid) } }
-
-/// The metadata of an occurrence of 'pid' in 'skgrepo'.
-fn occurrence_metadata_in (
-  skgrepo : &str,
-  pid     : &str,
-) -> String {
-  format! ( "(skg node (gnid {}) (skgRepos (nodeRepo {})))", pid, skgrepo ) }
-
-/// r, in 'theirs', and p, in 'main', each contain m, in 'theirs'.
+/// r, in 'theirs', and p, in 'main', each contain m, in 'third'.
 /// a, in 'theirs', and u, in 'main', each fork m.
-fn m_forked_by_its_author_and_the_user () -> InRustGraph {
+fn m_forked_in_theirs_and_in_main () -> InRustGraph {
   graph (&[
     Graphnode { contains : ids (&["m"]), .. node_in ("theirs", "r") },
     Graphnode { contains : ids (&["m"]), .. node ("p") },
-    node_in ("theirs", "m"),
+    node_in ("third", "m"),
     Graphnode { forks : msv_ids (&["m"]), .. node_in ("theirs", "a") },
     Graphnode { forks : msv_ids (&["m"]), .. node ("u") }, ]) }
 
 #[test]
-fn under_a_foreign_root_its_authors_fork_is_shown_and_not_the_users () {
+fn under_a_foreign_root_the_fork_in_its_home_is_shown_and_not_the_users () {
   assert_eq! ( run_asserting_fixpoint (
     &format! ("* {} r\n", occurrence_metadata_in ("theirs", "r")),
-    &m_forked_by_its_author_and_the_user () ) . outline (), "\
+    &m_forked_in_theirs_and_in_main () ) . outline (), "\
 node r
   node a (inPlaceOf m)
     forksFolder
@@ -164,7 +158,7 @@ node r
 fn under_an_owned_root_the_users_fork_is_shown () {
   assert_eq! ( run_asserting_fixpoint (
     &format! ("* {} p\n", occurrence_metadata ("p", "")),
-    &m_forked_by_its_author_and_the_user () ) . outline (), "\
+    &m_forked_in_theirs_and_in_main () ) . outline (), "\
 node p
   node u (inPlaceOf m)
     forksFolder
@@ -178,11 +172,11 @@ node p
           node u wp noClaim" ); }
 
 /// r, in 'theirs', contains e, in 'third', which contains c, in
-/// 'third'. c is forked by j, in 'theirs' (r's author), by d, in
-/// 'third' (e's author), and by u, in 'main' (the user). Under r,
-/// only r's author's perspective is followed, even beneath e.
+/// 'third'. c is forked by j, in 'theirs' (r's home), by d, in
+/// 'third' (e's home), and by u, in 'main'. Under r, only the
+/// perspective of r's home is followed, even beneath e.
 #[test]
-fn under_a_foreign_root_its_authors_perspective_holds_beneath_a_third_authors_node () {
+fn under_a_foreign_root_its_homes_perspective_holds_beneath_a_node_homed_elsewhere () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["e"]), .. node_in ("theirs", "r") },
     Graphnode { contains : ids (&["c"]), .. node_in ("third", "e") },
@@ -207,14 +201,14 @@ node r
               forksFolder
                 node c wp" ); }
 
-/// A chain of forks stops where the next is not of the perspective:
-/// m is forked by a, in 'theirs', which u, in 'main', forks.
-/// Under r, in 'theirs', a is shown.
+/// A chain of forks stops where the next is not in the perspective's
+/// skgrepo: m, in 'third', is forked by a, in 'theirs', which u, in
+/// 'main', forks. Under r, in 'theirs', a is shown.
 #[test]
 fn under_a_foreign_root_a_chain_stops_before_the_users_fork () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["m"]), .. node_in ("theirs", "r") },
-    node_in ("theirs", "m"),
+    node_in ("third", "m"),
     Graphnode { forks : msv_ids (&["m"]), .. node_in ("theirs", "a") },
     Graphnode { forks : msv_ids (&["a"]), .. node ("u") }, ]);
   assert_eq! ( run_asserting_fixpoint (
@@ -230,30 +224,36 @@ node r
         forksFolder
           node a wp" ); }
 
-/// Whether a foreign root is forked and so shows its content raw
-/// asks of its author's perspective, not the user's: the user's k
-/// forks r, yet r's author's fork of m is shown; r's
-/// author's s forks q, so q's content is raw. m in r's forks folder
-/// is a repeat (q's m holds its editability), so it shows nothing.
+/// Whether a root is shown raw where another mirror would stand, and
+/// so shows its content raw, asks of the view's perspective: from the
+/// perspective of 'private', under the restriction to 'main', which
+/// keeps 'private' out, r, in 'theirs', which k, in 'private', forks,
+/// is raw where k would stand, so its m, in 'theirs', is raw though
+/// a, in 'main', forks m; q, in 'theirs', forked by s, in 'third',
+/// stands as itself (from 'private', the first skgrepo declared that
+/// holds a mirror of q is q's own), so its m is shown as a. m in r's
+/// content holds m's editability, so q's a, in m's place, shows m in
+/// its forks folder write-protected.
 #[test]
-fn a_foreign_root_is_shown_raw_only_when_its_author_forks_it () {
+fn a_root_is_shown_raw_only_where_the_views_perspective_would_show_another () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["m"]), .. node_in ("theirs", "r") },
     Graphnode { contains : ids (&["m"]), .. node_in ("theirs", "q") },
     node_in ("theirs", "m"),
-    Graphnode { forks : msv_ids (&["m"]), .. node_in ("theirs", "a") },
-    Graphnode { forks : msv_ids (&["r"]), .. node ("k") },
-    Graphnode { forks : msv_ids (&["q"]), .. node_in ("theirs", "s") }, ]);
-  assert_eq! ( run_asserting_fixpoint (
+    Graphnode { forks : msv_ids (&["m"]), .. node ("a") },
+    Graphnode { forks : msv_ids (&["r"]), .. node_in ("private", "k") },
+    Graphnode { forks : msv_ids (&["q"]), .. node_in ("third", "s") }, ]);
+  assert_eq! ( run_asserting_fixpoint_from (
     &format! ("* {} r\n* {} q\n",
               occurrence_metadata_in ("theirs", "r"),
               occurrence_metadata_in ("theirs", "q")),
-    &graph ) . outline (), "\
+    &graph, &main_only (), Perspective::Skgrepo ( SkgrepoName::from ("private") ))
+    . outline (), "\
 node r
-  node a (inPlaceOf m)
-    forksFolder
-      node m wp
-node q
   node m
     forksFolder
-      node a wp noClaim" ); }
+      node a wp noClaim
+node q
+  node a (inPlaceOf m)
+    forksFolder
+      node m wp" ); }

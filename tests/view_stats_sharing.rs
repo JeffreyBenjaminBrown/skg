@@ -88,14 +88,13 @@ fn assert_sharing_stats_in_view_of_R (
     assert! ( f_line . contains ("(birth (forks in 2))")
               && f_line . contains ("(forks (in 1 (ancestors 2)))"),
       "{}: F, like E, is born of R's fork of it:\n{}", label, buf ); }
-  { // Because of mirror substitution, a fresh view of R shows
-    // C in place of P (C forks P), marked; C's position
-    // under a shown P is asserted from a view of P instead, in
-    // assert_c_forks_its_viewparent_in_view_of_P.
-    let c_lines : Vec<&str> = lines_containing (buf, "(gnid C)");
-    assert! ( c_lines . iter ()
-              . any ( |l| l . contains ("(inPlaceOf P)") ),
-      "{}: C is shown in place of P, marked:\n{}", label, buf ); }}
+  { // P and C, which forks it, are in one skgrepo, where P stands
+    // as itself ('docs/mirrors.org', "Which mirror stands"), so a
+    // fresh view of R shows P, not C in its place, with C as P's
+    // content.
+    assert! ( ! buf . contains ("inPlaceOf"),
+      "{}: nothing is shown in another's place:\n{}", label, buf );
+    assert_c_forks_its_viewparent_in_view_of_P (buf, label); }}
 
 fn assert_c_forks_its_viewparent_in_view_of_P (
   buf   : &str,
@@ -125,9 +124,8 @@ async fn sharing_view_stats_appear_and_roundtrip (
       let saved : String = // The save parses the buffer, so this also pins the parse arms.
         save_and_rerender (&de_novo, config, tantivy) . await ?;
       assert_sharing_stats_in_view_of_R (&saved, "after save");
-      { // This needs P shown as a parent, which substitution prevents
-        // in a view of R; a view rooted at P shows P raw (roots
-        // never substitute) with C as its content.
+      { // A view rooted at P shows P as itself, a root standing in
+        // its own home skgrepo, with C as its content.
         let (view_of_p, _pids, _tree)
           : (String, Vec<ID>, _) =
           multi_root_view (

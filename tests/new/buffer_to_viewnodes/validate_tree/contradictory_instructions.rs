@@ -213,7 +213,7 @@ fn validation_refuses_contradictory_processed_requests () -> Result<(), Box<dyn 
                 path : PathBuf::from ("/tmp/main"), owned : true } ) ]));
   let errors : Vec<BufferValidationError> = find_buffer_errors_for_saving_in_graph (
     &viewforest, &InRustGraph::from_graphnodes (&[]), &config,
-    Perspective::RootAuthors ) ?;
+    Perspective::RootHomes ) ?;
   let refusals : Vec<&BufferValidationError> = errors . iter ()
     . filter ( |e| matches! ( e, BufferValidationError::ContradictoryProcessedRequests (..) ))
     . collect ();

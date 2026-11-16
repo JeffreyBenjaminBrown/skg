@@ -139,15 +139,10 @@ FOREST_VIEW_REQUESTS = {
 # Commands that name one forest kind.
 FOREST_COMMAND_ALIASES = { "contains" : "containers",
                            "links-here" : "mentioners" }
-# A view's perspective
-# ('docs/api-and-formats.org', "Set perspective"): the command
-# line's word for each, and the server's; any other word is a foreign
-# skgrepo, naming its owner ('perspective_of_argument'). A fresh view
-# follows its root authors'.
-PERSPECTIVE_OF_ARGUMENT = { "next" : "next",
-                            "user" : "user",
-                            "root-authors" : "root authors" }
-DEFAULT_PERSPECTIVE = "root authors"
+# A view's perspective ('docs/api-and-formats.org', "Set
+# perspective"), by the server's name: "root homes", as every fresh
+# view follows, or "skgrepo NAME".
+DEFAULT_PERSPECTIVE = "root homes"
 SAVE_TERMINAL_RESPONSE_TYPES = {
   "save-result", "save-preview", "delete-from-confirmation", "strandeds-confirmation",
   "telescope-hoist-confirmation", "fork-confirmation",
@@ -249,7 +244,7 @@ def run_command (arguments):
         print ( f"{already_open . node_id} is already a root of the view "
                 f"{already_open . view_id}, whose files these are. If that "
                 f"view's perspective put it there, switch it back with "
-                f"'perspective SIDECAR root-authors' to view "
+                f"'perspective SIDECAR root homes' to view "
                 f"{already_open . node_id} by itself.", file = sys . stderr )
         for suffix in ( ".full.org", ".compact.org", ".view.json" ):
           print (files_stem + suffix)
@@ -355,12 +350,12 @@ def parse_command_line (argv):
     "view_files",
     help = "the BASE.view.json of the view, or a directory holding only one" )
   perspective_parser . add_argument (
-    "perspective", nargs = "?", default = "next",
+    "perspective", nargs = "*",
     help = ( "'next' (the default: the next in the view's cycle, as the "
-             "clients' 'C-c v o' does), 'root-authors' (each tree's root "
-             "author's, as a fresh view shows), 'user' (yours, in every "
-             "tree), or a foreign skgrepo's name (its owner's, in every "
-             "tree)" ))
+             "clients' 'C-c v o' does), 'root homes' (each tree's root's "
+             "home skgrepo, as a fresh view shows), or 'skgrepo NAME' "
+             "(that skgrepo's, owned or foreign, in every tree); the "
+             "words may be given apart or quoted together" ))
   perspective_parser . add_argument (
     "--port", type = int, default = None,
     help = "the server's port; it must be the one the sidecar records" )
@@ -833,7 +828,7 @@ def command_extend (arguments):
 
 def register_view_by_saving_it_unchanged (connection, saved_view, refusal):
   """Save SAVED_VIEW's full view back unchanged, as the view it is (a
-  buffer of the diff view, one drawn from the user's perspective), which
+  buffer of the diff view, one drawn from a skgrepo's perspective), which
   writes nothing and leaves CONNECTION's server holding the view: a
   request that works on a held view can then follow. Return the save's
   answer; raise REFUSAL, with the server's errors, when the server
@@ -939,22 +934,22 @@ def command_perspective (arguments):
   for path in written_paths:
     print (path)
 
-def perspective_of_argument (argument):
+def perspective_of_argument (words):
   """The server's name ('docs/api-and-formats.org', "Set
-  perspective") for the perspective ARGUMENT names on the command line:
-  'next', 'root-authors', 'user', a foreign skgrepo's name, which
-  names its owner, or the server's own name for a perspective, which
-  is taken as it is."""
-  if argument in PERSPECTIVE_OF_ARGUMENT . values () or argument . startswith ("owner of "):
-    return argument
-  return PERSPECTIVE_OF_ARGUMENT . get ( argument, "owner of " + argument )
+  perspective") for the perspective the command line's WORDS name:
+  'next' when there are none, else the words joined by spaces ('next',
+  'root homes' or 'skgrepo NAME'), which the server checks."""
+  return " " . join (words) if words else "next"
 
 def perspective_of_sidecar (sidecar):
-  """The perspective of the view a SIDECAR records,
-  by the server's wire name: 'user', 'owner of NAME', or
-  'root authors', as every fresh view does, and a sidecar that names
-  none."""
-  return sidecar . get ( "perspective", DEFAULT_PERSPECTIVE )
+  """The perspective of the view a SIDECAR records, by the server's
+  wire name: 'skgrepo NAME', or 'root homes', as every fresh view
+  does, and a sidecar that names none or names one in an older form
+  ('user', 'owner of NAME', 'root authors')."""
+  recorded = sidecar . get ( "perspective", DEFAULT_PERSPECTIVE )
+  if isinstance (recorded, str) and recorded . startswith ("skgrepo "):
+    return recorded
+  return DEFAULT_PERSPECTIVE
 
 def perspective_fields_of_sidecar (sidecar):
   """The fields of a view dict ('write_view_files') that carry the
@@ -1651,7 +1646,7 @@ def write_view_files (connection, view, out_dir, base_name, show_summary,
   records the view's perspective: VIEW's
   'perspective' and 'perspective_name', which a rewrite of a
   view carries from its sidecar ('perspective_fields_of_sidecar'), or
-  the root authors', a fresh view's. Given
+  the root homes, a fresh view's. Given
   UNLESS_COMPACT_DIFFERS_FROM, write nothing, and return None, when
   the compact view on disk is no longer that text: it was edited
   since it was read."""
@@ -2589,7 +2584,7 @@ def summary_lines (parsed_view, link_statuses, repo_ownership, view,
                    full_file_name):
   """Org comment lines, each a few 'NAME COUNT' facts of the view,
   after a line naming its perspective when that is not its root
-  authors'."""
+  homes."""
   headlines = [ line . metadata for line in parsed_view
                 if line . is_headline and line . metadata is not None ]
   occurrences = [ metadata for metadata in headlines
@@ -2623,7 +2618,7 @@ def summary_lines (parsed_view, link_statuses, repo_ownership, view,
       " (view ID " + view [ "view_id" ] + ")" ] + (
     [ "# Showing " + ( view . get ("perspective_name")
                        or view . get ("perspective") )
-      + " (each root author's perspective is the default)." ]
+      + " (each root's home skgrepo is the default)." ]
     if view . get ( "perspective", DEFAULT_PERSPECTIVE )
        != DEFAULT_PERSPECTIVE else [] ) + [
     "# Each headline ends in its handle ⟨ID HERALDS⟩: ID its viewnode ID,",
@@ -5797,7 +5792,7 @@ class SkgViewAlreadyOpen (SkgToolError):
       f"{node_id} is already a root of the view {view_id}, which this "
       f"connection holds, so the server sent no view of it. If that "
       f"view's perspective put it there, switch the view back with "
-      f"'perspective SIDECAR root-authors' to view {node_id} "
+      f"'perspective SIDECAR root homes' to view {node_id} "
       f"by itself." )
     self . node_id = node_id
     self . view_id = view_id
@@ -5912,10 +5907,10 @@ class SkgConnection:
     carry them ('skg--save-request-sexp' in
     'elisp/skg-request-save.el'). PERSPECTIVE, the perspective
     the buffer was drawn from, is named
-    unless it is the root authors', as the clients name it: the server
+    unless it is the root homes, as the clients name it: the server
     checks and rerenders the buffer following it, and holds the view
     with it, which a save that names none resets to the root
-    authors'. With PREVIEW, the server writes nothing, holds nothing,
+    homes. With PREVIEW, the server writes nothing, holds nothing,
     asks nothing, and answers 'save-preview': what the save would hide
     and stop hiding, and the errors that would refuse it."""
     line = request_line (

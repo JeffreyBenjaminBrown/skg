@@ -43,7 +43,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::mirrors::{
-  mirror_shown, perspective_owner_of_tree_containing};
+  mirror_shown, perspective_skgrepo_of_tree_containing};
 use crate::refresh::editability::{
   DrawnEditability, EditabilityAndClaim, carries_editableView_request,
   consume_editableView_request,
@@ -69,9 +69,8 @@ use crate::types::nodes::rust::GraphnodeInRust;
 use crate::refresh::diff_view;
 use crate::refresh::chain::draw_containerward_chain;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgrepoOwner};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::moves::{move_after, move_to_first_child, move_to_last_child};
-use crate::types::views_state::Perspective;
 use crate::types::viewnode::{
   FoldAndFocus, Folder, FolderRelation, PropertyMember, ViewRequest, Viewnode,
   ViewnodeKind, Vognode, Warrant, viewnode_of};
@@ -968,10 +967,9 @@ fn keep_hidden_outside_folder_last (
 /// stands as the mirror the perspective puts in its place
 /// ('server/dbs/in_rust_graph/mirrors.rs'), marked '(inPlaceOf N)'
 /// for the original N, which the save collects instead. The
-/// perspective is that of the author of the parent's top-level tree's
-/// root ('perspective_owner_of_tree_containing'): the user's under an
-/// owned root, that author's under a foreign one; or one owner's
-/// throughout, in a view switched to that owner's perspective. Not
+/// perspective is that of the home skgrepo of the parent's top-level
+/// tree's root ('perspective_skgrepo_of_tree_containing'), or of one
+/// skgrepo throughout, in a view switched to it. Not
 /// where the parent itself is shown raw where another mirror would
 /// stand (a root, or a member of a folder that is no member as such):
 /// there its children are raw too. A member already shown in
@@ -998,10 +996,10 @@ fn substitute_mirrors (
   if walk . is_diff_view ()
      || tree . get (parent) . unwrap () . value () . editable_gnid () . is_none ()
   { return Ok (( )); }
-  let owner : SkgrepoOwner = perspective_owner_of_tree_containing (
+  let skgrepo : SkgrepoName = perspective_skgrepo_of_tree_containing (
     walk . truth . config, walk . truth . graph, &walk . perspective,
     tree . get (parent) . unwrap () );
-  if is_raw_where_another_mirror_would_stand (tree, parent, &owner, walk)
+  if is_raw_where_another_mirror_would_stand (tree, parent, &skgrepo, walk)
   { return Ok (( )); }
   for child in children_of (tree, parent) {
     let (gnid, in_place_of, warrant) : (ID, Option<ID>, Warrant) =
@@ -1015,7 +1013,7 @@ fn substitute_mirrors (
       None => if warrant == Warrant::ByGraph {
         let shown : ID = mirror_shown (
           walk . truth . config, walk . truth . graph, walk . truth . restriction,
-          &owner, &gnid );
+          &skgrepo, &gnid );
         if shown != pid {
           write_protect_what_its_folders_hold (tree, child, walk);
           show_mirror (tree, child, &shown, Some (gnid), walk) ?;
@@ -1023,7 +1021,7 @@ fn substitute_mirrors (
       Some (original) => {
         let shown : ID = mirror_shown (
           walk . truth . config, walk . truth . graph, walk . truth . restriction,
-          &owner, &original );
+          &skgrepo, &original );
         if shown == walk . truth . graph . pid_else_raw_id (&original) {
           stop_substituting (tree, parent, child, &original, goal, walk) ?;
         } else if shown != pid {
@@ -1032,19 +1030,19 @@ fn substitute_mirrors (
           redraw_folders (tree, child, walk) ?; }}, }}
   Ok (( )) }
 
-/// Each root of the view shows what the view's perspective makes of
-/// the node it stands for (its '(inPlaceOf N)', else itself): the
-/// root authors' show that node raw, as every fresh view does; one
-/// owner's perspective shows the mirror it puts in that node's place
+/// Each root of the view shows the mirror the perspective of its tree
+/// ('perspective_skgrepo_of_tree_containing') puts in the place of the
+/// node it stands for (its '(inPlaceOf N)', else itself)
 /// ('mirror_shown'), marked '(inPlaceOf N)' unless it is the node
-/// itself.
+/// itself. Under the root homes that node stands in its own home
+/// skgrepo, so it shows itself, as every fresh view does.
 /// The occurrence is re-pointed where it stands, so it keeps its
 /// viewnode ID whichever way it switches, and its children follow
 /// from its own visit. A re-pointed root's folders are drawn afresh,
 /// for the node it now shows ('redraw_folders'), and it asks for what
 /// a fresh view of that node asks for ('ask_for_what_a_fresh_root_asks'). A fork of a root
 /// re-roots the view at the clone, which stands for nothing
-/// ('replace_saved_view_fork_roots').
+/// ('replace_saved_view_fork_roots'), and is substituted like any root.
 fn substitute_roots (
   tree        : &mut Tree<Viewnode>,
   buffer_root : NodeId,
@@ -1058,11 +1056,12 @@ fn substitute_roots (
         _ => continue, };
     let original : ID = in_place_of . clone ()
       . unwrap_or_else ( || walk . truth . graph . pid_else_raw_id (&gnid) );
-    let shown : ID = match &walk . perspective {
-      Perspective::RootAuthors => original . clone (),
-      Perspective::Owner (owner) => mirror_shown (
-        walk . truth . config, walk . truth . graph, walk . truth . restriction,
-        owner, &original ), };
+    let skgrepo : SkgrepoName = perspective_skgrepo_of_tree_containing (
+      walk . truth . config, walk . truth . graph, &walk . perspective,
+      tree . get (root) . unwrap () );
+    let shown : ID = mirror_shown (
+      walk . truth . config, walk . truth . graph, walk . truth . restriction,
+      &skgrepo, &original );
     let marked : Option<ID> = ( shown != original ) . then ( || original . clone () );
     let repointed : bool = walk . truth . graph . pid_else_raw_id (&gnid) != shown;
     let was_editable : bool =
@@ -1278,15 +1277,15 @@ fn reinstate_original_after (
   Ok (( )) }
 
 /// Whether the occurrence at 'treeid' is shown raw where, from the
-/// perspective of 'owner', another of its mirrors would stand in its
+/// perspective of 'skgrepo', another of its mirrors would stand in its
 /// place: at a root, or as a member of a folder that is no member as
 /// such of a forks folder ('note_of_member_as_such'), as a member of
 /// every other folder is.
 fn is_raw_where_another_mirror_would_stand (
-  tree   : &Tree<Viewnode>,
-  treeid : NodeId,
-  owner  : &SkgrepoOwner,
-  walk   : &Walk,
+  tree    : &Tree<Viewnode>,
+  treeid  : NodeId,
+  skgrepo : &SkgrepoName,
+  walk    : &Walk,
 ) -> bool {
   let node : NodeRef<Viewnode> = tree . get (treeid) . unwrap ();
   let raw_position : bool = node . parent () . is_some_and ( |parent|
@@ -1301,7 +1300,7 @@ fn is_raw_where_another_mirror_would_stand (
   raw_position
   && occurrence . in_place_of . is_none ()
   && mirror_shown ( walk . truth . config, walk . truth . graph,
-                    &walk . unrestricted, owner, &occurrence . gnid )
+                    &walk . unrestricted, skgrepo, &occurrence . gnid )
      != walk . truth . graph . pid_else_raw_id (&occurrence . gnid) }
 
 //

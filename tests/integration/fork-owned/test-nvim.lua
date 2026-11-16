@@ -4,7 +4,8 @@
 -- content is the owned M):
 --  - forking a dirty buffer is refused (no confirmation appears);
 --  - fork_node on M -> a fork-confirmation buffer; APPROVE -> the
---    clone is created (forks M) and shown in M's place on reopen;
+--    clone is created (forks M) and, M standing as itself in the one
+--    skgrepo that holds both, shown in M's forks folder on reopen;
 --  - on a second node M2, fork_node -> DECLINE strips the lingering
 --    (viewRequests fork) atom and commits nothing.
 
@@ -116,20 +117,21 @@ local clone_line = goto_line_starting_with('* (skg node (skgRepos (nodeRepo ',
 metadata.change_repo_at_line(clone_line, 'owned')
 save.approve_fork()
 
--- 5. Reopen Q fresh: mirror substitution now shows the clone in M's
---    place, carrying (inPlaceOf M).
+-- 5. Reopen Q fresh: the clone, in M's skgrepo, where M stands as
+--    itself, is shown in M's forks folder, forking it.
 do
   local live_q_buf = buffer_showing('Q')
   if live_q_buf then
     vim.api.nvim_buf_delete(live_q_buf, { force = true }) end
 end
 content_view.request_single_root_content_view_from_id('Q')
-local substituted = T.wait_for(function ()
+local shown = T.wait_for(function ()
   local buf = buffer_showing('Q')
-  return buf and T.buffer_text(buf):find('(inPlaceOf M)', 1, true)
+  return buf and T.buffer_text(buf):find('(birth (forks out 2))', 1, true)
+         and not T.buffer_text(buf):find('(inPlaceOf M)', 1, true)
 end, 10)
-T.check(substituted, "the clone was not shown in M's place on reopen")
-print("approve: the clone is shown in M's place with (inPlaceOf M)")
+T.check(shown, "the clone was not shown in M's forks folder on reopen")
+print("approve: M stands as itself, the clone in its forks folder")
 
 -- 6. DECLINE on a second node M2 (in Q2): the lingering fork atom is
 --    stripped and nothing is committed.
@@ -157,9 +159,9 @@ vim.api.nvim_buf_delete(q2_buf, { force = true })
 content_view.request_single_root_content_view_from_id('Q2')
 q2_buf = T.wait_for(function () return buffer_showing('Q2') end, 10)
 T.check(q2_buf, "Q2's view never reappeared")
--- Give the view a beat, then assert no substitution happened.
+-- Give the view a beat, then assert no fork of M2 is drawn.
 T.wait_for(function () return false end, 1)
-T.check(not T.buffer_text(q2_buf):find('(inPlaceOf M2)', 1, true),
+T.check(not T.buffer_text(q2_buf):find('(birth (forks out 2))', 1, true),
         'decline must not commit a clone forking M2')
 print('decline committed nothing (no clone forks M2)')
 

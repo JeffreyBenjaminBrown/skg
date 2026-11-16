@@ -10,3 +10,9 @@ foreign = true
 [[repos]]
 name = "main"
 path = "owned/main"
+
+# "private", owned, is declared after "main", so it is the more
+# private ('privacy_ladder').
+[[repos]]
+name = "private"
+path = "owned/private"

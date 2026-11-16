@@ -108,7 +108,7 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
     RefreshMode::DiffView { straddle        : &f . straddle,
                             buffer_kind     : DiffViewBufferKind::AllChanges,
                             processed_store : &ProcessedStore::default () },
-    100, Perspective::RootAuthors ) ?;
+    100, Perspective::RootHomes ) ?;
   let both : DiffChange = DiffChange::default ();
   assert_eq! ( children_with_change (forest . get (folder) . unwrap ()), vec! [
     ( "c1" . to_string (), both ),

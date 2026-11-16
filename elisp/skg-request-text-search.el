@@ -165,9 +165,9 @@ kill-buffer-hook to send close-view to the server."
           (heralds-minor-mode)
           (goto-char (point-min)))
         (setq skg-view-id view-id)
-        ;; The server draws a search afresh, from its root authors'
-        ;; perspective, even into a buffer an earlier search of
-        ;; the same terms switched to another perspective.
+        ;; The server draws a search afresh, from its root homes,
+        ;; even into a buffer an earlier search of the same terms
+        ;; switched to another perspective.
         (skg--set-perspective nil nil)
         (skg--capture-clean-baseline)
         (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)

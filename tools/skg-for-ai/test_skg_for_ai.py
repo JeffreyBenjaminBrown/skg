@@ -163,6 +163,7 @@ def main (argv):
   failures += failures_of_link_annotations ()
   failures += failures_of_shared_herald_cases ()
   failures += failures_of_forks_folder_claims ()
+  failures += failures_of_perspective_names ()
   failures += failures_against_scratch_servers (update_expected)
   shutil . rmtree ( os . environ [ "XDG_RUNTIME_DIR" ], ignore_errors = True )
   for failure in failures:
@@ -170,6 +171,35 @@ def main (argv):
   if failures:
     sys . exit (1)
   print ( "PASS" + ( " (expected files rewritten)" if update_expected else "" ))
+
+# ============================================================
+# The perspective's names
+# ============================================================
+
+def failures_of_perspective_names ():
+  """A sidecar's perspective is read by the server's names: 'skgrepo
+  NAME' as it is; none, 'root homes', and the older forms ('user',
+  'owner of NAME', 'root authors'), as the root homes. The command
+  line's words are joined, and none means 'next'."""
+  failures = []
+  for recorded, read in [ ( "skgrepo main", "skgrepo main" ),
+                          ( "root homes", "root homes" ),
+                          ( "user", "root homes" ),
+                          ( "owner of tracy", "root homes" ),
+                          ( "root authors", "root homes" ),
+                          ( None, "root homes" ) ]:
+    sidecar = {} if recorded is None else { "perspective" : recorded }
+    if skg_for_ai . perspective_of_sidecar (sidecar) != read:
+      failures . append ( f"a sidecar recording {recorded!r} is read as "
+                          f"{skg_for_ai . perspective_of_sidecar (sidecar)!r}, not {read!r}" )
+  for words, name in [ ( [], "next" ), ( [ "next" ], "next" ),
+                       ( [ "root", "homes" ], "root homes" ),
+                       ( [ "skgrepo main" ], "skgrepo main" ),
+                       ( [ "skgrepo", "main" ], "skgrepo main" ) ]:
+    if skg_for_ai . perspective_of_argument (words) != name:
+      failures . append ( f"the words {words!r} name "
+                          f"{skg_for_ai . perspective_of_argument (words)!r}, not {name!r}" )
+  return failures
 
 # ============================================================
 # The forks folder's claims
@@ -1626,7 +1656,9 @@ def check_implicit_fork_approved (context):
 def check_explicit_fork (context):
   """'fork' on an owned node, as the clients' 'skg-fork-node' marks
   it: refused beside other edits, then approved with '--yes', making a
-  clone in 'main' that forks it."""
+  clone in 'main' that forks it. The original, in 'main' too, stands
+  as itself there, so the save warns that the view goes on showing it,
+  and that no perspective shows the clone in its place."""
   folder = fresh_root_view (context, "fork-explicit")
   shared = compact_line_starting (folder, "*** Contained twice ⟨0n ")
   edit_compact ( folder, [ ( shared, shared [ : -1 ] + " fork⟩" ) ])
@@ -1658,7 +1690,13 @@ def check_explicit_fork (context):
     "'main').\n"
     "  It forks 'Contained twice' (shared-id), of the skgrepo 'main'.\n"
     "Approved: the save is sent again with the forks approved.\n"
-    + saved_line (0) + written_paths (folder) )
+    + saved_line (1) +
+    "Server warning: Your edit of 'Contained twice' forked it into your "
+    "skgrepo 'main', but this view is drawn there from the perspective of "
+    "main, so it goes on showing the original there, without your edit. "
+    "No perspective shows your fork there: its skgrepo holds another of "
+    "the mirrors, which stands there. It stands in the forks folder of "
+    "what is shown.\n" + written_paths (folder) )
   [ clone_file ] = set ( skg_files (context) ) - files_before
   clone_id = clone_file [ : - len (".skg") ]
   require_equal ( "the explicit clone's title", skg_title (context, clone_id),
@@ -3134,26 +3172,28 @@ def check_deleting_references (context):
 # ------------------------------------------------------------
 
 # ============================================================
-# A view's perspective: the data of the
-# perspective integration test, where foreign R contains M and
-# K; A, foreign, U, owned, and B, of a second foreign owner, "third",
-# each fork M; and P, owned, contains M. A view of R shows its
-# root author's perspective, A in M's place; the user's, U; or third's,
-# B. The cases run in order.
+# A view's perspective: the data of the perspective integration
+# test, where R, in foreign skgrepo "foreign", contains M, in foreign
+# skgrepo "origin", and K; A, in "foreign", U, in owned "main", and B,
+# in foreign "third", each fork M; and P, in "main", contains M. A
+# view of R is drawn from its root's home, "foreign", A in M's place;
+# from main's, U; from third's, B; from origin's, M itself. The cases
+# run in order.
 # ============================================================
 
 PERSPECTIVE_DATA = os . path . join (
   REPO_ROOT, "tests", "integration", "perspective", "data" )
-FOLLOWS_YOURS_LINE = "Showing your perspective.\n"
-FOLLOWS_THIRDS_LINE = "Showing third's perspective.\n"
-FOLLOWS_ROOT_AUTHORS_LINE = (
-  "Showing each root author's perspective (foreign's).\n" )
-FOLLOWS_YOURS_SUMMARY = (
-  "# Showing your perspective (each root author's perspective is the default).\n" )
+FOLLOWS_MAINS_LINE = "Showing the perspective of main.\n"
+FOLLOWS_THIRDS_LINE = "Showing the perspective of third.\n"
+FOLLOWS_ORIGINS_LINE = "Showing the perspective of origin.\n"
+FOLLOWS_ROOT_HOMES_LINE = (
+  "Showing the perspective of each root's home skgrepo (foreign).\n" )
+FOLLOWS_MAINS_SUMMARY = (
+  "# Showing the perspective of main (each root's home skgrepo is the default).\n" )
 FOLLOWS_THIRDS_SUMMARY = (
-  "# Showing third's perspective (each root author's perspective is the default).\n" )
-R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n***** ⟨It forks these, or these fork it.⟩\n****** A ⟨☮ Kb ⟳⟩\n****** B ⟨Kb ⌂:third⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳ ⌂:foreign⟩\n****** U ⟨Kb ⌂:main⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳ ⌂:foreign⟩\n** K ⟨0o⟩\n"
-R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK ⌂:foreign⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n***** ⟨It forks these, or these fork it.⟩\n****** A ⟨Kb⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳⟩\n****** B ⟨Kb ⌂:third⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳ ⌂:foreign⟩\n****** U ⟨☮ Kb ⟳ ⌂:main⟩\n** K ⟨0o⟩\n"
+  "# Showing the perspective of third (each root's home skgrepo is the default).\n" )
+R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK ⌂:origin⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n***** ⟨It forks these, or these fork it.⟩\n****** A ⟨☮ Kb ⟳ ⌂:foreign⟩\n****** B ⟨Kb ⌂:third⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳ ⌂:origin⟩\n****** U ⟨Kb ⌂:main⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳ ⌂:origin⟩\n** K ⟨0o⟩\n"
+R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK ⌂:origin⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n***** ⟨It forks these, or these fork it.⟩\n****** A ⟨Kb ⌂:foreign⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳ ⌂:origin⟩\n****** B ⟨Kb ⌂:third⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳ ⌂:origin⟩\n****** U ⟨☮ Kb ⟳ ⌂:main⟩\n** K ⟨0o⟩\n"
 def once_u_has_a_body (view):
   """VIEW as drawn once U has a body: U's write-protected occurrence,
   a repeat among M's forkers where U stands in M's place, says so
@@ -3161,12 +3201,12 @@ def once_u_has_a_body (view):
   shows its body."""
   return view . replace ( "U ⟨☮ Kb", "U ⟨☮B Kb" )
 
-R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK ⌂:foreign⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n***** ⟨It forks these, or these fork it.⟩\n****** A ⟨Kb⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳⟩\n****** B ⟨☮ Kb ⟳ ⌂:third⟩\n****** U ⟨Kb ⌂:main⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳ ⌂:foreign⟩\n** K ⟨0o⟩\n"
+R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK ⌂:origin⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n***** ⟨It forks these, or these fork it.⟩\n****** A ⟨Kb ⌂:foreign⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳ ⌂:origin⟩\n****** B ⟨☮ Kb ⟳ ⌂:third⟩\n****** U ⟨Kb ⌂:main⟩\n******* ⟨It forks these, or these fork it.⟩\n******** M ⟨☮ 2C 3bK ⟳ ⌂:origin⟩\n** K ⟨0o⟩\n"
 
 def copy_perspective_fixture (data_root):
-  """The perspective data, with a config naming its two foreign
+  """The perspective data, with a config naming its three foreign
   skgrepos and its owned one."""
-  for folder in ( "foreign", "owned", "third" ):
+  for folder in ( "foreign", "owned", "third", "origin" ):
     shutil . copytree ( os . path . join (PERSPECTIVE_DATA, folder),
                         os . path . join (data_root, folder) )
   with open ( os . path . join (data_root, "skgconfig.toml"), "w",
@@ -3176,7 +3216,8 @@ def copy_perspective_fixture (data_root):
       'beep_when_server_becomes_available = false\n\n'
       '[[repos]]\nname = "foreign"\npath = "foreign"\nforeign = true\n\n'
       '[[repos]]\nname = "main"\npath = "owned/main"\n\n'
-      '[[repos]]\nname = "third"\npath = "third"\nforeign = true\n' )
+      '[[repos]]\nname = "third"\npath = "third"\nforeign = true\n\n'
+      '[[repos]]\nname = "origin"\npath = "origin"\nforeign = true\n' )
 
 def failures_of_perspective (scratch, data_root):
   context = { "scratch"       : scratch,
@@ -3186,8 +3227,8 @@ def failures_of_perspective (scratch, data_root):
               "processes"     : [] }
   try:
     for case in [ check_switching_perspective_on_a_command_s_own_connection,
-                  check_saving_a_view_that_follows_yours,
-                  check_following_the_root_authors_again,
+                  check_saving_a_view_that_follows_mains,
+                  check_following_the_root_homes_again,
                   check_the_root_too,
                   check_switching_perspective_through_a_daemon,
                   check_viewing_a_root_a_perspective_put_in_place ]:
@@ -3224,60 +3265,62 @@ def without_deep_vnid (line):
 def check_switching_perspective_on_a_command_s_own_connection (context):
   """With no daemon, 'perspective' registers the view on its
   own connection (by saving it back unchanged) and switches it to the
-  next perspective, the user's: U stands in M's place, the summary
-  says so, and the sidecar records it. A view whose every root is
-  owned shows the user's already, and the server refuses a switch
-  that names them."""
+  next perspective, main's: U stands in M's place, the summary says
+  so, and the sidecar records it. A view of P, in "main", is drawn
+  from main's already, and the server refuses a switch that names
+  it."""
   folder = os . path . join ( context [ "scratch" ], "own" )
   context [ "own_folder" ] = folder
   require_tool_run ([ "view", "R", "--out-dir", folder ])
   require_equal ( "R's view", r_tree (folder), R_SHOWING_A )
   require_equal ( "a fresh sidecar's choice",
                   read_sidecar (folder, "view_R") [ "perspective" ],
-                  "root authors" )
+                  "root homes" )
   sidecar_path = os . path . join (folder, "view_R.view.json")
   require_output (
     run_tool ([ "perspective", sidecar_path ]),
-    FOLLOWS_YOURS_LINE + "" . join (
+    FOLLOWS_MAINS_LINE + "" . join (
       os . path . join (folder, "view_R" + suffix) + "\n"
       for suffix in ( ".full.org", ".compact.org", ".view.json" )))
-  require_equal ( "R's view, following yours", r_tree (folder),
-                  FOLLOWS_YOURS_SUMMARY + R_SHOWING_U )
+  require_equal ( "R's view, following main's", r_tree (folder),
+                  FOLLOWS_MAINS_SUMMARY + R_SHOWING_U )
   require_equal ( "the sidecar's choice",
-                  read_sidecar (folder, "view_R") [ "perspective" ], "user" )
+                  read_sidecar (folder, "view_R") [ "perspective" ], "skgrepo main" )
   require_tool_run ([ "view", "P", "--out-dir", folder ])
   require_failure (
     run_tool ([ "perspective", os . path . join (folder, "view_P.view.json"),
-                "user" ]),
-    [], "The server refused: Your perspective would show this buffer as its "
-        "root authors' do, so it is not one of its perspectives." )
+                "skgrepo", "main" ]),
+    [], "The server refused: The perspective of main would show this buffer "
+        "as the perspective of each root's home skgrepo does, so it is not "
+        "one of its perspectives." )
 
-def check_saving_a_view_that_follows_yours (context):
+def check_saving_a_view_that_follows_mains (context):
   """An edited view is not switched. Its save names the choice: the
-  server checks U's '(inPlaceOf M)' against the user's perspective,
-  which would be refused against the root author's, and the rerendered
-  view still shows U, its sidecar still recording the choice."""
+  server checks U's '(inPlaceOf M)' and rerenders the view from
+  main's perspective, and the rerendered view still shows U, its
+  sidecar still recording the choice."""
   folder = context [ "own_folder" ]
   edit_compact ( folder, [ ( "** U ⟨0b Kĥ1 ⌂:main⟩\n",
                              "** U ⟨0b Kĥ1 ⌂:main⟩\nU's new body.\n" ) ], "view_R" )
   require_failure (
     run_tool ([ "perspective", os . path . join (folder, "view_R.view.json"),
-                "root-authors" ]),
+                "root homes" ]),
     [], "Nothing was switched: the compact view has edits" )
   require_save_succeeds ( os . path . join (folder, "view_R.view.json") )
   require_equal ( "R's view, saved", r_tree (folder),
-                  FOLLOWS_YOURS_SUMMARY + once_u_has_a_body (R_SHOWING_U) )
+                  FOLLOWS_MAINS_SUMMARY + once_u_has_a_body (R_SHOWING_U) )
   require_in_file ( folder, "view_R", "** U ⟨0b Kĥ1 ⌂:main⟩\nU's new body.\n" )
   require_equal ( "U's body", skg_body (context, "U"), [ "U's new body." ] )
   require_equal ( "the saved sidecar's choice",
-                  read_sidecar (folder, "view_R") [ "perspective" ], "user" )
+                  read_sidecar (folder, "view_R") [ "perspective" ], "skgrepo main" )
 
-def check_following_the_root_authors_again (context):
-  """Named by its skgrepo, third's perspective shows B in M's place;
-  the next after it, the last, is the root authors' again."""
+def check_following_the_root_homes_again (context):
+  """Named, third's perspective shows B in M's place; the next after
+  it is origin's, M's own home, which shows M itself; the next after
+  that, the last, is the root homes again."""
   folder = context [ "own_folder" ]
   completed = run_tool ([ "perspective", os . path . join (folder, "view_R.view.json"),
-                          "third" ])
+                          "skgrepo third" ])
   if completed . returncode != 0 or not completed . stdout . startswith (
       FOLLOWS_THIRDS_LINE ):
     raise CaseFailure ( f"the switch printed {completed . stdout!r}, {completed . stderr!r}" )
@@ -3286,35 +3329,48 @@ def check_following_the_root_authors_again (context):
   require_equal ( "the sidecar's perspective",
                   { key : read_sidecar (folder, "view_R") [key]
                     for key in ( "perspective", "perspective_name" ) },
-                  { "perspective" : "owner of third",
-                    "perspective_name" : "third's perspective" } )
+                  { "perspective" : "skgrepo third",
+                    "perspective_name" : "the perspective of third" } )
   completed = run_tool ([ "perspective", os . path . join (folder, "view_R.view.json") ])
   if completed . returncode != 0 or not completed . stdout . startswith (
-      FOLLOWS_ROOT_AUTHORS_LINE ):
+      FOLLOWS_ORIGINS_LINE ):
     raise CaseFailure ( f"the switch printed {completed . stdout!r}, {completed . stderr!r}" )
-  require_equal ( "R's view, following its root author's", r_tree (folder),
-                  once_u_has_a_body (R_SHOWING_A) )
+  require_equal ( "R's child, from origin's perspective",
+                  r_tree (folder) . split ("\n") [0 : 2],
+                  [ "# Showing the perspective of origin (each root's home skgrepo is the default).",
+                    "* R ⟨0a C2 ⌂:foreign⟩" ] )
+  child = r_tree (folder) . split ("\n") [2]
+  if not ( child . startswith ("** M ⟨") and "ĥ" not in child ):
+    raise CaseFailure ( f"from origin's, M stands as itself:\n{r_tree (folder)}" )
+  completed = run_tool ([ "perspective", os . path . join (folder, "view_R.view.json") ])
+  if completed . returncode != 0 or not completed . stdout . startswith (
+      FOLLOWS_ROOT_HOMES_LINE ):
+    raise CaseFailure ( f"the switch printed {completed . stdout!r}, {completed . stderr!r}" )
+  require_equal ( "R's view, following its root's home", r_tree (folder),
+                  # A is re-pointed where M was reinstated, so keeps
+                  # the viewnode ID that occurrence was given.
+                  once_u_has_a_body (R_SHOWING_A) . replace ("** A ⟨0b ", "** A ⟨1n ") )
   require_equal ( "the sidecar's choice",
                   read_sidecar (folder, "view_R") [ "perspective" ],
-                  "root authors" )
+                  "root homes" )
 
 def check_the_root_too (context):
-  """A view of M, which U, the user's, forks, shows U as its root
-  from the user's perspective, standing for M ('ĥ' after its 'K'),
-  and M again from the root authors'."""
+  """A view of M, which U, in "main", forks, shows U as its root from
+  main's perspective, standing for M ('ĥ' after its 'K'), and M again
+  from the root homes."""
   folder = context [ "own_folder" ]
   require_tool_run ([ "view", "M", "--out-dir", folder ])
   root = lambda: read_compact (folder, "view_M") . split ("\n* ") [1] . split ("\n") [0]
   fresh = root ()
   require_equal ( "M's fresh root", ( fresh . startswith ("M ⟨0a "), "ĥ" in fresh ), ( True, False ) )
   require_tool_run ([ "perspective", os . path . join (folder, "view_M.view.json"),
-                      "user" ])
+                      "skgrepo main" ])
   switched = root ()
-  require_equal ( "M's root from your perspective",
+  require_equal ( "M's root from main's perspective",
                   ( switched . startswith ("U ⟨0a K"), "ĥ" in switched ), ( True, True ) )
   require_tool_run ([ "perspective", os . path . join (folder, "view_M.view.json"),
-                      "root-authors" ])
-  require_equal ( "M's root from the root authors' again", root (), fresh )
+                      "root homes" ])
+  require_equal ( "M's root from the root homes again", root (), fresh )
 
 def check_switching_perspective_through_a_daemon (context):
   """Through a daemon, which holds the view, the switch needs no
@@ -3327,14 +3383,14 @@ def check_switching_perspective_through_a_daemon (context):
   require_routed_run ( context, [ "view", "R" ] )
   sidecar_path = os . path . join (folder, "view_R.view.json")
   completed = run_tool ( [ "perspective", sidecar_path ], port = None )
-  if completed . returncode != 0 or not completed . stdout . startswith (FOLLOWS_YOURS_LINE):
+  if completed . returncode != 0 or not completed . stdout . startswith (FOLLOWS_MAINS_LINE):
     raise CaseFailure ( f"the switch printed {completed . stdout!r}, {completed . stderr!r}" )
-  require_equal ( "R's view, following yours", r_tree (folder),
-                  FOLLOWS_YOURS_SUMMARY + once_u_has_a_body (R_SHOWING_U) )
+  require_equal ( "R's view, following main's", r_tree (folder),
+                  FOLLOWS_MAINS_SUMMARY + once_u_has_a_body (R_SHOWING_U) )
   require_equal ( "the held sidecar", { key : read_sidecar (folder, "view_R") [key]
                                         for key in ( "perspective", "closed" ) },
-                  { "perspective" : "user", "closed" : False } )
-  require_log_line ( context, "perspective of view_R: your perspective" )
+                  { "perspective" : "skgrepo main", "closed" : False } )
+  require_log_line ( context, "perspective of view_R: the perspective of main" )
   require_routed_run ( context, [ "view", "U" ] )
   edit_compact ( folder, [ ( "* U ⟨0a ", "* U, retitled ⟨0a " ) ], "view_U" )
   completed = run_tool ( [ "save", os . path . join (folder, "view_U.view.json"), "--yes" ],
@@ -3343,25 +3399,25 @@ def check_switching_perspective_through_a_daemon (context):
     raise CaseFailure ( f"the save printed {completed . stdout!r}, {completed . stderr!r}" )
   require_log_line ( context, "re-rendered view_R because of 'save view_U.view.json --yes'" )
   require_equal ( "R's view, rewritten by the daemon", r_tree (folder),
-                  FOLLOWS_YOURS_SUMMARY + once_u_has_a_body (R_SHOWING_U) . replace ("** U ", "** U, retitled ") )
+                  FOLLOWS_MAINS_SUMMARY + once_u_has_a_body (R_SHOWING_U) . replace ("** U ", "** U, retitled ") )
   require_equal ( "the rewritten sidecar's choice",
-                  read_sidecar (folder, "view_R") [ "perspective" ], "user" )
+                  read_sidecar (folder, "view_R") [ "perspective" ], "skgrepo main" )
   require_tool_run ([ "daemon", "--stop", "--out-dir", folder ])
   context [ "daemon" ] . wait (timeout = 30)
   require_equal ( "the released sidecar", { key : read_sidecar (folder, "view_R") [key]
                                             for key in ( "perspective", "closed" ) },
-                  { "perspective" : "user", "closed" : True } )
+                  { "perspective" : "skgrepo main", "closed" : True } )
   edit_compact ( folder, [ ( "\n** U, retitled ⟨", "\n** U, retitled again ⟨" ) ], "view_R" )
   require_save_succeeds (sidecar_path)
   require_equal ( "R's view, saved after the daemon stopped", r_tree (folder),
-                  FOLLOWS_YOURS_SUMMARY + once_u_has_a_body (R_SHOWING_U) . replace ("** U ", "** U, retitled again ") )
-  require_tool_run ([ "perspective", sidecar_path, "root-authors" ])
-  require_equal ( "R's view, following its root author's", r_tree (folder),
+                  FOLLOWS_MAINS_SUMMARY + once_u_has_a_body (R_SHOWING_U) . replace ("** U ", "** U, retitled again ") )
+  require_tool_run ([ "perspective", sidecar_path, "root homes" ])
+  require_equal ( "R's view, following its root's home", r_tree (folder),
                   once_u_has_a_body (R_SHOWING_A) . replace (
                     "U ⟨Kb", "U, retitled again ⟨Kb" ) )
 
 def check_viewing_a_root_a_perspective_put_in_place (context):
-  """Through a daemon, a view of M switched to the user's perspective
+  """Through a daemon, a view of M switched to main's perspective
   has U as its root, so the server answers a view of U on that
   connection by naming M's view, as it lands a client there: 'view U'
   prints the files of M's view and says why. Switched back, 'view U'
@@ -3370,13 +3426,13 @@ def check_viewing_a_root_a_perspective_put_in_place (context):
   start_daemon (context)
   require_routed_run ( context, [ "view", "M" ] )
   sidecar_path = os . path . join (folder, "view_M.view.json")
-  for perspective in ( "user", "root-authors" ):
+  for perspective in ( "skgrepo main", "root homes" ):
     completed = run_tool ( [ "perspective", sidecar_path, perspective ],
                            port = None )
     if completed . returncode != 0:
       raise CaseFailure ( f"the switch printed {completed . stdout!r}, {completed . stderr!r}" )
     viewed = require_routed_run ( context, [ "view", "U" ] )
-    if perspective == "user":
+    if perspective == "skgrepo main":
       require_equal ( "what 'view U' printed, U being the root of M's view",
                       viewed . stdout . split (),
                       [ os . path . join ( os . path . realpath (folder), "view_M" + suffix )

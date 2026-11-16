@@ -13,3 +13,8 @@ path = "owned/main"
 name = "third"
 path = "third"
 foreign = true
+
+[[repos]]
+name = "origin"
+path = "origin"
+foreign = true

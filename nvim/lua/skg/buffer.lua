@@ -141,11 +141,11 @@ end
 -- ── a view's perspective ───────────────────────────────────────────
 --
 -- 'vim.b.skg_perspective': this view's perspective, as the server
--- names it on the wire: nil for its root authors' (a tree rooted at a
--- node of yours is drawn from yours, one rooted at another's node from
--- that author's), as every fresh view is; "user" for yours, or "owner of NAME" for another owner's,
--- in every tree. 'vim.b.skg_perspective_name': how the server
--- named it ("tracy's perspective", say), nil for the root authors'.
+-- names it on the wire: nil for its root homes (each tree is drawn
+-- from its root's home skgrepo), as every fresh view is; "skgrepo
+-- NAME" for the skgrepo NAME's, in every tree.
+-- 'vim.b.skg_perspective_name': how the server named it ("the
+-- perspective of tracy", say), nil for the root homes.
 -- 'perspective.cycle_perspective' sets both once the
 -- server has switched the view. A save sends the first as
 -- (perspective . NAME), so that the server checks and redraws
@@ -154,22 +154,22 @@ end
 -- survive filetype changes, as Emacs's permanent-locals do.
 
 ---Record that BUF shows the PERSPECTIVE, the server's wire
----name, which the server calls NAME. The root authors' perspective is
----recorded as nil, so that it stays unmarked and unsaid.
+---name, which the server calls NAME. The root homes are recorded as
+---nil, so that they stay unmarked and unsaid.
 ---@param buf integer
 ---@param perspective string|nil
 ---@param name string|nil
 function M.set_perspective (buf, perspective, name)
-  local default = perspective == nil or perspective == 'root authors'
+  local default = perspective == nil or perspective == 'root homes'
   vim.b[buf].skg_perspective = (not default) and perspective or nil
   vim.b[buf].skg_perspective_name = (not default) and name or nil
 end
 
 ---The statusline's mark for a view shown from a perspective other than
----its root authors': ":your perspective", say, there, "" elsewhere. The
----client draws no statusline of its own; put
+---its root homes: ":the perspective of tracy", say, there, ""
+---elsewhere. The client draws no statusline of its own; put
 ---'%{v:lua.require'skg.buffer'.perspective_mode_line()}' in
----yours (Emacs's mode name reads "SKG:your perspective", say).
+---yours (Emacs's mode name reads "SKG:the perspective of tracy", say).
 ---@param buf integer|nil default the current buffer
 ---@return string
 function M.perspective_mode_line (buf)
@@ -215,7 +215,7 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_id)
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(org_text, '\n'))
-  -- A fresh view is drawn from its root authors' perspective, even in a buffer
+  -- A fresh view is drawn from its root homes, even in a buffer
   -- reused by name from a view shown from another perspective. (Emacs
   -- reuses a buffer only for a search run again, and resets it there.)
   M.set_perspective(buf, nil, nil)

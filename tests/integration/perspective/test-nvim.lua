@@ -58,14 +58,14 @@ end, 10)
 T.check(buf, 'the view of R opened, showing A in M\'s place')
 vim.api.nvim_set_current_buf(buf)
 T.check(vim.b[buf].skg_perspective == nil,
-        "a fresh view is drawn from its root authors' perspective")
+        "a fresh view is drawn from its root homes")
 
 -- The cursor on A's headline; the switch must leave it on U's, which
 -- stands in the same place.
 vim.api.nvim_win_set_cursor(0, { line_in_ms_place(buf, 'A'), 0 })
 perspective.cycle_perspective()
 check_eventually(function ()
-    return vim.b[buf].skg_perspective == 'user'
+    return vim.b[buf].skg_perspective == 'skgrepo main'
            and line_in_ms_place(buf, 'U')
            and lock.stream_in_progress == nil
   end, 10, 'switched, the view shows U')
@@ -73,8 +73,8 @@ T.check(not line_in_ms_place(buf, 'A'),
         'switched, the view no longer shows A')
 T.check(vim.api.nvim_win_get_cursor(0)[1] == line_in_ms_place(buf, 'U'),
         "the cursor stayed on the headline M's mirror stands on")
-T.check(buffer.perspective_mode_line(buf) == ':your perspective',
-        'the statusline mark says the view shows your perspective')
+T.check(buffer.perspective_mode_line(buf) == ':the perspective of main',
+        "the statusline mark says the view shows main's perspective")
 
 -- Unsaved edits refuse the switch. The body line goes directly under
 -- U's headline: the end of the buffer is under foreign K, and an edit
@@ -98,20 +98,32 @@ check_eventually(function ()
   end, 20, 'the save finished')
 check_eventually(function ()
     return line_in_ms_place(buf, 'U') and not line_in_ms_place(buf, 'A')
-           and vim.b[buf].skg_perspective == 'user'
-  end, 1, 'after the save the view still shows your perspective')
+           and vim.b[buf].skg_perspective == 'skgrepo main'
+  end, 1, "after the save the view still shows main's perspective")
 
 -- The next perspective is third's, which shows B.
 perspective.cycle_perspective()
 check_eventually(function ()
-    return vim.b[buf].skg_perspective == 'owner of third'
+    return vim.b[buf].skg_perspective == 'skgrepo third'
            and line_in_ms_place(buf, 'B')
            and lock.stream_in_progress == nil
   end, 10, "the next perspective, third's, shows B")
-T.check(buffer.perspective_mode_line(buf) == ":third's perspective",
+T.check(buffer.perspective_mode_line(buf) == ':the perspective of third',
         "the statusline mark names third's perspective")
 
--- After the last, the root authors' again, showing A.
+-- The next is origin's, M's own home, which shows M itself.
+perspective.cycle_perspective()
+check_eventually(function ()
+    if vim.b[buf].skg_perspective ~= 'skgrepo origin'
+       or lock.stream_in_progress ~= nil
+       or line_in_ms_place(buf, 'A') or line_in_ms_place(buf, 'B') then
+      return false end
+    local m = line_of_gnid(buf, 'M')
+    return m ~= nil
+           and vim.api.nvim_buf_get_lines(buf, m - 1, m, false)[1]:sub(1, 3) == '** '
+  end, 10, "the next perspective, origin's, shows M itself")
+
+-- After the last, the root homes again, showing A.
 perspective.cycle_perspective()
 check_eventually(function ()
     return vim.b[buf].skg_perspective == nil
@@ -121,11 +133,11 @@ check_eventually(function ()
 T.check(buffer.perspective_mode_line(buf) == '',
         'the statusline mark is gone')
 
--- The root too: a view of M, which A (M's own author's), U (yours)
--- and B (third's) each fork, shows M as its root from the root
--- authors' perspective and each fork from its author's, re-pointed
--- where the root stands, so the cursor stays on it; the buffer keeps
--- its name.
+-- The root too: a view of M, which A (foreign's), U (main's) and B
+-- (third's) each fork, shows M as its root from the root homes (M's
+-- home is origin) and each fork from its skgrepo's perspective, in
+-- declaration order, re-pointed where the root stands, so the cursor
+-- stays on it; the buffer keeps its name.
 require('skg.single_root_content_view')
   .request_single_root_content_view_from_id('M')
 buf = T.wait_for(function ()
@@ -140,9 +152,9 @@ end, 10)
 T.check(buf, 'the view of M opened')
 vim.api.nvim_set_current_buf(buf)
 local name = vim.api.nvim_buf_get_name(buf)
-for _, step in ipairs({ { 'user', 'U', ':your perspective' },
-                        { 'owner of foreign', 'A', ":foreign's perspective" },
-                        { 'owner of third', 'B', ":third's perspective" },
+for _, step in ipairs({ { 'skgrepo foreign', 'A', ':the perspective of foreign' },
+                        { 'skgrepo main', 'U', ':the perspective of main' },
+                        { 'skgrepo third', 'B', ':the perspective of third' },
                         { nil, 'M', '' } }) do
   local followed, shown, mark = step[1], step[2], step[3]
   vim.api.nvim_win_set_cursor(0, { 1, 0 })

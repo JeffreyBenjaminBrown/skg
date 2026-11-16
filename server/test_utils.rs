@@ -15,10 +15,10 @@ use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::types::env::{SkgEnv, new_mutation_gate};
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::refresh::{Truth, Walk};
+use crate::refresh::{Truth, Walk, refresh_content_viewforest};
 use crate::refresh::chain::draw_containerward_chain;
 use crate::refresh::mode::RefreshMode;
-use crate::update_buffer::multi_root_view_via_runtime;
+use crate::update_buffer::{multi_root_view_via_runtime, stub_of_fresh_content_view};
 use crate::from_text::strandeds::StrandedsReview;
 use crate::save::{DeleteFrom, update_graph_minus_nodeMerges};
 use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
@@ -547,7 +547,7 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
     &SkgrepoRestriction::unrestricted (config),
     true, &HashMap::new (), &std::collections::HashSet::new (),
     &StrandedsReview::NotReviewed,
-    DeleteFrom::NotChosen, other_views, None, Perspective::RootAuthors ) . await
+    DeleteFrom::NotChosen, other_views, None, Perspective::RootHomes ) . await
 }
 
 /// Send 'org_buffer_text' as a save with '(preview . "true")': the
@@ -567,7 +567,7 @@ pub async fn save_preview_test (
     views_state, &SkgrepoRestriction::unrestricted (config),
     false, &HashMap::new (), &std::collections::HashSet::new (),
     &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
-    Perspective::RootAuthors, true ) . await }
+    Perspective::RootHomes, true ) . await }
 
 /// As 'update_from_and_rerender_buffer_test', but lets the test choose
 /// whether forks are approved -- pass false to exercise the
@@ -967,7 +967,7 @@ pub fn draw_containerward_chains_under_members (
   truth   : &Truth,
   mode    : RefreshMode,
 ) -> Result<(), Box<dyn Error>> {
-  let walk : Walk = Walk::new (truth, mode, 0, Perspective::RootAuthors);
+  let walk : Walk = Walk::new (truth, mode, 0, Perspective::RootHomes);
   for member in members {
     draw_containerward_chain (tree, *member, &walk) ?; }
   Ok (( )) }
@@ -1010,6 +1010,26 @@ pub fn multi_root_view_with_skgrepo_set (
   multi_root_view_inner (
     config, tantivy_index, root_gnids,
     skgrepo_restriction ) }
+
+/// A fresh content view of 'root_gnids', from the fixture's files, as
+/// 'multi_root_view_with_skgrepo_set' draws it but from 'perspective'
+/// (a fresh view in production follows its root homes; a view drawn
+/// so is one switched there before any edit).
+pub fn multi_root_view_from_perspective (
+  config              : &SkgConfig,
+  root_gnids          : &[ID],
+  skgrepo_restriction : &SkgrepoRestriction,
+  perspective         : Perspective,
+) -> Result < (String, Tree<Viewnode>), Box<dyn Error> > {
+  let graph : InRustGraph = graph_from_config (config) ?;
+  let mut viewforest : ViewForest =
+    stub_of_fresh_content_view (root_gnids, &graph);
+  refresh_content_viewforest (
+    &mut viewforest, &mut ViewnodeIdRecord::default (),
+    &Truth { graph : &graph, config, restriction : skgrepo_restriction },
+    perspective ) ?;
+  let text : String = viewforest_to_string (&viewforest) ?;
+  Ok (( text, viewforest . into_internal_tree () )) }
 
 /// The parts-based de-novo entry -- a thin shim that assembles a
 /// SkgEnv and routes through the de-novo render (multi_root_view_via_env).

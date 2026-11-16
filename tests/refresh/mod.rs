@@ -52,6 +52,13 @@ pub(super) fn node (
               home_skgrepo : SkgrepoName::from ("main"),
               .. empty_graphnode () } }
 
+/// 'node (pid)', but at home in 'skgrepo'.
+pub(super) fn node_in (
+  skgrepo : &str,
+  pid     : &str,
+) -> Graphnode {
+  Graphnode { home_skgrepo : SkgrepoName::from (skgrepo), .. node (pid) } }
+
 /// A list of members recorded in 'main'.
 pub(super) fn ids (
   pids : &[&str],
@@ -119,7 +126,18 @@ pub(super) fn refresh_and_render (
   mode   : RefreshMode,
   budget : usize,
 ) -> Result<String, Box<dyn Error>> {
-  refresh_viewforest (forest, record, truth, mode, budget, Perspective::RootAuthors) ?;
+  refresh_and_render_from (forest, record, truth, mode, budget, Perspective::RootHomes) }
+
+/// 'refresh_and_render', from 'perspective'.
+fn refresh_and_render_from (
+  forest      : &mut ViewForest,
+  record      : &mut ViewnodeIdRecord,
+  truth       : &Truth,
+  mode        : RefreshMode,
+  budget      : usize,
+  perspective : Perspective,
+) -> Result<String, Box<dyn Error>> {
+  refresh_viewforest (forest, record, truth, mode, budget, perspective) ?;
   viewforest_to_string (forest) }
 
 /// Refresh 'forest' under each of 'restrictions' in turn, as a view
@@ -174,7 +192,19 @@ pub(super) fn run_asserting_fixpoint_in (
 ) -> Run {
   run_parsed_asserting_fixpoint (
     parse (text, IdResolution::ThroughGraph (graph)),
-    graph, restriction, mode, budget ) }
+    graph, restriction, mode, budget, Perspective::RootHomes ) }
+
+/// As 'run_asserting_fixpoint_in' in a content view with a large
+/// budget, drawn from 'perspective'.
+pub(super) fn run_asserting_fixpoint_from (
+  text        : &str,
+  graph       : &InRustGraph,
+  restriction : &SkgrepoRestriction,
+  perspective : Perspective,
+) -> Run {
+  run_parsed_asserting_fixpoint (
+    parse (text, IdResolution::ThroughGraph (graph)),
+    graph, restriction, RefreshMode::ContentView, 100, perspective ) }
 
 /// As 'run_asserting_fixpoint_in' with no skgrepo restriction and a
 /// large budget, for 'text' parsed as written
@@ -187,27 +217,29 @@ pub(super) fn run_as_written_asserting_fixpoint_in (
   mode  : RefreshMode,
 ) -> Run {
   run_parsed_asserting_fixpoint (
-    parse (text, IdResolution::AsWritten), graph, &unrestricted (), mode, 100 ) }
+    parse (text, IdResolution::AsWritten), graph, &unrestricted (), mode, 100,
+    Perspective::RootHomes ) }
 
-/// Refresh 'forest' over 'graph' in 'mode' with 'budget', then assert
-/// the fixpoint.
+/// Refresh 'forest' over 'graph' in 'mode' with 'budget', from
+/// 'perspective', then assert the fixpoint.
 fn run_parsed_asserting_fixpoint (
   mut forest  : ViewForest,
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
   mode        : RefreshMode,
   budget      : usize,
+  perspective : Perspective,
 ) -> Run {
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph, config : &config, restriction };
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  let text : String = refresh_and_render (
-    &mut forest, &mut record, &truth, mode, budget )
+  let text : String = refresh_and_render_from (
+    &mut forest, &mut record, &truth, mode, budget, perspective . clone () )
     . unwrap ();
   if let Err (failure) = refresh_reaches_fixpoint (
     &text, graph,
     |again, again_record| refresh_viewforest (
-      again, again_record, &truth, mode, budget, Perspective::RootAuthors )) {
+      again, again_record, &truth, mode, budget, perspective . clone () )) {
     panic! ( "the refresh of a refresh's output is no fixpoint: {}", failure ); }
   Run { forest, text } }
 
@@ -314,5 +346,20 @@ pub(super) fn occurrence_metadata (
   pid  : &str,
   more : &str,
 ) -> String {
-  format! ( "(skg node (gnid {}) (skgRepos (nodeRepo main)){}{})",
-            pid, if more . is_empty () { "" } else { " " }, more ) }
+  occurrence_metadata_in_with ("main", pid, more) }
+
+/// The metadata of an occurrence of 'pid' in 'skgrepo'.
+pub(super) fn occurrence_metadata_in (
+  skgrepo : &str,
+  pid     : &str,
+) -> String {
+  occurrence_metadata_in_with (skgrepo, pid, "") }
+
+/// The metadata of an occurrence of 'pid' in 'skgrepo', with 'more'.
+pub(super) fn occurrence_metadata_in_with (
+  skgrepo : &str,
+  pid     : &str,
+  more    : &str,
+) -> String {
+  format! ( "(skg node (gnid {}) (skgRepos (nodeRepo {})){}{})",
+            pid, skgrepo, if more . is_empty () { "" } else { " " }, more ) }

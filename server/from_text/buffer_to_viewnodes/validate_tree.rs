@@ -2,10 +2,10 @@ pub mod contradictory_instructions;
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::mirrors::{
-  is_mirror_of, mirror_shown, perspective_owner_of_tree_containing};
+  is_mirror_of, mirror_shown, perspective_skgrepo_of_tree_containing};
 use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::from_text::fork::existing_owned_fork_of;
-use crate::types::misc::{ID, SkgConfig, SkgrepoOwner};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Folder, PropertyMember, ViewRequest};
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
 use crate::types::viewnode::{Vognode, Occurrence};
@@ -114,7 +114,7 @@ pub fn find_buffer_errors_for_saving (
     ::read_all_skg_files_from_skgrepos (config)?;
   let graph = InRustGraph::from_graphnodes (&nodes);
   find_buffer_errors_for_saving_in_graph (
-    viewforest, &graph, config, Perspective::RootAuthors ) }
+    viewforest, &graph, config, Perspective::RootHomes ) }
 
 /// Removing an ID from an idFolder aborts the save (see the
 /// glossary's "write-protected set"): for each present idFolder whose
@@ -185,7 +185,7 @@ fn idFolder_membership_errors (
 /// perspective. Any mirror may bear it: which one the refresh shows
 /// depends on the perspective and the skgrepo restriction. A refusal
 /// names the mirror the occurrence's tree's perspective
-/// ('perspective_owner_of_tree_containing') would show.
+/// ('perspective_skgrepo_of_tree_containing') would show.
 /// The explicit graph is required, so every present fact is checked against
 /// the same graph snapshot used by the rest of save planning.
 #[allow(non_snake_case)]
@@ -208,11 +208,11 @@ fn inPlaceOf_part_errors (
             None => continue },
         _ => continue };
     if ! is_mirror_of (graph, &unrestricted, &original, &bearer) {
-      let owner : SkgrepoOwner = perspective_owner_of_tree_containing (
+      let skgrepo : SkgrepoName = perspective_skgrepo_of_tree_containing (
         config, graph, &perspective, node_ref);
       let effective : Option<ID> = // the mirror shown, for the message
         Some ( mirror_shown (
-          config, graph, &unrestricted, &owner, &original ));
+          config, graph, &unrestricted, &skgrepo, &original ));
       errors . push (
         BufferValidationError::InPlaceOf_Mismatch (
           Some (bearer), original, effective,

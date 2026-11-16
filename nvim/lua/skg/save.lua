@@ -270,8 +270,8 @@ end
 ---  other view
 ---@param perspective string|nil the saved view's perspective
 ---  ('vim.b.skg_perspective'):
----  "user" or "owner of NAME", sent as (perspective . NAME);
----  nil, the root authors', sends nothing
+---  "skgrepo NAME", sent as (perspective . NAME);
+---  nil, the root homes, sends nothing
 ---@return string
 function M.save_request_sexp (view_id, position, approved_forks,
                                 fork_skgrepos, approved_hoist_pids,

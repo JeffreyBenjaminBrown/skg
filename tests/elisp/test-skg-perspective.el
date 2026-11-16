@@ -55,7 +55,7 @@ the sent requests (newest first) and the handlers."
                 (regexp-quote "(request . \"set perspective\") (view-id . \"r\") (perspective . \"next\")")
                 (car (funcall sent))))
        (should (gethash 'perspective handlers))
-       (skg--set-perspective "owner of tracy" "tracy's perspective")
+       (skg--set-perspective "skgrepo tracy" "the perspective of tracy")
        (skg-cycle-perspective)
        (should (string-match-p
                 (regexp-quote "(perspective . \"next\")")
@@ -70,20 +70,20 @@ the sent requests (newest first) and the handlers."
                  (lambda (format-string &rest args)
                    (setq shown (apply #'format format-string args)))))
         (skg--cycle-perspective-handler
-         nil "((response-type perspective) (view-id \"r\") (perspective \"user\") (perspective-name \"your perspective\"))")
-        (should (equal skg-perspective "user"))
-        (should (equal shown "Showing your perspective."))
-        (should (equal (eval (cadr mode-line-process) t) ":your perspective"))
+         nil "((response-type perspective) (view-id \"r\") (perspective \"skgrepo main\") (perspective-name \"the perspective of main\"))")
+        (should (equal skg-perspective "skgrepo main"))
+        (should (equal shown "Showing the perspective of main."))
+        (should (equal (eval (cadr mode-line-process) t) ":the perspective of main"))
         (skg--cycle-perspective-handler
-         nil "((response-type perspective) (view-id \"r\") (perspective \"owner of tracy\") (perspective-name \"tracy's perspective\"))")
-        (should (equal skg-perspective "owner of tracy"))
-        (should (equal shown "Showing tracy's perspective."))
-        (should (equal (eval (cadr mode-line-process) t) ":tracy's perspective"))
+         nil "((response-type perspective) (view-id \"r\") (perspective \"skgrepo tracy\") (perspective-name \"the perspective of tracy\"))")
+        (should (equal skg-perspective "skgrepo tracy"))
+        (should (equal shown "Showing the perspective of tracy."))
+        (should (equal (eval (cadr mode-line-process) t) ":the perspective of tracy"))
         (skg--cycle-perspective-handler
-         nil "((response-type perspective) (view-id \"r\") (perspective \"root authors\") (perspective-name \"each root author's perspective (tracy's)\"))")
+         nil "((response-type perspective) (view-id \"r\") (perspective \"root homes\") (perspective-name \"the perspective of each root's home skgrepo (tracy)\"))")
         (should (null skg-perspective))
         (should (null skg-perspective-name))
-        (should (equal shown "Showing each root author's perspective (tracy's)."))
+        (should (equal shown "Showing the perspective of each root's home skgrepo (tracy)."))
         (should (null (eval (cadr mode-line-process) t)))))))
 
 (ert-deftest test-perspective-refusal-changes-nothing-and-says-why ()
@@ -93,7 +93,7 @@ the sent requests (newest first) and the handlers."
                  (lambda (format-string &rest args)
                    (setq shown (apply #'format format-string args)))))
         (skg--cycle-perspective-handler
-         nil "((response-type perspective) (view-id \"p\") (perspective \"root authors\") (perspective-name \"each root author's perspective (yours)\") (content \"No other perspective would show this buffer differently from its root authors'.\"))")
+         nil "((response-type perspective) (view-id \"p\") (perspective \"root homes\") (perspective-name \"the perspective of each root's home skgrepo (main)\") (content \"No other perspective would show this buffer differently from the perspective of each root's home skgrepo.\"))")
         (should (null skg-perspective))
         (should (string-match-p "No other perspective" shown))))))
 
@@ -102,12 +102,12 @@ the sent requests (newest first) and the handlers."
     (let ((position '(:point-lines-below-focused-headline 0 :point-column 0
                       :point-screen-lines-below-window-start 0)))
       (should-not (assq 'perspective (skg--save-request-sexp "r" position)))
-      (skg--set-perspective "owner of tracy" "tracy's perspective")
+      (skg--set-perspective "skgrepo tracy" "the perspective of tracy")
       (skg-content-view-mode)
-      (should (equal skg-perspective "owner of tracy"))
-      (should (equal skg-perspective-name "tracy's perspective"))
+      (should (equal skg-perspective "skgrepo tracy"))
+      (should (equal skg-perspective-name "the perspective of tracy"))
       (should (equal (cdr (assq 'perspective (skg--save-request-sexp "r" position)))
-                     "owner of tracy")))))
+                     "skgrepo tracy")))))
 
 (ert-deftest test-perspective-is-on-C-c-v-o-and-C-c-v-p-is-free ()
   (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c v o"))

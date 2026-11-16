@@ -362,7 +362,7 @@ fn replace_saved_view_fork_roots (
       occurrence . view_requests . remove (&ViewRequest::Fork);
       // The view is re-rooted at the clone, which stands for nothing:
       // marked '(inPlaceOf F)', it would be read as a perspective's
-      // stand-in for F, which the root authors' show raw.
+      // stand-in for F, which the root homes show as itself.
       occurrence . in_place_of = None; }}
   Ok (())
 }

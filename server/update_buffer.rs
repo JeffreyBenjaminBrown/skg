@@ -62,10 +62,10 @@ pub fn render_initial_view (
 ) -> Result<(ViewForest, String), Box<dyn Error>> {
   let mut viewforest : ViewForest = stub_of_fresh_content_view (
     root_gnids, &runtime . graph );
-  refresh_content_viewforest ( // a fresh view is drawn from its root authors' perspective
+  refresh_content_viewforest ( // a fresh view is drawn from its root homes
     &mut viewforest, &mut ViewnodeIdRecord::default (),
     &Truth::of_runtime (runtime, restriction),
-    Perspective::RootAuthors ) ?;
+    Perspective::RootHomes ) ?;
   let text : String = viewforest_to_string (&viewforest) ?;
   Ok (( viewforest, text )) }
 

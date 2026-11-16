@@ -4,8 +4,9 @@
 # foreign node into a public clone, then
 # explicitly fork that clone (the shown substitute) into a private clone.
 # The result is an owned chain D forks C forks N; viewing N's
-# container shows the chain end D, marked (inPlaceOf N), and the save
-# accepts the chain-end carrier.
+# container, drawn from its home, public, shows C; switched to the
+# perspective of private, it shows the chain end D, marked (inPlaceOf
+# N), and the save accepts the chain-end carrier.
 #
 # Repos: public + private (owned) and foreign.
 

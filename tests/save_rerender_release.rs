@@ -249,11 +249,11 @@ fn a_privacy_challenge_stops_a_perspective_switch_until_approved
     assert! ( messages . last () . unwrap () . contains ("(response-type rerender-done)"),
               "{:?}", messages );
     assert_eq! ( connection . open_views . perspective_of_view (&view_id),
-                 Perspective::RootAuthors ); }
+                 Perspective::RootHomes ); }
   { let messages : Vec<String> = switch_tele_view (
       &f, &mut connection, " (approved-overPrivateText-pids \"tele\")" );
     assert_eq! ( extract_string_field_from_sexp (&messages [0], "perspective")
-                   . as_deref (), Some ("owner of other"), "{:?}", messages );
+                   . as_deref (), Some ("skgrepo other"), "{:?}", messages );
     let switched : String = messages . iter ()
       . find ( |message| message . contains ("(response-type rerender-view)") )
       . and_then ( |message| extract_string_field_from_sexp (message, "content") )
@@ -262,5 +262,5 @@ fn a_privacy_challenge_stops_a_perspective_switch_until_approved
               && switched . contains ("(inPlaceOf child)"),
               "{}", switched );
     assert_ne! ( connection . open_views . perspective_of_view (&view_id),
-                 Perspective::RootAuthors ); }
+                 Perspective::RootHomes ); }
   Ok (( )) }

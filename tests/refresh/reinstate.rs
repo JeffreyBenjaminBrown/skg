@@ -224,9 +224,9 @@ node p
     alias alias
   node c wp
     node q wp noClaim ⊥
-  node o (inPlaceOf n)
+  node n
     forksFolder
-      node n wp
+      node o wp noClaim
   unknown x
   node s
     forksFolder

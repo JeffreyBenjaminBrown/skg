@@ -10,32 +10,32 @@
 //! mirror is symmetric and transitive, so a cycle of forks is no
 //! special case.
 //!
-//! Where substitution acts, a perspective's owner O decides which of
-//! N's mirrors stands in N's place: the first by O's skgrepo list
-//! ('SkgConfig::perspective_skgrepo_list'), by home skgrepo. Several
-//! mirrors in that first skgrepo tie, and the tie is broken thus:
+//! Where substitution acts, a perspective's skgrepo S decides which of
+//! N's mirrors stands in N's place: the first by S's skgrepo list
+//! ('SkgConfig::perspective_skgrepo_list': S, then every other skgrepo
+//! in declaration order), by home skgrepo. Several mirrors in that
+//! first skgrepo tie, and the tie is broken thus:
 //! 1. one mirror alone there stands;
-//! 2. else, if exactly one of them is forked by none of the others, it
-//!    stands (an owned chain D forks C forks N, all in one skgrepo,
-//!    shows D);
-//! 3. else N itself, if it is one of them;
+//! 2. else N itself, if it is one of them;
+//! 3. else, if exactly one of them is forked by none of the others, it
+//!    stands (an owned chain D forks C forks N, all in one skgrepo
+//!    other than N's, shows D);
 //! 4. else the one nearest N along forks, in either direction, and
 //!    among equals the least pid.
-//! The owner need not own the mirror shown.
+//! Who owns the skgrepos plays no part.
 //!
 //! A top-level tree of a view is drawn from the perspective of its
-//! root's author ('perspective_owner_of_tree_containing'): a view
-//! rooted at a foreign node shows what that node's author would see,
-//! throughout the tree, even under a third author's nodes; a view
-//! rooted at an owned node, what the user would. A view switched to
-//! one owner's perspective ('Perspective::Owner': the user's, or
-//! a foreign owner's) is drawn from that owner's in every tree.
+//! root's home skgrepo ('perspective_skgrepo_of_tree_containing'),
+//! throughout the tree, even under nodes homed elsewhere; so a fresh
+//! view shows its root itself. A view switched to one skgrepo's
+//! perspective ('Perspective::Skgrepo') is drawn from it in every
+//! tree.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::herald_tokens::Side;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName, SkgrepoOwner};
+use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
 use crate::types::views_state::Perspective;
 
@@ -82,78 +82,75 @@ impl Mirrors {
 }
 
 /// The mirror of the note 'gnid' names that stands in its place,
-/// under 'restriction', from the perspective of 'owner'. The note's
+/// under 'restriction', from the perspective of 'skgrepo'. The note's
 /// pid when nothing else does (and 'gnid' itself when the graph lacks
 /// it).
 pub fn mirror_shown (
   config      : &SkgConfig,
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
-  owner       : &SkgrepoOwner,
+  skgrepo     : &SkgrepoName,
   gnid        : &ID,
 ) -> ID {
   let original : ID = graph . pid_else_raw_id (gnid);
   mirror_shown_among (
-    config, owner, &original,
+    config, skgrepo, &original,
     &mirrors_of (graph, restriction, &original) ) }
 
 /// Which of 'mirrors', the mirrors of 'original', stands in its place
-/// from the perspective of 'owner': the first by the owner's skgrepo
-/// list, ties broken as the module's comment says.
+/// from the perspective of 'skgrepo': the first by its skgrepo list,
+/// ties broken as the module's comment says.
 pub fn mirror_shown_among (
   config   : &SkgConfig,
-  owner    : &SkgrepoOwner,
+  skgrepo  : &SkgrepoName,
   original : &ID,
   mirrors  : &Mirrors,
 ) -> ID {
-  match first_ranked_mirrors (config, owner, mirrors) {
-    None => original . clone (),
-    Some (FirstRanked::One (pid)) => pid,
-    Some (FirstRanked::Tied (tied)) =>
-      if tied . iter () . any ( |mirror| &mirror . pid == original ) {
-        original . clone ()
-      } else {
-        tied . into_iter ()
-          . min_by ( |a, b| ( a . distance, &a . pid ) . cmp (&( b . distance, &b . pid )) )
-          . map ( |mirror| mirror . pid )
-          . unwrap_or_else ( || original . clone () ) }, }}
+  let tied : Vec<Mirror> = first_ranked_mirrors (config, skgrepo, mirrors);
+  if tied . len () == 1 {
+    return tied [0] . pid . clone (); }
+  if tied . is_empty ()
+     || tied . iter () . any ( |mirror| &mirror . pid == original ) {
+    return original . clone (); }
+  if let Some (pid) = the_only_one_forked_by_none_of_the_others (&tied, mirrors) {
+    return pid; }
+  tied . into_iter ()
+    . min_by ( |a, b| ( a . distance, &a . pid ) . cmp (&( b . distance, &b . pid )) )
+    . map ( |mirror| mirror . pid )
+    . unwrap_or_else ( || original . clone () ) }
 
-/// What the first two tie-breaking rules make of the mirrors in the
-/// first skgrepo of a perspective's skgrepo list that is home to any.
-pub enum FirstRanked {
-  /// One mirror stands: alone there, or the only one there that none
-  /// of the others forks.
-  One (ID),
-  /// These tie, for the caller to choose among.
-  Tied (Vec<Mirror>),
-}
-
-/// The members of 'mirrors' that 'owner''s skgrepo list ranks first,
-/// with the first two tie-breaking rules applied. None when no member
-/// is homed in a skgrepo the config names.
+/// The members of 'mirrors' homed in the first skgrepo of the
+/// perspective of 'skgrepo''s list that is home to any: the mirrors
+/// that tie, for the caller to choose among. Empty when no member is
+/// homed in a skgrepo the list names.
 pub fn first_ranked_mirrors (
   config  : &SkgConfig,
-  owner   : &SkgrepoOwner,
+  skgrepo : &SkgrepoName,
   mirrors : &Mirrors,
-) -> Option<FirstRanked> {
-  let first_home : SkgrepoName =
-    config . perspective_skgrepo_list (owner) . into_iter ()
-    . find ( |skgrepo| mirrors . members . iter ()
-             . any ( |mirror| &mirror . home == skgrepo ) ) ?;
-  let tied : Vec<Mirror> = mirrors . members . iter ()
+) -> Vec<Mirror> {
+  let Some (first_home) : Option<SkgrepoName> =
+    config . perspective_skgrepo_list (skgrepo) . into_iter ()
+    . find ( |listed| mirrors . members . iter ()
+             . any ( |mirror| &mirror . home == listed ) )
+    else { return Vec::new (); };
+  mirrors . members . iter ()
     . filter ( |mirror| mirror . home == first_home )
-    . cloned () . collect ();
-  if tied . len () == 1 {
-    return Some ( FirstRanked::One ( tied [0] . pid . clone () )); }
+    . cloned () . collect () }
+
+/// Of 'tied', some of 'mirrors''s members, the only one that none of
+/// the others forks, if exactly one is.
+pub fn the_only_one_forked_by_none_of_the_others (
+  tied    : &[Mirror],
+  mirrors : &Mirrors,
+) -> Option<ID> {
   let forked_by_none_of_the_others : Vec<&Mirror> = tied . iter ()
     . filter ( |mirror| ! tied . iter () . any ( |other|
       other . pid != mirror . pid
       && mirrors . forks . contains (&( other . pid . clone (), mirror . pid . clone () )) ))
     . collect ();
-  if forked_by_none_of_the_others . len () == 1 {
-    return Some ( FirstRanked::One (
-      forked_by_none_of_the_others [0] . pid . clone () )); }
-  Some ( FirstRanked::Tied (tied) ) }
+  match forked_by_none_of_the_others . as_slice () {
+    [one] => Some ( one . pid . clone () ),
+    _ => None, }}
 
 /// Whether 'candidate' is a mirror of 'original' under 'restriction'.
 /// Either may be a pid or an extra ID.
@@ -268,24 +265,24 @@ fn reaches_forkeeward (
       if seen . insert ( forkee . clone () ) { pending . push (forkee); }} }
   false }
 
-/// The owner from whose perspective the top-level tree containing
+/// The skgrepo from whose perspective the top-level tree containing
 /// 'position' is drawn, in a view drawn from 'perspective'.
-/// The owner's, in a view switched to one owner's perspective.
-/// Otherwise the root author's: the owner ('SkgConfig::skgrepo_owner')
-/// of the home skgrepo, as 'graph' knows it, of the node that tree's
-/// root, the child of the buffer root, stands for (its '(inPlaceOf
-/// N)', else itself: a root another perspective replaced still has its
-/// original's author); the user when that root is not an occurrence of
-/// a node 'graph' knows (a new node, a ghost, a tombstone), or when
-/// 'position' is the buffer root itself.
-pub fn perspective_owner_of_tree_containing (
+/// The view's skgrepo, in a view switched to one. Otherwise the root's
+/// home: the home skgrepo, as 'graph' knows it, of the node that
+/// tree's root, the child of the buffer root, stands for (its
+/// '(inPlaceOf N)', else itself: a root another perspective replaced
+/// still has its original's home); the config's default
+/// ('SkgConfig::default_perspective_skgrepo') when that root is not an
+/// occurrence of a node 'graph' knows (a new node, a ghost, a
+/// tombstone), or when 'position' is the buffer root itself.
+pub fn perspective_skgrepo_of_tree_containing (
   config             : &SkgConfig,
   graph              : &InRustGraph,
   perspective        : &Perspective,
   position           : NodeRef<Viewnode>,
-) -> SkgrepoOwner {
-  if let Perspective::Owner (owner) = perspective {
-    return owner . clone (); }
+) -> SkgrepoName {
+  if let Perspective::Skgrepo (skgrepo) = perspective {
+    return skgrepo . clone (); }
   let tree_root : Option<NodeRef<Viewnode>> =
     once (position) . chain ( position . ancestors () )
     . find ( |node| node . parent () . is_some_and ( |parent|
@@ -297,6 +294,4 @@ pub fn perspective_owner_of_tree_containing (
           occurrence . in_place_of . as_ref () . unwrap_or (&occurrence . gnid) )
         . map ( |(_pid, home)| home ),
       _ => None, } );
-  match root_home {
-    Some (home) => config . skgrepo_owner (&home),
-    None        => SkgrepoOwner::User, }}
+  root_home . unwrap_or_else ( || config . default_perspective_skgrepo () ) }

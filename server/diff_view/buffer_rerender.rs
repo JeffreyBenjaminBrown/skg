@@ -61,7 +61,7 @@ pub fn refresh_diffView_viewforest (
                             buffer_kind     : diffView_buffer_kind,
                             processed_store : store },
     runtime . config . initial_node_limit,
-    Perspective::RootAuthors ) } // unread: the diff view substitutes no mirrors
+    Perspective::RootHomes ) } // unread: the diff view substitutes no mirrors
 
 /// Bring an open buffer of the diff view up to date: bring the
 /// straddle in the context's slot up to date, and refresh the buffer

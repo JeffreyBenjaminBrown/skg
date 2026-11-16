@@ -130,7 +130,7 @@ pub(crate) struct Walk<'a> {
   /// in 'visit.rs'). Built once per walk.
   pub unrestricted             : SkgrepoRestriction,
   /// The view's perspective
-  /// ('perspective_owner_of_tree_containing').
+  /// ('perspective_skgrepo_of_tree_containing').
   pub perspective              : Perspective,
 }
 

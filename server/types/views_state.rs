@@ -3,7 +3,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::many_to_many::ManyToMany;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewnodeId, Viewnode, ViewnodeKind, Vognode};
-use super::misc::{ID, SkgConfig, SkgrepoName, SkgrepoOwner};
+use super::misc::{ID, SkgConfig, SkgrepoName};
 
 use ego_tree::{NodeId, NodeMut, Tree};
 use std::collections::{HashMap, HashSet};
@@ -53,24 +53,22 @@ pub struct ViewState {
 }
 
 /// A view's perspective: where a node stands as content, the refresh
-/// shows the mirror of it that the perspective's owner's skgrepo list
-/// ranks first ('substitute_mirrors' in 'server/refresh/visit.rs';
-/// 'server/dbs/in_rust_graph/mirrors.rs'). The client holds the choice for its
-/// buffer and names it in each save; the connection keeps it for the
-/// rerenders it starts ('ViewState::perspective'). A fresh view
-/// follows its root authors'.
+/// shows the mirror of it that the perspective's skgrepo list ranks
+/// first ('substitute_mirrors' in 'server/refresh/visit.rs';
+/// 'server/dbs/in_rust_graph/mirrors.rs'). The client holds the choice
+/// for its buffer and names it in each save; the connection keeps it
+/// for the rerenders it starts ('ViewState::perspective'). A fresh
+/// view follows its root homes.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum Perspective {
-  /// Each top-level tree is drawn from its root's author's
-  /// perspective: the user's under an owned root, that author's under
-  /// a foreign one
-  /// ('perspective_owner_of_tree_containing').
+  /// Each top-level tree is drawn from its root's home skgrepo: the
+  /// home of the node the root stands for
+  /// ('perspective_skgrepo_of_tree_containing').
   #[default]
-  RootAuthors,
-  /// Every tree is drawn from one owner's perspective, whoever wrote
-  /// its root: the user's (owning every owned skgrepo), or one
-  /// foreign owner's, as that owner, viewing, would see it.
-  Owner (SkgrepoOwner),
+  RootHomes,
+  /// Every tree is drawn from one skgrepo, owned or foreign, whatever
+  /// its root's home.
+  Skgrepo (SkgrepoName),
 }
 
 /// The viewnode IDs of one buffer: the counter they are assigned from,
@@ -123,50 +121,40 @@ impl DiffViewBufferKind {
 //
 
 impl Perspective {
-  /// The user's perspective, in every tree.
-  pub fn user (
-  ) -> Perspective {
-    Perspective::Owner (SkgrepoOwner::User) }
-
   /// The '(perspective . "...")' of a save or of a "set perspective"
-  /// request: "root authors", "user", or "owner
-  /// of NAME" for a foreign owner, NAME the first of its skgrepos in
-  /// declaration order ('SkgConfig::skgrepo_owner').
+  /// request: "root homes", or "skgrepo NAME".
   pub fn wire_name (
     &self,
   ) -> String {
     match self {
-      Perspective::RootAuthors => "root authors" . to_string (),
-      Perspective::Owner (SkgrepoOwner::User) => "user" . to_string (),
-      Perspective::Owner (SkgrepoOwner::Foreign (name)) =>
-        format! ("owner of {}", name . 0), } }
+      Perspective::RootHomes => "root homes" . to_string (),
+      Perspective::Skgrepo (skgrepo) =>
+        format! ("skgrepo {}", skgrepo . 0), } }
 
-  /// The choice 'name' gives ('wire_name'). "owner of NAME" may name
-  /// any foreign skgrepo of the owner; the result names the owner as
-  /// 'wire_name' does. None for any other name, an owned skgrepo
-  /// included.
+  /// The choice 'name' gives ('wire_name'). "skgrepo NAME" may name
+  /// any skgrepo the config lists, owned or foreign. None for any
+  /// other name.
   pub fn from_wire_name (
     name   : &str,
     config : &SkgConfig,
   ) -> Option<Perspective> {
-    match name {
-      "root authors" => Some (Perspective::RootAuthors),
-      "user"         => Some (Perspective::user ()),
-      _ => {
-        let skgrepo : SkgrepoName =
-          SkgrepoName::from ( name . strip_prefix ("owner of ") ? );
-        if ! config . skgrepos . contains_key (&skgrepo)
-           || config . skgrepo_is_owned (&skgrepo) { return None; }
-        Some ( Perspective::Owner ( config . skgrepo_owner (&skgrepo) )) }} }
+    if name == "root homes" { return Some (Perspective::RootHomes); }
+    let skgrepo : SkgrepoName =
+      SkgrepoName::from ( name . strip_prefix ("skgrepo ") ? );
+    config . skgrepos . contains_key (&skgrepo)
+      . then_some ( Perspective::Skgrepo (skgrepo) ) }
 
-  /// How a message to the user names an owner's perspective: "your
-  /// perspective", or "NAME's perspective".
-  pub fn name_of_owners_perspective (
-    owner : &SkgrepoOwner,
+  /// How a message to the user names the perspective of one skgrepo:
+  /// "the perspective of LABEL", LABEL its herald label
+  /// ('Skgrepo::herald_label').
+  pub fn name_of_skgrepos_perspective (
+    skgrepo : &SkgrepoName,
+    config  : &SkgConfig,
   ) -> String {
-    match owner {
-      SkgrepoOwner::User => "your perspective" . to_string (),
-      SkgrepoOwner::Foreign (name) => format! ("{}'s perspective", name . 0), } }
+    format! ( "the perspective of {}",
+              config . skgrepos . get (skgrepo)
+              . map ( |configured| configured . herald_label () )
+              . unwrap_or ( &skgrepo . 0 )) }
 }
 
 impl ViewforestId {
@@ -299,7 +287,7 @@ impl OpenViews {
       state . perspective = perspective; }}
 
   /// The perspective of the open view 'viewforest_id'; a view
-  /// the connection does not hold is drawn from its root authors'.
+  /// the connection does not hold is drawn from its root homes.
   pub fn perspective_of_view (
     &self,
     viewforest_id : &ViewforestId,

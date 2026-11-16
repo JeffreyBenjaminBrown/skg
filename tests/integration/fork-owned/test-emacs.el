@@ -2,7 +2,8 @@
 ;;; Open owned container Q (whose content is the owned M):
 ;;;  - forking a dirty buffer is refused (no confirmation appears);
 ;;;  - skg-fork-node on M -> a fork-confirmation buffer; APPROVE -> the
-;;;    clone is created (forks M) and shown in M's place on reopen;
+;;;    clone is created (forks M) and, M standing as itself in the one
+;;;    skgrepo that holds both, shown in M's forks folder on reopen;
 ;;;  - on a second node M2, skg-fork-node -> DECLINE strips the lingering
 ;;;    (viewRequests fork) atom and commits nothing.
 
@@ -82,24 +83,26 @@ Fails the test if it is not found."
       (skg--change-repo-at-point "owned")
       (skg-approve-fork)))
 
-  ;; 5. Reopen Q fresh: mirror substitution now shows the clone in M's
-  ;;    place, carrying (inPlaceOf M).
+  ;; 5. Reopen Q fresh: the clone, in M's skgrepo, where M stands as
+  ;;    itself, is shown in M's forks folder, forking it.
   (let ((q-buf (fork-test--buffer-showing "Q")))
     (when (buffer-live-p q-buf) (kill-buffer q-buf)))
   (skg-request-single-root-content-view-from-id "Q")
-  (let ((substituted (skg-test-wait-for
-                      (lambda ()
-                        (let ((q-buf (fork-test--buffer-showing "Q")))
-                          (and q-buf
-                               (with-current-buffer q-buf
-                                 (string-match-p "(inPlaceOf M)"
-                                                 (buffer-string))))))
-                      10)))
-    (unless substituted
+  (let ((shown (skg-test-wait-for
+                (lambda ()
+                  (let ((q-buf (fork-test--buffer-showing "Q")))
+                    (and q-buf
+                         (with-current-buffer q-buf
+                           (and (string-match-p "(birth (forks out 2))"
+                                                (buffer-string))
+                                (not (string-match-p "(inPlaceOf M)"
+                                                     (buffer-string))))))))
+                10)))
+    (unless shown
       (let ((q-buf (fork-test--buffer-showing "Q")))
-        (test-fail "the clone was not shown in M's place on reopen:\n%s"
+        (test-fail "the clone was not shown in M's forks folder on reopen:\n%s"
                    (if q-buf (with-current-buffer q-buf (buffer-string)) "<no Q buffer>"))))
-    (message "✓ approve: the clone is shown in M's place with (inPlaceOf M)"))
+    (message "✓ approve: M stands as itself, the clone in its forks folder"))
 
   ;; 6. DECLINE on a second node M2 (in Q2): the lingering fork atom is
   ;;    stripped and nothing is committed.
@@ -128,10 +131,10 @@ Fails the test if it is not found."
   (skg-request-single-root-content-view-from-id "Q2")
   (let ((q2-buf (skg-test-wait-for (lambda () (fork-test--buffer-showing "Q2")) 10)))
     (unless q2-buf (test-fail "Q2's view never reappeared"))
-    ;; Give the view a beat, then assert no substitution happened.
+    ;; Give the view a beat, then assert no fork of M2 is drawn.
     (skg-test-wait-for (lambda () nil) 1)
     (with-current-buffer q2-buf
-      (when (string-match-p "(inPlaceOf M2)" (buffer-string))
+      (when (string-match-p "(birth (forks out 2))" (buffer-string))
         (test-fail "decline must not commit a clone forking M2:\n%s"
                    (buffer-string))))
     (message "✓ decline committed nothing (no clone forks M2)"))

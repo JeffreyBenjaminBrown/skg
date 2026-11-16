@@ -154,7 +154,7 @@ fn refreshes_unchanged (
     &text, &runtime . graph,
     |forest, record| refresh_content_viewforest (
       forest, record, &Truth::of_runtime (runtime, restriction),
-      Perspective::RootAuthors )) }
+      Perspective::RootHomes )) }
 
 /// No skgrepo restriction, then the skgrepo restriction through
 /// each owned skgrepo but the most private (through which it would be
