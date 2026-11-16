@@ -6,6 +6,23 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* A stale-buffer warning names the note when only its forker changed (2026-11-16)
+  Found by the probe pass of every-mirror plan 2 ('TODO/every-mirror/review-2-probes.org',
+  observation of 35). Client A holds N's view, where R, a forker as
+  such, shows what it adds to N. Client B adds a child to R. A's save
+  of its unchanged view writes nothing, as it should, but warns "Left
+  as the graph has it: N (N), which changed after this buffer was
+  rendered ...", though N did not change: the baseline, parsed
+  against the new graph, reads R's new child as cut from R (absent
+  under R in the baseline), so the baseline's N would fork R and hide
+  the child, which differs from the graph, and N is judged stale. An
+  edit of N in that buffer would be refused for the same reason. The
+  cause is that the stale check ('server/serve/handlers/save_staleness.rs')
+  extracts the baseline's writes against today's graph, and a member
+  as such's partial content is read against the member's list as it
+  is now. Nothing is lost or made up; the warning and the refusal are
+  wrong. A fix would read a member as such's cuts in the baseline
+  against what that baseline drew, not against the graph.
 * An opened view keeps the server's fold atoms as text (2026-11-12)
   'skg-open-org-buffer-from-text' ('elisp/skg-buffer.el'), which
   both the content view and the diff view open through, inserts the
