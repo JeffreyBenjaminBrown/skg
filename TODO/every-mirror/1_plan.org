@@ -1,0 +1,1317 @@
+#+title: Plan 1 of every-mirror: one relation, 'forks', and the mirror a perspective shows
+#+startup: overview
+
+* Status: not to be executed yet; Jeff is still discussing
+The open questions below come first because they are the live part
+of this document. A slice may launch only once Jeff has answered, or
+accepted the provisional answer of, every question that slice names.
+An answer that differs from the provisional one becomes a correction
+under that slice's headline before its launch
+('coding-advice/orchestration.org', "Triage before each launch").
+
+Plan 2 ('TODO/every-mirror/2_plan.org', the display of mirrors) runs
+after this one and depends on it; "What plan 2 needs from this plan",
+under "Scope", says where each of its preconditions is met.
+
+* Open questions for Jeff
+Each names the slices it affects and the answer they will follow
+("provisional") unless Jeff gives another.
+** Q1. A perspective's skgrepo list
+Slices 2 and 3. Jeff's rule (decision 4, quoted under "Agreed
+behavior") ranks mirrors by "my list of skgrepos". Which list is it,
+for a perspective whose owner is O?
+*** Provisional
+O's skgrepos in the config's declaration order
+('SkgConfig::skgrepos_in_declaration_order'), then every other
+skgrepo in declaration order. For the user, O's skgrepos are the
+owned ones; for a foreign owner, those 'SkgConfig::skgrepo_owner'
+groups under it.
+*** Consequences to weigh
+**** A third author's fork can stand in for a note
+Today only the followed owner's overriders substitute
+('followable_overriders_of' in
+'server/dbs/in_rust_graph/override_resolution.rs' keeps only those
+whose owner is the follower). Under the provisional list, where the
+perspective's owner has no mirror of a note N, the first mirror in
+declaration order stands in N's place, whoever wrote it. That is what
+Jeff's example says ("one only in your X and your Y shows to me as in
+your X"); the alternative, "only O's skgrepos rank; with no mirror of
+O's, N shows as itself", contradicts that example when N is your Y.
+**** Owned declaration order is privacy order, most public first
+The config's owned entries are in privacy order
+('docs/api-and-formats.org', "Skgrepos": "The order of the owned
+entries is load-bearing"). So between two of my own mirrors, the more
+public one shows. A private fork C of my own public note N will no
+longer show in N's place (today C, an owned overrider, does), and an
+owned chain D (private) forks C (public) forks N (foreign) will show C,
+not D. The alternative is to rank an owner's own skgrepos most private
+first. Jeff's "(my X, my Y, your X, your Y)" does not say which X is.
+** Q2. Which notes are a note's mirrors
+Slices 2 and 3.
+*** Provisional
+The mirrors of N are N and every note joined to N by a path of
+'forks' relationships, followed in either direction, every
+relationship and every note on the path visible under the skgrepo
+restriction (as 'followable_overriders_of' gates one hop today: the
+relationship's relRepo and the forker's home skgrepo unrestricted).
+Mutual forks make the direction of a fork a poor guide to which note
+is "the original", and a closure has no cycle problem.
+*** Alternatives
+- Direct forks only: N and the notes that fork N. Today's chains (D
+  overrides C overrides N, all owned, shows D for N:
+  'resolve_override' walks the chain) would stop at C.
+- The forkerward closure only (today's walk, minus ownership). A
+  note's forkees would then never stand in its place, under any
+  perspective.
+*** Consequence to weigh
+Under the provisional answer, siblings are mirrors of each other (R and
+T both fork N: R is a mirror of T), and a forkee can stand in its
+forker's place: in a view from Jeff's perspective, my note R that forks
+Jeff's N shows as N wherever R stands as content.
+** Q3. Ties: several mirrors in the first-ranked skgrepo
+Slices 2 and 3. Decision 2 lets two of one owner's notes fork one
+note, possibly in one skgrepo, and an owned chain often lives in one
+skgrepo. Which of the tied mirrors stands?
+*** Provisional
+Let T be the mirrors whose home skgrepo comes first in the list.
+1. If T holds one note, it stands.
+2. Otherwise, if exactly one member of T is forked by no other member
+   of T, it stands. (An owned chain D forks C forks N, all in one
+   skgrepo, shows D, as today.)
+3. Otherwise N itself stands, if it is in T (mutual forks within one
+   skgrepo, and two forks of N in N's own skgrepo, show N as itself:
+   today's resolver likewise refuses to choose between two overriders,
+   'resolve_override', "candidates . len () != 1").
+4. Otherwise the member of T nearest N along 'forks' relationships in
+   either direction, and among equals the least pid.
+*** Alternative
+Rule 4 replaced by "N itself": where my two forks of a foreign N tie,
+N shows raw. Today that case cannot arise (monogamy).
+** Q4. The perspective cycle (C-c v o)
+Slices 2 and 7. Jeff: "Each buffer can have a point of view equal to
+any author of any node forked in that view."
+*** Provisional
+It stays as it is ('perspective_to_show' in
+'server/serve/handlers/overrides_followed.rs'): the root authors',
+then the user, then each foreign owner in declaration order, an owner
+admitted when drawing the view from it changes the text. Only the
+candidates change: today 'candidate_owners' takes the owners of the
+visible overriders of each original drawn where substitution acts; it
+will take the owners of every visible mirror of each such original.
+The root authors' perspective stays the default of a fresh view.
+** Q5. A skgrepo the server meets in the old format
+Slice 5. No dual reading ('coding-advice/no-legacy-support.org').
+*** Provisional
+A worktree '.skg' file holding a top-level key 'subscribesTo' or
+'overrides' (or their October 2026 predecessors 'subscribes_to' and
+'overrides_view_of') is unreadable, in an owned or a foreign skgrepo
+alike: the server refuses to start, as for any unreadable file today
+('read_all_skg_files_from_skgrepos_impl' fails on any load error, after
+'report_load_errors' writes
+'DATA_ROOT/initialization-error_unreadable-skg-files.org'). The report
+names every such file, says which keys it holds, and says that the
+skgrepo's owner should run 'tools/migrate-forks-2026-11/migrate.py',
+or, for a foreign skgrepo, that the user may instead remove it from
+'skgconfig.toml' until its owner has. A HEAD tree holding the keys
+makes the diff view refuse, saying to commit the migration.
+*** Alternative
+Load a foreign skgrepo in the old format without its retired keys and
+say so in the startup warnings. That keeps the server running with
+every subscription and override of that owner silently missing, which
+the server would then show as truth.
+*** Sub-question: how long the check lives
+Provisional: it stays until Jeff says every skgrepo either config
+reads is migrated; then a one-line follow-up deletes it. Its comment
+cites the tool's README, not this plan.
+** Q6. Forking a note one already forks
+Slice 3. Today the fork operation refuses ('ForkAlreadyExists') when
+the user already owns an overrider of the note: 'validate_fork_view_requests'
+('server/from_text/buffer_to_viewnodes/validate_tree.rs') for C-c m f,
+'validate_fork_specs_in_graph' ('server/from_text/fork.rs') for the
+implicit fork; both call 'existing_owned_overrider_of'. Decision 2
+removes monogamy from the graph's invariants. Does the operation keep
+its check?
+*** Provisional
+It keeps it, reworded ("you already fork this note; your fork is X"),
+as a guard of the operation, not an invariant: an edit of a foreign
+note shown raw (a view opened on it) that silently made a second clone
+would more often be an accident. A deliberate second fork is made by
+listing the note in an owned note's forkee folder, which nothing
+refuses.
+** Q7. A note forking itself
+Slice 3. Today an owned self-override is refused as a one-node
+'OwnedOverrideCycle' ('validate_override_invariants', via
+'resolve_override', which meets the input again). Removing the cycle
+check (decision 3) would admit 'N forks N', typed into N's forkee
+folder or made by a nodeMerge of N with a note it forks
+('three_nodeMerged_graphnodes' in
+'server/nodeMerge/nodeMergeInstructionTriple.rs' filters the
+acquirer's own IDs from 'contains' but not from 'overrides' or
+'subscribesTo').
+*** Provisional
+A save that leaves an owned note forking itself is refused (a new
+'SelfFork' violation, in the module where the cycle check was), and
+the nodeMerge drops the merged note's own IDs from its 'forks', as it
+does from 'contains'.
+** Q8. Names
+Slices 4 to 7. Decision 1 retires 'subscribesTo' and 'overrides'
+everywhere; these names would follow. Provisional, each:
+*** The relation
+'forks' in files, 'NodeRelation::Forks', roles 'forker' and 'forkee',
+'RelationRole::FORKER' and 'RelationRole::FORKEE', the recorderward
+relmap 'forkers_of', 'FieldIntent::SetForks', 'FolderRelation::Forks'
+with relname "forks", the view request '(folder forks)'.
+*** The folders
+'Folder::Forkee' ('forkeeFolder', label "It forks these.") and
+'Folder::Forker' ('forkerFolder', label "These fork it."), singular as
+every folder kind is ('Folder::Subscribee', 'Folder::Container').
+Plan 2 writes 'Folder::Forkees' and 'Folder::Forkers' and defers to
+this plan's names. The compound folders: 'Folder::HiddenInForkee'
+('hiddenInForkeeFolder', label unchanged) and
+'Folder::HiddenOutsideOfForkee' ('hiddenOutsideOfForkeeFolder', label
+"hides these, but forks nothing that contains them.").
+*** The herald letter
+'K' (for forK), in display position 2. 'F' is taken: =F2= counts true
+flags ('docs/heralds.org'). Tiers as 'subscribesTo' has them: in-side
+high, out-side medium.
+*** The part a shown mirror carries
+'(inPlaceOf N)', field 'in_place_of' on the occurrence, replacing
+'(overridesHere N)'. 'TODO/problems.org' ("Architecture note: 'drawn in
+place of another node' is override-specific data") proposed
+'drawn_in_place_of' for this rename. The herald stays =ĥ=, now after
+the =K= token.
+*** The perspective
+'Perspective' (the glossary's word) for 'OverridesFollowed', with
+variants 'RootAuthors' and 'Owner'; on the wire '(perspective . NAME)'
+for '(overrides-followed . NAME)', the request "set perspective" for
+"set overrides followed", the response type 'perspective'; the module
+'server/serve/handlers/perspective.rs'. Messages: "your perspective",
+"tracy's perspective", "each root author's perspective (tracy's,
+yours)".
+*** The clients
+'C-c l f' ('skg-show-folderOf-forks', Neovim '<localleader>lf') for
+'C-c l s'; 'C-c l o' goes. 'C-c v o' keeps its key; its command
+becomes 'skg-cycle-perspective' (Neovim 'CyclePerspective', module
+'skg.perspective'), its buffer variables 'skg-perspective' and
+'skg-perspective-name'. The AI tool's command 'override-perspective'
+becomes 'perspective', its sidecar key 'overrides_followed' becomes
+'perspective'.
+*** The substitution
+"mirror substitution" for "override substitution"; the module
+'server/dbs/in_rust_graph/mirrors.rs' for 'override_resolution.rs';
+'substitute_mirrors' for 'substitute_overriders'.
+
+* Assignment and authority
+Once released, this plan is a unitary declaration, but for the open
+questions above. Its decisions are Jeff's, given to the orchestrating
+Claude on 2026-11-16 in conversation (no discussion document); they
+are quoted under "Agreed behavior".
+
+An agent executes one slice per launch ('coding-advice/orchestration.org').
+Read, before the first edit: 'coding-advice/names.org',
+'coding-advice/formatting.org', 'coding-advice/ai-agents.org',
+'coding-advice/no-legacy-support.org', 'coding-advice/common-gotchas.md',
+'coding-advice/when-to-stop.org', 'coding-advice/commit-messages.org'.
+
+Function and file names cited in the present tense are today's,
+before this plan. A slice that renames something records the mapping
+in its record in 'TODO/every-mirror/progress.org', and each later
+slice maps a cited name through those records before relying on it.
+
+No slice reads or writes anything under 'data/', runs the migration
+tool on it, or starts, stops or connects to a server on ports 1730 or
+1761. The migration of real data happens after this plan, by each
+owner (see "Verification and completion").
+
+* Commits
+Jeff has asked for commits. One code commit per slice, more where a
+slice touches disparate things (slice 5 should commit the server, the
+fixtures' migration, and the clients separately, each leaving the tree
+green), the first line naming the plan and the slice: "every-mirror
+plan 1 slice N: ...". The slice's last commit carries its docs and
+flips its headline here to DONE. Read
+'coding-advice/commit-messages.org'. Stage only the files the slice
+touched, by path; never stage Jeff's untracked files (as of
+2026-11-16: 'TODO/total-diff-view/since-main.org',
+'data/bash/trim-node-bodies.sh', 'docs/en-espanol.org',
+'the-social-algorithm.org', 'unsaved-edits.org'), a '.elc', or anything
+under 'tests/results/'. If this plan, plan 2 or the glossary is dirty
+with Jeff's edits, commit only the slice's own hunks
+('coding-advice/orchestration.org', "Files Jeff is editing during a
+run"). End every commit message with
+'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>'.
+
+Each slice's record goes into 'TODO/every-mirror/progress.org' under a
+top-level headline "* Plan 1", one subheadline per slice, in the shape
+'coding-advice/orchestration.org' gives ("The report shape").
+Deviations from this plan's "how" go there too, with their reasons.
+
+* Scope
+** What plan 2 needs from this plan
+'TODO/every-mirror/2_plan.org', "Scope", "Preconditions: what this
+plan assumes plan 1 delivers", lists seven items. Each is met here:
+*** 1. One relation, 'forks'; 'hidesFromSubs' stays
+Slice 5 (files, graph, 'NodeRelation', 'shared/relations.json', the
+wire's relation keys); slice 6 (the folder and request names).
+'hidesFromSubs' keeps its name and means "hides from what it forks"
+("Vocabulary").
+*** 2. The subscription folders become the forkee and forker folders; the override folders go
+Slice 4 deletes the override folders; slice 6 renames
+'Folder::Subscribee' and 'Folder::Subscriber' as Q8 says, with atoms
+and labels, the forkee folder's membership editable and the forker
+folder's write-protected, as today.
+*** 3. Every behavior of the subscribee folder holds of the forkee folder
+Slice 6 is a rename only: 'add_default_folders', the hidden-in and
+hidden-outside folders, 'resolve_visibility' and
+'infer_hides_from_contains_removals', 'file_subscribee_members_written_in',
+'validate_text_claims', and 'subscriber_of_subscribee_as_such' (to be
+'forker_of_forkee_as_such') keep their behavior, and the tests that
+pin it today pass renamed.
+*** 4. Mutual forks are legal, and substitution on a cycle is defined
+Slice 2 defines substitution over mirrors, where a cycle is no special
+case (Q2, Q3); slice 3 removes 'OwnedOverrideCycle'.
+*** 5. Monogamy
+It goes (decision 2; slice 3). Plan 2's fixtures may put both forkers
+of a note in owned skgrepos, and plan 2's slice 5 test "if plan 1
+keeps monogamy, a cut ... is refused" has no case. The fork operation
+keeps its own check (Q6), which a cut (not an operation) never meets.
+*** 6. Substitution re-expressed over 'forks'; members of either forks folder shown raw
+Slices 2 and 5. Members of every partner folder stay raw:
+substitution acts only on content of an editable occurrence and on
+roots ('substitute_overriders' and 'substitute_roots' in
+'server/refresh/visit.rs'), which slice 2 keeps.
+*** 7. Everything else speaks of forks, every suite green
+Slices 4 to 8: the diff view's names, the search enrichment, both
+clients, the AI tool, the docs; slice 8 runs 'bash/all-tests.sh'.
+
+** In scope
+- One relation 'forks' replacing 'subscribesTo' and 'overrides' in
+  '.skg' files, the in-Rust graph, 'NodeRelation',
+  'shared/relations.json', the wire, the folders, the heralds, both
+  clients, the AI tool, the docs and the tests.
+- The one-time migration tool, and the server's refusal of the old
+  format.
+- Mirror substitution by a perspective's skgrepo list (decision 4),
+  replacing today's override substitution, with every reader of the
+  old resolution.
+- The removal of override monogamy and of the owned-cycle refusal,
+  with what each refusal also prevented.
+- The renames of the substitution's and the perspective's own names
+  (Q8).
+
+** Out of scope, decided
+- The display of mirrors: plan 2.
+- The diff view, beyond renaming what it shows.
+- Any new folder.
+- Renaming 'hidesFromSubs'.
+- Running the migration on 'data/': each owner does it, after this
+  plan.
+- Fixing 'TODO/problems.org' entries other than those this plan marks.
+
+* Vocabulary
+Checked against 'docs/glossary.org' and the code on 2026-11-16
+('coding-advice/names.org', "Check a plan's words before the run").
+** forks, forker, forkee
+The relation and its roles (Jeff's): "Forker forks forkee". Recorded
+by the forker. A *fork of N* is a note that forks N.
+*** The fork operation keeps its name
+'docs/glossary.org', "clone, and the fork operation", names the
+gesture that clones a foreign note. It keeps its name and is always
+called "the fork operation"; the note it makes is a *clone*, which
+forks the original. Where the glossary says "forks" for fork
+operations awaiting confirmation ("ask for confirmation (forks, Hoist,
+strandeds, delete-from)", "plus forks and nodeMerges"), slice 8 makes
+it say "fork operations".
+** mirror (coined)
+The *mirrors* of a note N: N and the notes Q2 says, under the skgrepo
+restriction. Not to be confused with "mirror" as a plain verb in a
+few docs ("The save is its mirror", 'docs/data-model_technical.org').
+** a perspective's skgrepo list (coined)
+The ordered list of skgrepos a perspective ranks mirrors by (Q1). Not
+"rank", which the glossary keeps for privacy ("a foreign skgrepo has
+no privacy rank"), and not "order", which names the privacy, fold and
+declaration orders.
+** the mirror shown
+For a note N at a position where substitution acts, under a
+perspective: the mirror Q1 and Q3 choose. It stands in N's place,
+marked '(overridesHere N)' until slice 7 and '(inPlaceOf N)' after.
+** mirror substitution
+Today's "override substitution" ('docs/glossary.org', "override
+substitution, and the vocabulary around it"), its rule replaced.
+"Shown raw", "raw root" and "original" keep their meanings.
+** perspective
+Unchanged in meaning ('docs/glossary.org', "perspective"): whose
+skgrepo list a view's trees rank by, its root authors' or one
+owner's. Jeff's "point of view" is this word; the plan does not use
+his.
+** forkee as such, the forkee-visibility step
+Slice 6's names for "subscribee as such" and "the subscribee-visibility
+step", unchanged in meaning. ("Forker as such" is plan 2's coinage.)
+** forkee folder, forker folder
+Slice 6's names for the subscribee and subscriber folders (Q8).
+Before slice 6 the plan says "subscribee folder" and "subscriber
+folder", their names in the code then.
+** retired keys (coined)
+'subscribesTo' and 'overrides' as top-level '.skg' keys, and their
+predecessors 'subscribes_to' and 'overrides_view_of'.
+** hidesFromSubs, kept
+Not renamed (decided): it now means "hides from what it forks"; "Subs"
+survives only in this name. Renaming it would add a second key to the
+migration and touch every hide reader for no change of meaning. Its
+folder labels change: "It hides these from what it forks.", "These
+hide it from what they fork."
+** false friends: not this plan's words
+These contain "subscribe" or "override" in other senses and are not
+renamed: 'tracing_subscriber' and 'tracing-subscriber'
+('server/main.rs', 'Cargo.toml'); 'subscribe_to_repo_change_notices'
+('server/serve.rs'); 'override_body' ('server/import_org_roam/parse.rs');
+'load_config_with_overrides'; 'skg--relRepo-no-override',
+'M.relRepo_no_override' and the menu entry "(no override: follow
+sticky-else-default)" (a relRepo request removed, not the relation);
+"Override with SKG_..." in 'bash/'; "unless overridden by a deeper
+style keyword" ('elisp/skg-sexpr/skg-lens.el'); "Overrides save to
+update" ('elisp/skg-id-search.el'); 'overPrivateText'.
+
+* Agreed behavior
+** Jeff's decisions (2026-11-16)
+1. One relation, 'forks' ("Forker forks forkee"), replaces both
+   'subscribesTo' and 'overrides', everywhere. 'hidesFromSubs' stays,
+   meaning "hides from what it forks".
+2. Two notes of one owner may fork the same note: the rule that no
+   node is overridden by more than one owned node goes.
+3. Mutual forks are legal (A forks B while B forks A).
+4. Which mirror a view shows in a note's place, verbatim: "Each buffer
+   can have a point of view equal to any author of any node forked in
+   that view. Where a fork is displayed, it is displayed according to
+   that point of view. If my list of skgrepos is (my X, my Y, your X,
+   your Y) then a node only in my repo Y and your repo X shows as in my
+   Y, one only in your X and your Y shows to me as in your X, etc."
+5. Existing data is migrated: each 'subscribesTo X' with or without a
+   like 'overrides X', and each 'overrides X' alone, becomes 'forks
+   X'. Claude never writes in Jeff's skgrepos: the migration is a
+   one-time tool each owner runs on their own.
+6. Out of scope: the display of mirrors (plan 2), the diff view beyond
+   renaming what it shows, any new folder.
+
+** 1. The relation 'forks'
+*** In the graph
+'forks' is recorded by the forker, like 'subscribesTo' and
+'overrides' today ('OUTBOUND_RELATIONSHIP_TYPES' in
+'server/dbs/in_rust_graph/relation_accessors.rs'). It is ordered, as
+'subscribesTo' is (its folder's goal is ordered,
+'Folder::goal_is_ordered'; the telescope weaves it with anchors,
+'server/telescope/compose.rs'), since the subscribee folder, whose
+membership is editable and ordered, becomes the forkee folder.
+*** What it means
+A forks B says both of today's things: A shows B's content that A
+neither contains nor hides, as a subscriber's subscribee as such does
+('less_what_the_subscriber_integrates' in 'server/refresh/goal.rs');
+and A and B are mirrors (behavior 3). A former override-only
+relationship gains the first meaning, a former subscription-only one
+the second.
+*** The fork operation
+The clone forks the original once, at the clone's home skgrepo, where
+'build_fork_clone' ('server/from_text/fork.rs') today writes both
+'subscribesTo' and 'overrides'. Nothing else about the operation
+changes but Q6.
+
+** 2. The file format, the migration, and the old format met later
+*** The format
+The key 'forks' takes the place of 'subscribesTo' in
+'GraphnodeOnDisk' ('server/types/nodes/fs.rs'), between 'contains' and
+'hidesFromSubs', with 'ListItem' members and anchors. 'overrides' goes.
+The serde aliases 'subscribes_to' and 'overrides_view_of' go with their
+fields; 'misc' and 'hides_from_its_subscriptions' stay (out of scope).
+*** The data, counted read-only on 2026-11-16
+Over the skgrepos the server on port 1761 reads
+('data/claude/skgconfig.toml': 'data/jeff/{public, personal-ish,
+deciduous, personal-proc, personal-most}' as foreign,
+'data/claude/{public, private}' and 'data/claude/team/*/notes' as
+owned), by grepping each '.skg' file's top-level lists (a relationship
+is one recorder and one target):
+| skgrepo       | files with 'subscribesTo' | with 'overrides' | paired | subscribe-only | override-only |
+|---------------+---------------------------+------------------+--------+----------------+---------------|
+| 'jeff/public' |                        36 |               32 |     32 |              4 |             0 |
+| 'claude/public' |                      99 |               99 |     99 |              0 |             0 |
+| every other   |                         0 |                0 |      0 |              0 |             0 |
+| total         |                       135 |              131 |    131 |              4 |             0 |
+No pid's pair is split across sections, no file names more than one
+target in either list, no target has two forkers, and no file holds
+the October 2026 keys. ('data/jeff/personal-deprecated', which only
+the server on port 1730 reads, holds none; 'data/from-browser', which
+neither reads, holds one pair.)
+
+Three of the four subscribe-only relationships are Jeff's notes
+subscribing back to Claude's forks of them (Jeff's
+'25fb2a5a...', '8514433c...' and 'c02f05e8...' subscribe to Claude's
+'a17ed26b...', 'c457e6c5...' and '32d5d1e1...', each of which
+overrides and subscribes to the Jeff note): after the migration they
+are mutual forks (decision 3). The fourth ('95fc4b53...' in
+'jeff/public') subscribes to '056a7de8-d7e5-4fb4-9a42-7e0f088ab898',
+which no '.skg' file under 'data/' holds: a dangling ID, which stays
+dangling as a 'forks' target.
+*** The one-time migration tool
+'tools/migrate-forks-2026-11/migrate.py', with 'README.org' and a test
+beside it, modeled on 'tools/migrate-skg-keys-2026-10/migrate.py'. One
+time: no workspace membership, not in 'bash/all-tests.sh'.
+**** What it reads
+'migrate.py [--dry-run] [--marks FILE]... DIR...': every '*.skg' file
+under each DIR (skipping '.git'), grouped by pid across the DIRs, so
+that an owner passes all their skgrepos at once and a telescope's
+sections are seen together; and each processed marks file named.
+**** What it writes
+For each pid:
+- Each section's 'subscribesTo' list (members and anchors, in order)
+  becomes its 'forks' list, written where 'subscribesTo' stood.
+- Each 'overrides' target that no section of the pid subscribes to is
+  appended, as a member, to the 'forks' of the section that recorded
+  the override (its relRepo is kept); the 'forks' key goes where the
+  server's serializer puts it (after 'contains').
+- An 'overrides' target that some section subscribes to is dropped;
+  the relationship is recorded once, where the subscription stood, and
+  the report counts each one whose section differs.
+- A target listed twice in one section's 'forks' is kept once.
+- A target that is one of the pid's own IDs is dropped and reported
+  (Q7).
+- The 'overrides' key and its list are deleted.
+Only top-level keys at the start of a line are touched, so titles and
+bodies never are. A file whose lists are not in block style, or that
+holds an October 2026 key, is left unchanged and reported, and the
+tool exits nonzero. A file it migrated holds no retired key, so a
+second run changes nothing.
+
+In each marks file, every mark whose leaf is a relationship of
+'SubscribesTo' or 'Overrides' is dropped, and the count reported
+(see the pitfall "The processed marks file is all or nothing").
+**** What it reports
+Files changed, relationships paired, subscribe-only, override-only,
+overrides dropped as recorded elsewhere, duplicates, self-forks, marks
+dropped; then, per DIR that is in a gitrepo, the line to commit it
+("git -C DIR commit -am 'Migrate to forks'"), since the diff view
+refuses a HEAD in the old format (Q5). '--dry-run' writes nothing and
+reports the same counts. The README gives the counts above, so that
+each owner can compare.
+*** The old format met by a server
+As Q5 says. The check reads the YAML's top-level keys, and is made in
+exactly these places: 'read_graphnode' ('server/dbs/filesystem/one_node.rs',
+which every worktree read of a section goes through:
+'read_skg_sections_from_folder', 'read_recently_modified_skgfiles_from_skgrepos',
+'sections_of_pid_on_disk'), and 'read_skgrepo_from_tree'
+('server/git_ops/git_snapshot.rs', the before-graph of the diff view and
+the candidate snapshot of stage-and-commit). Not in 'parse_blob_node',
+which 'server/git_ops/vanished.rs' uses on historical blobs to answer
+"investigate unknown node": history before the migration holds the
+retired keys forever, and that search reads them as having no forks
+(stated in the docs). 'graphnode_on_disk_as_graphnode_with_default_skgrepo'
+('server/git_ops/diff.rs') already treats any unparseable blob as
+absent with a warning; it gets the same check, so that an old blob is
+"absent" rather than a forkless node.
+
+'read_skg_sections_from_folder' returns at its first unreadable file
+today, and the report names the folder ('TODO/problems.org', "The
+unreadable-files report names the REPO FOLDER, not the file"). For
+this error it should collect every file of the folder holding retired
+keys and report each by path; the entry gets 'FIX PLANNED: ' for that
+part only, with a line saying so.
+
+** 3. Mirrors, and which one stands in a note's place
+*** Where substitution acts: unchanged
+Where a note N stands as content of an editable occurrence in a
+content view, and, in a view switched to one owner's perspective, at
+the view's roots; never in the diff view, never for a member of a
+partner folder, a chain node, a ghost, a search hit or a root under
+the root authors' perspective ('substitute_overriders',
+'substitute_roots', 'server/refresh/visit.rs'). The children of a
+note shown raw where something else would stand in its place are
+raw too, one level ('is_overridden_and_shown_raw', which exempts the
+subscribee folder's members).
+*** Which mirror stands
+The mirror shown for N, under the perspective of the tree N stands in
+(the root's author under the root authors', else the perspective's
+owner: 'override_follower_of_tree_containing'), is chosen from N's
+mirrors (Q2) by that owner's skgrepo list (Q1), ties broken by Q3.
+When it is N, nothing substitutes. The perspective's owner need not
+own the mirror shown.
+*** A carrier that is a mirror but not the one chosen
+Today 'substitute_overriders' leaves a carrier alone when it is on
+the followed owner's chain, even if not its end
+('carrier_on_override_chain_followed_by'). Every mirror of N is honest
+under the new rule, so that test would never re-point a carrier after
+a switch of perspective. The refresh will re-point every carrier that
+is not the mirror shown, and stop substituting where the mirror shown
+is N itself ('stop_substituting', unchanged).
+*** The tamper check
+'overridesHere_part_errors' ('validate_tree.rs') will accept a
+carrier that is any mirror of its original under the unrestricted
+skgrepo restriction (so that a switch of the restriction does not
+refuse a save of a part honest when drawn), and refuse any other,
+naming the mirror shown as today it names the chain's end.
+*** Every other reader of the old resolution
+Each follows mirrors, by the same function:
+- 'candidate_owners' ('overrides_followed.rs'): the owners of the
+  visible mirrors of each original (Q4).
+- 'forks_the_view_will_not_show' ('fork.rs'): warn when the mirror
+  shown for the original, under the edited occurrence's tree's
+  perspective, is not the new clone.
+- 'member_it_stands_for' ('resolve_visibility.rs') and 'stands_for'
+  ('file_what_is_written_in.rs'), which today walk overrides from
+  overrider to overridden: a child stands for the list member that is
+  its mirror, the nearest along 'forks' first, then the first in the
+  list. (Their comment's reasoning, "whichever view the user found it
+  in", holds the more now that a mirror in either direction can stand
+  in.)
+- 'suppressed_result_gnids' ('server/serve/handlers/text_search.rs'):
+  among the hits that are mirrors of one another, every hit but the
+  one the user's skgrepo list chooses (Q1, Q3, as if N were each hit
+  in turn: the hit that comes first) is suppressed, provided the one
+  chosen is owned. A foreign hit still never suppresses. An owned
+  mutual pair that both match shows one hit, not none (today's walk
+  would suppress each from the other, once the cycle is legal).
+- The update-relevant neighborhood ('update_relevant_neighborhood_over',
+  'override_walk_from_seeds'): the two monotonic override walks become
+  each seed's mirrors, in the before and the after graph, so that a
+  save changing any relationship among a note's mirrors redraws the
+  views in which another of them stands. 'forks' joins the ordinary
+  one-hop relations in place of 'subscribesTo'.
+- The birth fact of a mirror shown ('server/refresh/viewnodestats.rs',
+  where today a shown overrider gets '(overrides out)'): '(forks out)'
+  when the mirror shown reaches N by forker steps only, '(forks in)'
+  when by forkee steps only, none otherwise (the client's =ĥ= needs
+  only the part: 'heralds--rel-token' draws the token where the part
+  is present).
+
+** 4. The refusals that go, and what they also did
+*** Monogamy
+'MultipleOwnedOverriders' goes from 'validate_override_invariants' and
+'validate_affected_override_invariants_with_counts'
+('override_invariants.rs'). With it go: 'derive_merge_override_collisions',
+'MergeOverrideCollision' and its message ('prepared_update.rs'), which
+exist only to explain a monogamy violation a nodeMerge causes; and the
+comment of 'owned_ancestor_skgrepos_for_foreign_vognodes' ('fork.rs')
+that leans on it ("monogamy means at most one clone anyway"). The fork
+operation keeps its check (Q6), moved out of the invariants module.
+*** The owned cycle
+'OwnedOverrideCycle' goes. Mirrors (Q2, Q3) have no cycle case. The
+search's suppression would otherwise drop both of an owned mutual
+pair (behavior 3). A self-fork is refused instead (Q7), and the
+nodeMerge drops one.
+*** What stays in the module
+'UnknownSkgrepo', and 'SelfFork' (Q7). The module and its scope
+derivation shrink to what those need: a self-fork can only appear on a
+note the save touches, so 'derive_affected_override_scope' reduces to
+the touched pids and the nodes a nodeMerge re-keys.
+
+** 5. Folders
+*** The override folders go
+'Folder::Overridden' and 'Folder::Overrider', 'FolderRelation::Overrides',
+the request '(folder overrides)', 'C-c l o' and Neovim 'lo', the
+overridden-as-such display (its content raw, without its recorder's
+hides), and the save's 'visit_overridden_folder'. The subscribee
+folder, renamed, is the one place a buffer edits 'forks'.
+*** The search enrichment
+Under each hit, its subscribee folder and subscriber folder (forkee
+and forker folders from slice 6), each when nonempty, in place of the
+two override folders ('stub_root_of_hit').
+*** The subscription folders, renamed
+As Q8. Behavior unchanged (plan 2's precondition 3).
+
+** 6. Wire, heralds, clients, AI tool
+Each layer speaks the new names as slices 5 to 7 introduce them.
+'(rels ...)' carries one key 'forks' where it carried 'subscribesTo'
+and 'overrides'; its sides add up the two old ones' members once. The
+=ĥ= herald follows the 'forks' token. Herald labels, changed-folder
+labels ('shared/herald-styles.json', "its subscribers changed (other
+files)" and kin) and the AI tool's prose speak of forks. Old buffers,
+and the AI tool's saved views, which hold old atoms, are refused at
+save by the parser and must be reopened (no migration).
+
+** 7. What stays as it is, and what changes, among the defaults a user sees
+*** Kept
+- A fresh content view: its containers folder on each root, its
+  subscribee (forkee) folder on each editable occurrence an
+  editable-view request extends ('add_default_folders',
+  'stub_of_fresh_content_view').
+- What a subscribee (forkee) as such shows, and the hidden-in and
+  hidden-outside folders.
+- Where substitution acts; roots shown raw under the root authors'
+  perspective; one level of raw children.
+- The root authors' perspective as every fresh view's.
+- C-c v o's cycle and order (Q4), under its new command name.
+- The fork operation's gestures and confirmation buffer.
+- The diff view's folders and default presentation.
+- The fold state of everything already in a buffer.
+*** Changed
+- Which mirror stands in a note's place (Q1 to Q3); a mirror in
+  either direction may, a third author's may.
+- A carrier is re-pointed whenever it is not the mirror shown.
+- Override folders gone; 'C-c l o' gone; 'C-c l s' becomes 'C-c l f'.
+- The search enrichment draws the forkee and forker folders.
+- The heralds: one letter =K= for 'S' and 'O'.
+- Two owned forks of one note, and owned mutual forks, are saved.
+- A server refuses to start on an unmigrated skgrepo (Q5).
+
+* Pitfalls the slices must respect
+** Live servers and data
+Ports 1730 and 1761 are Jeff's live servers ('target/release/skg' with
+'data/jeff/skgconfig.toml' and 'data/claude/skgconfig.toml'), which
+read each other's skgrepos as foreign and have no hot reload of code.
+Never start, stop or connect to them, never pass those ports or
+configs to anything, never build the release profile. Never run the
+migration tool on 'data/'. Isolated instances only
+('.claude/skills/verify/SKILL.md'). Every commit leaves the tree green.
+** An unknown key is dropped silently, and the next save erases it
+'GraphnodeOnDisk' has no 'deny_unknown_fields'; serde ignores a key it
+does not know. Once slice 5 removes the two fields, a file still
+holding them would load with neither, and the save's decomposition
+would rewrite the section without them ('docs/api-and-formats.org',
+"The .skg file format": "saving decomposes the node back into
+sections"). That is why the refusal (Q5) lands in the same slice as
+the field's removal, before any test runs against the new struct.
+** The processed marks file is all or nothing
+'ProcessedStore::load' ('server/diff_view/processed_store.rs') reads an
+unparseable file as an empty store, and the next change overwrites it.
+'RelationshipKey' serializes 'NodeRelation' by variant name. So once
+'SubscribesTo' and 'Overrides' are gone, one old mark loses every
+mark. Both live marks files were empty on 2026-11-16 (17 bytes each);
+the tool drops such marks anyway, and slice 5 greps 'tests/' for
+'"SubscribesTo"' and '"Overrides"' in marks fixtures.
+** HEAD before the migration is committed
+After the tool runs and before the owner commits, an owned skgrepo's
+HEAD holds the retired keys. 'read_skgrepo_from_tree' will refuse it
+(Q5), so the diff view and stage-and-commit refuse until the commit.
+That is intended; the README says to commit at once. Tests build
+their gitrepos from fixtures the tool has migrated, so none sees it.
+** The honest-carrier rule hides a stateless gap
+See behavior 3, "A carrier that is a mirror but not the one chosen":
+keeping the leniency of 'carrier_on_override_chain_followed_by', with
+"honest" widened to every mirror, would make 'C-c v o' change nothing
+in content positions already substituted.
+** The walks over 'overrides' besides the resolver
+'member_it_stands_for', 'stands_for', 'suppressed_result_gnids',
+'override_walk_from_seeds', 'carrier_on_override_chain_followed_by'
+(and through it 'overridesHere_part_errors'), and 'candidate_owners'
+via 'visible_overriders_with_owners_of'. Every one changes in slice 2.
+A grep for 'NodeRelation::Overrides' after slice 2 should find only the
+relation's plumbing (accessors, stats, heralds, strandeds, restores,
+'relRepo_info.rs').
+** What each removed refusal prevented
+Listed under behavior 4; slice 3 handles each. Also: the resolver's
+refusal to choose among two overriders ('resolve_override') and its
+backstop on a cycle are replaced by Q3's rule, not kept beside it.
+** The nodeMerge filters 'contains' and nothing else
+'three_nodeMerged_graphnodes' removes the acquirer's own IDs from
+'contains' only; 'subscribesTo' and 'overrides' are combined raw. Q7.
+** String-typed relation lookups fail silently
+'find_related_nodes' ('server/dbs/in_rust_graph/query.rs') matches
+relation and role names as strings and returns nothing for an unknown
+triple ('_ => {}'). After the rename, a stale "subscribesTo" or
+"overrides" in a caller would pass silently. Slice 5 makes that arm
+panic, naming the triple, and marks the entry "String-typed relation
+lookups fail silently" in 'TODO/problems.org' 'FIX PLANNED: '.
+** Readers of each renamed atom and field
+Grepped on 2026-11-16 ('git grep' over 'server', 'shared', 'elisp',
+'nvim', 'tools', 'tests', 'bash'). Each slice regreps before its
+edits and lists what it changed in its record.
+*** 'subscribesTo' and 'overrides' as fields
+'server/types/nodes/{fs, rust, complete}.rs', 'server/telescope/{compose,
+decompose, invariants, types}.rs', 'server/dbs/filesystem/one_node.rs',
+'server/dbs/in_rust_graph.rs' (the relmaps), 'query.rs',
+'complete_validation.rs', 'internal_index_validation.rs', 'stats.rs',
+'override_invariants.rs', 'prepared_update.rs', 'relation_accessors.rs',
+'server/from_text/{fork, validate, supplement_from_disk, strandeds,
+hide_report, weave}.rs', 'server/from_text/local_fieldintent_collection/{lower,
+types, traverse}.rs', 'server/nodeMerge/nodeMergeInstructionTriple.rs',
+'server/delete_references_to_absent_node.rs', 'server/import_org_roam.rs',
+'server/import_org_roam/parse.rs', 'server/import_md_and_org/build.rs',
+'server/save.rs', 'server/test_utils.rs', 'tools/find-danglers/find.py',
+'tools/transplant-changes-from-one-repo-to-repo/' (one-time; adapt
+only if its tests run in a suite, else note it stale in its README).
+*** 'NodeRelation::SubscribesTo' and 'NodeRelation::Overrides'
+'relation_accessors.rs', 'stats.rs', 'server/diff_view/restore_requests.rs',
+'server/from_text/strandeds.rs', 'server/herald_tokens.rs',
+'server/refresh/goal.rs', 'server/refresh/viewnodestats.rs',
+'server/serve/handlers/relRepo_info.rs', 'server/types/viewnode.rs',
+'file_what_is_written_in.rs', 'resolve_visibility.rs', 'text_search.rs';
+tests 'tests/dbs/in_rust_graph/relation_accessors.rs',
+'tests/herald_tokens.rs', 'tests/unit/change_leaves.rs'.
+*** The relmaps 'subscribers_of' and 'overriders_of'
+'server/dbs/in_rust_graph.rs', 'internal_index_validation.rs',
+'query.rs', 'relation_accessors.rs', 'override_invariants.rs',
+'override_resolution.rs', 'prepared_update.rs',
+'server/diff_view/restore_requests.rs', 'server/save.rs',
+'server/telescope/invariants.rs'; tests
+'tests/dbs/in_rust_graph/{complete_validation, internal_index_validation,
+override_invariants}.rs', 'tests/merge/merge_nodes.rs',
+'tests/unit/prepared_graph_update.rs'.
+*** 'RelationRole::SUBSCRIBER', 'SUBSCRIBEE', 'OVERRIDER', 'OVERRIDDEN'
+'override_resolution.rs', 'server/graph_straddle/union_walk.rs',
+'tests/leak_battery.rs'.
+*** The folder kinds
+'Folder::Subscribee', 'Subscriber', 'Overridden', 'Overrider',
+'HiddenInSubscribee', 'HiddenOutsideOfSubscribee':
+'server/diff_view/changes.rs', 'server/from_text/buffer_to_viewnodes/{local,
+validate_tree}.rs', 'file_what_is_written_in.rs',
+'local_fieldintent_collection/{mod, traverse}.rs', 'server/heralds.rs',
+'server/refresh/{ancestry, goal, viewnodestats, visit}.rs',
+'server/serve/handlers/text_search.rs', 'server/types/viewnode.rs';
+tests 'tests/metadata_fields_table.rs', 'tests/unit/{fork, viewnode}.rs',
+'tests/viewnode_ids.rs', 'tests/overrideward_view_subtree.rs',
+'tests/hidden_nodes.rs', 'tests/refresh/ancestry.rs'.
+*** The folder atoms
+'subscribeeFolder', 'subscriberFolder', 'overriddenFolder',
+'overriderFolder', 'hiddenInSubscribeeFolder',
+'hiddenOutsideOfSubscribeeFolder': besides the server files above,
+'server/from_text/local_fieldintent_collection/{predicates, types}.rs',
+'server/types/misc.rs' (a comment), 'shared/{herald-styles,
+metadata-fields, relations}.json', 'elisp/skg-metadata.el',
+'elisp/skg-request-views.el', 'nvim/lua/skg/metadata.lua',
+'tools/skg-for-ai/skg_for_ai.py', and some 70 test files: the
+Rust tests, 'tests/elisp/', 'tests/nvim/', 'tests/shared/herald-rules.sexp',
+'tests/shared/herald-rendering-cases.txt', and the integration tests
+'diff-view-motions', 'save_collateral_break_cycle' and
+'save_collateral_delete_then_edit_under_it' (its 'README/' too).
+*** The view requests '(folder subscribesTo)' and '(folder overrides)'
+'server/types/viewnode.rs' ('FolderRelation'), 'server/refresh/visit.rs'
+('kinds_redrawing', 'folders_of_relation', the request ranks),
+'elisp/skg-request-views.el', 'nvim/lua/skg/views.lua',
+'nvim/lua/skg/keymaps.lua', 'elisp/skg-keymaps-and-aliases.el',
+'tools/skg-for-ai/skg_for_ai.py' (its folder table), 'shared/metadata-fields.json'
+(the request's argument list); tests 'collateral_partner_folder',
+'extend_partner_folder_member', 'hidden_nodes', 'overridden_as_such',
+'partner_folder_matrix', 'partner_folder_order', 'partner_folder_warnings',
+'refresh/{hide_folders, reinstate, requests}', 'restricted_graphnode_in_the_buffer',
+'subscriber_hides_under_a_narrowing', 'view_stats_sharing'.
+*** 'overridesHere'
+'override_resolution.rs', 'server/from_text.rs', 'validate_tree.rs',
+'predicates.rs' ('deleted_overrider_keeps_its_original'),
+'server/heralds.rs', 'server/org_to_text.rs', 'viewnodestats.rs',
+'visit.rs', 'server/rerender_pass.rs', 'overrides_followed.rs',
+'server/serve/handlers/save_dependencies/mod.rs',
+'server/serve/metadata_fields.rs', 'server/serve/parse_metadata_sexp.rs',
+'server/types/{errors, save, viewnode}.rs', 'shared/metadata-fields.json',
+'elisp/heralds-minor-mode.el', 'nvim/lua/skg/heralds.lua',
+'tools/skg-for-ai/{skg_for_ai.py, README.org, test_skg_for_ai.py}',
+and the tests that name it (among them 'tests/override_substitution.rs',
+45 uses; 'tests/refresh/substitution.rs'; 'tests/fork.rs'; the
+integration tests 'fork', 'fork-chain', 'fork-owned' and
+'overrides-followed'; 'tests/shared/metadata-editor-cases.txt').
+*** 'OverridesFollowed' and the wire's 'overrides-followed'
+'override_resolution.rs', 'server/diff_view/buffer_rerender.rs',
+'server/from_text.rs', 'validate_tree.rs', 'fork.rs',
+'server/refresh/{mod, visit}.rs', 'server/rerender_pass.rs',
+'server/serve.rs', 'overrides_followed.rs', 'save_buffer.rs',
+'text_search.rs', 'server/serve/protocol.rs', 'server/test_utils.rs',
+'server/types/views_state.rs', 'server/update_buffer.rs';
+'elisp/{skg-buffer, skg-request-override-perspective, skg-request-save,
+skg-request-text-search, skg-client, skg-reload, skg-keymaps-and-aliases}.el',
+'nvim/lua/skg/{buffer, override_perspective, save, keymaps, messages}.lua';
+the AI tool; tests 'tests/elisp/test-skg-override-perspective.el',
+'tests/elisp/test-skg-search-results.el',
+'tests/nvim/override_perspective_spec.lua', the integration test
+'overrides-followed', and the Rust tests that build a perspective.
+*** The save's subscription names
+'FieldIntent::SetSubscribesTo', 'SetOverrides', 'SubscribeeVisibility',
+'SubscribeeTextClaim', 'LocalContext::SubscribeeAsSuchPosition',
+'subscriber_from_disk', 'subscribee_from_disk' and kin:
+'local_fieldintent_collection/{lower, resolve_visibility, traverse,
+types, validate_text_claims}.rs', 'server/serve.rs',
+'server/serve/protocol.rs', 'supplement_from_disk.rs', 'hide_report.rs';
+tests 'tests/new/local_fieldintent_collection/{extraction, traverse,
+types}.rs'.
+** Tests are grouped by path
+Rust test files are compiled through '#[path]' modules in
+'tests/grouped_*.rs' (for instance 'tests/grouped_overrides.rs' holds
+'override_substitution.rs', 'overridden_as_such.rs',
+'overrideward_view_subtree.rs', 'extend_raw_overridden_children.rs',
+'collateral_subscribee_staleness.rs', 'fork.rs'), and 'Cargo.toml'
+names each group ('grouped_overrides'). A renamed or deleted test file
+changes its group file; a renamed group changes 'Cargo.toml' and any
+'cargo nextest -E' filter quoted in a test's header comment.
+** The herald table has pinned copies
+A folder atom, a label or a relation letter touches 'herald_rule_table'
+('server/heralds.rs'), 'shared/herald-styles.json' ('node_heralds',
+whose keys 'hiddenInSubscribeeFolder_subscriber' and
+'hiddenOutsideOfSubscribeeFolder_subscriber' name the subscriber's
+letter; 'folder_heralds.write_protected', 'folder_heralds.other_files'
+and 'folder_heralds.changed_labels', checked at startup by
+'folder_heralds_inconsistencies'; 'relationship_heralds', with its
+'overrides_here' and 'side_tiers'), 'tests/shared/herald-rules.sexp',
+'tests/shared/herald-rendering-cases.txt' (both clients),
+'herald_rules_cover_the_emittable_vocabulary', and
+'shared/metadata-fields.json' (read by the AI tool's 'FOLDER_ATOMS').
+'skg--relRepo-unsupported-folder-atoms' ('elisp/skg-metadata.el'),
+'M.relRepo_unsupported_folder_atoms' ('nvim/lua/skg/metadata.lua') and
+'RELREPO_UNSUPPORTED_FOLDERS' ('tools/skg-for-ai/skg_for_ai.py') name
+every write-protected partner folder; the clients'
+writable-folder kinds ('elisp/skg-metadata.el' near
+'(subscribeeFolder . "subscribesTo")', 'WRITABLE_FOLDER_RELATIONSHIP_KINDS'
+in the AI tool) name the editable ones. The clients read relation
+letters and display order from 'shared/relations.json'
+('elisp/skg-shared.el', 'nvim/lua/skg/shared.lua', the AI tool's
+relation table); a conformance test ('tests/metadata_fields_table.rs')
+checks it against 'NodeRelation'.
+** Exhaustive matches on 'Folder' and 'NodeRelation'
+'Folder::all' (with its 'guard'), 'goal_is_ordered', 'is_editable',
+'repr_in_client', 'required_ancestry', 'kinds_redrawing',
+'birth_facts_for_folder', 'folder_goal', the parse's dispatch in
+'local.rs', and the traversal match on 'Folder'; 'members_carry_containerward_chain'
+and 'members_are_properties' do not, so check them by hand.
+'NodeRelation::ALL', 'relation_name', 'roles', the flag slots of
+'herald_tokens.rs', and 'GRAPH_RELATIONS' ('viewnodestats.rs') match on
+'NodeRelation'.
+** Old buffers and saved AI views
+After slice 4, 5, 6 or 7, a buffer drawn before it holds atoms or
+parts the parser no longer knows, and its save is refused. No
+migration: reopening redraws it. On 2026-11-16, 83 of the AI tool's
+saved views under 'data/claude/views/' held such atoms; the AI tool's
+README will say to fetch them again.
+** Integration tests
+A slice that changes what the server writes into a buffer runs
+'bash/integration-tests.sh' (the Emacs pass) before it ends, then
+'bash/all-tests.sh' (both clients). Every suite was green on
+2026-11-15 ('tests/results/ALL.org': 76 of 76 integration tests).
+Directories with forks or overrides in their fixtures are the
+likeliest to change: 'fork', 'fork-chain', 'fork-owned', 'fork-repo',
+'fork-source', 'overridden-direct-visit', 'override-menu',
+'overrides-followed', 'search-enrichment', 'set-relRepo' and the
+'save_collateral_*' ones.
+** Suites
+Serialize full runs. Rust: 'bash/nextest.sh'. Emacs:
+'bash/emacs-tests.sh'. Neovim: 'bash/nvim-tests.sh'. AI tool: 'python3
+tools/skg-for-ai/test_skg_for_ai.py' after 'cargo build --bin skg'
+(every slice from 2 on: it asserts the server's behavior).
+Everything: 'bash/all-tests.sh' (in the background, no timeout under
+15 minutes). Logs go under 'tests/results/every-mirror-1/sliceN/';
+copy what 'progress.org' cites before a full run, which wipes
+'tests/results/'.
+
+* Code map
+Today's names.
+** Relation and graph
+- 'server/dbs/in_rust_graph/relation_accessors.rs':
+  'OUTBOUND_RELATIONSHIP_TYPES', 'NodeRelation', 'RelationRole',
+  'UPDATE_RELEVANT_ORDINARY_RELATIONS', 'update_relevant_neighborhood_over',
+  'override_walk_from_seeds', 'other_member_pids_gated',
+  'outbound_pids_for_relation_gated'.
+- 'server/dbs/in_rust_graph.rs' (relmaps, their add and remove),
+  'query.rs' ('find_related_nodes'), 'stats.rs',
+  'internal_index_validation.rs', 'complete_validation.rs',
+  'prepared_update.rs'.
+- 'server/dbs/in_rust_graph/override_resolution.rs': 'resolve_override',
+  'override_follower_of_tree_containing',
+  'carrier_on_override_chain_followed_by', 'followable_overriders_of',
+  'visible_overriders_with_owners_of'.
+- 'server/dbs/in_rust_graph/override_invariants.rs':
+  'validate_override_invariants', 'derive_affected_override_scope',
+  'validate_affected_override_invariants_with_counts',
+  'existing_owned_overrider_of', 'owned_overriders_of',
+  'format_override_invariant_violations'.
+- 'shared/relations.json'; 'tests/metadata_fields_table.rs'.
+** Files and telescopes
+- 'server/types/nodes/{fs, rust, complete}.rs'.
+- 'server/telescope/{compose, decompose, invariants, types}.rs'.
+- 'server/dbs/filesystem/one_node.rs' ('read_graphnode',
+  'sections_of_pid_on_disk'), 'multiple_nodes.rs'
+  ('read_skg_sections_from_folder', 'read_all_skg_files_from_skgrepos_impl',
+  'report_load_errors', 'read_recently_modified_skgfiles_from_skgrepos').
+- 'server/git_ops/git_snapshot.rs' ('read_skgrepo_from_tree',
+  'parse_blob_section', 'parse_blob_node'), 'server/git_ops/diff.rs',
+  'server/git_ops/vanished.rs'.
+- 'server/diff_view/processed_store.rs'.
+** Substitution and perspective
+- 'server/refresh/visit.rs': 'substitute_overriders',
+  'substitute_roots', 'redraw_folders', 'kinds_redrawing',
+  'show_overrider', 'stop_substituting', 'is_overridden_and_shown_raw',
+  'add_default_folders'.
+- 'server/refresh/mod.rs' ('Walk' and its perspective field),
+  'server/refresh/viewnodestats.rs' (the shown overrider's birth fact).
+- 'server/serve/handlers/overrides_followed.rs': 'perspective_to_show',
+  'candidate_owners', 'original_at_substitution_position',
+  'perspective_rank'.
+- 'server/types/views_state.rs' ('OverridesFollowed'),
+  'server/serve/protocol.rs', 'server/serve/handlers/save_buffer.rs',
+  'server/rerender_pass.rs', 'server/update_buffer.rs'.
+- 'server/from_text/buffer_to_viewnodes/validate_tree.rs'
+  ('overridesHere_part_errors', 'validate_fork_view_requests').
+** The save, the fork operation, the nodeMerge
+- 'server/from_text/fork.rs': 'build_fork_clone',
+  'validate_fork_specs_in_graph', 'forks_the_view_will_not_show',
+  'owned_ancestor_skgrepos_for_foreign_vognodes',
+  'build_fork_confirmation_buffer'.
+- 'server/from_text/local_fieldintent_collection/': 'traverse.rs'
+  ('visit_subscribee_folder', 'visit_overridden_folder'), 'types.rs',
+  'lower.rs', 'resolve_visibility.rs' ('member_it_stands_for'),
+  'predicates.rs', 'validate_text_claims.rs'.
+- 'server/from_text/file_what_is_written_in.rs' ('stands_for').
+- 'server/from_text/{validate, supplement_from_disk, strandeds,
+  hide_report, weave}.rs', 'server/delete_references_to_absent_node.rs'.
+- 'server/nodeMerge/nodeMergeInstructionTriple.rs'
+  ('three_nodeMerged_graphnodes', 'gnids_shown_through_subscriptions').
+** Folders, refresh goals, heralds
+- 'server/types/viewnode.rs' ('Folder', 'FolderRelation').
+- 'server/refresh/{goal, ancestry}.rs'.
+- 'server/heralds.rs', 'server/herald_tokens.rs',
+  'shared/herald-styles.json', 'shared/metadata-fields.json'.
+- 'server/serve/handlers/text_search.rs' ('stub_root_of_hit',
+  'suppressed_result_gnids').
+- The diff view: 'server/diff_view/{changes, restore_requests}.rs',
+  'server/graph_straddle/union_walk.rs', 'server/serve/handlers/relRepo_info.rs'.
+** Clients and AI tool
+- Emacs: 'elisp/heralds-minor-mode.el' ('heralds--rel-token'),
+  'skg-metadata.el', 'skg-request-views.el', 'skg-keymaps-and-aliases.el',
+  'skg-buffer.el', 'skg-request-override-perspective.el',
+  'skg-request-save.el', 'skg-request-text-search.el', 'skg-client.el',
+  'skg-reload.el', 'skg-request-relRepo-info.el'.
+- Neovim: 'nvim/lua/skg/{heralds, metadata, views, keymaps, messages,
+  buffer, override_perspective, save, relRepo_info}.lua'.
+- 'tools/skg-for-ai/skg_for_ai.py', 'README.org', 'test_skg_for_ai.py',
+  'test-fixture/'.
+** Docs
+'docs/glossary.org' (relation, partner folder and its table, compound
+partner folder, write-protected set's example, "subscribee as such",
+the subscribee-visibility step, role tree's adjectives, override
+substitution, perspective, clone and the fork operation, Folder's
+per-kind rules, update-relevant neighborhood, hiderel);
+'docs/data-model_friendly.org' ("Forks of foreign data require three
+more relationships", which becomes two); 'docs/data-model_technical.org'
+(the field tables, the relmaps, the hard validation constraints, the
+editable folders); 'docs/api-and-formats.org' (text search, save
+buffer's perspective, view requests, the stats metadata and birth
+table, override substitution, set overrides followed, relRepo info,
+delete references, the .skg format, the metadata headers, restricted
+skgrepos); 'docs/heralds.org'; 'docs/override.org';
+'docs/forks.org'; 'docs/sharing-model.org'; 'docs/diff-view.org';
+'docs/COMMANDS.org' and 'docs/COMMANDS-nvim.org'; 'docs/telescopes.org';
+'docs/moving-nodes-across-repos.org'; 'docs/nvim-client-deviations.org';
+'tools/skg-for-ai/README.org'. Files named '-old' are left alone.
+** Tests most likely to change
+'tests/override_substitution.rs', 'tests/refresh/substitution.rs',
+'tests/dbs/in_rust_graph/{override_resolution, override_invariants,
+complete_validation, relation_accessors}.rs', 'tests/init_refusal.rs',
+'tests/unit/prepared_graph_update.rs', 'tests/fork.rs',
+'tests/unit/fork.rs', 'tests/merge/merge_nodes.rs',
+'tests/overridden_as_such.rs', 'tests/extend_raw_overridden_children.rs',
+'tests/overrideward_view_subtree.rs', 'tests/partner_folder_matrix.rs',
+'tests/hidden_from_subscriptions.rs', 'tests/subscribee_*.rs',
+'tests/collateral_subscribee_staleness.rs', 'tests/repo_sets.rs',
+'tests/view_stats_sharing.rs', 'tests/leak_battery.rs',
+'tests/metadata_fields_table.rs', 'tests/unit/heralds.rs',
+'tests/new/local_fieldintent_collection/'. A test pinning a name is a
+fixture adaptation; a test pinning a save's effect on the graph or what
+a view shows must not change unless a slice's behavior says so.
+
+* Implementation sequence
+** TODO Slice 1: the one-time migration tool
+Questions: Q7 (self-forks dropped).
+- 'tools/migrate-forks-2026-11/migrate.py' as behavior 2 says, with
+  'README.org': what it does, the counts of behavior 2 for Jeff's and
+  Claude's skgrepos, the commit line, and the order of the
+  transition ("Verification and completion").
+- 'tools/migrate-forks-2026-11/test_migrate.py' (one-time, run by this
+  slice and slice 5 only), over temporary copies: a pair; a
+  subscribe-only; an override-only appended after the section's
+  subscriptions; anchors kept in order; a pair split across two
+  sections of one pid (recorded at the subscription's section, the
+  override dropped and counted); a self-reference dropped; a
+  duplicate; a flow-style list and an October 2026 key refused,
+  unchanged, nonzero exit; '--dry-run' writes nothing; a second run
+  changes nothing; a title or body line that reads like a key is
+  untouched; a marks file with one 'SubscribesTo', one 'Overrides' and
+  one 'Contains' mark keeps only the last.
+- Docs: the README only. No server change, so no Rust suite.
+- Run 'python3 tools/migrate-forks-2026-11/test_migrate.py'.
+
+** TODO Slice 2: mirror substitution, over today's 'overrides'
+Questions: Q1, Q2, Q3, Q4. The invariants stay in force here, so owned
+data still has no cycle or second owned overrider; foreign data may.
+- 'server/dbs/in_rust_graph/mirrors.rs' (Q8) replaces
+  'override_resolution.rs': the mirrors of a note (Q2) over the
+  relation 'overrides' (slice 5 switches it to 'forks', in one place);
+  a perspective's skgrepo list (Q1); the mirror shown (Q3);
+  'override_follower_of_tree_containing' kept, renamed if Q8 renames
+  the perspective (else in slice 7); a predicate "is a mirror of", for
+  the tamper check. Keep the functions short and named per
+  'coding-advice/names.org'.
+- 'substitute_overriders', 'substitute_roots' and
+  'is_overridden_and_shown_raw' ('visit.rs') ask the mirror shown;
+  re-point as behavior 3 says.
+- Every other reader behavior 3 lists: the tamper check,
+  'candidate_owners', 'forks_the_view_will_not_show',
+  'member_it_stands_for', 'stands_for', 'suppressed_result_gnids', the
+  update-relevant neighborhood, the shown mirror's birth fact.
+- Tests. Rewrite 'tests/dbs/in_rust_graph/override_resolution.rs' as
+  the mirrors' tests: Jeff's example verbatim (two owners, two
+  skgrepos each, the four placements he names), from both
+  perspectives; a foreign two-cycle; Q3's four rules, one test each; a
+  restricted middle note cutting a path. In 'tests/override_substitution.rs':
+  a switch of perspective re-points a substituted content child; a
+  third author's mirror stands where Q1 says; the tamper check accepts
+  any mirror and refuses a non-mirror. In the search tests: a foreign
+  mutual pair shows both. In the neighborhood tests: a sibling fork's
+  change reaches a view showing the other sibling. Tests pinning
+  today's chain resolution adapt only where Q1, Q2 or Q3 change the
+  answer, and the record lists each.
+- Docs: glossary ("override substitution", "perspective", "mirror"
+  and "a perspective's skgrepo list" added, "update-relevant
+  neighborhood"); 'docs/api-and-formats.org' ("Override substitution
+  and the overridesHere part", "Set overrides followed", "Text
+  search"); 'docs/override.org'; 'docs/forks.org'.
+- This slice changes what the server writes into buffers: run
+  'bash/nextest.sh', the AI tool's tests, 'bash/integration-tests.sh',
+  then 'bash/all-tests.sh'.
+
+** TODO Slice 3: monogamy and the owned-cycle refusal go
+Questions: Q6, Q7.
+- 'override_invariants.rs': remove 'MultipleOwnedOverriders' and
+  'OwnedOverrideCycle'; add 'SelfFork' (Q7) for an owned note listing
+  one of its own IDs under 'overrides' (slice 5: 'forks'); shrink the
+  scope derivation as behavior 4 says. Remove
+  'derive_merge_override_collisions', 'MergeOverrideCollision',
+  'owned_overriders_at', 'participant', their message, the
+  'merge_override_collisions' field of 'GraphUpdatePreparationError'
+  and the clause on it in 'is_override_invariant_only' ('prepared_update.rs',
+  'server/save.rs').
+- The fork operation's check (Q6) moves out of the invariants module,
+  beside 'validate_fork_specs_in_graph', reworded; both callers use
+  it. Correct the comments that lean on monogamy ('fork.rs',
+  'override_resolution.rs' if any survives, 'docs/glossary.org',
+  "clone, and the fork operation").
+- 'three_nodeMerged_graphnodes': drop the merged note's own IDs from
+  the combined 'overrides' and 'subscribesTo' (Q7).
+- Tests: 'tests/dbs/in_rust_graph/override_invariants.rs' rewritten
+  (two owned overriders of one note pass; an owned two-cycle passes; a
+  self-reference is refused); 'tests/init_refusal.rs' and its fixture
+  refuse a self-reference instead of two owners; 'tests/unit/prepared_graph_update.rs'
+  loses the collision case and gains "a nodeMerge of a note with the
+  note it overrides saves without a self-reference"; a save making an
+  owned mutual pair, and one adding a second owned overrider, each
+  render with the mirror Q3 chooses; a search where both of an owned
+  mutual pair match shows one; the fork operation's refusal still
+  fires, with the new wording (Q6).
+- Docs: glossary (clone and the fork operation; Folder's notes on
+  monogamy); 'docs/data-model_technical.org' ("Hard validation
+  constraints"); 'docs/api-and-formats.org' (save errors);
+  'docs/forks.org'; 'docs/override.org'.
+- Run 'bash/nextest.sh', the AI tool's tests, 'bash/integration-tests.sh'
+  (a refusal message the server writes may change), then
+  'bash/all-tests.sh'.
+
+** TODO Slice 4: the override folders go
+- Remove 'Folder::Overridden', 'Folder::Overrider',
+  'FolderRelation::Overrides' and every arm, row and table entry the
+  pitfalls "Exhaustive matches" and "The herald table has pinned
+  copies" name: the save's 'visit_overridden_folder' and
+  'FieldIntent::SetOverrides' (a buffer no longer edits 'overrides';
+  only the fork operation and the files write it until slice 5), the
+  overridden-as-such goal (content raw, without hides) in
+  'server/refresh/goal.rs', the arm in 'kinds_redrawing', the request
+  ranks, the exemption list of 'is_overridden_and_shown_raw' (unchanged
+  in effect).
+- 'stub_root_of_hit' draws the subscribee and subscriber folders, each
+  when nonempty, in place of the two override folders; a suppressed
+  hit reappears in its suppressor's subscribee folder only where a
+  subscription records it, until slice 5 makes the two one relation
+  (say so in the record).
+- Clients: remove 'skg-show-folderOf-overrides', 'C-c l o',
+  'ShowFolderOfOverrides' and 'lo', the 'overridden' relRepo kind and
+  its folder atom in the writable and write-protected lists, and the
+  role help entries "overrider" and "overridden"
+  ('elisp/skg-metadata.el', 'nvim/lua/skg/metadata.lua'). The AI tool:
+  its '(folder overrides)' entry, the atoms in its lists, its
+  writable-kind table.
+- Tests: delete 'tests/overridden_as_such.rs' and
+  'tests/extend_raw_overridden_children.rs' (their behavior goes;
+  update 'tests/grouped_overrides.rs'), and the integration test
+  'overridden-direct-visit' if it only drives the folder (else adapt
+  it); adapt 'tests/overrideward_view_subtree.rs',
+  'tests/partner_folder_matrix.rs', 'tests/extend_partner_folder_member.rs',
+  'tests/view_stats_sharing.rs', 'tests/refresh/reinstate.rs',
+  'tests/hidden_nodes.rs', the herald pins, the elisp, Neovim and AI
+  tool tests, and the integration test 'search-enrichment'.
+- Docs: glossary (partner folder and its table, Folder's per-kind
+  rules, "override substitution"'s overridden-as-such paragraph, role
+  tree's adjectives); 'docs/api-and-formats.org' (text search, view
+  requests, birth table, the override section's raw-children
+  paragraph); 'docs/heralds.org'; both COMMANDS docs; the AI tool's
+  README.
+- This slice changes what the server writes into buffers: run the
+  suites as slice 2 does.
+
+** TODO Slice 5: one relation, 'forks', in files, graph, save and wire
+Questions: Q5, Q8 (the relation's names and its letter). Commit in
+three parts, each green: the server with its unit and Rust tests; the
+fixtures' migration; the clients and the AI tool.
+- The format: 'GraphnodeOnDisk' 'forks' (behavior 2), 'Graphnode',
+  'GraphnodeInRust', the telescope's composition (ordered, woven as
+  'subscribesTo' is), decomposition and invariants; the retired-key
+  refusal where behavior 2 says, with its report; the per-file
+  collection in 'read_skg_sections_from_folder' for this error.
+- The graph: relmap 'forkers_of'; 'NodeRelation::Forks' with roles
+  'forker' and 'forkee' in 'OUTBOUND_RELATIONSHIP_TYPES';
+  'RelationRole::FORKER' and 'FORKEE'; 'UPDATE_RELEVANT_ORDINARY_RELATIONS';
+  'find_related_nodes' (and its panic, pitfall); stats; internal index
+  and complete validation; 'shared/relations.json' (one entry, letter
+  and display position per Q8, folders still 'subscriberFolder' and
+  'subscribeeFolder' until slice 6).
+- The mirrors module reads 'forks'; 'SelfFork' reads 'forks'.
+- The save: 'FieldIntent::SetForks' for 'SetSubscribesTo' (lowering,
+  weave, supplement, strandeds, hide report and floors, restores);
+  'build_fork_clone' writes 'forks' once; the nodeMerge combines
+  'forks'; 'delete_references_to_absent_node'; the importers.
+- The wire: '(rels (forks ...))'; the birth facts ('(forks in 2)' for
+  a subscribee-folder member, '(forks out 2)' for a subscriber-folder
+  member, the shown mirror's as behavior 3 says); =ĥ= with the 'forks'
+  token ('heralds--rel-token', 'rel_chunks' in 'nvim/lua/skg/heralds.lua',
+  'relation_token' in the AI tool); 'relationship_heralds' in
+  'shared/herald-styles.json' ('side_tiers'; 'overrides_here' keeps its
+  key until slice 7).
+- Fixtures: run slice 1's tool over every fixture directory holding
+  '.skg' files under 'tests/' and 'tools/skg-for-ai/test-fixture/'
+  (145 files held the keys on 2026-11-16), then hand-edit the inline
+  YAML the tool cannot reach (the files 'git grep -l -E
+  "(subscribesTo|overrides):"' finds outside '.skg' and '.org':
+  'server/test_utils.rs', 'tests/fork.rs', 'tests/hidden_nodes.rs',
+  'tests/merge/merge_nodes.rs', 'tests/delete_strips_references_from_neighbors.rs',
+  'tests/unit/telescope.rs', the fixtures' 'README.md' files, the
+  integration tests' 'run-test.sh' files, and others it lists). Record
+  the tool's report in the slice's record.
+- Tests: the retired-key refusal, owned and foreign, its report naming
+  every such file of a folder; a HEAD tree with retired keys refuses
+  the diff view with the commit message; 'investigate unknown node'
+  still finds a vanished node whose blob holds retired keys; an old
+  marks mark does not empty the store when the tool has run (and the
+  pitfall's grep of marks fixtures); a former subscribe-only fixture
+  now substitutes and a former override-only one now shows its
+  unintegrated content, each as decision 5 implies.
+- Docs: glossary (relation and its table, "subscribee as such" and the
+  visibility step reworded to 'forks', update-relevant neighborhood,
+  hiderel); 'docs/data-model_friendly.org' (two relationships);
+  'docs/data-model_technical.org' (fields, relmaps, relation table);
+  'docs/api-and-formats.org' (the .skg format, the stats metadata and
+  birth table, relRepo info, delete references, restricted skgrepos'
+  weave); 'docs/heralds.org' (the letter, its tiers);
+  'docs/telescopes.org'; 'docs/forks.org'; 'docs/sharing-model.org'.
+- This slice changes what the server writes into buffers: run the
+  suites as slice 2 does.
+
+** TODO Slice 6: forkee and forker names
+Questions: Q8 (folders, compound folders, request, keys, labels).
+A rename with no change of behavior: plan 2's precondition 3.
+- 'Folder::Subscribee' and 'Folder::Subscriber' and the compound folder
+  kinds, their atoms, labels and every reader the pitfall "Readers of
+  each renamed atom and field" names; 'FolderRelation::SubscribesTo' as
+  'FolderRelation::Forks' ("forks"); the save's names
+  ('SubscribeeVisibility', 'SubscribeeTextClaim',
+  'SubscribeeAsSuchPosition', 'visit_subscribee_folder',
+  'file_subscribee_members_written_in', 'subscriber_of_subscribee_as_such',
+  'less_what_the_subscriber_integrates', 'hidden_in_subscribee',
+  'hidden_outside_of_subscribees', 'subscriber_from_disk' and kin) in
+  the forkee and forker vocabulary; the hider and hidden folders'
+  labels ("Vocabulary", hidesFromSubs).
+- 'shared/relations.json' folders 'forkerFolder' and 'forkeeFolder';
+  herald styles (the two '_subscriber' keys become '_forker') and every
+  pinned copy; 'shared/metadata-fields.json'.
+- Clients: 'skg-show-folderOf-forks' on 'C-c l f' (Neovim 'lf'),
+  'skg--forkee-as-such-at-point-p' and the Neovim twin, the writable
+  and write-protected lists, the relRepo kinds and help.
+  The AI tool: its folder table, lists, 'subscribee_as_such'.
+- Test files whose names name the retired relations move with
+  'git mv' and their group files: 'subscribee_folder.rs',
+  'subscribee_folder_empty_persists.rs', 'subscribee_heralds.rs',
+  'collateral_subscribee_staleness.rs', 'subscriber_hides_under_a_narrowing.rs',
+  'hidden_from_subscriptions.rs', 'overrideward_view_subtree.rs' and
+  their fixture directories; the group 'grouped_overrides' as
+  'grouped_forks' (and 'Cargo.toml').
+- Tests: the renamed ones pass unchanged in substance; the herald
+  rendering cases in both clients; a request '(folder forks)' draws
+  both folders.
+- Docs: glossary (the as-such entries, the visibility step, partner
+  folder, compound partner folder, write-protected set's example,
+  Folder's rules, role tree's adjectives); 'docs/data-model_technical.org';
+  'docs/api-and-formats.org'; 'docs/heralds.org'; both COMMANDS docs;
+  'docs/sharing-model.org'; 'docs/diff-view.org' (the changed-folder
+  labels); the AI tool's README.
+- This slice changes what the server writes into buffers: run the
+  suites as slice 2 does.
+
+** TODO Slice 7: the substitution's and the perspective's names
+Questions: Q8 (the part, the perspective, the command), Q4.
+- '(overridesHere N)' becomes '(inPlaceOf N)' in the parser, the
+  metadata tables, the printer, the heralds (with the style key
+  'overrides_here', to be 'in_place_of'), both clients, the AI tool and
+  every test text; 'deleted_overrider_keeps_its_original' and kin
+  in the mirror vocabulary.
+- 'OverridesFollowed' becomes 'Perspective'; the wire's
+  '(overrides-followed . NAME)', the request "set overrides followed"
+  and the response type as Q8 says; the handler module renamed;
+  the messages of 'perspective_name'.
+- Clients: 'skg-cycle-perspective' on 'C-c v o', its buffer variables,
+  'skg-request-override-perspective.el' as 'skg-request-perspective.el'
+  (and its 'require's in 'skg-client.el' and 'skg-reload.el'); Neovim
+  'CyclePerspective', 'skg.perspective'. The AI tool's command and
+  sidecar key (Q8).
+- 'docs/override.org' becomes 'docs/mirrors.org' ('git mv'), every
+  link to it updated; the integration test 'overrides-followed' becomes
+  'perspective', 'tests/override_substitution.rs' becomes
+  'tests/mirror_substitution.rs', the client perspective tests
+  likewise.
+- Mark the 'TODO/problems.org' entry "Architecture note: 'drawn in
+  place of another node' is override-specific data" 'FIX PLANNED: '
+  at this slice's start, and move it to 'TODO/DONE/problems.org' at
+  its end, as that file's header says.
+- Docs: glossary (override substitution as mirror substitution, the
+  part, perspective); 'docs/api-and-formats.org' ("Set perspective",
+  save buffer's '(perspective . NAME)', the metadata headers);
+  'docs/heralds.org'; both COMMANDS docs; the AI tool's README.
+- This slice changes what the server writes into buffers: run the
+  suites as slice 2 does.
+
+** TODO Slice 8: the last sweep, and the handoff
+- 'git grep -n -i -E "subscri|overrid"' over 'server', 'shared',
+  'elisp', 'nvim', 'tools/skg-for-ai', 'tests', 'bash' and 'docs' (not
+  '-old' docs, 'TODO/', or the false friends of "Vocabulary"): each
+  remaining hit is renamed, or listed in the record with why it stays
+  (history in a docstring, the retired-key check, the migration tool).
+- Docs: a last pass over every doc of the code map for sentences the
+  slices left stale; the glossary's "forks" for fork operations
+  ("Vocabulary"); the transition, in 'docs/api-and-formats.org' ("The
+  .skg file format"): the retired keys and the refusal.
+- Mark 'TODO/problems.org' entries this plan fixed and move them, as
+  the earlier slices say.
+- Run 'bash/integration-tests.sh', then 'bash/all-tests.sh'.
+
+* Verification and completion
+Each slice ends with its suites green but for failures it classifies
+as pre-existing or flaky, its docs, its record in 'progress.org', and
+its headline DONE. After slice 8 the orchestrator runs the review of
+'coding-advice/plans.org', "After each plan": one agent on the terms
+the plan's code coined or reused and any 'TODO/' citation in code, and
+one probe agent driving each behavior of "Agreed behavior" against an
+isolated server, with migrated fixture data.
+
+Then it reports to Jeff the transition, which no agent of this plan
+performs:
+1. The live servers run old binaries and keep running; neither should
+   be restarted on the new code before both owners have migrated,
+   since each reads the other's skgrepos as foreign (Q5).
+2. Jeff runs 'tools/migrate-forks-2026-11/migrate.py --dry-run' and
+   then without '--dry-run' over 'data/jeff/public',
+   'data/jeff/personal-ish', 'data/jeff/deciduous',
+   'data/jeff/personal-proc', 'data/jeff/personal-deprecated' and
+   'data/jeff/personal-most', with '--marks
+   data/jeff/processed-marks-skgconfig.json', compares the counts with
+   behavior 2, and commits each gitrepo.
+3. Claude does the same over 'data/claude/public',
+   'data/claude/private' and 'data/claude/team/*/notes', with its
+   marks file, in a session where Jeff asks for it.
+4. Both servers restart.
+5. The AI tool's saved views are fetched again.
+
+* Stops and deviations
+Stop only for the conditions in 'coding-advice/when-to-stop.org'. One
+stop this plan expects as possible: in slice 5, if a test pins a
+behavior that depended on a note subscribing without overriding, or
+overriding without subscribing, and neither decision 1 nor decision 5
+says what it should become; stop and list each such test with what it
+pinned. Otherwise deviations go into 'progress.org' under the slice's
+record.
