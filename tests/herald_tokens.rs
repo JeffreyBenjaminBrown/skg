@@ -65,7 +65,7 @@ fn contains_multi_not_birth () {
 }
 
 #[test]
-fn subscribee_as_such () {
+fn forkee_as_such () {
   // bK: grandparent (gen 2) forks it, born of forks.
   let c = RelationCounts { forkers : 1, .. counts () };
   let mut f = AncestorFlags::default ();

@@ -4,10 +4,10 @@ aliases:
 - alias 1 on disk
 - alias 2 on disk
 forks:
-- sub_1_on_disk
-- sub_2_on_disk
-- override_1_on_disk
-- override_2_on_disk
-- override_3_on_disk
+- fork_1_on_disk
+- fork_2_on_disk
+- fork_3_on_disk
+- fork_4_on_disk
+- fork_5_on_disk
 hides:
 - hide_1_on_disk

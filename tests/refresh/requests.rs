@@ -270,7 +270,7 @@ node g
     node b" ); }
 
 #[test]
-fn a_subscriptions_request_adds_the_subscribee_folder_and_drops_an_empty_subscriber_folder () {
+fn a_forks_request_adds_the_forks_folder () {
   let graph : InRustGraph = graph (&[
     Graphnode { forks : msv_ids (&["e"]),
                 hides : msv_ids (&["o"]), .. node ("s") },
@@ -406,7 +406,7 @@ node c wp
         node top wp noClaim" ); }
 
 #[test]
-fn a_subscriptions_request_completes_a_subscribee_folder_already_there () {
+fn a_forks_request_completes_a_forks_folder_already_there () {
   let graph : InRustGraph = graph (&[
     Graphnode { forks : msv_ids (&["e"]),
                 hides : msv_ids (&["o"]), .. node ("s") },

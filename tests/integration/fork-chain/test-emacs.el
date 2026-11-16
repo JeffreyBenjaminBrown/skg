@@ -1,7 +1,7 @@
-;;; Integration test for the motivating override-chain case.
+;;; Integration test for the motivating chain-of-forks case.
 ;;; Fork a foreign N into a public clone C (implicit fork), then run
 ;;; skg-fork-node on the shown substitute C and rotate its clone to a
-;;; private skgrepo, forming the chain D overrides C overrides N. Viewing
+;;; private skgrepo, forming the chain D forks C forks N. Viewing
 ;;; N's container then shows the chain end D, marked (inPlaceOf N),
 ;;; and the save accepts that chain-end carrier.
 
@@ -36,7 +36,7 @@
 
 (defun integration-test-fork-chain ()
   "Drive the foreign-fork -> fork-the-substitute -> chain flow."
-  (message "Starting override-chain integration test...")
+  (message "Starting chain-of-forks integration test...")
   (let ((test-port (getenv "SKG_TEST_PORT")))
     (when test-port (setq skg-port (string-to-number test-port))))
 
@@ -56,7 +56,7 @@
         (replace-match edited t t))
       (skg-request-save-buffer)))
 
-  ;; 3. Approve the foreign fork -> public clone C overrides N.
+  ;; 3. Approve the foreign fork -> public clone C forks N.
   (let ((confirm-buf (skg-test-wait-for
                       (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))
     (unless confirm-buf (test-fail "no fork-confirmation for N appeared"))
@@ -87,7 +87,7 @@
       (skg-fork-node)))
 
   ;; 6. In the confirmation buffer, rotate the clone-to-be's skgrepo to
-  ;;    private, then approve -> private D overrides C.
+  ;;    private, then approve -> private D forks C.
   (let ((confirm-buf (skg-test-wait-for
                       (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))
     (unless confirm-buf (test-fail "no fork-confirmation for the clone appeared"))
@@ -134,11 +134,11 @@
           (test-fail "saving the chain-end view did not complete"))
         (message "✓ saving the chain-end view succeeded"))))
 
-  (message "PASS: Override-chain integration test successful!")
+  (message "PASS: Chain-of-forks integration test successful!")
   (kill-emacs 0))
 
 (run-at-time 90 nil (lambda ()
-                      (message "TIMEOUT: override-chain integration test timed out!")
+                      (message "TIMEOUT: chain-of-forks integration test timed out!")
                       (kill-emacs 1)))
 
 (integration-test-fork-chain)

@@ -38,7 +38,7 @@ fn hit (
 #[test]
 fn all_tests () -> Result<(), Box<dyn Error>> {
   run_with_shared_test_stores (
-    "skg-test-overrideward-view-subtree",
+    "skg-test-forks-under-search-hits",
     |s| Box::pin ( async move {
       s . reset_from_config (
         "forks_under_search_hits",
@@ -51,11 +51,11 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
         &graph, &s . config, &restriction ) ?;
       an_owned_mutual_pair_both_matching_shows_one_hit (
         &graph, &s . config, &restriction ) ?;
-      a_hit_shows_the_nodes_it_subscribes_to_in_a_folder (
+      a_hit_shows_the_nodes_it_forks_in_a_folder (
         &graph, &s . config, &restriction ) ?;
       end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
         &graph, &s . config, &restriction ) ?;
-      a_hit_subscribing_to_an_absent_node_shows_it_in_a_folder (
+      a_hit_forking_an_absent_node_shows_it_in_a_folder (
         &graph, &s . config, &restriction ) ?;
       Ok (( )) } )) }
 
@@ -129,7 +129,7 @@ fn suppression_anchors_at_owned (
     hit ("G",  "foreign", "cooking, the original"),
     hit ("M1", "foreign", "mutual one"),
     hit ("M2", "foreign", "mutual two"),
-    hit ("B",  "foreign", "boring override"),
+    hit ("B",  "foreign", "boring fork"),
     hit ("E",  "foreign", "exciting original"),
   ] . into_iter () . collect ();
   let suppressed : HashSet<ID> =
@@ -144,7 +144,7 @@ fn suppression_anchors_at_owned (
      must survive at top level." );
   Ok (( )) }
 
-/// Owned O1 and O2 override each other, and both match: one stands,
+/// Owned O1 and O2 fork each other, and both match: one stands,
 /// the other is suppressed. They tie (one skgrepo, each forked by the
 /// other), and a tie among hits goes to the least pid, O1.
 fn an_owned_mutual_pair_both_matching_shows_one_hit (
@@ -162,11 +162,11 @@ fn an_owned_mutual_pair_both_matching_shows_one_hit (
                "one of the owned mutual pair is shown, O1" );
   Ok (( )) }
 
-/// U subscribes to F, which overrides G, and nothing subscribes to U.
+/// U forks F, which forks G, and nothing forks U.
 /// So under U hangs, folded, a forks folder whose one
-/// write-protected member is F, and no forks folder. F holds
+/// write-protected member is F. F holds
 /// nothing: G is not drawn under it.
-fn a_hit_shows_the_nodes_it_subscribes_to_in_a_folder (
+fn a_hit_shows_the_nodes_it_forks_in_a_folder (
   graph       : &InRustGraph,
   config      : &SkgConfig,
   restriction : &SkgrepoRestriction,
@@ -192,18 +192,18 @@ fn a_hit_shows_the_nodes_it_subscribes_to_in_a_folder (
             "U's one folder is its forks folder, folded" );
   let f : NodeRef<Viewnode> =
     find_child ( folders [0], "F" )
-    . expect ("F (the node U subscribes to) is in the folder");
+    . expect ("F (the node U forks) is in the folder");
   assert! ( matches! ( &f . value () . kind,
                        ViewnodeKind::Vognode (Vognode::Occurrence (t))
                        if t . is_writeProtected () ),
             "F is a write-protected member" );
   assert! ( f . children () . next () . is_none (), "F holds nothing" );
-  a_hit_shows_the_nodes_that_subscribe_to_it_in_a_folder (
+  a_hit_shows_the_nodes_that_fork_it_in_a_folder (
     graph, config, restriction ) }
 
-/// B subscribes to E, and E subscribes to nothing. So under E hangs,
+/// B forks E, and E forks nothing. So under E hangs,
 /// folded, a forks folder whose one member is B.
-fn a_hit_shows_the_nodes_that_subscribe_to_it_in_a_folder (
+fn a_hit_shows_the_nodes_that_fork_it_in_a_folder (
   graph       : &InRustGraph,
   config      : &SkgConfig,
   restriction : &SkgrepoRestriction,
@@ -228,21 +228,21 @@ fn a_hit_shows_the_nodes_that_subscribe_to_it_in_a_folder (
             && folders [0] . value () . foldAndFocus . folded,
             "E's one folder is its forks folder, folded" );
   assert! ( find_child ( folders [0], "B" ) . is_some (),
-            "B (which subscribes to E) is in the folder" );
+            "B (which forks E) is in the folder" );
   Ok (( )) }
 
-/// D subscribes to "gone", which is on disk, in D's file, but not in
+/// D forks "gone", which is on disk, in D's file, but not in
 /// the graph. The stub asks the forks folder's own goal, the one
 /// the refresh fills it from, whether the folder has members, so D's
 /// forks folder is drawn, holding the unknown that stands for
 /// "gone".
-fn a_hit_subscribing_to_an_absent_node_shows_it_in_a_folder (
+fn a_hit_forking_an_absent_node_shows_it_in_a_folder (
   graph       : &InRustGraph,
   config      : &SkgConfig,
   restriction : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
   let matches : MatchGroups =
-    [ hit ("D", "foreign", "dangling overrider") ]
+    [ hit ("D", "foreign", "dangling fork") ]
     . into_iter () . collect ();
   let (mut viewforest, results) =
     build_search_viewforest ( "dangling", &matches, &HashSet::new () );

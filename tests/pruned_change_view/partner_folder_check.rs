@@ -2,8 +2,8 @@
 // folders: under a write-protected parent no child claims
 // membership, so whatever stands there saves. The 'partner_ids' fixture (one
 // skgrepo, main): c1 and c2, whose bodies changed, each contain
-// recorder, unchanged, which subscribes to x by its extra ID x2 and
-// to ghost, which no node has. So recorder is shown write-protected
+// recorder, unchanged, which forks x by its extra ID x2 and
+// ghost, which no node has. So recorder is shown write-protected
 // in the content of each.
 
 use crate::pruned_change_view::common::{open_all_changes_buffer, save, with_fixture};
@@ -15,7 +15,7 @@ use skg::metadata_canon::without_viewnode_ids;
 
 /// The buffer with a forks folder holding 'members' under the
 /// write-protected recorder in c2's content.
-fn with_subscribee_folder_under_recorder (
+fn with_forks_folder_under_recorder (
   buffer  : &str,
   members : &[&str],
 ) -> String {
@@ -38,7 +38,7 @@ fn a_member_shown_by_an_extra_id_and_an_unknown_member_pass (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("partner_ids", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let response : SaveResponse = save ( f, &with_subscribee_folder_under_recorder (
+    let response : SaveResponse = save ( f, &with_forks_folder_under_recorder (
       &buffer, &[ "(skg node (gnid x2) (skgRepos (nodeRepo main)) writeProtected) x",
                   "(skg unknown (gnid ghost))" ] )) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
@@ -53,7 +53,7 @@ fn a_dangling_removed_member_is_not_counted (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("partner_ids", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let response : SaveResponse = save ( f, &with_subscribee_folder_under_recorder (
+    let response : SaveResponse = save ( f, &with_forks_folder_under_recorder (
       &buffer, &[ "(skg node (gnid x2) (skgRepos (nodeRepo main)) writeProtected) x",
                   "(skg unknown (gnid ghost))",
                   "(skg unknown (gnid gone) noClaim (diff (rel removed)))" ] )) ?;
@@ -68,7 +68,7 @@ fn an_unknown_member_with_another_raw_id_saves (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("partner_ids", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let response : SaveResponse = save ( f, &with_subscribee_folder_under_recorder (
+    let response : SaveResponse = save ( f, &with_forks_folder_under_recorder (
       &buffer, &[ "(skg node (gnid x2) (skgRepos (nodeRepo main)) writeProtected) x",
                   "(skg unknown (gnid other_ghost))" ] )) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );

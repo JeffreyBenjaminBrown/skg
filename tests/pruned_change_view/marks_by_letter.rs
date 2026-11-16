@@ -157,9 +157,9 @@ fn each_letter_each_way_on_a_removed_node (
     ] ) ?;
     Ok (( )) }) }
 
-/// Each letter each way on a modified node: sub, which unsubscribed
-/// from s1 and subscribed to s2, in s1's forks folder. There 'rel'
-/// is its subscription to s1 and 'node' the one to s2, which no
+/// Each letter each way on a modified node: sub, which stopped
+/// forking s1 and forked s2, in s1's forks folder. There 'rel'
+/// is its 'forks' relationship to s1 and 'node' the one to s2, which no
 /// headline under it shows; in s2's forks folder the two swap.
 #[test]
 fn each_letter_each_way_on_a_modified_node (
@@ -231,8 +231,8 @@ fn marking_a_modified_node_leaves_its_childrens_containment (
 
 /// A changed folder is acted on through its members, each an ordinary
 /// headline: in sub's forks folder, s1 and s2 each name their
-/// subscription by 'rel', and 'node' on either names nothing, since
-/// neither node changed. 'node rel' marks the subscription; 'node'
+/// 'forks' relationship by 'rel', and 'node' on either names nothing, since
+/// neither node changed. 'node rel' marks the relationship; 'node'
 /// alone is dropped with a warning.
 #[test]
 fn each_letter_on_the_members_of_a_changed_folder (

@@ -114,7 +114,7 @@ fn writeProtected_ancestor_skgrepo_is_read_from_its_gnid () {
     "a write-protected ancestor's repo must come from its ID, not the one it shows, which lags the move" ); }
 
 /// A fork-to-be (clone) with an edited title over the original N it
-/// overrides, in N's foreign repo. (original_title is N's disk title.)
+/// forks, in N's foreign repo. (original_title is N's disk title.)
 fn fork_spec_n_edited (
   skgrepo_confirmed : bool,
 ) -> ForkSpec {
@@ -131,7 +131,7 @@ fn fork_spec_n_edited (
 fn fork_clone_hides_children_the_edit_deleted () {
   // N had [N1, N2] on disk; the forking edit kept only N1. The clone
   // must hide N2, or it would reappear under the clone as
-  // unintegrated subscribed content the user just dismissed.
+  // unintegrated forked content the user just dismissed.
   let buffer_node : Graphnode = Graphnode {
     title        : "N-edited" . to_string (),
     home_skgrepo : SkgrepoName::from ("foreign"),

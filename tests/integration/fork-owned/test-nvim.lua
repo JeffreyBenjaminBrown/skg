@@ -152,7 +152,7 @@ T.check(not T.buffer_text(q2_buf):find('(viewRequests', 1, true),
         'decline must strip the (viewRequests fork) atom')
 print('decline stripped the lingering fork atom')
 
--- Reopen Q2 fresh: no clone overrides M2 (decline committed nothing).
+-- Reopen Q2 fresh: no clone forks M2 (decline committed nothing).
 vim.api.nvim_buf_delete(q2_buf, { force = true })
 content_view.request_single_root_content_view_from_id('Q2')
 q2_buf = T.wait_for(function () return buffer_showing('Q2') end, 10)
@@ -160,8 +160,8 @@ T.check(q2_buf, "Q2's view never reappeared")
 -- Give the view a beat, then assert no substitution happened.
 T.wait_for(function () return false end, 1)
 T.check(not T.buffer_text(q2_buf):find('(inPlaceOf M2)', 1, true),
-        'decline must not commit a clone overriding M2')
-print('decline committed nothing (no clone overrides M2)')
+        'decline must not commit a clone forking M2')
+print('decline committed nothing (no clone forks M2)')
 
 -- 7. Killing the confirmation buffer directly (not via approve/decline)
 --    must also strip the lingering fork atom from the source buffer.

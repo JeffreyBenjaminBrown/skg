@@ -30,8 +30,8 @@ use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::viewforest_root_viewnode;
 use std::error::Error;
 
-const SUBSCRIBEE_EDIT_CONFIG: &str =
-  "tests/hidden_from_forks/fixtures-subscribee-edit/skgconfig.toml";
+const FORKEE_EDIT_CONFIG: &str =
+  "tests/hidden_from_forks/fixtures-forkee-edit/skgconfig.toml";
 
 fn save_gnids (
   instructions : &[NodeInstruction],
@@ -66,7 +66,7 @@ fn nodeInstructions_from_tree (
     . map (NodeIntent::into_node_instruction)
     . collect() }
 
-/// This returns the (subscriber, visibility-signal) pairs that
+/// This returns the (forker, visibility-signal) pairs that
 /// collection emits.
 fn visibility_pairs_from_tree (
   viewforest : Tree<Viewnode>,
@@ -99,7 +99,7 @@ fn unknown_members_write_their_editable_relationship_recorders_only () {
     * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
     ** (skg unknown (gnid content-unknown))
     ** (skg forksFolder)
-    *** (skg unknown (gnid subscribee-unknown))
+    *** (skg unknown (gnid forkee-unknown))
     *** (skg hiddenOutsideOfForkPartnersFolder)
     **** (skg unknown (gnid hiddenoutside-unknown))
   "};
@@ -110,7 +110,7 @@ fn unknown_members_write_their_editable_relationship_recorders_only () {
   let recorder = saved_node_by_gnid (&instructions, "recorder");
   assert_eq! (members_of (&recorder . contains), vec! [ID::from ("content-unknown")]);
   assert_eq! (members_msv (&recorder . forks),
-              MSV::Specified (vec! [ID::from ("subscribee-unknown")]));
+              MSV::Specified (vec! [ID::from ("forkee-unknown")]));
   assert_eq! (hiddenoutside_edits_from_tree (viewnode_tree_as_written (input)),
               vec! [(ID::from ("recorder"),
                     skg::from_text::local_fieldintent_collection::types::HiddenOutsideEdit {
@@ -383,16 +383,16 @@ fn extraction_skips_alias_and_id_display_nodes (
     vec![ID::from ("child")]); }
 
 #[test]
-fn extraction_collects_subscribees_without_hidden_branches (
+fn extraction_collects_forkees_without_hidden_branches (
 ) {
   let input: &str =
     indoc! {"
-            * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
+            * (skg node (gnid forker) (skgRepos (nodeRepo main))) forker
             ** (skg forksFolder)
-            *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
+            *** (skg node (gnid forkee) (skgRepos (nodeRepo main))) forkee
             **** (skg hiddenInForkPartnerFolder)
             ***** (skg node (gnid hidden-in) (skgRepos (nodeRepo main))) hidden in child
-            **** (skg node (gnid subscribee-content) (skgRepos (nodeRepo main))) subscribee content
+            **** (skg node (gnid forkee-content) (skgRepos (nodeRepo main))) forkee content
             *** (skg hiddenOutsideOfForkPartnersFolder)
             **** (skg node (gnid hidden-outside) (skgRepos (nodeRepo main))) hidden outside child
         "};
@@ -408,18 +408,18 @@ fn extraction_collects_subscribees_without_hidden_branches (
     // write-protected folders, so they are self-writers on the new recursion
     // surface.
     vec![
-      ID::from ("subscriber"),
+      ID::from ("forker"),
       ID::from ("hidden-in"),
-      ID::from ("subscribee-content"),
+      ID::from ("forkee-content"),
       ID::from ("hidden-outside")]);
   assert_eq!(
-    members_msv (&saved_node_by_gnid (&instructions, "subscriber") . forks),
-    MSV::Specified (vec![ID::from ("subscribee")]));
+    members_msv (&saved_node_by_gnid (&instructions, "forker") . forks),
+    MSV::Specified (vec![ID::from ("forkee")]));
   assert_eq!(
-    saved_node_by_gnid (&instructions, "subscriber") . contains,
+    saved_node_by_gnid (&instructions, "forker") . contains,
     vec![]);
   assert!(
-    ! save_gnids (&instructions) . contains (&ID::from ("subscribee"))); }
+    ! save_gnids (&instructions) . contains (&ID::from ("forkee"))); }
 
 #[test]
 fn write_protected_folder_members_save_themselves_but_not_their_recorder (
@@ -428,7 +428,7 @@ fn write_protected_folder_members_save_themselves_but_not_their_recorder (
     indoc! {"
             * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
             ** (skg forksFolder)
-            *** (skg node (gnid subscriber) (skgRepos (nodeRepo main)) noClaim) subscriber
+            *** (skg node (gnid forker) (skgRepos (nodeRepo main)) noClaim) forker
             ** (skg hiderFolder)
             *** (skg node (gnid hider) (skgRepos (nodeRepo main))) hider
             ** (skg hiddenFolder)
@@ -445,7 +445,7 @@ fn write_protected_folder_members_save_themselves_but_not_their_recorder (
     // The members are self-writers, on the new recursion surface;
     // the recorder is unaffected by any of these write-protected folders.
     vec![ID::from ("recorder"),
-         ID::from ("subscriber"),
+         ID::from ("forker"),
          ID::from ("hider"),
          ID::from ("hidden")]);
   assert_eq!(
@@ -453,31 +453,31 @@ fn write_protected_folder_members_save_themselves_but_not_their_recorder (
     Vec::<ID>::new()); }
 
 #[test]
-fn subscribee_hiderel_intent_collects_visible_content (
+fn forkee_hiderel_intent_collects_visible_content (
 ) {
   let input : &str =
     indoc! {"
-            * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
+            * (skg node (gnid forker) (skgRepos (nodeRepo main))) forker
             ** (skg forksFolder)
-            *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
+            *** (skg node (gnid forkee) (skgRepos (nodeRepo main))) forkee
             **** (skg node (gnid a) (skgRepos (nodeRepo main))) a
             **** (skg node (gnid b) (skgRepos (nodeRepo main))) b
             "};
 
   assert_eq!(
     visibility_pairs_from_org (input),
-    vec![(ID::from ("subscriber"),
+    vec![(ID::from ("forker"),
        ForkeeVisibility {
-         forkee     : ID::from ("subscribee"),
+         forkee     : ID::from ("forkee"),
          visible    : vec![ID::from ("a"), ID::from ("b")],
        })]); }
 
 #[test]
-fn subscribee_hiderel_intents_preserve_subscribee_tree_order (
+fn forkee_hiderel_intents_preserve_forkee_tree_order (
 ) {
   let input : &str =
     indoc! {"
-            * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
+            * (skg node (gnid forker) (skgRepos (nodeRepo main))) forker
             ** (skg forksFolder)
             *** (skg node (gnid first) (skgRepos (nodeRepo main))) first
             **** (skg node (gnid first-child) (skgRepos (nodeRepo main))) first child
@@ -488,45 +488,45 @@ fn subscribee_hiderel_intents_preserve_subscribee_tree_order (
   assert_eq!(
     visibility_pairs_from_org (input),
     vec![
-      (ID::from ("subscriber"),
+      (ID::from ("forker"),
          ForkeeVisibility {
            forkee     : ID::from ("first"),
            visible    : vec![ID::from ("first-child")],
          }),
-      (ID::from ("subscriber"),
+      (ID::from ("forker"),
          ForkeeVisibility {
            forkee     : ID::from ("second"),
            visible    : vec![ID::from ("second-child")],
          })]); }
 
 #[test]
-fn subscribee_hiderel_intent_uses_only_children (
+fn forkee_hiderel_intent_uses_only_children (
 ) {
   let input : &str =
     indoc! {"
-            * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
+            * (skg node (gnid forker) (skgRepos (nodeRepo main))) forker
             ** (skg forksFolder)
-            *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
+            *** (skg node (gnid forkee) (skgRepos (nodeRepo main))) forkee
             **** (skg node (gnid child) (skgRepos (nodeRepo main))) child
             ***** (skg node (gnid grandchild) (skgRepos (nodeRepo main))) grandchild
             "};
 
   assert_eq!(
     visibility_pairs_from_org (input),
-    vec![(ID::from ("subscriber"),
+    vec![(ID::from ("forker"),
        ForkeeVisibility {
-         forkee     : ID::from ("subscribee"),
+         forkee     : ID::from ("forkee"),
          visible    : vec![ID::from ("child")],
        })]); }
 
 #[test]
-fn subscribee_hiderel_intent_ignores_writeProtected_subscribee (
+fn forkee_hiderel_intent_ignores_writeProtected_forkee (
 ) {
   let input : &str =
     indoc! {"
-            * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
+            * (skg node (gnid forker) (skgRepos (nodeRepo main))) forker
             ** (skg forksFolder)
-            *** (skg node (gnid subscribee) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) subscribee
+            *** (skg node (gnid forkee) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) forkee
             "};
 
   assert_eq!(
@@ -534,18 +534,18 @@ fn subscribee_hiderel_intent_ignores_writeProtected_subscribee (
     Vec::<(ID, ForkeeVisibility)>::new()); }
 
 #[test]
-fn subscribee_hiderel_intent_ignores_writeProtected_subscriber (
+fn forkee_hiderel_intent_ignores_writeProtected_forker (
 ) {
-  // At-most-one-writer-per-ID: even though the subscribee
-  // here is editable with visible content, its subscriber instance is
-  // write-protected, so no hide/unhide edits are inferred for the subscriber
+  // At-most-one-writer-per-ID: even though the forkee
+  // here is editable with visible content, its forker instance is
+  // write-protected, so no hide/unhide edits are inferred for the forker
   // -- those belong only to the forks folder under the editable
-  // instance of that subscriber.
+  // instance of that forker.
   let input : &str =
     indoc! {"
-            * (skg node (gnid subscriber) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) subscriber
+            * (skg node (gnid forker) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) forker
             ** (skg forksFolder)
-            *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
+            *** (skg node (gnid forkee) (skgRepos (nodeRepo main))) forkee
             **** (skg node (gnid a) (skgRepos (nodeRepo main))) a
             "};
 
@@ -554,13 +554,13 @@ fn subscribee_hiderel_intent_ignores_writeProtected_subscriber (
     Vec::<(ID, ForkeeVisibility)>::new()); }
 
 #[test]
-fn subscribee_hiderel_intent_excludes_non_content_delete_and_ghost_children (
+fn forkee_hiderel_intent_excludes_non_content_delete_and_ghost_children (
 ) {
   let input : &str =
     indoc! {"
-            * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
+            * (skg node (gnid forker) (skgRepos (nodeRepo main))) forker
             ** (skg forksFolder)
-            *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
+            *** (skg node (gnid forkee) (skgRepos (nodeRepo main))) forkee
             **** (skg node (gnid keep) (skgRepos (nodeRepo main))) keep
             **** (skg node (gnid independent) (skgRepos (nodeRepo main)) noClaim) independent
             **** (skg node (gnid delete-me) (skgRepos (nodeRepo main)) (editRequest delete)) delete me
@@ -573,20 +573,20 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_ghost_children (
 
   assert_eq!(
     intents,
-    vec![(ID::from ("subscriber"),
+    vec![(ID::from ("forker"),
        ForkeeVisibility {
-         forkee     : ID::from ("subscribee"),
+         forkee     : ID::from ("forkee"),
          visible    : vec![ID::from ("keep")],
        })]); }
 
 #[test]
-fn subscribee_hiderel_intent_ignores_hidden_folder_contents (
+fn forkee_hiderel_intent_ignores_hidden_folder_contents (
 ) {
   let input : &str =
     indoc! {"
-            * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
+            * (skg node (gnid forker) (skgRepos (nodeRepo main))) forker
             ** (skg forksFolder)
-            *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
+            *** (skg node (gnid forkee) (skgRepos (nodeRepo main))) forkee
             **** (skg hiddenInForkPartnerFolder)
             ***** (skg node (gnid hidden-in) (skgRepos (nodeRepo main))) hidden in child
             **** (skg node (gnid visible) (skgRepos (nodeRepo main))) visible
@@ -596,9 +596,9 @@ fn subscribee_hiderel_intent_ignores_hidden_folder_contents (
 
   assert_eq!(
     visibility_pairs_from_org (input),
-    vec![(ID::from ("subscriber"),
+    vec![(ID::from ("forker"),
        ForkeeVisibility {
-         forkee     : ID::from ("subscribee"),
+         forkee     : ID::from ("forkee"),
          visible    : vec![ID::from ("visible")],
        })]); }
 
@@ -614,7 +614,7 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
             ** (skg node (gnid child) (skgRepos (nodeRepo main))) child
             Child body
             ** (skg forksFolder)
-            *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
+            *** (skg node (gnid forkee) (skgRepos (nodeRepo main))) forkee
             * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
             Doomed body
         "};
@@ -638,7 +638,7 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
     "root alias" . to_string()]));
   assert_eq!(members_of (&root . contains), vec![ID::from ("child")]);
   assert_eq!(members_msv (&root . forks), MSV::Specified (vec![
-    ID::from ("subscribee")]));
+    ID::from ("forkee")]));
   assert!(matches!(
     instructions . last(),
     Some (NodeInstruction::Delete (DeleteNode { gnid, .. }))
@@ -656,7 +656,7 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
             ** (skg aliasFolder) aliases
             *** (skg alias) root alias
             ** (skg forksFolder)
-            *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
+            *** (skg node (gnid forkee) (skgRepos (nodeRepo main))) forkee
             * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
             Doomed body
         "};
@@ -681,7 +681,7 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
   assert_eq!(members_msv (&root . aliases), MSV::Specified (vec![
     "root alias" . to_string()]));
   assert_eq!(members_msv (&root . forks), MSV::Specified (vec![
-    ID::from ("subscribee")]));
+    ID::from ("forkee")]));
   assert_eq!(
     saved_node_by_gnid (&instructions, "independent") . contains,
     vec![]);
@@ -697,80 +697,80 @@ fn all_tests
     "skg-test-new-lic-extraction",
     |s| Box::pin ( async move {
       s . reset_from_config (
-        "subscribee_as_such_child_list_removal_does_not_save_subscribee",
-        SUBSCRIBEE_EDIT_CONFIG) ?;
-      subscribee_as_such_child_list_removal_does_not_save_subscribee (
+        "forkee_as_such_child_list_removal_does_not_save_forkee",
+        FORKEE_EDIT_CONFIG) ?;
+      forkee_as_such_child_list_removal_does_not_save_forkee (
         &s . config ) . await ?;
       s . reset_from_config (
-        "subscribee_as_such_child_removal_is_not_foreign_contains_edit",
-        SUBSCRIBEE_EDIT_CONFIG) ?;
-      subscribee_as_such_child_removal_is_not_foreign_contains_edit (
+        "forkee_as_such_child_removal_is_not_foreign_contains_edit",
+        FORKEE_EDIT_CONFIG) ?;
+      forkee_as_such_child_removal_is_not_foreign_contains_edit (
         &s . config ) . await ?;
       s . reset_from_config (
-        "subscribee_as_such_child_list_removal_infers_subscriber_hide",
-        SUBSCRIBEE_EDIT_CONFIG) ?;
-      subscribee_as_such_child_list_removal_infers_subscriber_hide (
+        "forkee_as_such_child_list_removal_infers_forker_hide",
+        FORKEE_EDIT_CONFIG) ?;
+      forkee_as_such_child_list_removal_infers_forker_hide (
         &s . config ) . await ?;
       s . reset_from_config (
-        "moving_subscribee_as_such_child_to_subscriber_does_not_hide",
-        SUBSCRIBEE_EDIT_CONFIG) ?;
-      moving_subscribee_as_such_child_to_subscriber_does_not_hide (
+        "moving_forkee_as_such_child_to_forker_does_not_hide",
+        FORKEE_EDIT_CONFIG) ?;
+      moving_forkee_as_such_child_to_forker_does_not_hide (
         &s . config ) . await ?;
       s . reset_from_config (
-        "subscribee_as_such_visible_child_removes_subscriber_hide",
+        "forkee_as_such_visible_child_removes_forker_hide",
         "tests/hidden_from_forks/fixtures-hidden-within-but-none-without/skgconfig.toml") ?;
-      subscribee_as_such_visible_child_removes_subscriber_hide (
+      forkee_as_such_visible_child_removes_forker_hide (
         &s . config ) . await ?;
       s . reset_from_config (
-        "subscribee_as_such_unhide_preserves_unrelated_hides",
+        "forkee_as_such_unhide_preserves_unrelated_hides",
         "tests/hidden_from_forks/fixtures-every-kind-of-folder/skgconfig.toml") ?;
-      subscribee_as_such_unhide_preserves_unrelated_hides (
+      forkee_as_such_unhide_preserves_unrelated_hides (
         &s . config ) . await ?;
       s . reset_from_config (
-        "overlapping_subscribee_hiderel_conflict_rejects_save",
-        "tests/hidden_from_forks/fixtures-overlapping-subscribees/skgconfig.toml") ?;
-      overlapping_subscribee_hiderel_conflict_rejects_save (
+        "overlapping_forkee_hiderel_conflict_rejects_save",
+        "tests/hidden_from_forks/fixtures-overlapping-forkees/skgconfig.toml") ?;
+      overlapping_forkee_hiderel_conflict_rejects_save (
         &s . config ) . await ?;
       s . reset_from_config (
         "ordinary_owned_child_list_edit_still_changes_contains",
-        SUBSCRIBEE_EDIT_CONFIG) ?;
+        FORKEE_EDIT_CONFIG) ?;
       ordinary_owned_child_list_edit_still_changes_contains (
         &s . config ) . await ?;
       s . reset_from_config (
-        "ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee",
-        SUBSCRIBEE_EDIT_CONFIG) ?;
-      ordinary_same_gnid_occurrence_keeps_contains_edit_when_also_as_subscribee (
+        "ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_forkee",
+        FORKEE_EDIT_CONFIG) ?;
+      ordinary_same_gnid_occurrence_keeps_contains_edit_when_also_as_forkee (
         &s . config ) . await ?;
       s . reset_from_config (
-        "recursive_descendant_under_as_subscribee_keeps_own_contains_edit",
-        SUBSCRIBEE_EDIT_CONFIG) ?;
-      recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
+        "recursive_descendant_under_as_forkee_keeps_own_contains_edit",
+        FORKEE_EDIT_CONFIG) ?;
+      recursive_descendant_under_as_forkee_keeps_own_contains_edit (
         &s . config ) . await ?;
       s . reset_from_config (
-        "foreign_subscribee_as_such_title_edit_is_rejected",
-        SUBSCRIBEE_EDIT_CONFIG) ?;
-      foreign_subscribee_as_such_title_edit_is_rejected (
+        "foreign_forkee_as_such_title_edit_is_rejected",
+        FORKEE_EDIT_CONFIG) ?;
+      foreign_forkee_as_such_title_edit_is_rejected (
         &s . config ) . await ?;
       s . reset_from_config (
-        "owned_as_subscribee_title_edit_is_rejected",
-        SUBSCRIBEE_EDIT_CONFIG) ?;
-      owned_as_subscribee_title_edit_is_rejected (
+        "owned_as_forkee_title_edit_is_rejected",
+        FORKEE_EDIT_CONFIG) ?;
+      owned_as_forkee_title_edit_is_rejected (
         &s . config ) . await ?;
       s . reset_from_config (
-        "owned_as_subscribee_body_edit_is_rejected",
-        SUBSCRIBEE_EDIT_CONFIG) ?;
-      owned_as_subscribee_body_edit_is_rejected (
+        "owned_as_forkee_body_edit_is_rejected",
+        FORKEE_EDIT_CONFIG) ?;
+      owned_as_forkee_body_edit_is_rejected (
         &s . config ) . await ?;
       Ok (( )) } )) }
 
-async fn subscribee_as_such_child_list_removal_does_not_save_subscribee (
+async fn forkee_as_such_child_list_removal_does_not_save_forkee (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
                 * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
                 ** (skg forksFolder)
-                *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
+                *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) forkee-e
                 **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
                 "};
       let instructions : Vec<NodeInstruction> =
@@ -778,24 +778,24 @@ async fn subscribee_as_such_child_list_removal_does_not_save_subscribee (
           input, config) . await?;
       assert!(
         ! save_gnids (&instructions) . contains (&ID::from ("e")),
-        "subscribee-as-such should not produce a SaveNode: {:?}",
+        "forkee-as-such should not produce a SaveNode: {:?}",
         instructions);
       Ok (()) }
 
-async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
+async fn forkee_as_such_child_removal_is_not_foreign_contains_edit (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
                 * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
                 ** (skg forksFolder)
-                *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
+                *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) forkee-e
                 **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
                 "};
       let instructions : Vec<NodeInstruction> =
         nodeInstructions_from_org_with_disk (
           input, config) . await?;
-      // Editing within a subscribee-as-such is not a foreign-contains
+      // Editing within a forkee-as-such is not a foreign-contains
       // edit of e: e is neither rejected as a ModifiedForeignNode, nor
       // written, nor forked. (e2, the foreign content shown under it, may
       // fork -- now resolving to the default owned skgrepo rather than
@@ -816,7 +816,7 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
           &clone_skgrepo_inputs,
           &std::collections::HashMap::new(),
           config, &SkgrepoRestriction::unrestricted (config))
-        . expect ("the subscribee-as-such edit must not error");
+        . expect ("the forkee-as-such edit must not error");
       assert!(
         ! save_gnids (&node_instructions) . contains (&ID::from ("e")),
         "e must not be written as a foreign node: {:?}", node_instructions);
@@ -825,14 +825,14 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
         "e must not be forked: {:?}", fork_specs);
       Ok (()) }
 
-async fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
+async fn forkee_as_such_child_list_removal_infers_forker_hide (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
                 * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
                 ** (skg forksFolder)
-                *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
+                *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) forkee-e
                 **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
                 "};
       let instructions : Vec<NodeInstruction> =
@@ -844,18 +844,18 @@ async fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
         MSV::Specified (vec![ID::from ("e1")]));
       assert!(
         ! save_gnids (&instructions) . contains (&ID::from ("e")),
-        "subscribee-as-such should not produce a SaveNode: {:?}",
+        "forkee-as-such should not produce a SaveNode: {:?}",
         instructions);
       Ok (()) }
 
-async fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
+async fn moving_forkee_as_such_child_to_forker_does_not_hide (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
                 * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
                 ** (skg forksFolder)
-                *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
+                *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) forkee-e
                 **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
                 ** (skg node (gnid e1) (skgRepos (nodeRepo foreign)) writeProtected) e1
                 "};
@@ -871,14 +871,14 @@ async fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
         vec![ID::from ("e1")]);
       Ok (()) }
 
-async fn subscribee_as_such_visible_child_removes_subscriber_hide (
+async fn forkee_as_such_visible_child_removes_forker_hide (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
                 * (skg node (gnid R) (skgRepos (nodeRepo main))) R
                 ** (skg forksFolder)
-                *** (skg node (gnid E1) (skgRepos (nodeRepo main))) subscribee-1
+                *** (skg node (gnid E1) (skgRepos (nodeRepo main))) forkee-1
                 **** (skg node (gnid E11) (skgRepos (nodeRepo main))) E11
                 **** (skg node (gnid H) (skgRepos (nodeRepo main))) H
                 **** (skg node (gnid E12) (skgRepos (nodeRepo main))) E12
@@ -892,21 +892,21 @@ async fn subscribee_as_such_visible_child_removes_subscriber_hide (
         MSV::Specified (vec![]));
       assert!(
         ! save_gnids (&instructions) . contains (&ID::from ("E1")),
-        "subscribee-as-such should not produce a SaveNode: {:?}",
+        "forkee-as-such should not produce a SaveNode: {:?}",
         instructions);
       Ok (()) }
 
-async fn subscribee_as_such_unhide_preserves_unrelated_hides (
+async fn forkee_as_such_unhide_preserves_unrelated_hides (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
                 * (skg node (gnid R) (skgRepos (nodeRepo main))) R
                 ** (skg forksFolder)
-                *** (skg node (gnid E1) (skgRepos (nodeRepo main))) subscribee-1
+                *** (skg node (gnid E1) (skgRepos (nodeRepo main))) forkee-1
                 **** (skg node (gnid hidden-in-E1) (skgRepos (nodeRepo main))) hidden-in-E1
                 **** (skg node (gnid E11) (skgRepos (nodeRepo main))) E11
-                *** (skg node (gnid E2) (skgRepos (nodeRepo main))) subscribee-2
+                *** (skg node (gnid E2) (skgRepos (nodeRepo main))) forkee-2
                 **** (skg node (gnid E21) (skgRepos (nodeRepo main))) E21
                 "};
       let instructions : Vec<NodeInstruction> =
@@ -920,7 +920,7 @@ async fn subscribee_as_such_unhide_preserves_unrelated_hides (
                ID::from ("hidden-for-no-reason")]));
       Ok (()) }
 
-async fn overlapping_subscribee_hiderel_conflict_rejects_save (
+async fn overlapping_forkee_hiderel_conflict_rejects_save (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
@@ -964,16 +964,16 @@ async fn ordinary_owned_child_list_edit_still_changes_contains (
         vec![ID::from ("r1")]);
       Ok (()) }
 
-async fn ordinary_same_gnid_occurrence_keeps_contains_edit_when_also_as_subscribee (
+async fn ordinary_same_gnid_occurrence_keeps_contains_edit_when_also_as_forkee (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
                 * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
                 ** (skg forksFolder)
-                *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
+                *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) forkee-e
                 **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
-                * (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
+                * (skg node (gnid e) (skgRepos (nodeRepo foreign))) forkee-e
                 ** (skg node (gnid e1) (skgRepos (nodeRepo foreign))) e1
                 "};
       let instructions : Vec<NodeInstruction> =
@@ -1015,14 +1015,14 @@ fn idfolder_resident_occurrence_saves_itself_but_is_not_content (
     members_of (&saved_node_by_gnid (&instructions, "root") . contains),
     vec![ID::from ("real-child")]); }
 
-async fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
+async fn recursive_descendant_under_as_forkee_keeps_own_contains_edit (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
                 * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
                 ** (skg forksFolder)
-                *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
+                *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) forkee-e
                 **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
                 "};
       let instructions : Vec<NodeInstruction> =
@@ -1030,14 +1030,14 @@ async fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
           input, config) . await?;
       assert!(
         ! save_gnids (&instructions) . contains (&ID::from ("e")),
-        "subscribee-as-such should not produce a SaveNode: {:?}",
+        "forkee-as-such should not produce a SaveNode: {:?}",
         instructions);
       assert_eq!(
         members_of (&saved_node_by_gnid (&instructions, "e2") . contains),
         Vec::<ID>::new());
       Ok (()) }
 
-async fn foreign_subscribee_as_such_title_edit_is_rejected (
+async fn foreign_forkee_as_such_title_edit_is_rejected (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
@@ -1062,11 +1062,11 @@ async fn foreign_subscribee_as_such_title_edit_is_rejected (
             if msg . contains ("Cannot edit title/body")
                && msg . contains ("forkee-as-such")
                && msg . contains ("e")),
-        "expected foreign subscribee-as-such title edit rejection, got {:?}",
+        "expected foreign forkee-as-such title edit rejection, got {:?}",
         buffer_error);
       Ok (()) }
 
-async fn owned_as_subscribee_title_edit_is_rejected (
+async fn owned_as_forkee_title_edit_is_rejected (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
@@ -1091,11 +1091,11 @@ async fn owned_as_subscribee_title_edit_is_rejected (
             if msg . contains ("Cannot edit title/body")
                && msg . contains ("forkee-as-such")
                && msg . contains ("r")),
-        "expected owned subscribee-as-such title edit rejection, got {:?}",
+        "expected owned forkee-as-such title edit rejection, got {:?}",
         buffer_error);
       Ok (()) }
 
-async fn owned_as_subscribee_body_edit_is_rejected (
+async fn owned_as_forkee_body_edit_is_rejected (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
@@ -1121,7 +1121,7 @@ async fn owned_as_subscribee_body_edit_is_rejected (
             if msg . contains ("Cannot edit title/body")
                && msg . contains ("forkee-as-such")
                && msg . contains ("r")),
-        "expected owned subscribee-as-such body edit rejection, got {:?}",
+        "expected owned forkee-as-such body edit rejection, got {:?}",
         buffer_error);
       Ok (()) }
 
@@ -1277,11 +1277,11 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
 // extraction, with one test per condition not already covered above.
 
 #[test]
-fn toDelete_member_is_excluded_from_subscribees (
+fn toDelete_member_is_excluded_from_forkees (
 ) {
   let input : &str =
     indoc! {"
-            * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
+            * (skg node (gnid forker) (skgRepos (nodeRepo main))) forker
             ** (skg forksFolder)
             *** (skg node (gnid keep) (skgRepos (nodeRepo main))) keep
             *** (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
@@ -1291,7 +1291,7 @@ fn toDelete_member_is_excluded_from_subscribees (
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    members_msv (&saved_node_by_gnid (&instructions, "subscriber") . forks),
+    members_msv (&saved_node_by_gnid (&instructions, "forker") . forks),
     MSV::Specified (vec![ID::from ("keep")])); }
 
 #[test]
@@ -1328,15 +1328,15 @@ fn duplicate_members_of_defining_folders_are_silently_deduplicated (
 // The next three tests pin the editable-folder membership semantics that
 // the relationship matrix asks for at the cheapest seam:
 // forksFolder order and one-member removal persist to
-// subscribesTo; and the write-protected hiddenFolder never writes the
+// forks; and the write-protected hiddenFolder never writes the
 // recorder's hides.
 
 #[test]
-fn reordering_subscribees_reorders_subscribesTo (
+fn reordering_forkees_reorders_forks (
 ) {
   // A forksFolder is writable: its member order is the recorder's
-  // subscribesTo order. Members [c, a, b] (a reorder of [a, b, c])
-  // emit subscribesTo = [c, a, b].
+  // forks order. Members [c, a, b] (a reorder of [a, b, c])
+  // emit forks = [c, a, b].
   let input : &str =
     indoc! {"
             * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
@@ -1355,10 +1355,10 @@ fn reordering_subscribees_reorders_subscribesTo (
       ID::from ("c"), ID::from ("a"), ID::from ("b")])); }
 
 #[test]
-fn removing_one_subscribee_keeps_the_rest (
+fn removing_one_forkee_keeps_the_rest (
 ) {
   // Deleting one member of an editable folder (b, from [a, b, c]) leaves
-  // the rest: subscribesTo = [a, c], neither empty nor unspecified.
+  // the rest: forks = [a, c], neither empty nor unspecified.
   let input : &str =
     indoc! {"
             * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder

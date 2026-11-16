@@ -1,5 +1,5 @@
 pid: S
-title: subscriber-S
+title: forker-S
 forks:
 - M
 - N

@@ -1,5 +1,5 @@
 pid: A2
-title: Second subscriber
+title: Second forker
 forks:
 - B
 hides:

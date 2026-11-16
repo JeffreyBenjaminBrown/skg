@@ -129,7 +129,7 @@ async fn test_multi_root_view_with_shared_nodes (
       // and again in place of node 3, its mirror (2 and 3 fork 4 and 5,
       // and 5 forks 3; 2 alone is forked by no other mirror: Q3, rule 2).
       // Editable nodes with forks get forks folder children,
-      // and each forks folder has Subscribee children with the subscribed IDs.
+      // and each forks folder has the forked IDs as its children.
       // Because node 2 has node 1 as a container, the root 2 gets a
       // containers folder, whose one write-protected member is node 1;
       // node 1 has no container, so no chain hangs under it.
@@ -180,7 +180,7 @@ async fn test_multi_root_view_with_node_limit (
       // 'main', and 2 alone is forked by none of them, so 2 stands for 3
       // (Q3, rule 2); being shown already, its later copies are
       // write-protected. Root 2 extends its body + default folders
-      // (folders are not budget-bound); subscribee members are
+      // (folders are not budget-bound); forkee members are
       // write-protected.
       let expected = indoc! {
         "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2)) (hides (out 2))))) title 1

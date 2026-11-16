@@ -69,7 +69,7 @@ node p
     node a wp noClaim
     node b wp noClaim" ); }
 
-/// Another buffer's save reordered p's aliases and subscribees; this
+/// Another buffer's save reordered p's aliases and forkees; this
 /// collateral view still holds the old orders.
 /// Its editable folders take the new ones, since its next save would
 /// write the order it shows.

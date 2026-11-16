@@ -1,11 +1,11 @@
 // cargo nextest run --test grouped_forks -E 'test(collateral_forkee_staleness::)'
 //
-// Regression for a collateral-rerender staleness. A editable subscriber
-// open in two views: changing its subscriptions in one view and saving must
+// Regression for a collateral-rerender staleness. An editable forker
+// open in two views: changing its forks in one view and saving must
 // refresh the other (collateral) view's forksFolder from the graph,
-// not leave it claiming the old subscription.
+// not leave it claiming the old forkee.
 //
-// Installs the explicit graph handle (the subscribee lookups read
+// Installs the explicit graph handle (the forkee lookups read
 // the captured graph), so it lives among the grouped_forks installers.
 
 use std::error::Error;
@@ -24,12 +24,12 @@ use skg::types::views_state::{OpenViews, ViewforestId};
 use skg::types::misc::ID;
 
 #[test]
-fn collateral_editable_subscriber_forksFolder_refreshes
+fn collateral_editable_forker_forksFolder_refreshes
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-collateral-subscribee-staleness",
+    "skg-test-collateral-forkee-staleness",
     "tests/collateral_forkee_staleness/fixtures",
-    "/tmp/tantivy-test-collateral-subscribee-staleness",
+    "/tmp/tantivy-test-collateral-forkee-staleness",
     |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
@@ -40,7 +40,7 @@ fn collateral_editable_subscriber_forksFolder_refreshes
       let b_viewforest_id : ViewforestId = ViewforestId::ContentView ("S-b" . into ());
 
       // View A rooted at S: S is an editable root, its forksFolder
-      // shows both subscribees M and N.
+      // shows both forkees M and N.
       let (a_view, a_pids, a_vf) =
         single_root_view (
           config, Some (tantivy), &ID::from ("S") ) ?;
@@ -62,7 +62,7 @@ fn collateral_editable_subscriber_forksFolder_refreshes
       views_state . open_views . register_view (
         &graph . load_full (), b_viewforest_id . clone (), b_vf, &b_pids, &SkgrepoRestriction::unrestricted (config) );
 
-      // In view A, drop N from S's forksFolder (subscribesTo -> [M])
+      // In view A, drop N from S's forksFolder (forks -> [M])
       // and save A.
       let edited_a : String = without_lines_containing (&a_view, "(gnid N)");
       let (_response, collateral_views) =
@@ -72,7 +72,7 @@ fn collateral_editable_subscriber_forksFolder_refreshes
 
       // The collateral view B must refresh from the just-saved graph:
       // its forksFolder still shows M, and N, no longer a
-      // subscribee, vanishes from it.
+      // forkee, vanishes from it.
       assert_eq! ( collateral_views . len (), 1,
         "exactly view B should be collateral: {:?}", collateral_views );
       let b_collateral : &str = &collateral_views[0];
@@ -80,6 +80,6 @@ fn collateral_editable_subscriber_forksFolder_refreshes
         "M must remain in B's forksFolder:\n{}", b_collateral );
       assert! ( ! b_collateral . contains ("(gnid N)"),
         "N must vanish from B's forksFolder (the editable \
-         subscriber refreshes from the graph):\n{}",
+         forker refreshes from the graph):\n{}",
         b_collateral );
       Ok (( )) } )) }

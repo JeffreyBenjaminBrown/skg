@@ -1,5 +1,5 @@
 // Binary grouping: view rendering and
-// subscription-visibility tests. See tests/grouped_unit.rs for why
+// forkee-visibility tests. See tests/grouped_unit.rs for why
 // test files are grouped into a few [[test]] targets.
 
 #[path = "shared/git_fixture_helpers.rs"]

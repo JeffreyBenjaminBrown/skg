@@ -122,7 +122,7 @@ Fails the test if it is not found."
         (test-fail "decline must strip the (viewRequests fork) atom:\n%s"
                    (buffer-string))))
     (message "✓ decline stripped the lingering fork atom"))
-  ;; Reopen Q2 fresh: no clone overrides M2 (decline committed nothing).
+  ;; Reopen Q2 fresh: no clone forks M2 (decline committed nothing).
   (let ((q2-buf (fork-test--buffer-showing "Q2")))
     (when (buffer-live-p q2-buf) (kill-buffer q2-buf)))
   (skg-request-single-root-content-view-from-id "Q2")
@@ -132,9 +132,9 @@ Fails the test if it is not found."
     (skg-test-wait-for (lambda () nil) 1)
     (with-current-buffer q2-buf
       (when (string-match-p "(inPlaceOf M2)" (buffer-string))
-        (test-fail "decline must not commit a clone overriding M2:\n%s"
+        (test-fail "decline must not commit a clone forking M2:\n%s"
                    (buffer-string))))
-    (message "✓ decline committed nothing (no clone overrides M2)"))
+    (message "✓ decline committed nothing (no clone forks M2)"))
 
   ;; 7. Killing the confirmation buffer directly (not via C-c C-k) must
   ;;    also strip the lingering fork atom from the source buffer.

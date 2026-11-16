@@ -9,7 +9,7 @@
 //
 // Fixture:
 //   container.skg     contains: [victim, sibling]
-//   subscriber.skg    forks: [victim, sibling]
+//   forker.skg        forks: [victim, sibling]
 //   victim.skg        (the one being deleted)
 //   sibling.skg       (left alone)
 //
@@ -17,7 +17,7 @@
 // pipeline should:
 //   - delete victim.skg
 //   - rewrite container.skg to contains: [sibling]
-//   - rewrite subscriber.skg to forks: [sibling]
+//   - rewrite forker.skg to forks: [sibling]
 //   - leave sibling.skg unchanged.
 
 use indoc::indoc;
@@ -72,9 +72,9 @@ fn all_tests
                  "tests/delete_strips_references_from_neighbors/fixtures-cross-owner") ?;
       delete_preserves_foreign_referencer (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("delete_in_foreign_subscribee_rerenders_as_unknown",
+      s . reset ("delete_in_foreign_forkee_rerenders_as_unknown",
                  "tests/delete_strips_references_from_neighbors/fixtures-cross-owner") ?;
-      delete_in_foreign_subscribee_rerenders_as_unknown (
+      delete_in_foreign_forkee_rerenders_as_unknown (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("delete_in_foreign_hiddenoutside_rerenders_as_unknown",
                  "tests/delete_strips_references_from_neighbors/fixtures-cross-owner") ?;
@@ -255,7 +255,7 @@ async fn delete_preserves_foreign_referencer (
      owned primary is deleted: {}", fresh_view);
   Ok (( )) }
 
-async fn delete_in_foreign_subscribee_rerenders_as_unknown (
+async fn delete_in_foreign_forkee_rerenders_as_unknown (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -267,20 +267,20 @@ async fn delete_in_foreign_subscribee_rerenders_as_unknown (
     mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
-      * (skg node (gnid subscriber) (skgRepos (nodeRepo foreign))) foreign subscriber
+      * (skg node (gnid forker) (skgRepos (nodeRepo foreign))) foreign forker
       ** (skg forksFolder)
       *** (skg node (gnid victim) (skgRepos (nodeRepo owned)) noClaim (editRequest delete)) victim
     "}, config, tantivy, &graph,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);
   assert! ( ! response . saved_view . lines () . next () . unwrap_or ("")
-              . contains ("(gnid subscriber)"),
+              . contains ("(gnid forker)"),
     "the buffer whose foreign root was forked must immediately be rooted at the fork: {}",
     response . saved_view);
   let (fresh, _, _) = single_root_view (
-    config, Some (tantivy), &ID::from ("subscriber") ) ?;
+    config, Some (tantivy), &ID::from ("forker") ) ?;
   assert! (fresh . contains ("unknown (gnid victim-alt)"),
-    "the raw foreign subscribee must retain the deleted node's extra ID as \
+    "the raw foreign forkee must retain the deleted node's extra ID as \
      Unknown: {}", fresh);
   Ok (( ))
 }
@@ -297,9 +297,9 @@ async fn delete_in_foreign_hiddenoutside_rerenders_as_unknown (
     mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
-      * (skg node (gnid hide-subscriber) (skgRepos (nodeRepo foreign))) foreign hide subscriber
+      * (skg node (gnid hide-forker) (skgRepos (nodeRepo foreign))) foreign hide forker
       ** (skg forksFolder)
-      *** (skg node (gnid hide-subscribee) (skgRepos (nodeRepo foreign))) foreign hide subscribee
+      *** (skg node (gnid hide-forkee) (skgRepos (nodeRepo foreign))) foreign hide forkee
       *** (skg hiddenOutsideOfForkPartnersFolder)
       **** (skg node (gnid victim) (skgRepos (nodeRepo owned)) (editRequest delete)) victim
     "}, config, tantivy, &graph,
@@ -309,7 +309,7 @@ async fn delete_in_foreign_hiddenoutside_rerenders_as_unknown (
     "a retained foreign hide must become its raw extra ID immediately: {}",
     response . saved_view);
   let (fresh, _, _) = single_root_view (
-    config, Some (tantivy), &ID::from ("hide-subscriber") ) ?;
+    config, Some (tantivy), &ID::from ("hide-forker") ) ?;
   assert! (fresh . contains ("unknown (gnid victim-alt)"),
     "immediate hidden-outside rerender must match a fresh render: {}", fresh);
   Ok (( ))
@@ -368,19 +368,19 @@ async fn delete_strips_references_impl (
       "container.contains lost sibling: {:?}",
       container . contains )); }
 
-  // 3. subscriber.skg's forks has only sibling.
-  let subscriber : Graphnode =
+  // 3. forker.skg's forks has only sibling.
+  let forker : Graphnode =
     graphnode_from_pid_and_skgrepo (
-      config, ID::from ("subscriber"), &main ) ?;
+      config, ID::from ("forker"), &main ) ?;
   let sub_vec : Vec<ID> =
-    members_msv ( &subscriber . forks ) . into_vec ();
+    members_msv ( &forker . forks ) . into_vec ();
   if sub_vec . contains (&ID::from ("victim")) {
     failures . push ( format! (
-      "subscriber.forks still has victim: {:?}",
+      "forker.forks still has victim: {:?}",
       sub_vec )); }
   if ! sub_vec . contains (&ID::from ("sibling")) {
     failures . push ( format! (
-      "subscriber.forks lost sibling: {:?}",
+      "forker.forks lost sibling: {:?}",
       sub_vec )); }
 
   // 4. sibling.skg unchanged.

@@ -1,13 +1,13 @@
 // cargo nextest run --test grouped_forks -E 'test(collateral_partner_folder::)'
 //
 // Two cells of the relationship matrix ('docs/sharing-model.org', "The
-// write-protected folders: who subscribes to or hides this node") that
+// write-protected folders: who hides this node") that
 // need an open collateral view and the collateral rerender
 // stream:
 //
 // 1. collateral folder-membership update: a view of N shows a
 //    forksFolder with member S; a save of a second view that drops
-//    S's subscription to N must re-render N's view (collaterally) with
+//    S's fork of N must re-render N's view (collaterally) with
 //    S unwarranted in its forksFolder.
 //
 // 2. warning scoping: what the refresh of the collateral view changes
@@ -87,7 +87,7 @@ fn collateral_partner_folder_update_and_warning_scoping
           &mut views_state ) . await ?;
 
       // CELL 1 -- collateral folder-membership update: N's view is
-      // re-rendered with S, no longer a subscriber, kept in N's
+      // re-rendered with S, no longer a forker, kept in N's
       // forksFolder, unwarranted (the refresh keeps what the
       // truth no longer relates, and marks it).
       assert_eq! ( collateral_views . len (), 1,
@@ -112,7 +112,7 @@ fn collateral_partner_folder_update_and_warning_scoping
 
 /// A member the refresh adds to a folder at a later visit gets its
 /// containerward chain. N's view shows S in its forksFolder; C
-/// contains T. A save of T's view that makes T subscribe to N
+/// contains T. A save of T's view that makes T fork N
 /// rerenders N's view collaterally, its refresh adding T to the folder,
 /// under which hangs T's chain: C, write-protected and claiming nothing.
 #[test]

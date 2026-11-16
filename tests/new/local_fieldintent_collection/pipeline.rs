@@ -24,8 +24,8 @@ use std::error::Error;
 
 use crate::parse_helpers::viewforest_as_written;
 
-const SUBSCRIBEE_EDIT_CONFIG : &str =
-  "tests/hidden_from_forks/fixtures-subscribee-edit/skgconfig.toml";
+const FORKEE_EDIT_CONFIG : &str =
+  "tests/hidden_from_forks/fixtures-forkee-edit/skgconfig.toml";
 
 /// This parses the way production does, supplying ids and repos
 /// from the graph on disk. Orgs that mention on-disk nodes need it.
@@ -66,9 +66,9 @@ fn all_tests
                  "tests/merge/merge_nodes/fixtures") ?;
       pipeline_basic_mixed_tree (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset_from_config ("pipeline_subscribee_hiderels",
-                             SUBSCRIBEE_EDIT_CONFIG) ?;
-      pipeline_subscribee_hiderels (
+      s . reset_from_config ("pipeline_forkee_hiderels",
+                             FORKEE_EDIT_CONFIG) ?;
+      pipeline_forkee_hiderels (
         &s . config ) . await ?;
       s . reset ("pipeline_write_protected_folder_member_edits",
                  "tests/merge/merge_nodes/fixtures") ?;
@@ -87,7 +87,7 @@ fn all_tests
       pipeline_nodeMerge_requests (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("pipeline_rejects_text_claim_mismatch",
-                             SUBSCRIBEE_EDIT_CONFIG) ?;
+                             FORKEE_EDIT_CONFIG) ?;
       pipeline_rejects_text_claim_mismatch (
         &s . config ) . await ?;
       Ok (( )) } )) }
@@ -148,14 +148,14 @@ async fn pipeline_basic_mixed_tree (
       assert!( nodeMerge_acquisitions . is_empty() );
       Ok (( )) }
 
-async fn pipeline_subscribee_hiderels (
+async fn pipeline_forkee_hiderels (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
             * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
             ** (skg forksFolder)
-            *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
+            *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) forkee-e
             **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
             "};
       let forest : ViewForest =
@@ -171,7 +171,7 @@ async fn pipeline_subscribee_hiderels (
       assert!(
         ! save_gnids (&plan . node_instructions)
           . contains (&ID::from ("e")),
-        "subscribee-as-such should not produce a SaveNode" );
+        "forkee-as-such should not produce a SaveNode" );
       Ok (( )) }
 
 async fn pipeline_write_protected_folder_member_edits (

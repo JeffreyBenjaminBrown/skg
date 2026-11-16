@@ -10,7 +10,7 @@
 // Fixture: 'tele' is homed in 'main', which records its content; its
 // title sits only in 'private', more private than 'main', so it is an
 // overPrivateText telescope under the restriction "main". 'other-child',
-// in the foreign skgrepo 'other', overrides 'tele''s child, so the view
+// in the foreign skgrepo 'other', forks 'tele''s child, so the view
 // of 'tele' has a second perspective, other's.
 
 use skg::serve::ViewsState;

@@ -232,7 +232,7 @@ node p
 
 /// What a content view adds unasked, the diff view does not: s's
 /// forks folder, though an editable-view request extends s, and
-/// the folder of what s hides in e, though e is an editable subscribee
+/// the folder of what s hides in e, though e is an editable forkee
 /// as such.
 #[test]
 fn the_diff_view_adds_no_default_folders () {

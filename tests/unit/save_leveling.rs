@@ -165,7 +165,7 @@ fn homeSkgrepoMove_to_more_private_clamps_relRepos_up (
 }
 
 #[test]
-fn hide_floor_is_the_most_public_explaining_subscription (
+fn hide_floor_is_the_most_public_explaining_fork (
 ) {
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
@@ -177,9 +177,9 @@ fn hide_floor_is_the_most_public_explaining_subscription (
   let recorder : Graphnode = node_at ("recorder", "public");
   let graph : InRustGraph = graph_from ( & [
     recorder . clone (), hidden, container_a, container_b ] );
-  { // Only a private subscription explains the hide: the hide must
-    // be private, else it leaks the inference that the private
-    // subscription exists. The privatized subscription is a disk
+  { // Only a private 'forks' relationship explains the hide: the hide
+    // must be private, else it leaks the inference that the private
+    // relationship exists. The privatized relationship is a disk
     // fact (sticky preserves it); raising its privacy from the
     // buffer would come through the (relRepo ...) atom (see the
     // explicit_repo_* tests below), landed with render-and-gating.

@@ -9,27 +9,27 @@
 //
 // Fixture (tests/mirror_substitution/fixtures, single skgrepo
 // "main", owned): Q contains P and P2; P contains N and M;
-// R overrides N and contains W; S subscribes to E; E contains N.
+// R forks N and contains W; S forks E; E contains N.
 //
 // The multi-repo fixture (fixtures-multi) adds the ownership and
-// visibility gates: FR (skgrepo "foreign", not owned) overrides
-// N1; R2 (skgrepo "other", owned) overrides N2; N3 lives in
-// "other" while P3 and its overrider R3 live in "main".
+// visibility gates: FR (skgrepo "foreign", not owned) forks
+// N1; R2 (skgrepo "other", owned) forks N2; N3 lives in
+// "other" while P3 and its fork R3 live in "main".
 //
 // The foreign-root fixture (fixtures-foreign-root) gives a view its
 // root's author's perspective: R (skgrepo "foreign", not
 // owned) contains M and K; A, also foreign, and U, in "main", each
-// override M; P, in "main", contains M, and W, in "main", contains U.
+// fork M; P, in "main", contains M, and W, in "main", contains U.
 // A second foreign owner,
-// "third", overrides M with B and K with T. Foreign F2 contains M2,
-// which contains N2; U2, in "main", overrides M2, and T2, third's, N2.
+// "third", forks M with B and K with T. Foreign F2 contains M2,
+// which contains N2; U2, in "main", forks M2, and T2, third's, N2.
 //
 // The replaced-root-folders fixture (fixtures-replaced-root-folders)
 // gives a foreign root and the user's fork of it different folders:
 // foreign L, titled "missive", alias "letter", contains L1, L2 and L3;
 // foreign Q contains L, and foreign X links to it. J, in "main",
 // titled "answer", alias "reply",
-// subscribes to and overrides L, contains L1 and hides L2; V, in
+// forks L, contains L1 and hides L2; V, in
 // "main", contains J, and Y, in "main", links to it.
 
 use skg::test_utils::{save_added_forks, save_and_rerender};
@@ -79,19 +79,19 @@ fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/mirror_substitution/fixtures";
   run_with_shared_test_stores (
-    "skg-test-override-substitution",
+    "skg-test-mirror-substitution",
     |s| Box::pin ( async move {
-      s . reset ("de_novo_rendering_shows_the_overrider_marked", fixtures) ?;
-      de_novo_rendering_shows_the_overrider_marked (
+      s . reset ("de_novo_rendering_shows_the_mirror_marked", fixtures) ?;
+      de_novo_rendering_shows_the_mirror_marked (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("save_roundtrips_to_original_and_is_a_fixpoint", fixtures) ?;
       save_roundtrips_to_original_and_is_a_fixpoint (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("extraction_honors_overridesHere", fixtures) ?;
-      extraction_honors_overridesHere (
+      s . reset ("extraction_honors_inPlaceOf", fixtures) ?;
+      extraction_honors_inPlaceOf (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_second_owned_overrider_saves_and_q3s_mirror_stands", fixtures) ?;
-      a_second_owned_overrider_saves_and_q3s_mirror_stands (
+      s . reset ("a_second_owned_fork_saves_and_q3s_mirror_stands", fixtures) ?;
+      a_second_owned_fork_saves_and_q3s_mirror_stands (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("an_owned_mutual_pair_saves_and_q3s_mirror_stands", fixtures) ?;
       an_owned_mutual_pair_saves_and_q3s_mirror_stands (
@@ -106,11 +106,11 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       let foreign_root : &str =
         "tests/mirror_substitution/fixtures-foreign-root";
-      s . reset ("a_view_follows_the_overrides_of_its_roots_author", foreign_root) ?;
-      a_view_follows_the_overrides_of_its_roots_author (
+      s . reset ("a_view_follows_the_perspective_of_its_roots_author", foreign_root) ?;
+      a_view_follows_the_perspective_of_its_roots_author (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("under_a_foreign_root_a_save_roundtrips_its_authors_overrider", foreign_root) ?;
-      under_a_foreign_root_a_save_roundtrips_its_authors_overrider (
+      s . reset ("under_a_foreign_root_a_save_roundtrips_its_authors_mirror", foreign_root) ?;
+      under_a_foreign_root_a_save_roundtrips_its_authors_mirror (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror", foreign_root) ?;
       the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror (
@@ -131,14 +131,14 @@ fn all_tests
                  "tests/mirror_substitution/fixtures-third-author") ?;
       a_third_authors_mirror_stands_where_the_user_has_none (
         &s . config, &mut s . tantivy ) ?;
-      s . reset ("a_switch_to_the_users_overrides_is_refused_where_it_would_change_nothing", foreign_root) ?;
-      a_switch_to_the_users_overrides_is_refused_where_it_would_change_nothing (
+      s . reset ("a_switch_to_the_users_perspective_is_refused_where_it_would_change_nothing", foreign_root) ?;
+      a_switch_to_the_users_perspective_is_refused_where_it_would_change_nothing (
         &s . config, &mut s . tantivy ) ?;
       s . reset ("next_cycles_through_every_perspective_that_shows_the_view_differently", foreign_root) ?;
       next_cycles_through_every_perspective_that_shows_the_view_differently (
         &s . config, &mut s . tantivy ) ?;
-      s . reset ("a_perspective_stays_in_the_cycle_where_another_hides_what_it_overrides", foreign_root) ?;
-      a_perspective_stays_in_the_cycle_where_another_hides_what_it_overrides (
+      s . reset ("a_perspective_stays_in_the_cycle_where_another_hides_what_it_forks", foreign_root) ?;
+      a_perspective_stays_in_the_cycle_where_another_hides_what_it_forks (
         &s . config, &mut s . tantivy ) ?;
       s . reset ("the_root_authors_are_named_in_the_order_of_their_first_roots", foreign_root) ?;
       the_root_authors_are_named_in_the_order_of_their_first_roots (
@@ -163,8 +163,8 @@ fn all_tests
       s . reset ("a_replaced_search_hit_stays_a_hit", replaced_root_folders) ?;
       a_replaced_search_hit_stays_a_hit (
         &s . config, &mut s . tantivy ) ?;
-      s . reset ("a_save_following_the_users_overrides_shows_a_new_fork_in_place", foreign_root) ?;
-      a_save_following_the_users_overrides_shows_a_new_fork_in_place (
+      s . reset ("a_save_following_the_users_perspective_shows_a_new_fork_in_place", foreign_root) ?;
+      a_save_following_the_users_perspective_shows_a_new_fork_in_place (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_held_view_follows_whatever_its_save_names", foreign_root) ?;
       a_held_view_follows_whatever_its_save_names (
@@ -225,7 +225,7 @@ fn read_fixture_file (
   std::fs::read_to_string (&path)
     . unwrap_or_else ( |e| panic! ("reading {:?}: {}", path, e) ) }
 
-async fn de_novo_rendering_shows_the_overrider_marked (
+async fn de_novo_rendering_shows_the_mirror_marked (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -246,7 +246,7 @@ async fn de_novo_rendering_shows_the_overrider_marked (
       assert! ( view . lines () . any (
                   |l| l . contains ("(gnid M)")
                       && ! l . contains ("inPlaceOf") ),
-        "M, not overridden, is shown raw:\n{}", view );
+        "M, not forked, is shown raw:\n{}", view );
       Ok (( )) }
 
 async fn save_roundtrips_to_original_and_is_a_fixpoint (
@@ -288,7 +288,7 @@ async fn save_roundtrips_to_original_and_is_a_fixpoint (
 /// the others, so N stands as itself (Q3, rule 3), where R stood before
 /// the save; and M, whose mirrors are the same three, stands as itself.
 /// R and M stand in N's forks folder, forkers claiming nothing.
-async fn a_second_owned_overrider_saves_and_q3s_mirror_stands (
+async fn a_second_owned_fork_saves_and_q3s_mirror_stands (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -337,7 +337,7 @@ async fn an_owned_mutual_pair_saves_and_q3s_mirror_stands (
             "R is shown only as N's mutual, in its forks folder:\n{}", after );
   Ok (( )) }
 
-async fn extraction_honors_overridesHere (
+async fn extraction_honors_inPlaceOf (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -437,7 +437,7 @@ async fn extraction_honors_overridesHere (
           other => panic! (
             "tampered fact must abort the save; got: {:?}",
             other . map ( |v| v . len () ) ), }}
-      { // Subscribee-as-such: the visible-content signal speaks of
+      { // Forkee-as-such: the visible-content signal speaks of
         // the original, so no spurious hide of N is inferred.
         let buffer = indoc! {"
           * (skg node (gnid S) (skgRepos (nodeRepo main))) S
@@ -453,9 +453,9 @@ async fn extraction_honors_overridesHere (
               . iter () . any ( |m| &m . member == &ID::from ("N") ),
             "S must not hide N: the shown R stands for N" ); }}
       { // Deleting R where it stands for N there deletes R and hides
-        // N from S, as removing R does: a deleted overrider keeps its
+        // N from S, as removing R does: a deleted mirror keeps its
         // original only in the content of a parent the user does not
-        // own ('content_members'), and a subscribee as such has no
+        // own ('content_members'), and a forkee as such has no
         // content the save writes, only S's hides. Nor is N filed in S.
         let buffer = indoc! {"
           * (skg node (gnid S) (skgRepos (nodeRepo main))) S
@@ -484,7 +484,7 @@ async fn ownership_and_visibility_gate_substitution (
 ) -> Result<(), Box<dyn Error>> {
       (
         graph_handle_from_config (config) ? );
-      { // A foreign overrider never substitutes.
+      { // A foreign fork never substitutes.
         let (view, _pids, _tree) =
           multi_root_view (
             config, None,
@@ -495,7 +495,7 @@ async fn ownership_and_visibility_gate_substitution (
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           config, SkgrepoName ("main" . to_string ())) ?;
-      { // A restricted owned overrider does not substitute.
+      { // A restricted owned fork does not substitute.
         let (view, _pids, _tree) =
           multi_root_view_with_skgrepo_set (
             config, None,
@@ -503,7 +503,7 @@ async fn ownership_and_visibility_gate_substitution (
         assert! ( marked_lines (&view, "N2") . is_empty (),
           "R2's repo is restricted; N2 is shown raw:\n{}", view );
         assert! ( view . contains ("(gnid N2)"), "{}", view ); }
-      { // The same overrider substitutes when its skgrepo is unrestricted.
+      { // The same fork substitutes when its skgrepo is unrestricted.
         let (view, _pids, _tree) =
           multi_root_view (
             config, None,
@@ -512,9 +512,9 @@ async fn ownership_and_visibility_gate_substitution (
         assert_eq! ( marked . len (), 1, "{}", view );
         assert! ( marked [0] . contains ("(gnid R2)"), "{}", view ); }
       { // The skgrepo restriction beats substitution: restricted original,
-        // recorded in an unrestricted section, unrestricted overrider
+        // recorded in an unrestricted section, unrestricted fork
         // -> the original stands as a Restricted vognode, and the
-        // overrider is not shown in its place.
+        // fork is not shown in its place.
         let (view, _pids, _tree) =
           multi_root_view_with_skgrepo_set (
             config, None,
@@ -522,7 +522,7 @@ async fn ownership_and_visibility_gate_substitution (
         assert! ( view . contains ("restricted (gnid N3)"),
           "the restricted original stands as a Restricted vognode:\n{}", view );
         assert! ( ! view . contains ("(gnid R3)"),
-          "its overrider must not be shown in its place (the \
+          "its fork must not be shown in its place (the \
            fact would name a restricted node):\n{}", view ); }
       Ok (( )) }
 
@@ -555,7 +555,7 @@ async fn save_under_set (
     "save must not error; got: {:?}", response . errors );
   Ok ( response . saved_view ) }
 
-/// A half-visible owned chain: D overrides C overrides N, with the
+/// A half-visible owned chain: D forks C forks N, with the
 /// end D in skgrepo 'other'. Unrestricted the END D substitutes for N;
 /// under 'main' (hiding 'other') the middle C substitutes. Saving the
 /// half-visible view accepts the middle carrier (it is on N's chain)
@@ -666,10 +666,10 @@ fn line_of_gnid<'a> (
   view . lines () . find ( |l| l . contains (&fact) ) }
 
 /// R, foreign, contains M; A, of R's author, and U, the user's, each
-/// override M; P, owned, contains M. A view of R shows A in M's
+/// fork M; P, owned, contains M. A view of R shows A in M's
 /// place, a view of P shows U, and a view of both shows each under
 /// its own root.
-async fn a_view_follows_the_overrides_of_its_roots_author (
+async fn a_view_follows_the_perspective_of_its_roots_author (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -692,7 +692,7 @@ async fn a_view_follows_the_overrides_of_its_roots_author (
 /// Saving a view of foreign R, unchanged, where A stands for M, writes
 /// nothing to R, passes the inPlaceOf tamper check, and is a
 /// fixpoint.
-async fn under_a_foreign_root_a_save_roundtrips_its_authors_overrider (
+async fn under_a_foreign_root_a_save_roundtrips_its_authors_mirror (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -1005,7 +1005,7 @@ fn a_third_authors_mirror_stands_where_the_user_has_none (
 /// switch back to the root authors' is not refused. A view the
 /// connection does not hold, and a request naming no perspective,
 /// are refused too.
-fn a_switch_to_the_users_overrides_is_refused_where_it_would_change_nothing (
+fn a_switch_to_the_users_perspective_is_refused_where_it_would_change_nothing (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -1021,14 +1021,14 @@ fn a_switch_to_the_users_overrides_is_refused_where_it_would_change_nothing (
             && extract_string_field_from_sexp (&owned [0], "perspective-name")
             . as_deref () == Some ("each root author's perspective (yours)"),
     "the refusal carries the unchanged perspective: {:?}", owned );
-  for (expected_wire, expected_overrider) in [ ("owner of foreign", "A"),
-                                               ("owner of third",   "B") ] {
+  for (expected_wire, expected_mirror) in [ ("owner of foreign", "A"),
+                                            ("owner of third",   "B") ] {
     let next : Vec<String> = messages_answering (
       &switch_request_naming ("P", "next"),
       &mut views_state, &env, config, handle_set_perspective_request );
     assert! ( extract_string_field_from_sexp (&next [0], "perspective")
               . as_deref () == Some (expected_wire)
-              && rerendered_text (&next) . is_some_and ( |text| line_of_gnid (&text, expected_overrider)
+              && rerendered_text (&next) . is_some_and ( |text| line_of_gnid (&text, expected_mirror)
                    . is_some_and ( |l| l . contains ("(inPlaceOf M)") )),
       "next skips the user's, which would change nothing, for each foreign owner's in turn: {:?}", next ); }
   let back : Vec<String> = messages_answering (
@@ -1103,10 +1103,10 @@ fn next_cycles_through_every_perspective_that_shows_the_view_differently (
 
 /// The cycle does not depend on the path taken. In a view of F2, the
 /// user's U2 stands in M2's place and holds nothing, so N2, which
-/// third overrides, is not drawn from the user's perspective; third's
+/// third forks, is not drawn from the user's perspective; third's
 /// is still the next after it, as found from the root authors'
 /// drawing, and a request naming it from there is not refused.
-fn a_perspective_stays_in_the_cycle_where_another_hides_what_it_overrides (
+fn a_perspective_stays_in_the_cycle_where_another_hides_what_it_forks (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -1192,12 +1192,12 @@ async fn next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_autho
   Ok (( )) }
 
 /// The root too: a view of M, which A (M's own author's), U (the
-/// user's) and B (third's) each override, shows M raw from the root
+/// user's) and B (third's) each fork, shows M raw from the root
 /// authors' perspective, as a fresh view does, and each owner's
-/// override of it from that owner's, marked '(inPlaceOf M)'. The
+/// fork of it from that owner's, marked '(inPlaceOf M)'. The
 /// root is re-pointed where it stands, so it keeps its viewnode ID
 /// both ways, and the root authors' perspective shows M raw again. A
-/// save through the replaced root edits the overrider, not M.
+/// save through the replaced root edits the mirror, not M.
 async fn a_perspective_replaces_the_root_and_the_root_authors_restore_it (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1450,7 +1450,7 @@ fn without_vnids<'a> (
 /// the clone's forks folder (the folder K's occurrence carried, now
 /// the clone's); U still stands in M's place. The connection keeps the
 /// choice the save named.
-async fn a_save_following_the_users_overrides_shows_a_new_fork_in_place (
+async fn a_save_following_the_users_perspective_shows_a_new_fork_in_place (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -1617,9 +1617,9 @@ async fn deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows
   assert! ( line_of_gnid (saved, "U") . is_none (), "{}", saved );
   Ok (( )) }
 
-/// At the plan: 'delete' on an overrider standing for M leaves M in
+/// At the plan: 'delete' on a mirror standing for M leaves M in
 /// its parent's list under a foreign parent, which is not forked;
-/// removing the overrider's headline instead removes M, which forks
+/// removing the mirror's headline instead removes M, which forks
 /// R. Under an owned parent, the deletion takes M out of the list too,
 /// as it did before.
 fn a_deleted_mirror_keeps_its_original_but_a_removed_one_does_not (

@@ -157,12 +157,12 @@ fn inbound_containerward_data_hides_N_at_public (
       Ok (( )) } )) }
 
 #[test]
-fn forksFolder_style_inbound_gates_privately_recorded_subscription (
+fn forksFolder_style_inbound_gates_a_privately_recorded_fork (
 ) -> Result<(), Box<dyn Error>> {
   run_with_skgrepo_set_test_db (
-    "skg-test-leak-battery-subscriber",
+    "skg-test-leak-battery-forker",
     "tests/leak_battery/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-leak-battery-subscriber",
+    "/tmp/tantivy-test-leak-battery-forker",
     |config, _tantivy| Box::pin ( async move {
       let public : SkgrepoRestriction =
         SkgrepoRestriction::named (config, SkgrepoName::from ("public"))?;
@@ -174,41 +174,41 @@ fn forksFolder_style_inbound_gates_privately_recorded_subscription (
         InRustGraph::from_graphnodes (&nodes);
 
       // C's forksFolder goal list: 'other_member_pids_gated' at
-      // the SUBSCRIBEE role (C's own role -- who subscribes to C).
-      // S's subscription is recorded only in S's private section, so
+      // the FORKEE role (C's own role -- who forks C).
+      // S's 'forks' relationship is recorded only in S's private section, so
       // it must not appear at "public" even though S itself is a
       // fully public node.
-      let subscribers_public : Vec<ID> =
+      let forkers_public : Vec<ID> =
         graph . other_member_pids_gated (
           &ID::from ("C"), RelationRole::FORKEE, &public );
       assert! (
-        ! subscribers_public . contains (&ID::from ("S")),
-        "S's privately-recorded subscription to C must not surface \
+        ! forkers_public . contains (&ID::from ("S")),
+        "S's privately-recorded 'forks' relationship to C must not surface \
          in C's forksFolder goal list at public: {:?}",
-        subscribers_public );
-      let subscribers_all : Vec<ID> =
+        forkers_public );
+      let forkers_all : Vec<ID> =
         graph . other_member_pids_gated (
           &ID::from ("C"), RelationRole::FORKEE, &all );
       assert! (
-        subscribers_all . contains (&ID::from ("S")),
-        "unrestricted S's subscription to C is visible: {:?}",
-        subscribers_all );
+        forkers_all . contains (&ID::from ("S")),
+        "unrestricted S's 'forks' relationship to C is visible: {:?}",
+        forkers_all );
       Ok (( )) } )) }
 
 #[test]
-fn default_forksFolder_requires_an_unrestricted_subscription_relationship (
+fn default_forksFolder_requires_an_unrestricted_forks_relationship (
 ) -> Result<(), Box<dyn Error>> {
   run_with_skgrepo_set_test_db (
-    "skg-test-leak-battery-default-subscribee-folder",
+    "skg-test-leak-battery-default-forks-folder",
     "tests/leak_battery/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-leak-battery-default-subscribee-folder",
+    "/tmp/tantivy-test-leak-battery-default-forks-folder",
     |config, tantivy| Box::pin ( async move {
       let public : SkgrepoRestriction =
         SkgrepoRestriction::named (config, SkgrepoName::from ("public"))?;
       let all : SkgrepoRestriction =
         SkgrepoRestriction::unrestricted (config);
 
-      // S and C are both public, but S's subscription to C is recorded
+      // S and C are both public, but S's 'forks' relationship to C is recorded
       // only in private.  The default folder's existence must follow the
       // relationship skgrepo, not merely the visibility of its endpoints.
       let (at_public, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
@@ -217,7 +217,7 @@ fn default_forksFolder_requires_an_unrestricted_subscription_relationship (
           &[ ID::from ("S") ], &public ) ?;
       assert! (
         ! at_public . contains ("forksFolder"),
-        "a restricted subscription must not leave an empty default \
+        "a restricted 'forks' relationship must not leave an empty default \
          forksFolder behind:\n{}", at_public );
 
       let (at_all, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
@@ -226,11 +226,11 @@ fn default_forksFolder_requires_an_unrestricted_subscription_relationship (
           &[ ID::from ("S") ], &all ) ?;
       assert! (
         at_all . contains ("forksFolder"),
-        "the unrestricted subscription must create the default folder unrestricted:\n{}",
+        "the unrestricted 'forks' relationship must create the default folder unrestricted:\n{}",
         at_all );
       assert! (
         at_all . contains ("leak-battery-C"),
-        "the unrestricted subscription's member must render unrestricted:\n{}",
+        "the unrestricted relationship's member must render unrestricted:\n{}",
         at_all );
       Ok (( )) } )) }
 
@@ -249,9 +249,9 @@ fn ancestor_heralds_gate_privately_recorded_relations (
       let graph_handle = (
         graph_handle_from_config (config)? );
       let graph = graph_handle . load_full ();
-      // Buffer: C with child S. S subscribes to C, but that relationship is
+      // Buffer: C with child S. S forks C, but that relationship is
       // recorded only in S's private section, so the ancestor-flag
-      // pass must not tint S's herald with the 'S' token at public.
+      // pass must not tint S's herald with the 'K' token at public.
       // (Both nodes are individually public; the relationship is what gates.)
       let herald_of_S = | restriction : &SkgrepoRestriction |
       -> Result<Option<String>, Box<dyn Error>> {
@@ -283,19 +283,19 @@ fn ancestor_heralds_gate_privately_recorded_relations (
           & s_ref . value () . kind
         else { return Err ("S is not an occurrence" . into ()); };
         Ok ( t . viewStats . rel_heralds . rels . clone () ) };
-      // In the semantic wire the subscription shows as a `forks`
+      // In the semantic wire the relationship shows as a `forks`
       // relation; gated out at public, present under `all`. (S's only
-      // subscription here is to its buffer-parent C.)
+      // fork here is of its buffer-parent C.)
       let at_public : Option<String> = herald_of_S (&public) ?;
       assert! (
         ! at_public . as_deref () . unwrap_or ("")
           . contains ("forks"),
-        "S's privately-recorded subscription to its buffer-parent C \
+        "S's privately-recorded 'forks' relationship to its buffer-parent C \
          must not tint an ancestor herald at public: {:?}", at_public );
       let at_all : Option<String> = herald_of_S (&all) ?;
       assert! (
         at_all . as_deref () . unwrap_or ("") . contains ("forks"),
-        "unrestricted the subscription flags S's herald: {:?}", at_all );
+        "unrestricted the relationship flags S's herald: {:?}", at_all );
       Ok (( )) } )) }
 
 #[test]

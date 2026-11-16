@@ -4,7 +4,7 @@
 // unwarranted child, claiming nothing, and never removes a child.
 //
 // The 'commit_leftovers' fixture is 'removed_partners' (b, d and e
-// drop x or c from their content; s drops its subscribee s2) with p,
+// drop x or c from their content; s drops its forkee s2) with p,
 // a container of b, and h, which contains hm at HEAD and is deleted.
 // Its "all changes" buffer holds, among other roots: e, holding x as
 // a removed member, editable, with x's content xc and its changed

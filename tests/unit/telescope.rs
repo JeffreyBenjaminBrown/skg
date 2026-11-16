@@ -506,8 +506,8 @@ fn later_text_reports_the_repo_that_actually_won (
 }
 
 /// The pre-October-2026 names of the hides and flags keys still load,
-/// and are written under today's keys. (Those of the subscription and
-/// the override are retired, and refused: 'retired_keys.rs'.)
+/// and are written under today's keys. (The retired keys
+/// 'subscribesTo' and 'overrides' are refused: 'retired_keys.rs'.)
 #[test]
 fn pre_october_2026_hides_and_flags_keys_still_load () {
   use crate::types::nodes::fs::GraphnodeOnDisk;

@@ -209,7 +209,7 @@ async fn test_child_of_writeProtected_occurrence_inherits_its_gnid_skgrepo (
                  input ); }
   Ok (( )) }
 
-/// Regression: a subscribee
+/// Regression: a forkee
 /// pasted from the link stack arrives as a bare id under a
 /// 'forksFolder' non-vognode, with no skgrepo.
 /// 'inherit_skgrepo_from_nearest_occurrence_ancestor_if_possible'
@@ -221,14 +221,14 @@ async fn test_repoless_folder_member_gets_graph_skgrepo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   // 'root' is an extra_id of fixture node 'root-pid', whose skgrepo is
-  // 'main'. The subscribee reference below carries neither skgrepo nor
+  // 'main'. The forkee reference below carries neither skgrepo nor
   // the primary id, and is write-protected -- exactly the bare-paste shape
   // (a link-stack paste yields a write-protected node with only an id).
   let input : &str =
     indoc! {"
             * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
             ** (skg forksFolder)
-            *** (skg node (gnid root) writeProtected) subscribee reference
+            *** (skg node (gnid root) writeProtected) forkee reference
         "};
   let viewforest : ViewForest =
     org_to_viewforest (input, IdResolution::ThroughGraph (&graph_from_config (config) ?)) . unwrap() . 0;
@@ -246,7 +246,7 @@ async fn test_repoless_folder_member_gets_graph_skgrepo (
         t . gnid . 0, "root-pid",
         "The referenced id 'root' should have resolved to its pid \
          'root-pid'." ); }
-    _ => panic! ("expected an Occurrence subscribee member") }
+    _ => panic! ("expected an Occurrence forkee member") }
   Ok (( )) }
 
 async fn test_add_missing_info_comprehensive (
@@ -320,7 +320,7 @@ async fn test_skgrepo_inheritance_logic (
 
 ) -> Result<(), Box<dyn Error>> {
   // Tests skgrepo inheritance through multiple levels,
-  // with explicit skgrepos overriding inheritance at various depths.
+  // with explicit skgrepos taking precedence over inheritance at various depths.
   let input: &str =
     indoc! {"
             * (skg node (gnid 1) (skgRepos (nodeRepo main))) _
@@ -355,6 +355,6 @@ async fn test_skgrepo_inheritance_logic (
       actual_viewforest . root(),
       expected_viewforest . root()),
     "Repo inheritance: Forests not equivalent.\n\
-     Expected repos to inherit from parent, with explicit repos overriding." );
+     Expected repos to inherit from parent, with explicit repos taking precedence." );
 
   Ok (( )) }

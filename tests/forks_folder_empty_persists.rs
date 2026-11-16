@@ -30,24 +30,24 @@ fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/forks_folder_empty_persists/fixtures";
   run_with_shared_test_stores (
-    "skg-test-subscribee-folder-empty-persists",
+    "skg-test-forks-folder-empty-persists",
     |s| Box::pin ( async move {
-      s . reset ("test_empty_subscribee_folder_persists", fixtures) ?;
-      test_empty_subscribee_folder_persists (
+      s . reset ("test_empty_forks_folder_persists", fixtures) ?;
+      test_empty_forks_folder_persists (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_empty_subscriber_folder_is_removed", fixtures) ?;
-      test_empty_subscriber_folder_is_removed (
+      s . reset ("test_empty_hider_folder_is_removed", fixtures) ?;
+      test_empty_hider_folder_is_removed (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-async fn test_empty_subscribee_folder_persists (
+async fn test_empty_forks_folder_persists (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      empty_subscribee_folder_persists_impl (
+      empty_forks_folder_persists_impl (
         config, tantivy ) . await }
 
-async fn empty_subscribee_folder_persists_impl (
+async fn empty_forks_folder_persists_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -87,14 +87,14 @@ async fn empty_subscribee_folder_persists_impl (
 // Contrast: an empty *write-protected* partner folder -- here a
 // hiderFolder -- is removed by the postorder prune sweep, because (unlike the
 // forks folder) it is not an editable interface; an emptied one is just noise.
-async fn test_empty_subscriber_folder_is_removed (
+async fn test_empty_hider_folder_is_removed (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      empty_subscriber_folder_removed_impl (
+      empty_hider_folder_removed_impl (
         config, tantivy ) . await }
 
-async fn empty_subscriber_folder_removed_impl (
+async fn empty_hider_folder_removed_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {

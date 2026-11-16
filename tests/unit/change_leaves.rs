@@ -169,7 +169,7 @@ fn processed_aggregates_over_the_leaves_that_exist () {
     order_only_nodes : 0, waiting_nodes : 0 } ); }
 
 /// Before: r contains a. After: r also contains the new node n1, which
-/// contains the new n2 and the existing a, and subscribes to the new
+/// contains the new n2 and the existing a, and forks the new
 /// n5; n2 contains n1 back; a contains the new n3; n5 contains the new
 /// n6; the new n4 stands alone.
 fn straddle_with_new_nodes () -> GraphStraddle {
@@ -207,7 +207,7 @@ fn a_walk_through_new_nodes_follows_its_relations_only () {
                "through the cycle once, not into the existing a, nor n5" );
   assert_eq! ( walk ("n1", NewNodeWalk::Outward),
                ids (&["n1", "n2", "n5", "n6"]),
-               "into what n1 subscribes to, and on from there" );
+               "into what n1 forks, and on from there" );
   assert_eq! ( walk ("r", NewNodeWalk::Contentward), ids (&["n1", "n2"]),
                "from a node that is not new, into its new members" );
   assert_eq! ( walk ("a", NewNodeWalk::Contentward), ids (&["n3"]) );
@@ -247,7 +247,7 @@ fn a_request_on_new_nodes_marks_what_its_walk_follows () {
     marked_by ( forest, NamedLeafSet::NewNodesFrom (
       ID::from ("n1"), NewNodeWalk::Contentward, BOTH_KINDS )),
     contentward,
-    "neither r's relationship to n1, nor n1's subscription, nor a or n3" );
+    "neither r's relationship to n1, nor n1's 'forks' relationship, nor a or n3" );
   assert_eq! (
     marked_by ( forest, NamedLeafSet::NewNodesFrom (
       ID::from ("n1"), NewNodeWalk::Outward, BOTH_KINDS )),

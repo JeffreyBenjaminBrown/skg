@@ -340,7 +340,7 @@ node r
 
 #[test]
 fn an_editable_folder_a_narrowing_empties_stays_and_fills_again_on_widening () {
-  // s, in 'main', subscribes to e, in 'private', recording it in its
+  // s, in 'main', forks e, in 'private', recording it in its
   // 'private' section, so that under 'main' alone nothing stands for
   // e. One forest, kept between refreshes as a view is: narrowed, then
   // widened.

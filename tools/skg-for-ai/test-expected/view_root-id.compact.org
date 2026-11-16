@@ -10,7 +10,7 @@
 # Links 3, distinct targets 3, resolved 2, unresolved 1 (missing 1).
 # Server errors 0, warnings 0.
 * The fixture root ⟨0a 1C2 L2 ⌂:main⟩
-The root links to [[id:child-b-id][its second child]]⟦→ Second child, a subscriber ⌂:main⟧,
+The root links to [[id:child-b-id][its second child]]⟦→ Second child, a forker ⌂:main⟧,
 to [[id:fred-note-id][Fred's note]]⟦→ Fred's note ⌂:fred⟧ in the foreign repo,
 and to [[id:missing-id][a node nobody wrote]]⟦not held here⟧.
 ** ⟨0b ☮ These also contain it.⟩
@@ -18,7 +18,7 @@ and to [[id:missing-id][a node nobody wrote]]⟦not held here⟧.
 ** First child ⟨0d aC1⟩
 A body line that stays unnumbered.
 *** Contained twice ⟨0e 2aC⟩
-** Second child, a subscriber ⟨0f a/L K1 H2⟩
+** Second child, a forker ⟨0f a/L K1 H2⟩
 *** ⟨0g It forks these, or these fork it.⟩
 **** Fred's note ⟨0h ☮ C1 1/L bK ⌂:fred⟩
 **** ⟨0i b hides these, but nothing it forks or that forks it contains them.⟩

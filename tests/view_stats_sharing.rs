@@ -4,15 +4,14 @@
 // ('docs/api-and-formats.org', "Stats metadata: graphStats and
 // viewStats"; the tokens in 'docs/heralds.org', "Ancestor flags and
 // floors"):
-// - a subscribee-as-such is born of its folder recorder's fork of it,
-//   and shows that fork as its relation to generation 2 (once
-//   "grandparentOverrides", when subscriptions and overrides were two
-//   relations);
-// - overridesParent ("Op"): a node shown under a vognode it forks.
+// - a forkee-as-such is born of its folder recorder's fork of it,
+//   and shows that fork as its relation to generation 2;
+// - forking its viewparent: a node shown under a vognode it forks
+//   shows a forks-out relation to generation 1.
 // One fixture serves both: R forks E and F (each under R's
 // forksFolder, born of the fork); R contains P,
-// P contains C, and C forks P (so C as content of P carries Op,
-// and C as a view root does not). Each stat round-trips through a
+// P contains C, and C forks P (so C as content of P carries that
+// relation, and C as a view root does not). Each stat round-trips through a
 // save (the viewStats parser errors on unknown atoms, so this also
 // pins the parse arms).
 
@@ -35,8 +34,8 @@ fn all_tests
       s . reset ("sharing_view_stats_appear_and_roundtrip", fixtures) ?;
       sharing_view_stats_appear_and_roundtrip (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("overridesParent_is_position_relative", fixtures) ?;
-      overridesParent_is_position_relative (
+      s . reset ("forking_the_viewparent_is_position_relative", fixtures) ?;
+      forking_the_viewparent_is_position_relative (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
@@ -78,9 +77,9 @@ fn assert_sharing_stats_in_view_of_R (
     match *folder {
       "forksFolder" => {
         assert! ( line . contains ("(birth (forks in 2))"),
-          "{}: E-as-subscribee is born of the fork:\n{}", label, buf );
+          "{}: E-as-forkee is born of the fork:\n{}", label, buf );
         assert! ( line . contains ("(forks (in 1 (ancestors 2)))"),
-          "{}: E-as-subscribee shows R's fork of it (gen 2):\n{}",
+          "{}: E-as-forkee shows R's fork of it (gen 2):\n{}",
           label, buf ); },
       other => panic! (
         "{}: E shown outside any folder ({:?}):\n{}", label, other, buf ),
@@ -90,20 +89,20 @@ fn assert_sharing_stats_in_view_of_R (
               && f_line . contains ("(forks (in 1 (ancestors 2)))"),
       "{}: F, like E, is born of R's fork of it:\n{}", label, buf ); }
   { // Because of mirror substitution, a fresh view of R shows
-    // C in place of P (C forks P), marked; the Op position (C
-    // under a shown P) is asserted from a view of P instead, in
-    // assert_op_in_view_of_P.
+    // C in place of P (C forks P), marked; C's position
+    // under a shown P is asserted from a view of P instead, in
+    // assert_c_forks_its_viewparent_in_view_of_P.
     let c_lines : Vec<&str> = lines_containing (buf, "(gnid C)");
     assert! ( c_lines . iter ()
               . any ( |l| l . contains ("(inPlaceOf P)") ),
       "{}: C is shown in place of P, marked:\n{}", label, buf ); }}
 
-fn assert_op_in_view_of_P (
+fn assert_c_forks_its_viewparent_in_view_of_P (
   buf   : &str,
   label : &str,
 ) {
   let c_lines : Vec<&str> = lines_containing (buf, "(gnid C)");
-  // Op ("overridesParent"): C forks its viewparent (a = P), so it
+  // C forks its viewparent (a = P), so it
   // shows a forks-out relation to generation 1.
   assert! ( c_lines . iter ()
             . any ( |l| l . contains ("(forks (out")
@@ -126,7 +125,7 @@ async fn sharing_view_stats_appear_and_roundtrip (
       let saved : String = // The save parses the buffer, so this also pins the parse arms.
         save_and_rerender (&de_novo, config, tantivy) . await ?;
       assert_sharing_stats_in_view_of_R (&saved, "after save");
-      { // Op needs P shown as a parent, which substitution prevents
+      { // This needs P shown as a parent, which substitution prevents
         // in a view of R; a view rooted at P shows P raw (roots
         // never substitute) with C as its content.
         let (view_of_p, _pids, _tree)
@@ -134,14 +133,14 @@ async fn sharing_view_stats_appear_and_roundtrip (
           multi_root_view (
             config, Some (tantivy),
             &[ ID ("P" . to_string ()) ] ) ?;
-        assert_op_in_view_of_P (&view_of_p, "de novo, view of P");
+        assert_c_forks_its_viewparent_in_view_of_P (&view_of_p, "de novo, view of P");
         let saved_p : String =
           save_and_rerender (&view_of_p, config, tantivy)
           . await ?;
-        assert_op_in_view_of_P (&saved_p, "after save, view of P"); }
+        assert_c_forks_its_viewparent_in_view_of_P (&saved_p, "after save, view of P"); }
       Ok (( )) }
 
-async fn overridesParent_is_position_relative (
+async fn forking_the_viewparent_is_position_relative (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -156,7 +155,8 @@ async fn overridesParent_is_position_relative (
         view_of_c . lines ()
         . find ( |l| l . starts_with ("* ") && l . contains ("(gnid C)") )
         . expect ("view of C should have C as its root");
-      assert! ( ! c_root_line . contains ("overridesParent"),
-        "C as a view root has no viewparent to override:\n{}",
+      assert! ( ! ( c_root_line . contains ("(forks (out")
+                && c_root_line . contains ("(ancestors 1)") ),
+        "C as a view root has no viewparent to fork:\n{}",
         view_of_c );
       Ok (( )) }

@@ -152,7 +152,7 @@ async fn test_writeProtected_relRepo_request_needs_an_editable_recorder (
       * (skg node (gnid root) (skgRepos (nodeRepo main))) root
       ** (skg node (gnid collected) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo main))) under an editable parent
       ** (skg forksFolder)
-      *** (skg node (gnid collected_subscribee) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo main))) in an editable recorder's folder
+      *** (skg node (gnid collected_forkee) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo main))) in an editable recorder's folder
       ** (skg node (gnid protected_parent) (skgRepos (nodeRepo main)) writeProtected) write-protected parent
       *** (skg node (gnid orphaned) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo main))) under a write-protected parent
     "};
@@ -918,7 +918,7 @@ fn a_gnid_only_vognode_counts_in_the_distinctness_checks_when_it_claims () {
 /// and of the acquiredBy folder, as it does in a content list and the
 /// hidden-outside folder (above): where a record names a node no graph
 /// has, or one the skgrepo restriction keeps out ('docs/api-and-formats.org',
-/// "Restricted-skgrepo nodes": "content, subscribees, and every partner
+/// "Restricted-skgrepo nodes": "content, forkees, and every partner
 /// folder's members alike"). Every viewnode of the buffer passes local
 /// validation.
 #[test]

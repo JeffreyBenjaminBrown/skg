@@ -1,19 +1,19 @@
 // cargo nextest run --test grouped_repos -E 'test(forker_hides_under_a_narrowing::)'
 //
 // A save under a skgrepo narrowing leaves alone what the narrowing
-// keeps out of a subscriber's hides ('docs/api-and-formats.org',
+// keeps out of a forker's hides ('docs/api-and-formats.org',
 // "Restricted-skgrepo nodes"). Two steps of the save write a
-// subscriber's hides from what the buffer shows: the
-// subscribee-visibility step, for a subscribee shown editable under
-// its subscriber, and the save of the folder of what the subscriber
-// hides outside its subscribees. Each reads the subscribee's content
-// and the subscriber's hides by the records the skgrepo restriction
+// forker's hides from what the buffer shows: the
+// forkee-visibility step, for a forkee shown editable under
+// its forker, and the save of the folder of what the forker
+// hides outside its forkees. Each reads the forkee's content
+// and the forker's hides by the records the skgrepo restriction
 // shows, as the view drew them: a hide recorded in a restricted
 // section is neither removed nor moved, and no hide is written of a
 // member that only a restricted record explains.
 //
 // Every fixture has the skgrepos "public" and "private", both owned;
-// r, home "public", subscribes to e by a record in its public file,
+// r, home "public", forks e by a record in its public file,
 // and every view is of r, under "public" alone.
 
 use crate::git_fixture::{
@@ -29,7 +29,7 @@ use std::error::Error;
 
 const VIEW : &str = "view of r";
 
-/// Under "public", e is made editable as r's subscribee and the view
+/// Under "public", e is made editable as r's forkee and the view
 /// saved unchanged. e contains c by a public record and x and y by
 /// private ones, so the view shows c alone under e: the save hides
 /// neither x nor y from r, and no file changes.
@@ -62,7 +62,7 @@ fn an_unchanged_save_hides_nothing_that_only_a_restricted_record_explains (
 /// shown as e's content under r. A save of that view, unchanged,
 /// leaves the hide where it was.
 #[test]
-fn an_unchanged_save_keeps_a_restricted_hide_of_what_the_subscribee_shows (
+fn an_unchanged_save_keeps_a_restricted_hide_of_what_the_forkee_shows (
 ) -> Result<(), Box<dyn Error>> {
   under_public (
     &[ ("r", "pid: r\ntitle: r\nforks:\n- e\n"),
@@ -72,7 +72,7 @@ fn an_unchanged_save_keeps_a_restricted_hide_of_what_the_subscribee_shows (
     &[ ("r", "pid: r\nhides:\n- h\n") ],
     |f, public| {
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
-      let editable : String = e_editable_under_its_subscriber (f, public) ?;
+      let editable : String = e_editable_under_its_forker (f, public) ?;
       assert! ( has_line (&editable, "**** (skg node (gnid h)"),
                 "h stands as e's content:\n{}", editable );
       assert! ( ! editable . contains ("hiddenInForkPartnerFolder"),
@@ -89,7 +89,7 @@ fn an_unchanged_save_keeps_a_restricted_hide_of_what_the_subscribee_shows (
 /// "public" h stands nowhere under r, and saves leave every file as it
 /// was.
 #[test]
-fn a_restricted_hide_of_restricted_subscribee_content_stands_nowhere_and_saves_keep_it (
+fn a_restricted_hide_of_restricted_forkee_content_stands_nowhere_and_saves_keep_it (
 ) -> Result<(), Box<dyn Error>> {
   under_public (
     &[ ("r", "pid: r\ntitle: r\nforks:\n- e\n"),
@@ -100,7 +100,7 @@ fn a_restricted_hide_of_restricted_subscribee_content_stands_nowhere_and_saves_k
        ("e", "pid: e\ncontains:\n- h\n") ],
     |f, public| {
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
-      let editable : String = e_editable_under_its_subscriber (f, public) ?;
+      let editable : String = e_editable_under_its_forker (f, public) ?;
       assert! ( ! editable . contains ("(gnid h)"), "h stands nowhere:\n{}", editable );
       save (f, &editable, public) ?;
       assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
@@ -108,7 +108,7 @@ fn a_restricted_hide_of_restricted_subscribee_content_stands_nowhere_and_saves_k
 
 /// r hides hpub by a record in its public file and hpriv by one in
 /// its private section; e contains neither. Under "public" the folder
-/// of what r hides outside its subscribees shows hpub alone. Saved
+/// of what r hides outside its forkees shows hpub alone. Saved
 /// unchanged, then with hpub's line deleted, then with a hide of n
 /// added, the folder's edits reach r's public file alone, and the
 /// private section keeps its hide of hpriv.
@@ -125,7 +125,7 @@ fn edits_of_the_hidden_outside_folder_leave_a_restricted_hide_alone (
     &[ ("r", "pid: r\nhides:\n- hpriv\n") ],
     |f, public| {
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
-      let requested : String = subscribee_folder_requested (f, public) ?;
+      let requested : String = forks_folder_requested (f, public) ?;
       assert_eq! ( members_of_the_hidden_outside_folder (&requested), vec! ["hpub"] );
       let unchanged : String = save (f, &requested, public) ?;
       assert_eq! ( skg_files (f) ?, files_before, "saved unchanged, no file changed" );
@@ -145,10 +145,10 @@ fn edits_of_the_hidden_outside_folder_leave_a_restricted_hide_alone (
 /// r hides h and o by records in its public file; e contains c by a
 /// public record and h by a private one. Under "public" e's content
 /// is c alone, so both hides stand outside, in the folder of what r
-/// hides outside its subscribees. Saved unchanged, r keeps both;
+/// hides outside its forkees. Saved unchanged, r keeps both;
 /// with h's line deleted, r's public file hides o alone.
 #[test]
-fn a_hide_of_what_the_subscribee_contains_restrictedly_stands_outside_and_its_edits_save (
+fn a_hide_of_what_the_forkee_contains_restrictedly_stands_outside_and_its_edits_save (
 ) -> Result<(), Box<dyn Error>> {
   under_public (
     &[ ("r", "pid: r\ntitle: r\nforks:\n- e\nhides:\n- h\n- o\n"),
@@ -159,7 +159,7 @@ fn a_hide_of_what_the_subscribee_contains_restrictedly_stands_outside_and_its_ed
     &[ ("e", "pid: e\ncontains:\n- h\n") ],
     |f, public| {
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
-      let requested : String = subscribee_folder_requested (f, public) ?;
+      let requested : String = forks_folder_requested (f, public) ?;
       assert_eq! ( members_of_the_hidden_outside_folder (&requested), vec! ["h", "o"] );
       let unchanged : String = save (f, &requested, public) ?;
       assert_eq! ( skg_files (f) ?, files_before, "saved unchanged, no file changed" );
@@ -175,7 +175,7 @@ fn a_hide_of_what_the_subscribee_contains_restrictedly_stands_outside_and_its_ed
 //
 
 /// The view of r with its forks folder requested, as saved.
-fn subscribee_folder_requested (
+fn forks_folder_requested (
   f      : &mut Fixture,
   public : &SkgrepoRestriction,
 ) -> Result<String, Box<dyn Error>> {
@@ -186,14 +186,14 @@ fn subscribee_folder_requested (
 
 /// The view of r with its forks folder requested and e made
 /// editable in it, as saved.
-fn e_editable_under_its_subscriber (
+fn e_editable_under_its_forker (
   f      : &mut Fixture,
   public : &SkgrepoRestriction,
 ) -> Result<String, Box<dyn Error>> {
-  let requested : String = subscribee_folder_requested (f, public) ?;
+  let requested : String = forks_folder_requested (f, public) ?;
   save (f, &with_e_requested_editable (&requested), public) }
 
-/// 'view' with an editable-view request on e, r's subscribee.
+/// 'view' with an editable-view request on e, r's forkee.
 fn with_e_requested_editable (
   view : &str,
 ) -> String {
@@ -223,7 +223,7 @@ fn has_line (
   without_viewnode_ids (view) . lines () . any ( |line| line . starts_with (prefix) ) }
 
 /// The gnid of each member of the folder of what r hides outside its
-/// subscribees.
+/// forkees.
 fn members_of_the_hidden_outside_folder (
   view : &str,
 ) -> Vec<String> {

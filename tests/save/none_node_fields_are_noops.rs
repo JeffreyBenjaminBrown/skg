@@ -126,11 +126,11 @@ async fn test_none_forks_get_replaced_with_disk_forks_logic (
         &config, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . forks),
-      MSV::Specified ( vec![ ID::new ("sub_1_on_disk"),
-                   ID::new ("sub_2_on_disk"),
-                   ID::new ("override_1_on_disk"),
-                   ID::new ("override_2_on_disk"),
-                   ID::new ("override_3_on_disk") ]),
+      MSV::Specified ( vec![ ID::new ("fork_1_on_disk"),
+                   ID::new ("fork_2_on_disk"),
+                   ID::new ("fork_3_on_disk"),
+                   ID::new ("fork_4_on_disk"),
+                   ID::new ("fork_5_on_disk") ]),
       "Unspecified forks from client should be replaced with forks from disk." ); }
 
   { let mut user_node : Graphnode = empty_graphnode ();

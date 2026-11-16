@@ -3,7 +3,7 @@
 // The fork/clone feature: editing a foreign node N (write-protected, in a
 // skgrepo the user does not own) is read as a request to clone it. The
 // clone C lives in an owned skgrepo, copies N's edited title/body/
-// contains, subscribes to N and overrides N; N itself is untouched.
+// contains, and forks N; N itself is untouched.
 //
 // Installs the explicit graph handle (mirror substitution and
 // forksFolder content read it), so it belongs among the
@@ -92,7 +92,7 @@ const FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER : &str = indoc! {"
 
 /// The explicit 'skg-fork-node' gesture: an owned node (P) carries
 /// (viewRequests fork). Unlike the implicit foreign fork, P keeps its
-/// own save; saving adds a clone C that overrides P, built from P's disk
+/// own save; saving adds a clone C that forks P, built from P's disk
 /// snapshot.
 const EXPLICIT_FORK_BUFFER : &str = indoc! {"
   * (skg node (gnid P) (skgRepos (nodeRepo owned)) (viewRequests fork)) P-container
@@ -190,8 +190,8 @@ fn all_tests
       s . reset ("fork_no_owned_ancestor_defaults", two_owned) ?;
       fork_no_owned_ancestor_defaults (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("fork_user_set_repo_overrides", two_owned) ?;
-      fork_user_set_skgrepo_overrides (
+      s . reset ("fork_user_set_skgrepo_wins", two_owned) ?;
+      fork_user_set_skgrepo_wins (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("fork_default_prefers_unrestricted_owned_repo", two_owned) ?;
       fork_default_prefers_unrestricted_owned_skgrepo (
@@ -227,8 +227,8 @@ fn all_tests
       s . reset ("a_reply_under_ones_own_unfiled_fork_files_the_original", mail) ?;
       a_reply_under_ones_own_unfiled_fork_files_the_original (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_headline_typed_under_the_subscribee_itself_files_nothing", mail) ?;
-      a_headline_typed_under_the_subscribee_itself_files_nothing (
+      s . reset ("a_headline_typed_under_the_forkee_itself_files_nothing", mail) ?;
+      a_headline_typed_under_the_forkee_itself_files_nothing (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_third_partys_reply_in_anothers_unread_list_warns",
                  "tests/fork/fixtures-mail-third-party") ?;
@@ -322,8 +322,8 @@ fn second_level (
   view . lines () . filter ( |line| line . starts_with ("** ") ) . collect () }
 
 /// Mail between two skgrepos: the sender's note 't' holds messages
-/// 'm1' and 'm2'. The reader's 'f' forks 't' (subscribes to it,
-/// overrides it, contains only 'maybe done'), so 't' stands in f's
+/// 'm1' and 'm2'. The reader's 'f' forks 't' (and contains
+/// only 'maybe done'), so 't' stands in f's
 /// forks folder listing the messages f has neither filed nor
 /// hidden: the reader's unread list. The reader types a reply under
 /// 'm1' there, which forks 'm1', and saves, approving the fork.
@@ -434,7 +434,7 @@ async fn a_reply_under_ones_own_unfiled_fork_files_the_original (
 /// A headline typed straight under 't' in the unread list is no
 /// member of 't' (its list does not name it), so saving it files
 /// nothing in 'f'.
-async fn a_headline_typed_under_the_subscribee_itself_files_nothing (
+async fn a_headline_typed_under_the_forkee_itself_files_nothing (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -575,7 +575,7 @@ async fn explicit_fork_on_unknown_node_errors (
       "expected ForkRequestOnUnknownNode, got {:?}", other ), }
   Ok (( )) }
 
-/// The explicit fork skgsave-commits a clone overriding the owned P (override
+/// The explicit fork skgsave-commits a clone forking the owned P (mirror
 /// substitution then shows it in P's place), and a second explicit fork
 /// of the now-forked P is rejected with 'ForkAlreadyExists'.
 async fn explicit_fork_round_trip_and_refork_refusal (
@@ -597,7 +597,7 @@ async fn explicit_fork_round_trip_and_refork_refusal (
     "the approved explicit fork must skgsave-commit: {:?}", response . errors );
   let clone : Graphnode = clone_forking_on_disk (config, "P") ?;
   assert_eq! ( members_of ( clone . forks . or_default () ), vec! [ ID::from ("P") ],
-    "the clone subscribes to P" );
+    "the clone forks P" );
   assert! ( config . skgrepo_is_owned (& clone . home_skgrepo),
     "the clone lives in an owned repo" );
   // P is untouched (still owns its container role).
@@ -699,10 +699,10 @@ async fn fork_no_owned_ancestor_defaults (
     response . saved_view );
   Ok (( )) }
 
-/// The user-set clone skgrepo (the 'fork-repos' transport) overrides
-/// the inferred one. FORK_BUFFER infers "owned" from the owned ancestor
+/// The user-set clone skgrepo (the 'fork-repos' transport) wins
+/// over the inferred one. FORK_BUFFER infers "owned" from the owned ancestor
 /// P; passing N -> "owned2" lands the clone in "owned2" instead.
-async fn fork_user_set_skgrepo_overrides (
+async fn fork_user_set_skgrepo_wins (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -723,7 +723,7 @@ async fn fork_user_set_skgrepo_overrides (
     "the user-set fork must skgsave-commit: {:?}", response . errors );
   let c : Graphnode = clone_on_disk (config) ?;
   assert_eq! ( c . home_skgrepo, SkgrepoName::from ("owned2"),
-    "the user-set repo 'owned2' must override the inferred 'owned'; \
+    "the user-set repo 'owned2' must win over the inferred 'owned'; \
      got {:?}", c . home_skgrepo );
   Ok (( )) }
 
@@ -1098,7 +1098,7 @@ async fn fork_fixture_files (
 /// P's stored
 /// 'contains' is not rewritten to the clone -- it still lists N, so the
 /// fact round-trips and a save never silently re-points containers at
-/// the clone. (That the clone's subscribee-as-such view of N starts
+/// the clone. (That the clone's forkee-as-such view of N starts
 /// empty and fills as N gains children is the prerequisite rule,
 /// exercised in hidden_from_forks; here C.contains ==
 /// N.contains == [N1,N2] gives it nothing to show.)
@@ -1130,7 +1130,7 @@ async fn fork_round_trip (
   assert! ( p_view . contains (& format! ("(gnid {})", clone_gnid . 0)),
     "the shown substitute must be the clone {}:\n{}", clone_gnid . 0, p_view );
   assert! ( p_view . contains ("forksFolder"),
-    "the clone (a subscriber of N) shows a forksFolder:\n{}", p_view );
+    "the clone (a forker of N) shows a forksFolder:\n{}", p_view );
 
   // The load-bearing round-trip: P's stored contains was not rewritten
   // to the clone; it still lists N (the fact collected N, not C).
@@ -1142,7 +1142,7 @@ async fn fork_round_trip (
 /// A collateral rerender substitutes the clone for N, as every refresh
 /// of an editable occurrence's content does: the refresh decides from
 /// the buffer and the graph as they are now, not from which view made
-/// the override. Editing P as well as forking N makes the second P
+/// the fork. Editing P as well as forking N makes the second P
 /// view collateral through the normal changed-PID path; no
 /// fork-specific invalidation or rendering path participates.
 async fn fork_collateral_rerender_substitutes_too (

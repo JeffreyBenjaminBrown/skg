@@ -93,7 +93,7 @@ fn c_is_the_recorders_and_the_members_of_existence_changed_relationship_leaves (
     ("fresh",              &["main"],              &[]),
     ("historical_content", &["main"],              &[]),
     ("kinds",              &["public", "private"], &[]),
-    ("overrides",          &["main"],              &[]),
+    ("mirrors",            &["main"],              &[]),
     ("partner_ids",        &["main"],              &[]),
     ("removed_partners",   &["main"],              &[]),
     ("sets",               &["main"],              &[]),

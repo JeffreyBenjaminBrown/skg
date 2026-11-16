@@ -73,7 +73,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         assert_eq!(
           acquiree_text_preserver . forks,
           MSV::Specified(vec![]),
-          "acquiree_text_preserver should have empty subscriptions" );
+          "acquiree_text_preserver should have empty forks" );
         assert_eq!(
           acquiree_text_preserver . hides,
           MSV::Specified(vec![]),

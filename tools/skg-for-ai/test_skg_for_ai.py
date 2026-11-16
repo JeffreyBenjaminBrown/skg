@@ -143,8 +143,8 @@ TOOL_RUNS = [
                          ( "mentioners",    "child-b-id" ),
                          ( "forks",         "fred-note-id" ),
                          ( "hides",         "fred-aside-id" ),
-                         ( "aliases",       "overridden-id" ),
-                         ( "flags",         "overrider-id" ) ] ]
+                         ( "aliases",       "forkee-id" ),
+                         ( "flags",         "forker-id" ) ] ]
 
 def main (argv):
   update_expected = "--update-expected" in argv
@@ -865,7 +865,7 @@ def check_move (context):
       "*** Contained twice ⟨0e 2aC⟩\n" ) ])
   report = ( REPORT_HEAD +
              "Moved: ⟨0e⟩ 'Contained twice', from under ⟨0d⟩ 'First child, "
-             "renamed' to under ⟨0g⟩ 'Second child, a subscriber'.\n" )
+             "renamed' to under ⟨0g⟩ 'Second child, a forker'.\n" )
   require_output ( run_save (folder, "--yes"),
                    report + saved_line (0) + written_paths (folder) )
   require_equal ( "the old container's content",
@@ -880,11 +880,11 @@ def check_removal (context):
   edit_compact ( folder, [ ( "*** Contained twice ⟨0k 2aC⟩\n", "" ) ])
   report = ( REPORT_HEAD +
              "Removed: ⟨0k⟩ 'Contained twice', from under ⟨0f⟩ 'Second "
-             "child, a subscriber'.\n" )
-  # Its container subscribes to Fred's note, which does not contain
+             "child, a forker'.\n" )
+  # Its container forks Fred's note, which does not contain
   # it, so the removal hides nothing, and the save says why.
   hides_nothing = ( "Hides nothing: 'Contained twice' left 'Second child, a "
-                    "subscriber', but it is no content of 'Fred's note', nor "
+                    "forker', but it is no content of 'Fred's note', nor "
                     "a mirror of any.\n" )
   require_output ( run_save (folder, "--yes"),
                    report + saved_line (0) + hides_nothing +
@@ -1039,7 +1039,7 @@ def check_stale_view (context):
   folder_a = fresh_root_view (context, "stale-a")
   folder_e = fresh_root_view (context, "stale-e")
   folder_b = fresh_root_view (context, "stale-b")
-  edit_compact ( folder_b, [ ( "** Second child, a subscriber ⟨0e ",
+  edit_compact ( folder_b, [ ( "** Second child, a forker ⟨0e ",
                                "** Second child, renamed in B ⟨0e " ) ])
   require_save_succeeds (folder_b)
   require_edited_stale_save_refused (context, folder_e)
@@ -1050,14 +1050,14 @@ def require_edited_stale_save_refused (context, folder):
   change, so the server refuses the whole save, naming the node, and
   nothing is written; the tool prints the refusal and leaves the
   view's files."""
-  edit_compact ( folder, [ ( "** Second child, a subscriber ⟨0e ",
+  edit_compact ( folder, [ ( "** Second child, a forker ⟨0e ",
                              "** Second child, renamed in E ⟨0e " ) ])
   graph_before = skg_files (context)
   full_before = read_file ( os . path . join (folder, ROOT_BASE_NAME + ".full.org") )
   completed = run_save (folder, "--yes")
   expected_head = (
     REPORT_HEAD +
-    "Title: ⟨0e⟩ 'Second child, a subscriber' → 'Second child, renamed in E'.\n"
+    "Title: ⟨0e⟩ 'Second child, a forker' → 'Second child, renamed in E'.\n"
     "Server: nothing was saved, 1 error, 0 warnings.\n"
     "Server error: NOTHING WAS SAVED" )
   if ( completed . returncode != 1
@@ -1084,7 +1084,7 @@ def require_unedited_stale_save_warned (context, folder):
     REPORT_HEAD +
     "Title: ⟨0d⟩ 'First child, renamed' → 'First child, renamed in A'.\n" +
     saved_line (1) +
-    "Server warning: Left as the graph has it: Second child, a subscriber "
+    "Server warning: Left as the graph has it: Second child, a forker "
     "(child-b-id), which changed after this buffer was rendered and which "
     "this buffer did not edit.\n" +
     written_paths (folder) )
@@ -1430,7 +1430,7 @@ def check_placing_beside_an_editable_occurrence (context):
     run_save (folder, "--yes"),
     REPORT_HEAD +
     "Placed: ⟨node:shared-id⟩ 'Contained twice', under ⟨0i⟩ 'Second child, "
-    "a subscriber', write-protected, since the view already holds an "
+    "a forker', write-protected, since the view already holds an "
     "editable occurrence of it.\n" + saved_line (0) + written_paths (folder) )
   require_equal ( "the second container's content",
                   skg_list (context, "child-b-id", "contains"), [ "shared-id" ] )
@@ -1456,10 +1456,10 @@ def check_placing_a_node_twice (context):
     "Placed: ⟨node:fred-detail-id⟩ 'A detail of Fred's', under ⟨0d⟩ 'First "
     "child'.\n"
     "Placed: ⟨node:fred-detail-id⟩ 'A detail of Fred's', under ⟨0i⟩ 'Second "
-    "child, a subscriber', write-protected, since the view already holds an "
+    "child, a forker', write-protected, since the view already holds an "
     "editable occurrence of it.\n" + saved_line (0) +
-    # The second child subscribes to Fred's note and hid the detail.
-    "Stops hiding 'A detail of Fred's' from 'Second child, a subscriber', as "
+    # The second child forks Fred's note and hid the detail.
+    "Stops hiding 'A detail of Fred's' from 'Second child, a forker', as "
     "content of 'Fred's note'.\n" + written_paths (folder) )
   require_equal ( "the first child's content after placing twice",
                   skg_list (context, "child-a-id", "contains"),
@@ -1478,9 +1478,9 @@ def check_placement_errors (context):
     "*** Nobody ⟨node:nobody-id⟩\n"
     "*** With a body ⟨node:top-id⟩\n"
     "Its body line.\n"
-    "*** With a child ⟨node:overridden-id⟩\n"
+    "*** With a child ⟨node:forkee-id⟩\n"
     "**** Its child\n"
-    "*** With a word ⟨node:overrider-id fork⟩\n" ) ])
+    "*** With a word ⟨node:forker-id fork⟩\n" ) ])
   graph_before = skg_files (context)
   completed = run_save (folder, "--yes")
   require_output (
@@ -1489,14 +1489,14 @@ def check_placement_errors (context):
     "Error: ⟨node:top-id⟩ on line 10 of the compact view has a body; a placed "
     "node is saved write-protected, which saves no body. Save the placement "
     "first, then edit its body.\n"
-    "Error: ⟨node:overridden-id⟩ on line 12 of the compact view has children; "
+    "Error: ⟨node:forkee-id⟩ on line 12 of the compact view has children; "
     "a placed node is saved write-protected, under which nothing claims "
     "membership. Save the placement first, then add them.\n"
-    "Error: ⟨node:overrider-id⟩ on line 14 of the compact view carries "
+    "Error: ⟨node:forker-id⟩ on line 14 of the compact view carries "
     "'fork'; it takes no other word.\n",
     expected_returncode = 1 )
   edit_compact ( folder, [ ( "Its body line.\n", "" ), ( "**** Its child\n", "" ),
-                           ( "⟨node:overrider-id fork⟩", "⟨node:overrider-id⟩" ) ])
+                           ( "⟨node:forker-id fork⟩", "⟨node:forker-id⟩" ) ])
   require_output (
     run_save (folder, "--yes"),
     REPORT_HEAD +
@@ -1704,7 +1704,7 @@ def check_forking_and_hiding_by_placing (context):
   if ( "Fork:" in completed . stdout or "Server: saved," not in completed . stdout
        or completed . stdout . count (hide_line) != 1 ):
     raise CaseFailure ( f"the hiding save printed {completed . stdout!r}" )
-  require_equal ( "what the node hides from its subscriptions",
+  require_equal ( "what the node hides from its forks",
                   skg_list (context, "elsewhere-id", "hides"),
                   [ "fred-detail-id" ] )
   lines = read_file (compact_path) . split ("\n")
@@ -1870,11 +1870,11 @@ def check_search_matching (context):
                     "noSearchMatching true)': the node no longer matches searches.",
                     "Search matching: ⟨0e⟩ 'Contained twice', as '(flag "
                     "noSearchMatching true)': the node no longer matches searches.",
-                    "Search matching: ⟨0f⟩ 'Second child, a subscriber', as "
+                    "Search matching: ⟨0f⟩ 'Second child, a forker', as "
                     "'(flag noSearchMatching true)': the node no longer matches "
                     "searches.",
                     "Skipped: 'noSearchMatching subtree' on ⟨0a⟩ leaves ⟨0k⟩ "
-                    "'Second child, a subscriber' (write-protected)." ] )
+                    "'Second child, a forker' (write-protected)." ] )
   for node_id in [ "root-id", "child-a-id", "shared-id", "child-b-id" ]:
     require_equal ( node_id + "'s flags after 'noSearchMatching subtree'",
                     skg_list (context, node_id, "flags"), [ "NoSearchMatching" ] )
@@ -1895,20 +1895,20 @@ def check_merging (context):
     head + "Error: ⟨0a⟩ on line 1 of the compact view carries "
     "'merge:nobody-id', which names no node of the graph.\n",
     expected_returncode = 1 )
-  edit_compact ( folder, [ ( "merge:nobody-id", "merge:overridden-id" ) ], base_name )
+  edit_compact ( folder, [ ( "merge:nobody-id", "merge:forkee-id" ) ], base_name )
   require_output (
     run_save (folder, "--yes"),
     head + "Merge: ⟨0a⟩ 'A second container, outside the view' acquires "
-    "⟨node:overridden-id⟩ 'An overridden node, outside the view', as '(merge "
-    "overridden-id)': a nodeMerge makes the two one node, this one, with the "
+    "⟨node:forkee-id⟩ 'A forkee, outside the view', as '(merge "
+    "forkee-id)': a nodeMerge makes the two one node, this one, with the "
     "relationships of both.\n" + saved_line (0) +
     "" . join ( os . path . join (folder, base_name + suffix) + "\n"
                 for suffix in ( ".full.org", ".compact.org", ".view.json" )))
   require_equal ( "whether the acquiree's file remains",
-                  os . path . exists ( skg_path (context, "overridden-id") ), False )
+                  os . path . exists ( skg_path (context, "forkee-id") ), False )
   require_equal ( "the acquirer's extra IDs",
                   skg_list (context, "elsewhere-id", "extra_ids"),
-                  [ "overridden-id" ] )
+                  [ "forkee-id" ] )
 
 def check_deleting_a_subtree (context):
   """'delete subtree' deletes the node and every node occurrence below
@@ -1965,7 +1965,7 @@ def check_misplaced_words (context):
   new_line = len ( read_compact (folder) . split ("\n") ) - 1
   root = append_word ("* The fixture root ⟨", "relRepo:main")
   contained = append_word ("*** Contained twice ⟨", "repo:fred")
-  second = append_word ("** Second child, a subscriber ⟨", "repo:main")
+  second = append_word ("** Second child, a forker ⟨", "repo:main")
   require_output (
     run_save (folder, "--yes"),
     REPORT_HEAD +
@@ -2343,7 +2343,7 @@ EXPECTED_DIFF_COMPACT = (
   "* Above the root ⟨0d C1 ⌂:main⟩\n"
   "** The fixture root ⟨0e aC2 L2⟩\n"
   "The root links to [[id:child-b-id][its second child]]⟦→ Second child, "
-  "a subscriber ⌂:main⟧,\n"
+  "a forker ⌂:main⟧,\n"
   "to [[id:fred-note-id][Fred's note]]⟦→ Fred's note ⌂:fred⟧ in the "
   "foreign repo,\n"
   "and to [[id:missing-id][a node nobody wrote]]⟦not held here⟧.\n"
@@ -2356,7 +2356,7 @@ EXPECTED_DIFF_COMPACT = (
   # container stands above it, so no containers folder is drawn; its
   # '~+' says the change.
   "**** A new grandchild ⟨0j ∃+ ~+⟩\n"
-  "*** Second child, a subscriber ⟨0k ☮ a/L K1 H2⟩\n" )
+  "*** Second child, a forker ⟨0k ☮ a/L K1 H2⟩\n" )
 
 # ============================================================
 # The daemon: each case runs on the graph and the daemon the earlier
@@ -2468,14 +2468,14 @@ def check_daemon_rewrites_after_a_change_on_disk (context):
   start_second_server (context)
   second_folder = save_through_second_server (
     context, "view_root-id",
-    ( "** Second child, a subscriber ⟨0f ",
+    ( "** Second child, a forker ⟨0f ",
       "** Second child, renamed on the second server ⟨0f " ))
   require_log_line ( context, RELOADED_ONE_MAIN_FILE )
   require_log_line (
     context,
     "re-rendered view_root-id because files changed on disk (reloaded 1 "
     "file from repo main); 'Second child, renamed "
-    "on the second server' changed: title, was 'Second child, a subscriber'" )
+    "on the second server' changed: title, was 'Second child, a forker'" )
   require_log_line ( context, "re-rendered links-here_child-b-id because files changed on disk" )
   require_in_file ( context [ "daemon_folder" ], "view_root-id",
                     "** Second child, renamed on the second server ⟨0f " )
@@ -2905,20 +2905,20 @@ def check_hiding_the_foreign_skgrepos (context):
   """'restrict --foreign hidden' hides the foreign skgrepos: the held
   views are rerendered under it, one showing overPrivateText text only
   with '--show-overPrivateText', and a held view of a foreign node's
-  subscriber no longer shows it. The switch is refused while a held
+  forker no longer shows it. The switch is refused while a held
   view has unsaved edits. 'restrict private --foreign shown' lifts the
   restriction."""
   folder = context [ "daemon_folder" ]
   require_tool_run ([ "view", "child-b-id", "--out-dir", folder ])
   require_in_file ( folder, "view_child-b-id", "*** Fred's note ⟨" )
-  edit_compact ( folder, [ ( "* Second child, a subscriber ⟨",
+  edit_compact ( folder, [ ( "* Second child, a forker ⟨",
                              "* Second child, unsaved ⟨" ) ], "view_child-b-id" )
   completed = run_tool ([ "restrict", "--foreign", "hidden" ])
   require_output ( completed, "", expected_returncode = 1 )
   if "view_child-b-id.compact.org has unsaved edits" not in completed . stderr:
     raise CaseFailure ( f"stderr was {completed . stderr!r}" )
   edit_compact ( folder, [ ( "* Second child, unsaved ⟨",
-                             "* Second child, a subscriber ⟨" ) ], "view_child-b-id" )
+                             "* Second child, a forker ⟨" ) ], "view_child-b-id" )
   require_failure (
     run_tool ([ "restrict", "--foreign", "hidden" ]), [],
     "skg_for_ai: The skgrepo restriction is as it was: run again with "
@@ -2989,11 +2989,11 @@ def check_setting_relRepos (context):
                                                             "contains"), [] )
   require_equal ( "whether the private section of the first child records it",
                   "- shared-id" in private_lines (context, "child-a-id"), True )
-  second = compact_line_starting (folder, "** Second child, a subscriber ⟨")
+  second = compact_line_starting (folder, "** Second child, a forker ⟨")
   edit_compact ( folder, [ ( second + "\n",
                              second + "\n*** A child kept private\n" ) ])
   require_save_succeeds (folder)
-  second = compact_line_starting (folder, "** Second child, a subscriber ⟨")
+  second = compact_line_starting (folder, "** Second child, a forker ⟨")
   child = compact_line_starting (folder, "*** A child kept private ⟨")
   edit_compact ( folder, [ ( second, second [ : -1 ] + " relRepo:private subtree⟩" ) ])
   completed = require_save_succeeds (folder)
@@ -3044,7 +3044,7 @@ def check_moving_to_another_skgrepo (context):
                   private_lines (context, "secret-id") [ 1 : ],
                   [ "contains:", "- shared-id", "- doomed-id", "" ] )
   folder = fresh_root_view (context, "move-new")
-  second = compact_line_starting (folder, "** Second child, a subscriber ⟨")
+  second = compact_line_starting (folder, "** Second child, a forker ⟨")
   edit_compact ( folder, [ ( second + "\n", second +
                              "\n*** Made private ⟨new repo:private⟩\n" ) ])
   completed = require_save_succeeds (folder)

@@ -2,7 +2,7 @@
 -- nvim client. The Lua mirror of test-emacs.el in this directory:
 -- open owned P (whose content is foreign N); make N editable and
 -- edit its title; save -> a fork-confirmation buffer appears and
--- nothing commits; approve -> the clone is created (overriding N) and
+-- nothing commits; approve -> the clone is created (forking N) and
 -- immediately shown in N's place when P re-renders.
 
 local T = dofile('../test-nvim-lib.lua')

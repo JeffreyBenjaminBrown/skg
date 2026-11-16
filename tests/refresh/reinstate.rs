@@ -105,7 +105,7 @@ node p
   forksFolder" ); }
 
 #[test]
-fn a_subscribee_as_such_shows_what_its_subscriber_neither_hides_nor_contains () {
+fn a_forkee_as_such_shows_what_its_forker_neither_hides_nor_contains () {
   let graph : InRustGraph = graph (&[
     Graphnode { forks : msv_ids (&["e"]),
                 hides : msv_ids (&["h"]),
@@ -126,8 +126,8 @@ node s
           node e wp noClaim
       node k
   node i",
-    "an editable subscribee as such also shows the folder of what its \
-     subscriber hides in it" ); }
+    "an editable forkee as such also shows the folder of what its \
+     forker hides in it" ); }
 
 #[test]
 fn a_folder_omits_the_members_whose_records_are_restricted () {
@@ -158,7 +158,7 @@ node p
   assert! ( ! run . text . contains ("hush"), "{}", run . text ); }
 
 #[test]
-fn the_hidden_in_subscribee_folder_holds_what_the_subscriber_hides_of_the_subscribees_content () {
+fn the_hidden_in_forkee_folder_holds_what_the_forker_hides_of_the_forkees_content () {
   let graph : InRustGraph = graph (&[
     Graphnode { forks : msv_ids (&["e"]),
                 hides : msv_ids (&["h", "o"]), .. node ("s") },

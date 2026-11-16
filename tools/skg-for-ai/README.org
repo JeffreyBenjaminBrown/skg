@@ -1206,7 +1206,7 @@ view and prints a line per change, each naming headlines by handle and
 title, as in
 #+begin_example
 Changes in view_root-id.compact.org, against view_root-id.full.org (view ID content-view:root-id):
-Moved: ⟨0e⟩ 'Contained twice', from under ⟨0d⟩ 'First child' to under ⟨0f⟩ 'Second child, a subscriber'.
+Moved: ⟨0e⟩ 'Contained twice', from under ⟨0d⟩ 'First child' to under ⟨0f⟩ 'Second child, a forker'.
 New: 'A new grandchild', under ⟨0d⟩ 'First child'.
 Title: ⟨0d⟩ 'First child' → 'First child, renamed'.
 Bodies changed: 1 (⟨0a⟩).
@@ -1264,7 +1264,7 @@ preview, which writes nothing, and prints each line of the server's
 answer, as in
 #+begin_example
 Hides 'A detail of Fred's' from 'A second container, outside the view', as content of 'Fred's note'.
-Hides nothing: 'Contained twice' left 'Second child, a subscriber', but it is no content of 'Fred's note', nor a mirror of any.
+Hides nothing: 'Contained twice' left 'Second child, a forker', but it is no content of 'Fred's note', nor a mirror of any.
 #+end_example
 'Hides' and 'Stops hiding' name what the save adds to or takes from
 the forker's hides, and the forkee whose content holds it.

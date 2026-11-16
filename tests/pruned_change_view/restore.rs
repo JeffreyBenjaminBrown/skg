@@ -4,14 +4,14 @@
 // ghost.
 //
 // In the 'removed_partners' fixture b, bb, d and e drop x or c from their
-// content and s drops its subscribee s2. Its "all changes" buffer holds
+// content and s drops its forkee s2. Its "all changes" buffer holds
 // b with x as an editable removed member, d with c likewise, and under
 // x's container folder e as a '~-' container (b, above x, stands in no
 // folder); and s2 with s, in its forks folder, as a '~-'
-// subscriber.
+// forker.
 //
 // In the 'restore' fixture g, deleted since HEAD, was contained by q
-// (between q1 and q2), subscribed to by t, and contained gc and gd; gd
+// (between q1 and q2), forked by t, and contained gc and gd; gd
 // is deleted too, and r dropped gc from its content. Its buffer holds
 // q with g as a ghost (gc and gd under it), r with gc as
 // a removed member (g, historical, in gc's container folder), and t
@@ -50,7 +50,7 @@ const X_REMOVED_FROM_B : &str =
   "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels";
 const E_REMOVED_AS_XS_CONTAINER : &str =
   "**** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected (view ghostWarrant)";
-const S_REMOVED_AS_S2S_SUBSCRIBER : &str =
+const S_REMOVED_AS_S2S_FORKER : &str =
   "*** (skg node (gnid s) (skgRepos (nodeRepo main)) noClaim writeProtected";
 /// d, a node of the containerward chain under c, a member of x's
 /// containers folder.
@@ -143,12 +143,12 @@ fn restoring_a_removed_container_from_a_folder () -> Result<(), Box<dyn Error>> 
 /// forker stands claiming nothing: it returns to its index at HEAD in
 /// the forker's list.
 #[test]
-fn restoring_a_removed_subscription_from_a_subscriber_folder (
+fn restoring_a_removed_fork_from_the_forkees_forks_folder (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("removed_partners", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let (response, files) : (SaveResponse, BTreeMap<String, String>) = saved ( f,
-      &requesting (&buffer, S_REMOVED_AS_S2S_SUBSCRIBER, "restoreRel") ) ?;
+      &requesting (&buffer, S_REMOVED_AS_S2S_FORKER, "restoreRel") ) ?;
     assert_eq! ( file_of (&files, "s"),
                  "title: s\npid: s\nforks:\n- s1\n- s2\n- s3\n" );
     assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
@@ -156,7 +156,7 @@ fn restoring_a_removed_subscription_from_a_subscriber_folder (
     Ok (( )) }) }
 
 /// The node's file is written back as HEAD had it, its out-link to
-/// gd (still deleted) included; its container and its subscriber list
+/// gd (still deleted) included; its container and its forker list
 /// it again, q at its index at HEAD. g's list names gd, which HEAD
 /// has, so gd is its ghost there, claiming membership: a later save of
 /// the buffer keeps gd in g's list, as it would an unknown's.
@@ -244,14 +244,14 @@ fn restore_requests_on_the_wrong_kind_stop_the_save () -> Result<(), Box<dyn Err
       assert_eq! ( skg_files (f) ?, files_before ); }
     Ok (( )) }) }
 
-/// In the 'subscribee_member' fixture, p hangs under sub, the added
+/// In the 'forker_member' fixture, p hangs under sub, the added
 /// member of s1's changed forks folder, as sub's containerward
 /// chain. A restoreRel with '(rel removed)' typed beside it there is
 /// refused, as on a chain node under a containers folder's member.
 #[test]
-fn restoreRel_is_refused_on_a_chain_node_under_a_subscriber_folders_member (
+fn restoreRel_is_refused_on_a_chain_node_under_a_forks_folders_forker (
 ) -> Result<(), Box<dyn Error>> {
-  with_fixture ("subscribee_member", &["main"], |f| {
+  with_fixture ("forker_member", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let requested : String = edit_line (

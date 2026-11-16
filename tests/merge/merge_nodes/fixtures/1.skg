@@ -6,8 +6,8 @@ contains:
 - "12"
 - "overlap"
 forks:
-- 1-subscribes-to
-- overridden-by-1
+- 1-forks
+- 1-forks-too
 hides:
-- hidden-from-1s-subscriptions
-- hidden-from-subscriptions-of-1-but-in-content-of-2
+- 1-hides
+- 1-hides-but-2-contains

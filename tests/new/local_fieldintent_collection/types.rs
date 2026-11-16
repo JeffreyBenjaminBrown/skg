@@ -113,25 +113,25 @@ fn combineable_intents_always_combine () {
   let mut acc : CollectedFieldIntents =
     CollectedFieldIntents::new();
   acc . instructionMerge_fieldIntent (
-    &emitter (), ID::from ("subscriber"), delete_intent () ) . unwrap();
+    &emitter (), ID::from ("forker"), delete_intent () ) . unwrap();
   // Visibility and text claims coexist with anything, even delete,
   // and several may accumulate per ID.
-  for subscribee in ["e1", "e2", "e1"] {
+  for forkee in ["e1", "e2", "e1"] {
     acc . instructionMerge_fieldIntent (
-      &emitter (), ID::from ("subscriber"),
+      &emitter (), ID::from ("forker"),
       FieldIntent::ForkeeVisibility (
         ForkeeVisibility {
-          forkee     : ID::from (subscribee),
+          forkee     : ID::from (forkee),
           visible    : vec![] } )) . unwrap(); }
   acc . instructionMerge_fieldIntent (
-    &emitter (), ID::from ("subscriber"),
+    &emitter (), ID::from ("forker"),
     FieldIntent::ForkeeTextClaim (
       ForkeeTextClaim {
         title    : "t" . to_string(),
         body     : None,
         headline : emitter () } )) . unwrap();
   let entry : &FieldIntentsForOneId =
-    acc . by_pid . get (&ID::from ("subscriber")) . unwrap();
+    acc . by_pid . get (&ID::from ("forker")) . unwrap();
   assert_eq!( entry . visibility . len(), 3 );
   assert_eq!( entry . text_claims . len(), 1 ); }
 

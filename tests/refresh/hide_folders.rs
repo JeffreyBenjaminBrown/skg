@@ -1,7 +1,7 @@
-// The two hide folders under a skgrepo narrowing. A subscriber s
-// subscribes to e and hides h. A hide is inside when a subscribee
+// The two hide folders under a skgrepo narrowing. A forker s
+// forks e and hides h. A hide is inside when a forkee
 // contains the hidden graphnode, and outside otherwise; under e shown
-// editable as s's subscribee, the folder 'hiddenInForkPartnerFolder'
+// editable as s's forkee, the folder 'hiddenInForkPartnerFolder'
 // shows the inside hides, and beside e, in s's forks folder,
 // 'hiddenOutsideOfForkPartnersFolder' shows the outside ones. Both
 // folders, and e's content, are read by the records the skgrepo
@@ -34,7 +34,7 @@ fn at (
     &SkgrepoName::from (record . skgrepo ()),
     members . iter () . map ( |member| ID::from (*member) ) . collect () ) }
 
-/// s subscribes to e (recorded in 'main') and hides h by 'hide'; e
+/// s forks e (recorded in 'main') and hides h by 'hide'; e
 /// contains c (in 'main'), and h by 'containment' when there is one.
 fn s_e_h (
   hide        : Record,
@@ -126,11 +126,11 @@ fn a_restricted_hide_of_what_e_contains_restrictedly_stands_nowhere_under_a_narr
                ( vec! [INSIDE . to_string ()], Vec::<String>::new () )); }
 
 /// Lead 2's case B: e itself is private, so its content, recorded in
-/// its own file, is restricted, while s's subscription and hide are
+/// its own file, is restricted, while s's 'forks' relationship and hide are
 /// visible. Under the skgrepo narrowing e is a restricted viewnode,
 /// and the hide stands outside, which says nothing of e's content.
 #[test]
-fn a_visible_hide_of_what_a_restricted_subscribee_contains_stands_outside_under_a_narrowing () {
+fn a_visible_hide_of_what_a_restricted_forkee_contains_stands_outside_under_a_narrowing () {
   let graph : InRustGraph = graph (&[
     Graphnode { forks : MSV::Specified ( at (Record::Main, &["e"]) ),
                 hides : MSV::Specified ( at (Record::Main, &["h"]) ),

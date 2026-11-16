@@ -5,7 +5,7 @@
 // ('docs/diff-view.org', "A save makes nothing editable and appends no
 // root"). The 'fresh' fixture (one skgrepo, main): r
 // contains a, whose body changed, and w, unchanged; w contains w1
-// and w2; w1 contains w1a and subscribes to w2. s, unchanged,
+// and w2; w1 contains w1a and forks w2. s, unchanged,
 // contains s1. p and q are new, and contain each other. So the
 // buffer's roots are q and r, and w is a write-protected member
 // without its content.
@@ -307,7 +307,7 @@ fn the_command_on_a_buffer_with_every_change_editable_changes_nothing (
 /// U, cascades through its content as in an ordinary view, until the
 /// node budget (6 here) is spent: the four nodes of U (a, p, q and r)
 /// charge it too, then w and w1 extend; w2 and w1a stay
-/// write-protected. No default folder is added (w1 subscribes to w2),
+/// write-protected. No default folder is added (w1 forks w2),
 /// and the nodes made editable stay so after the next save.
 #[test]
 fn an_editable_view_request_cascades_within_the_node_budget (

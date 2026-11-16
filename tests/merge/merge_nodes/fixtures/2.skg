@@ -6,5 +6,5 @@ body: 2 body
 contains:
 - "21"
 - "22"
-- hidden-from-subscriptions-of-1-but-in-content-of-2
+- 1-hides-but-2-contains
 - "overlap"

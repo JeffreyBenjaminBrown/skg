@@ -1,4 +1,4 @@
-# Test fixtures for SubscribeeFolder functionality.
+# Test fixtures for the forks folder drawn by default.
 
 Two repos: 'home' (owned) and 'away' (foreign).
 
@@ -8,22 +8,22 @@ Structure:
     11        contains 111, forks 11-sees
     111       (leaf)
     12        forks 12-sees
-    13        (leaf, no subscriptions)
+    13        (leaf, no forks)
     14        contains 141
     141       (leaf)
 
   away/
-    11-sees   (subscribee of 11)
-    12-sees   (subscribee of 12)
+    11-sees   (forkee of 11)
+    12-sees   (forkee of 12)
     invisible (not referenced)
 
 Expected content view from node 1:
   * 1
   ** 11
-  *** subscribees     <-- SubscribeeFolder because 11 subscribes to something
+  *** forks folder    <-- because 11 forks something
   *** 111
   ** 12
-  *** subscribees     <-- SubscribeeFolder because 12 subscribes to something
-  ** 13               <-- no SubscribeeFolder (no subscriptions)
-  ** 14               <-- no SubscribeeFolder (no subscriptions)
+  *** forks folder    <-- because 12 forks something
+  ** 13               <-- no forks folder (it forks nothing)
+  ** 14               <-- no forks folder (it forks nothing)
   *** 141

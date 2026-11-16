@@ -567,7 +567,7 @@ choices, so the prompt pre-fills with the default instead."
   "A view-root tree exercising the walk's qualification and pruning:
 true content (a, b), an false branch (c, d), an
 write-protected-but-true member (e) over content (f), a
-forksFolder member (g) over subscribee-as-such content (h), and an
+forksFolder member (g) over forkee-as-such content (h), and an
 aliasFolder.")
 
 (defun test--line-of-id (gnid)
@@ -582,7 +582,7 @@ aliasFolder.")
   "Kind `content' hits true content children of editable
 occurrence parents only: the root's own (na) relationship is skipped, the
 false branch and everything below the write-protected node and the
-subscribee-as-such member are pruned, and folder members are untouched."
+forkee-as-such member are pruned, and folder members are untouched."
   (test--with-skg-content-view
    test--recursive-content-tree
    test--config-public-private-trusted
@@ -600,7 +600,7 @@ subscribee-as-such member are pruned, and folder members are untouched."
 
 (ert-deftest test-recursive-walk-forkee ()
   "Kind `forkee' hits only the claiming forksFolder members, leaving content
-children and subscribee-as-such content untouched."
+children and forkee-as-such content untouched."
   (test--with-skg-content-view
    test--recursive-content-tree
    test--config-public-private-trusted

@@ -44,10 +44,10 @@ fn lowering_produces_ordered_nodeInstructions_and_signals () {
       "} );
   let LoweringOutput { intents, visibility, .. } =
     lower_collected_fieldIntents (collected) . unwrap();
-  { // There is one visibility pair, aimed at the subscriber.
+  { // There is one visibility pair, aimed at the forker.
     assert_eq!( visibility . len(), 1 );
-    let (subscriber, signal) = &visibility [0];
-    assert_eq!( subscriber, &ID::from ("root") );
+    let (forker, signal) = &visibility [0];
+    assert_eq!( forker, &ID::from ("root") );
     assert_eq!( signal . forkee, ID::from ("e") );
     assert_eq!( signal . visible, vec![ID::from ("visible")] ); }
   let nodeInstructions : Vec<NodeInstruction> =
@@ -55,7 +55,7 @@ fn lowering_produces_ordered_nodeInstructions_and_signals () {
     . into_iter()
     . map ( |intent| intent . into_node_instruction() . unwrap() )
     . collect();
-  // 'e' is a subscribee-as-such, holding only signals, so it
+  // 'e' is a forkee-as-such, holding only signals, so it
   // lowers to nothing.
   assert_eq!( nodeInstructions . len(), 4 );
   { let root : &Graphnode = match &nodeInstructions [0] {

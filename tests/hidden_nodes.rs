@@ -12,11 +12,11 @@
 // Restricted vognode in place, over its children.
 //
 // The fixture, written by the test:
-//   public  : r contains a, h, b and subscribes to hs; a; b; s1; hv.
+//   public  : r contains a, h, b and forks hs; a; b; s1; hv.
 //   private : h ("h secret", aliased "h alias secret") contains s1;
 //             hs ("hs secret"); hh ("hh secret").
 // r records all of that in its public file. Some tests have r hide hh,
-// or hh and hv, from its subscribers there, and some give r a private
+// or hh and hv, from its forks there, and some give r a private
 // section, which records that r contains hc ("hc secret", private)
 // after b and hides hp ("hp secret", private).
 
@@ -82,7 +82,7 @@ fn a_save_under_a_restriction_keeps_the_members_its_restricted_vognodes_stand_fo
                      "the restricted member h stays where it stood" );
         assert_eq! ( members_of ( r . forks . or_default () ),
                      vec! [ ID::from ("hs") ],
-                     "the restricted subscribee hs stays" ); }
+                     "the restricted forkee hs stays" ); }
       { // drawn under "private", then switched to "public"
         let mut restriction : SkgrepoRestriction =
           SkgrepoRestriction::unrestricted (&f . config);
@@ -101,15 +101,15 @@ fn a_save_under_a_restriction_keeps_the_members_its_restricted_vognodes_stand_fo
                      "the restricted member h stays where it stood" );
         assert_eq! ( members_of ( r . forks . or_default () ),
                      vec! [ ID::from ("hs") ],
-                     "the restricted subscribee hs stays" ); }
+                     "the restricted forkee hs stays" ); }
       Ok (( )) } ) }
 
-/// r hides hh (private) and hv (public) from its subscribers in its
+/// r hides hh (private) and hv (public) from its forks in its
 /// public file, and hp (private) in its private section, which also
 /// records that r contains hc (private). A view of r drawn under "private" (no restriction)
 /// and switched to "public" shows Restricted vognodes, not empty
 /// folders: hs in the forks folder, hh beside
-/// hv in the folder of what r hides outside its subscribees; and h in
+/// hv in the folder of what r hides outside its forkees; and h in
 /// r's content. Of hp and hc, whose records are restricted, it shows
 /// nothing. Saved with an edit, it keeps every hide and every member.
 #[test]
@@ -173,11 +173,11 @@ fn deleting_a_restricted_vognodes_line_removes_its_record_alone (
       assert_r_keeps_its_members (f);
       Ok (( )) } ) }
 
-/// r contains x, private, and subscribes to e, which contains x too;
+/// r contains x, private, and forks e, which contains x too;
 /// r records both in its public file. Under "public" x stands in r's
 /// content as a Restricted vognode; its line deleted and the view
-/// saved, r would hide x from its subscriptions, x being content of a
-/// node r subscribes to, as it would on an occurrence's removal. That
+/// saved, r would hide x from its forks, x being content of a
+/// node r forks, as it would on an occurrence's removal. That
 /// hide would land in r's private section, the more private of the
 /// endpoints' homes, which the skgrepo restriction keeps out: the save
 /// is refused, naming the skgrepo, and no file changes.
@@ -305,7 +305,7 @@ fn a_tightened_restriction_re_kinds_an_occurrence_of_a_restricted_node_in_place 
       Ok (( )) } ) }
 
 /// The exact buffers of a view of r switched to "public" and back to
-/// "private" (no restriction): narrowed, hs is a Restricted vognode in the subscribee
+/// "private" (no restriction): narrowed, hs is a Restricted vognode in the forks
 /// folder, and h's occurrence a Restricted vognode holding s1;
 /// widened, each is an occurrence again, where it stood. And of a view
 /// rooted at h, which is private: narrowed, its root is a Restricted
@@ -345,7 +345,7 @@ fn a_switch_and_its_reverse_draw_these_buffers (
                    "the widened view of h, saved back, changes no file" );
       Ok (( )) } ) }
 
-/// As above, where r also hides hh, private, from its subscribers:
+/// As above, where r also hides hh, private, from its forks:
 /// narrowed, the forks folder holds hs, and the hidden-outside
 /// folder in it hh, each as a Restricted vognode; widened, each is an
 /// occurrence again.
@@ -558,13 +558,11 @@ fn a_save_under_the_narrowing_then_a_widening_keep_rs_private_record (
                    "saved unchanged under the narrowing, the view comes back as it was" );
       Ok (( )) } ) }
 
-/// r's private section records that r subscribes to s, hides s1 from
-/// its subscribers and overrides o, each a public graphnode. The view
-/// of r asks for its hides folders; the forks folder is
-/// drawn by default. No folder shows the override, which the save
-/// keeps from disk.
+/// r's private section records that r forks s and o and hides s1
+/// from its forks, each a public graphnode. The view of r asks for its hides
+/// folders; the forks folder is drawn by default.
 #[test]
-fn a_narrowing_and_a_widening_keep_rs_private_subscription_and_override_records (
+fn a_narrowing_and_a_widening_keep_rs_private_fork_and_hide_records (
 ) -> Result<(), Box<dyn Error>> {
   round_trip_keeps_the_private_record (
     PrivateRecordsOfR::PartnerRecords, false,
@@ -702,10 +700,10 @@ fn save_view_cleanly_under (
             response . errors, text );
   Ok (response) }
 
-/// r hides s1 and hh, private, from its subscribers, recording both in
+/// r hides s1 and hh, private, from its forks, recording both in
 /// its public file. Under "public", with the folder of what r hides
 /// requested, hh stands as a restricted headline there and in the
-/// folder of what r hides outside its subscribees. Its line deleted
+/// folder of what r hides outside its forkees. Its line deleted
 /// from the second and the view saved, r no longer hides hh, and the
 /// first folder's restricted headline goes.
 #[test]
@@ -869,8 +867,8 @@ fn a_save_of_a_view_whose_root_is_a_restricted_headline_changes_nothing (
                    "the refused save changes nothing on disk" );
       Ok (( )) } ) }
 
-/// r (public) subscribes to s and hides s1 and 'nowhere' from its
-/// subscribers, a hide of a gnid that resolves to no node, recorded in
+/// r (public) forks s and hides s1 and 'nowhere' from its
+/// forks, a hide of a gnid that resolves to no node, recorded in
 /// r's public file. Under "private" (no restriction) and under "public", the folder of what
 /// r hides, once requested, holds a reference to the unknown node
 /// 'nowhere' beside s1; the buffer saved unchanged saves, and r keeps
@@ -934,7 +932,7 @@ fn assert_restricted_vognodes_alone_stand_for (
               "{} shows {} only as a Restricted vognode:\n{}", what, gnid, buffer ); }}
 
 /// What each child of the folder of what r hides outside its
-/// subscribees stands as: "KIND GNID".
+/// forkees stands as: "KIND GNID".
 fn children_of_the_hidden_outside_folder (
   buffer : &str,
 ) -> Vec<String> {
@@ -945,7 +943,7 @@ fn children_of_the_hidden_outside_folder (
   kind_and_gnid_of_each_child (&tree, folder) }
 
 /// r keeps its members: it contains a, h, b and hc, hc after b as its
-/// private section places it, and subscribes to hs.
+/// private section places it, and forks hs.
 fn assert_r_keeps_its_members (
   f : &Fixture,
 ) {
@@ -955,7 +953,7 @@ fn assert_r_keeps_its_members (
                "r keeps its members, hc after b" );
   assert_eq! ( members_of ( r . forks . or_default () ),
                vec! [ ID::from ("hs") ],
-               "r keeps its subscription to hs" ); }
+               "r keeps its fork of hs" ); }
 
 /// A view of r drawn under "private" (no restriction) and switched to "public".
 fn switched_to_public (
@@ -985,7 +983,7 @@ fn write_fixture (
 ) -> Result<(), Box<dyn Error>> {
   write_fixture_where_r_hides (dir, &[], PrivateSectionOfR::NotWritten) }
 
-/// The fixture, with r hiding 'hides' from its subscribers in its
+/// The fixture, with r hiding 'hides' from its forks in its
 /// public file, and, when 'private_section' says so, a private section
 /// of r, which records that r contains hc after b and hides hp. Beside
 /// them stand hh ("hh secret", private) and hv (public), which r may

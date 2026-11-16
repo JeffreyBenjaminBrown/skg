@@ -5,7 +5,7 @@
 // keeps it across saves and rerenders, and the view's
 // 'ViewnodeIdRecord' knows the ones the forest holds.
 //
-// Fixture: p contains a; a contains b and c; c subscribes to d. The
+// Fixture: p contains a; a contains b and c; c forks d. The
 // view of a shows p in a's containers folder, b and c as members, and
 // c's forks folder holding d.
 

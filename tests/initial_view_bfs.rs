@@ -26,9 +26,9 @@ fn all_tests
       s . reset ("test_bfs_limit_8_two_branches", fixtures) ?;
       test_bfs_limit_8_two_branches (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_budget_content_beats_subscribers",
-                 "tests/initial_view_bfs/fixtures-content-vs-subscribers") ?;
-      test_budget_content_beats_subscribers (
+      s . reset ("test_budget_content_beats_forkees",
+                 "tests/initial_view_bfs/fixtures-content-vs-forkees") ?;
+      test_budget_content_beats_forkees (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
@@ -199,14 +199,14 @@ async fn test_bfs_limit_8_two_branches (
 
 // §5.5: content wins the budget race; a folder (here a forks folder) fills whole
 // and is budget-neutral. Fixture: root r -> content chain c1 -> c2, and r also
-// subscribes to s1, s2. With budget = 3 (exactly the content chain r, c1, c2):
-// the chain fully extends (c2 is editable, body and all), and both subscribers
+// forks s1, s2. With budget = 3 (exactly the content chain r, c1, c2):
+// the chain fully extends (c2 is editable, body and all), and both forkees
 // are shown (the folder is whole), write-protected. If the folder had spent the budget,
 // s1 and s2 would have eaten two of the three units and c2 would be left
-// write-protected -- it is not, which is the guarantee this test pins. Subscribers
-// also sit one level deeper than content (r -> forks folder -> subscriber vs
+// write-protected -- it is not, which is the guarantee this test pins. Forkees
+// also sit one level deeper than content (r -> forks folder -> forkee vs
 // r -> c1), so BFS-by-depth reaches content first regardless.
-async fn test_budget_content_beats_subscribers (
+async fn test_budget_content_beats_forkees (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -218,7 +218,7 @@ async fn test_budget_content_beats_subscribers (
         multi_root_view ( &test_config, None, & focii
                         ) ?;
 
-      println!("content-vs-subscribers (budget 3):\n{}", result);
+      println!("content-vs-forkees (budget 3):\n{}", result);
 
       let expected = indoc! {"* (skg node (gnid r) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2))))) r
                               ** (skg forksFolder)

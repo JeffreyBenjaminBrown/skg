@@ -699,7 +699,7 @@ fn an_unedited_stale_foreign_node_is_not_forked
                . contains ("n as they rewrote it") );
   assert! ( ! texts_of_files_in (&f, "main") . iter ()
               . chain ( texts_of_files_in (&f, "other") . iter () )
-              . any ( |text| text . contains ("overrides") ),
+              . any ( |text| text . contains ("forks:") ),
             "no clone of n" );
   Ok (()) }
 

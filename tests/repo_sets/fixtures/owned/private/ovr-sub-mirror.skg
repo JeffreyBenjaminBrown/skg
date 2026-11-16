@@ -1,0 +1,6 @@
+pid: ovr-sub-mirror
+title: private mirror title must not leak
+contains:
+- ovr-sub-child
+forks:
+- ovr-sub-original

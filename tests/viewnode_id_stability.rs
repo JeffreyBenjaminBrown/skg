@@ -6,7 +6,7 @@
 // still shows loses its ID or takes another's.
 //
 // The fixture, written by the test:
-//   public  : r contains a, b, c, s; a contains a1; c subscribes to d;
+//   public  : r contains a, b, c, s; a contains a1; c forks d;
 //             x contains r; s1.
 //   private : s ("s secret") contains s1.
 // The view of r shows x in a containers folder once it is requested,

@@ -1,0 +1,6 @@
+pid: hide-forker
+title: foreign hide forker
+forks:
+- hide-forkee
+hides:
+- victim-alt

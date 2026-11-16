@@ -9,7 +9,7 @@
 # Contained elsewhere too 3, forked 1, forking 1.
 # Links 0, distinct targets 0, resolved 0, unresolved 0.
 # Server errors 0, warnings 0.
-* Second child, a subscriber ⟨0a 1C 1/L K1 H2 ⌂:main⟩
+* Second child, a forker ⟨0a 1C 1/L K1 H2 ⌂:main⟩
 ** ⟨0i ☮ These link to it.⟩
 *** The fixture root ⟨0j ☮B 1C2b L2b⟩
 **** Above the root ⟨0k ☮ Ca⟩

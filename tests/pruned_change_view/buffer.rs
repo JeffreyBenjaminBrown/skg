@@ -3,10 +3,10 @@
 // skgrepos public and private) each root shows one kind of change:
 // txt is retitled and its body edited; ali loses alias a1 and gains
 // a3, and loses its extra ID ali-old; flg gains a flag; ct drops k1
-// (which contains k1c) and gains k2 (ctx, with its content, is unchanged); sub subscribes to s2 instead of s1; mv
+// (which contains k1c) and gains k2 (ctx, with its content, is unchanged); sub forks s2 instead of s1; mv
 // moves from public to private; rr's containment of rm moves to
-// private; acq acquired acqd by a nodeMerge; gone, which subscribed
-// to orph, is deleted.
+// private; acq acquired acqd by a nodeMerge; gone, which forked
+// orph, is deleted.
 
 use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::{Fixture, edit_line, save_cleanly, skg_files};
@@ -166,7 +166,7 @@ fn alias_id_and_flag_changes_fill_their_folders (
   Ok (( )) }
 
 #[test]
-fn a_subscription_change_shows_on_both_sides (
+fn a_fork_change_shows_on_both_sides (
 ) -> Result<(), Box<dyn Error>> {
   let buffer : String = kinds_buffer () ?;
   assert_lines_in_order ( &buffer, &[
@@ -231,7 +231,7 @@ fn marks_in_the_store_show_as_processed (
     Ok (( )) }) }
 
 #[test]
-fn a_deleted_subscriber_is_shown_in_the_changed_subscriber_folder (
+fn a_deleted_forker_is_shown_in_the_changed_forks_folder (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &kinds_buffer () ?, &[
     "* (skg node (gnid orph)",
@@ -251,8 +251,8 @@ fn the_kinds_buffer_saves_back_unchanged (
 
 /// The 'removed_partners' fixture (one skgrepo, main): at HEAD a, b,
 /// bb, c and e contain x, which contains xc; d contains c; s
-/// subscribes to s1, s2 and s3. Since then b, bb and e stopped
-/// containing x, d stopped containing c, and s stopped subscribing to
+/// forks s1, s2 and s3. Since then b, bb and e stopped
+/// containing x, d stopped containing c, and s stopped forking
 /// s2. So b, bb, d and e are roots, and b's removed member x is x's
 /// first occurrence.
 fn removed_partners_buffer (
@@ -312,7 +312,7 @@ fn a_removed_member_first_in_level_order_is_editable_with_its_changes (
   assert_eq! ( editable . len (), 1, "{}", buffer );
   Ok (( )) }
 
-/// The 'subscribee_member' fixture (one skgrepo, main): s1
+/// The 'forker_member' fixture (one skgrepo, main): s1
 /// forks s0; since HEAD, sub forks s1; c contains s1 and p contains
 /// sub. So the stub roots c and p show s1 and sub, and s1's changed
 /// forks folder holds, after s0, sub, its relationship added, with
@@ -321,9 +321,9 @@ fn a_removed_member_first_in_level_order_is_editable_with_its_changes (
 /// carrying no change facts. Likewise sub's changed forks folder holds
 /// s1, with c under it. The buffer saves back unchanged.
 #[test]
-fn a_member_of_a_changed_subscriber_folder_holds_its_chain (
+fn a_member_of_a_changed_forks_folder_holds_its_chain (
 ) -> Result<(), Box<dyn Error>> {
-  with_fixture ("subscribee_member", &["main"], |f| {
+  with_fixture ("forker_member", &["main"], |f| {
     let buffer : String = without_viewnode_ids (&buffer_of (f) ?);
     let lines : Vec<&str> = buffer . lines () . collect ();
     for (folder, member, chain_node) in [ ("forksFolder", "sub", "p"),
@@ -348,7 +348,7 @@ fn a_member_of_a_changed_subscriber_folder_holds_its_chain (
                 "{}'s chain, {}, hangs under it:\n{}", member, chain_node, buffer ); }
     Ok (( )) }) ?;
   saves_back_unchanged (
-    "subscribee_member", &["main"], DiffViewBufferKind::AllChanges ) }
+    "forker_member", &["main"], DiffViewBufferKind::AllChanges ) }
 
 /// x is editable as b's removed member, which stands before e's, so
 /// e's removed member x is write-protected, and holds nothing.
@@ -412,10 +412,10 @@ fn a_removed_member_editable_before_a_save_stays_editable_after_it (
     assert_eq! ( editable . len (), 1, "{}", saved );
     Ok (( )) }) }
 
-/// s's forks folder shows s2, the subscribee it lost, where it
-/// stood in s's list, not after the subscribees it kept.
+/// s's forks folder shows s2, the forkee it lost, where it
+/// stood in s's list, not after the forkees it kept.
 #[test]
-fn a_removed_subscribee_is_shown_where_it_stood (
+fn a_removed_forkee_is_shown_where_it_stood (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &removed_partners_buffer () ?, &[
     "* (skg node (gnid s)",

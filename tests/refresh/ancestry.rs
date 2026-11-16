@@ -77,21 +77,21 @@ fn a_body_diff_stands_only_under_an_old_text () {
     . collect ();
   assert_eq! ( unsayable, vec! [ false, true ] ); }
 
-/// The deepest rows: the folder of what a subscriber hides in one
-/// subscribee needs that subscribee, the forks folder and the
-/// subscriber above it; the folder of what it hides outside its
-/// subscribees needs the forks folder and the subscriber. Where
-/// the subscriber is a ghost, both are unsayable, though their
+/// The deepest rows: the folder of what a forker hides in one
+/// forkee needs that forkee, the forks folder and the
+/// forker above it; the folder of what it hides outside its
+/// forkees needs the forks folder and the forker. Where
+/// the forker is a ghost, both are unsayable, though their
 /// viewparents are of the right kinds.
 #[test]
-fn the_deep_rows_of_the_hidden_folders_reach_the_subscriber () {
-  let chain = |subscriber : &str| -> ViewForest { parse ( &formatdoc! ("
+fn the_deep_rows_of_the_hidden_folders_reach_the_forker () {
+  let chain = |forker : &str| -> ViewForest { parse ( &formatdoc! ("
     * {} s
     ** (skg forksFolder)
     *** {} e
     **** (skg hiddenInForkPartnerFolder)
     *** (skg hiddenOutsideOfForkPartnersFolder)
-    ", subscriber, occurrence_metadata ("e", "writeProtected") ),
+    ", forker, occurrence_metadata ("e", "writeProtected") ),
     IdResolution::AsWritten ) };
   let folder = |forest : &ViewForest, wanted : Folder| -> NodeId {
     forest . nodes ()
@@ -124,13 +124,13 @@ fn the_deep_rows_of_the_hidden_folders_reach_the_subscriber () {
   { let forest : ViewForest = chain (
       "(skg (vnid ss) ghost (gnid s) (skgRepos (nodeRepo main)))" );
     assert! ( is_unsayable ( &forest, folder (&forest, Folder::HiddenInForkPartner) ),
-              "its viewparent is an occurrence, but its subscriber is a ghost" );
+              "its viewparent is an occurrence, but its forker is a ghost" );
     assert! ( is_unsayable ( &forest, folder (&forest, Folder::HiddenOutsideOfForkPartners) ),
               "its viewparent is a forks folder, but that folder's is a ghost" ); }}
 
 /// An occurrence has no row: wherever it stands it stays an
 /// occurrence, so it keeps standing for its node. Here its viewparents
-/// become tombstones (a hidden-outside folder not in a subscribee
+/// become tombstones (a hidden-outside folder not in a forks
 /// folder, which is unsayable, and an old text, which describes
 /// nothing in a content view); it does not.
 #[test]

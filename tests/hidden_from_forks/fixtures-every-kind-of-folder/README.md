@@ -1,35 +1,35 @@
 # Every Kind of Folder
 
-Tests that both `HiddenOutsideOfSubscribeeFolder` and `HiddenInSubscribeeFolder` collectors appear when needed.
+Tests that both `HiddenOutsideOfForkPartnersFolder` and `HiddenInForkPartnerFolder` collectors appear when needed.
 
-## PITFALL: id "E" <=> title "subscribee"
+## PITFALL: id "E" <=> title "forkee-"
 
 Most nodes have titles equal to their IDs.
-Subscribees don't, though.
-The test function 'add_editable_view_request_to_subscribees'
+Forkees don't, though.
+The test function 'add_editable_view_request_to_forkees'
 needs an easy way to find them,
 so in their titles (which used to match)
-I have replaced "E" with "subscribee-".
+I have replaced "E" with "forkee-".
 
 ## Graph Structure
 
 ```
-R (subscriber)
+R (forker)
 ├── contains: [R1]
 ├── forks: [E1, E2]
 └── hides: [hidden-in-E1, hidden-in-E2, hidden-for-no-reason]
 
-E1 (subscribee)
+E1 (forkee)
 └── contains: [hidden-in-E1, E11]   # hidden first, then non-hidden
 
-E2 (subscribee)
+E2 (forkee)
 └── contains: [E21, hidden-in-E2]   # non-hidden first, then hidden
 
 # The rest of these are leaves: just a title and an ID
 R1 (ordinary child of R)
 hidden-in-E1 (hidden, in E1's content)
 hidden-in-E2 (hidden, in E2's content)
-hidden-for-no-reason (hidden, NOT in any subscribee's content)
+hidden-for-no-reason (hidden, NOT in any forkee's content)
 E11 (not hidden, in E1's content)
 E21 (not hidden, in E2's content)
 ```

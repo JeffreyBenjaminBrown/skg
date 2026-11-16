@@ -4,20 +4,20 @@ use skg::types::misc::{ID, SkgConfig};
 use std::error::Error;
 
 #[test]
-fn one_subscribee_has_contextual_counts_under_two_subscribers (
+fn one_forkee_has_contextual_counts_under_two_forkers (
 ) -> Result<(), Box<dyn Error>> {
   let config : SkgConfig = load_config_with_overrides (
     "tests/forkee_heralds/fixtures/skgconfig.toml",
-    Some ("skg-test-subscribee-heralds"), &[] ) ?;
-  for (subscriber, numerator) in [("A1", 1), ("A2", 2)] {
+    Some ("skg-test-forkee-heralds"), &[] ) ?;
+  for (forker, numerator) in [("A1", 1), ("A2", 2)] {
     let (view, _, _) : (String, Vec<ID>, _) = single_root_view (
-      &config, None, &ID::from (subscriber) ) ?;
+      &config, None, &ID::from (forker) ) ?;
     let b_line : &str = view . lines ()
       . find (|line| line . contains ("(gnid B)"))
-      . expect ("shared subscribee in view");
+      . expect ("shared forkee in view");
     assert! (b_line . contains (&format! (
       "(contains (out 3 (unintegrated {}))", numerator)),
       "{} must report its own U over B's graph-level D: {}",
-      subscriber, view);
+      forker, view);
   }
   Ok (( )) }

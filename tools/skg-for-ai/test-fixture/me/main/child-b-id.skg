@@ -1,5 +1,5 @@
 pid: child-b-id
-title: Second child, a subscriber
+title: Second child, a forker
 forks:
 - fred-note-id
 hides:

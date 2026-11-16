@@ -1,6 +1,6 @@
 ;;; test-skg-save-hides.el --- A save says what it hid -*- lexical-binding: t; -*-
 
-;; The server infers hides from what left a subscriber, so no edit
+;; The server infers hides from what left a forker, so no edit
 ;; shows one. A save's answer names each in '(hides ...)', and the
 ;; client shows them in the echo area, below whatever the save showed
 ;; already ('docs/api-and-formats.org', "Save buffer").

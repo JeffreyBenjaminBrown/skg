@@ -45,7 +45,7 @@ fn a_headline_carries_the_leaves_it_names (
                 "{:?} in:\n{}", line, saved ); }
     Ok (( )) }) }
 
-/// The relationship by which sub no longer subscribes to s1 is one
+/// The relationship by which sub no longer forks s1 is one
 /// leaf. Marked on its image under sub, it shows processed on its image
 /// under s1 too.
 #[test]
@@ -71,9 +71,9 @@ fn a_mark_shows_on_both_images_of_a_relationship (
 
 /// A folder member carries its node's other properties as a content
 /// member does: sub, in s1's forks folder, whose file records
-/// two leaves (its subscription to s1 removed, to s2 added), shows
-/// '(properties changed)' there, for its subscription to s2, which no
-/// headline under it shows; 'rel' is its subscription to s1. One
+/// two leaves (its fork of s1 removed, of s2 added), shows
+/// '(properties changed)' there, for its 'forks' relationship to s2, which no
+/// headline under it shows; 'rel' is its relationship to s1. One
 /// request naming 'node' and 'rel' there marks its file: its image in
 /// s2's forks folder, where the two swap, is processed on both
 /// objects too, and so is each member of its root's forks folder.

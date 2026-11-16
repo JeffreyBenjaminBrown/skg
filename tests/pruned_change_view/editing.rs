@@ -1,7 +1,7 @@
 // Editing a buffer of the diff view like any view: what the
 // user may change, what the save refuses, and what is rerendered. The
-// 'kinds' fixture is described in 'buffer.rs'. The 'overrides'
-// fixture: r overrides n, and p, which contains n, is retitled.
+// 'kinds' fixture is described in 'buffer.rs'. The 'mirrors'
+// fixture: r forks n, and p, which contains n, is retitled.
 
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::metadata_canon::without_viewnode_ids;
@@ -110,7 +110,7 @@ fn a_removed_id_does_not_abort_the_save (
 
 /// Deleting the save-inert images of removed things changes nothing:
 /// k1, removed from ct's content (editable and claiming nothing, deleted
-/// with what it holds), and gone, a deleted subscriber of orph. Both
+/// with what it holds), and gone, a deleted forker of orph. Both
 /// are shown again where they stood.
 #[test]
 fn deleted_images_of_removed_members_respawn (
@@ -210,12 +210,12 @@ fn register_content_view_of (
     &f . graph . load_full (), viewforest_id . clone (), tree, &pids, &SkgrepoRestriction::unrestricted (&f . config) );
   Ok (text) }
 
-/// The diff view shows the graph as stored: a member that an
-/// overrider would replace in an ordinary view is shown as itself.
+/// The diff view shows the graph as stored: a member that a
+/// mirror would stand in place of in an ordinary view is shown as itself.
 #[test]
 fn mirror_substitution_is_off (
 ) -> Result<(), Box<dyn Error>> {
-  with_fixture ("overrides", &["main"], |f| {
+  with_fixture ("mirrors", &["main"], |f| {
     let (ordinary_view, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from ("p") ] ) ?;
     assert! ( ordinary_view . contains ("(inPlaceOf n)"),

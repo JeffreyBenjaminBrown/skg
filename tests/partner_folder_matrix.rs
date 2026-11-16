@@ -724,7 +724,7 @@ async fn omission_scenarios (
     // the owner's public section, stands as a Restricted vognode;
     // omWsub-unseen, recorded in its private section, is omitted from
     // the render, and the restricted save weaves it back into
-    // subscribesTo.
+    // forks.
     let s : &str = "forksFolder/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view_with_skgrepo_set (
@@ -732,7 +732,7 @@ async fn omission_scenarios (
     fails . want_contains (s, &buf, "(gnid omWsub-active)");
     fails . want_contains (s, &buf, "restricted (gnid omWsub-inactive)");
     fails . want_absent (s, &buf, "omWsub-unseen");
-    // Delete the only unrestricted subscribee and save under the
+    // Delete the only unrestricted forkee and save under the
     // restricted set: the Restricted vognode keeps omWsub-inactive, the
     // weave preserves the invisible omWsub-unseen (a restricted save
     // cannot delete what it cannot see), and the deleted unrestricted
@@ -749,17 +749,17 @@ async fn omission_scenarios (
           MSV::Unspecified => Vec::new (), };
         if ! subs . contains (&ID::from ("omWsub-inactive")) {
           fails . record (s, format! (
-            "restricted save dropped the Restricted vognode's subscribee: {:?}",
+            "restricted save dropped the Restricted vognode's forkee: {:?}",
             subs)); }
         if ! subs . contains (&ID::from ("omWsub-unseen")) {
           fails . record (s, format! (
-            "restricted save dropped the invisible subscribee: {:?}",
+            "restricted save dropped the invisible forkee: {:?}",
             subs)); }
         if subs . contains (&ID::from ("omWsub-active")) {
           fails . record (s, format! (
-            "deleted visible subscribee should be gone: {:?}", subs)); } }
+            "deleted visible forkee should be gone: {:?}", subs)); } }
       None => fails . record (s,
-        "deleting the visible subscribee should change the recorder" . into ()), } }
+        "deleting the visible forkee should change the recorder" . into ()), } }
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
@@ -770,12 +770,12 @@ async fn omission_scenarios (
 //////////////////////////////////////////////////////////////
 
 #[test]
-fn a_save_admits_a_second_owned_overrider
+fn a_save_admits_a_second_owned_fork
   () -> Result<(), Box<dyn Error>> {
   run_with_skgrepo_set_test_db (
-    "skg-test-partner-folder-matrix-second-overrider",
+    "skg-test-partner-folder-matrix-second-owned-fork",
     "tests/partner_folder_matrix/fixtures-monogamy/skgconfig.toml",
-    "/tmp/tantivy-test-partner-folder-matrix-second-overrider",
+    "/tmp/tantivy-test-partner-folder-matrix-second-owned-fork",
     |config, tantivy| Box::pin ( async move {
       // mono-r1 already forks mono-target on disk; this save
       // makes mono-r2 fork it too.
@@ -792,12 +792,12 @@ fn a_save_admits_a_second_owned_overrider
       Ok (( )) } )) }
 
 #[test]
-fn buffer_save_refuses_a_self_subscription
+fn buffer_save_refuses_a_self_fork
   () -> Result<(), Box<dyn Error>> {
   run_with_skgrepo_set_test_db (
-    "skg-test-partner-folder-matrix-self-override",
+    "skg-test-partner-folder-matrix-self-fork",
     "tests/partner_folder_matrix/fixtures-monogamy/skgconfig.toml",
-    "/tmp/tantivy-test-partner-folder-matrix-self-override",
+    "/tmp/tantivy-test-partner-folder-matrix-self-fork",
     |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
@@ -810,7 +810,7 @@ fn buffer_save_refuses_a_self_subscription
         save (buffer, config, tantivy, &graph) . await;
       let err : Box<dyn Error> = match result {
         Ok (_)  => panic! (
-          "a save making a note subscribe to itself must be refused"),
+          "a save making a note fork itself must be refused"),
         Err (e) => e, };
       let save_error : &SaveError =
         err . downcast_ref::<SaveError> ()
@@ -829,15 +829,15 @@ fn buffer_save_refuses_a_self_subscription
         graphnode_by_gnid (
           &skg::test_utils::graph_handle_from_config (config)? . load_full (),
           config, &ID::from ("mono-r2") ) ?;
-      let subscriptions_empty : bool = match &r2 . forks {
+      let forks_empty : bool = match &r2 . forks {
         MSV::Unspecified       => true,
         MSV::Specified (gnids)   => gnids . is_empty (), };
-      assert! ( subscriptions_empty,
-        "a refused save must not write mono-r2's subscription: {:?}",
+      assert! ( forks_empty,
+        "a refused save must not write mono-r2's fork: {:?}",
         r2 . forks );
       Ok (( )) } )) }
 
-/// Owned E contains foreign R, which subscribes to (forks) E: the
+/// Owned E contains foreign R, which forks E: the
 /// server starts on this, with a warning ('init_refusal.rs'), but a
 /// save that leaves the pair is refused, naming both notes; a save
 /// that ends it saves.

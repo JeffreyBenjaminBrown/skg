@@ -237,7 +237,7 @@ pub(super) fn parse (
 /// One line per viewnode in buffer order, indented two spaces per
 /// generation below the roots: its kind and what it stands for, then
 /// 'wp' (write-protected), 'noClaim', '⊥' (no warrant), 'ᗣ' (a ghost
-/// warrant), 'folded', and for an overrider '(inPlaceOf N)'.
+/// warrant), 'folded', and for a mirror '(inPlaceOf N)'.
 pub(super) fn outline (
   forest : &ViewForest,
 ) -> String {

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Integration test for the motivating override-chain case (the crux of
-# the override-chains arc): fork a foreign node into a public clone, then
+# Integration test for the motivating chain-of-forks case: fork a
+# foreign node into a public clone, then
 # explicitly fork that clone (the shown substitute) into a private clone.
-# The result is an owned chain D overrides C overrides N; viewing N's
+# The result is an owned chain D forks C forks N; viewing N's
 # container shows the chain end D, marked (inPlaceOf N), and the save
 # accepts the chain-end carrier.
 #
@@ -16,7 +16,7 @@ PROJECT_ROOT="$(cd "$TEST_DIR/../../.." && pwd)"
 
 source "$TEST_DIR/../test-lib.sh"
 
-echo "=== SKG Override-Chain (fork-of-a-fork) Integration Test ==="
+echo "=== SKG Chain-of-Forks (fork-of-a-fork) Integration Test ==="
 echo "Test directory: $TEST_DIR"
 
 cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
@@ -61,8 +61,8 @@ start_skg_server
 
 run_client_test
 
-# Disk verification (step 5): the public clone C overrides the foreign N
-# and names no private id; the private clone D overrides C.
+# Disk verification (step 5): the public clone C forks the foreign N
+# and names no private id; the private clone D forks C.
 echo "Verifying clone .skg files on disk..."
 PUB_CLONE=$(find "$TEST_DIR/data/owned/public" -name '*.skg' ! -name 'P.skg' | head -1)
 PRIV_CLONE=$(find "$TEST_DIR/data/owned/private" -name '*.skg' | head -1)

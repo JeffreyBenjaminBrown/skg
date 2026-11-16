@@ -1,9 +1,9 @@
 // cargo nextest run --test grouped_forks -E 'test(forkee_as_such_extension::)'
 //
-// Extending a subscribee as such, on the R/E/G/H example: R
-// subscribes to and overrides E, R hides H, E contains G and H.
-// Extended with X overriding G, so substitution below the
-// subscribee as such is observable: extending E under the
+// Extending a forkee as such, on the R/E/G/H example: R
+// forks E, R hides H, E contains G and H.
+// Extended with X forking G, so substitution below the
+// forkee as such is observable: extending E under the
 // forksFolder applies R's hides (no H) and the general
 // substitution rule (G is shown as X, marked). The folder member
 // itself (E) is shown raw: folders never substitute.
@@ -22,10 +22,10 @@ fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/forkee_as_such_extension/fixtures";
   run_with_shared_test_stores (
-    "skg-test-subscribee-as-such-extension",
+    "skg-test-forkee-as-such-extension",
     |s| Box::pin ( async move {
-      s . reset ("subscribee_as_such_extension_hides_and_substitutes", fixtures) ?;
-      subscribee_as_such_extension_hides_and_substitutes (
+      s . reset ("forkee_as_such_extension_hides_and_substitutes", fixtures) ?;
+      forkee_as_such_extension_hides_and_substitutes (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("folder_members_never_substitute", fixtures) ?;
       folder_members_never_substitute (
@@ -86,7 +86,7 @@ async fn extend_e_under (
     "the {} copy of E was found and given a request", folder );
   save_and_rerender (&edited, config, tantivy) . await }
 
-async fn subscribee_as_such_extension_hides_and_substitutes (
+async fn forkee_as_such_extension_hides_and_substitutes (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -101,12 +101,12 @@ async fn subscribee_as_such_extension_hides_and_substitutes (
                   *c == "forksFolder"
                   && l . contains ("(inPlaceOf G)")
                   && l . contains ("(gnid X)") ),
-        "the general rule applies below a subscribee-as-such: \
+        "the general rule applies below a forkee-as-such: \
          G is shown as X, marked:\n{}", view );
       assert! ( ! tagged . iter () . any ( |(c, l)|
                   *c == "forksFolder"
                   && l . contains ("(gnid H)") ),
-        "R's hides apply to the subscribee-as-such extension; H \
+        "R's hides apply to the forkee-as-such extension; H \
          appears only under the hiddenInForkPartnerFolder:\n{}", view );
       assert! ( tagged . iter () . any ( |(c, l)|
                   *c == "hiddenInForkPartnerFolder"
@@ -124,8 +124,8 @@ async fn folder_members_never_substitute (
         multi_root_view (
           config, Some (tantivy),
           &[ ID::from ("R") ] ) ?;
-      // R overrides E, yet the folder copy of E is shown raw: the
-      // forksFolder shows the graph fact "R subscribes to E";
+      // R forks E, yet the folder copy of E is shown raw: the
+      // forksFolder shows the graph fact "R forks E";
       // substituting inside it would obscure the fact displayed.
       let e_lines : Vec<&str> =
         view . lines ()

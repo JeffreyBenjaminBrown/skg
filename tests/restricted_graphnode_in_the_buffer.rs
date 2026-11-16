@@ -84,13 +84,13 @@ fn a_relRepo_request_into_a_restricted_skgrepo_is_refused (
     assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
     Ok (( )) } ) }
 
-/// r subscribes to e1 publicly and to e by a record in its private
+/// r forks e1 publicly and e by a record in its private
 /// section; e contains h. Under "public" a hide of h is typed into
-/// the folder of what r hides outside its subscribees. The one
-/// subscription that explains the hide is restricted, so the hide
+/// the folder of what r hides outside its forkees. The one
+/// 'forks' relationship that explains the hide is restricted, so the hide
 /// would land in "private": refused, naming the skgrepo.
 #[test]
-fn a_hide_only_a_restricted_subscription_explains_is_refused (
+fn a_hide_only_a_restricted_fork_explains_is_refused (
 ) -> Result<(), Box<dyn Error>> {
   under_public (
     &[ ("r",  "pid: r\ntitle: r\nforks:\n- e1\nhides:\n- o\n"),

@@ -29,10 +29,10 @@ async fn cleanup_test(
 }
 
 #[test]
-fn test_subscribee_folder_appears_for_subscribers(
+fn test_forks_folder_appears_for_forkers(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let test_name = "skg-test-subscribee-folder";
+    let test_name = "skg-test-forks-folder-by-default";
     let config =
       setup_multi_skgrepo_test (test_name) . await?;
     let (result, _pids, _) : (String, Vec<ID>, _) =
@@ -40,9 +40,9 @@ fn test_subscribee_folder_appears_for_subscribers(
                       )?;
     println!("forks folder test result:\n{}", result);
 
-    // Nodes 11 and 12 subscribe to something, so they get forks folder children.
-    // Each forks folder has Subscribee children showing what the node subscribes to.
-    // Nodes 13 and 14 do not subscribe to anything, so no forks folder.
+    // Nodes 11 and 12 fork something, so they get forks folder children.
+    // Each forks folder has forkee children showing what the node forks.
+    // Nodes 13 and 14 fork nothing, so no forks folder.
     // The 11/12 -> *-sees relationships run from owned "home" nodes to foreign
     // "away" nodes. Their default is the recorder's home: that is writable
     // and deliberately exposes the foreign ID/relationship there. Since
@@ -62,7 +62,7 @@ fn test_subscribee_folder_appears_for_subscribers(
       *** (skg node (gnid 141) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 141
 "};
     assert_metadata_eq!(result, expected,
-      "Nodes with subscriptions should have forks folder children");
+      "Nodes that fork something should have forks folder children");
     cleanup_test(
       test_name,
       &config . tantivy_folder,

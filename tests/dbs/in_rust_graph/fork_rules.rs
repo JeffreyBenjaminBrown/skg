@@ -119,7 +119,7 @@ fn one_owned_fork_is_valid () {
   assert_eq! (
     violations_for (vec![
       node ("target", "owned", &[]),
-      node ("overrider", "owned", &["target"]),
+      node ("forker", "owned", &["target"]),
     ]),
     vec![] ); }
 

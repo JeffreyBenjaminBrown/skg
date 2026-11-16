@@ -4,11 +4,11 @@
 // restriction shows, and records a new hide no more publicly than
 // the records that explain it ('docs/api-and-formats.org',
 // "Restricted-skgrepo nodes"). Deleting a member's line from a
-// subscriber hides the member from its subscriptions when a
-// subscribee contains it; the subscriptions, the subscribees'
-// content and the subscriber's hides are read by their visible
+// forker hides the member from its forks when a
+// forkee contains it; the 'forks' relationships, the forkees'
+// content and the forker's hides are read by their visible
 // records, and the hide's relRepo is at least as private as the
-// subscription and the contains record that explain it. Re-adding a
+// 'forks' relationship and the contains record that explain it. Re-adding a
 // member drops no hide the skgrepo restriction keeps out.
 //
 // Every fixture has the skgrepos "public" and "private", both owned.
@@ -24,7 +24,7 @@ use std::error::Error;
 
 const VIEW : &str = "view";
 
-/// r contains y and subscribes to e, both by public records; e
+/// r contains y and forks e, both by public records; e
 /// contains c publicly and y only privately. Under "public" y's line
 /// under r is deleted: e's content, as the narrowing shows it, is c
 /// alone, so nothing explains a hide of y, and r's files name no
@@ -72,13 +72,13 @@ fn a_hide_lands_no_more_publicly_than_the_contains_record_that_explains_it (
                    "r's private section hides y" );
       Ok (( )) } ) }
 
-/// r2 contains z by a public record, and its one subscription, to e2
+/// r2 contains z by a public record, and its one 'forks' relationship, to e2
 /// (which contains z publicly), is recorded in r2's private section.
-/// Under "public" z's line is deleted: the subscription is out of
+/// Under "public" z's line is deleted: the relationship is out of
 /// sight, so no hide is inferred, and r2's private section is left
 /// as it was.
 #[test]
-fn a_restricted_subscription_explains_no_hide (
+fn a_restricted_fork_explains_no_hide (
 ) -> Result<(), Box<dyn Error>> {
   under_public (
     &[ ("r2", "pid: r2\ntitle: r2\ncontains:\n- z\n"),
@@ -96,7 +96,7 @@ fn a_restricted_subscription_explains_no_hide (
                    Some (private_before), "r2's private section is as it was" );
       Ok (( )) } ) }
 
-/// r subscribes to e publicly and hides h by a record in its private
+/// r forks e publicly and hides h by a record in its private
 /// section; e contains h. Under "public" h is typed as r's content
 /// and saved: r's public file contains h, and the restricted hide
 /// stays.

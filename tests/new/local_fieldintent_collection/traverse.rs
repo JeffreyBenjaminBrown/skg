@@ -89,19 +89,19 @@ fn writeProtected_members_relRepo_requests_reach_their_editable_recorder () {
               Some (vec![(ID::from ("s"), private)]) ); }
 
 #[test]
-fn subscribee_as_such_emits_claim_and_visibility () {
+fn forkee_as_such_emits_claim_and_visibility () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
+      * (skg node (gnid forker) (skgRepos (nodeRepo main))) forker
       ** (skg forksFolder)
       *** (skg node (gnid e) (skgRepos (nodeRepo main))) e
-      Subscribee body
+      Forkee body
       **** (skg node (gnid visible) (skgRepos (nodeRepo main))) visible
       **** (skg node (gnid hidden) (skgRepos (nodeRepo main)) noClaim) hidden
       **** (skg node (gnid leaving) (skgRepos (nodeRepo main)) (editRequest delete)) leaving
       "} );
   { let e : &FieldIntentsForOneId = entry (&collected, "e");
-    // The subscribee-as-such emits no Set* intents, only a text
+    // The forkee-as-such emits no Set* intents, only a text
     // claim.
     assert_eq!( e . title_and_body, None );
     assert_eq!( e . contains, None );
@@ -109,28 +109,28 @@ fn subscribee_as_such_emits_claim_and_visibility () {
       e . text_claims,
       vec![ ForkeeTextClaim {
         title    : "e" . to_string(),
-        body     : Some ("Subscribee body" . to_string()),
+        body     : Some ("Forkee body" . to_string()),
         headline : HeadlineName::of ( None, Some (&ID::from ("e")), "e" ) } ]); }
-  { let subscriber : &FieldIntentsForOneId = entry (&collected, "subscriber");
+  { let forker : &FieldIntentsForOneId = entry (&collected, "forker");
     assert_eq!(
-      subscriber . visibility,
+      forker . visibility,
       vec![ ForkeeVisibility {
         forkee     : ID::from ("e"),
         visible    : vec![ID::from ("visible")] } ]);
-    assert_eq!( subscriber . forks,
+    assert_eq!( forker . forks,
                 Some (vec![(ID::from ("e"), None)]) ); }
-  { // Ordinary editable children of a subscribee-as-such still
+  { // Ordinary editable children of a forkee-as-such still
     // emit their own instructions, but form no one's contains.
     let visible : &FieldIntentsForOneId = entry (&collected, "visible");
     assert!( visible . title_and_body . is_some() ); }}
 
 #[test]
-fn aliasfolder_under_subscribee_as_such_emits_nothing () {
+fn aliasfolder_under_forkee_as_such_emits_nothing () {
   // The trap: a naive implementation
-  // would write the subscribee's aliases.
+  // would write the forkee's aliases.
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
+      * (skg node (gnid forker) (skgRepos (nodeRepo main))) forker
       ** (skg forksFolder)
       *** (skg node (gnid e) (skgRepos (nodeRepo main))) e
       **** (skg aliasFolder) aliases
@@ -239,22 +239,22 @@ fn a_ghost_that_claims_keeps_its_gnid_in_its_parents_list () {
                      . map ( |gnid| (ID::from (*gnid), None) ) . collect () )); }
 
 #[test]
-fn writeProtected_subscribee_as_such_emits_nothing () {
+fn writeProtected_forkee_as_such_emits_nothing () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
+      * (skg node (gnid forker) (skgRepos (nodeRepo main))) forker
       ** (skg forksFolder)
       *** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected) e
       **** (skg node (gnid under) (skgRepos (nodeRepo main)) writeProtected) under
       "} );
   assert!( collected . by_pid . get (&ID::from ("e")) . is_none() );
-  assert_eq!( entry (&collected, "subscriber") . visibility, vec![] ); }
+  assert_eq!( entry (&collected, "forker") . visibility, vec![] ); }
 
 #[test]
-fn editable_subscribee_under_writeProtected_subscriber_claims_without_visibility () {
+fn editable_forkee_under_writeProtected_forker_claims_without_visibility () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg node (gnid subscriber) (skgRepos (nodeRepo main)) writeProtected) subscriber
+      * (skg node (gnid forker) (skgRepos (nodeRepo main)) writeProtected) forker
       ** (skg forksFolder)
       *** (skg node (gnid e) (skgRepos (nodeRepo main))) e
       **** (skg node (gnid visible) (skgRepos (nodeRepo main))) visible
@@ -265,8 +265,8 @@ fn editable_subscribee_under_writeProtected_subscriber_claims_without_visibility
       title    : "e" . to_string(),
       body     : None,
       headline : HeadlineName::of ( None, Some (&ID::from ("e")), "e" ) } ]);
-  assert!( collected . by_pid . get (&ID::from ("subscriber")) . is_none(),
-           "no visibility intent reaches a write-protected subscriber" ); }
+  assert!( collected . by_pid . get (&ID::from ("forker")) . is_none(),
+           "no visibility intent reaches a write-protected forker" ); }
 
 #[test]
 fn present_but_empty_folders_differ_from_absent_folders () {

@@ -1,9 +1,9 @@
--- Integration test for the motivating override-chain case, nvim
+-- Integration test for the motivating chain-of-forks case, nvim
 -- client. The Lua mirror of test-emacs.el in this directory: fork a
 -- foreign N into a public clone C (implicit fork), then run
 -- skg.views.fork_node on the shown substitute C and rotate
--- its clone to a private skgrepo, forming the chain D overrides C
--- overrides N. Viewing N's container then shows the chain end D,
+-- its clone to a private skgrepo, forming the chain D forks C
+-- forks N. Viewing N's container then shows the chain end D,
 -- marked (inPlaceOf N), and the save accepts that chain-end
 -- carrier.
 
@@ -65,7 +65,7 @@ local function reopen_P ()
   return p_buf
 end
 
-print('Starting override-chain integration test...')
+print('Starting chain-of-forks integration test...')
 
 -- 1. Open P (public); its content is the foreign N.
 local p_buf = reopen_P()
@@ -84,7 +84,7 @@ vim.api.nvim_buf_set_lines(p_buf, n_line - 1, n_line, false,
                            { n_line_edited })
 save.request_save_buffer()
 
--- 3. Approve the foreign fork -> public clone C overrides N.
+-- 3. Approve the foreign fork -> public clone C forks N.
 local confirm_buf_1 = T.wait_for_buffer('skg://fork-confirmation', 10)
 T.check(confirm_buf_1, 'no fork-confirmation for N appeared')
 vim.api.nvim_set_current_buf(confirm_buf_1)
@@ -108,7 +108,7 @@ goto_line_containing('(inPlaceOf N)',
 view_requests.fork_node()
 
 -- 6. In the confirmation buffer, rotate the clone-to-be's skgrepo to
---    private, then approve -> private D overrides C.
+--    private, then approve -> private D forks C.
 local confirm_buf_2 = T.wait_for_buffer('skg://fork-confirmation', 10)
 T.check(confirm_buf_2, 'no fork-confirmation for the clone appeared')
 vim.api.nvim_set_current_buf(confirm_buf_2)
@@ -144,4 +144,4 @@ end, 10)
 T.check(saved, 'saving the chain-end view did not complete')
 print('saving the chain-end view succeeded')
 
-T.pass('PASS: Override-chain integration test successful!')
+T.pass('PASS: Chain-of-forks integration test successful!')

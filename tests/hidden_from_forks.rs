@@ -1,8 +1,8 @@
 // cargo nextest run --test grouped_views -E 'test(hidden_from_forks::)'
 //
-// Tests for hiddenOutsideOfForkPartnersFolder, hiddenInForkPartnerFolder, and HiddenFromSubscribees.
+// Tests for hiddenOutsideOfForkPartnersFolder, hiddenInForkPartnerFolder, and the hides relation.
 // These test that:
-// 1. Initial view shows subscribees as write-protected with hiddenOutsideOfForkPartnersFolder
+// 1. Initial view shows forkees as write-protected with hiddenOutsideOfForkPartnersFolder
 // 2. After saving with editable view requests, hiddenInForkPartnerFolder is shown
 
 use skg::skgrepo_sets::SkgrepoRestriction;
@@ -32,21 +32,21 @@ use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
 
-/// Add (viewRequests editableView) to all subscribee nodes in org text.
-/// Modifies the node section of each subscribee to request an editable view.
-/// Subscribees are Occurrence children of forks folders.
+/// Add (viewRequests editableView) to all forkee nodes in org text.
+/// Modifies the node section of each forkee to request an editable view.
+/// Forkees are Occurrence children of forks folders.
 ///
-/// KLUDGE: We identify subscribees by matching on "subscribee-" in the title.
+/// KLUDGE: We identify forkees by matching on "forkee-" in the title.
 /// That's easier than navigating the org-tree's topoogy.
-fn add_editable_view_request_to_subscribees (
+fn add_editable_view_request_to_forkees (
   org_text : &str,
 ) -> String {
   // Process line-by-line, inserting viewRequests after write-protected
-  // for lines containing "subscribee-" in the title
+  // for lines containing "forkee-" in the title
   org_text
     . lines()
     . map(|line| {
-      if line . contains ("subscribee-") && line . contains ("writeProtected") {
+      if line . contains ("forkee-") && line . contains ("writeProtected") {
         // Insert viewRequests right after the `write-protected' atom. In the
         // semantic-herald format `writeProtected' may be followed by `)'
         // (no more atoms) or by `(view ...)'.
@@ -63,7 +63,7 @@ fn add_editable_view_request_to_subscribees (
     . collect::<Vec<_>>()
     . join ("\n") + "\n" }
 
-async fn save_buffer_for_hidden_subscriptions_test (
+async fn save_buffer_for_hidden_from_forks_test (
   buffer      : &str,
 
   config      : &SkgConfig,
@@ -137,7 +137,7 @@ fn insert_before_r1 (
       else { line . to_string () } )
     . collect () }
 
-fn extended_subscribee_edit_view (
+fn extended_forkee_edit_view (
   initial_view : &str,
   edit_kind    : &str,
 ) -> String {
@@ -152,7 +152,7 @@ fn extended_subscribee_edit_view (
       without_e1 ),
     _ => panic! ("unknown edit kind: {}", edit_kind), }}
 
-fn assert_hides_e1_in_subscribee_folder (
+fn assert_hides_e1_under_the_forkee (
   buffer : &str,
 ) {
   assert! (
@@ -164,7 +164,7 @@ fn assert_hides_e1_in_subscribee_folder (
   assert! (
     ! buffer . lines() . any ( |line|
       without_viewnode_ids (line) . starts_with ("**** (skg node (gnid e1)") ),
-    "Expected e1 not to remain visible as subscribee-as-such content:\n{}",
+    "Expected e1 not to remain visible as forkee-as-such content:\n{}",
     buffer ); }
 
 fn assert_does_not_hide_e1 (
@@ -175,7 +175,7 @@ fn assert_does_not_hide_e1 (
     "Expected no hiddenInForkPartnerFolder for e1:\n{}",
     buffer ); }
 
-fn move_h_from_hiddenin_folder_to_visible_subscribee_content (
+fn move_h_from_hiddenin_folder_to_visible_forkee_content (
   buffer : &str,
 ) -> String {
   let mut in_h_subtree : bool = false; // H's containerward chain moves with it
@@ -221,17 +221,17 @@ fn add_e11_to_hiddenoutside_folder (
     "(skg hiddenOutsideOfForkPartnersFolder)",
     "**** (skg node (gnid E11) (skgRepos (nodeRepo main)) writeProtected) E11" ) }
 
-fn assert_e1_removed_from_visible_subscribee_branch (
+fn assert_e1_removed_from_visible_forkee_branch (
   buffer : &str,
 ) {
   assert! (
     ! buffer . lines() . any ( |line|
       without_viewnode_ids (line) . starts_with ("**** (skg node (gnid e1)") ),
-    "Expected e1 not to be regenerated as subscribee-as-such content:\n{}",
+    "Expected e1 not to be regenerated as forkee-as-such content:\n{}",
     buffer );
   assert! (
     without_viewnode_ids (buffer) . contains ("**** (skg node (gnid e2)"),
-    "Expected unrelated subscribee-as-such content e2 to remain visible:\n{}",
+    "Expected unrelated forkee-as-such content e2 to remain visible:\n{}",
     buffer ); }
 
 fn remove_e1_and_e2_subtrees (
@@ -290,83 +290,83 @@ fn node_from_disk (
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   run_with_shared_test_stores (
-    "skg-test-hidden-from-subscriptions",
+    "skg-test-hidden-from-forks",
     |s| Box::pin ( async move {
-      s . reset ("test_deleting_foreign_subscribee_content_preserves_branch_edit",
-        "tests/hidden_from_forks/fixtures-subscribee-edit") ?;
-      test_deleting_foreign_subscribee_content_preserves_branch_edit (
+      s . reset ("test_deleting_foreign_forkee_content_preserves_branch_edit",
+        "tests/hidden_from_forks/fixtures-forkee-edit") ?;
+      test_deleting_foreign_forkee_content_preserves_branch_edit (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_deleting_foreign_subscribee_content_infers_hide",
-        "tests/hidden_from_forks/fixtures-subscribee-edit") ?;
-      test_deleting_foreign_subscribee_content_infers_hide (
+      s . reset ("test_deleting_foreign_forkee_content_infers_hide",
+        "tests/hidden_from_forks/fixtures-forkee-edit") ?;
+      test_deleting_foreign_forkee_content_infers_hide (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_removing_subscribee_content_from_subscriber_contains_infers_hide",
+      s . reset ("test_removing_forkee_content_from_forker_contains_infers_hide",
         "tests/hidden_from_forks/fixtures-clone-edit") ?;
-      test_removing_subscribee_content_from_subscriber_contains_infers_hide (
+      test_removing_forkee_content_from_forker_contains_infers_hide (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_readding_subscribee_content_to_subscriber_contains_unhides",
+      s . reset ("test_readding_forkee_content_to_forker_contains_unhides",
         "tests/hidden_from_forks/fixtures-clone-edit") ?;
-      test_readding_subscribee_content_to_subscriber_contains_unhides (
+      test_readding_forkee_content_to_forker_contains_unhides (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_placing_and_removing_an_overrider_of_subscribee_content_hides_what_it_overrides",
-        "tests/hidden_from_forks/fixtures-overrider-of-subscribee-content") ?;
-      test_placing_and_removing_an_overrider_of_subscribee_content_hides_what_it_overrides (
+      s . reset ("test_placing_and_removing_a_fork_of_forkee_content_hides_what_it_forks",
+        "tests/hidden_from_forks/fixtures-fork-of-forkee-content") ?;
+      test_placing_and_removing_a_fork_of_forkee_content_hides_what_it_forks (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_removing_an_overrider_of_subscribee_content_hides_what_it_overrides",
-        "tests/hidden_from_forks/fixtures-overrider-of-subscribee-content") ?;
-      test_removing_an_overrider_of_subscribee_content_hides_what_it_overrides (
+      s . reset ("test_removing_a_fork_of_forkee_content_hides_what_it_forks",
+        "tests/hidden_from_forks/fixtures-fork-of-forkee-content") ?;
+      test_removing_a_fork_of_forkee_content_hides_what_it_forks (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_a_preview_and_a_save_say_what_they_hide",
-        "tests/hidden_from_forks/fixtures-overrider-of-subscribee-content") ?;
+        "tests/hidden_from_forks/fixtures-fork-of-forkee-content") ?;
       test_a_preview_and_a_save_say_what_they_hide (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_a_save_says_why_a_removal_hides_nothing",
-        "tests/hidden_from_forks/fixtures-overrider-of-subscribee-content") ?;
+        "tests/hidden_from_forks/fixtures-fork-of-forkee-content") ?;
       test_a_save_says_why_a_removal_hides_nothing (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_placing_an_overrider_of_a_hidden_node_keeps_its_hide",
-        "tests/hidden_from_forks/fixtures-overrider-of-subscribee-content") ?;
-      test_placing_an_overrider_of_a_hidden_node_keeps_its_hide (
+      s . reset ("test_placing_a_fork_of_a_hidden_node_keeps_its_hide",
+        "tests/hidden_from_forks/fixtures-fork-of-forkee-content") ?;
+      test_placing_a_fork_of_a_hidden_node_keeps_its_hide (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_replacing_an_overrider_with_its_original_hides_nothing",
-        "tests/hidden_from_forks/fixtures-overrider-of-subscribee-content") ?;
-      test_replacing_an_overrider_with_its_original_hides_nothing (
+      s . reset ("test_replacing_a_fork_with_its_original_hides_nothing",
+        "tests/hidden_from_forks/fixtures-fork-of-forkee-content") ?;
+      test_replacing_a_fork_with_its_original_hides_nothing (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_collateral_view_reflects_newly_hidden_subscribee_content",
-        "tests/hidden_from_forks/fixtures-subscribee-edit") ?;
-      test_collateral_view_reflects_newly_hidden_subscribee_content (
+      s . reset ("test_collateral_view_reflects_newly_hidden_forkee_content",
+        "tests/hidden_from_forks/fixtures-forkee-edit") ?;
+      test_collateral_view_reflects_newly_hidden_forkee_content (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_moving_foreign_subscribee_content_to_subscriber_does_not_hide",
-        "tests/hidden_from_forks/fixtures-subscribee-edit") ?;
-      test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
+      s . reset ("test_moving_foreign_forkee_content_to_forker_does_not_hide",
+        "tests/hidden_from_forks/fixtures-forkee-edit") ?;
+      test_moving_foreign_forkee_content_to_forker_does_not_hide (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_moving_foreign_subscribee_content_elsewhere_still_hides",
-        "tests/hidden_from_forks/fixtures-subscribee-edit") ?;
-      test_moving_foreign_subscribee_content_elsewhere_still_hides (
+      s . reset ("test_moving_foreign_forkee_content_elsewhere_still_hides",
+        "tests/hidden_from_forks/fixtures-forkee-edit") ?;
+      test_moving_foreign_forkee_content_elsewhere_still_hides (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_extra_view_child_under_foreign_subscribee_vanishes",
-        "tests/hidden_from_forks/fixtures-subscribee-edit") ?;
-      test_extra_view_child_under_foreign_subscribee_vanishes (
+      s . reset ("test_extra_view_child_under_foreign_forkee_vanishes",
+        "tests/hidden_from_forks/fixtures-forkee-edit") ?;
+      test_extra_view_child_under_foreign_forkee_vanishes (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_extra_view_child_under_owned_subscribee_vanishes",
-        "tests/hidden_from_forks/fixtures-subscribee-edit") ?;
-      test_extra_view_child_under_owned_subscribee_vanishes (
+      s . reset ("test_extra_view_child_under_owned_forkee_vanishes",
+        "tests/hidden_from_forks/fixtures-forkee-edit") ?;
+      test_extra_view_child_under_owned_forkee_vanishes (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset_from_config ("test_subscribee_and_compound_partner_folders",
+      s . reset_from_config ("test_forkee_and_compound_partner_folders",
         "tests/hidden_from_forks/fixtures-every-kind-of-folder/skgconfig.toml") ?;
-      test_subscribee_and_compound_partner_folders (
+      test_forkee_and_compound_partner_folders (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_hidden_within_but_none_without",
         "tests/hidden_from_forks/fixtures-hidden-within-but-none-without/skgconfig.toml") ?;
       test_hidden_within_but_none_without (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide",
+      s . reset ("test_moving_hidden_forkee_content_to_visible_branch_infers_unhide",
         "tests/hidden_from_forks/fixtures-hidden-within-but-none-without") ?;
-      test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
+      test_moving_hidden_forkee_content_to_visible_branch_infers_unhide (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_collateral_view_reflects_newly_unhidden_subscribee_content",
+      s . reset ("test_collateral_view_reflects_newly_unhidden_forkee_content",
         "tests/hidden_from_forks/fixtures-hidden-within-but-none-without") ?;
-      test_collateral_view_reflects_newly_unhidden_subscribee_content (
+      test_collateral_view_reflects_newly_unhidden_forkee_content (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_deleting_from_hiddenin_folder_does_not_unhide",
         "tests/hidden_from_forks/fixtures-hidden-within-but-none-without") ?;
@@ -386,7 +386,7 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-async fn test_deleting_foreign_subscribee_content_preserves_branch_edit (
+async fn test_deleting_foreign_forkee_content_preserves_branch_edit (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -403,21 +403,21 @@ async fn test_deleting_foreign_subscribee_content_preserves_branch_edit (
           &config, None,
           &ID ("r" . to_string()) )?;
     let extended : String =
-      save_buffer_for_hidden_subscriptions_test (
-        &add_editable_view_request_to_subscribees (&initial_view),
+      save_buffer_for_hidden_from_forks_test (
+        &add_editable_view_request_to_forkees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
-      extended_subscribee_edit_view (&extended, "delete");
+      extended_forkee_edit_view (&extended, "delete");
     let rerendered : String =
-      save_buffer_for_hidden_subscriptions_test (
+      save_buffer_for_hidden_from_forks_test (
         &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
-    assert_e1_removed_from_visible_subscribee_branch (&rerendered);
+    assert_e1_removed_from_visible_forkee_branch (&rerendered);
     Ok (( )) }
 
-async fn test_deleting_foreign_subscribee_content_infers_hide (
+async fn test_deleting_foreign_forkee_content_infers_hide (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -434,12 +434,12 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
           &config, None,
           &ID ("r" . to_string()) )?;
     let extended : String =
-      save_buffer_for_hidden_subscriptions_test (
-        &add_editable_view_request_to_subscribees (&initial_view),
+      save_buffer_for_hidden_from_forks_test (
+        &add_editable_view_request_to_forkees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
-      extended_subscribee_edit_view (&extended, "delete");
+      extended_forkee_edit_view (&extended, "delete");
     let (mut stream, _read_end) : (TcpStream, TcpStream) =
       mk_test_tcp_stream_pair ();
     let response = update_from_and_rerender_buffer (
@@ -447,7 +447,7 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
       &Err (String::new ()), &mut views_state ) . await ?;
     let rerendered : String = response . saved_view;
 
-    assert_hides_e1_in_subscribee_folder (&rerendered);
+    assert_hides_e1_under_the_forkee (&rerendered);
     let r_skg : Graphnode =
       node_from_disk (&config, "r")?;
     assert_eq!(
@@ -458,12 +458,12 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
     Ok (( )) }
 
 /// The contains-removal rule ('docs/forks.org', "Editing the clone:
-/// deletions become hides"): owned f contains [c, x] and subscribes to o,
+/// deletions become hides"): owned f contains [c, x] and forks o,
 /// whose contains include c (but not x). Saving f without its children must
-/// hide c (it would otherwise reappear under f as unintegrated subscribed
-/// content), and must not hide x (no subscribee contains it -- deleting it
+/// hide c (it would otherwise reappear under f as unintegrated forkee
+/// content), and must not hide x (no forkee contains it -- deleting it
 /// is an ordinary contains edit).
-async fn test_removing_subscribee_content_from_subscriber_contains_infers_hide (
+async fn test_removing_forkee_content_from_forker_contains_infers_hide (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -476,7 +476,7 @@ async fn test_removing_subscribee_content_from_subscriber_contains_infers_hide (
     let buffer : &str = indoc! {"
       * (skg node (gnid f) (skgRepos (nodeRepo owned))) f
       "};
-    save_buffer_for_hidden_subscriptions_test (
+    save_buffer_for_hidden_from_forks_test (
       buffer, &config, tantivy, &graph, &mut views_state
     ) . await ?;
     let f_skg : Graphnode =
@@ -487,15 +487,15 @@ async fn test_removing_subscribee_content_from_subscriber_contains_infers_hide (
     assert_eq! (
       members_of ( f_skg . hides . or_default () ),
       vec! [ ID::from ("c") ],
-      "removing c (content of subscribee o) must hide it, and removing x (content of no subscribee) must not: {:?}",
+      "removing c (content of forkee o) must hide it, and removing x (content of no forkee) must not: {:?}",
       f_skg . hides );
     Ok (( )) }
 
 /// The inverse of the contains-removal rule: owned g hides c and
-/// subscribes to o (which contains c). Saving g with c as content
+/// forks o (which contains c). Saving g with c as content
 /// must drop the now-stale hide -- c is integrated, so g should no
 /// longer appear among c's hiders.
-async fn test_readding_subscribee_content_to_subscriber_contains_unhides (
+async fn test_readding_forkee_content_to_forker_contains_unhides (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -509,7 +509,7 @@ async fn test_readding_subscribee_content_to_subscriber_contains_unhides (
       * (skg node (gnid g) (skgRepos (nodeRepo owned))) g
       ** (skg node (gnid c) (skgRepos (nodeRepo foreign)) writeProtected) c
       "};
-    save_buffer_for_hidden_subscriptions_test (
+    save_buffer_for_hidden_from_forks_test (
       buffer, &config, tantivy, &graph, &mut views_state
     ) . await ?;
     let g_skg : Graphnode =
@@ -522,14 +522,14 @@ async fn test_readding_subscribee_content_to_subscriber_contains_unhides (
       g_skg . hides );
     Ok (( )) }
 
-/// Foreign j contains owned m and foreign k; foreign r overrides m,
-/// as one's fork of another's note does, and j's own contains, like
-/// any container's, still names m. Owned f forks j: it subscribes to
-/// and overrides j, and contains nothing. Placing r in f and saving,
+/// Foreign j contains owned m and foreign k; foreign r forks m,
+/// as one's clone of another's note does, and j's own contains, like
+/// any container's, still names m. Owned f forks j and contains
+/// nothing. Placing r in f and saving,
 /// then removing it and saving, is the gesture that dismisses any
 /// other child of j; r stands for m wherever m appears as content,
 /// so it must hide m, the member of j's content r stands for.
-async fn test_placing_and_removing_an_overrider_of_subscribee_content_hides_what_it_overrides (
+async fn test_placing_and_removing_a_fork_of_forkee_content_hides_what_it_forks (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -542,7 +542,7 @@ async fn test_placing_and_removing_an_overrider_of_subscribee_content_hides_what
       * (skg node (gnid f) (skgRepos (nodeRepo owned))) f
       ** (skg node (gnid r) (skgRepos (nodeRepo foreign)) writeProtected) r
       "};
-    save_buffer_for_hidden_subscriptions_test (
+    save_buffer_for_hidden_from_forks_test (
       placed, &config, tantivy, &graph, &mut views_state
     ) . await ?;
     let f_placed : Graphnode = node_from_disk (&config, "f") ?;
@@ -551,7 +551,7 @@ async fn test_placing_and_removing_an_overrider_of_subscribee_content_hides_what
     let removed : &str = indoc! {"
       * (skg node (gnid f) (skgRepos (nodeRepo owned))) f
       "};
-    save_buffer_for_hidden_subscriptions_test (
+    save_buffer_for_hidden_from_forks_test (
       removed, &config, tantivy, &graph, &mut views_state
     ) . await ?;
     let f_skg : Graphnode = node_from_disk (&config, "f") ?;
@@ -560,13 +560,13 @@ async fn test_placing_and_removing_an_overrider_of_subscribee_content_hides_what
     assert_eq! (
       members_of ( f_skg . hides . or_default () ),
       vec! [ ID::from ("m") ],
-      "removing r, which overrides m, a member of j's content, must hide m: {:?}",
+      "removing r, which forks m, a member of j's content, must hide m: {:?}",
       f_skg . hides );
     Ok (( )) }
 
-/// Owned g subscribes to j and contains r, which overrides m, a
+/// Owned g forks j and contains r, which forks m, a
 /// member of j's content. Removing r from g hides m.
-async fn test_removing_an_overrider_of_subscribee_content_hides_what_it_overrides (
+async fn test_removing_a_fork_of_forkee_content_hides_what_it_forks (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -578,7 +578,7 @@ async fn test_removing_an_overrider_of_subscribee_content_hides_what_it_override
     let buffer : &str = indoc! {"
       * (skg node (gnid g) (skgRepos (nodeRepo owned))) g
       "};
-    save_buffer_for_hidden_subscriptions_test (
+    save_buffer_for_hidden_from_forks_test (
       buffer, &config, tantivy, &graph, &mut views_state
     ) . await ?;
     let g_skg : Graphnode = node_from_disk (&config, "g") ?;
@@ -587,7 +587,7 @@ async fn test_removing_an_overrider_of_subscribee_content_hides_what_it_override
     assert_eq! (
       members_of ( g_skg . hides . or_default () ),
       vec! [ ID::from ("m") ],
-      "removing r, which overrides m, must hide m: {:?}",
+      "removing r, which forks m, must hide m: {:?}",
       g_skg . hides );
     Ok (( )) }
 
@@ -607,7 +607,7 @@ async fn save_and_return_hides (
     "the save must succeed: {:?}", response . errors );
   Ok (response . hides) }
 
-/// Owned g subscribes to j and contains r, which overrides m, a
+/// Owned g forks j and contains r, which forks m, a
 /// member of j's content. A preview of the save that removes r says
 /// it hides m, and writes nothing; the save itself says the same.
 /// Then h, which hides m, takes m in, and the save says it stops
@@ -652,12 +652,12 @@ async fn test_a_preview_and_a_save_say_what_they_hide (
       save_and_return_hides (
         placed, config, tantivy, &graph, &mut views_state ) . await ?,
       vec! [ "Stops hiding 'm' from 'h', as content of 'j'." . to_string () ],
-      "placing a hidden member in its subscriber unhides it" );
+      "placing a hidden member in its forker unhides it" );
     Ok (( )) }
 
-/// A child leaving a subscriber that subscribes to something, whose
+/// A child leaving a forker that forks something, whose
 /// departure hides nothing, earns a line naming the rule that held:
-/// y, which j does not contain and which overrides nothing, placed in
+/// y, which j does not contain and which forks nothing, placed in
 /// f and removed; and r, removed from g in the save that puts m, the
 /// member r stands for, in its place.
 async fn test_a_save_says_why_a_removal_hides_nothing (
@@ -695,11 +695,11 @@ async fn test_a_save_says_why_a_removal_hides_nothing (
       vec! [ "Hides nothing: 'r' left 'g', but 'g' still contains 'm', which it stands for." . to_string () ] );
     Ok (( )) }
 
-/// Owned h subscribes to j and hides m. Placing r, which overrides
+/// Owned h forks j and hides m. Placing r, which forks
 /// m, in h keeps the hide of m: containing r does not integrate m
 /// (the unintegrated content compares IDs), so dropping the hide
 /// would bring m back as unintegrated.
-async fn test_placing_an_overrider_of_a_hidden_node_keeps_its_hide (
+async fn test_placing_a_fork_of_a_hidden_node_keeps_its_hide (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -712,7 +712,7 @@ async fn test_placing_an_overrider_of_a_hidden_node_keeps_its_hide (
       * (skg node (gnid h) (skgRepos (nodeRepo owned))) h
       ** (skg node (gnid r) (skgRepos (nodeRepo foreign)) writeProtected) r
       "};
-    save_buffer_for_hidden_subscriptions_test (
+    save_buffer_for_hidden_from_forks_test (
       buffer, &config, tantivy, &graph, &mut views_state
     ) . await ?;
     let h_skg : Graphnode = node_from_disk (&config, "h") ?;
@@ -721,14 +721,14 @@ async fn test_placing_an_overrider_of_a_hidden_node_keeps_its_hide (
     assert_eq! (
       members_of ( h_skg . hides . or_default () ),
       vec! [ ID::from ("m") ],
-      "placing r, which overrides m, must keep h's hide of m: {:?}",
+      "placing r, which forks m, must keep h's hide of m: {:?}",
       h_skg . hides );
     Ok (( )) }
 
-/// Owned g contains r, which overrides m, a member of j's content.
+/// Owned g contains r, which forks m, a member of j's content.
 /// A save that replaces r with m in g hides nothing: g still holds
 /// the member r stood for.
-async fn test_replacing_an_overrider_with_its_original_hides_nothing (
+async fn test_replacing_a_fork_with_its_original_hides_nothing (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -741,7 +741,7 @@ async fn test_replacing_an_overrider_with_its_original_hides_nothing (
       * (skg node (gnid g) (skgRepos (nodeRepo owned))) g
       ** (skg node (gnid m) (skgRepos (nodeRepo owned))) m
       "};
-    save_buffer_for_hidden_subscriptions_test (
+    save_buffer_for_hidden_from_forks_test (
       buffer, &config, tantivy, &graph, &mut views_state
     ) . await ?;
     let g_skg : Graphnode = node_from_disk (&config, "g") ?;
@@ -753,7 +753,7 @@ async fn test_replacing_an_overrider_with_its_original_hides_nothing (
       g_skg . hides );
     Ok (( )) }
 
-async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
+async fn test_collateral_view_reflects_newly_hidden_forkee_content (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -779,7 +779,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
 
     let (extended, collateral_views) =
       save_buffer_and_read_collateral_views (
-        &add_editable_view_request_to_subscribees (&initial_view),
+        &add_editable_view_request_to_forkees (&initial_view),
         &saved_viewforest_id, &config, tantivy, &graph,
         &mut views_state ) . await?;
     assert!(
@@ -797,7 +797,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       &graph . load_full (), collateral_viewforest_id, extended_viewforest, &extended_pids, &SkgrepoRestriction::unrestricted (config));
 
     let edited : String =
-      extended_subscribee_edit_view (&extended, "delete");
+      extended_forkee_edit_view (&extended, "delete");
     let (_saved_view, collateral_views) =
       save_buffer_and_read_collateral_views (
         &edited, &saved_viewforest_id, &config, tantivy, &graph,
@@ -808,7 +808,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       "Expected one collateral view:\n{:?}",
       collateral_views);
     // e1 was hidden, so it appears under the hiddenInForkPartnerFolder.
-    // Its occurrence in the subscribee's content, which claimed
+    // Its occurrence in the forkee's content, which claimed
     // membership there and is no longer warranted, vanishes with its
     // subtree (e11): e1 shows once, hidden, write-protected and folded.
     let collateral : &str = &collateral_views[0];
@@ -819,13 +819,13 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
     assert_eq! ( collateral . lines ()
                    . filter ( |line| line . contains ("(gnid e1)") ) . count (),
                  1,
-      "e1's occurrence in the subscribee's content vanishes:\n{}", collateral );
+      "e1's occurrence in the forkee's content vanishes:\n{}", collateral );
     assert! ( ! collateral . contains ("(gnid e11)"),
       "e11 vanishes with it:\n{}", collateral );
 
     Ok (( )) }
 
-async fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
+async fn test_moving_foreign_forkee_content_to_forker_does_not_hide (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -842,14 +842,14 @@ async fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
           &config, None,
           &ID ("r" . to_string()) )?;
     let extended : String =
-      save_buffer_for_hidden_subscriptions_test (
-        &add_editable_view_request_to_subscribees (&initial_view),
+      save_buffer_for_hidden_from_forks_test (
+        &add_editable_view_request_to_forkees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
-      extended_subscribee_edit_view (&extended, "move_to_r");
+      extended_forkee_edit_view (&extended, "move_to_r");
     let rerendered : String =
-      save_buffer_for_hidden_subscriptions_test (
+      save_buffer_for_hidden_from_forks_test (
         &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
@@ -861,13 +861,13 @@ async fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
       rerendered );
     // Regression ('docs/forks.org', "Unintegrated content: the
     // forksFolder"): e1, now contained by the
-    // subscriber r, must not also re-appear as unintegrated subscribee-as-such
+    // forker r, must not also re-appear as unintegrated forkee-as-such
     // content. Before the contains-subtraction fix it showed twice -- once as
-    // r's integrated content (above) and once under the subscribee-as-such.
-    assert_e1_removed_from_visible_subscribee_branch (&rerendered);
+    // r's integrated content (above) and once under the forkee-as-such.
+    assert_e1_removed_from_visible_forkee_branch (&rerendered);
     Ok (( )) }
 
-async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
+async fn test_moving_foreign_forkee_content_elsewhere_still_hides (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -884,18 +884,18 @@ async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
           &config, None,
           &ID ("r" . to_string()) )?;
     let extended : String =
-      save_buffer_for_hidden_subscriptions_test (
-        &add_editable_view_request_to_subscribees (&initial_view),
+      save_buffer_for_hidden_from_forks_test (
+        &add_editable_view_request_to_forkees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
-      extended_subscribee_edit_view (&extended, "move_to_a");
+      extended_forkee_edit_view (&extended, "move_to_a");
     let rerendered : String =
-      save_buffer_for_hidden_subscriptions_test (
+      save_buffer_for_hidden_from_forks_test (
         &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
-    assert_hides_e1_in_subscribee_folder (&rerendered);
+    assert_hides_e1_under_the_forkee (&rerendered);
     assert! (
       without_viewnode_ids (&rerendered) . contains (
         "** (skg node (gnid e1) (skgRepos (nodeRepo foreign)) writeProtected" ),
@@ -903,7 +903,7 @@ async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
       rerendered );
     Ok (( )) }
 
-async fn test_extra_view_child_under_foreign_subscribee_vanishes (
+async fn test_extra_view_child_under_foreign_forkee_vanishes (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -920,8 +920,8 @@ async fn test_extra_view_child_under_foreign_subscribee_vanishes (
           &config, None,
           &ID ("r" . to_string()) )?;
     let extended : String =
-      save_buffer_for_hidden_subscriptions_test (
-        &add_editable_view_request_to_subscribees (&initial_view),
+      save_buffer_for_hidden_from_forks_test (
+        &add_editable_view_request_to_forkees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
@@ -932,7 +932,7 @@ async fn test_extra_view_child_under_foreign_subscribee_vanishes (
          **** (skg node (gnid a) (skgRepos (nodeRepo owned)) writeProtected) a\n\
          **** (skg node (gnid e1) (skgRepos (nodeRepo foreign)) writeProtected) e1" );
     let rerendered : String =
-      save_buffer_for_hidden_subscriptions_test (
+      save_buffer_for_hidden_from_forks_test (
         &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
@@ -953,7 +953,7 @@ async fn test_extra_view_child_under_foreign_subscribee_vanishes (
 
     Ok (( )) }
 
-async fn test_extra_view_child_under_owned_subscribee_vanishes (
+async fn test_extra_view_child_under_owned_forkee_vanishes (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -969,11 +969,11 @@ async fn test_extra_view_child_under_owned_subscribee_vanishes (
               ** (skg forksFolder)
               *** (skg node (gnid r) (skgRepos (nodeRepo owned))) r
               **** (skg node (gnid r2) (skgRepos (nodeRepo owned)) writeProtected) r2
-              **** (skg node (gnid e) (skgRepos (nodeRepo foreign)) writeProtected) subscribee-e
+              **** (skg node (gnid e) (skgRepos (nodeRepo foreign)) writeProtected) forkee-e
               **** (skg node (gnid r1) (skgRepos (nodeRepo owned)) writeProtected) r1
               "} . to_string();
     let rerendered : String =
-      save_buffer_for_hidden_subscriptions_test (
+      save_buffer_for_hidden_from_forks_test (
         &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
@@ -998,19 +998,19 @@ async fn test_extra_view_child_under_owned_subscribee_vanishes (
     Ok (( )) }
 
 /// Every kind of Folder:
-/// - R subscribes to E1, E2
+/// - R forks E1, E2
 /// - R hides hidden-in-E1, hidden-in-E2, hidden-for-no-reason
 /// - E1 contains hidden-in-E1 (hidden) and E11 (not hidden)
 /// - E2 contains E21 (not hidden) and hidden-in-E2 (hidden)
-/// - hidden-for-no-reason is not in any subscribee's content
+/// - hidden-for-no-reason is not in any forkee's content
 ///
 /// Tests two views:
-/// - Initial view from R: subscribees are write-protected (bare leaves)
-/// - View from R with editable views extended at each subscribee
+/// - Initial view from R: forkees are write-protected (bare leaves)
+/// - View from R with editable views extended at each forkee
 ///
 /// Also tests ordering rule: hiddenInForkPartnerFolder precedes content regardless of .skg order.
 /// E2's .skg has [E21, hidden-in-E2] but view shows hiddenInForkPartnerFolder before E21.
-async fn test_subscribee_and_compound_partner_folders (
+async fn test_forkee_and_compound_partner_folders (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -1025,18 +1025,18 @@ async fn test_subscribee_and_compound_partner_folders (
     let expected_initial = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 3))))) R
        ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-2
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
+       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
        *** (skg hiddenOutsideOfForkPartnersFolder)
        **** (skg folded node (gnid hidden-for-no-reason) (skgRepos (nodeRepo main)) writeProtected (view (rels (hides (in 1 (ancestors 3)))) (birth (hides in 3)))) hidden-for-no-reason
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
     assert_metadata_eq!(initial_view, expected_initial,
-      "Initial view from R: write-protected subscribees are bare leaves; only hiddenOutsideOfForkPartnersFolder shown");
+      "Initial view from R: write-protected forkees are bare leaves; only hiddenOutsideOfForkPartnersFolder shown");
 
     let extended = { // Request editable views, then save
       let modified_view : String =
-        add_editable_view_request_to_subscribees (&initial_view);
+        add_editable_view_request_to_forkees (&initial_view);
       println!("Modified view (with editable requests):\n{}", modified_view);
       let graph : InRustGraphHandle =
         (
@@ -1058,17 +1058,17 @@ async fn test_subscribee_and_compound_partner_folders (
     let expected_extended = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 3))))) R
        ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
        **** (skg hiddenInForkPartnerFolder)
        ***** (skg folded node (gnid hidden-in-E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) hidden-in-E1
-       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (forks (in 1))) cycle)) subscribee-1
+       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (forks (in 1))) cycle)) forkee-1
        **** (skg forksFolder)
        ***** (skg node (gnid R) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1)) (forks (out 2 (ancestors 2))) (hides (out 3))) (birth (forks out 2)) cycle)) R
        **** (skg node (gnid E11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E11
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-2
+       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
        **** (skg hiddenInForkPartnerFolder)
        ***** (skg folded node (gnid hidden-in-E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) hidden-in-E2
-       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (forks (in 1))) cycle)) subscribee-2
+       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (forks (in 1))) cycle)) forkee-2
        **** (skg forksFolder)
        ***** (skg node (gnid R) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1)) (forks (out 2 (ancestors 2))) (hides (out 3))) (birth (forks out 2)) cycle)) R
        **** (skg node (gnid E21) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E21
@@ -1086,13 +1086,13 @@ async fn test_subscribee_and_compound_partner_folders (
     Ok (( )) }
 
 /// Hidden within but none hidden without:
-/// - R subscribes to E1
+/// - R forks E1
 /// - R hides H
 /// - E1 contains [E11, H, E12] where H is hidden and E11, E12 are not
 ///
 /// Tests two views:
 /// - Initial view from R: E1 is write-protected (bare leaf), H doesn't appear
-/// - View from R with editable views extended at each subscribee: H appears in hiddenInForkPartnerFolder before E11 and E12
+/// - View from R with editable views extended at each forkee: H appears in hiddenInForkPartnerFolder before E11 and E12
 ///
 /// No hiddenOutsideOfForkPartnersFolder in either state (H is in E1's content).
 async fn test_hidden_within_but_none_without (
@@ -1108,15 +1108,15 @@ async fn test_hidden_within_but_none_without (
     let expected_initial = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 1)) (hides (out 1))))) R
        ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 3 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 3 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
     assert_metadata_eq!(initial_view, expected_initial,
-      "Initial view from R: write-protected subscribee is bare leaf; H doesn't appear");
+      "Initial view from R: write-protected forkee is bare leaf; H doesn't appear");
 
     let extended = { // request editable views, then save
       let modified_view : String =
-        add_editable_view_request_to_subscribees (&initial_view);
+        add_editable_view_request_to_forkees (&initial_view);
       println!("Modified view (with editable requests):\n{}", modified_view);
       let graph : InRustGraphHandle =
         (
@@ -1141,10 +1141,10 @@ async fn test_hidden_within_but_none_without (
     let expected_extended = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 1)) (hides (out 1))))) R
        ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 3 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 3 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
        **** (skg hiddenInForkPartnerFolder)
        ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) H
-       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 3 (ancestors 1))) (forks (in 1))) cycle)) subscribee-1
+       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 3 (ancestors 1))) (forks (in 1))) cycle)) forkee-1
        **** (skg forksFolder)
        ***** (skg node (gnid R) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1)) (forks (out 1 (ancestors 2))) (hides (out 1))) (birth (forks out 2)) cycle)) R
        **** (skg node (gnid E11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E11
@@ -1156,7 +1156,7 @@ async fn test_hidden_within_but_none_without (
 
     Ok (( )) }
 
-async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
+async fn test_moving_hidden_forkee_content_to_visible_branch_infers_unhide (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -1173,15 +1173,15 @@ async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
           &config, None,
           &ID ("R" . to_string()) )?;
     let extended : String =
-      save_buffer_for_hidden_subscriptions_test (
-        &add_editable_view_request_to_subscribees (&initial_view),
+      save_buffer_for_hidden_from_forks_test (
+        &add_editable_view_request_to_forkees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
-      move_h_from_hiddenin_folder_to_visible_subscribee_content (
+      move_h_from_hiddenin_folder_to_visible_forkee_content (
         &extended );
     let rerendered : String =
-      save_buffer_for_hidden_subscriptions_test (
+      save_buffer_for_hidden_from_forks_test (
         &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
@@ -1192,7 +1192,7 @@ async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
     assert! (
       rerendered . lines() . any ( |line|
         without_viewnode_ids (line) . starts_with ("**** (skg node (gnid H)") ),
-      "Expected H to be visible subscribee-as-such content:\n{}",
+      "Expected H to be visible forkee-as-such content:\n{}",
       rerendered );
     let r_skg : Graphnode =
       node_from_disk (&config, "R")?;
@@ -1205,7 +1205,7 @@ async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
 
     Ok (( )) }
 
-async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
+async fn test_collateral_view_reflects_newly_unhidden_forkee_content (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -1231,7 +1231,7 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
 
     let (extended, collateral_views) =
       save_buffer_and_read_collateral_views (
-        &add_editable_view_request_to_subscribees (&initial_view),
+        &add_editable_view_request_to_forkees (&initial_view),
         &saved_viewforest_id, &config, tantivy, &graph,
         &mut views_state ) . await?;
     assert!(
@@ -1249,7 +1249,7 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
       &graph . load_full (), collateral_viewforest_id, extended_viewforest, &extended_pids, &SkgrepoRestriction::unrestricted (config));
 
     let edited : String =
-      move_h_from_hiddenin_folder_to_visible_subscribee_content (
+      move_h_from_hiddenin_folder_to_visible_forkee_content (
         &extended );
     let (_saved_view, collateral_views) =
       save_buffer_and_read_collateral_views (
@@ -1269,7 +1269,7 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
     assert! (
       collateral_views[0] . lines() . any ( |line|
         without_viewnode_ids (line) . starts_with ("**** (skg node (gnid H)") ),
-      "Expected H to be visible subscribee-as-such content in collateral view:\n{}",
+      "Expected H to be visible forkee-as-such content in collateral view:\n{}",
       collateral_views[0] );
 
     Ok (( )) }
@@ -1291,14 +1291,14 @@ async fn test_deleting_from_hiddenin_folder_does_not_unhide (
           &config, None,
           &ID ("R" . to_string()) )?;
     let extended : String =
-      save_buffer_for_hidden_subscriptions_test (
-        &add_editable_view_request_to_subscribees (&initial_view),
+      save_buffer_for_hidden_from_forks_test (
+        &add_editable_view_request_to_forkees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
       remove_hiddenin_branch (&extended);
     let rerendered : String =
-      save_buffer_for_hidden_subscriptions_test (
+      save_buffer_for_hidden_from_forks_test (
         &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
@@ -1316,17 +1316,17 @@ async fn test_deleting_from_hiddenin_folder_does_not_unhide (
     Ok (( )) }
 
 /// Hidden without but none hidden within:
-/// - R subscribes to E1, E2
+/// - R forks E1, E2
 /// - R hides H
-/// - H is not in any subscribee's content
+/// - H is not in any forkee's content
 /// - E1 contains [E11, E12], E12 contains [E121]
 /// - E2 has no content
 ///
 /// Tests two views:
 /// - Initial view from R: E1, E2 are write-protected (bare leaves), H in hiddenOutsideOfForkPartnersFolder
-/// - View from R with editable views extended at each subscribee: E1 shows E11, E12 (E12 write-protected); E2 extended but empty; H still in hiddenOutsideOfForkPartnersFolder
+/// - View from R with editable views extended at each forkee: E1 shows E11, E12 (E12 write-protected); E2 extended but empty; H still in hiddenOutsideOfForkPartnersFolder
 ///
-/// No hiddenInForkPartnerFolder in either state (H is not in any subscribee's content).
+/// No hiddenInForkPartnerFolder in either state (H is not in any forkee's content).
 async fn test_hidden_without_but_none_within (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1339,17 +1339,17 @@ async fn test_hidden_without_but_none_within (
     let expected_initial = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 1))))) R
        ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-2
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
+       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
        *** (skg hiddenOutsideOfForkPartnersFolder)
        **** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (hides (in 1 (ancestors 3)))) (birth (hides in 3)))) H
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
     assert_metadata_eq!(initial_view, expected_initial,
       "Initial view from R: H in hiddenOutsideOfForkPartnersFolder; E1 and E2 are writeProtected bare leaves");
-    let with_subscribees_extended = {
+    let with_forkees_extended = {
       let modified_view : String =
-        add_editable_view_request_to_subscribees (&initial_view);
+        add_editable_view_request_to_forkees (&initial_view);
       println!("Modified view (with editable requests):\n{}", modified_view);
       let graph : InRustGraphHandle =
         (
@@ -1366,24 +1366,24 @@ async fn test_hidden_without_but_none_within (
         &Err ( String::new () ), &mut views_state ) . await ?;
       response . saved_view };
     println!("View from R after save with editable view requests:\n{}",
-             with_subscribees_extended);
+             with_forkees_extended);
     let expected_extended = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 1))))) R
        ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
        **** (skg forksFolder)
        ***** (skg node (gnid R) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1)) (forks (out 2 (ancestors 2))) (hides (out 1))) (birth (forks out 2)) cycle)) R
        **** (skg node (gnid E11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E11
        **** (skg node (gnid E12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) E12
        ***** (skg node (gnid E121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E121
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-2
+       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
        **** (skg forksFolder)
        ***** (skg node (gnid R) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1)) (forks (out 2 (ancestors 2))) (hides (out 1))) (birth (forks out 2)) cycle)) R
        *** (skg hiddenOutsideOfForkPartnersFolder)
        **** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (hides (in 1 (ancestors 3)))) (birth (hides in 3)))) H
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
-    assert_metadata_eq!(with_subscribees_extended, expected_extended,
+    assert_metadata_eq!(with_forkees_extended, expected_extended,
       "View with extended forkees: H still in hiddenOutsideOfForkPartnersFolder (at end); E1 extended with E11, E12; E2 extended, its content empty; each shows its forks folder, R forking it");
 
     Ok (( )) }
@@ -1420,12 +1420,12 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
       rerendered );
     assert! (
       ! rerendered . contains ("(gnid E11)"),
-      "E11, now hidden inside a collapsed subscribee, vanishes from \
+      "E11, now hidden inside a collapsed forkee, vanishes from \
        where it was typed:\n{}",
       rerendered );
-    let subscriber : Graphnode = node_from_disk (config, "R") ?;
+    let forker : Graphnode = node_from_disk (config, "R") ?;
     assert! (
-      members_of (subscriber . hides . or_default ())
+      members_of (forker . hides . or_default ())
         . contains (&ID::from ("E11")),
       "Expected adding E11 to hiddenOutsideOfForkPartnersFolder to save a hide." );
     assert! (
@@ -1435,40 +1435,40 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
       "Expected the post-skgsave-commit moved-inside warning: {:?}",
       response . warnings );
     let extended : String =
-      save_buffer_for_hidden_subscriptions_test (
-        &add_editable_view_request_to_subscribees (&rerendered),
+      save_buffer_for_hidden_from_forks_test (
+        &add_editable_view_request_to_forkees (&rerendered),
         &config, tantivy, &graph, &mut views_state
       ) . await ?;
     assert! (
       extended . contains ("hiddenInForkPartnerFolder")
       && extended . lines () . any ( |line| line . contains ("(gnid E11)") ),
-      "The hidden child should appear in hiddenHere once its subscribee is \
+      "The hidden child should appear in hiddenHere once its forkee is \
        editable:\n{}", extended );
     let without_h : String = extended . lines ()
       . filter (|line| ! line . contains ("(gnid H)"))
       . collect::<Vec<_>> () . join ("\n") + "\n";
-    let _ : String = save_buffer_for_hidden_subscriptions_test (
+    let _ : String = save_buffer_for_hidden_from_forks_test (
       &without_h, &config, tantivy, &graph, &mut views_state
     ) . await ?;
-    let subscriber_after_removal : Graphnode = node_from_disk (config, "R") ?;
+    let forker_after_removal : Graphnode = node_from_disk (config, "R") ?;
     assert! (
       ! members_of (
-          subscriber_after_removal . hides . or_default ())
+          forker_after_removal . hides . or_default ())
         . contains (&ID::from ("H")),
       "Removing H from hiddenOutsideOfForkPartnersFolder must remove its hide." );
 
     Ok (( )) }
 
 /// Overlapping hidden within:
-/// - R subscribes to E1, E2
+/// - R forks E1, E2
 /// - R hides H
 /// - Both E1 and E2 contain H (and nothing else)
 ///
 /// Tests two views:
 /// - Initial view from R: E1, E2 are write-protected (bare leaves), H doesn't appear
-/// - View from R with editable views extended at each subscribee: H appears in hiddenInForkPartnerFolder under both E1 and E2
+/// - View from R with editable views extended at each forkee: H appears in hiddenInForkPartnerFolder under both E1 and E2
 ///
-/// No hiddenOutsideOfForkPartnersFolder in either state (H is in subscribees' content).
+/// No hiddenOutsideOfForkPartnersFolder in either state (H is in forkees' content).
 async fn test_overlapping_hidden_within (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1481,15 +1481,15 @@ async fn test_overlapping_hidden_within (
     let expected_initial = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 1))))) R
        ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-2
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
+       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
     assert_metadata_eq!(initial_view, expected_initial,
-      "Initial view from R: write-protected subscribees are bare leaves; H doesn't appear");
+      "Initial view from R: write-protected forkees are bare leaves; H doesn't appear");
     let extended = {
       let modified_view : String =
-        add_editable_view_request_to_subscribees (&initial_view);
+        add_editable_view_request_to_forkees (&initial_view);
       println!("Modified view (with editable requests):\n{}",
                modified_view);
       let graph : InRustGraphHandle =
@@ -1510,18 +1510,18 @@ async fn test_overlapping_hidden_within (
     let expected_extended = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 1))))) R
        ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
        **** (skg hiddenInForkPartnerFolder)
        ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) H
-       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))) cycle)) subscribee-1
-       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))))) subscribee-2
+       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))) cycle)) forkee-1
+       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))))) forkee-2
        **** (skg forksFolder)
        ***** (skg node (gnid R) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1)) (forks (out 2 (ancestors 2))) (hides (out 1))) (birth (forks out 2)) cycle)) R
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-2
+       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
        **** (skg hiddenInForkPartnerFolder)
        ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) H
-       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))))) subscribee-1
-       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))) cycle)) subscribee-2
+       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))))) forkee-1
+       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))) cycle)) forkee-2
        **** (skg forksFolder)
        ***** (skg node (gnid R) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1)) (forks (out 2 (ancestors 2))) (hides (out 1))) (birth (forks out 2)) cycle)) R
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1

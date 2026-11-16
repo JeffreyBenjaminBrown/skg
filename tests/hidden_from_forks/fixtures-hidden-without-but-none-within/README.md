@@ -1,11 +1,11 @@
 # Hidden Without But None Within
 
-Tests that `HiddenOutsideOfSubscribeeFolder` appears when a hidden node is NOT in any subscribee's content.
+Tests that `HiddenOutsideOfForkPartnersFolder` appears when a hidden node is NOT in any forkee's content.
 
 ## Graph Structure
 
 ```
-R (subscriber)
+R (forker)
 ├── contains: [R1]
 ├── forks: [E1, E2]
 └── hides: [H]

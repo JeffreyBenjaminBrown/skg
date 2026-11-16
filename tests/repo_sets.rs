@@ -74,8 +74,8 @@ fn all_tests
       s . reset ("tombstones_under_folders_save_without_error", fixtures) ?;
       tombstones_under_folders_save_without_error (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("tombstone_in_subscribee_folder_does_not_contribute_to_forks", fixtures) ?;
-      tombstone_in_subscribee_folder_does_not_contribute_to_forks (
+      s . reset ("tombstone_in_forks_folder_does_not_contribute_to_forks", fixtures) ?;
+      tombstone_in_forks_folder_does_not_contribute_to_forks (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("weave_preserves_omitted_restricted_content_members", fixtures) ?;
       weave_preserves_omitted_restricted_content_members (
@@ -88,25 +88,25 @@ fn all_tests
         &s . config, &mut s . tantivy ) ?;
       Ok (( )) } )) }
 
-/// PIN (the override-substitution-across-switch case,
+/// PIN (the mirror-substitution-across-switch case,
 /// 'docs/api-and-formats.org', "Restricted-skgrepo nodes: omission,
-/// retention, and save preservation"): a shown override substitute whose
+/// retention, and save preservation"): a mirror shown in another's place whose
 /// skgrepo goes restricted on a skgrepo-set switch vanishes with its
 /// subtree; the rerender shows the original directly (a restricted
-/// overrider does not substitute) with no leak of the overrider's
+/// mirror does not substitute) with no leak of the mirror's
 /// title or id; and the container's contains still saves to the
-/// original, never to the overrider.
+/// original, never to the mirror.
 ///
 /// Fixtures: public 'ovr-sub-container' -> 'ovr-sub-original' (N);
-/// private 'ovr-sub-overrider' (R) overrides ovr-sub-original and
+/// private 'ovr-sub-mirror' (R) forks ovr-sub-original and
 /// contains the public 'ovr-sub-child' (D). Under "private" (no restriction) R substitutes
 /// for N; switching to "public" makes R restricted.
 ///
-/// Installs the explicit graph handle (override resolution reads
+/// Installs the explicit graph handle (mirror substitution reads
 /// it), so it assumes per-test process isolation (nextest), like
 /// tests/mirror_substitution.rs.
 #[test]
-fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
+fn mirror_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
 ) -> Result<(), Box<dyn Error>> {
   run_with_skgrepo_set_test_db (
     "skg-test-ovr-sub-switch",
@@ -124,11 +124,11 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
           &[ ID::from ("ovr-sub-container") ] ) ?;
       assert! (
         view_all . contains ("(inPlaceOf ovr-sub-original)"),
-        "unrestricted the overrider should substitute for N:\n{}",
+        "unrestricted the mirror should substitute for N:\n{}",
         view_all );
       assert! (
-        view_all . contains ("private overrider title must not leak"),
-        "unrestricted the unrestricted overrider is shown:\n{}", view_all );
+        view_all . contains ("private mirror title must not leak"),
+        "unrestricted the unrestricted mirror is shown:\n{}", view_all );
 
       // 2. Switch to "public": R goes restricted; the view re-renders.
       let graph : skg::dbs::in_rust_graph::InRustGraphHandle =
@@ -169,24 +169,24 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
           . expect ("the switched view should still be registered");
         viewforest_to_string (forest) ? };
       assert! ( ! view_public . contains ("tombstone"),
-        "the overrider vanishes, leaving no tombstone:\n{}",
+        "the mirror vanishes, leaving no tombstone:\n{}",
         view_public );
       assert! ( view_public . contains ("ovr-sub-original"),
         "the original N should be shown directly:\n{}", view_public );
       assert! (
-        ! view_public . contains ("private overrider title must not leak"),
-        "the restricted overrider's title must not leak:\n{}", view_public );
-      assert! ( ! view_public . contains ("ovr-sub-overrider"),
-        "the restricted overrider's id must not leak:\n{}", view_public );
+        ! view_public . contains ("private mirror title must not leak"),
+        "the restricted mirror's title must not leak:\n{}", view_public );
+      assert! ( ! view_public . contains ("ovr-sub-mirror"),
+        "the restricted mirror's id must not leak:\n{}", view_public );
       assert! ( ! view_public . contains ("inPlaceOf"),
-        "nothing carries an override marker:\n{}",
+        "nothing carries an inPlaceOf part:\n{}",
         view_public );
       assert! ( ! view_public . contains ("ovr-sub-child"),
-        "the overrider's descendant vanishes with it:\n{}",
+        "the mirror's descendant vanishes with it:\n{}",
         view_public );
 
       // 4. Saving the switched view keeps N in the container's
-      //    contains, and the restricted overrider writes nothing.
+      //    contains, and the restricted mirror writes nothing.
       let public : SkgrepoRestriction =
         SkgrepoRestriction::named (config, SkgrepoName::from ("public")) ?;
       let plan = buffer_to_validated_saveplan (
@@ -201,8 +201,8 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
           "the container keeps the original in contains, not R" ); }
       assert! (
         ! save_gnids (&plan . node_instructions)
-          . contains (&ID::from ("ovr-sub-overrider")),
-        "the restricted overrider produces no SaveNode" );
+          . contains (&ID::from ("ovr-sub-mirror")),
+        "the restricted mirror produces no SaveNode" );
       Ok (( )) } )) }
 
 fn save_gnids (
@@ -816,14 +816,14 @@ async fn tombstones_under_folders_save_without_error (
         result . err () . map ( |e| format! ("{:?}", e)) );
       Ok (( )) }
 
-async fn tombstone_in_subscribee_folder_does_not_contribute_to_forks (
+async fn tombstone_in_forks_folder_does_not_contribute_to_forks (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // A tombstone emits no forks membership, just as it emits
   // no contains relationship_axes: 'forks' is
   // order-meaningful, but the disk merge (weave) owns invisible
-  // subscribees, so a tombstone where one stood must not feed the
+  // forkees, so a tombstone where one stood must not feed the
   // recorder's forksFolder. (root has no forks on disk, so the
   // unrestricted member is the only one written.)
       let buffer = indoc! {"
@@ -844,7 +844,7 @@ async fn tombstone_in_subscribee_folder_does_not_contribute_to_forks (
           saved_node_by_gnid (&instructions, "root")
             . forks . or_default () ),
         vec! [ ID::from ("active-b") ],
-        "the tombstone must not be a subscribee member" );
+        "the tombstone must not be a forkee member" );
       Ok (( )) }
 
 async fn weave_preserves_omitted_restricted_content_members (

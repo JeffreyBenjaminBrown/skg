@@ -3,7 +3,7 @@
 // which stands where the first stood and has a fresh vnid. It is
 // folded only if every sibling was, and so is its body; it is focused,
 // editable and claiming if any sibling was, but not editable when it
-// shows an overrider whose editable occurrence is elsewhere; it carries
+// shows a mirror whose editable occurrence is elsewhere; it carries
 // the union of their view requests, and the edit request and the
 // relationship request of whichever carried one; it holds every
 // sibling's children in sibling order, each marked 'noClaim' unless the
@@ -211,10 +211,10 @@ fn the_merged_siblings_relationship_request_is_carried () {
   assert_eq! ( occurrence . relationshipEditRequest,
                Some ( RelationshipEditRequest::RelRepo ( SkgrepoName::from ("private") )) ); }
 
-/// p contains n, which o overrides. Under p, o stands for n
+/// p contains n, which o forks. Under p, o stands for n
 /// ('inPlaceOf'), write-protected, and beside it n itself is
 /// editable: the two stand for one gnid, so they merge into o's place.
-fn an_overrider_beside_its_editable_original (
+fn a_mirror_beside_its_editable_original (
   first_roots : &str,
 ) -> String {
   formatdoc! ("
@@ -225,7 +225,7 @@ fn an_overrider_beside_its_editable_original (
        occurrence_metadata ("o", "writeProtected (inPlaceOf n)"),
        occurrence_metadata ("n", "noClaim") ) }
 
-fn overridden () -> InRustGraph {
+fn forked () -> InRustGraph {
   graph (&[
     Graphnode { contains : ids (&["n"]), .. node ("p") },
     node ("n"),
@@ -234,20 +234,20 @@ fn overridden () -> InRustGraph {
 #[test]
 fn the_result_takes_the_merged_siblings_editability () {
   let run : Run = run_asserting_fixpoint (
-    &an_overrider_beside_its_editable_original (""), &overridden ());
+    &a_mirror_beside_its_editable_original (""), &forked ());
   assert_eq! ( run . outline (), "\
 node p
   node o (inPlaceOf n)" ); }
 
 #[test]
 fn the_result_stays_write_protected_when_its_node_is_editable_elsewhere () {
-  // The overrider exception: the result shows o, and o's editable
+  // The mirror exception: the result shows o, and o's editable
   // occurrence is the first root, so the result does not take n's
   // editability.
   let run : Run = run_asserting_fixpoint (
-    &an_overrider_beside_its_editable_original (
+    &a_mirror_beside_its_editable_original (
       &format! ("* {} o\n", occurrence_metadata ("o", ""))),
-    &overridden ());
+    &forked ());
   assert_eq! ( run . outline (), "\
 node o
 node p

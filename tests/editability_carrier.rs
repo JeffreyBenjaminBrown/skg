@@ -7,7 +7,7 @@
 // save's collateral rerender draws such a member.
 //
 // The fixture, written by the test, one skgrepo "main": p contains a;
-// s subscribes to e.
+// s forks e.
 
 use crate::git_fixture::{
   OwnedSkgrepos, open_content_view, save_cleanly, with_git_fixture,
@@ -20,7 +20,7 @@ use skg::types::views_state::ViewforestId;
 
 use std::error::Error;
 
-/// p contains a; s subscribes to e.
+/// p contains a; s forks e.
 fn write_fixture (
   dir : &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
@@ -35,7 +35,7 @@ fn write_fixture (
 /// carrying the editable-view request, so s is editable and shows its
 /// forks folder, as a fresh view's members do.
 #[test]
-fn a_member_a_save_draws_shows_its_default_subscribee_folder (
+fn a_member_a_save_draws_shows_its_default_forks_folder (
 ) -> Result<(), Box<dyn Error>> {
   let case : tempfile::TempDir = tempfile::TempDir::new () ?;
   write_fixture (case . path ()) ?;
