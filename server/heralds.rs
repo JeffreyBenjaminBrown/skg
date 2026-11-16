@@ -482,8 +482,9 @@ pub fn herald_rule_table () -> HeraldRule {
       leaf (Folder::Forks . repr_in_client (),
             "It forks these, or these fork it.") ],
       // Under a member as such, what it contains that the user keeps
-      // elsewhere (in an owned note, or in the note whose forks folder
-      // holds the member): names no ancestor.
+      // elsewhere (in an owned note but the member, the note whose
+      // forks folder holds the member among them when owned): names
+      // no ancestor.
       write_protected_leaves (Folder::IntegratedElsewhere . repr_in_client (),
             "It contains these, and you keep them elsewhere."),
       write_protected_leaves (Folder::Hidden . repr_in_client (),

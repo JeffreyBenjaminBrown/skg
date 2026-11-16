@@ -606,11 +606,11 @@ pub enum Folder {
   Hidden,
   /// Child of a member as such of a forks folder (a forkee or forker
   /// as such). Collects the member's content that the user keeps
-  /// elsewhere: what an owned note but the member, or the note whose
-  /// forks folder holds it, contains, less what that note hides
-  /// ('docs/glossary.org', "integrated"). Write-protected (the user
-  /// keeps these in the notes that contain them). Stands first among
-  /// the member's folders.
+  /// elsewhere: what an owned note but the member contains (the note
+  /// whose forks folder holds the member among them, when owned), less
+  /// what that note hides ('docs/glossary.org', "integrated").
+  /// Write-protected (the user keeps these in the notes that contain
+  /// them). Stands first among the member's folders.
   IntegratedElsewhere,
   HiddenInForkPartner, // Child of a member as such of a forks folder (a forkee or forker as such). Collects children of the member that the note whose forks folder holds it hides. Write-protected (but these relationships are editable by modifying the listed contents of the member as such).
   HiddenByForker, // Child of a forker as such. Collects what the forker hides of the content of the note whose forks folder holds it. Write-protected (the forker's hides are its owner's, edited in its own view).

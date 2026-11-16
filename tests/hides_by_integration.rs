@@ -33,13 +33,17 @@
 // - d, kept by M alone and so drawing no containers folder, kept in y
 //   too and then removed from M: the saved view names y, as a fresh
 //   view does.
+// One reads a view of x, foreign, instead: what x contains of M's
+// content is x's own, so M draws it neither as content nor in its
+// folder of what the user keeps elsewhere.
 
 use std::error::Error;
 use std::collections::BTreeMap;
 
 use crate::view_and_save_helpers::{
-  content_of, depth, ids, line_of, node, save, save_cleanly, skg_files, under,
-  view_of, with_line_after_subtree_of, without_subtree_of};
+  content_of, depth, first_forks_folders_members, ids, line_of, node, save,
+  save_cleanly, skg_files, under, view_of, with_line_after_subtree_of,
+  without_subtree_of};
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::skgrepo_sets::SkgrepoRestriction;
@@ -84,6 +88,8 @@ fn all_tests
       a_move_from_an_indirect_member_into_an_owned_note_hides_nothing (&s . config, &mut s . tantivy) . await ?;
       s . reset ("a_member_standing_in_the_folder_names_its_new_keeper", FIXTURES) ?;
       a_member_standing_in_the_folder_names_its_new_keeper (&s . config, &mut s . tantivy) . await ?;
+      s . reset ("under_a_foreign_note_what_it_contains_is_not_kept_by_the_user", FIXTURES) ?;
+      under_a_foreign_note_what_it_contains_is_not_kept_by_the_user (&s . config, &mut s . tantivy) . await ?;
       Ok (( )) } )) }
 
 //
@@ -472,4 +478,27 @@ async fn a_member_standing_in_the_folder_names_its_new_keeper (
                "d's containers folder names y:\n{}", saved );
   assert_eq! ( saved, view_of (config, tantivy, "M") ?,
                "the saved view is a fresh one" );
+  Ok (( )) }
+
+/// A view of x, foreign: M, a forker-only member of its forks folder,
+/// contains d, which x contains too. That is x's own content, not
+/// something the user keeps elsewhere: M draws only z, and no folder
+/// of what the user keeps elsewhere. G and F, whose f2 and g2 y keeps,
+/// still draw theirs. Saved unchanged, the view writes nothing.
+async fn under_a_foreign_note_what_it_contains_is_not_kept_by_the_user (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let view : String = view_of (config, tantivy, "x") ?;
+  assert_eq! ( first_forks_folders_members (&view), vec! ["M", "G", "F"], "{}", view );
+  assert_eq! ( content_gnids_of (&view, "M"), vec! ["z"], "{}", view );
+  assert! ( members_of_folder_under (&view, "M", "integratedElsewhereFolder") . is_empty (),
+            "{}", view );
+  assert! ( line_of (&view, "M") . contains ("(unintegrated 1)"),
+            "M counts z alone:\n{}", view );
+  assert_eq! ( members_of_folder_under (&view, "G", "integratedElsewhereFolder"),
+               vec! ["g2"], "{}", view );
+  assert_eq! ( members_of_folder_under (&view, "F", "integratedElsewhereFolder"),
+               vec! ["f2"], "{}", view );
+  is_a_fixpoint (&view, "x", config, tantivy) . await ?;
   Ok (( )) }

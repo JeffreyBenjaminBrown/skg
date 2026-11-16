@@ -443,10 +443,13 @@ pub(crate) fn owned_notes_containing (
 /// What 'member', a member as such of the forks folder of 'note',
 /// contains that the user keeps elsewhere: the goal of its folder
 /// 'Folder::IntegratedElsewhere'. Its content by the records the
-/// skgrepo restriction shows that 'note' contains, or that an owned
-/// note but 'member' contains ('owned_notes_containing'), less what
-/// 'note' hides (which stands in the member's folder of what the note
-/// hides in it instead), in the member's list's order.
+/// skgrepo restriction shows that an owned note but 'member' contains
+/// ('owned_notes_containing': 'note' among them when the user owns
+/// it), less what 'note' hides (which stands in the member's folder of
+/// what the note hides in it instead), in the member's list's order.
+/// What a foreign 'note' contains is its own content, kept by its
+/// owner, not the user: the member shows it neither among its content
+/// nor here.
 pub(crate) fn integrated_elsewhere (
   member : &ID,
   note   : &ID,
@@ -462,16 +465,11 @@ pub(crate) fn integrated_elsewhere (
     &graph . outbound_gnids_for_relation_gated (
       note, NodeRelation::Hides, restriction ),
     graph ) . into_iter () . collect ();
-  let contained_by_the_note : HashSet<ID> = resolve_all (
-    &graph . outbound_gnids_for_relation_gated (
-      note, NodeRelation::Contains, restriction ),
-    graph ) . into_iter () . collect ();
   contents . into_iter ()
     . filter ( |gnid| ! hidden . contains (gnid) )
-    . filter ( |gnid| contained_by_the_note . contains (gnid)
-                      || ! owned_notes_containing (
-                             graph, walk . truth . config, restriction, gnid,
-                             from_ref (member), None ) . is_empty () )
+    . filter ( |gnid| ! owned_notes_containing (
+                          graph, walk . truth . config, restriction, gnid,
+                          from_ref (member), None ) . is_empty () )
     . collect () }
 
 /// When the occurrence at 'treeid' is a member as such of a forks

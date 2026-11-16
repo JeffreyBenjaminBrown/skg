@@ -272,13 +272,16 @@ to what it forks, not to your note.
 *** What you keep elsewhere
 
 A child of a member as such is integrated when you keep it somewhere:
-when your note (whose forks folder shows the member) contains it, or
-when any note of your graph does, your graph being the notes of your
-owned skgrepos, as the skgrepo restriction shows them, the member
-itself excepted ('docs/glossary.org', "integrated"). A member shows
-only what is not integrated and your note does not hide. So moving
-someone's child into a note of yours, or under one, needs no hide:
-skg sees that you keep it.
+when any note of your graph contains it, your graph being the notes
+of your owned skgrepos, as the skgrepo restriction shows them, the
+member itself excepted ('docs/glossary.org', "integrated"). The note
+whose forks folder shows the member is one of them when it is yours.
+A member shows only what is not integrated and that note neither
+contains nor hides. So moving someone's child into a note of yours,
+or under one, needs no hide: skg sees that you keep it. In a view of
+someone else's note, what that note contains is its owner's, not
+something you keep: a member shows it neither among its content nor
+in the folder below.
 
 What the member contains that you keep elsewhere stands in its folder
 =integratedElsewhereFolder= ("☮ It contains these, and you keep them
