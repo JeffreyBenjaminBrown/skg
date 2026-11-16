@@ -211,7 +211,12 @@ of what the forker, the viewparent, hides of the note's content reads
 note is the grandparent: =b hides these, but no fork partner shown
 contains them.= (b's hides that no member of the forks folder,
 forkee, forker or indirect member, contains.) The hider and hidden folders read =☮ These hide
-it from their forks.= and =☮ It hides these from its forks.=
+it from their forks.= and =☮ It hides these from its forks.= The
+folder of what a member as such contains that the user keeps
+elsewhere, first under the member, names no ancestor: =☮ It contains
+these, and you keep them elsewhere.= (its members are born of the
+member's contains, =(contains in 2)=; 'docs/forks.org', "What you
+keep elsewhere").
 
 The bare atom =noClaim= (a child that does not affect its parent's
 membership on save) has no glyph of its own. Under an editable parent

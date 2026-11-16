@@ -164,10 +164,12 @@ each claiming nothing (deleting one hides it, attaching it makes =C=
 fork it: [[file:./sharing-model.org][sharing-model.org]], "The
 forks folder"; see "Every mirror, flat", below). A forkee's content is exactly
 what you have *not* yet integrated: a forkee as such shows only the
-children its forker (=C=) neither hides nor already contains. A fresh
-clone has ~C.contains == N.contains~, so this starts *empty* — every
-child you copied is excluded as already-contained. As the original gains
-new children you have not pulled in, they appear here.
+children its forker (=C=) neither hides nor already contains, and that
+no other note of yours contains (see "What you keep elsewhere",
+below). A fresh clone has ~C.contains == N.contains~, so it starts
+showing no content: every child you copied stands, folded, in its
+folder of what you keep elsewhere. As the original gains new children
+you have not pulled in, they appear among its content.
 
 *** An example
 
@@ -194,7 +196,9 @@ instead, marked as standing in for the original:
 ,*** eggy mysticism      «Kĥ» (shown in place of Egg Man's "mystical")
 ,**** Which came first, the chicken or the egg?
 ,*** forksFolder
-,**** mystical           (the forkee as such; empty so far)
+,**** mystical           (the forkee as such; no content so far)
+,***** ☮ It contains these, and you keep them elsewhere.
+,****** Which came first, the chicken or the egg?   (folded)
 #+end_example
 
 When Egg Man later extends =mystical=:
@@ -215,15 +219,18 @@ forkee as such:
 ,**** Which came first, the chicken or the egg?
 ,*** forksFolder
 ,**** mystical
+,***** ☮ It contains these, and you keep them elsewhere.
+,****** Which came first, the chicken or the egg?   (folded)
 ,***** Egg limpia (curanderismo)     (unintegrated)
 ,***** The philosophical egg         (unintegrated)
 #+end_example
 
 Since [[file:./tree-folding-is-powerful.org][branches can be folded]], even
 hundreds of new originals' children need not clutter your view. To
-integrate one, move it into your clone's own content; it then drops out
-of the forkee as such (it is now contained). You can also hide
-individual children.
+integrate one, move it into your clone's own content, or into any
+other note of yours; it then leaves the forkee's content for its
+folder of what you keep elsewhere. You can also hide individual
+children.
 
 *** Every mirror, flat
 
@@ -257,6 +264,70 @@ alike: a hide of something only an indirect member contains stands
 under that member, in its folder of what your note hides in it. Its
 own hides of your note's content are not drawn under it: they apply
 to what it forks, not to your note.
+
+*** What you keep elsewhere
+
+A child of a member as such is integrated when you keep it somewhere:
+when your note (whose forks folder shows the member) contains it, or
+when any note of your graph does, your graph being the notes of your
+owned skgrepos, as the skgrepo restriction shows them, the member
+itself excepted ('docs/glossary.org', "integrated"). A member shows
+only what is not integrated and your note does not hide. So moving
+someone's child into a note of yours, or under one, needs no hide:
+skg sees that you keep it.
+
+What the member contains that you keep elsewhere stands in its folder
+=integratedElsewhereFolder= ("☮ It contains these, and you keep them
+elsewhere."), first among the member's folders, before the folder of
+what your note hides in it, drawn when it holds something, under an
+editable member. It is write-protected, its members are folded, in
+the member's list's order, and each carries a containers folder,
+folded, naming where you keep it (its containers, but those the view
+already shows above it). A child your note hides stands in the hidden
+folder only, even when you keep it too: the hide is the explicit
+record, and that folder is where moving it out removes it. A hide
+that keeping makes redundant stays, harmless; moved out of the hidden
+folder, the child is unhidden, and stands then in the folder of what
+you keep elsewhere. No save removes such a hide by itself.
+
+Before, with your =x= forking someone's =x=, which contains =a=, =b=
+and =c=, and your =y= containing =a=:
+
+#+begin_example
+,* x                    (yours, editable)
+,** forksFolder
+,*** x                  (theirs, bK)
+,**** ☮ It contains these, and you keep them elsewhere.
+,***** a                (folded)
+,****** ☮ These also contain it.
+,******* y              (yours)
+,**** b                 -- cut this, and paste it under your z
+,**** c                 -- cut this alone
+#+end_example
+
+After the save, your =z= contains =b=, your =x= hides =c= alone, and
+=b= joins =a= in the folder of what you keep elsewhere. Remove =a=
+from your =y=, and =a= shows under their =x= again, with no hide.
+Under a skgrepo restriction that keeps out where you keep a child
+(your =y= in a private skgrepo, the view showing only the public
+one), the child is not integrated there, and shows among the member's
+content.
+
+The save hides a child cut from a member, or removed from your note
+while a member contains it, only where no note of yours but that
+member contains it after the save: a note the save writes, by its
+contents as the save leaves them, any other as the graph has them.
+Removing a child from your note that another note of yours keeps
+hides nothing, and the save says so ("Hides nothing: 'd' left 'x',
+but 'z' keeps it."). A cut from a member claiming nothing still makes
+your note fork it (see "Cutting from a forker"), whether or not it
+hides anything ('tests/hides_by_integration.rs').
+
+The diff view keeps its forks folders as they were: a member there
+shows what you keep elsewhere among its content, and no such folder
+is drawn. A buffer drawn before this rule shows such children under a
+member, claiming; the next refresh leaves them out, and a save of it
+before then hides nothing it did not draw.
 
 *** Writing in an unintegrated child integrates it
 
@@ -315,8 +386,9 @@ indirect member (see "Every mirror, flat"). Cutting a child
 from it (deleting the child's headline there, whether or not you
 paste it elsewhere) makes your note fork it: a forker as such that a
 cut is made from becomes a forkee too. Your note hides
-the child unless it contains it after the save, as a cut from a
-forkee does. Before:
+the child unless it, or another note of yours, contains it after the
+save, as a cut from a forkee does (see "What you keep elsewhere").
+Before:
 
 #+begin_example
 ,* x                    (yours, editable)
@@ -355,8 +427,10 @@ X2. Each view shows the others, through its flat forks folder:
 ,* R                    (editable)
 ,** forksFolder
 ,*** N                  (2bK: R and T fork it; editable)
+,**** integratedElsewhereFolder     (X1, X2, X3, folded: R keeps them)
 ,**** X4                -- what N adds to R
 ,*** T                  (no b: an indirect member, editable)
+,**** integratedElsewhereFolder     (X1, X3, folded: R keeps them)
 ,**** Y
 ,**** Z
 ,** X1
@@ -366,14 +440,18 @@ X2. Each view shows the others, through its flat forks folder:
 
 N shows only X4, what R neither contains nor hides; T, which R does
 not fork and which does not fork R, stands there too, an indirect
-member, showing Y and Z, what R neither contains nor hides. In N's
-own view R and T are forkers as such:
+member, showing Y and Z, what R neither contains nor hides. What each
+contains that R keeps stands in its folder of what you keep elsewhere
+(see "What you keep elsewhere"). In N's own view R and T are forkers
+as such:
 
 #+begin_example
 ,* N                    (editable)
 ,** forksFolder
 ,*** R                  (Kb: editable, showing nothing of its own)
+,**** integratedElsewhereFolder     (X1, X2, X3, folded: N keeps them)
 ,*** T                  (Kb: editable)
+,**** integratedElsewhereFolder     (X1, X3, folded: N keeps them)
 ,**** hiddenInForkPartnerFolder     (Z, folded: N hides it)
 ,**** hiddenByForkerFolder     (X2, folded: T hides it)
 ,**** Y
@@ -392,7 +470,8 @@ X4 in N's folder of what R hides in it. In N's view, cutting Y from T
 and pasting it into N's own content makes N fork T and contain Y,
 hiding nothing new. T is then a mutual (=bKb=), claiming, first in
 N's forks folder, showing nothing (N contains or hides all of T's
-content); R follows; Y stands in N's content. T's folder of what it
+content), Y joining its folder of what you keep elsewhere; R
+follows; Y stands in N's content. T's folder of what it
 hides of N's content (X2) goes with the change, since that folder is
 drawn under a forker as such only. Each of these saved views, saved
 again unchanged, writes nothing ('tests/forks_meet.rs';
@@ -430,7 +509,10 @@ stays quiet about it. Putting =X= back among =C='s contents removes
 the hide again. (This is the same rule the forking edit itself
 follows: children of =N= you deleted /while/ forking are born hidden.
 And it holds for any owned note that forks something, not just
-clones.) Hides are symmetric: the same holds of a note that forks
+clones.) Moving =X= into another note of yours instead records no
+hide: you keep it there, so =N= does not show it (see "What you keep
+elsewhere"), and the save says "Hides nothing: 'X' left 'C', but 'D'
+keeps it." Hides are symmetric: the same holds of a note that forks
 yours. If =F= forks =C= and contains =X=, =C='s forks folder shows
 =F= with what it adds to =C='s content, so removing =X= from =C=
 hides =X= there too ("Hides 'X' from 'C', as content of 'F'."), and

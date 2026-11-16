@@ -462,8 +462,11 @@ recorders that record its parent; for forking, one folder lists both:
    nodes it forks, and the nodes that fork it), each once, whichever
    roles it plays: see "the forks folder".
 
-The three compound partner folders (see "compound partner folder")
-each join three relationships -- forking, hiding and containment:
+The four compound partner folders (see "compound partner folder")
+each join several relationships -- forking, containment, and hiding:
+- an *integratedElsewhereFolder*, under a member as such of a forks
+  folder, lists that member's contents which the user keeps elsewhere
+  (see "integrated");
 - a *hiddenInForkPartnerFolder*, under a member as such of a forks
   folder (a forkee or forker as such), lists that member's contents
   which the note whose folder holds it hides;
@@ -503,11 +506,12 @@ such or a forker as such -- is drawn as content is (see "forkee as
 such" and "forker as such"), so it is extended, but it gets no forks
 folder unasked: the folder it stands in lists every mirror already.
 A forks request on it (=C-c l f=, '(folder forks)') draws one there.
-An editable member as such gets its nonempty
-=hiddenInForkPartnerFolder=, the hidden-in compound partner folder
-specific to how the note sees that member; and an editable forker as
-such that forks the note its nonempty =hiddenByForkerFolder=, of
-what it hides of the note's content.
+An editable member as such gets, first, its nonempty
+=integratedElsewhereFolder=, of what the user keeps elsewhere, then
+its nonempty =hiddenInForkPartnerFolder=, the hidden-in compound
+partner folder specific to how the note sees that member; and an
+editable forker as such that forks the note, after them, its nonempty
+=hiddenByForkerFolder=, of what it hides of the note's content.
 The diff view draws no default folder. Under each member of a partner folder hangs its
 containerward chain, under a member of the forks folder in a
 containers folder of its own (see "foldering, the containerward
@@ -554,9 +558,19 @@ does is in 'docs/data-model_technical.org', "The forks folder".
 
 A compound partner folder is a partner folder whose membership joins
 more than one relationship, as against the ordinary partner folders,
-which read one relation role. There are three, and each joins three
+which read one relation role. There are four. Three join three
 nodes -- a note N, a fork partner S and a hidden node H -- by "N
 forks S" or "S forks N", by a hide of H, and by a containment of H.
+The fourth, the *integrated-elsewhere folder*
+(=integratedElsewhereFolder=, label "☮ It contains these, and you
+keep them elsewhere."), stands under S where S is a member as such of
+N's forks folder, first among S's folders, and holds S's content that
+the user keeps elsewhere (N contains it, or an owned note but S
+does: see "integrated"), less N's hides, in the order of S's list.
+It is write-protected, its members folded, each carrying a
+containers folder, folded, naming where the user keeps it (its
+containers but S's view-ancestors), and no chain directly. A child N
+hides stands in the hidden-in folder only.
 The *hidden-in compound partner folder* (=hiddenInForkPartnerFolder=,
 label "☮ It contains these, but c hides them.") stands under S inside
 N's forks folder, where S is a member as such (a forkee or forker as
@@ -586,7 +600,9 @@ unhides it. The note whose hides a compound folder shows is its
 *hider* ('CompoundFolderParties::hider'), and, for the two folders
 under a member as such, the note whose content holds what is hidden
 is its *container* ('CompoundFolderParties::container'): the member
-for the hidden-in folder, N for the hidden-by folder. Both read each relationship by the records the skgrepo
+for the hidden-in and integrated-elsewhere folders, N for the
+hidden-by folder (the integrated-elsewhere folder's "hider" is N,
+whose hides it leaves out). Both read each relationship by the records the skgrepo
 restriction shows: under a skgrepo narrowing, a hide of H that S
 contains only by a restricted record stands in the hidden-outside
 folder, and a hide recorded in a restricted section stands in
@@ -656,8 +672,9 @@ In the above view, forkee1 and forkee2 are both "forkees as
 such": a member of a forks folder that claims (and,
 in the refresh, that the graph warrants). They are not just forkees,
 but they are being shown /as/ forkees. A forkee as such shows its
-content less what the forker contains or hides
-('less_what_the_note_integrates' in 'server/refresh/goal.rs').
+content less what the forker contains or hides and what the user
+keeps elsewhere ('less_what_the_note_integrates' in
+'server/refresh/goal.rs'; see "integrated").
 
 In a content view, under an editable forker, the refresh draws a
 forkee as such as it draws content: write-protected, carrying an
@@ -704,13 +721,38 @@ occurrence member of a forks folder. The refresh also asks that it be
 warranted ('note_of_member_as_such'); the save reads its position and
 claim alone, as it cannot know a warrant.
 *What a member shows* of its content, its *unintegrated content*, is
-its content less what N contains or hides, by the records the skgrepo
+its content less what N hides, less what N contains, and less what
+any owned note but the member contains, by the records the skgrepo
 restriction shows, in the member's order
 ('less_what_the_note_integrates' in 'server/refresh/goal.rs';
-note_of_member_as_such'); the '(unintegrated COUNT ...)' part of its
-view stats counts it, an indirect member's too. For a forker that is
-what it adds to N; one that adds nothing shows nothing but its
-folders.
+'note_of_member_as_such'; see "integrated"); the '(unintegrated
+COUNT ...)' part of its view stats counts it, an indirect member's
+too. What the member contains that the user keeps elsewhere stands in
+its integrated-elsewhere folder (see "compound partner folder"). For
+a forker that is what it adds to N; one that adds nothing shows
+nothing but its folders. In the diff view, which draws no
+integrated-elsewhere folder, a member shows its content less what N
+contains or hides alone.
+
+*** integrated, the user's graph, kept elsewhere
+
+A child of a member as such S of a note N's forks folder is
+*integrated* by the user when the user *keeps it elsewhere*: when N
+contains it, or when a note of the *user's graph* but S does. The
+user's graph is every note homed in an owned skgrepo, as the skgrepo
+restriction shows it: a note the restriction shows, by a record of
+the child it shows ('owned_notes_containing' in
+'server/refresh/goal.rs'). N's own contains counts even where N is
+foreign: what N already holds is integrated into N. A note containing
+a mirror of the child does not contain the child. S shows what is not
+integrated and N does not hide (see "what a member shows"); what is
+integrated stands in S's integrated-elsewhere folder
+(=integratedElsewhereFolder=, 'Folder::IntegratedElsewhere'; see
+"compound partner folder"). So moving a child into an owned note
+needs no hide: a cut hides only what no owned note but the member
+keeps after the save (see "cut"). A hide that keeping makes
+redundant is kept, and stands in the hidden-in folder
+('docs/forks.org', "What you keep elsewhere").
 
 A forker as such is drawn as a forkee as such is: in a content view,
 under an editable N, editable unless it is a repeat or the budget is
@@ -740,8 +782,9 @@ child of F that N hides, shown claiming under F, is unhidden in N, as
 under a forkee; and a child F showed that the buffer no longer shows
 claiming under F was cut from it (see "cut"). A cut from a forker
 makes N fork F, so that F, if it forks N, becomes a mutual, and N
-hides each child cut that it does not contain after the save (one
-pasted into N's content is not hidden). The view the save redraws
+hides each child cut that neither it nor an owned note but F contains
+after the save (one pasted into N's content, or into any note of the
+user's, is not hidden). The view the save redraws
 gives F's headline its claim, so that it stands among the forkees,
 not as a pending detachment: every view the refresh draws gives each
 member of a forks folder the claim the graph gives it
@@ -756,7 +799,8 @@ forkee-visibility step uses. The fork rules still bind: a save that
 would make N fork F while N contains F is refused. The step reads F's
 content and N's hides and content by the records the skgrepo
 restriction shows, as the view drew them: F shows its content less
-what N contains or hides wherever it is a mirror of N under the
+what N contains or hides and what the user keeps elsewhere, by the
+graph before the save, wherever it is a mirror of N under the
 restriction ('is_mirror_of'), as an indirect member is. A forker the
 graph lacks (typed there) has no list to lose: what it shows is its
 contains.
@@ -769,9 +813,15 @@ it is pasted elsewhere. A cut child is one the member's list names,
 and the view showed there, that the buffer no longer shows claiming
 under it. The member's own list never changes: a cut edits the note
 whose forks folder holds the member. A cut from a forkee hides the
-child in the note unless the note contains it after the save (see "the
-forkee-visibility step"); a cut from a forker does that too, and makes
-the note fork the forker (see "the forker-visibility step").
+child in the note unless the note, or a note of the user's graph but
+the member, contains it after the save (see "integrated" and "the
+forkee-visibility step"): a note the save writes by its contains as
+the save leaves them, any other by the graph. A cut from a forker
+does that too, and makes the note fork the forker (see "the
+forker-visibility step"). Removing a child from the note while a
+member contains it hides it by the same rule: only where some member
+containing it would show it after the save
+('infer_hides_from_contains_removals').
 
 *** the forkee-visibility step
 
@@ -779,8 +829,10 @@ The *forkee-visibility step* (a term of plan 10) is the step of
 the save that, for a forkee as such shown editable under its
 forker (the note that forks it), reads what the buffer shows of
 the forkee's content and rewrites the forker's hides to match: content shown there,
-claiming, is unhidden, and content not shown, which the forker
-does not contain, is hidden ('resolve_visibility' in
+claiming, is unhidden, and content the view drew there (what the
+forker neither hid nor integrated before the save, by the graph) and
+no longer shows, which neither the forker nor an owned note but the
+forkee contains after the save, is hidden ('resolve_visibility' in
 'server/from_text/local_fieldintent_collection/resolve_visibility.rs').
 It reads the forkee's content and the forker's hides by the
 records the skgrepo restriction shows, as the view drew them, so a
@@ -2058,7 +2110,8 @@ The node that has an ID, as its PID or as an extra ID, is that ID's
 
 How a folder (see "partner folder") is built. It is the
 =ViewnodeKind::Folder= variant and the payload type =Folder=, one
-enum for the nine partner folders and the three property folders.
+enum for the eleven partner folders, the three property folders and
+the illegal-edit folder.
 “Folder” here describes an org non-vognode that groups viewnodes; it
 does not mean a filesystem directory.  “Role col”, “relation col”,
 and bare “sharing col” are retired names for the general concept.
@@ -2080,8 +2133,9 @@ acquire inconsistent treatment in different layers:
   write-protected: its membership follows from the graph, and the
   refresh redraws it from the graph (see [[*write-protected set][write-protected set]]).
 - =goal_is_ordered=: the viewparent's own file records the members'
-  order, which the warranted members take: the editable folders and
-  =hiddenFolder=. In the forks folder the forkees take it, and its
+  order, which the warranted members take: the editable folders,
+  =hiddenFolder=, and =integratedElsewhereFolder= (in the order of the
+  member's own list). In the forks folder the forkees take it, and its
   forker-only and indirect members follow them in the graph's and the
   config's order (see "the forks folder"); in the diff view's forks
   folder its forker-only members follow them in the order the view
@@ -2096,10 +2150,10 @@ acquire inconsistent treatment in different layers:
   graph straddle, and save-inert), and =idFolder= and =flagsFolder=.
 - =members_are_properties=: the alias, ID and flags folders.
 - =members_carry_containerward_chain= (asked with whether the view is
-  the diff view): every folder but the property folders and the two
-  acquisition folders, and outside the diff view but the forks
-  folder, whose members carry their chain in a containers folder
-  instead.
+  the diff view): every folder but the property folders, the two
+  acquisition folders and =integratedElsewhereFolder=, and outside the
+  diff view but the forks folder; the members of these two carry
+  their chain in a containers folder instead.
 
 The ☮ herald on a write-protected folder's headline is a
 herald-table fact only (=server/heralds.rs=), with no wire atom of

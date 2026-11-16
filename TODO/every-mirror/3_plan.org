@@ -781,7 +781,7 @@ Questions: Q2. Decisions A and B; behavior 2.
   f under a member); the AI tool's README.
 - Run the suites as slice 1 does.
 
-** TODO Slice 3: hides by integration
+** DONE Slice 3: hides by integration
 Decision C; behavior 3.
 - What a member shows, through 'content_goal_gnids' (so the
   '(unintegrated COUNT)' stat follows); the integrated-elsewhere

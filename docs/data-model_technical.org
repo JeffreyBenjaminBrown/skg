@@ -346,8 +346,10 @@ nor ends a fork another view made.
 *** The goal
 A parent's *goal* is what the truth says its children should be
 (=goal_of_parent= in =server/refresh/goal.rs=): for an occurrence's
-content, its =contains= list in file order (for a forkee shown as
-such, less what its forker hides or already contains); for a node
+content, its =contains= list in file order (for a member as such of
+a forks folder, less what the note whose folder holds it hides or
+already contains, and less what another note the user owns contains:
+'docs/forks.org', "What you keep elsewhere"); for a node
 of the containerward chain, its containers; for a folder, its
 partners in the folder's relation, or the compound folders' derived
 lists; for a property folder, the node's aliases, IDs or true flags.
@@ -527,10 +529,12 @@ which shows one only when asked ('(folder forks)'): the folder it
 stands in lists every mirror already. A forks folder already
 standing under a member stays, as the refresh keeps what a buffer
 holds. An editable member as such of a forks folder (a forkee or
-forker as such) shows, first, the folder of what the note whose
-folder holds it hides in it, when that holds anything; and an
+forker as such) shows, first, the folder of what it contains that the
+user keeps elsewhere ('Folder::IntegratedElsewhere',
+'integrated_elsewhere'), then the folder of what the note whose
+folder holds it hides in it, each when it holds anything; and an
 editable forker as such that forks that note
-('note_forked_by_forker_as_such') shows, after that, the folder of
+('note_forked_by_forker_as_such') shows, after them, the folder of
 what it hides of that note's content ('Folder::HiddenByForker'),
 when that holds anything; once a cut makes that forker a forkee, the
 folder's members vanish and it goes, and so they do under an
@@ -540,7 +544,14 @@ indirect member, whose hides do not apply to the note
 member as such the refresh draws under an editable occurrence is
 itself such an occurrence: it is drawn editable, as content is (see
 "The extent and the node budget"), so it shows its content less what
-the note contains or hides ('note_of_member_as_such'). A forkee as such that becomes a
+the note contains or hides and what the user keeps elsewhere
+('note_of_member_as_such'). The folder of what the user keeps
+elsewhere is write-protected; each member drawn into it carries a
+folded containers folder, as a member of a forks folder does, and
+an unwarranted member of it vanishes, the folder being derived each
+time from where the user keeps it ('leaves_its_write_protected_folder').
+The diff view draws none of these folders, and there a member shows
+what the user keeps elsewhere among its content. A forkee as such that becomes a
 Restricted vognode (a skgrepo narrowing keeps its node out) loses the
 folders it showed, and draws them anew once it is an occurrence again
 ('rekind_to_gnid_only', 'rekind_to_occurrence' in
@@ -555,8 +566,9 @@ save hid stands there.
 =required_ancestry= (=server/refresh/ancestry.rs=) gives each kind of
 descriptor the ancestors it may stand under, nearest first: a folder
 under an occurrence (the acquired-by folder under a ghost; the
-hidden-outside folder in a forks folder; the hidden-in and hidden-by
-folders under a member of a forks folder); a property member in its
+hidden-outside folder in a forks folder; the integrated-elsewhere,
+hidden-in and hidden-by folders under a member of a forks folder); a
+property member in its
 property folder; a change viewnode under an occurrence or a ghost,
 and a body diff under an old text. A descriptor whose ancestors are
 not those is unsayable. A vognode has no row: an occurrence is never
@@ -606,9 +618,11 @@ member.
 **** What each member shows
 A member as such -- a forkee as such, or a forker-only or an
 indirect member (a forker as such) -- shows its content less what N
-contains or hides, and, drawn editable, its own folders but a forks
-folder, the folders of what N hides in it and, under a forker of N,
-of what it hides of N's content among them.
+contains or hides and less what a note the user owns, but the
+member, contains (=owned_notes_containing=), and, drawn editable, its
+own folders but a forks folder, the folders of what the user keeps
+elsewhere, of what N hides in it and, under a forker of N, of what it
+hides of N's content among them.
 The birth facts follow the roles in which the member stands
 (=forks_folder_member_roles= in =server/refresh/viewnodestats.rs=):
 =(forks in 2)= where it claims (where the folder reads no claims,
@@ -655,7 +669,9 @@ joined to N is not hidden. So:
   attaching an indirect member makes N fork it;
 - in a forkee as such E, drawn editable: E's title and body are saved
   when the user owns E, and refused (a text claim) when it is foreign;
-  cutting one of E's children hides it in N, and a child N hides,
+  cutting one of E's children (one the view drew there, by the graph
+  before the save) hides it in N unless N, or a note the user owns
+  but E, contains it after the save, and a child N hides,
   shown claiming under E, is unhidden (the forkee-visibility step), a
   save that would hide or unhide anything in a foreign N being
   refused; a child placed under E that E's list does not name (a
@@ -667,10 +683,11 @@ joined to N is not hidden. So:
   content as under E; a child N hides, shown claiming under F, is
   unhidden; a child F showed that the buffer no longer shows under
   F was cut from it (what F showed is read as its content less what
-  N contains or hides wherever F is a mirror of N, 'is_mirror_of',
-  an indirect member included), which makes N fork F (a mutual now,
-  where F forks N) and hides
-  the child in N unless N contains it after the save (the
+  N contains or hides and what the user kept elsewhere, wherever F is
+  a mirror of N, 'is_mirror_of', an indirect member included), which
+  makes N fork F (a mutual now, where F forks N) and hides the child
+  in N unless N, or a note the user owns but F, contains it after the
+  save (the
   forker-visibility step, 'resolve_forker_visibility'); the view
   the save redraws gives F's headline its claim, as every refresh
   gives each member of a forks folder the claim the graph gives it

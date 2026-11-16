@@ -450,18 +450,25 @@ Without such a request, an editable node shows only its forksFolder,
 where it has a fork partner, either way, unless it is itself a member
 of a forksFolder, which lists every mirror already (plus, on an
 editable member of a forksFolder, the nonempty
-hiddenInForkPartnerFolder, and on an editable forker of the folder's
-node the nonempty hiddenByForkerFolder); the heralds advertise other
+integratedElsewhereFolder and hiddenInForkPartnerFolder, and on an
+editable forker of the folder's node the nonempty
+hiddenByForkerFolder); the heralds advertise other
 nonempty relations. <localleader>lf on a member of a forksFolder draws its own.
 
 In a content view, each node a forksFolder holds that the node forks
 (a forkee as such, =bK= or =bKb=) is drawn editable, as content is,
 unless it is editable elsewhere in the buffer or the node budget is
 spent: it shows its content less what the node contains or hides,
-and its own folders. Its title and body save when you own it; a
-foreign one's edits are refused (view it as itself, where an edit
-starts the fork operation).
-Deleting one of its children hides it in the forking node; a headline
+and less what another node you own contains, and its own folders,
+first among them the folder of what it contains that you keep
+elsewhere ("☮ It contains these, and you keep them elsewhere."),
+folded and write-protected, each member with a folded containers
+folder naming where you keep it. Its title and body save when you
+own it; a foreign one's edits are refused (view it as itself, where
+an edit starts the fork operation).
+Deleting one of its children hides it in the forking node, unless a
+node you own (the forking node, or another) contains it after the
+save: moving a child into a node of yours hides nothing; a headline
 typed under it, or a node moved there from elsewhere, joins its
 content, after the child it follows, when you own it, and is refused
 under a foreign one.
@@ -471,9 +478,11 @@ as such, claiming nothing: one that forks the node, =Kb=, or an
 indirect member, a mirror of the node joined to it only through
 others, with no 'b' flag) is drawn the same way: editable unless a
 repeat or past the budget, showing what it adds to the node's content
-(its content less what the node contains or hides), with its own
-folders. Under it, first, stands the folder of what the node hides
-of its content ("☮ It contains these, but c hides them."), then,
+(its content less what the node contains or hides, and less what
+another node you own contains), with its own folders. Under it,
+first, stands the folder of what it contains that you keep elsewhere,
+then the folder of what the node hides of its content ("☮ It
+contains these, but c hides them."), then,
 under one that forks the node, the folder of what it hides of the
 node's content ("☮ a hides these, which c contains."), each folded
 and write-protected. Its title and body save when you own it, and are
@@ -483,8 +492,9 @@ its whole list. Deleting one of its children (a cut) makes the
 node fork it, so it is redrawn claiming, among the forkees (a mutual,
 =bKb=, where it forks the node), without its folder of what it hides
 of the node's content (drawn under a forker only); the node hides the child unless
-the node contains it after the save, so a child cut there and pasted
-into the node's own content is taken in, hiding nothing. Under a
+the node, or another node you own, contains it after the save, so a
+child cut there and pasted into the node's own content, or into any
+node of yours, is taken in, hiding nothing. Under a
 foreign node such a save is refused.
 *** <localleader>la : :SkgShowFolderOfAliases
 The aliasFolder -- other text you could search for to find this node

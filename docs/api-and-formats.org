@@ -361,7 +361,11 @@ So far there are these endpoints:
          contains 'M', which it stands for=, =this save shows it
          under 'E'= (an explicit gesture in the forks folder won), or
          =this save places it under 'E'= (R moved under a member as
-         such E, whose content it joins).
+         such E, whose content it joins), or ='Y' keeps it= (or ='Y'
+         keeps 'M', which it stands for=; several keepers =keep=):
+         an owned note Y other than S contains it after the save, so
+         no partner shows it ('docs/forks.org', "What you keep
+         elsewhere").
        Each quoted name is a title, as the save leaves it. A fork's
        clone counts as a forker with no hides on disk, named =the
        fork 'T'=, since it has its original's title; a node the save
@@ -1724,15 +1728,23 @@ drawn the same way, showing what it adds to the
 note's content; its title and body, and a child placed under it,
 are read as a forkee as such's, never its content as its whole
 list. A save that cuts one of its children makes the note fork it,
-and hides the child in the note unless the note contains it after the
-save; the saved view gives the forker its claim, so it is redrawn
+and hides the child in the note unless the note, or another note the
+user owns, contains it after the save; the saved view gives the forker its claim, so it is redrawn
 among the forkees (a mutual, where it forks the note), without a
 =hiddenByForkerFolder=. Deleting a forker as such hides it in the
 note. Under a foreign note such a save is refused.
-An editable member as such of either kind additionally includes its
-nonempty =hiddenInForkPartnerFolder=, first; an editable forker as
-such that forks the note its nonempty =hiddenByForkerFolder= (what
-it hides of the note's content), after that;
+A member as such of either kind shows its content less what the note
+contains or hides and less what another note the user owns contains:
+what the user keeps elsewhere ('docs/forks.org', "What you keep
+elsewhere"). An editable member as such additionally includes its
+nonempty =integratedElsewhereFolder= (what it contains that the user
+keeps elsewhere, write-protected, its members folded, each with a
+=containerFolder= naming where), first; its nonempty
+=hiddenInForkPartnerFolder= after that; an editable forker as such
+that forks the note its nonempty =hiddenByForkerFolder= (what it
+hides of the note's content), after them; a cut from either kind
+hides only what no note the user owns but the member contains after
+the save;
 =hiddenOutsideOfForkPartnersFolder=, when nonempty, stands last in
 every =forksFolder= of a content view; emptied by a save, it goes
 from the redrawn view, as from a fresh one. Use a
@@ -1772,16 +1784,19 @@ no folder unasked but where something changed.
   no chain hangs directly under it. Where the refresh draws one that
   is no repeat (an occurrence of a node another occurrence holds the
   editability of), it draws a =containerFolder= under it, as its
-  first child (after a =hiddenInForkPartnerFolder= and a
-  =hiddenByForkerFolder=, if they are added later, before every
-  other child), its members marked =folded=, so
+  first child (after an =integratedElsewhereFolder=, a
+  =hiddenInForkPartnerFolder= and a =hiddenByForkerFolder=, if they
+  are added later, before every other child), its members marked
+  =folded=, so
   that only the folder's headline shows; each of its members carries
   the chain as above, and the folder, like any, lists no
   view-ancestor and is pruned when empty. A repeat gets nothing. A
   buffer drawn before this rule may hold chain nodes directly under
   such a member; the refresh reads them as its content (unwarranted,
   =noWarrant=, under a write-protected member). Reopening the view
-  redraws it.
+  redraws it. A member of an =integratedElsewhereFolder= is drawn the
+  same way: no chain directly under it, and a folded
+  =containerFolder= under it, naming where the user keeps it.
 - =editableView= — on a write-protected occurrence, make it the node's
   editable one (the occurrence that was editable is write-protected,
   keeping its shown content, whose children claim nothing there); on
@@ -1945,7 +1960,8 @@ member-as-such =contains= outgoing side (a forkee or forker as such)
 adds =(unintegrated COUNT (ancestors GEN...))=, including when both
 counts are zero; absence of that subform means the role does not
 apply. The numerator counts members not already directly contained
-or hidden by the note whose forks folder holds the occurrence. Subset counts cannot exceed their side's
+or hidden by the note whose forks folder holds the occurrence, nor
+contained by another note the user owns: what the member shows. Subset counts cannot exceed their side's
 total. The ancestors counted are the viewparent, or, for a folder
 member, the vognodes of the folder's required ancestry. A child
 claiming nothing under a member as such -- content the note hides,
@@ -1988,6 +2004,7 @@ through others) in neither, and carry none.
 | hider-folder member              | =(hides out 2)=                               |
 | container-folder member          | =(contains out 2)=                            |
 | mentioner-folder member          | =(linksTo out 2)=                             |
+| integrated-elsewhere member      | =(contains in 2)=                             |
 | hidden-in-fork-partner member    | =(hides in 4) (contains in 2)=                |
 | hidden-by-fork-partner member    | =(hides in 2) (contains in 4)=                |
 | hidden-outside member            | =(hides in 3)=                                |
@@ -2597,8 +2614,8 @@ Partner folders are represented in Rust as
 =ViewnodeKind::Folder (Folder)=, but their external metadata
 remains the established bare non-vognode atom:
 =forksFolder=,
-=hiderFolder=, =hiddenFolder=, =hiddenInForkPartnerFolder=,
-=hiddenByForkerFolder=,
+=hiderFolder=, =hiddenFolder=, =integratedElsewhereFolder=,
+=hiddenInForkPartnerFolder=, =hiddenByForkerFolder=,
 =hiddenOutsideOfForkPartnersFolder=, =containerFolder=, =mentionerFolder=,
 or, in the diff view only, =acquiredByFolder= or =acquiredFolder=;
 and, outside the diff view, =illegalEditFolder=.

@@ -899,12 +899,16 @@ server's confirmation is printed and approved, and the '.skg' files
 show a clone in the owned skgrepo that contains the new child and
 forks the original, which is unchanged. Then
 'fork' on an owned node is refused beside another edit, and alone is
-approved, making a clone that forks it. Last, a
-foreign node placed in the forks folder 'forest forks' draws is
-forked, and its unintegrated child, removed from under it and from
-under an indirect member that also contains it, is hidden, the cut
-from the indirect member making the node fork it too, and neither
-save forking a clone.
+approved, making a clone that forks it. Last, a foreign
+node's detail is taken out of the first child, so that only the
+second child keeps it, and that node, placed in the forks folder
+'forest forks' draws, is forked: it shows the detail in its folder
+of what you keep elsewhere, and the second child, an indirect member,
+shows it as content; removed from under the second child, it is
+hidden, the cut making the node fork the second child too, and
+neither save forking a clone; then removing from the node's content
+a child its partners contain, which the first child keeps, hides
+nothing, and the report says the first and second child keep it.
 
 Then, on a fourth server over a fresh copy of the fixture, it writes the
 words of "Words in a handle": 'detach' (the child leaves its parent's
@@ -1285,7 +1289,8 @@ that left a note with such a fork partner without hiding anything,
 and the rule that kept it from hiding: it is no content of the
 partners and a mirror of none of it,
 or what it stands for was hidden already, or is still contained, or
-the same save shows it in the forks folder. A removal from a note
+the same save shows it in the forks folder, or another node you own
+keeps it ("but 'Y' keeps it"), so that no partner shows it. A removal from a note
 that forks nothing prints no line. Every word is the
 server's ('docs/api-and-formats.org', "Save buffer"). When the server
 would refuse the save, the report says so, with its errors, and the
@@ -1392,16 +1397,22 @@ of it."
 Placed in an editable folder of a 'forest' view, a node joins that
 folder's relation instead: in the forks folder ('forest forks ID')
 the folder's node forks it. Under a forkee as such, the forked node
-in that folder, stand its children the forker has not integrated;
-removing one there hides it from the forker, as in the clients. A
+in that folder, stand its children the forker has not integrated:
+neither contains, nor hides, nor keeps in another node you own;
+those you keep elsewhere stand first, folded, under "☮ It contains
+these, and you keep them elsewhere.", each with the folder of its
+containers ('docs/forks.org', "What you keep elsewhere"). Removing
+one of the others there hides it from the forker, as in the clients,
+unless a node you own contains it after the save: moving it into one
+of your nodes hides nothing. A
 note that forks the folder's node, and that it does not fork, stands
 there claiming nothing; removing it hides it in the folder's node.
 So does each other mirror of the folder's node, joined to it only
 through others (an indirect member): claiming nothing, and removing
 it hides it there too. Under either, a forker as such, stands what it
 adds to the folder's node's content; removing one of those makes the
-folder's node fork it, and hides the child unless the node contains
-it after the save.
+folder's node fork it, and hides the child unless the node, or another
+node you own, contains it after the save.
 A node placed under a forkee or forker as such joins that member's
 content, after the child it follows, when you own the member; under
 a foreign one the save is refused.

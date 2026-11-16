@@ -3813,3 +3813,235 @@ The slice's headline in '3_plan.org' is DONE.
 - The atoms of the compound folders ('hiddenInForkPartnerFolder' now
   also under an indirect member, no fork partner) are kept, knowingly,
   as the plan says; for the next terms review.
+** Slice 3: hides by integration
+*** Commits
+- ca967674 every-mirror plan 3 slice 3: hides by integration (server,
+  both clients' folder lists, skg-for-ai and its tests, the tests and
+  fixtures, the forks-meet integration test: one commit, since the new
+  folder atom must be known to all of them at once)
+- (the commit carrying this record) every-mirror plan 3 slice 3: docs,
+  record, DONE
+*** Suites
+- The slice's own tests: the new 'tests/hides_by_integration.rs'
+  (eleven sub-tests in one 'all_tests', in 'grouped_forks') passed on
+  its first run. Checked against the code: with the forkee step's
+  "no owned note keeps it after the save" removed, the move test
+  fails ("M hides nothing"); with the removal inference's partner
+  check removed, the move of d from M to z fails (M hides d).
+- 'bash/nextest.sh': first run 1265 of 1273, 8 failures, all
+  expected (see "Fixtures changed"): six adaptations of pinned views
+  or of a line found by gnid that now first meets the new folder
+  ('refresh::tests::reinstate::a_forkee_as_such_shows_what_its_forker_neither_hides_nor_contains',
+  'forkers_drawn_editable', 'fork' (the mail tests),
+  'members_as_such_and_stale_buffers' (two),
+  'local_fieldintent_collection_extraction' (its fixture's forkees
+  owned, so neither showed the shared child)), and two behavior
+  changes decision C makes ('mirror_substitution': deleting R, which
+  stands for N under a forkee, no longer hides N, which owned P keeps;
+  'hidden_from_forks': moving e1 from a foreign forkee into a new
+  owned note no longer hides it). Then 1273 of 1273, and again 1273
+  of 1273 after the diff-view change (see "Deviations").
+- Emacs 503 of 503; Neovim all pass.
+- The AI tool's tests (after 'cargo build --bin skg'): four runs. Two
+  failures were handles shifted by the new folder's two viewnodes
+  ('check_write_protected_foreign_edit_refused' and
+  'check_making_a_foreign_node_editable': ⟨0s⟩ is ⟨0u⟩;
+  'check_implicit_fork_approved': ⟨0t⟩ is ⟨0v⟩), one each run masking
+  the next; then 'check_forking_and_hiding_by_placing', an expected
+  behavior change: by that point the first and second child both keep
+  Fred's detail, so nothing was left to cut. The check now first takes
+  the detail out of the first child, so that the second child alone
+  keeps it and shows it as an indirect member's content, and cuts it
+  there (the same hide and fork as before); its last step now asserts
+  "Hides nothing: 'Contained twice' left 'A second container, outside
+  the view', but 'First child' and 'Second child, a forker' keep it."
+  Last run: PASS.
+- 'bash/integration-tests.sh' (the Emacs pass): first run 38 of 39,
+  'forks-meet' failing, an expected adaptation (N's first child in
+  R's view is now its folder of what the user keeps elsewhere, X1 to
+  X3, and in N's view Y, once N's, stands first in T's such folder);
+  after it, 'forks-meet' passes in both clients run alone.
+- 'bash/all-tests.sh', first run: all pass: Emacs 503 of 503, Neovim
+  pass, nextest 1273 of 1273, doctests, team tools, AI reader,
+  integration 78 of 78 (both clients). The docs were written before
+  it; no code changed after it.
+- End to end, per '/verify': an isolated 'target/debug/skg' on port
+  27733, scratch data under '/tmp/claude-1000/every-mirror-p3-slice3/'
+  with owned "pub" and "priv" (declared in that order) and foreign
+  "you": your x (you) contains a, b and c; my x (pub) forks your x and
+  hides c; my y (priv) is empty; home (pub) contains my x and my y.
+  Jeff's picture, in order: in home's view, a moved from under your x
+  to under my y and saved: my y contains a, my x hides c alone, no
+  hide line. A fresh view of my x: under your x, first, "☮ It
+  contains these, and you keep them elsewhere." holding a, folded,
+  its containers folder naming my y; then the hidden folder (c); then
+  b. Saved unchanged, no file changed. b deleted from under your x:
+  "Hides 'b' from 'my x', as content of 'your x'.", my x hides c and
+  b. a removed from my y in y's view: no hide; my x's view shows a
+  under your x again. c (hidden) placed in my y: my x's view shows c
+  in the hidden folder only, not in the integrated one; moved out of
+  it to stand under your x: "Stops hiding 'c' from 'my x', as content
+  of 'your x'.", and c stands in the integrated folder. Under the
+  restriction "pub" (my y's "priv" kept out), c shows under your x
+  again. The server was stopped by PID, the port checked free, the
+  scratch data deleted; transcripts in
+  '/tmp/claude-1000/every-mirror-p3-slice3/transcript/'.
+Logs: 'tests/results/every-mirror/slice3-plan3/' (nextest-first.log,
+nextest-second.log, nextest.log, emacs.log, nvim.log, ai-tool-first.log
+to ai-tool-fourth.log and ai-tool.log, integration.out, and the full
+run's all-tests.out, all-tests-ALL.org and all-tests-*.log).
+'tests/results/every-mirror/' was copied out before 'bash/all-tests.sh'
+and put back after it.
+*** Deviations from the plan's "how"
+**** "No owned note contains it": the member itself excepted
+Read literally, an owned member as such would integrate all its own
+content (it contains it), and no cut from it could ever hide. So the
+owned notes that integrate a child of member M are the owned notes
+but M ('owned_notes_containing', its 'excepted'). Two members that
+both contain a child, one of them owned, therefore differ: under the
+foreign one the child is kept (by the owned one), under the owned one
+it shows, unless another owned note keeps it too. The removal
+inference ('infer_hides_from_contains_removals') follows: a child
+removed from N is hidden only where some partner containing it would
+show it after the save, that is, where no owned note but that partner
+contains it then. The nodeMerge ('gnids_shown_through_fork_partners')
+excepts the partner likewise.
+**** "An owned note": its home owned, shown, its record shown
+An owned note counts when its home skgrepo is owned, the skgrepo
+restriction shows it, and shows its record of the child (the graph's
+gated containment relmap). A note the save writes counts by its
+contains as the save leaves them ('ContainsAfterSave', built by
+'LoweredNodeIntents::contains_after_save' and, in the hide report, from
+the plan); a note it deletes does not count; any other note, by the
+graph. IDs are compared resolved, with no mirror substitution: a note
+holding a fork of the child does not keep the child.
+**** Placements run before the visibility loops
+A child placed under a member as such joins its content
+('add_children_placed_under_member_as_such'); that ran inside each
+signal's loop. So that a child moved from one member into an owned
+member in one save counts as kept whichever signal comes first, the
+placements now run as one pass ('add_children_placed_under_members_as_such')
+after the removal inference and before the two visibility loops.
+**** The conflict check skips what was kept elsewhere
+'validate_no_overlapping_forkee_hiderel_conflicts' compares, child by
+child, what each forkee shows. A child one owned forkee keeps is
+drawn under the other forkee's folder of what is kept elsewhere, not
+as its content; read as "hide it" there, an unchanged save would have
+been refused. A child kept elsewhere before the save, by the graph,
+now says nothing there.
+**** The diff view's content goal keeps the old rule
+The plan: every rule here does nothing in the diff view. Since the
+diff view draws no integrated-elsewhere folder, a member there keeps
+what the user keeps elsewhere among its content
+('less_what_the_note_integrates' takes 'kept_elsewhere_counts', false
+there). The stats pass, which does not know the mode, counts
+'(unintegrated N)' by the new rule in both (see "Unfinished").
+**** An unwarranted member of the new folder vanishes
+Unlike the hidden-in folder's members, which stay marked ⊥ in a
+redrawn buffer, a member of the integrated-elsewhere folder that the
+user no longer keeps elsewhere (removed from y, or kept out by a
+narrowing) vanishes from it ('leaves_its_write_protected_folder'),
+since the folder is derived each time from where the user keeps it;
+the child is drawn among the member's content instead.
+**** The folder's parties
+'compound_folder_parties' gives the new folder the hidden-in folder's
+places: its container is the member (its viewparent), its "hider" N
+(three up), whose hides it leaves out. Its birth fact is
+'(contains in 2)', its relRepo fact none.
+**** The hide report's line
+"Hides nothing: 'R' left 'S', but 'Y' keeps it." names every owned
+note but S keeping R after the save ("'Y' and 'Z' keep it"; "'Y'
+keeps 'M', which it stands for" for a mirror). It is said only for a
+removal from S's content, as the plan says: a cut from a member that
+hides nothing because an owned note keeps the child prints no line,
+as no line is printed today for a cut whose child S contains.
+**** A parse message
+The parse's refusal of a non-occurrence child of the compound folders
+under a member as such said "(hidden ones)"; the integrated-elsewhere
+folder holds no hidden ones, so the phrase went. No test pinned it.
+**** Tests placed
+All the plan's tests are in 'tests/hides_by_integration.rs'; the
+narrowing test is a view only (the helper module saves under no
+restriction); the forker and indirect-member cases are a move of f1
+from F (forker-only) into z (M forks F, hides nothing), a cut of g1
+from G (indirect: M forks G, hides g1) and a move of g1 into z (M
+forks G, hides nothing). The end-to-end check drove Jeff's picture
+with a narrowing.
+*** Fixtures changed
+- 'tests/hides_by_integration/fixtures/' (new): "public", "private"
+  (owned, in that order), "theirs" (foreign): x, F, G and their
+  content in theirs, M and z in public, y in private.
+- 'tests/hidden_from_forks/fixtures-overlapping-forkees/': E1, E2 and
+  shared moved to a new foreign skgrepo "theirs" (the extraction
+  test's buffer names it), since with both forkees owned each keeps
+  'shared' for the other and neither shows it, so no conflict arises;
+  the test's point needs a child no owned note keeps.
+- Expected views and assertions adapted: 'tests/refresh/reinstate.rs'
+  (i, which s contains, in e's new folder), 'tests/forkers_drawn_editable.rs'
+  (T's folders: integrated, hidden-in, hidden-by, then Y),
+  'tests/fork.rs' (the mail: m1, filed, stands in t's new folder; the
+  reply's m1 is found as f's content),
+  'tests/members_as_such_and_stale_buffers.rs' (W and U, both owned,
+  keep u1 for each other; U found as the forks folder's member, since
+  it first appears in W's u1's containers folder),
+  'tests/mirror_substitution.rs' and 'tests/hidden_from_forks.rs' (the
+  two behavior changes above; the sub-test
+  'test_moving_foreign_forkee_content_elsewhere_still_hides' is now
+  'test_moving_foreign_forkee_content_into_another_owned_note_does_not_hide'),
+  'tests/unit/viewnode.rs' and 'tests/metadata_fields_table.rs' (the
+  new kind), 'tests/shared/herald-rules.sexp' (regenerated by
+  'emit-herald-rules') and 'tests/shared/herald-rendering-cases.txt'
+  (a case for the new label, pinned by both clients and the AI
+  tool), skg-for-ai's tests (above), and the forks-meet integration
+  test (both clients' scripts and run-test.sh's header).
+*** Unfinished
+- A stale buffer with unsaved edits: what the view drew under a
+  member is read from the graph at the save, as the plan says. If,
+  after a view of N was drawn, another view or client stops keeping a
+  child (removes it from y), and N's view is saved without a redraw
+  in between (a dirty buffer the collateral rerender passes over),
+  the save reads that child as drawn under the member and cut, and
+  hides it. The same class of gap exists already for hides another
+  view removed. A cheap remedy, not taken: the visibility signals
+  could carry what the buffer shows in the member's integrated folder
+  and its hidden folder, and the save subtract those.
+- A fork's creation-time hides ('build_fork_clone') do not ask about
+  integration: a child the forking edit deletes is born hidden even if
+  the same save puts it in another owned note. The hide is redundant
+  and harmless (it stands in the hidden folder), and outside the
+  plan's list.
+- The '(unintegrated N)' count in the diff view uses the new rule
+  while a member there draws what is kept elsewhere among its content
+  (the stats pass does not know the mode).
+- Many views change shape: every forkee of a clone now shows its
+  folder of what the user keeps elsewhere (all its content, at
+  first), as the plan decides ("that an owned note or N contains").
+  Folded, but a new headline under every such member.
+- The containers folder under a member of the new folder is drawn
+  only where the member is no repeat: where the view shows the child
+  above (in the keeper's own content, say), it names nothing.
+*** DONE
+The slice's headline in '3_plan.org' is DONE.
+*** Names coined or changed
+- New: 'Folder::IntegratedElsewhere' (atom 'integratedElsewhereFolder',
+  label "☮ It contains these, and you keep them elsewhere.",
+  provisional), its goal 'integrated_elsewhere'; 'owned_notes_containing'
+  and 'ContainsAfterSave' (with 'contents_saved_for') in
+  'server/refresh/goal.rs'; 'LoweredNodeIntents::contains_after_save';
+  'add_children_placed_under_members_as_such',
+  'owned_notes_containing_after_save', 'kept_elsewhere_before_save' in
+  'resolve_visibility.rs'.
+- Changed signatures: 'content_goal_gnids' takes the config and the
+  member; 'less_what_the_note_integrates' the config, the member and
+  'kept_elsewhere_counts'; 'unintegrated_content_gnids' a
+  'kept_elsewhere' predicate; 'set_herald_strings_in_viewnode' the
+  config.
+- Terms: "integrated", "the user's graph", "kept elsewhere"
+  (glossary entry "integrated, the user's graph, kept elsewhere"), "the
+  integrated-elsewhere folder"; 'docs/forks.org' has the section "What
+  you keep elsewhere", which the code and tests cite. The names
+  'less_what_the_note_integrates' and "unintegrated" keep their names
+  and now mean the wider rule.
+- Test renamed: 'hidden_from_forks::test_moving_foreign_forkee_content_elsewhere_still_hides'
+  is 'test_moving_foreign_forkee_content_into_another_owned_note_does_not_hide'.
+  New: 'hides_by_integration::*'.
