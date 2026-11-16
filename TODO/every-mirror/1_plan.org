@@ -1455,6 +1455,12 @@ Questions: Q6, Q7.
   suites as slice 2 does.
 
 ** TODO Slice 5: one relation, 'forks', in files, graph, save and wire
+*** Corrections carried from slice 1
+Run the migration tool once per fixture's own set of skgrepos, never
+over all of 'tests/' at once: it groups sections by pid across every
+directory it is given, so unrelated fixtures sharing a pid such as 'a'
+would be paired (slice 1's all-at-once dry run reported 3 overrides
+"recorded in another section", likely such pairings).
 Questions: Q5, Q8 (the relation's names and its letter), Q10 (the
 hides key). Commit in
 three parts, each green: the server with its unit and Rust tests; the
@@ -1579,6 +1585,12 @@ every save fork every forker.
   suites as slice 2 does.
 
 ** TODO Slice 7: the save's and the goal's names, and the test files
+*** Corrections carried from slice 1
+The migration tool renames processed marks naming 'HidesFromSubs' to
+'Hides', not drops them. When this slice renames the relation, the new
+variant's serialized name must be exactly 'Hides', or the marks files
+the tool wrote become unreadable, and an unreadable marks file loads
+as empty and is overwritten.
 Questions: Q10. A rename with no change of behavior: plan 2's
 precondition 3.
 - The save's and the refresh's subscription names
