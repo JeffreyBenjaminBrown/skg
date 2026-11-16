@@ -76,12 +76,12 @@ function M.handler (response)
     if refusal then
       vim.notify('skg: ' .. refusal)
       return end
-    local followed = payload.field_text(response, 'perspective')
+    local perspective = payload.field_text(response, 'perspective')
     local name = payload.field_text(response, 'perspective-name')
     local view_id = payload.field_text(response, 'view-id')
     local buf = view_id and buffer.find_buffer_by_view_id(view_id)
     if buf then
-      buffer.set_perspective(buf, followed, name)
+      buffer.set_perspective(buf, perspective, name)
       vim.cmd('redrawstatus!') end
     vim.notify('Showing ' .. tostring(name) .. '.')
   end)

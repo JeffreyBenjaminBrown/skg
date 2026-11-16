@@ -250,7 +250,7 @@ fn the_clone (
   Ok ( new_public_files [0] . trim_start_matches ("public/")
        . trim_end_matches (".skg") . to_string () ) }
 
-/// Save 'text' as VIEW under 'restriction', its forks approved; it
+/// Save 'text' as VIEW under 'restriction', its fork operations approved; it
 /// must save without errors.
 fn save_cleanly (
   f           : &mut Fixture,

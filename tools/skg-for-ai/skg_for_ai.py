@@ -902,7 +902,7 @@ def command_perspective (arguments):
     refusal = response_field (response, "content")
     if refusal is not None:
       raise SkgToolError ( "The server refused: " + sexp_to_text (refusal) )
-    followed = response_text_field (response, "perspective")
+    perspective = response_text_field (response, "perspective")
     name = response_text_field (response, "perspective-name")
     if rerendered is None:
       raise SkgToolError (
@@ -922,7 +922,7 @@ def command_perspective (arguments):
                           in response_field (done, "errors") or [] ],
         "warnings"    : [ sexp_to_text (warning) for warning
                           in response_field (done, "warnings") or [] ],
-        "perspective" : followed,
+        "perspective" : perspective,
         "perspective_name"   : name },
       saved_view . directory, saved_view . base_name, sidecar [ "summary" ] )
     release_view (connection, view_id)
@@ -1881,10 +1881,10 @@ def relationship_heralds_text (metadata):
 def relation_token (relation_name, letter, form, in_place_of):
   in_side = relation_side_text (relation_name, "in", form)
   out_side = relation_side_text (relation_name, "out", form)
-  here = relation_name == "forks" and in_place_of
-  if not in_side and not out_side and not here:
+  shows_in_place_of = relation_name == "forks" and in_place_of
+  if not in_side and not out_side and not shows_in_place_of:
     return ""
-  return in_side + letter + ( "ĥ" if here else "" ) + out_side
+  return in_side + letter + ( "ĥ" if shows_in_place_of else "" ) + out_side
 
 def relation_side_text (relation_name, side_name, form):
   side = metadata_form (form, side_name)
@@ -2980,8 +2980,8 @@ def parse_edited_compact_view (compact_text):
 # folder takes.
 HERALD_PHRASES_HOLDING_HANDLE_WORDS = (
   "It forks these, or these fork it.",
-  "It hides these from its forks.",
-  "These hide it from their forks." )
+  "It hides these from what it forks.",
+  "These hide it from what they fork." )
 
 def handle_words (display_text):
   """The words of a handle's display text: its tokens, the heralds of

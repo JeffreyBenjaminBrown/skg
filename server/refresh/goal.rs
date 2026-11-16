@@ -388,13 +388,13 @@ fn folder_goal (
       Some ( Goal::unordered ( gnid_items (
         hidden_in_forkee (
           &occurrence_pid_of (parties . forkee ?) ?,
-          &occurrence_pid_of (parties . forker) ?, walk ),
+          &occurrence_pid_of (parties . hider) ?, walk ),
         &HashMap::new ()))) },
     Folder::HiddenOutsideOfForkPartners => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       Some ( Goal::ordered ( gnid_items (
         hidden_outside_of_forkees (
-          &occurrence_pid_of (parties . forker) ?, walk ),
+          &occurrence_pid_of (parties . hider) ?, walk ),
         &HashMap::new ()))) },
     Folder::Forks =>
       Some ( forks_folder_goal (&described_pid () ?, walk) ),

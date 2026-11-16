@@ -158,12 +158,12 @@ the redraws it starts itself, even after a restart.")
 view shows its root authors'.")
 (put 'skg-perspective-name 'permanent-local t)
 
-(defun skg--set-perspective (followed name)
-  "Record that this view shows the perspective FOLLOWED, the server's
+(defun skg--set-perspective (perspective name)
+  "Record that this view shows the PERSPECTIVE, the server's
 wire name, which the server calls NAME. The root authors' perspective
 is recorded as nil, so that it stays unmarked and unsaid."
-  (let ((default (or (null followed) (equal followed "root authors"))))
-    (setq skg-perspective (unless default followed))
+  (let ((default (or (null perspective) (equal perspective "root authors"))))
+    (setq skg-perspective (unless default perspective))
     (setq skg-perspective-name (unless default name))))
 
 (defun skg--perspective-mode-line ()

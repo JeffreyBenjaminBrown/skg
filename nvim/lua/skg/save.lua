@@ -1355,9 +1355,9 @@ function M.fork_repos_from_confirmation_buffer (buf)
   return pairs_found
 end
 
----Approve the forks listed in the fork-confirmation buffer: extract
----each clone's chosen skgrepo, kill the confirmation buffer, and
----re-save the source buffer with the forks approved. Refuses
+---Approve the fork operations listed in the fork-confirmation buffer:
+---extract each clone's chosen skgrepo, kill the confirmation buffer,
+---and re-save the source buffer with the fork operations approved. Refuses
 ---while any clone-to-be still carries the placeholder skgrepo.
 function M.approve_fork ()
   local buf = vim.api.nvim_get_current_buf()

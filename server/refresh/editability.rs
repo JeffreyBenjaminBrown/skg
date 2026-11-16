@@ -273,10 +273,9 @@ fn in_the_diffViews_u (
 
 /// How an occurrence the refresh draws stands: its editability, and
 /// whether it claims membership of its viewparent's list.
-// TODO: The pair stands in for the 'ChildFlags' that the review of
-// plan 04.1 proposed, the flags every child has (its claim and its
-// warrant) beside 'FoldAndFocus', and that is not built. When it is,
-// this goes.
+// TODO: The pair stands in for a 'ChildFlags', not built: the flags
+// every child has (its claim and its warrant), beside 'FoldAndFocus'.
+// When it is built, this goes.
 #[derive(Clone, Copy)]
 pub(crate) struct EditabilityAndClaim {
   pub editability : DrawnEditability,

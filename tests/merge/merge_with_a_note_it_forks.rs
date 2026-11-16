@@ -2,7 +2,7 @@
 //
 // A nodeMerge of a note with a note it forks saves, and the merged
 // note neither forks nor hides itself: 'three_nodeMerged_graphnodes'
-// drops the merged note's own IDs from its forks and hides, as from
+// drops the merged note's own IDs from its 'forks' and 'hides', as from
 // its contents.
 //
 // Fixture graph (all owned, at 'main'):

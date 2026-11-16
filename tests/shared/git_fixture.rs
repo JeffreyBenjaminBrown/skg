@@ -252,7 +252,7 @@ pub fn under_public (
       body (f, &restriction) } ) }
 
 /// Save 'text' as the content view 'view' under 'restriction', its
-/// forks approved, whatever the response.
+/// fork operations approved, whatever the response.
 pub fn save_view_under (
   f           : &mut Fixture,
   view        : &str,
@@ -262,7 +262,7 @@ pub fn save_view_under (
   save_under (f, view, text, restriction, true, DeleteFrom::NotChosen) }
 
 /// Save 'text' as the content view 'view' through the save handler's
-/// own pipeline, under 'restriction', its forks approved when 'approved_forks', with the
+/// own pipeline, under 'restriction', its fork operations approved when 'approved_forks', with the
 /// delete-from choice 'delete_from'.
 pub fn save_under (
   f              : &mut Fixture,

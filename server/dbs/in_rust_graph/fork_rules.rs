@@ -1,13 +1,14 @@
-//! The rules an owned note's forks, contents and hides must keep.
+//! The fork rules ('docs/glossary.org'): the rules an owned note's
+//! home skgrepo, forks, contents and hides must keep.
 //!
 //! A note *forks* another when it records a 'forks' relationship to
 //! it. An owned note may not
 //! - fork itself ('SelfFork'), contain itself ('SelfContains') or hide
 //!   itself ('SelfHides'); a link to itself is fine;
 //! - both fork and contain one note ('ForkeeContained'): a note it
-//!   forks is the same note as it, and containing that is like
-//!   containing itself (a dangling ID, naming no note, breaks none of
-//!   these pair rules);
+//!   forks is its mirror, which may stand in its place, and containing
+//!   that is like containing itself (a dangling ID, naming no note,
+//!   breaks none of these pair rules);
 //! - contain a note that forks it, or fork a note that contains it
 //!   ('ForkerContained'), for the same reason.
 //! Any number of notes, owned or not, may fork one note, and forks may

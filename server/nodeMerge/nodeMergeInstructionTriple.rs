@@ -75,10 +75,10 @@ fn nodeMerge_from_acquirer_and_acquiree (
     // so these ids are dropped from the combined
     // hides below.
     let mut shown : HashSet<ID> =
-      gnids_shown_through_forks (
+      gnids_shown_through_forkees (
         &acquirer_from_disk, graph, config ) ?;
     shown . extend (
-      gnids_shown_through_forks (
+      gnids_shown_through_forkees (
         &acquiree_from_disk, graph, config ) ? );
     shown };
   let updated_acquirer : Graphnode =
@@ -204,7 +204,7 @@ fn three_nodeMerged_graphnodes(
       MSV::Specified (combined); }
   { // Combine hides, filtering to hide
     // nothing that the acquirer contains, and nothing either member
-    // showed through its forks pre-merge: if it was
+    // showed through its forkees pre-merge: if it was
     // contained in one member's forkee and unhidden by (and not
     // contained in) that member, the merge keeps showing it -- one
     // member's hide never silences the other's view. ("Something
@@ -229,7 +229,7 @@ fn three_nodeMerged_graphnodes(
 /// its own contents (the forkee-as-such display rule,
 /// docs/sharing-model.org). A forkee with no disk entry
 /// contributes nothing.
-fn gnids_shown_through_forks (
+fn gnids_shown_through_forkees (
   node   : &Graphnode,
   graph  : &InRustGraph,
   config : &SkgConfig,

@@ -112,7 +112,7 @@ pub fn described_node (
   match kind {
     Folder::HiddenInForkPartner | Folder::HiddenOutsideOfForkPartners => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
-      Some ( parties . forkee . unwrap_or (parties . forker) ) },
+      Some ( parties . forkee . unwrap_or (parties . hider) ) },
     _ => required_ancestors (tree, folder) . first () . copied (), } }
 
 /// The gnids the view shows above the headline at 'treeid': of each
@@ -135,9 +135,8 @@ pub fn view_ancestor_gnids (
     . collect () }
 
 /// A compound folder's two parties, where they stand: the note whose
-/// hides it shows (the 'forker', its forker), and, for the folder
-/// of what that note hides in one forkee, that forkee as such (the
-/// 'forkee'). In
+/// hides it shows (the 'hider'), and, for the folder of what that
+/// note hides in one forkee, that forkee as such (the 'forkee'). In
 ///   forker > forksFolder > forkee > hiddenInForkPartnerFolder
 /// the forkee is the folder's viewparent and the forker three
 /// generations up; in
@@ -145,7 +144,7 @@ pub fn view_ancestor_gnids (
 /// the note is two up.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CompoundFolderParties {
-  pub forker     : NodeId,
+  pub hider      : NodeId,
   pub forkee     : Option<NodeId>,
 }
 
@@ -161,10 +160,10 @@ pub fn compound_folder_parties (
   let required : Vec<NodeId> = required_ancestors (tree, folder);
   match kind { // the places are those of the rows ANC_HIDDEN_IN and ANC_HIDDEN_OUTSIDE
     Folder::HiddenInForkPartner => Some ( CompoundFolderParties {
-      forker     : *required . get (2) ?,
+      hider      : *required . get (2) ?,
       forkee     : Some ( *required . first () ? ) } ),
     Folder::HiddenOutsideOfForkPartners => Some ( CompoundFolderParties {
-      forker     : *required . get (1) ?,
+      hider      : *required . get (1) ?,
       forkee     : None } ),
     _ => None, } }
 

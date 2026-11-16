@@ -90,11 +90,11 @@ fn all_tests
       s . reset ("extraction_honors_inPlaceOf", fixtures) ?;
       extraction_honors_inPlaceOf (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_second_owned_fork_saves_and_q3s_mirror_stands", fixtures) ?;
-      a_second_owned_fork_saves_and_q3s_mirror_stands (
+      s . reset ("a_second_owned_fork_saves_and_the_original_stands", fixtures) ?;
+      a_second_owned_fork_saves_and_the_original_stands (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("an_owned_mutual_pair_saves_and_q3s_mirror_stands", fixtures) ?;
-      an_owned_mutual_pair_saves_and_q3s_mirror_stands (
+      s . reset ("an_owned_mutual_pair_saves_and_the_original_stands", fixtures) ?;
+      an_owned_mutual_pair_saves_and_the_original_stands (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("ownership_and_visibility_gate_substitution",
                              "tests/mirror_substitution/fixtures-multi/skgconfig.toml") ?;
@@ -289,10 +289,11 @@ async fn save_roundtrips_to_original_and_is_a_fixpoint (
 /// M, in N's skgrepo, comes to fork N beside R (saved through the
 /// save's graph update). N's
 /// three mirrors tie in that skgrepo, R and M both forked by none of
-/// the others, so N stands as itself (Q3, rule 3), where R stood before
+/// the others, so N stands as itself (rule 3 of 'docs/mirrors.org',
+/// "Which mirror stands"), where R stood before
 /// the save; and M, whose mirrors are the same three, stands as itself.
 /// R and M stand in N's forks folder, forkers claiming nothing.
-async fn a_second_owned_fork_saves_and_q3s_mirror_stands (
+async fn a_second_owned_fork_saves_and_the_original_stands (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -321,9 +322,10 @@ async fn a_second_owned_fork_saves_and_q3s_mirror_stands (
 
 /// N comes to fork R, which forks N: an owned mutual pair, in
 /// one skgrepo (saved as above). Each is forked by the other, so N
-/// stands as itself (Q3, rule 3), where R stood before the save; R
+/// stands as itself (rule 3 of 'docs/mirrors.org', "Which mirror
+/// stands"), where R stood before the save; R
 /// is drawn in N's forks folder, a mutual, born of both sides.
-async fn an_owned_mutual_pair_saves_and_q3s_mirror_stands (
+async fn an_owned_mutual_pair_saves_and_the_original_stands (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -562,7 +564,7 @@ async fn save_under_set (
 /// A half-visible owned chain: D forks C forks N, with the
 /// end D in skgrepo 'other'. Unrestricted the END D substitutes for N;
 /// under 'main' (hiding 'other') the middle C substitutes. Saving the
-/// half-visible view accepts the middle carrier (it is on N's chain)
+/// half-visible view accepts the middle mirror bearing the part (it is on N's chain)
 /// and keeps N in P's contains; an off-chain fact is rejected.
 async fn chain_half_visible_keeps_the_original (
   config : &SkgConfig,
@@ -596,7 +598,7 @@ async fn chain_half_visible_keeps_the_original (
         assert! ( marked [0] . contains ("(gnid C)"),
           "the chain middle C is shown under main:\n{}", view );
         view };
-      { // Saving the half-visible view accepts the middle carrier and
+      { // Saving the half-visible view accepts the middle bearer and
         // keeps N (not C) in P's contains.
         let saved : String =
           save_under_set (&view_main, config, tantivy, &main_set)
@@ -613,7 +615,7 @@ async fn chain_half_visible_keeps_the_original (
         assert! ( p_file . contains ("- N"),
           "P still contains N after the half-visible save:\n{}", p_file );
         assert! ( ! p_file . contains ("- C"),
-          "P must NOT be rewritten to contain the carrier C:\n{}",
+          "P must NOT be rewritten to contain the bearer C:\n{}",
           p_file ); }
       { // A fact on a node not on N's chain is rejected.
         let buffer = indoc! {"
@@ -717,7 +719,7 @@ async fn under_a_foreign_root_a_save_roundtrips_its_authors_mirror (
   Ok (( )) }
 
 /// The tamper check accepts any mirror of the original as its
-/// carrier, whichever the tree's perspective would show: under owned
+/// bearer, whichever the tree's perspective would show: under owned
 /// P, whose tree is drawn from the user's perspective (which shows U
 /// in M's place), A, a fork of M by M's own author, carrying
 /// '(inPlaceOf M)', saves. K, no mirror of M, carrying it, aborts
@@ -726,22 +728,22 @@ async fn the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   graph_handle_from_config (config) ?;
-  let carried_by = |carrier : &str| -> String { format! (
+  let borne_by = |bearer : &str| -> String { format! (
     "* (skg node (gnid P) (skgRepos (nodeRepo main))) P\n\
-     ** (skg node (gnid {carrier}) (skgRepos (nodeRepo foreign)) (inPlaceOf M)) {carrier}\n" ) };
-  assert! ( node_instructions_from (&carried_by ("A"), config) . await . is_ok (),
-    "a mirror the tree's perspective would not show is still an honest carrier" );
-  match node_instructions_from (&carried_by ("K"), config) . await {
+     ** (skg node (gnid {bearer}) (skgRepos (nodeRepo foreign)) (inPlaceOf M)) {bearer}\n" ) };
+  assert! ( node_instructions_from (&borne_by ("A"), config) . await . is_ok (),
+    "a mirror the tree's perspective would not show may still bear the part" );
+  match node_instructions_from (&borne_by ("K"), config) . await {
     Err (SaveError::BufferValidationErrors { errors, .. }) =>
       assert! ( errors . iter () . any ( |e| matches! (
         e, BufferValidationError::InPlaceOf_Mismatch (
-             Some (carrier), original, Some (shown), _ )
-           if carrier == &ID::from ("K") && original == &ID::from ("M")
+             Some (bearer), original, Some (shown), _ )
+           if bearer == &ID::from ("K") && original == &ID::from ("M")
               && shown == &ID::from ("U") )),
-        "a carrier that is no mirror of M must abort, naming U; got: {:?}",
+        "a bearer that is no mirror of M must abort, naming U; got: {:?}",
         errors ),
     other => panic! (
-      "a carrier that is no mirror of M must abort the save; got: {:?}",
+      "a bearer that is no mirror of M must abort the save; got: {:?}",
       other . map ( |v| v . len () ) ), }
   Ok (( )) }
 
@@ -939,7 +941,7 @@ fn a_switched_view_follows_the_users_perspective_until_switched_back (
     "switched back, R's author's A stands in M's place again:\n{}", back );
   Ok (( )) }
 
-/// Every mirror is an honest carrier, so a content child already
+/// Every mirror may bear the part, so a content child already
 /// shown in another's place is re-pointed whenever the view's
 /// perspective ranks another mirror first: a view of owned P shows U,
 /// the user's, in M's place; switched to third's perspective, B; to
@@ -1573,7 +1575,7 @@ async fn a_save_following_the_users_perspective_shows_a_new_fork_in_place (
   Ok (( )) }
 
 /// Under foreign R, U, the user's, and A, R's author's, each carrying
-/// '(inPlaceOf M)', are honest whichever perspective the save
+/// '(inPlaceOf M)', may bear it whichever perspective the save
 /// names: each is a mirror of M. K, no mirror of M, is refused under
 /// either, the refusal naming the mirror the named perspective shows.
 /// A root standing for another node has that node's author: K standing
@@ -1584,9 +1586,9 @@ fn the_tamper_check_accepts_a_mirror_whatever_perspective_the_save_names (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraph = InRustGraph::from_graphnodes (
     &read_all_skg_files_from_skgrepos (config) ? );
-  let buffer_showing = |carrier : &str, repo : &str| -> String { format! (
+  let buffer_showing = |bearer : &str, repo : &str| -> String { format! (
     "* (skg node (gnid R) (skgRepos (nodeRepo foreign))) R\n** (skg node (gnid {}) (skgRepos (nodeRepo {})) (inPlaceOf M)) {}\n",
-    carrier, repo, carrier ) };
+    bearer, repo, bearer ) };
   let mismatch_naming = |buffer : &str, followed : Perspective| -> Option<ID> {
     match buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       buffer, &graph, config, &SkgrepoRestriction::unrestricted (config),
@@ -1654,9 +1656,9 @@ async fn a_held_view_follows_whatever_its_save_names (
 /// deletes U and nothing else: it asks to fork nothing, R keeps M, and
 /// the redrawn view shows in U's place the mirror of M that the user's
 /// perspective now ranks first: A, M's author's fork of it, in M's
-/// skgrepo, which the user's list ranks above third's. (Before 2026-11-15
-/// U's deletion dropped M from R's content, an edit of foreign R, so
-/// the save asked to fork R.)
+/// skgrepo, which the user's list ranks above third's. Deleting a
+/// mirror shown in its original's place deletes the mirror, not the
+/// original's membership, so it edits no foreign parent.
 async fn deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_the_original (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,

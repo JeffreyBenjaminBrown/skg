@@ -505,7 +505,7 @@ pub async fn save_and_rerender (
 
 /// Save, through the save's graph update (which checks the fork
 /// rules), the node 'pid' as disk has it but with 'forkees' appended
-/// to its forks, each recorded at its home: how a test makes an owned
+/// to its 'forks' list, each recorded at its home: how a test makes an owned
 /// note fork another without drawing a buffer.
 pub async fn save_added_forks (
   pid     : &ID,

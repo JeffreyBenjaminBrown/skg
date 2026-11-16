@@ -532,8 +532,8 @@ fn an_entry_already_staged_is_neither_committed_nor_unstaged () -> TestResult {
       assert_eq! ( staged_paths (f, "main") ?, vec! [ "notes.txt" . to_string () ] );
       Ok (( )) }) }
 
-/// The check of decision 4, forced to expect a's changes left when a
-/// goes in: nothing is committed.
+/// The check before committing ('check_candidate'), forced to
+/// expect a's changes left when a goes in: nothing is committed.
 #[test]
 fn a_mismatch_in_the_check_commits_nothing () -> TestResult {
   with_scratch ( MAIN, &[

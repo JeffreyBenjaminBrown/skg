@@ -4,8 +4,10 @@
 //! The config declares, in order: 'my-y' and 'my-x', owned (so 'my-y'
 //! is the more public), then 'your-x' and 'your-y', foreign, one
 //! owner's, whose manifest says 'your-x' is the more public. So the
-//! user's skgrepo list is (my-x, my-y, your-x, your-y), as in Jeff's
-//! example, and the foreign owner's is (your-y, your-x, my-y, my-x).
+//! user's skgrepo list is (my-x, my-y, your-x, your-y), and the
+//! foreign owner's is (your-y, your-x, my-y, my-x): each owner's own
+//! skgrepos most private first, then the others in declaration order
+//! ('docs/mirrors.org', "Which mirror stands").
 
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::mirrors::{
@@ -87,13 +89,16 @@ fn every_one_shows (
       ID::from (expected),
       "asked of {}, from {:?}'s perspective", asked . pid . 0, owner ); }}
 
-/// Jeff: "If my list of skgrepos is (my X, my Y, your X, your Y) then
-/// a node only in my repo Y and your repo X shows as in my Y, one only
-/// in your X and your Y shows to me as in your X, etc." Each pair is a
-/// note and its fork, whichever of the two is asked about; the
-/// foreign owner's list ranks its own most private first.
+/// Of two mirrors, the one whose home skgrepo the perspective's
+/// skgrepo list ranks first stands, from each owner's perspective:
+/// the user's list is (my-x, my-y, your-x, your-y), so a note in
+/// your-x and its fork in my-y shows as the fork in my-y, and one in
+/// your-y and its fork in your-x shows as the fork in your-x; the
+/// foreign owner's list ranks its own skgrepos most private first.
+/// Each pair is a note and its fork, whichever of the two is asked
+/// about.
 #[test]
-fn jeffs_example_from_both_perspectives () {
+fn each_owner_ranks_its_own_skgrepos_first () {
   for ( placements, mine, yours ) in [
     ( [ ("n", "your-x", vec! []), ("f", "my-y",   vec! ["n"]) ], "f", "n" ),
     ( [ ("n", "your-y", vec! []), ("f", "your-x", vec! ["n"]) ], "f", "n" ),
@@ -130,8 +135,9 @@ fn a_foreign_two_cycle_shows_the_first_ranked_from_either_note () {
   every_one_shows (&notes, &me (), "a");
   every_one_shows (&notes, &you (), "b"); }
 
-/// Q3, rule 1: one mirror alone in the first-ranked skgrepo stands,
-/// though a forker of it is elsewhere.
+/// Rule 1 of 'docs/mirrors.org', "Which mirror stands": one mirror
+/// alone in the first-ranked skgrepo stands, though a forker of it is
+/// elsewhere.
 #[test]
 fn rule_one_a_mirror_alone_in_the_first_skgrepo_stands () {
   every_one_shows (
@@ -139,7 +145,8 @@ fn rule_one_a_mirror_alone_in_the_first_skgrepo_stands () {
        note ("d", "your-y", &["c"]) ],
     &me (), "c" ); }
 
-/// Q3, rule 2: of a chain in one skgrepo, the one no other forks.
+/// Rule 2 of 'docs/mirrors.org', "Which mirror stands": of a chain in
+/// one skgrepo, the one no other forks.
 #[test]
 fn rule_two_the_one_no_other_there_forks_stands () {
   every_one_shows (
@@ -147,8 +154,9 @@ fn rule_two_the_one_no_other_there_forks_stands () {
        note ("d", "my-x", &["c"]) ],
     &me (), "d" ); }
 
-/// Q3, rule 3: two forks of N in N's own skgrepo tie, and N stands;
-/// so does a mutual pair in one skgrepo, from either note.
+/// Rule 3 of 'docs/mirrors.org', "Which mirror stands": two forks of
+/// N in N's own skgrepo tie, and N stands; so does a mutual pair in
+/// one skgrepo, from either note.
 #[test]
 fn rule_three_the_original_stands_among_a_tie () {
   let siblings : Vec<Graphnode> = vec! [
@@ -159,8 +167,9 @@ fn rule_three_the_original_stands_among_a_tie () {
   assert_eq! ( shown (&mutual, &unrestricted (), &me (), "a"), ID::from ("a") );
   assert_eq! ( shown (&mutual, &unrestricted (), &me (), "b"), ID::from ("b") ); }
 
-/// Q3, rule 4: N is not among the tie (a, b and c, all in 'my-x',
-/// where b and c fork N and a forks b; a and c are forked by none of
+/// Rule 4 of 'docs/mirrors.org', "Which mirror stands": N is not
+/// among the tie (a, b and c, all in 'my-x', where b and c fork N
+/// and a forks b; a and c are forked by none of
 /// the others), so the nearest to N stands, and among equals (b and c)
 /// the least pid. 'a', the least pid of all, is farther.
 #[test]

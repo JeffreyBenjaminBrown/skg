@@ -156,7 +156,7 @@ fn verify_filesystem_after_merge_2_into_1(
   // (node 2 had no relationships to transfer)
   assert_eq!(members_of (node_1 . forks . or_default()),
              vec![ ID::from ("1-forks"), ID::from ("1-forks-too") ],
-             "Node 1 should keep its forks");
+             "Node 1 should keep its forks list");
 
   // Note: node 1 originally hid both "1-hides"
   // and "1-hides-but-2-contains".

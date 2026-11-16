@@ -73,16 +73,16 @@ fn set_viewnodestats_recursive (
         tree, treeid, &node_pid, ancestor_gnids );
       if multi_skgrepo {
         set_skgrepo_at_boundary (tree, treeid); }
-      let fork_sides : Option<ForksFolderMemberSides> =
-        forks_folder_member_sides (tree, treeid, graph, restriction, relRepos);
-      let stands_as_member_here : bool = match &fork_sides {
-        Some (sides) => sides . as_forkee || sides . as_forker,
+      let fork_roles : Option<ForksFolderMemberRoles> =
+        forks_folder_member_roles (tree, treeid, graph, restriction, relRepos);
+      let stands_as_member_here : bool = match &fork_roles {
+        Some (roles) => roles . as_forkee || roles . as_forker,
         None => stands_as_member (tree, treeid), };
       set_herald_strings_in_viewnode (
-        tree, treeid, &node_pid, stands_as_member_here, fork_sides . as_ref (),
+        tree, treeid, &node_pid, stands_as_member_here, fork_roles . as_ref (),
         graph, restriction, relRepos, container_to_contents, content_to_containers );
       set_omitted_body (tree, treeid, &node_pid, graph);
-      set_relRepo (tree, treeid, stands_as_member_here, fork_sides . as_ref (),
+      set_relRepo (tree, treeid, stands_as_member_here, fork_roles . as_ref (),
                    graph, relRepos, config);
       Some (node_pid)
     } else { None };
@@ -131,28 +131,28 @@ fn stands_as_member (
     ViewnodeKind::Folder (_) => t . viewStats . warrant == Warrant::ByGraph,
     _ => false, } }
 
-/// The sides on which a member of a forks folder stands as a member of
+/// The roles in which a member of a forks folder stands as a member of
 /// it: as a forkee, when the folder's viewparent forks it (where the
 /// folder reads its members' claims, when it claims: the claim says
 /// the viewparent forks it; elsewhere, when the graph's warrant and a
 /// record the skgrepo restriction shows say so), and as a forker, when
 /// the graph's warrant and such a record say that it forks the
-/// viewparent, whatever it claims. A mutual stands on both; a forkee
-/// the user detached, on neither.
-struct ForksFolderMemberSides {
+/// viewparent, whatever it claims. A mutual stands in both; a forkee
+/// the user detached, in neither.
+struct ForksFolderMemberRoles {
   as_forkee : bool,
   as_forker : bool,
 }
 
-/// The sides of the occurrence at 'treeid' as a member of the forks
-/// folder it stands in; None for any other viewnode.
-fn forks_folder_member_sides (
+/// The roles the occurrence at 'treeid' plays as a member of the
+/// forks folder it stands in; None for any other viewnode.
+fn forks_folder_member_roles (
   tree        : &Tree<Viewnode>,
   treeid      : NodeId,
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
   relRepos    : &mut RelRepoLookup,
-) -> Option<ForksFolderMemberSides> {
+) -> Option<ForksFolderMemberRoles> {
   let node : NodeRef<Viewnode> = tree . get (treeid) ?;
   let ViewnodeKind::Vognode (Vognode::Occurrence (t)) = &node . value () . kind
     else { return None; };
@@ -167,7 +167,7 @@ fn forks_folder_member_sides (
       graph, restriction, relRepos, &t . gnid, &note, role ) };
   let note_forks_it : bool = note_plays (RelationRole::FORKER);
   let it_forks_note : bool = note_plays (RelationRole::FORKEE);
-  Some ( ForksFolderMemberSides {
+  Some ( ForksFolderMemberRoles {
     as_forkee : if parent_reads_claims (tree, folder . id ()) { t . claimsMembership }
                 else { note_forks_it },
     as_forker : it_forks_note, } ) }
@@ -190,7 +190,7 @@ fn set_herald_strings_in_viewnode (
   treeid                : NodeId,
   node_pid              : &ID,
   stands_as_member_here : bool, // see 'stands_as_member'
-  fork_sides            : Option<&ForksFolderMemberSides>,
+  fork_roles            : Option<&ForksFolderMemberRoles>,
   graph                 : &InRustGraph,
   restriction           : &SkgrepoRestriction,
   relRepos              : &mut RelRepoLookup,
@@ -251,7 +251,7 @@ fn set_herald_strings_in_viewnode (
     in_place_of . as_ref () . and_then ( |original|
       side_of_mirror_shown (graph, restriction, node_pid, original) );
   let birth_facts : Vec<BirthFact> =
-    birth_facts (tree, &parent_kind, stands_as_member_here, fork_sides, &flags, side_of_mirror);
+    birth_facts (tree, &parent_kind, stands_as_member_here, fork_roles, &flags, side_of_mirror);
   let rel_heralds : RelationshipHeralds = relationship_heralds_sexp (
     &counts, gstats . aliases, gstats . extra_ids, gstats . flags,
     &flags, &birth_facts, unintegrated );
@@ -379,14 +379,14 @@ fn relationship_is_visible (
 /// viewparent's containment; for a child standing as no member
 /// ('stands_as_member'), none. Usually a singleton; a
 /// HiddenInForkPartner member has two, and so has a mutual in a forks
-/// folder, one per side it stands on ('fork_sides'). A mirror shown in
+/// folder, one per side it stands on ('fork_roles'). A mirror shown in
 /// another's place leads with its fork relation, on the side
 /// 'side_of_mirror_shown' gives.
 fn birth_facts (
   tree                  : &Tree<Viewnode>,
   parent_kind           : &ParentKind,
   stands_as_member_here : bool,
-  fork_sides            : Option<&ForksFolderMemberSides>,
+  fork_roles            : Option<&ForksFolderMemberRoles>,
   flags                 : &AncestorFlags,
   side_of_mirror        : Option<Side>, // shown in another's place, reaching it by forker (out) or forkee (in) steps only
 ) -> Vec<BirthFact> {
@@ -399,8 +399,8 @@ fn birth_facts (
           if flags . contains_in . contains (&1) {
             vec![ BirthFact::new ( NodeRelation::Contains, Side::In, Some (1) ) ]
           } else { Vec::new () },
-        ParentKind::Folder (folder, folder_treeid) => match fork_sides {
-          Some (sides) => birth_facts_of_fork_sides (sides),
+        ParentKind::Folder (folder, folder_treeid) => match fork_roles {
+          Some (roles) => birth_facts_of_fork_roles (roles),
           None => birth_facts_for_folder (tree, folder, *folder_treeid), },
         ParentKind::Other => Vec::new (), }}};
   if let Some (side) = side_of_mirror {
@@ -413,11 +413,11 @@ fn birth_facts (
 
 /// A forks folder member's birth facts: '(forks in 2)' where it stands
 /// as a forkee, '(forks out 2)' where it stands as a forker, both for
-/// a mutual ('ForksFolderMemberSides').
-fn birth_facts_of_fork_sides (
-  sides : &ForksFolderMemberSides,
+/// a mutual ('ForksFolderMemberRoles').
+fn birth_facts_of_fork_roles (
+  roles : &ForksFolderMemberRoles,
 ) -> Vec<BirthFact> {
-  [ ( sides . as_forkee, Side::In ), ( sides . as_forker, Side::Out ) ]
+  [ ( roles . as_forkee, Side::In ), ( roles . as_forker, Side::Out ) ]
     . into_iter ()
     . filter ( |(stands, _)| *stands )
     . map ( |(_, side)| BirthFact::new ( NodeRelation::Forks, side, Some (2) ))
@@ -432,7 +432,7 @@ fn side_of_role (
 
 /// A partner-folder member's birth facts. The folder's recorder is the
 /// member's grandparent; the compound partner folders sit one or two
-/// levels deeper under the forker. (The table of birth facts is in
+/// levels deeper under the hider. (The table of birth facts is in
 /// docs/api-and-formats.org.)
 fn birth_facts_for_folder (
   tree          : &Tree<Viewnode>,
@@ -440,8 +440,8 @@ fn birth_facts_for_folder (
   folder_treeid : NodeId,
 ) -> Vec<BirthFact> {
   match folder {
-    // A forks folder's member's facts are those of its sides
-    // ('birth_facts'); one standing on neither has none.
+    // A forks folder's member's facts are those of its roles
+    // ('birth_facts'); one standing in neither has none.
     Folder::Forks => Vec::new (),
     Folder::Hider | Folder::Hidden
     | Folder::Container | Folder::Mentioner
@@ -464,7 +464,7 @@ fn birth_facts_for_folder (
         else { return Vec::new (); }; // unsayable, so entombstoned
       once ( BirthFact::new (
           NodeRelation::Hides, Side::In,
-          generation_above_a_member (tree, folder_treeid, parties . forker) ))
+          generation_above_a_member (tree, folder_treeid, parties . hider) ))
         . chain ( parties . forkee . map ( |forkee| BirthFact::new (
             NodeRelation::Contains, Side::In,
             generation_above_a_member (tree, folder_treeid, forkee) )) )
@@ -513,7 +513,7 @@ fn set_relRepo (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
   stands_as_member_here : bool, // see 'stands_as_member'
-  fork_sides : Option<&ForksFolderMemberSides>, // in a forks folder: a forkee's relRepo is its viewparent's record, a forker-only member's its own
+  fork_roles : Option<&ForksFolderMemberRoles>, // in a forks folder: a forkee's relRepo is its viewparent's record, a forker-only member's its own
   graph  : &InRustGraph,
   relRepos : &mut RelRepoLookup,
   config : &SkgConfig,
@@ -535,8 +535,8 @@ fn set_relRepo (
         ParentKind::Vognode (parent_pid) =>
           (parent_pid, NodeRelation::Contains, node_pid),
         ParentKind::Folder (folder, folder_treeid) => {
-          let member_role : Option<RelationRole> = match fork_sides {
-            Some (sides) if sides . as_forkee => Some (RelationRole::FORKEE),
+          let member_role : Option<RelationRole> = match fork_roles {
+            Some (roles) if roles . as_forkee => Some (RelationRole::FORKEE),
             Some (_) => Some (RelationRole::FORKER),
             None => folder . relation_member_role (), };
           let Some (role) : Option<RelationRole> = member_role

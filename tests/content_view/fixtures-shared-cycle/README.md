@@ -27,7 +27,7 @@ Note: Files 4 and 5 are islands w/r/t the `contains` relationship.
 - **5.skg** forks: 3.skg, 4.skg
 
 ### Hide Relationships
-- **1.skg** hides from its forks: 4.skg, 5.skg (via alias 55)
+- **1.skg** hides from what it forks: 4.skg, 5.skg (via alias 55)
 
 ### Aliases
 Multiple IDs can refer to the same file:

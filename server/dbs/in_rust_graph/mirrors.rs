@@ -232,10 +232,10 @@ pub fn mirror_pids_ignoring_restriction (
 
 /// Which side of 'original' the mirror 'shown' stands on, as the
 /// birth fact of a mirror shown in its place says: 'Side::Out' when
-/// 'shown' reaches 'original' by forker steps only (it forks a note
-/// that ... forks 'original'), 'Side::In' when by forkee steps only,
-/// None otherwise (a sibling, say). Where both hold (mutual forks),
-/// 'Side::Out'.
+/// 'shown' reaches 'original' forkeeward (it forks a note that ...
+/// forks 'original'), 'Side::In' when 'original' reaches 'shown'
+/// forkeeward, None otherwise (a sibling, say). Where both hold
+/// (mutual forks), 'Side::Out'.
 pub fn side_of_mirror_shown (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
@@ -244,15 +244,15 @@ pub fn side_of_mirror_shown (
 ) -> Option<Side> {
   let shown : ID = graph . pid_else_raw_id (shown);
   let original : ID = graph . pid_else_raw_id (original);
-  if reaches_by_forkee_steps (graph, restriction, &shown, &original) {
+  if reaches_forkeeward (graph, restriction, &shown, &original) {
     Some (Side::Out)
-  } else if reaches_by_forkee_steps (graph, restriction, &original, &shown) {
+  } else if reaches_forkeeward (graph, restriction, &original, &shown) {
     Some (Side::In)
   } else { None }}
 
-/// Whether 'to' is reached from 'from' by following visible fork
-/// relationships from forker to forkee only.
-fn reaches_by_forkee_steps (
+/// Whether 'to' is reached from 'from' forkeeward: by following
+/// visible 'forks' relationships from forker to forkee only.
+fn reaches_forkeeward (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
   from        : &ID,

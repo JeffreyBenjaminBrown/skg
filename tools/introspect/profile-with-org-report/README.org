@@ -16,7 +16,7 @@ It records three complementary kinds of evidence:
 - counts of graph files, view bytes/headlines, request bytes, save
   instructions, files changed in the disposable copy, and the incremental
   graph neighborhood actually checked (affected IDs, reindexed owners,
-  override scope/steps, telescope owners, and local-index keys).
+  fork-rule scope/steps, telescope owners, and local-index keys).
 
 The server's structured tracing log supplies nested wall-time spans.  This is
 important because an on-CPU profile cannot account for filesystem or lock

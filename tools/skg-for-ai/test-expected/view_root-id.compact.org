@@ -21,5 +21,5 @@ A body line that stays unnumbered.
 ** Second child, a forker ⟨0f a/L K1 H2⟩
 *** ⟨0g It forks these, or these fork it.⟩
 **** Fred's note ⟨0h ☮ C1 1/L bK ⌂:fred⟩
-**** ⟨0i b hides these, but nothing it forks or that forks it contains them.⟩
+**** ⟨0i b hides these, but nothing it forks contains them.⟩
 ***** An aside of Fred's ⟨0j ☮ cH ⌂:fred folded⟩

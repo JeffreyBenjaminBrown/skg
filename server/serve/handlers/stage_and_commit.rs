@@ -278,7 +278,7 @@ pub fn commit_nodes (
   report . errors = errors;
   StageAndCommitAnswer::Committed (report) }
 
-/// Decision 4 of the plan this implements: the graph the prepared
+/// The check before anything is committed: the graph the prepared
 /// commits would leave ('PreparedCommits::final_tree_of', with the
 /// foreign skgrepos at their worktrees) must read back, pass the
 /// whole-graph validation, name in the three lists no node it lacks

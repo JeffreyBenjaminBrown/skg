@@ -488,7 +488,7 @@ fn orphan_under_a_tombstone (
 /// skgrepo restriction keeps out stays, unwarranted, for a skgrepo
 /// widening to show again. In a forks folder, whether or not it reads
 /// claims, an unwarranted member claiming nothing that its viewparent
-/// hides vanishes too ('hidden_in_its_forks_folder').
+/// hides vanishes too ('is_hidden_by_the_forks_folders_viewparent').
 fn mark_claims (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -507,7 +507,7 @@ fn mark_claims (
     else if claims_are_read {
       let warrant : Option<Warrant> = warrant_of_child (goal, viewnode);
       if ! claims && warrant == Some (Warrant::No)
-         && hidden_in_its_forks_folder (tree, parent, child, walk) {
+         && is_hidden_by_the_forks_folders_viewparent (tree, parent, child, walk) {
         vanish (tree, child, walk) ?; }
       else { vanish_if_unwarranted (tree, child, warrant, walk) ?; }}
     else if warrant_of_child (goal, viewnode) == Some (Warrant::No)
@@ -530,7 +530,7 @@ fn leaves_its_write_protected_folder (
 ) -> bool {
   unhidden_in_the_hides_folder (tree, parent, child, walk)
   || view_ancestor_in_its_folder (tree, parent, child)
-  || hidden_in_its_forks_folder (tree, parent, child, walk) }
+  || is_hidden_by_the_forks_folders_viewparent (tree, parent, child, walk) }
 
 /// Whether 'child' stands in the forks folder at 'parent' for a note
 /// the folder's viewparent hides, by a record the skgrepo restriction
@@ -538,7 +538,7 @@ fn leaves_its_write_protected_folder (
 /// ('forker_only_members') but of the folder of what it hides outside
 /// its fork partners, as a save that deleted the forker from another
 /// view leaves it.
-fn hidden_in_its_forks_folder (
+fn is_hidden_by_the_forks_folders_viewparent (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
   child  : NodeId,

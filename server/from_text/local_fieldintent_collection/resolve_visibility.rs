@@ -353,7 +353,7 @@ fn infer_hides_from_contains_removals (
           let forkees : Vec<ID> = match &forks_msv {
             // The post-save forks: unforking a node in
             // the same save also stops hides being inferred from it.
-            MSV::Specified (subs) => subs . clone (),
+            MSV::Specified (forkees) => forkees . clone (),
             MSV::Unspecified =>
               members_with_visible_records (
                 forker_from_disk . forks . or_default (),

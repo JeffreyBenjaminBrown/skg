@@ -4,7 +4,7 @@
 // restriction shows, and records a new hide no more publicly than
 // the records that explain it ('docs/api-and-formats.org',
 // "Restricted-skgrepo nodes"). Deleting a member's line from a
-// forker hides the member from its forks when a
+// forker hides the member from what it forks when a
 // forkee contains it; the 'forks' relationships, the forkees'
 // content and the forker's hides are read by their visible
 // records, and the hide's relRepo is at least as private as the

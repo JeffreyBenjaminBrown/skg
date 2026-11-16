@@ -153,15 +153,15 @@ end
 -- itself, even after a restart. Like every 'vim.b' variable they
 -- survive filetype changes, as Emacs's permanent-locals do.
 
----Record that BUF shows the perspective FOLLOWED, the server's wire
+---Record that BUF shows the PERSPECTIVE, the server's wire
 ---name, which the server calls NAME. The root authors' perspective is
 ---recorded as nil, so that it stays unmarked and unsaid.
 ---@param buf integer
----@param followed string|nil
+---@param perspective string|nil
 ---@param name string|nil
-function M.set_perspective (buf, followed, name)
-  local default = followed == nil or followed == 'root authors'
-  vim.b[buf].skg_perspective = (not default) and followed or nil
+function M.set_perspective (buf, perspective, name)
+  local default = perspective == nil or perspective == 'root authors'
+  vim.b[buf].skg_perspective = (not default) and perspective or nil
   vim.b[buf].skg_perspective_name = (not default) and name or nil
 end
 
@@ -173,9 +173,9 @@ end
 ---@param buf integer|nil default the current buffer
 ---@return string
 function M.perspective_mode_line (buf)
-  local followed = vim.b[buf or 0].skg_perspective
-  if not followed then return '' end
-  return ':' .. (vim.b[buf or 0].skg_perspective_name or followed)
+  local perspective = vim.b[buf or 0].skg_perspective
+  if not perspective then return '' end
+  return ':' .. (vim.b[buf or 0].skg_perspective_name or perspective)
 end
 
 ---Record the normalized text from a successful server replacement.

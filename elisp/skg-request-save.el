@@ -1234,9 +1234,9 @@ child's id N -- the key by which the server applies the chosen repo."
     (nreverse pairs)))
 
 (defun skg-approve-fork ()
-  "Approve the forks listed in this *SKG Fork Confirmation* buffer:
+  "Approve the fork operations listed in this *SKG Fork Confirmation* buffer:
 extract each clone's chosen repo, re-save the source buffer with
-the forks approved (carrying those repos), and replace the confirmation
+the fork operations approved (carrying those repos), and replace the confirmation
 pane with a result buffer.  The result changes from \"saving\" to the
 server-confirmed success or failure when the approved save finishes.
 

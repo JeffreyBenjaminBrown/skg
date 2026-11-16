@@ -443,7 +443,7 @@ pub fn herald_rule_table () -> HeraldRule {
             any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]) ],
       // The write-protected folders carry ☮ ("cannot be changed
       // from here"); the editable folders (forksFolder,
-      // aliasFolder) do not.
+      // hiddenOutsideOfForkPartnersFolder, aliasFolder) do not.
       // The two compound folders name the note whose hides they show
       // by its ancestor letter (docs/heralds.org, "Ancestor flags and
       // floors"), styled apart from the words around it. It stands
@@ -456,20 +456,20 @@ pub fn herald_rule_table () -> HeraldRule {
                       Folder::HiddenInForkPartner . repr_in_client (), "☮"),
       leaf (Folder::HiddenInForkPartner . repr_in_client (),
             "It contains these, but"),
-      leaf_styled_as ("hiddenInForkPartnerFolder_forker",
+      leaf_styled_as ("hiddenInForkPartnerFolder_hider",
                       Folder::HiddenInForkPartner . repr_in_client (), "c"),
       leaf (Folder::HiddenInForkPartner . repr_in_client (),
             "hides them."),
-      leaf_styled_as ("hiddenOutsideOfForkPartnersFolder_forker",
+      leaf_styled_as ("hiddenOutsideOfForkPartnersFolder_hider",
                       Folder::HiddenOutsideOfForkPartners . repr_in_client (), "b"),
       leaf (Folder::HiddenOutsideOfForkPartners . repr_in_client (),
-            "hides these, but nothing it forks or that forks it contains them."),
+            "hides these, but nothing it forks contains them."),
       leaf (Folder::Forks . repr_in_client (),
             "It forks these, or these fork it.") ],
       write_protected_leaves (Folder::Hidden . repr_in_client (),
-            "It hides these from its forks."),
+            "It hides these from what it forks."),
       write_protected_leaves (Folder::Hider . repr_in_client (),
-            "These hide it from their forks."),
+            "These hide it from what they fork."),
       write_protected_leaves (Folder::Container . repr_in_client (),
             "These also contain it."),
       write_protected_leaves (Folder::Mentioner . repr_in_client (),

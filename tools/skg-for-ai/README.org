@@ -192,10 +192,10 @@ as the clients' 'skg-cycle-perspective'
 ('C-c v o' in Emacs) does, and writes the view again;
 'perspective SIDECAR PERSPECTIVE' switches to the one named:
 'root-authors', 'user', or a foreign skgrepo's name, for its owner.
-Where a node stands as content and a fork of it exists (a note that
-forks it, or one joined to it by forks: a mirror, 'docs/mirrors.org',
-"Mirrors"), the view may show the fork in its place, marked 'ĥ' after
-its 'K' ('⟨0b Kĥ1⟩'). Whose forks count is the perspective: a
+Where a node stands as content and it has mirrors (notes joined to
+it by forks, either way: 'docs/mirrors.org', "Mirrors"), the view may
+show one of its mirrors in its place, marked 'ĥ' after its 'K'
+('⟨0b Kĥ1⟩'). Whose skgrepo list ranks the mirrors is the perspective: a
 fresh view follows each tree's root author's (under a root of yours,
 yours; under a teammate's root, that teammate's); the others follow
 one author's in every tree, whoever wrote the root, so you read the
@@ -405,7 +405,7 @@ client shows them, the heralds are:
 The relationship heralds are rendered as the clients render them;
 'docs/heralds.org', "Relationship heralds", explains them. In display
 order: 'C' contains, 'L' links to, 'K' forks (the K of forK; 'F' is
-the flags count), 'H' hides (from its forks). A count before a letter counts the
+the flags count), 'H' hides (from what it forks). A count before a letter counts the
 nodes on the relation's in-side ("two nodes contain this"), a count
 after it the out-side ("this contains three"). A lowercase letter is
 an ancestor in this view: 'a' the viewparent, 'b' the grandparent, and

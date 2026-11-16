@@ -43,7 +43,7 @@ an interactive command NAME that requests REQUEST-FORM and auto-saves."
         rows)))
 
 (skg--define-view-request-commands
-  ;; Folders ('C-c l'): both folders of the relation.
+  ;; Folders ('C-c l'): the relation's folders.
   (skg-show-folderOf-aliases       (folder aliases)
     "Show the aliases folder for the headline at point.")
   (skg-show-folderOf-hides (folder hides)

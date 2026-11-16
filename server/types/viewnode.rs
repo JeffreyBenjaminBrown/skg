@@ -380,14 +380,14 @@ pub struct Occurrence {
   pub claimsMembership : bool,
   /// Some(N) means this viewnode is shown here in place of N, of
   /// which it is a mirror ('server/dbs/in_rust_graph/mirrors.rs').
-  /// Herald pink "ĥ" after "O".
+  /// Herald pink "ĥ" after "K".
   /// Load-bearing, unlike the view stats: save extraction
   /// collects N (not this node's own ID) into the parent's lists
   /// wherever this fact appears, so a substituted child
   /// round-trips to the original ID instead of rewriting the
   /// parent's contains. Serialized as the keyed form
   /// '(inPlaceOf N)' at the top level; tamper-checked at
-  /// buffer validation (the carrier must be a mirror of N, under
+  /// buffer validation (the headline bearing it must be a mirror of N, under
   /// the unrestricted skgrepo restriction: 'inPlaceOf_part_errors').
   pub in_place_of      : Option<ID>,
 
@@ -898,8 +898,8 @@ impl Folder {
   /// The role its members play in the relation the folder shows, of
   /// which the node it describes plays the other; None for a folder that shows no
   /// one relation, and for the forks folder, whose members play either
-  /// role of 'forks' or both: each reader of a member's role asks the
-  /// member's side there ('FORKS_FOLDER_MEMBER_ROLES').
+  /// role of 'forks' or both: each reader of a member's role asks
+  /// which roles the member plays there ('FORKS_FOLDER_MEMBER_ROLES').
   pub fn relation_member_role (
     &self,
   ) -> Option<RelationRole> {

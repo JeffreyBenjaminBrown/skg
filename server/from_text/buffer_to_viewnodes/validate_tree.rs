@@ -174,14 +174,15 @@ fn idFolder_membership_errors (
 /// Tamper validation for the '(inPlaceOf N)' part
 /// ('docs/mirrors.org', "The inPlaceOf part").
 /// The part is load-bearing text: wherever it appears, save
-/// extraction collects N instead of the carrier's own ID. So a
+/// extraction collects N instead of the bearer's own ID (the
+/// bearer: the headline bearing the part). So a
 /// part the server would not have rendered must abort the save --
 /// otherwise hand-edited (or yanked, or stale) metadata could
-/// rewrite arbitrary contains members. The check: the carrier must
+/// rewrite arbitrary contains members. The check: the bearer must
 /// be a mirror of N ('is_mirror_of'), under the unrestricted skgrepo
 /// restriction, so that a part honest when rendered does not start
 /// failing after a switch of the skgrepo restriction or of the
-/// perspective. Any mirror is honest: which one the refresh shows
+/// perspective. Any mirror may bear it: which one the refresh shows
 /// depends on the perspective and the skgrepo restriction. A refusal
 /// names the mirror the occurrence's tree's perspective
 /// ('perspective_owner_of_tree_containing') would show.
@@ -198,7 +199,7 @@ fn inPlaceOf_part_errors (
   let unrestricted : SkgrepoRestriction = SkgrepoRestriction::unrestricted (config);
   for edge in viewforest . root () . traverse () {
     let Edge::Open (node_ref) = edge else { continue; };
-    let (carrier, original) : (ID, ID) =
+    let (bearer, original) : (ID, ID) =
       match &node_ref . value () . kind {
         ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
           match &t . in_place_of {
@@ -206,7 +207,7 @@ fn inPlaceOf_part_errors (
               ( t . gnid . clone (), original . clone () ),
             None => continue },
         _ => continue };
-    if ! is_mirror_of (graph, &unrestricted, &original, &carrier) {
+    if ! is_mirror_of (graph, &unrestricted, &original, &bearer) {
       let owner : SkgrepoOwner = perspective_owner_of_tree_containing (
         config, graph, &perspective, node_ref);
       let effective : Option<ID> = // the mirror shown, for the message
@@ -214,7 +215,7 @@ fn inPlaceOf_part_errors (
           config, graph, &unrestricted, &owner, &original ));
       errors . push (
         BufferValidationError::InPlaceOf_Mismatch (
-          Some (carrier), original, effective,
+          Some (bearer), original, effective,
           node_ref . value () . headline_name () )); }}}
 
 /// For each node carrying a Fork view request (the explicit

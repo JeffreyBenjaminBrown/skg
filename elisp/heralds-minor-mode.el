@@ -548,14 +548,14 @@ of birth facts (RELATION SIDE [GEN]), already accounts for."
   "Render relation REL's token from FORM, or nil if it has nothing to show."
   (let ((in-s (heralds--rel-side-text rel 'in form birth write-protected))
         (out-s (heralds--rel-side-text rel 'out form birth write-protected))
-        (here (and (eq rel 'forks) in-place-of)))
-    (unless (and (string-empty-p in-s) (string-empty-p out-s) (not here))
+        (shows-in-place-of (and (eq rel 'forks) in-place-of)))
+    (unless (and (string-empty-p in-s) (string-empty-p out-s) (not shows-in-place-of))
       (concat in-s
               (heralds--styled (heralds--rel-letter rel)
                                (if (assq rel birth)
                                    (heralds--relationship-style 'birth_letter)
                                  (heralds--relationship-style 'letter)))
-              (if here (heralds--styled "ĥ" (heralds--relationship-style
+              (if shows-in-place-of (heralds--styled "ĥ" (heralds--relationship-style
                                              'in_place_of))
                 "")
               out-s))))

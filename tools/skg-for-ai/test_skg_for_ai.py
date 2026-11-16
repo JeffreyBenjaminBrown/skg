@@ -1704,7 +1704,7 @@ def check_forking_and_hiding_by_placing (context):
   if ( "Fork:" in completed . stdout or "Server: saved," not in completed . stdout
        or completed . stdout . count (hide_line) != 1 ):
     raise CaseFailure ( f"the hiding save printed {completed . stdout!r}" )
-  require_equal ( "what the node hides from its forks",
+  require_equal ( "what the node hides from what it forks",
                   skg_list (context, "elsewhere-id", "hides"),
                   [ "fred-detail-id" ] )
   lines = read_file (compact_path) . split ("\n")
@@ -3152,9 +3152,9 @@ FOLLOWS_YOURS_SUMMARY = (
   "# Showing your perspective (each root author's perspective is the default).\n" )
 FOLLOWS_THIRDS_SUMMARY = (
   "# Showing third's perspective (each root author's perspective is the default).\n" )
-R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨0c It forks these, or these fork it.⟩\n**** M ⟨0d ☮ 2C 3bK⟩\n***** P ⟨0e ☮ Ca ⌂:main⟩\n***** R ⟨0f ☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
-R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨0c It forks these, or these fork it.⟩\n**** M ⟨0d ☮ 2C 3bK ⌂:foreign⟩\n***** P ⟨0e ☮ Ca ⌂:main⟩\n***** R ⟨0f ☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
-R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨0c It forks these, or these fork it.⟩\n**** M ⟨0d ☮ 2C 3bK ⌂:foreign⟩\n***** P ⟨0e ☮ Ca ⌂:main⟩\n***** R ⟨0f ☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
+R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨☮ 2C 3bK⟩\n***** P ⟨☮ Ca ⌂:main⟩\n***** R ⟨☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
+R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨☮ 2C 3bK ⌂:foreign⟩\n***** P ⟨☮ Ca ⌂:main⟩\n***** R ⟨☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
+R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨☮ 2C 3bK ⌂:foreign⟩\n***** P ⟨☮ Ca ⌂:main⟩\n***** R ⟨☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
 
 def copy_perspective_fixture (data_root):
   """The perspective data, with a config naming its two foreign
@@ -3198,9 +3198,21 @@ def failures_of_perspective (scratch, data_root):
 
 def r_tree (folder):
   """The headlines of the view of R in FOLDER, and the summary's line
-  naming its perspective, if it has one."""
-  return "" . join ( line + "\n" for line in read_compact (folder, "view_R") . split ("\n")
+  naming its perspective, if it has one. A headline three or more
+  levels deep loses its viewnode ID: those under R's child stand in
+  the forks folder of the mirror shown there, drawn afresh, with new
+  viewnode IDs, whenever a switch re-points that child."""
+  return "" . join ( without_deep_vnid (line) + "\n"
+                     for line in read_compact (folder, "view_R") . split ("\n")
                      if line . startswith ("*") or line . startswith ("# Showing") )
+
+def without_deep_vnid (line):
+  """LINE without its handle's viewnode ID, if it is a headline three
+  or more levels deep."""
+  if not line . startswith ("***"):
+    return line
+  return re . sub ( r"⟨[0-9a-z]+( |⟩)", lambda m: "⟨" + ( "" if m . group (1) == " " else "⟩" ),
+                    line, count = 1 )
 
 def check_switching_perspective_on_a_command_s_own_connection (context):
   """With no daemon, 'perspective' registers the view on its

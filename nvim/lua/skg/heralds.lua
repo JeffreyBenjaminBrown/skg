@@ -388,8 +388,8 @@ end
 local function rel_chunks (rel, form, birth, write_protected, in_place_of)
   local in_c = rel_side_chunks(rel, 'in', form, birth, write_protected)
   local out_c = rel_side_chunks(rel, 'out', form, birth, write_protected)
-  local here = rel == 'forks' and in_place_of
-  if #in_c == 0 and #out_c == 0 and not here then return nil end
+  local shows_in_place_of = rel == 'forks' and in_place_of
+  if #in_c == 0 and #out_c == 0 and not shows_in_place_of then return nil end
   local born = false
   for _, fact in ipairs(birth) do
     if fact.relation == rel then born = true end end
@@ -397,7 +397,7 @@ local function rel_chunks (rel, form, birth, write_protected, in_place_of)
   for _, c in ipairs(in_c) do table.insert(chunks, c) end
   table.insert(chunks, styled(rel_letter(rel),
     born and relationship_styles.birth_letter or relationship_styles.letter))
-  if here then
+  if shows_in_place_of then
     table.insert(chunks, styled('ĥ', relationship_styles.in_place_of)) end
   for _, c in ipairs(out_c) do table.insert(chunks, c) end
   return chunks

@@ -56,7 +56,7 @@ view's buffer, and name it; or show the server's refusal."
   (condition-case err
       (let* ((response (read payload))
              (refusal (cadr (assoc 'content response)))
-             (followed (cadr (assoc 'perspective response)))
+             (perspective (cadr (assoc 'perspective response)))
              (name (cadr (assoc 'perspective-name response)))
              (buffer (skg-find-buffer-by-view-id
                       (cadr (assoc 'view-id response)))))
@@ -64,7 +64,7 @@ view's buffer, and name it; or show the server's refusal."
             (message "skg: %s" refusal)
           (when buffer
             (with-current-buffer buffer
-              (skg--set-perspective followed name)
+              (skg--set-perspective perspective name)
               (force-mode-line-update)))
           (message "Showing %s." name)))
     (error
