@@ -21,7 +21,7 @@ does ('docs/api-and-formats.org', "The .skg file format").
 
 =R= forks =N= says two things.  =R= shows =N='s content that =R=
 neither contains nor hides: in =R='s forks folder, claiming, =N= is a
-subscribee as such ('docs/glossary.org', "subscribee as such").  And
+forkee as such ('docs/glossary.org', "forkee as such").  And
 =R= and =N= are mirrors, so either may stand in the other's place
 (see "Mirror substitution").  So a fork shown, editable, in its
 original's place draws, by default, its forks folder with the
@@ -348,7 +348,7 @@ problem:
 
 - =contains= memberships are relRepo-gated before the refresh computes a
   content goal, including the contains-minus-hides treatment of a subscribee;
-- =hidesFromSubs= and the containment memberships used to
+- =hides= and the containment memberships used to
   derive the hidden-in and hidden-outside folders are gated in the
   refresh's goals;
 - ordinary relationship folders, the containerward chain, herald counts, and
@@ -385,5 +385,5 @@ not perform interactive override substitution.
 - [[file:../server/export_org.rs][raw contains-based Org export]]
 - [[file:../server/dbs/in_rust_graph/relation_accessors.rs][relRepo-gated relationship access]]
 - [[file:../server/dbs/in_rust_graph/stats.rs][repo-set-gated herald counts]]
-- [[file:../tests/overrideward_view_subtree.rs][search folder regression coverage]]
+- [[file:../tests/forks_under_search_hits.rs][search folder regression coverage]]
 - [[file:../tests/integration/overridden-direct-visit/][exact-visit integration coverage]]

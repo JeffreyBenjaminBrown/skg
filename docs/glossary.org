@@ -231,14 +231,13 @@ content subtree), which writes a =writeProtectedView= or
 *** relation, relationship, member, membership, partner
 
 As in TypeDB, a *relation* is a kind of relationship: =contains=,
-=linksTo=, =forks=, =hidesFromSubs=. Each names its two roles:
+=linksTo=, =forks=, =hides=. Each names its two roles:
 container contains content, mentioner linksTo mentioned, forker forks
-forkee, hider hidesFromSubs hidden. A forks B says two things: A shows
-B's content that A neither contains nor hides (see "subscribee as
-such"), and A and B are mirrors (see "mirror"). =hidesFromSubs= is
-short for "hides from its subscriptions": the hider hides the hidden
-node from what the hider shows of its forkees. (In a '.skg' file its
-key is 'hides'.) A *relationship* is one instance of a relation: this
+forkee, hider hides hidden. A forks B says two things: A shows
+B's content that A neither contains nor hides (see "forkee as
+such"), and A and B are mirrors (see "mirror"). =hides= means
+"hides from its forks": the hider keeps the hidden node out of what
+the hider shows of its forkees. A *relationship* is one instance of a relation: this
 node contains that one. (Graph theory would call it an edge; we don't,
 because the word is opaque to newcomers.)
 
@@ -567,12 +566,10 @@ is shown unwarranted (⊥), and has no effect on N.
 The user could delete R, but it is reinstated as soon as they save,
 because, again, the hiderFolder is a write-protected set.
 
-*** "subscribee as such"
+*** "forkee as such"
 
 In Skg some nodes fork others: the forker forks the forkee.
 (See [[file:./data-model_technical.org][the technical data model]].)
-Where a forker's forkees are listed under it, the code calls the
-forker the "subscriber" and each forkee a "subscribee".
 A node that plays the forkee role can be viewed as an ordinary node,
 or /as/ a forkee. In the latter case it appears
 underneath the relevant forker, claiming, in its 'forksFolder':
@@ -584,8 +581,8 @@ underneath the relevant forker, claiming, in its 'forksFolder':
   ...
 #+end_example
 
-In the above view, forkee1 and forkee2 are both "subscribees as
-such" (forkees as such): a member of a forks folder that claims (and,
+In the above view, forkee1 and forkee2 are both "forkees as
+such": a member of a forks folder that claims (and,
 in the refresh, that the graph warrants). They are not just forkees,
 but they are being shown /as/ forkees. This changes the way edits are
 interpreted: edits to a forkee as such can only affect what the
@@ -594,16 +591,16 @@ nothing -- a forker-only member, or a forkee the user detached -- is
 no forkee as such: it is an ordinary node standing there, as under a
 write-protected folder.
 
-*** the subscribee-visibility step
+*** the forkee-visibility step
 
-The *subscribee-visibility step* (a term of plan 10) is the step of
-the save that, for a subscribee as such shown editable under its
-subscriber (the note that forks it), reads what the buffer shows of
-the subscribee's content and rewrites the subscriber's hides to match: content shown there,
-claiming, is unhidden, and content not shown, which the subscriber
+The *forkee-visibility step* (a term of plan 10) is the step of
+the save that, for a forkee as such shown editable under its
+forker (the note that forks it), reads what the buffer shows of
+the forkee's content and rewrites the forker's hides to match: content shown there,
+claiming, is unhidden, and content not shown, which the forker
 does not contain, is hidden ('resolve_visibility' in
 'server/from_text/local_fieldintent_collection/resolve_visibility.rs').
-It reads the subscribee's content and the subscriber's hides by the
+It reads the forkee's content and the forker's hides by the
 records the skgrepo restriction shows, as the view drew them, so a
 hide recorded in a restricted section is neither removed nor moved,
 and no hide is written of a member that only a restricted record
@@ -1059,7 +1056,7 @@ skgrepo restriction lets it be seen, answers 'restricted' for such a node,
 as distinct from 'present' and 'absent' ('GnidPresence'), and the
 view shows nothing of it but, where a visible record names it, a
 restricted viewnode (see "restricted viewnode"). "Hidden" is reserved
-for hides-from-subscriptions.
+for the =hides= relation.
 
 The skgrepo restriction limits what can be edited as well as what can
 be seen: no save, nodeMerge,
@@ -1267,7 +1264,7 @@ only — shallow), and =forks= N, once (so N's later additions surface
 to C as unintegrated forked content, and override substitution shows C
 wherever N would appear, from your perspective). Children of N
 that the forking edit deleted become C's
-=hidesFromSubs=, and thereafter any child removed from
+=hides=, and thereafter any child removed from
 an owned forker's contains that some forkee still contains is
 hidden likewise on save (re-adding it unhides). The fork operation
 refuses to fork a node you already fork, naming your fork of it:
@@ -1744,7 +1741,7 @@ almost certainly need not read this section.
 For a set of IDs in one graph snapshot, the *update-relevant
 neighborhood* contains the IDs themselves, their immediate neighbors in
 both directions along =contains=, =linksTo=, =forks=, and
-=hidesFromSubs=, and every mirror of each ID, whatever any skgrepo
+=hides=, and every mirror of each ID, whatever any skgrepo
 restriction shows (see "mirror"): a change to any relationship among a
 note's mirrors can change which of them stands where another is
 drawn. The mirrors are taken from the original IDs only, never from an
@@ -2287,7 +2284,7 @@ into a more public telescope section. Hoist /moves/ text to home.
 
 *** hiderel = "hides" relationship
 
-A relationship of the relation =hidesFromSubs=, which a '.skg' file
+A relationship of the relation =hides=, which a '.skg' file
 records under the key 'hides'. See [[file:./data-model_technical.org][the technical data model]] for the hiding
 relationship.
 

@@ -332,28 +332,28 @@ So far there are these endpoints:
        sends one error, =NOTHING WAS SAVED=, whose validation errors
        follow as =** Error N= headlines.
        When the save hid something, stopped hiding something, or took
-       a child out of a subscriber without hiding it, the answer
+       a child out of a forker without hiding it, the answer
        carries =(hides ("LINE" ...))=, after the point entries and the
        processed summary (below) and before =changed-headlines=, one
        line each, in words the server chooses
        ('hide_report_lines' in 'server/from_text/hide_report.rs'):
        - =Hides 'M' from 'S', as content of 'E'.= for each member M
-         the save adds to subscriber S's =hidesFromSubs=, naming each
-         subscribee E of S whose content holds M (the clause is absent
-         for a hide outside every subscribee);
+         the save adds to forker S's =hides=, naming each
+         forkee E of S whose content holds M (the clause is absent
+         for a hide outside every forkee);
        - =Stops hiding 'M' from 'S', as content of 'E'.= for each it
          removes;
        - =Hides nothing: 'R' left 'S', but WHY.= for each child R that
-         left the content of an owned subscriber S, which forks
+         left the content of an owned forker S, which forks
          something, whose departure hid nothing. WHY names the rule:
          =it is no content of 'E', nor a mirror of any= (R neither is a
-         member of a subscribee's content nor a mirror of one, as a
-         subscriber's own fork of it is), =it was hidden already= (or
+         member of a forkee's content nor a mirror of one, as a
+         forker's own fork of it is), =it was hidden already= (or
          ='M', which it stands for, was hidden already=), ='S' still
          contains 'M', which it stands for=, or =this save shows it
          under 'E'= (an explicit gesture in the forks folder won).
        Each quoted name is a title, as the save leaves it. A fork's
-       clone counts as a subscriber with no hides on disk, named =the
+       clone counts as a forker with no hides on disk, named =the
        fork 'T'=, since it has its original's title; a node the save
        deletes is named in no line. Only records the skgrepo
        restriction shows count. The hides are computed from the save's
@@ -1335,7 +1335,7 @@ one automatically.
     rerendered.
   - The mutation removes only exact raw-ID matches in owned =contains=,
     =forks= and =hides= lists (the warning's structured relationships
-    name these fields "contains", "forks" and "hidesFromSubs").  It
+    name these fields "contains", "forks" and "hides").  It
     leaves text links and foreign telescopes untouched.
 
 ** Rerender all views
@@ -1705,7 +1705,7 @@ no folder unasked but where something changed.
 
 - =(folder RELNAME)= — build the folders of the relation, populated from the
   graph. RELNAME is =aliases=,
-  =hidesFromSubs= (the hider and hidden folders), =forks= (the one
+  =hides= (the hider and hidden folders), =forks= (the one
   =forksFolder=, both sides of the relation), =containers=
   or =mentioners=.
   The editable folder (=forksFolder= / =aliasFolder=)
@@ -1885,22 +1885,22 @@ say; =COUNT= is the complete distinct visible node count even when
 ancestor flags let the client omit its numeral. =GEN= is an ancestor
 generation: 1 is the viewparent, 2 the grandparent, counting
 non-vognode levels. Relation keys are =contains=, =linksTo=,
-=forks=, and =hidesFromSubs=. The =linksTo=
+=forks=, and =hides=. The =linksTo=
 incoming side adds =(substantive COUNT (ancestors GEN...))= for the
 subset whose skgrepo has a nonempty body, visible direct content, or
 more than one distinct visible resolved target. Its outgoing side
 counts distinct visible resolved targets. An applicable
-subscribee-as-such =contains= outgoing side adds =(unintegrated COUNT
+forkee-as-such =contains= outgoing side adds =(unintegrated COUNT
 (ancestors GEN...))=, including when both counts are zero; absence of
 that subform means the role does not apply. The numerator counts
 members not already directly contained or hidden by that
-occurrence's subscriber. Subset counts cannot exceed their side's
+occurrence's forker. Subset counts cannot exceed their side's
 total. The ancestors counted are the viewparent, or, for a folder
 member, the vognodes of the folder's required ancestry. A child
-claiming nothing under a subscribee-as-such -- content its subscriber
+claiming nothing under a forkee-as-such -- content its forker
 hides, which the refresh keeps there, unwarranted, while it holds a
-subtree or the user keeps it -- also counts the subscriber, three
-generations up, on its =hidesFromSubs= incoming side, as a
+subtree or the user keeps it -- also counts the forker, three
+generations up, on its =hides= incoming side, as a
 =hiddenInForkPartnerFolder= member does.
 
 =(props (aliases K) (extraIds K) (flags K))= holds the property
@@ -1931,12 +1931,12 @@ neither, and carries none.
 | forks-folder forkee (claiming)   | =(forks in 2)=                                               |
 | forks-folder forker              | =(forks out 2)=                                              |
 | forks-folder mutual              | =(forks in 2) (forks out 2)=                                 |
-| hidden-folder member             | =(hidesFromSubs in 2)=                        |
-| hider-folder member              | =(hidesFromSubs out 2)=                       |
+| hidden-folder member             | =(hides in 2)=                                |
+| hider-folder member              | =(hides out 2)=                               |
 | container-folder member          | =(contains out 2)=                            |
 | mentioner-folder member          | =(linksTo out 2)=                             |
-| hidden-in-fork-partner member    | =(hidesFromSubs in 4) (contains in 2)=        |
-| hidden-outside member            | =(hidesFromSubs in 3)=                        |
+| hidden-in-fork-partner member    | =(hides in 4) (contains in 2)=                |
+| hidden-outside member            | =(hides in 3)=                                |
 | mirror shown (overridesHere)     | =(forks out)= or =(forks in)=                                |
 A member of an acquisition folder carries none: a nodeMerge is no
 relation. In a forks folder the relationship heralds tell the sides
@@ -1944,7 +1944,7 @@ apart: a forkee shows =bK= (its viewparent's viewparent, 'b', forks
 it), a forker =Kb=, a mutual =bKb= ('docs/heralds.org').
 See [[file:./heralds.org][heralds.org]] for the rendered notation and styles.
 
-The graph counts fold into these forms (=forks= / =hidesFromSubs=
+The graph counts fold into these forms (=forks= / =hides=
 become the =K= / =H= tokens; =aliasing= / =extraIDs= /
 true flags become the =Ak= / =Ik= / =Fk= property tokens), and the
 per-relation view-position flags are the ancestor-lettered tokens.
@@ -2322,7 +2322,9 @@ aspect ={"Node": {"pid": ..., "aspect": ...}}=, where the aspect is
 or ={"Flag": FLAG}=; or a relationship aspect ={"Relationship":
 {"relation": ..., "recorder": ..., "member": ..., "aspect": ...}}=
 (the leaf's 'RelationshipKey', flattened, beside its aspect), where
-the aspect is ="Existence"= or ="RelRepo"=. N is the fingerprint
+the relation is named by its 'NodeRelation' variant (="Contains"=,
+="LinksTo"=, ="Forks"= or ="Hides"=) and the aspect is ="Existence"=
+or ="RelRepo"=. N is the fingerprint
 of the change the mark approved, a hash of the leaf's before and after
 values; a mark whose fingerprint no longer matches the current change
 counts as absent.
@@ -2371,7 +2373,7 @@ Fields:
     on save from the in-memory order; hand-written anchors are
     honored on load (a dangling anchor's run falls back with a
     warning, and duplicate anchors concatenate in file order).
-- =hides=: The relation =hidesFromSubs=, unordered; a plain list of
+- =hides=: The relation =hides=, unordered; a plain list of
   IDs. The effective list is the union across sections; each entry's
   relRepo is its section's skgrepo. The key used before October 2026,
   =hides_from_its_subscriptions=, still loads.
@@ -2806,7 +2808,7 @@ relationship names such a node depends on the relationship's
 skgrepo's section, its relRepo.
 
 A member whose record the set keeps out is omitted entirely --
-content, subscribees, and every partner folder's members alike.
+content, forkees, and every partner folder's members alike.
 Omission is recursive: an omitted container's whole branch is
 omitted, unrestricted descendants included (they stay reachable by
 search or direct visit). A member whose record the set shows, and
@@ -2840,18 +2842,18 @@ the members whose records are
 restricted, and a node's aliases whose records are restricted. A
 restricted viewnode keeps its member in the list while
 it claims, and deleting its line removes the record, as deleting an
-unknown viewnode's does. The folder of what a subscriber hides outside its
-subscribees replaces the hides with a visible record, each of which
+unknown viewnode's does. The folder of what a forker hides outside its
+forkees replaces the hides with a visible record, each of which
 it showed, as an occurrence, an unknown viewnode or a restricted viewnode; a
 hide recorded in a restricted section is never replaced. Which hides
-stand outside the subscribees is what the visible records say: a
-hide of a node a subscribee contains only by a restricted record
-stands in that folder, and its line edits the hide. A subscribee
-shown editable under its subscriber shows its content by its
+stand outside the forkees is what the visible records say: a
+hide of a node a forkee contains only by a restricted record
+stands in that folder, and its line edits the hide. A forkee
+shown editable under its forker shows its content by its
 visible records, less the hides with a visible record; the save
-writes the subscriber's hides from what it shows, by the same
+writes the forker's hides from what it shows, by the same
 records, so that a hide recorded in a restricted section survives
-even where the subscribee's content shows the hidden node, and no
+even where the forkee's content shows the hidden node, and no
 hide is written of a member only a restricted record explains. Edits to
 visible members, including deletions, are honored. A member whose
 record is restricted needs no headline for this: the disk supplies
@@ -2905,8 +2907,8 @@ principle as follows.
     Activate it first; an invisible record is never created
     silently."): a member typed or pasted whose default floor, the
     more private of the two homes, is restricted; a hide inferred from
-    a removal, or typed into the folder of what a subscriber hides
-    outside its subscribees, that its explanation floors in a
+    a removal, or typed into the folder of what a forker hides
+    outside its forkees, that its explanation floors in a
     restricted section; an explicit relRepo request to a restricted
     skgrepo. A record the graph already holds there is not refused.
     Nor may a record leave such a section: a headline pasted for a
@@ -2914,11 +2916,11 @@ principle as follows.
     request, is refused ("Cannot move a record out of a restricted
     repo ...").
   - A new hide's relRepo is at least as private as each record that
-    explains it: the hider's =forks= record and the subscribee's
+    explains it: the hider's =forks= record and the forkee's
     contains record, the more private of the two, the most public such
     explanation winning; and at least the more private of the two
     homes. Removals infer hides only from what the set shows: the
-    subscriber's visible forks, their contents by visible
+    forker's visible forks, their contents by visible
     records, and its visible hides, so that re-adding a member drops
     no restricted hide of it.
   - A fork copies into its clone only the records the set shows, each

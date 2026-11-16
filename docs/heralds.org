@@ -81,8 +81,8 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 ** Relationship heralds
 *** Letters and sides
 The relations, in display order, are =C= contains, =L= links to, =K=
-forks (the K of forK; =F= is the flags count), and =H= hides from its
-subscriptions. A relation's token has an in-side before its letter and
+forks (the K of forK; =F= is the flags count), and =H= hides (from its
+forks). A relation's token has an in-side before its letter and
 an out-side after it. The in-side counts nodes that relate to this node
 ("N nodes contain it"); the out-side counts nodes this node relates to
 ("it contains N nodes"). =2C3= thus means two containers and three
@@ -132,12 +132,13 @@ to three distinct visible targets. Whitespace-only bodies, repeated
 links and alternate IDs for the same target do not count. =5L= has no
 resolved outgoing target. A self-link counts when visible.
 
-On a subscribee shown under a subscriber, the contains out-side counts
-the contents the subscriber has neither directly included nor hidden.
+On a forkee as such (a forkee shown under its forker), the contains
+out-side counts the contents the forker has neither directly included
+nor hidden.
 =C2/8= means eight visible direct contents, two of them unintegrated.
 =C8= means none is unintegrated; =C8/= means all eight are. The count
-belongs to that occurrence: another subscriber can give the same
-subscribee a different numerator.
+belongs to that occurrence: another forker can give the same
+forkee a different numerator.
 
 The numerator gets its own carrier, chosen the same way from its
 glyphs; the side's carrier is chosen from the denominator's. The slash

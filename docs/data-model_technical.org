@@ -26,7 +26,7 @@ derived text links.
 | =aliases= | =MSV<RelPartner<String>>= | Search aliases and the skgrepo at which each is recorded. |
 | =contains= | =Vec<RelPartner<ID>>= | Ordered content children and each relationship's relRepo. |
 | =forks= | =MSV<RelPartner<ID>>= | Ordered nodes this node forks, with relRepos: their content it does not contain or hide shows under it, and each is its mirror.  Stored under the '.skg' key 'forks'. |
-| =hidesFromSubs= | =MSV<RelPartner<ID>>= | Nodes suppressed when reached through what this node forks, with relRepos.  Stored under the '.skg' key 'hides'. |
+| =hides= | =MSV<RelPartner<ID>>= | Nodes suppressed when reached through what this node forks, with relRepos. |
 | =flags= | =Vec<Flag>= | Node flags: import provenance (=Had_ID_Before_Import=, =Was_Overloaded=) and behavior settings such as =NoSearchMatching=. |
 | =linksTo= | =Vec<ID>= on =GraphnodeInRust= | Outbound Org =id:= links parsed from title/body text.  Derived rather than serialized as a graph field. |
 
@@ -48,7 +48,7 @@ that hand-authored or temporarily incomplete graphs remain representable.
 |--------------+------------+-------------+-----------|
 | =contains= | container | contained | Ordered document/content nesting. |
 | =forks= | forker | forkee | The forker shows the forkee's content that the forker neither contains nor hides, and the two are mirrors: either may stand in the other's place where mirror substitution acts.  The fork operation's clone forks its original. |
-| =hidesFromSubs= | hider | hidden | Suppresses the hidden node only when it would be reached through what the hider forks. |
+| =hides= | hider | hidden | Suppresses the hidden node only when it would be reached through what the hider forks. |
 | =linksTo= | mentioner | mentioned | Plain Org ID links derived from text. |
 
 Home skgrepo and which node carries each extra ID are node properties, not separate runtime
@@ -386,16 +386,16 @@ gone, a relRepo or a home that differs) asks the record's
 visibility first, and a record the skgrepo restriction keeps out is
 neither removed, moved nor rewritten, whatever the buffer shows in its
 place. A write that acts on the skgrepo restriction's silence is a defect.
-So the subscribee-visibility step, which rewrites a subscriber's
-hides from what an editable subscribee shows of its content under it
-(=resolve_visibility.rs=), reads the subscribee's content and the
-subscriber's hides by their visible records: a hide recorded in a
+So the forkee-visibility step, which rewrites a forker's
+hides from what an editable forkee as such shows of its content under it
+(=resolve_visibility.rs=), reads the forkee's content and the
+forker's hides by their visible records: a hide recorded in a
 restricted section is neither removed nor moved, though the
-subscribee's visible record shows the hidden node as its content, and
+forkee's visible record shows the hidden node as its content, and
 no hide is written of a member that only a restricted record
 explains. The inference of hides from a removal
 (=infer_hides_from_contains_removals=) reads the same way: the
-subscriber's visible forks, their content by visible records,
+forker's visible forks, their content by visible records,
 and its visible hides. So does the hiding of a forker deleted from a
 forks folder (=resolve_forks_folder_removals=): only a forker whose
 record the skgrepo restriction shows was drawn, so only such a one
@@ -561,7 +561,7 @@ on a member claiming nothing is refused at validation
 is in its own file.
 
 **** What a save reads there
-The save's traversal (=visit_subscribee_folder= in
+The save's traversal (=visit_forks_folder= in
 =server/from_text/local_fieldintent_collection/traverse.rs=) reads
 the folder's claiming members as N's 'forks', and visits a claiming
 member as a forkee as such and one claiming nothing as a member of a

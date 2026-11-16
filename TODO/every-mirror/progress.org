@@ -1181,3 +1181,192 @@ members print 'noClaim'), or Q12 and Q13.
   refused at save and must be reopened (pitfall "Old buffers").
 *** DONE
 The slice's headline in '1_plan.org' is DONE.
+** Slice 7: the save's and the goal's names, and the test files
+*** Commits
+- 77ee1426 every-mirror plan 1 slice 7: the hides relation is 'hides' everywhere
+- b5449138 every-mirror plan 1 slice 7: the save's and the refresh's names speak of forkers and forkees
+- (the commit carrying this record) every-mirror plan 1 slice 7: docs, record, DONE
+*** Suites
+- After the hides rename (77ee1426's tree): 'bash/nextest.sh' 1243 of
+  1243, first run; the AI tool's tests (after 'cargo build --bin skg')
+  PASS, first run; 'bash/emacs-tests.sh' first run 502 of 503 and
+  'bash/nvim-tests.sh' one failure, the same shared case,
+  'test-heralds-shared-rendering-cases' / "skg.heralds renders the
+  cases shared with Emacs": an expected fixture adaptation (the hider
+  folder's label is 8 characters shorter, and the case pinned its
+  style run, 'message*39'). Fixed, then Emacs 503 of 503, Neovim no
+  failure. (The rerun overwrote the first Emacs and Neovim logs.)
+- After the vocabulary rename: 'bash/nextest.sh' first run 1242 of
+  1243, 'new::local_fieldintent_collection_extraction::all_tests': an
+  expected fixture adaptation, three assertions on message text
+  ("Conflicting subscribee visibility edits", "subscribee-as-such")
+  that the save now words "forkee"; it took two more runs to find the
+  three. Then 1243 of 1243. The AI tool PASS, Emacs 503 of 503,
+  Neovim no failure, first runs.
+- 'bash/integration-tests.sh': 38 of 38 (the Emacs pass), first run.
+- 'bash/all-tests.sh', first run, on the final code: all pass: build,
+  Emacs 503 of 503, Neovim (no failure), nextest 1243 of 1243,
+  doctests, team tools, AI reader, integration 76 of 76 (both clients).
+  77ee1426 alone was checked by the four suites above, not by the
+  integration tests.
+- Also, per the '/verify' skill, an isolated 'target/debug' server on
+  port 24758 with scratch data in a gitrepo (owned N contains c1 and c2
+  and forks F; F contains c1 and c2): a view of N drew F in its forks
+  folder, claiming; deleting c1 from N's content and saving reported
+  "Hides 'c1' from 'N', as content of 'F'.", wrote 'contains: [c2]' and
+  'hides: [c1]' to N.skg, and the rerendered view carried
+  '(rels ... (hides (out 1)))'. The diff view showed c1 in N's hidden
+  folder with '(diff (rel added) (leaves 1 rel))'; saving it with
+  '(editRequest (processed rel))' wrote the marks file with one mark,
+  relation "Hides". The server was stopped by its PID; a second mark
+  (a 'Contains' mark of no current change) was added to the file by
+  hand; restarted, the diff view showed c1's leaf '(processed rel)',
+  so the file holding a 'Hides' mark loaded whole. Stopped by its PID,
+  its port checked free, the scratch folder deleted (transcripts under
+  'verify/').
+Logs: 'tests/results/every-mirror/slice7-plan1/' (nextest-hides-first.log,
+ai-tool-hides.log, emacs-hides.log, nvim-hides.log, nextest-names-first.log,
+nextest-names-extraction.log, nextest.log, ai-tool-names.log,
+emacs-names.log, nvim-names.log, integration.log, all-tests.out,
+all-tests-ALL.org, verify/).
+*** Names, for the slices after
+- 'NodeRelation::HidesFromSubs' is 'NodeRelation::Hides' (serialized
+  "Hides"; relation name "hides" on the wire, in '(rels ...)', in
+  '(birth ...)' and in 'shared/relations.json'). The field
+  'hidesFromSubs' is 'hides' on 'GraphnodeOnDisk' (no serde rename
+  now), 'Graphnode', 'GraphnodeInRust', 'SectionSlices', 'ComposedNode',
+  'DecompositionInput', 'NodeSaveIntent' and the save's per-ID entry.
+  'StructuredField::HidesFromSubs' is 'StructuredField::Hides' (label
+  "hides"). 'FolderRelation::HidesFromSubs' is 'FolderRelation::Hides';
+  the request '(folder hidesFromSubs)' is '(folder hides)'.
+- Clients: 'skg-show-folderOf-hides' ('C-c l h'); Neovim
+  'ShowFolderOfHides' ('lh'), 'show_folderOf_hides'; the AI tool's
+  forest kind 'hides' (expected file 'forest-hides_fred-aside-id.compact.org').
+- Labels: the hidden folder "It hides these from its forks.", the
+  hider folder "These hide it from their forks." The AI tool's
+  'HERALD_PHRASES_HOLDING_HANDLE_WORDS' lists both.
+- The save: 'FieldIntent::SubscribeeVisibility' and the struct are
+  'ForkeeVisibility' (field 'forkee'); 'SubscribeeTextClaim' is
+  'ForkeeTextClaim'; 'LocalContext::SubscribeeAsSuchPosition' is
+  'ForkeeAsSuchPosition' (fields 'forker', 'forker_is_editable');
+  'LocalContext::HiddenOutsidePosition' and 'HiddenOutsideAdded' have
+  'forker' for 'subscriber'; 'visit_subscribee_folder' is
+  'visit_forks_folder'; 'file_subscribee_members_written_in' is
+  'file_forkee_members_written_in' ('forkee_members_written_in',
+  'file_in_forker'); 'subscriber_from_disk' / 'subscribee_from_disk'
+  are 'forker_from_disk' / 'forkee_from_disk';
+  'subscriber_subscribes_after_save' is 'forker_forks_after_save';
+  'subscriber_contains_after_save' is 'forker_contains_after_save';
+  'apply_hiderel_delta_to_subscriber' is 'apply_hiderel_delta_to_forker';
+  'validate_no_overlapping_subscribee_hiderel_conflicts' is
+  'validate_no_overlapping_forkee_hiderel_conflicts';
+  'gnids_shown_through_subscriptions' is 'gnids_shown_through_forks'
+  (nodeMerge); the parse's 'is_subscribee_as_such' and
+  'parent_is_subscribee_as_such' are 'is_forkee_as_such' and
+  'parent_is_forkee_as_such'; 'subscription_floor' is 'fork_floor'.
+- The refresh: 'subscriber_of_subscribee_as_such' is
+  'forker_of_forkee_as_such'; 'less_what_the_subscriber_integrates' is
+  'less_what_the_forker_integrates'; 'hidden_in_subscribee' is
+  'hidden_in_forkee'; 'hidden_outside_of_subscribees' is
+  'hidden_outside_of_forkees'; 'goal_list_for_hiddenInSubscribee_folder'
+  and 'goal_list_for_hiddenOutsideOfSubscribee_folder' are
+  'goal_list_for_hiddenInForkPartner_folder' and
+  'goal_list_for_hiddenOutsideOfForkPartners_folder';
+  'CompoundFolderParties' has 'forker' and 'forkee'.
+- Clients: 'skg--forkee-as-such-at-point-p' (Emacs),
+  'M.forkee_as_such_at_line_p' (Neovim), 'forkee_as_such' (AI tool).
+- Test files (each fixture directory moved with it): 'subscribee_folder'
+  is 'forks_folder_by_default', 'subscribee_folder_empty_persists' is
+  'forks_folder_empty_persists', 'subscribee_heralds' is
+  'forkee_heralds', 'collateral_subscribee_staleness' is
+  'collateral_forkee_staleness', 'subscriber_hides_under_a_narrowing'
+  is 'forker_hides_under_a_narrowing', 'hidden_from_subscriptions' is
+  'hidden_from_forks', 'overrideward_view_subtree' is
+  'forks_under_search_hits', 'subscribee_as_such_extension' is
+  'forkee_as_such_extension'. The group 'grouped_overrides' is
+  'grouped_forks' (Cargo.toml and every header's nextest filter).
+- Glossary entries: "forkee as such", "the forkee-visibility step".
+*** Deviations from the plan's "how"
+**** Logs under 'tests/results/every-mirror/slice7-plan1/'
+As the launch brief said.
+**** Two code commits
+The hides relation's rename and the save's vocabulary touch different
+names; each is a commit, the first checked green by nextest, the AI
+tool's tests and both clients' unit suites, the second by every suite.
+**** 'hidden_outside_of_forkees', not "of fork partners"
+Its goal subtracts the content of the note's forkees only (slice 6
+kept the membership; plan 2's decision 8 widens it), so the function
+is named for what it reads; the goal-list function is named for its
+folder kind, 'hiddenOutsideOfForkPartnersFolder'. Plan 2 should rename
+the first when it widens it.
+**** "subscription" in prose became "fork" or "'forks' relationship"
+In the save's and nodeMerge's comments a subscription (the
+relationship) is now "a fork" where the sentence is about the
+relationship ("a hide is only as public as some fork that makes it
+meaningful"). The vocabulary's "a fork of N" is a note; the two
+readings rarely collide in those sentences, but slice 9's sweep may
+prefer "'forks' relationship" throughout. The clients' relRepo help
+for the hider and hidden roles says "floored at the most public forks
+relationship explaining them".
+**** What inside the tests keeps the old words
+Only the production names were renamed inside test code (types,
+fields, messages the tests assert). Test function names, comments,
+temporary-folder names and fixture IDs ('subscribee-1',
+'fixtures-subscribee-edit', the AI fixture title "Second child, a
+subscriber") keep "subscriber"/"subscribee", in the renamed files as
+elsewhere: 810 lines in 110 test files on 2026-11-16, for slice 9's
+sweep. A fixture ID or folder renamed blindly would break its file.
+Not renamed, as not in the slice's list: 'tests/extend_raw_overridden_children.rs',
+'tests/override_substitution.rs' (slice 8), 'tests/dbs/in_rust_graph/override_invariants.rs'.
+'tests/unit/fork.rs''s helper 'subscribee_folder' became 'forks_folder'.
+**** The marks test, with a 'Hides' mark the tool wrote
+'marks_before_the_forks_migration.json' gained a 'HidesFromSubs'
+mark; 'marks_after_the_forks_migration.json' is the tool's output on a
+copy of it ('migrate.py --marks', in '/tmp', an empty DIR): the
+'SubscribesTo' mark dropped, the 'HidesFromSubs' one renamed 'Hides'.
+The test asserts both remaining marks load.
+**** Docs written by a delegated agent
+From a brief of this slice's names, checked by reading its diff. It
+also named the 'NodeRelation' variants a marks file may hold in
+'docs/api-and-formats.org' ("Processed marks file"). It left the
+subscriber prose of 'docs/forks.org', 'docs/override.org' and
+'docs/sharing-model.org' for slice 9, and noted that
+'docs/sharing-model.org' calls the hide folders by names that match
+no label.
+*** Tests adapted (expected fixture adaptations)
+- Mechanically, every Rust test's 'hidesFromSubs' field,
+  'NodeRelation::HidesFromSubs', the relation string "hidesFromSubs"
+  ('find_related_nodes' triples, relRepo-info's refusal, the
+  '(folder hidesFromSubs)' requests), and '(rels (hidesFromSubs ...))'
+  / '(birth (hidesFromSubs ...))' in expected buffers; the clients'
+  relation lists ('tests/elisp/test-skg-set-relRepo.el',
+  'tests/nvim/metadata_spec.lua', two integration tests' helpers).
+- The labels: 'tests/shared/herald-rules.sexp' (regenerated text),
+  'tests/shared/herald-rendering-cases.txt' (text and style run), the
+  AI tool's expected 'forest-hides_fred-aside-id.compact.org'.
+- 'tests/new/local_fieldintent_collection/{extraction, traverse,
+  types, lower}.rs' and 'tests/refresh/ancestry.rs': the renamed types
+  and fields, and three message assertions.
+- Kept on purpose: 'tests/unit/retired_keys.rs' and the retired-keys
+  case of 'tests/init_refusal.rs' still write and name 'hidesFromSubs'.
+*** Tests added
+None; 'a_marks_file_loads_whole_once_the_forks_migration_has_run'
+('tests/unit/processed_store.rs') now also loads a 'Hides' mark.
+*** Fixtures changed
+- 'tests/unit/processed_store/marks_{before,after}_the_forks_migration.json'
+  (above).
+- Moved with their test files, contents unchanged: the fixture
+  directories of the eight renamed tests.
+- 'tools/skg-for-ai/test-expected/forest-hidesFromSubs_fred-aside-id.compact.org'
+  is 'forest-hides_fred-aside-id.compact.org', with the new label.
+*** Unfinished, and notes for later slices and Jeff
+- Slice 9's sweep: the tests' internal vocabulary (above); the
+  subscriber prose of three docs; 'docs/sharing-model.org''s hide
+  folder names.
+- The retired-key check still names 'hidesFromSubs'
+  ('RETIRED_SKG_KEYS'), as it must until every skgrepo is migrated.
+- For the handoff: the code now reads the 'Hides' marks the migration
+  tool writes, so the slice-5 orchestrator's note ("no real data is
+  migrated before slice 7 lands") is satisfied by this commit.
+*** DONE
+The slice's headline in '1_plan.org' is DONE.

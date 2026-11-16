@@ -33,7 +33,7 @@ The =forks= relationship is what makes Skg show N' wherever N would appear as re
 
 The same relationship makes new content in N appear in your N' as "unintegrated forked content" (which you can proceed to integrate if you like). If you delete the =forks= relationship, both stop being true. N' can also fork other nodes apart from N.
 
-If the original N contains C, and you delete C from your N', then N' gains a "hidesFromSubs" relationship to C, which prevents C from being shown as "unintegrated forked content" in N'.
+If the original N contains C, and you delete C from your N', then N' gains a "hides" relationship to C, which prevents C from being shown as "unintegrated forked content" in N'.
 ** Privacy relies on forking.
 The previous section describes how forking is used to integrate foreign content into one's data. Forking is also the mechanism by which private data is added to public data.
 

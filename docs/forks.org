@@ -7,8 +7,8 @@ additions still reach you, but your edits never touch the original.
 
 See also [[file:./sharing-model.org][the sharing model]] for the underlying
 relations (=forks=,
-=hidesFromSubs=) and =glossary.org= ("clone, and the fork operation",
-"subscribee as such", "override substitution").
+=hides=) and =glossary.org= ("clone, and the fork operation",
+"forkee as such", "override substitution").
 
 ** The implicit gesture: editing a foreign node
 
@@ -253,7 +253,7 @@ Suppose the clone =C= and the original =N= both contain a child =X=,
 and you delete =X= from =C= (or move it elsewhere). Without more, =X=
 would immediately resurface under =C= as unintegrated forked
 content — you removed it, =N= still contains it. So the save records a
-hide: =C= now =hidesFromSubs= =X=, and the forks folder
+hide: =C= now =hides= =X=, and the forks folder
 stays quiet about it. Putting =X= back among =C='s contents removes
 the hide again. (This is the same rule the forking edit itself
 follows: children of =N= you deleted /while/ forking are born hidden.

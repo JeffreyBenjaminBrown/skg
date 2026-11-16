@@ -146,7 +146,7 @@ to the roots. The kinds:
 | containers    | C-c l c | the containers folder: what contains the node                                    |
 | mentioners    | C-c l m | the mentioners folder: what links to it                                          |
 | forks         | C-c l f | the forks folder: what it forks, and what forks it                               |
-| hidesFromSubs | C-c l h | the hidden folder (what it hides from what it forks) and the hiders folder       |
+| hides         | C-c l h | the hidden folder (what it hides from what it forks) and the hiders folder       |
 | aliases       | C-c l a | the aliases folder                                                               |
 | flags         | C-c l p | the flags folder: its true flags                                                 |
 A write-protected folder (☮) is one whose membership cannot be
@@ -405,14 +405,14 @@ client shows them, the heralds are:
 The relationship heralds are rendered as the clients render them;
 'docs/heralds.org', "Relationship heralds", explains them. In display
 order: 'C' contains, 'L' links to, 'K' forks (the K of forK; 'F' is
-the flags count), 'H' hides from its subscriptions. A count before a letter counts the
+the flags count), 'H' hides (from its forks). A count before a letter counts the
 nodes on the relation's in-side ("two nodes contain this"), a count
 after it the out-side ("this contains three"). A lowercase letter is
 an ancestor in this view: 'a' the viewparent, 'b' the grandparent, and
 so on; it replaces the count when ancestors make up the whole side. A
 fraction marks a subset: '1/5L', five nodes link here and one of them
 is substantive; 'C2/8', eight contents, two not yet integrated by the
-subscriber above. 'ĥ' after 'K' says this occurrence stands in for a
+forker above. 'ĥ' after 'K' says this occurrence stands in for a
 node it is a mirror of. The property counts 'A' (aliases), 'I' (extra IDs)
 and 'F' (true flags) follow. So '⟨0h 2aC3⟩' has two containers, one
 of them the viewparent, and three contents.
@@ -1258,7 +1258,7 @@ one reworded (see "Retyped headlines"). Then 'Not moved:' and
 'Skipped:' name what a 'subtree' leaves out, and why.
 
 Last, without '--yes', come the hides, which no edit shows: the server
-infers them from what left a subscriber ('docs/forks.org', "Editing
+infers them from what left a forker ('docs/forks.org', "Editing
 the clone: deletions become hides"). The tool sends the save as a
 preview, which writes nothing, and prints each line of the server's
 answer, as in
@@ -1267,10 +1267,10 @@ Hides 'A detail of Fred's' from 'A second container, outside the view', as conte
 Hides nothing: 'Contained twice' left 'Second child, a subscriber', but it is no content of 'Fred's note', nor a mirror of any.
 #+end_example
 'Hides' and 'Stops hiding' name what the save adds to or takes from
-the subscriber's hides, and the subscribee whose content holds it.
+the forker's hides, and the forkee whose content holds it.
 'Hides nothing:' is a child that left a note that forks
 something without hiding anything, and the rule that kept it from
-hiding: it is no content of the subscribee and a mirror of none of it,
+hiding: it is no content of the forkee and a mirror of none of it,
 or what it stands for was hidden already, or is still contained, or
 the same save shows it in the forks folder. A removal from a note
 that forks nothing prints no line. Every word is the

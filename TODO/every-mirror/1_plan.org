@@ -1599,7 +1599,7 @@ every save fork every forker.
 - This slice changes what the server writes into buffers: run the
   suites as slice 2 does.
 
-** TODO Slice 7: the save's and the goal's names, and the test files
+** DONE Slice 7: the save's and the goal's names, and the test files
 *** Corrections carried from slice 1
 The migration tool renames processed marks naming 'HidesFromSubs' to
 'Hides', not drops them. When this slice renames the relation, the new

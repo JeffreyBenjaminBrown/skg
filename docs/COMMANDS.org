@@ -465,7 +465,7 @@ advertise other nonempty relations.
 The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:
 type an alias in and save.
-*** C-c l h : skg-show-folderOf-hidesFromSubs
+*** C-c l h : skg-show-folderOf-hides
 The hiderFolder and hiddenFolder -- both write-protected (☮). Hiding is edited from
 a forkee as such, the forks folder, or the folder of what a note hides
 outside its fork partners, never from these folders. On a node that neither
