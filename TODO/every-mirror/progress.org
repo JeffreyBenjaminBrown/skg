@@ -904,3 +904,9 @@ expected stop did not arise.
   perspective and the part (slices 8 and 9).
 *** DONE
 The slice's headline in '1_plan.org' is DONE.
+** Orchestrator's notes after slice 5 (2026-11-16)
+For slice 9's handoff: no real data is migrated before slice 7 lands,
+since the tool renames marks to 'Hides', which the code reads only
+from slice 7 on. Visible to Jeff once migrated, as decided: a former
+subscription-only note is a mirror, and so are sibling forks of one
+note, so either may stand in the other's place.
