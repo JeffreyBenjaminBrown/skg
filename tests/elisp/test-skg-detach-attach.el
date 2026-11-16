@@ -95,7 +95,7 @@ it gives it the node's atom and 'noClaim'."
 (ert-deftest test-skg-detach-and-attach-under-an-editable-folder ()
   "An editable partner folder under an editable node reads claims."
   (let ((text (concat test-skg-detach-attach--editable-parent
-                      "** (skg subscribeeFolder)\n"
+                      "** (skg forksFolder)\n"
                       "*** (skg node (gnid s) (skgRepos (nodeRepo r))) s\n")))
     (should (string-match-p
              "^\\*\\*\\* (skg node (gnid s) (skgRepos (nodeRepo r)) noClaim) s$"
@@ -110,7 +110,7 @@ parent at all, both refuse and change nothing."
                           "** (skg node (gnid c) (skgRepos (nodeRepo r))) c\n")
                   2)
             (cons (concat test-skg-detach-attach--editable-parent
-                          "** (skg subscriberFolder)\n"
+                          "** (skg hiderFolder)\n"
                           "*** (skg node (gnid s) (skgRepos (nodeRepo r)) noClaim) s\n")
                   3)
             (cons test-skg-detach-attach--editable-parent 1)))
@@ -146,3 +146,28 @@ parent at all, both refuse and change nothing."
               #'skg-attach)))
 
 (provide 'test-skg-detach-attach)
+
+(ert-deftest test-skg-pending-detachment-in-a-forks-folder ()
+  "In a forksFolder a member claiming nothing is a pending detachment
+only when the folder's viewparent still forks it: a detached forkee E
+or a detached mutual M, whose '(rels (forks (in ...)))' names
+ancestor generation 2; not a forker F the viewparent does not fork,
+which the server draws claiming nothing."
+  (let ((parent '(skg forksFolder))
+        (grandparent '(skg node (gnid n) (skgRepos (nodeRepo r)))))
+    (should (skg--pending-detachment-p
+             '(skg node (gnid e) noClaim writeProtected
+                   (view (rels (forks (in 1 (ancestors 2))))
+                         (birth (forks in 2))))
+             parent grandparent))
+    (should (skg--pending-detachment-p
+             '(skg node (gnid m) noClaim writeProtected
+                   (view (rels (forks (in 1 (ancestors 2))
+                                      (out 1 (ancestors 2))))
+                         (birth (forks out 2))))
+             parent grandparent))
+    (should-not (skg--pending-detachment-p
+                 '(skg node (gnid f) noClaim writeProtected
+                       (view (rels (forks (out 1 (ancestors 2))))
+                             (birth (forks out 2))))
+                 parent grandparent))))

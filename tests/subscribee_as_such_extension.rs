@@ -4,7 +4,7 @@
 // subscribes to and overrides E, R hides H, E contains G and H.
 // Extended with X overriding G, so substitution below the
 // subscribee as such is observable: extending E under the
-// subscribeeFolder applies R's hides (no H) and the general
+// forksFolder applies R's hides (no H) and the general
 // substitution rule (G is shown as X, marked). The folder member
 // itself (E) is shown raw: folders never substitute.
 
@@ -56,10 +56,10 @@ fn lines_by_enclosing_folder (
       line ));
     if depth > 0 {
       let line_without_viewnode_id : String = without_viewnode_ids (line);
-      if line_without_viewnode_id . contains ("(skg subscribeeFolder)")
-        { stack . push ((depth, "subscribeeFolder")); }
-      else if line_without_viewnode_id . contains ("(skg hiddenInSubscribeeFolder)")
-        { stack . push ((depth, "hiddenInSubscribeeFolder")); }}}
+      if line_without_viewnode_id . contains ("(skg forksFolder)")
+        { stack . push ((depth, "forksFolder")); }
+      else if line_without_viewnode_id . contains ("(skg hiddenInForkPartnerFolder)")
+        { stack . push ((depth, "hiddenInForkPartnerFolder")); }}}
   result }
 
 /// Request an editable view of the E copy under 'folder' (by editing
@@ -93,25 +93,25 @@ async fn subscribee_as_such_extension_hides_and_substitutes (
       (
         graph_handle_from_config (config) ? );
       let view : String =
-        extend_e_under ("subscribeeFolder", config, tantivy)
+        extend_e_under ("forksFolder", config, tantivy)
         . await ?;
       let tagged : Vec<(&str, &str)> =
         lines_by_enclosing_folder (&view);
       assert! ( tagged . iter () . any ( |(c, l)|
-                  *c == "subscribeeFolder"
+                  *c == "forksFolder"
                   && l . contains ("(overridesHere G)")
                   && l . contains ("(gnid X)") ),
         "the general rule applies below a subscribee-as-such: \
          G is shown as X, marked:\n{}", view );
       assert! ( ! tagged . iter () . any ( |(c, l)|
-                  *c == "subscribeeFolder"
+                  *c == "forksFolder"
                   && l . contains ("(gnid H)") ),
         "R's hides apply to the subscribee-as-such extension; H \
-         appears only under the hiddenInSubscribeeFolder:\n{}", view );
+         appears only under the hiddenInForkPartnerFolder:\n{}", view );
       assert! ( tagged . iter () . any ( |(c, l)|
-                  *c == "hiddenInSubscribeeFolder"
+                  *c == "hiddenInForkPartnerFolder"
                   && l . contains ("(gnid H)") ),
-        "H shows in the hiddenInSubscribeeFolder:\n{}", view );
+        "H shows in the hiddenInForkPartnerFolder:\n{}", view );
       Ok (( )) }
 
 async fn folder_members_never_substitute (
@@ -125,14 +125,14 @@ async fn folder_members_never_substitute (
           config, Some (tantivy),
           &[ ID::from ("R") ] ) ?;
       // R overrides E, yet the folder copy of E is shown raw: the
-      // subscribeeFolder shows the graph fact "R subscribes to E";
+      // forksFolder shows the graph fact "R subscribes to E";
       // substituting inside it would obscure the fact displayed.
       let e_lines : Vec<&str> =
         view . lines ()
         . filter ( |l| l . contains ("(gnid E)") )
         . collect ();
       assert_eq! ( e_lines . len (), 1,
-        "E appears under the subscribee folder:\n{}", view );
+        "E appears under the forks folder:\n{}", view );
       assert! ( e_lines . iter () . all (
                   |l| ! l . contains ("overridesHere") ),
         "it is not substituted:\n{}", view );

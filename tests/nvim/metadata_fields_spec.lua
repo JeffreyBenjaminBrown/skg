@@ -44,7 +44,7 @@ describe('skg.sexpr.metadata_fields.kind_of_sexp', function ()
         ['(skg ghost (gnid g) (skgRepos (nodeRepo r)))'] = 'ghost',
         ['(skg alias (skgRepos (relRepo r)))'] = 'alias',
         ['(skg (flag noSearchMatching))'] = 'flag',
-        ['(skg subscribeeFolder)'] = 'folder',
+        ['(skg forksFolder)'] = 'folder',
         ['(skg folded tombstone)'] = 'tombstone' }) do
       assert.are.equal(kind_name,
         fields.kind_of_sexp(sexpr.read(sexp_text)).kind, sexp_text)

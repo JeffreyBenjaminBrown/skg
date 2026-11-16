@@ -288,6 +288,7 @@ async fn save_roundtrips_to_original_and_is_a_fixpoint (
 /// three mirrors tie in that skgrepo, R and M both forked by none of
 /// the others, so N stands as itself (Q3, rule 3), where R stood before
 /// the save; and M, whose mirrors are the same three, stands as itself.
+/// R and M stand in N's forks folder, forkers claiming nothing.
 async fn a_second_owned_overrider_saves_and_q3s_mirror_stands (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -306,16 +307,19 @@ async fn a_second_owned_overrider_saves_and_q3s_mirror_stands (
   assert! ( marked_lines (&after, "N") . is_empty ()
             && marked_lines (&after, "M") . is_empty (),
             "nothing stands in N's or M's place:\n{}", after );
+  let r_lines : Vec<&str> = after . lines ()
+    . filter ( |line| line . contains ("(gnid R)") ) . collect ();
   assert! ( line_of_gnid (&after, "N") . is_some ()
             && line_of_gnid (&after, "M") . is_some ()
-            && line_of_gnid (&after, "R") . is_none (),
-            "N and M are shown as themselves, R not at all:\n{}", after );
+            && ! r_lines . is_empty ()
+            && r_lines . iter () . all ( |line| line . contains ("(birth (forks out 2))") ),
+            "N and M are shown as themselves, R only as a forker in N's forks folder:\n{}", after );
   Ok (( )) }
 
 /// N comes to fork R, which forks N: an owned mutual pair, in
 /// one skgrepo (saved as above). Each is forked by the other, so N
 /// stands as itself (Q3, rule 3), where R stood before the save; R
-/// is drawn, as what N forks, in N's subscribee folder.
+/// is drawn in N's forks folder, a mutual, born of both sides.
 async fn an_owned_mutual_pair_saves_and_q3s_mirror_stands (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -330,9 +334,8 @@ async fn an_owned_mutual_pair_saves_and_q3s_mirror_stands (
             && line_of_gnid (&after, "N") . is_some (),
             "N is shown as itself:\n{}", after );
   assert! ( line_of_gnid (&after, "R")
-            . is_some_and ( |l| l . contains ("(birth (forks in 2))") ),
-            "R is shown only as what N forks, in its subscribee \
-             folder:\n{}", after );
+            . is_some_and ( |l| l . contains ("(birth (forks in 2) (forks out 2))") ),
+            "R is shown only as N's mutual, in its forks folder:\n{}", after );
   Ok (( )) }
 
 async fn extraction_honors_overridesHere (
@@ -439,7 +442,7 @@ async fn extraction_honors_overridesHere (
         // the original, so no spurious hide of N is inferred.
         let buffer = indoc! {"
           * (skg node (gnid S) (skgRepos (nodeRepo main))) S
-          ** (skg subscribeeFolder)
+          ** (skg forksFolder)
           *** (skg node (gnid E) (skgRepos (nodeRepo main))) E
           **** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected (overridesHere N)) R
         "};
@@ -457,7 +460,7 @@ async fn extraction_honors_overridesHere (
         // content the save writes, only S's hides. Nor is N filed in S.
         let buffer = indoc! {"
           * (skg node (gnid S) (skgRepos (nodeRepo main))) S
-          ** (skg subscribeeFolder)
+          ** (skg forksFolder)
           *** (skg node (gnid E) (skgRepos (nodeRepo main))) E
           **** (skg node (gnid R) (skgRepos (nodeRepo main)) (overridesHere N) (editRequest delete)) R
         "};
@@ -764,9 +767,11 @@ async fn under_a_foreign_root_a_forked_child_is_shown_as_the_original (
   assert! ( line_of_gnid (&saved, "K")
             . is_some_and ( |l| l . ends_with (") K") ),
     "under R, K is shown as itself, unedited:\n{}", saved );
-  assert! ( line_of_gnid (&saved, &clone . pid . 0) . is_none ()
-            && ! saved . contains ("K-edited"),
-    "under R, the user's clone of K is not shown:\n{}", saved );
+  let clone_lines : Vec<&str> = saved . lines ()
+    . filter ( |line| line . contains (&format! ("(gnid {})", clone . pid . 0)) )
+    . collect ();
+  assert! ( clone_lines . iter () . all ( |line| line . contains ("(birth (forks out 2))") ),
+    "under R, the user's clone of K is shown only in K's forks folder, as its forker:\n{}", saved );
   assert! ( line_of_gnid (&saved, "A")
             . is_some_and ( |l| l . contains ("(overridesHere M)") ),
     "under R, A still stands for M:\n{}", saved );
@@ -1278,7 +1283,7 @@ fn a_replaced_root_shows_its_own_containers (
             && users_container_folder [0] . contains ("(gnid W)")
             && ! users . contains ("noWarrant"),
     "from the user's, U's folder lists W, which contains U, and nothing of M's \
-     (M's containers show only under M, in U's subscribee folder, since U \
+     (M's containers show only under M, in U's forks folder, since U \
      forks M):\n{}", users );
   assert_eq! ( without_vnids ( users . lines () . skip (1) ),
                without_vnids ( fresh_view_of_u . lines () . skip (1) ),
@@ -1293,12 +1298,12 @@ fn a_replaced_root_shows_its_own_containers (
   Ok (( )) }
 
 /// A replaced root's default folders are the replacement's: a view
-/// of foreign L shows no subscribee folder, since L subscribes to
-/// nothing. From the user's perspective the root is J, the user's fork
-/// of L, and it is drawn as a fresh view of J draws it: its containers
-/// folder, and its subscribee folder holding L, counting the one child
-/// of L that J neither contains nor hides. Back at the root authors',
-/// L is drawn again as the fresh view drew it.
+/// of foreign L shows its forks folder holding J, which forks it,
+/// claiming nothing. From the user's perspective the root is J, the
+/// user's fork of L, and it is drawn as a fresh view of J draws it:
+/// its containers folder, and its forks folder holding L, claiming,
+/// counting the one child of L that J neither contains nor hides. Back
+/// at the root authors', L is drawn again as the fresh view drew it.
 fn a_replaced_root_shows_its_own_default_folders (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1307,8 +1312,9 @@ fn a_replaced_root_shows_its_own_default_folders (
     connection_holding_a_view_of (config, tantivy, "L", &[ ID::from ("L") ]) ?;
   let (_, _, fresh_view_of_j) : (ViewsState, SkgEnv, String) =
     connection_holding_a_view_of (config, tantivy, "J", &[ ID::from ("J") ]) ?;
-  assert! ( ! view . contains ("subscribeeFolder"),
-    "a fresh view of L has no subscribee folder:\n{}", view );
+  assert! ( line_of_gnid (&view, "J") . is_some_and (
+              |line| line . contains ("noClaim") && line . contains ("(birth (forks out 2))") ),
+    "a fresh view of L shows J in its forks folder, claiming nothing:\n{}", view );
   let mut switch = |named : &str| -> Result<String, Box<dyn Error>> {
     let messages : Vec<String> = messages_answering (
       &switch_request_naming ("L", named),
@@ -1316,11 +1322,11 @@ fn a_replaced_root_shows_its_own_default_folders (
     assert! ( refusal_of (&messages) . is_none (), "{:?}", messages );
     Ok ( rerendered_text (&messages) . ok_or ("the switch rerenders") ? ) };
   let users : String = switch ("user") ?;
-  assert! ( users . contains ("subscribeeFolder")
+  assert! ( users . contains ("forksFolder")
             && line_of_gnid (&users, "L") . is_some_and (
                  |line| line . contains ("(unintegrated 1)") )
             && ! users . contains ("noWarrant"),
-    "from the user's, J shows its subscribee folder, L in it with its count:\n{}", users );
+    "from the user's, J shows its forks folder, L in it with its count:\n{}", users );
   assert_eq! ( without_vnids ( users . lines () . skip (1) ),
                without_vnids ( fresh_view_of_j . lines () . skip (1) ),
     "J's folders are drawn as a fresh view of J draws them" );
@@ -1385,7 +1391,7 @@ async fn a_replaced_root_redraws_the_folders_it_was_asked_for (
 /// folders. Switched to the user's perspective, the hit for foreign L
 /// ("missive") shows J, the user's fork, still write-protected, with
 /// what a search hit for J ("answer") shows: its containers folder and
-/// its subscribee folder, folded, and no content, which only an
+/// its forks folder, folded, and no content, which only an
 /// editable root draws. Back at the root authors', the hit shows L's
 /// folders again.
 fn a_replaced_search_hit_stays_a_hit (
@@ -1441,8 +1447,10 @@ fn without_vnids<'a> (
 
 /// In a view of foreign R that follows the user's overrides, editing
 /// R's child K forks it, and the save's rerender shows the clone, with
-/// the edit, in K's place, as '(overridesHere K)'; U still stands in
-/// M's place. The connection keeps the choice the save named.
+/// the edit, in K's place, as '(overridesHere K)', K standing only in
+/// the clone's forks folder (the folder K's occurrence carried, now
+/// the clone's); U still stands in M's place. The connection keeps the
+/// choice the save named.
 async fn a_save_following_the_users_overrides_shows_a_new_fork_in_place (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1472,7 +1480,9 @@ async fn a_save_following_the_users_overrides_shows_a_new_fork_in_place (
   assert! ( line_of_gnid (saved, &clone . pid . 0)
             . is_some_and ( |l| l . contains ("(overridesHere K)") && l . ends_with (") K-edited") ),
     "the clone, edited, stands in K's place:\n{}", saved );
-  assert! ( line_of_gnid (saved, "K") . is_none (), "{}", saved );
+  assert! ( saved . lines () . filter ( |line| line . contains ("(gnid K)") )
+            . all ( |line| line . contains ("(birth (forks in 2))") ),
+            "K stands only in the clone's forks folder:\n{}", saved );
   assert! ( line_of_gnid (saved, "U") . is_some_and ( |l| l . contains ("(overridesHere M)") ),
     "U still stands in M's place:\n{}", saved );
   assert_eq! ( views_state . open_views . overrides_followed_by_view (

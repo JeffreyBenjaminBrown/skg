@@ -3,15 +3,14 @@
 // When the refresh corrects a write-protected partner folder in the
 // view the user just saved, the save succeeds, and the only warning is
 // the one for the discarded folder headline text
-// ('docs/sharing-model.org', "The write-protected folders: who
-// subscribes to, overrides, or hides this node"):
+// ('docs/sharing-model.org', "The write-protected folders"):
 // - a deleted generated member is reinstated;
 // - a child placed in the folder, which claims nothing there, stays,
 //   unwarranted.
 //
-// Fixture: r and t subscribe to n; the test explicitly asks for n's
-// subscription folders. x is an unrelated node the test places inside
-// that folder.
+// Fixture: r and t hide n; the test explicitly asks for n's hides
+// folders, and so draws its hider folder. x is an unrelated node the
+// test places inside that folder.
 
 use std::error::Error;
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
@@ -88,7 +87,7 @@ async fn write_protected_folder_repairs_warn_impl (
       &[ ID ("n" . to_string ()) ] ) ?;
   let folder_request : String = initial_buffer . replacen (
     "node ",
-    "node (viewRequests (folder subscribesTo))", 1 );
+    "node (viewRequests (folder hidesFromSubs))", 1 );
   let mut views_state : ViewsState = fresh_views_state ();
   let complete_buffer : String =
     save_buffer (&folder_request, config, tantivy, &graph, &mut views_state)
@@ -114,7 +113,7 @@ async fn write_protected_folder_repairs_warn_impl (
         x_line . chars () . take_while ( |c| *c == '*' ) . count ();
       format! ( "{} xx", "*" . repeat (stars + 1) ) };
     let folder_line : String =
-      line_containing (&complete_buffer, "subscriberFolder") . to_string ();
+      line_containing (&complete_buffer, "hiderFolder") . to_string ();
     complete_buffer
       . replace ( &format! ("{}\n", r_line), "" ) // delete member r
       . replace ( &t_line,                        // place x (with child) after t
@@ -126,11 +125,11 @@ async fn write_protected_folder_repairs_warn_impl (
   assert! ( response . errors . is_empty (),
     "save must succeed; got errors: {:?}", response . errors );
   assert_eq! ( response . warnings . iter ()
-               . filter ( |w| ! w . contains ("Headline text on a subscriberFolder") )
+               . filter ( |w| ! w . contains ("Headline text on a hiderFolder") )
                . count (), 0,
                "the reinstatement is no warning: {:?}", response . warnings );
   assert! ( response . warnings . iter ()
-            . any ( |w| w . contains ("Headline text on a subscriberFolder") ),
+            . any ( |w| w . contains ("Headline text on a hiderFolder") ),
     "discarded folder headline text must warn: {:?}",
     response . warnings );
   let saved : String = response . saved_view;
@@ -140,12 +139,12 @@ async fn write_protected_folder_repairs_warn_impl (
     assert! ( x_line_after . contains ("noWarrant")
               && ! x_line_after . contains ("noClaim"),
       "x must stay, unwarranted, with no claim atom: {}", x_line_after ); }
-  assert! ( ! line_containing (&saved, "subscriberFolder")
+  assert! ( ! line_containing (&saved, "hiderFolder")
               . contains ("HELLO"),
     "the folder headline edit must not survive the rerender:\n{}", saved );
   { // A body on a non-vognode still aborts the save (Body_of_NonVognode).
     let folder_line : String =
-      line_containing (&saved, "subscriberFolder") . to_string ();
+      line_containing (&saved, "hiderFolder") . to_string ();
     let with_body : String =
       saved . replace ( &folder_line,
                         &format! ("{}\nan illegal body", folder_line) );
@@ -161,14 +160,14 @@ async fn failed_save_carries_warnings_with_errors (
 ) -> Result<(), Box<dyn Error>> {
   // A failed save's response carries
   // its warnings alongside its errors. The buffer below produces both
-  // a parse-time warning (leftover text on a subscriberFolder headline)
+  // a parse-time warning (leftover text on a hiderFolder headline)
   // and a validation error (an idFolder claiming an id node n lacks).
       let graph : InRustGraphHandle =
         (
           graph_handle_from_config (config) ? );
       let buffer : &str = "\
 * (skg node (gnid n) (skgRepos (nodeRepo main))) n
-** (skg subscriberFolder) leftover headline text
+** (skg hiderFolder) leftover headline text
 *** (skg node (gnid r) (skgRepos (nodeRepo main)) writeProtected) r
 *** (skg node (gnid t) (skgRepos (nodeRepo main)) writeProtected) t
 ** (skg idFolder)
@@ -191,7 +190,7 @@ async fn failed_save_carries_warnings_with_errors (
             "expected an IDFolder_Edited error: {:?}", errors );
           assert! (
             warnings . iter () . any (
-              |w| w . contains ("Headline text on a subscriberFolder") ),
+              |w| w . contains ("Headline text on a hiderFolder") ),
             "a failed save must carry its parse warning: {:?}", warnings ); }
         other => panic! (
           "expected BufferValidationErrors, got {:?}", other ), }

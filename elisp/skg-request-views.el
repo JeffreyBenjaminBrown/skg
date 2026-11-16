@@ -48,8 +48,8 @@ an interactive command NAME that requests REQUEST-FORM and auto-saves."
     "Show the aliases folder for the headline at point.")
   (skg-show-folderOf-hidesFromSubs (folder hidesFromSubs)
     "Show the hide folders (hiderFolder + hiddenFolder).")
-  (skg-show-folderOf-subscribesTo  (folder subscribesTo)
-    "Show the subscription folders (subscribeeFolder + subscriberFolder).")
+  (skg-show-folderOf-forks         (folder forks)
+    "Show the forksFolder: the notes this one forks, then those that fork it.")
   (skg-show-folderOf-flags flags
     "Show the write-protected flags folder for the node at point.")
   (skg-show-folderOf-containers    (folder containers)

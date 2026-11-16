@@ -3,7 +3,7 @@
 -- run-test.sh for the data.
 --
 -- Phase 1: Open the diff view; a's containers, mentioners and
---          subscribers folders each hold a write-protected member
+--          forks folders each hold a write-protected member
 --          with change facts.
 -- Phase 2: <localleader>rnc visits every headline with change facts
 --          but those three members, and <localleader>rnC visits them
@@ -112,12 +112,12 @@ print('=== PHASE 1: Open the diff view ===')
 require('skg.diff_view').diffView_open()
 local all_changes = T.wait_for(function ()
   local buf = all_changes_buffer()
-  if buf and T.buffer_text(buf):find('subscriberFolder', 1, true) then return buf end
+  if buf and T.buffer_text(buf):find('forksFolder', 1, true) then return buf end
   return nil
 end)
 if not all_changes then T.fail('Timeout waiting for the "all changes" buffer') end
 vim.api.nvim_set_current_buf(all_changes)
-for _, folder in ipairs({ 'containerFolder', 'mentionerFolder', 'subscriberFolder' }) do
+for _, folder in ipairs({ 'containerFolder', 'mentionerFolder', 'forksFolder' }) do
   T.check(T.buffer_text(all_changes):find(folder, 1, true) ~= nil,
           'the buffer shows a ' .. folder)
 end
@@ -160,7 +160,7 @@ do
     local text = T.buffer_text(all_changes)
     local folder = text:find('mentionerFolder', 1, true)
     local old_text = folder and text:find('(oldText', folder, true)
-    local next_folder = folder and text:find('subscriberFolder', folder, true)
+    local next_folder = folder and text:find('forksFolder', folder, true)
     return old_text and next_folder and old_text < next_folder or nil
   end, 20)
   T.check(moved, "y's old text moved into the mentioners folder:\n"

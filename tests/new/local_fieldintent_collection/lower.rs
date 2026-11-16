@@ -37,7 +37,7 @@ fn lowering_produces_ordered_nodeInstructions_and_signals () {
       ** (skg aliasFolder) aliases
       *** (skg alias) nickname
       ** (skg node (gnid child) (skgRepos (nodeRepo main))) child
-      ** (skg subscribeeFolder)
+      ** (skg forksFolder)
       *** (skg node (gnid e) (skgRepos (nodeRepo main))) e
       **** (skg node (gnid visible) (skgRepos (nodeRepo main))) visible
       * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed

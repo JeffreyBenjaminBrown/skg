@@ -563,9 +563,13 @@ of its line; otherwise nil."
   "Non-nil when the headline at point, with METADATA-SEXP, is a
 write-protected occurrence (☮, not a ghost) and its parent is a folder
 of other files: one listed by 'other_files', in 'folder_heralds' of
-'shared/herald-styles.json'. Its changes are drawn at its own node's
-editable occurrence, so the plain motions skip it. A ghost is visited:
-a deleted subscriber's subscription, say, is drawn nowhere else."
+'shared/herald-styles.json'; or a forksFolder, where the occurrence is
+born only of forking the folder's viewparent
+\(`skg--born-only-forking-its-folders-viewparent-p'), which it records
+in its own file. Its changes are drawn at its own node's editable
+occurrence, so the plain motions skip it. A ghost is visited: a
+deleted forker's fork, say, is drawn nowhere else. So is a forkee or a
+mutual in a forksFolder: the viewparent records that fork."
   (and (skg--node-write-protected-p metadata-sexp)
        (save-excursion
          (and (org-up-heading-safe)
@@ -573,10 +577,21 @@ a deleted subscriber's subscription, say, is drawn nowhere else."
                              (ignore-errors
                                (skg--metadata-sexp-at-point-or-nil)))))
                 (and folder
-                     (member (symbol-name folder)
-                             (alist-get 'other_files
-                                        (alist-get 'folder_heralds
-                                                   skg-shared-herald-styles)))))))))
+                     (or (member (symbol-name folder)
+                                 (alist-get 'other_files
+                                            (alist-get 'folder_heralds
+                                                       skg-shared-herald-styles)))
+                         (and (eq folder 'forksFolder)
+                              (skg--born-only-forking-its-folders-viewparent-p
+                               metadata-sexp)))))))))
+
+(defun skg--born-only-forking-its-folders-viewparent-p (metadata-sexp)
+  "Non-nil when METADATA-SEXP's birth facts name '(forks out 2)' and no
+'(forks in 2)': a member of a forksFolder that forks the folder's
+viewparent, which does not fork it."
+  (let ((birth (skg-sexp-cdr-at-path metadata-sexp '(skg view birth))))
+    (and (member '(forks out 2) birth)
+         (not (member '(forks in 2) birth)))))
 
 ;;; The processed summary
 

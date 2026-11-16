@@ -268,7 +268,7 @@ async fn delete_in_foreign_subscribee_rerenders_as_unknown (
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
       * (skg node (gnid subscriber) (skgRepos (nodeRepo foreign))) foreign subscriber
-      ** (skg subscribeeFolder)
+      ** (skg forksFolder)
       *** (skg node (gnid victim) (skgRepos (nodeRepo owned)) noClaim (editRequest delete)) victim
     "}, config, tantivy, &graph,
     &Err (String::new ()), &mut views_state ) . await ?;
@@ -298,9 +298,9 @@ async fn delete_in_foreign_hiddenoutside_rerenders_as_unknown (
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
       * (skg node (gnid hide-subscriber) (skgRepos (nodeRepo foreign))) foreign hide subscriber
-      ** (skg subscribeeFolder)
+      ** (skg forksFolder)
       *** (skg node (gnid hide-subscribee) (skgRepos (nodeRepo foreign))) foreign hide subscribee
-      *** (skg hiddenOutsideOfSubscribeeFolder)
+      *** (skg hiddenOutsideOfForkPartnersFolder)
       **** (skg node (gnid victim) (skgRepos (nodeRepo owned)) (editRequest delete)) victim
     "}, config, tantivy, &graph,
     &Err (String::new ()), &mut views_state ) . await ?;

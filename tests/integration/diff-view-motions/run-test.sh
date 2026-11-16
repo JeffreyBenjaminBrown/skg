@@ -11,10 +11,10 @@
 # and y stand alone. In the worktree:
 #   - m is deleted (a's containers change, and m's ghost is a root);
 #   - r2 contains a (a's containers change again);
-#   - s subscribes to a (a's subscribers change);
+#   - s forks a (a's forks change, on its forkers' side);
 #   - y is retitled and its body mentions a (a's mentioners change).
 # So a, under m's ghost, shows its containers, mentioners and
-# subscribers folders, each holding a write-protected member whose
+# forks folders, each holding a write-protected member whose
 # change is drawn where that member's node stands editable.
 #
 # The data is generated here, in data/, and removed afterward.

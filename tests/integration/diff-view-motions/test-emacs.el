@@ -2,7 +2,7 @@
 ;;; run-test.sh for the data.
 ;;;
 ;;; Phase 1: Open the diff view; a's containers, mentioners and
-;;;          subscribers folders each hold a write-protected member
+;;;          forks folders each hold a write-protected member
 ;;;          with change facts.
 ;;; Phase 2: C-c r n c visits every headline with change facts but
 ;;;          those three members, and C-c r n C visits them too. Each
@@ -121,11 +121,11 @@ viewparent. The skipped lines."
              (let ((buf (all-changes-buffer)))
                (and buf
                     (with-current-buffer buf
-                      (string-match-p "subscriberFolder" (buffer-string)))
+                      (string-match-p "forksFolder" (buffer-string)))
                     (skg-test-wait-for-response 1)))))
     (test-fail "Timeout waiting for the \"all changes\" buffer"))
   (set-buffer (all-changes-buffer))
-  (dolist (folder '("containerFolder" "mentionerFolder" "subscriberFolder"))
+  (dolist (folder '("containerFolder" "mentionerFolder" "forksFolder"))
     (unless (string-match-p folder (buffer-string))
       (test-fail "The buffer lacks a %s:\n%s" folder (buffer-string))))
   (test-pass "The diff view shows a's three folders of other files"))
@@ -169,7 +169,7 @@ viewparent. The skipped lines."
                            (let ((old-text (save-excursion
                                              (re-search-forward "(oldText" nil t)))
                                  (next-folder (save-excursion
-                                                (re-search-forward "subscriberFolder" nil t))))
+                                                (re-search-forward "forksFolder" nil t))))
                              (and old-text next-folder
                                   (< old-text next-folder))))))))
            20)

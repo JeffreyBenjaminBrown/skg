@@ -157,7 +157,7 @@ fn inbound_containerward_data_hides_N_at_public (
       Ok (( )) } )) }
 
 #[test]
-fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
+fn forksFolder_style_inbound_gates_privately_recorded_subscription (
 ) -> Result<(), Box<dyn Error>> {
   run_with_skgrepo_set_test_db (
     "skg-test-leak-battery-subscriber",
@@ -173,7 +173,7 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
       let graph : InRustGraph =
         InRustGraph::from_graphnodes (&nodes);
 
-      // C's subscriberFolder goal list: 'other_member_pids_gated' at
+      // C's forksFolder goal list: 'other_member_pids_gated' at
       // the SUBSCRIBEE role (C's own role -- who subscribes to C).
       // S's subscription is recorded only in S's private section, so
       // it must not appear at "public" even though S itself is a
@@ -184,7 +184,7 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
       assert! (
         ! subscribers_public . contains (&ID::from ("S")),
         "S's privately-recorded subscription to C must not surface \
-         in C's subscriberFolder goal list at public: {:?}",
+         in C's forksFolder goal list at public: {:?}",
         subscribers_public );
       let subscribers_all : Vec<ID> =
         graph . other_member_pids_gated (
@@ -196,7 +196,7 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
       Ok (( )) } )) }
 
 #[test]
-fn default_subscribeeFolder_requires_an_unrestricted_subscription_relationship (
+fn default_forksFolder_requires_an_unrestricted_subscription_relationship (
 ) -> Result<(), Box<dyn Error>> {
   run_with_skgrepo_set_test_db (
     "skg-test-leak-battery-default-subscribee-folder",
@@ -216,16 +216,16 @@ fn default_subscribeeFolder_requires_an_unrestricted_subscription_relationship (
           config, Some (tantivy),
           &[ ID::from ("S") ], &public ) ?;
       assert! (
-        ! at_public . contains ("subscribeeFolder"),
+        ! at_public . contains ("forksFolder"),
         "a restricted subscription must not leave an empty default \
-         subscribeeFolder behind:\n{}", at_public );
+         forksFolder behind:\n{}", at_public );
 
       let (at_all, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view_with_skgrepo_set (
           config, Some (tantivy),
           &[ ID::from ("S") ], &all ) ?;
       assert! (
-        at_all . contains ("subscribeeFolder"),
+        at_all . contains ("forksFolder"),
         "the unrestricted subscription must create the default folder unrestricted:\n{}",
         at_all );
       assert! (

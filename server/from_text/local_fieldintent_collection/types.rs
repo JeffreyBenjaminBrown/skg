@@ -22,12 +22,12 @@ pub enum LocalContext {
   TopLevel, // The node is a child of the BufferRoot.
   UnderVognode { // The node's parent is an occurrence, a ghost, an unknown, or a tombstone.
     parent_if_editable : Option<ID>, }, // This is Some iff the parent is save-eligible.
-  UnderDefiningFolder ( // The node is inside an aliasFolder or a subscribeeFolder.
+  UnderDefiningFolder ( // The node is inside an aliasFolder or a forksFolder.
     DefiningFolderRecorder ),
-  SubscribeeAsSuchPosition { // The node is a direct child of a subscribeeFolder.
+  SubscribeeAsSuchPosition { // The node is a claiming direct child of a forksFolder: a forkee as such.
     subscriber               : ID,
     subscriber_is_editable   : bool, },
-  HiddenOutsidePosition { // The one derived-but-editable compound partner folder under a subscribeeFolder.
+  HiddenOutsidePosition { // The one derived-but-editable compound partner folder under a forksFolder.
     subscriber       : ID,
     is_saveEligible  : bool, },
   UnderWriteProtectedFolder, // The node is inside a write-protected partner folder, an idFolder, or a property member.
@@ -35,7 +35,7 @@ pub enum LocalContext {
 
 /// A DefiningFolderRecorder is what a defining folder knows about its recorder
 /// (the folder's parent). The id and editability are carried even
-/// when the recorder is not save-eligible, because a subscribeeFolder's
+/// when the recorder is not save-eligible, because a forksFolder's
 /// children need them for text claims, which outlive the visibility
 /// guard.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -50,7 +50,7 @@ pub struct DefiningFolderRecorder {
 /// pairs one of these with a target ID, and the pair is
 /// instructionMerged into the accumulator.
 /// The first seven kinds are exclusive (at most one per ID); the
-/// last three are combineable (any number per ID). That distinction is
+/// last four are combineable (any number per ID). That distinction is
 /// the shape of 'FieldIntentsForOneId': each exclusive kind gets an
 /// Option slot there, and each combineable kind gets a Vec slot.
 /// .
@@ -83,6 +83,19 @@ pub enum FieldIntent {
   SubscribeeVisibility (SubscribeeVisibility),
   HiddenOutsideEdit  (HiddenOutsideEdit),
   SubscribeeTextClaim  (SubscribeeTextClaim),
+  ForksFolderMembers (ForksFolderMembers),
+}
+
+/// This is an unresolved signal: the buffer presents 'members' as
+/// every member of the forks folder of a save-eligible note, claiming
+/// or not. A note that forks it, by a record the skgrepo restriction
+/// shows, that is not among them and that it does not fork after the
+/// save was deleted from the folder, and joins the note's hides
+/// ('resolve_forks_folder_removals'): a forker-only member, or a
+/// mutual, whose fork the same save ends.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ForksFolderMembers {
+  pub members : Vec<ID>,
 }
 
 /// This is an unresolved signal: the buffer presents 'visible' as
@@ -133,6 +146,7 @@ pub struct FieldIntentsForOneId {
   pub flag       : Option<(Flag, bool)>,
   pub visibility     : Vec<SubscribeeVisibility>,  // This slot is combineable.
   pub hidden_outside : Vec<HiddenOutsideEdit>,     // This slot is combineable.
+  pub forks_folder_members : Vec<ForksFolderMembers>, // This slot is combineable.
   pub text_claims    : Vec<SubscribeeTextClaim>,   // This slot is combineable, and is consumed only by validation.
 }
 
@@ -193,7 +207,8 @@ impl CollectedFieldIntents {
     if ! matches! ( intent,
                     FieldIntent::SubscribeeVisibility (_)
                     | FieldIntent::HiddenOutsideEdit (_)
-                    | FieldIntent::SubscribeeTextClaim (_) )
+                    | FieldIntent::SubscribeeTextClaim (_)
+                    | FieldIntent::ForksFolderMembers (_) )
     { let emitters : &mut Vec<HeadlineName> =
         self . exclusive_emitters . entry (target . clone ())
         . or_default ();
@@ -217,6 +232,9 @@ impl CollectedFieldIntents {
         Ok (( )) },
       FieldIntent::SubscribeeTextClaim (c) => {
         entry . text_claims . push (c);
+        Ok (( )) },
+      FieldIntent::ForksFolderMembers (members) => {
+        entry . forks_folder_members . push (members);
         Ok (( )) },
       FieldIntent::Delete { skgrepo } => {
         if entry . some_nondelete_exclusive_slot_is_filled() {
@@ -275,7 +293,8 @@ impl CollectedFieldIntents {
           FieldIntent::Delete { .. }
             | FieldIntent::SubscribeeVisibility (_)
             | FieldIntent::HiddenOutsideEdit (_)
-            | FieldIntent::SubscribeeTextClaim (_) =>
+            | FieldIntent::SubscribeeTextClaim (_)
+            | FieldIntent::ForksFolderMembers (_) =>
             unreachable! ("handled by the outer match"), }}}}
 }
 

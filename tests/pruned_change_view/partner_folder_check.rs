@@ -13,7 +13,7 @@ use skg::serve::handlers::save_buffer::SaveResponse;
 use std::error::Error;
 use skg::metadata_canon::without_viewnode_ids;
 
-/// The buffer with a subscribee folder holding 'members' under the
+/// The buffer with a forks folder holding 'members' under the
 /// write-protected recorder in c2's content.
 fn with_subscribee_folder_under_recorder (
   buffer  : &str,
@@ -26,7 +26,7 @@ fn with_subscribee_folder_under_recorder (
     . unwrap_or_else ( || panic! (
       "recorder is shown write-protected under c2:\n{}", buffer ));
   buffer . replacen ( recorder_under_c2, &format! (
-    "{}\n*** (skg subscribeeFolder)\n{}", recorder_under_c2,
+    "{}\n*** (skg forksFolder)\n{}", recorder_under_c2,
     members . iter () . map ( |member| format! ("**** {}", member) )
     . collect::<Vec<String>> () . join ("\n") ), 1 ) }
 

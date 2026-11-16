@@ -19,7 +19,7 @@ and to [[id:missing-id][a node nobody wrote]]⟦not held here⟧.
 A body line that stays unnumbered.
 *** Contained twice ⟨0e 2aC⟩
 ** Second child, a subscriber ⟨0f a/L K1 H2⟩
-*** ⟨0g It subscribes to these.⟩
+*** ⟨0g It forks these, or these fork it.⟩
 **** Fred's note ⟨0h ☮ C1 1/L bK ⌂:fred⟩
-**** ⟨0i b hides these, but subscribes to nothing that contains them.⟩
+**** ⟨0i b hides these, but nothing it forks or that forks it contains them.⟩
 ***** An aside of Fred's ⟨0j ☮ cH ⌂:fred folded⟩

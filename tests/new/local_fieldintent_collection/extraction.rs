@@ -98,9 +98,9 @@ fn unknown_members_write_their_editable_relationship_recorders_only () {
   let input = indoc! {"
     * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
     ** (skg unknown (gnid content-unknown))
-    ** (skg subscribeeFolder)
+    ** (skg forksFolder)
     *** (skg unknown (gnid subscribee-unknown))
-    *** (skg hiddenOutsideOfSubscribeeFolder)
+    *** (skg hiddenOutsideOfForkPartnersFolder)
     **** (skg unknown (gnid hiddenoutside-unknown))
   "};
   let instructions = nodeInstructions_from_tree (viewnode_tree_as_written (input))
@@ -388,12 +388,12 @@ fn extraction_collects_subscribees_without_hidden_branches (
   let input: &str =
     indoc! {"
             * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
-            **** (skg hiddenInSubscribeeFolder)
+            **** (skg hiddenInForkPartnerFolder)
             ***** (skg node (gnid hidden-in) (skgRepos (nodeRepo main))) hidden in child
             **** (skg node (gnid subscribee-content) (skgRepos (nodeRepo main))) subscribee content
-            *** (skg hiddenOutsideOfSubscribeeFolder)
+            *** (skg hiddenOutsideOfForkPartnersFolder)
             **** (skg node (gnid hidden-outside) (skgRepos (nodeRepo main))) hidden outside child
         "};
 
@@ -427,8 +427,8 @@ fn write_protected_folder_members_save_themselves_but_not_their_recorder (
   let input: &str =
     indoc! {"
             * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
-            ** (skg subscriberFolder)
-            *** (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
+            ** (skg forksFolder)
+            *** (skg node (gnid subscriber) (skgRepos (nodeRepo main)) noClaim) subscriber
             ** (skg hiderFolder)
             *** (skg node (gnid hider) (skgRepos (nodeRepo main))) hider
             ** (skg hiddenFolder)
@@ -458,7 +458,7 @@ fn subscribee_hiderel_intent_collects_visible_content (
   let input : &str =
     indoc! {"
             * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
             **** (skg node (gnid a) (skgRepos (nodeRepo main))) a
             **** (skg node (gnid b) (skgRepos (nodeRepo main))) b
@@ -478,7 +478,7 @@ fn subscribee_hiderel_intents_preserve_subscribee_tree_order (
   let input : &str =
     indoc! {"
             * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid first) (skgRepos (nodeRepo main))) first
             **** (skg node (gnid first-child) (skgRepos (nodeRepo main))) first child
             *** (skg node (gnid second) (skgRepos (nodeRepo main))) second
@@ -505,7 +505,7 @@ fn subscribee_hiderel_intent_uses_only_children (
   let input : &str =
     indoc! {"
             * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
             **** (skg node (gnid child) (skgRepos (nodeRepo main))) child
             ***** (skg node (gnid grandchild) (skgRepos (nodeRepo main))) grandchild
@@ -525,7 +525,7 @@ fn subscribee_hiderel_intent_ignores_writeProtected_subscribee (
   let input : &str =
     indoc! {"
             * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid subscribee) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) subscribee
             "};
 
@@ -539,12 +539,12 @@ fn subscribee_hiderel_intent_ignores_writeProtected_subscriber (
   // At-most-one-writer-per-ID: even though the subscribee
   // here is editable with visible content, its subscriber instance is
   // write-protected, so no hide/unhide edits are inferred for the subscriber
-  // -- those belong only to the SubscribeeFolder under the editable
+  // -- those belong only to the forks folder under the editable
   // instance of that subscriber.
   let input : &str =
     indoc! {"
             * (skg node (gnid subscriber) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) subscriber
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
             **** (skg node (gnid a) (skgRepos (nodeRepo main))) a
             "};
@@ -559,7 +559,7 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_ghost_children (
   let input : &str =
     indoc! {"
             * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
             **** (skg node (gnid keep) (skgRepos (nodeRepo main))) keep
             **** (skg node (gnid independent) (skgRepos (nodeRepo main)) noClaim) independent
@@ -585,12 +585,12 @@ fn subscribee_hiderel_intent_ignores_hidden_folder_contents (
   let input : &str =
     indoc! {"
             * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
-            **** (skg hiddenInSubscribeeFolder)
+            **** (skg hiddenInForkPartnerFolder)
             ***** (skg node (gnid hidden-in) (skgRepos (nodeRepo main))) hidden in child
             **** (skg node (gnid visible) (skgRepos (nodeRepo main))) visible
-            *** (skg hiddenOutsideOfSubscribeeFolder)
+            *** (skg hiddenOutsideOfForkPartnersFolder)
             **** (skg node (gnid hidden-outside) (skgRepos (nodeRepo main))) hidden outside child
             "};
 
@@ -613,7 +613,7 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
             *** (skg alias) root alias
             ** (skg node (gnid child) (skgRepos (nodeRepo main))) child
             Child body
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
             * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
             Doomed body
@@ -655,7 +655,7 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
             ** (skg node (gnid content) (skgRepos (nodeRepo main))) content
             ** (skg aliasFolder) aliases
             *** (skg alias) root alias
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid subscribee) (skgRepos (nodeRepo main))) subscribee
             * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
             Doomed body
@@ -769,7 +769,7 @@ async fn subscribee_as_such_child_list_removal_does_not_save_subscribee (
       let input : &str =
         indoc! {"
                 * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
-                ** (skg subscribeeFolder)
+                ** (skg forksFolder)
                 *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
                 **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
                 "};
@@ -788,7 +788,7 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
       let input : &str =
         indoc! {"
                 * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
-                ** (skg subscribeeFolder)
+                ** (skg forksFolder)
                 *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
                 **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
                 "};
@@ -831,7 +831,7 @@ async fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
       let input : &str =
         indoc! {"
                 * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
-                ** (skg subscribeeFolder)
+                ** (skg forksFolder)
                 *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
                 **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
                 "};
@@ -854,7 +854,7 @@ async fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
       let input : &str =
         indoc! {"
                 * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
-                ** (skg subscribeeFolder)
+                ** (skg forksFolder)
                 *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
                 **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
                 ** (skg node (gnid e1) (skgRepos (nodeRepo foreign)) writeProtected) e1
@@ -877,7 +877,7 @@ async fn subscribee_as_such_visible_child_removes_subscriber_hide (
       let input : &str =
         indoc! {"
                 * (skg node (gnid R) (skgRepos (nodeRepo main))) R
-                ** (skg subscribeeFolder)
+                ** (skg forksFolder)
                 *** (skg node (gnid E1) (skgRepos (nodeRepo main))) subscribee-1
                 **** (skg node (gnid E11) (skgRepos (nodeRepo main))) E11
                 **** (skg node (gnid H) (skgRepos (nodeRepo main))) H
@@ -902,7 +902,7 @@ async fn subscribee_as_such_unhide_preserves_unrelated_hides (
       let input : &str =
         indoc! {"
                 * (skg node (gnid R) (skgRepos (nodeRepo main))) R
-                ** (skg subscribeeFolder)
+                ** (skg forksFolder)
                 *** (skg node (gnid E1) (skgRepos (nodeRepo main))) subscribee-1
                 **** (skg node (gnid hidden-in-E1) (skgRepos (nodeRepo main))) hidden-in-E1
                 **** (skg node (gnid E11) (skgRepos (nodeRepo main))) E11
@@ -926,7 +926,7 @@ async fn overlapping_subscribee_hiderel_conflict_rejects_save (
       let input : &str =
         indoc! {"
                 * (skg node (gnid R) (skgRepos (nodeRepo main))) R
-                ** (skg subscribeeFolder)
+                ** (skg forksFolder)
                 *** (skg node (gnid E1) (skgRepos (nodeRepo main))) E1
                 **** (skg node (gnid shared) (skgRepos (nodeRepo main))) shared
                 *** (skg node (gnid E2) (skgRepos (nodeRepo main))) E2
@@ -970,7 +970,7 @@ async fn ordinary_same_gnid_occurrence_keeps_contains_edit_when_also_as_subscrib
       let input : &str =
         indoc! {"
                 * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
-                ** (skg subscribeeFolder)
+                ** (skg forksFolder)
                 *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
                 **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
                 * (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
@@ -1021,7 +1021,7 @@ async fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
       let input : &str =
         indoc! {"
                 * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
-                ** (skg subscribeeFolder)
+                ** (skg forksFolder)
                 *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
                 **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
                 "};
@@ -1043,7 +1043,7 @@ async fn foreign_subscribee_as_such_title_edit_is_rejected (
       let input : &str =
         indoc! {"
                 * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
-                ** (skg subscribeeFolder)
+                ** (skg forksFolder)
                 *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) changed title
                 **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
                 "};
@@ -1072,7 +1072,7 @@ async fn owned_as_subscribee_title_edit_is_rejected (
       let input : &str =
         indoc! {"
                 * (skg node (gnid a) (skgRepos (nodeRepo owned))) a
-                ** (skg subscribeeFolder)
+                ** (skg forksFolder)
                 *** (skg node (gnid r) (skgRepos (nodeRepo owned))) changed title
                 **** (skg node (gnid r1) (skgRepos (nodeRepo owned))) r1
                 "};
@@ -1101,7 +1101,7 @@ async fn owned_as_subscribee_body_edit_is_rejected (
       let input : &str =
         indoc! {"
                 * (skg node (gnid a) (skgRepos (nodeRepo owned))) a
-                ** (skg subscribeeFolder)
+                ** (skg forksFolder)
                 *** (skg node (gnid r) (skgRepos (nodeRepo owned))) r
                 body text that should not be accepted here
                 **** (skg node (gnid r1) (skgRepos (nodeRepo owned))) r1
@@ -1282,7 +1282,7 @@ fn toDelete_member_is_excluded_from_subscribees (
   let input : &str =
     indoc! {"
             * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid keep) (skgRepos (nodeRepo main))) keep
             *** (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
         "};
@@ -1306,7 +1306,7 @@ fn duplicate_members_of_defining_folders_are_silently_deduplicated (
             *** (skg alias) echo
             *** (skg alias) other
             *** (skg alias) echo
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid s1) (skgRepos (nodeRepo main)) writeProtected) s1
             *** (skg node (gnid s2) (skgRepos (nodeRepo main)) writeProtected) s2
             *** (skg node (gnid s1) (skgRepos (nodeRepo main)) writeProtected) s1
@@ -1327,20 +1327,20 @@ fn duplicate_members_of_defining_folders_are_silently_deduplicated (
 
 // The next three tests pin the editable-folder membership semantics that
 // the relationship matrix asks for at the cheapest seam:
-// subscribeeFolder order and one-member removal persist to
+// forksFolder order and one-member removal persist to
 // subscribesTo; and the write-protected hiddenFolder never writes the
 // recorder's hides.
 
 #[test]
 fn reordering_subscribees_reorders_subscribesTo (
 ) {
-  // A subscribeeFolder is writable: its member order is the recorder's
+  // A forksFolder is writable: its member order is the recorder's
   // subscribesTo order. Members [c, a, b] (a reorder of [a, b, c])
   // emit subscribesTo = [c, a, b].
   let input : &str =
     indoc! {"
             * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid c) (skgRepos (nodeRepo main))) c
             *** (skg node (gnid a) (skgRepos (nodeRepo main))) a
             *** (skg node (gnid b) (skgRepos (nodeRepo main))) b
@@ -1362,7 +1362,7 @@ fn removing_one_subscribee_keeps_the_rest (
   let input : &str =
     indoc! {"
             * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid a) (skgRepos (nodeRepo main))) a
             *** (skg node (gnid c) (skgRepos (nodeRepo main))) c
         "};

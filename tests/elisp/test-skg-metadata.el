@@ -136,12 +136,13 @@ and leave the headline's own metadata alone."
   "A sample of the C-c l (folders) bindings. No C-c p prefix is bound:
 the folder commands are the way to show a node's partners."
   (dolist (pair '(("C-c l a" . skg-show-folderOf-aliases)
-                  ("C-c l s" . skg-show-folderOf-subscribesTo)
+                  ("C-c l f" . skg-show-folderOf-forks)
                   ("C-c l c" . skg-show-folderOf-containers)
                   ("C-c l m" . skg-show-folderOf-mentioners)))
     (should (eq (lookup-key skg-content-view-mode-map (kbd (car pair)))
                 (cdr pair))))
   (should-not (lookup-key skg-content-view-mode-map (kbd "C-c l o")))
+  (should-not (lookup-key skg-content-view-mode-map (kbd "C-c l s")))
   (should-not (lookup-key skg-content-view-mode-map (kbd "C-c p"))))
 
 (ert-deftest test-skg-folder-change-processed ()
@@ -699,7 +700,7 @@ the request."
 **** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected (diff (rel removed))) d"
              ;; a node of the chain under another folder's member
              "* (skg node (gnid r) (skgRepos (nodeRepo main))) r
-** (skg subscriberFolder) subscribers
+** (skg hiderFolder) hiders
 *** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected) s
 **** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected (diff (rel removed))) d"))
     (should (equal (test-skg--refusal-of
@@ -776,7 +777,7 @@ unchanged."
                ("* (skg alias) an alias"
                 ("editRequest" . ("none (default)" "relRepo")))
                ("* (skg tombstone)")
-               ("* (skg subscribeeFolder)")
+               ("* (skg forksFolder)")
                ("* (skg (flag noSearchMatching)) no search matching")))
       (test-skg--with-metadata-editor-on
        (car case)

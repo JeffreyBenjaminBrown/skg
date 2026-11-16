@@ -22,7 +22,7 @@
 //!   'claiming_children_have_distinct_gnids', and write-protected-folder
 //!   members have distinct IDs per
 //!   'partnerFolder_children_have_distinct_gnids'. The defining folders
-//!   (aliasFolder, subscribeeFolder) may contain
+//!   (aliasFolder, forksFolder) may contain
 //!   duplicates; emission dedups them silently.
 //! Collection performs no ancestry re-verification. On shapes that
 //! validation precludes, it stays total, emitting nothing rather
@@ -34,11 +34,13 @@
 //! including as a member of a write-protected folder, where it is
 //! save-eligible for itself but invisible to the folder's recorder.)
 //! .
-//! DEFINITION: a vognode is *in subscribee-as-such position* iff it
-//! is an occurrence member direct child of a subscribeeFolder.
-//! A child of a subscribeeFolder claiming nothing is not a member of the
-//! folder, hence not shown *as* a subscribee: it is an ordinary
-//! self-writer that stands there claiming nothing.
+//! DEFINITION: a vognode is *in subscribee-as-such position* (a forkee
+//! as such) iff it is a claiming occurrence direct child of a
+//! forksFolder. A child of a forksFolder claiming nothing (a
+//! forker-only member, or a detached forkee) is no member of the
+//! note's 'forks', hence not shown *as* a forkee: it is an ordinary
+//! self-writer that stands there claiming nothing, as under a
+//! write-protected folder.
 
 use crate::from_text::local_fieldintent_collection::predicates::{
   occurrence_child_counts_as_content,
@@ -47,7 +49,7 @@ use crate::from_text::local_fieldintent_collection::predicates::{
   member_counts_for_partnerFolder };
 use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, DefiningFolderRecorder, LocalContext, FieldIntent,
-  HiddenOutsideEdit, SubscribeeTextClaim, SubscribeeVisibility };
+  ForksFolderMembers, HiddenOutsideEdit, SubscribeeTextClaim, SubscribeeVisibility };
 use crate::types::errors::HeadlineName;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
@@ -89,7 +91,7 @@ fn visit (
         Some ( DefiningFolderRecorder {
           // Carrying the identity of the ghost or gnid-only vognode
           // (write-protected, not save-eligible) keeps a
-          // subscribeeFolder found under a ghost meaningful: its
+          // forksFolder found under a ghost meaningful: its
           // children stay in subscribee-as-such position, so their
           // title edits bounce via text claims instead of silently
           // becoming real edits.
@@ -116,9 +118,9 @@ fn visit (
     // the editable folders ('Folder::is_editable'): the
     // ones whose membership the save reads. The catch-all folder arm
     // after them covers the write-protected ones.
-    ViewnodeKind::Folder (Folder::Subscribee) =>
+    ViewnodeKind::Folder (Folder::Forks) =>
       visit_subscribee_folder (node_ref, context, collected, owned),
-    ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) =>
+    ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners) =>
       visit_hiddenOutside_folder (node_ref, context, collected, owned),
     ViewnodeKind::Folder (Folder::ID)
       | ViewnodeKind::Folder (Folder::Flags { .. })
@@ -170,10 +172,10 @@ fn visit_occurrence (
               headline : headline . clone () } )) ?;
         if subscriber_is_editable {
           // The at-most-one-writer-per-ID guard: only the
-          // subscribeeFolder under the editable instance of a
+          // forksFolder under the editable instance of a
           // subscriber may write its hide edits. The same subscriber
           // can recur write-protected elsewhere with its own
-          // subscribeeFolder; without this guard those could emit
+          // forksFolder; without this guard those could emit
           // contradictory hide edits for one ID.
           collected . instructionMerge_fieldIntent (
             &headline,
@@ -248,10 +250,10 @@ fn recurse_under_vognode (
     let child_context : LocalContext =
       match &child . value() . kind {
         ViewnodeKind::Folder (Folder::Alias)
-          // The partner folder here is the relation-role one
-          // whose goal is ordered; the write-protected folders fall to
-          // the UnderWriteProtectedFolder arm below.
-          | ViewnodeKind::Folder (Folder::Subscribee) =>
+          // The partner folder here is the forks folder, the one
+          // editable relation folder; the write-protected folders fall
+          // to the UnderWriteProtectedFolder arm below.
+          | ViewnodeKind::Folder (Folder::Forks) =>
           match &recorder {
             Some (o) =>
               LocalContext::UnderDefiningFolder (o . clone()),
@@ -315,6 +317,11 @@ fn visit_aliasFolder (
   recurse_with_uniform_context (
     node_ref, &LocalContext::UnderWriteProtectedFolder, collected, owned) }
 
+/// The forks folder: its claiming members are the recorder's 'forks',
+/// and the members it shows at all, claiming or not, the signal from
+/// which deleting a forker hides it ('ForksFolderMembers'). A claiming
+/// member stands as a forkee as such; one claiming nothing, as a
+/// member of a write-protected folder.
 fn visit_subscribee_folder (
   node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
@@ -328,14 +335,22 @@ fn visit_subscribee_folder (
           &recorder . headline,
           recorder . gnid . clone(),
           FieldIntent::SetForks (
-            partnerFolder_members (node_ref) )) ?; }
+            partnerFolder_members (node_ref) )) ?;
+        collected . instructionMerge_fieldIntent (
+          &recorder . headline,
+          recorder . gnid . clone(),
+          FieldIntent::ForksFolderMembers ( ForksFolderMembers {
+            members : forks_folder_members_shown (node_ref) } )) ?; }
       for child in node_ref . children() {
         let child_context : LocalContext =
           match &child . value() . kind {
-            ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) =>
+            ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners) =>
               LocalContext::HiddenOutsidePosition {
                 subscriber      : recorder . gnid . clone(),
                 is_saveEligible : recorder . is_saveEligible },
+            ViewnodeKind::Vognode (Vognode::Occurrence (t))
+              if ! t . claimsMembership =>
+              LocalContext::UnderWriteProtectedFolder,
             _ =>
               // The subscriber's identity is passed even when the recorder is
               // not save-eligible, because text claims outlive the
@@ -377,7 +392,7 @@ fn visit_hiddenOutside_folder (
             _ => claiming_gnid_only_or_ghost_member (child . value ()), };
         if let Some ((gnid, relRepo_request)) = member {
           if relRepo_request . is_some () {
-            return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
+            return Err ("HiddenOutsideOfForkPartners membership is editable, but hide relRepos are derived." . to_string ()); }
           members . push (gnid); }}
       collected . instructionMerge_fieldIntent (
         &node_ref . value () . headline_name (),
@@ -402,7 +417,22 @@ fn dedup_members_by_gnid (
       result . push ((gnid, skgrepo)); }}
   result }
 
-/// This returns the members of a subscribeeFolder: its occurrence
+/// Every vognode the forks folder at 'node_ref' shows, claiming or not,
+/// but those marked for deletion: the members present in the saved
+/// buffer, against which a forker it no longer shows counts as deleted.
+fn forks_folder_members_shown (
+  node_ref : NodeRef<Viewnode>,
+) -> Vec<ID> {
+  node_ref . children ()
+    . filter_map ( |child| match &child . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
+        ( ! matches! ( t . edit_request (), Some (&NodeEditRequest::Delete) ))
+        . then ( || t . gnid . clone () ),
+      ViewnodeKind::Vognode (vognode) => Some ( vognode . gnid () . clone () ),
+      _ => None, } )
+    . collect () }
+
+/// This returns the members of a forksFolder: its occurrence
 /// children that pass the partner
 /// folder membership predicate, and its claiming gnid-only vognodes
 /// and ghosts ('claiming_gnid_only_or_ghost_member'),

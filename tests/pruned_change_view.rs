@@ -42,3 +42,5 @@ mod restore;
 mod one_child_per_key;
 #[path = "pruned_change_view/commit_processed.rs"]
 mod commit_processed;
+#[path = "pruned_change_view/forks_folder.rs"]
+mod forks_folder;

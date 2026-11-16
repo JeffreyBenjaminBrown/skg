@@ -26,7 +26,7 @@ use std::path::PathBuf;
 /// '(diff (leaves N OBJECT...))'. With ctx removed from ct in the buffer
 /// too, ct's content changeset marker gathers three content
 /// relationships (k1 and ctx removed, k2 added); the
-/// ghost of gone, in orph's subscriber folder, names a leaf on each
+/// ghost of gone, in orph's forks folder, names a leaf on each
 /// of its objects; an old text names its one leaf.
 #[test]
 fn a_headline_carries_the_leaves_it_names (
@@ -39,7 +39,7 @@ fn a_headline_carries_the_leaves_it_names (
       save_cleanly (f, &all_changes_view (), &without_ctx) ? . saved_view;
     for line in [
       "** (skg (changesetMarker content) (diff (leaves 3 rel)))",
-      "*** (skg ghost (gnid gone) (skgRepos (nodeRepo public)) (diff (node removed) (rel removed) (leaves 2 node rel))) gone",
+      "*** (skg ghost (gnid gone) (skgRepos (nodeRepo public)) noClaim (diff (node removed) (rel removed) (leaves 2 node rel))) gone",
       "** (skg (oldText titleAndBody) (diff (leaves 1))) txt" ] {
       assert! ( without_viewnode_ids (&saved) . lines () . any ( |l| l == line ),
                 "{:?} in:\n{}", line, saved ); }
@@ -70,13 +70,13 @@ fn a_mark_shows_on_both_images_of_a_relationship (
     Ok (( )) }) }
 
 /// A folder member carries its node's other properties as a content
-/// member does: sub, in s1's subscriber folder, whose file records
+/// member does: sub, in s1's forks folder, whose file records
 /// two leaves (its subscription to s1 removed, to s2 added), shows
 /// '(properties changed)' there, for its subscription to s2, which no
 /// headline under it shows; 'rel' is its subscription to s1. One
 /// request naming 'node' and 'rel' there marks its file: its image in
-/// s2's subscriber folder, where the two swap, is processed on both
-/// objects too, and so is each member of its root's subscribee folder.
+/// s2's forks folder, where the two swap, is processed on both
+/// objects too, and so is each member of its root's forks folder.
 /// Its root shows no 'M': every change it records is shown under it.
 #[test]
 fn a_gesture_on_a_modified_folder_member_marks_its_file (

@@ -281,12 +281,11 @@ fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
                 "{} must be n's member under x again:\n{}", child, moved_back ); }
     Ok (( )) }) }
 
-/// In the 'kinds' fixture the worktree removed sub's subscription to
-/// s1, so the buffer shows s1's subscriber folder holding sub as a
-/// removed member marked '(diff (rel removed))', with no claim atom,
-/// since the folder reads no claims. Write-protected, s1 saves
-/// unchanged: the save does not check a write-protected occurrence's
-/// partner folders.
+/// In the 'kinds' fixture the worktree removed sub's fork of s1, so
+/// the buffer shows s1's forks folder holding sub as a removed member
+/// marked '(diff (rel removed))', claiming nothing (it never forked
+/// s1's side). Write-protected, s1 saves unchanged: the save does not
+/// check a write-protected occurrence's partner folders.
 #[test]
 fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
 ) -> Result<(), Box<dyn Error>> {
@@ -302,10 +301,9 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
       . skip_while ( |line| ! without_viewnode_ids (line) . starts_with ("* (skg node (gnid s1) ") )
       . take (3) . collect ();
     assert! ( s1_and_folder [0] . contains ("writeProtected")
-              && s1_and_folder [1] == "** (skg subscriberFolder)"
+              && s1_and_folder [1] == "** (skg forksFolder)"
               && without_viewnode_ids (s1_and_folder [2]) . starts_with ("*** (skg node (gnid sub) ")
-              && s1_and_folder [2] . ends_with ("(diff (rel removed) (properties changed) (leaves 2 node rel))) sub")
-              && ! s1_and_folder [2] . contains ("noClaim"),
+              && s1_and_folder [2] . ends_with ("(diff (rel removed) (properties changed) (leaves 2 node rel))) sub"),
               "s1 must be write-protected, showing sub as a removed member:\n{}",
               text );
     let files_before : BTreeMap<String, String> = skg_files (f) ?;

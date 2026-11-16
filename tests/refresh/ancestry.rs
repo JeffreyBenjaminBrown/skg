@@ -78,19 +78,19 @@ fn a_body_diff_stands_only_under_an_old_text () {
   assert_eq! ( unsayable, vec! [ false, true ] ); }
 
 /// The deepest rows: the folder of what a subscriber hides in one
-/// subscribee needs that subscribee, the subscribee folder and the
+/// subscribee needs that subscribee, the forks folder and the
 /// subscriber above it; the folder of what it hides outside its
-/// subscribees needs the subscribee folder and the subscriber. Where
+/// subscribees needs the forks folder and the subscriber. Where
 /// the subscriber is a ghost, both are unsayable, though their
 /// viewparents are of the right kinds.
 #[test]
 fn the_deep_rows_of_the_hidden_folders_reach_the_subscriber () {
   let chain = |subscriber : &str| -> ViewForest { parse ( &formatdoc! ("
     * {} s
-    ** (skg subscribeeFolder)
+    ** (skg forksFolder)
     *** {} e
-    **** (skg hiddenInSubscribeeFolder)
-    *** (skg hiddenOutsideOfSubscribeeFolder)
+    **** (skg hiddenInForkPartnerFolder)
+    *** (skg hiddenOutsideOfForkPartnersFolder)
     ", subscriber, occurrence_metadata ("e", "writeProtected") ),
     IdResolution::AsWritten ) };
   let folder = |forest : &ViewForest, wanted : Folder| -> NodeId {
@@ -99,8 +99,8 @@ fn the_deep_rows_of_the_hidden_folders_reach_the_subscriber () {
                                if *folder == wanted ))
     . unwrap () . id () };
   { let forest : ViewForest = chain (&occurrence_metadata ("s", ""));
-    let hidden_in : NodeId = folder (&forest, Folder::HiddenInSubscribee);
-    let hidden_outside : NodeId = folder (&forest, Folder::HiddenOutsideOfSubscribee);
+    let hidden_in : NodeId = folder (&forest, Folder::HiddenInForkPartner);
+    let hidden_outside : NodeId = folder (&forest, Folder::HiddenOutsideOfForkPartners);
     assert! ( ! is_unsayable (&forest, hidden_in) );
     assert! ( ! is_unsayable (&forest, hidden_outside) );
     let title_at = |treeid : Option<NodeId>| -> Option<String> {
@@ -108,7 +108,7 @@ fn the_deep_rows_of_the_hidden_folders_reach_the_subscriber () {
     assert_eq! ( required_ancestors (&forest, hidden_in) . into_iter ()
                  . map ( |treeid| outline_line (&forest, treeid) )
                  . collect::<Vec<String>> (),
-                 vec! [ "node e wp", "subscribeeFolder", "node s" ] );
+                 vec! [ "node e wp", "forksFolder", "node s" ] );
     let parties : CompoundFolderParties =
       compound_folder_parties (&forest, hidden_in) . unwrap ();
     assert_eq! ( title_at ( Some (parties . subscriber) ), Some ("node s" . to_string ()) );
@@ -123,10 +123,10 @@ fn the_deep_rows_of_the_hidden_folders_reach_the_subscriber () {
                  Some ("node s" . to_string ()) ); }
   { let forest : ViewForest = chain (
       "(skg (vnid ss) ghost (gnid s) (skgRepos (nodeRepo main)))" );
-    assert! ( is_unsayable ( &forest, folder (&forest, Folder::HiddenInSubscribee) ),
+    assert! ( is_unsayable ( &forest, folder (&forest, Folder::HiddenInForkPartner) ),
               "its viewparent is an occurrence, but its subscriber is a ghost" );
-    assert! ( is_unsayable ( &forest, folder (&forest, Folder::HiddenOutsideOfSubscribee) ),
-              "its viewparent is a subscribee folder, but that folder's is a ghost" ); }}
+    assert! ( is_unsayable ( &forest, folder (&forest, Folder::HiddenOutsideOfForkPartners) ),
+              "its viewparent is a forks folder, but that folder's is a ghost" ); }}
 
 /// An occurrence has no row: wherever it stands it stays an
 /// occurrence, so it keeps standing for its node. Here its viewparents
@@ -138,7 +138,7 @@ fn an_occurrence_is_never_unsayable () {
   let graph : InRustGraph = graph (&[ node ("p"), node ("c") ]);
   let input : String = formatdoc! ("
     * {} p
-    ** (skg hiddenOutsideOfSubscribeeFolder)
+    ** (skg hiddenOutsideOfForkPartnersFolder)
     *** {} c
     ** (skg (oldText title)) old
     *** {} c
@@ -150,7 +150,7 @@ fn an_occurrence_is_never_unsayable () {
                              is_unsayable (&forest, node . id ()) ))
     . collect ();
   assert_eq! ( unsayable, vec! [ "node p false",
-                                 "hiddenOutsideOfSubscribeeFolder true",
+                                 "hiddenOutsideOfForkPartnersFolder true",
                                  "node c wp false",
                                  "oldText false",
                                  "node c wp false" ] );

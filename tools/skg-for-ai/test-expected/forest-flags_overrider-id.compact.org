@@ -1,5 +1,5 @@
 * An overrider, outside the view ⟨0a K1 F1 ⌂:main⟩
 ** ⟨0d ☮ flags⟩
 *** ⟨0e ☮ had ID before import⟩
-** ⟨0b It subscribes to these.⟩
+** ⟨0b It forks these, or these fork it.⟩
 *** An overridden node, outside the view ⟨0c ☮ bK A1⟩

@@ -1,9 +1,9 @@
 // The two hide folders under a skgrepo narrowing. A subscriber s
 // subscribes to e and hides h. A hide is inside when a subscribee
 // contains the hidden graphnode, and outside otherwise; under e shown
-// editable as s's subscribee, the folder 'hiddenInSubscribeeFolder'
-// shows the inside hides, and beside e, in s's subscribee folder,
-// 'hiddenOutsideOfSubscribeeFolder' shows the outside ones. Both
+// editable as s's subscribee, the folder 'hiddenInForkPartnerFolder'
+// shows the inside hides, and beside e, in s's forks folder,
+// 'hiddenOutsideOfForkPartnersFolder' shows the outside ones. Both
 // folders, and e's content, are read by the records the skgrepo
 // restriction shows: s's hide of h, and e's containment of h, each
 // recorded in 'main' (visible under every skgrepo restriction here)
@@ -50,19 +50,19 @@ fn s_e_h (
     Graphnode { contains : e_contains, .. node ("e") },
     node ("c"), node ("h") ]) }
 
-/// Where h stands in a view of s whose subscribee folder the user
+/// Where h stands in a view of s whose forks folder the user
 /// requested, e editable in it, refreshed under no skgrepo restriction
 /// and under 'main' alone: the viewparent of each of h's headlines, as
-/// the outline describes it ("hiddenOutsideOfSubscribeeFolder",
-/// "hiddenInSubscribeeFolder", or "node e" for e's content).
+/// the outline describes it ("hiddenOutsideOfForkPartnersFolder",
+/// "hiddenInForkPartnerFolder", or "node e" for e's content).
 fn where_h_stands (
   graph : &InRustGraph,
 ) -> ( Vec<String>, Vec<String> ) {
   let input : String = formatdoc! ("
     * {} s
-    ** (skg subscribeeFolder)
+    ** (skg forksFolder)
     *** {} e
-    ", occurrence_metadata ("s", "(viewRequests (folder subscribesTo))"),
+    ", occurrence_metadata ("s", "(viewRequests (folder forks))"),
        occurrence_metadata ("e", "") );
   let restriction : SkgrepoRestriction = main_only ();
   let under = |restriction : &SkgrepoRestriction| -> Vec<String> {
@@ -85,8 +85,8 @@ fn viewparents_of_h (
         . unwrap_or_default () } )
     . collect () }
 
-const OUTSIDE : &str = "hiddenOutsideOfSubscribeeFolder";
-const INSIDE  : &str = "hiddenInSubscribeeFolder";
+const OUTSIDE : &str = "hiddenOutsideOfForkPartnersFolder";
+const INSIDE  : &str = "hiddenInForkPartnerFolder";
 const CONTENT : &str = "node e";
 
 #[test]

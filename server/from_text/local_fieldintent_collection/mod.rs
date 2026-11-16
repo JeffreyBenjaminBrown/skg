@@ -78,12 +78,12 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
     nodeMerge_pairs (&collected);
   let (resolved, post_skgsave_commit_notice_candidates)
     : (lower::LoweredNodeIntents, Vec<PostSkgsaveCommitNoticeCandidate>) = {
-    let LoweringOutput { intents, visibility, hidden_outside } =
+    let LoweringOutput { intents, visibility, hidden_outside, forks_folder_members } =
       lower_collected_fieldIntents (collected)
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     resolve_visibility (
-      intents, &visibility, &hidden_outside, graph, config,
-      skgrepo_restriction ) ? };
+      intents, &visibility, &hidden_outside, &forks_folder_members,
+      graph, config, skgrepo_restriction ) ? };
   let with_disk : NodeInstructions_with_Repomoves =
     build_diskSupplemented_nodeInstructions (
       resolved . into_ordered_intents(),
@@ -161,7 +161,7 @@ fn orphan_warnings (
 
 /// Whether the save creates a node from 'node', an editable occurrence
 /// without a delete request whose gnid the graph lacks, and its parent
-/// reads no claims. (A claiming child of a subscribee folder is a
+/// reads no claims. (A claiming child of a forks folder is a
 /// subscribee as such, which the save does not create.)
 fn is_created_as_an_orphan (
   viewforest : &ViewForest,
@@ -178,7 +178,7 @@ fn is_created_as_an_orphan (
   created
   && match &parent . value () . kind {
     ViewnodeKind::BufferRoot => false,
-    ViewnodeKind::Folder (Folder::Subscribee) if occurrence . claimsMembership => false,
+    ViewnodeKind::Folder (Folder::Forks) if occurrence . claimsMembership => false,
     _ => ! parent_reads_claims (viewforest, parent . id ()), } }
 
 /// Transitional compatibility for direct extraction tests.

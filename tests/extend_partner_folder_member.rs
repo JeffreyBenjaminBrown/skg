@@ -1,11 +1,12 @@
 // cargo nextest run --test grouped_overrides -E 'test(extend_partner_folder_member::)'
 //
 // Default folders on ordinary editable nodes and on editable
-// partner folder members.  The initial presentation contains only a nonempty
-// subscribeeFolder.  The other relation folders require explicit requests;
-// after one of their members is extended as editable, that member gets the
-// same default subscribeeFolder.  A subscribee-as-such additionally gets its
-// nonempty HiddenInSubscribeeFolder.
+// partner folder members.  The initial presentation contains only a
+// forksFolder, where the node has a fork partner.  The other relation
+// folders require explicit requests; after one of their members is
+// extended as editable, that member gets the same default forksFolder.
+// A forkee as such additionally gets its nonempty
+// hiddenInForkPartnerFolder.
 
 use std::error::Error;
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
@@ -61,9 +62,9 @@ fn subtree_for_node_in_folder (
             .unwrap_or (false)
     { matches . push (i); }
     if let Some (folder) = [
-      "subscribeeFolder", "subscriberFolder",
+      "forksFolder",
       "hiderFolder", "hiddenFolder",
-      "hiddenInSubscribeeFolder", "hiddenOutsideOfSubscribeeFolder",
+      "hiddenInForkPartnerFolder", "hiddenOutsideOfForkPartnersFolder",
     ] . into_iter () . find ( |folder| line . contains (folder) )
     { folder_stack . push ((depth, folder)); }}
   assert_eq! ( matches . len (), 1,
@@ -105,18 +106,19 @@ fn add_editable_view_requests_to_folder_members (
         " writeProtected (viewRequests editableView) " ) ); }
     else { output . push (line . to_string ()); }
     if let Some (folder) = [
-      "subscribeeFolder", "subscriberFolder",
+      "forksFolder",
       "hiderFolder", "hiddenFolder",
-      "hiddenInSubscribeeFolder", "hiddenOutsideOfSubscribeeFolder",
+      "hiddenInForkPartnerFolder", "hiddenOutsideOfForkPartnersFolder",
     ] . into_iter () . find ( |folder| line . contains (folder) )
     { folder_stack . push ((depth, folder)); }}
   output . join ("\n") + "\n"
 }
 
-/// A subscribing root of a fresh view is drawn with its subscribee
-/// folder and, beside its subscribees, the folder of what it hides
-/// outside them, whose members are drawn folded: N forks Subscribee
-/// and Overridden, and hides Hidden, which no forkee contains.
+/// A forking root of a fresh view is drawn with its forks folder: N
+/// forks Subscribee and Overridden, claiming them, and Overrider and S
+/// fork N, claiming nothing; last, the folder of what it hides outside
+/// them, whose members are drawn folded: N hides Hidden, which no
+/// forkee contains.
 #[test]
 fn a_subscribing_root_is_drawn_with_its_subscription_folders
   () -> Result<(), Box<dyn Error>> {
@@ -133,12 +135,14 @@ fn a_subscribing_root_is_drawn_with_its_subscription_folders
         . filter ( |line| line . starts_with ('*') )
         . map ( |line| line . split (" (skgRepos") . next () . unwrap () . to_string () )
         . collect ();
-      assert_eq! ( outline [.. 6], [
+      assert_eq! ( outline [.. 8], [
         "* (skg node (gnid N)",
-        "** (skg subscribeeFolder)",
+        "** (skg forksFolder)",
         "*** (skg node (gnid Subscribee)",
         "*** (skg node (gnid Overridden)",
-        "*** (skg hiddenOutsideOfSubscribeeFolder)",
+        "*** (skg node (gnid Overrider)",
+        "*** (skg node (gnid S)",
+        "*** (skg hiddenOutsideOfForkPartnersFolder)",
         "**** (skg folded node (gnid Hidden)" ],
         "{}", n_view );
       Ok (( )) } )) }
@@ -158,29 +162,29 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
         multi_root_view (
           config, Some (tantivy), &[ID::from ("N")] )
  ?;
-      assert! ( n_view . contains ("subscribeeFolder"),
-        "N's nonempty subscribeeFolder should be shown initially:\n{}",
+      assert! ( n_view . contains ("forksFolder"),
+        "N's nonempty forksFolder should be shown initially:\n{}",
         n_view );
-      for exotic in [ "subscriberFolder", "hiderFolder", "hiddenFolder" ] {
+      for exotic in [ "hiderFolder", "hiddenFolder" ] {
         assert! ( ! n_view . contains (exotic),
           "{} should require an explicit folder request:\n{}",
           exotic, n_view ); }
 
       let requested_folders : String = n_view . replacen (
         "node ",
-        "node (viewRequests (folder subscribesTo) \
+        "node (viewRequests (folder forks) \
          (folder hidesFromSubs))", 1 );
       let with_folders : String =
         save (&requested_folders, config, tantivy, &graph)
         . await ? . saved_view;
-      for folder in [ "subscribeeFolder", "subscriberFolder",
+      for folder in [ "forksFolder",
                       "hiderFolder", "hiddenFolder" ] {
         assert! ( with_folders . contains (folder),
           "the explicit requests should show {}:\n{}", folder, with_folders ); }
 
       let members : [(&str, &str); 4] = [
-        ("Subscribee", "subscribeeFolder"),
-        ("S", "subscriberFolder"),
+        ("Subscribee", "forksFolder"),
+        ("S", "forksFolder"),
         ("Hidden", "hiddenFolder"),
         ("Hider", "hiderFolder") ];
       let extended_request : String =
@@ -191,27 +195,27 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
       for (gnid, folder) in members {
         let subtree : String =
           subtree_for_node_in_folder (&saved, gnid, folder);
-        assert! ( subtree . contains ("subscribeeFolder"),
+        assert! ( subtree . contains ("forksFolder"),
           "editable partner folder member {} should get its nonempty \
-           subscribeeFolder:\n{}", gnid, saved );
-        for exotic in [ "subscriberFolder", "hiderFolder", "hiddenFolder" ] {
+           forksFolder:\n{}", gnid, saved );
+        for exotic in [ "hiderFolder", "hiddenFolder" ] {
           assert! ( ! subtree . contains (exotic),
             "editable partner folder member {} should not get {} by \
              default:\n{}", gnid, exotic, saved ); }}
       let subscribee_subtree : String =
         subtree_for_node_in_folder (
-          &saved, "Subscribee", "subscribeeFolder");
-      assert! ( subscribee_subtree . contains ("hiddenInSubscribeeFolder"),
+          &saved, "Subscribee", "forksFolder");
+      assert! ( subscribee_subtree . contains ("hiddenInForkPartnerFolder"),
         "a editable subscribee-as-such should also show its nonempty \
          hidden-here folder:\n{}", saved );
       let subscriber_subtree : String =
-        subtree_for_node_in_folder (&saved, "S", "subscriberFolder");
+        subtree_for_node_in_folder (&saved, "S", "forksFolder");
       assert! ( subscriber_subtree . contains ("(gnid C)")
                 && subscriber_subtree . contains ("content of S"),
         "S's own content should appear on extension:\n{}", saved );
-      assert! ( ! subscriber_subtree . contains ("hiddenInSubscribeeFolder")
+      assert! ( ! subscriber_subtree . contains ("hiddenInForkPartnerFolder")
                 && ! subscriber_subtree . contains (
-                  "hiddenOutsideOfSubscribeeFolder"),
-        "subscription hides apply to subscribees-as-such, not to a \
-         subscriberFolder member:\n{}", saved );
+                  "hiddenOutsideOfForkPartnersFolder"),
+        "a note's hides apply to its forkees as such, not to a \
+         forker-only member of its forksFolder:\n{}", saved );
       Ok (( )) } )) }

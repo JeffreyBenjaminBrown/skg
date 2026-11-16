@@ -108,7 +108,7 @@ fn a_save_under_a_restriction_keeps_the_members_its_restricted_vognodes_stand_fo
 /// public file, and hp (private) in its private section, which also
 /// records that r contains hc (private). A view of r drawn under "private" (no restriction)
 /// and switched to "public" shows Restricted vognodes, not empty
-/// folders: hs in the subscribee folder, hh beside
+/// folders: hs in the forks folder, hh beside
 /// hv in the folder of what r hides outside its subscribees; and h in
 /// r's content. Of hp and hc, whose records are restricted, it shows
 /// nothing. Saved with an edit, it keeps every hide and every member.
@@ -346,7 +346,7 @@ fn a_switch_and_its_reverse_draw_these_buffers (
       Ok (( )) } ) }
 
 /// As above, where r also hides hh, private, from its subscribers:
-/// narrowed, the subscribee folder holds hs, and the hidden-outside
+/// narrowed, the forks folder holds hs, and the hidden-outside
 /// folder in it hh, each as a Restricted vognode; widened, each is an
 /// occurrence again.
 #[test]
@@ -362,13 +362,13 @@ fn a_switch_draws_restricted_vognodes_in_the_folders (
       let opened : String = open_view_of_r (f, &restriction) ?;
       let narrowed : String = switch (f, &mut restriction, "public") ?;
       let widened : String = switch (f, &mut restriction, "private") ?;
-      assert! ( opened . contains ("hiddenOutsideOfSubscribeeFolder"),
-                "unrestricted r's subscribee folder holds hs and hh:\n{}", opened );
+      assert! ( opened . contains ("hiddenOutsideOfForkPartnersFolder"),
+                "unrestricted r's forks folder holds hs and hh:\n{}", opened );
       assert_eq! ( narrowed, "\
 * (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 2))) repoBoundary)) r
-** (skg (vnid 0b) subscribeeFolder)
+** (skg (vnid 0b) forksFolder)
 *** (skg (vnid 0c) restricted (gnid hs))
-*** (skg (vnid 0d) hiddenOutsideOfSubscribeeFolder)
+*** (skg (vnid 0d) hiddenOutsideOfForkPartnersFolder)
 **** (skg (vnid 0e) folded restricted (gnid hh))
 ** (skg (vnid 0f) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
 ** (skg (vnid 0g) restricted (gnid h))
@@ -377,9 +377,9 @@ fn a_switch_draws_restricted_vognodes_in_the_folders (
 " );
       assert_eq! ( widened, "\
 * (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 3)) (forks (out 1)) (hidesFromSubs (out 1))) repoBoundary)) r
-** (skg (vnid 0b) subscribeeFolder)
+** (skg (vnid 0b) forksFolder)
 *** (skg (vnid 0c) node (gnid hs) (skgRepos (nodeRepo private) (relRepo public)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) hs secret
-*** (skg (vnid 0d) hiddenOutsideOfSubscribeeFolder)
+*** (skg (vnid 0d) hiddenOutsideOfForkPartnersFolder)
 **** (skg (vnid 0e) folded node (gnid hh) (skgRepos (nodeRepo private)) writeProtected (view (rels (hidesFromSubs (in 1 (ancestors 3)))) (birth (hidesFromSubs in 3)) repoBoundary)) hh secret
 ** (skg (vnid 0f) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
 ** (skg (vnid 0g) node (gnid h) (skgRepos (nodeRepo private) (relRepo public)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (props (aliases 1)) (birth (contains in 1)) repoBoundary)) h secret
@@ -390,7 +390,7 @@ fn a_switch_draws_restricted_vognodes_in_the_folders (
 
 const SWITCHED_TO_PUBLIC : &str = "\
 * (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 2))) repoBoundary)) r
-** (skg (vnid 0b) subscribeeFolder)
+** (skg (vnid 0b) forksFolder)
 *** (skg (vnid 0c) restricted (gnid hs))
 ** (skg (vnid 0d) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
 ** (skg (vnid 0e) restricted (gnid h))
@@ -400,7 +400,7 @@ const SWITCHED_TO_PUBLIC : &str = "\
 
 const SWITCHED_BACK_TO_ALL : &str = "\
 * (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 3)) (forks (out 1))) repoBoundary)) r
-** (skg (vnid 0b) subscribeeFolder)
+** (skg (vnid 0b) forksFolder)
 *** (skg (vnid 0c) node (gnid hs) (skgRepos (nodeRepo private) (relRepo public)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) hs secret
 ** (skg (vnid 0d) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
 ** (skg (vnid 0e) node (gnid h) (skgRepos (nodeRepo private) (relRepo public)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (props (aliases 1)) (birth (contains in 1)) repoBoundary)) h secret
@@ -560,7 +560,7 @@ fn a_save_under_the_narrowing_then_a_widening_keep_rs_private_record (
 
 /// r's private section records that r subscribes to s, hides s1 from
 /// its subscribers and overrides o, each a public graphnode. The view
-/// of r asks for its hidesFromSubs folders; the subscribee folder is
+/// of r asks for its hidesFromSubs folders; the forks folder is
 /// drawn by default. No folder shows the override, which the save
 /// keeps from disk.
 #[test]
@@ -655,7 +655,7 @@ fn round_trip_keeps_the_private_record (
       let opened : String = open (f) ?;
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
       let narrowed : String = switch_skgrepo_set (f, &mut restriction, "public", view) ? . 0;
-      // pc, a member of r; s, of its subscribee folder. (The hidden
+      // pc, a member of r; s, of its forks folder. (The hidden
       // folder, write-protected, reads no claims: its member s1 stays,
       // unwarranted, with its chain.)
       for member in [ "** (skg node (gnid pc)", "*** (skg node (gnid s)" ] {
@@ -940,7 +940,7 @@ fn children_of_the_hidden_outside_folder (
 ) -> Vec<String> {
   let tree : Tree<Viewnode> = viewnode_tree_as_written (buffer);
   let folder : NodeId =
-    first_folder (&tree, &Folder::HiddenOutsideOfSubscribee)
+    first_folder (&tree, &Folder::HiddenOutsideOfForkPartners)
     . unwrap_or_else ( || panic! ( "no hidden-outside folder:\n{}", buffer ));
   kind_and_gnid_of_each_child (&tree, folder) }
 

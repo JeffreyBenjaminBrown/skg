@@ -27,7 +27,7 @@ end
 local command_rows = {
   { 'show_folderOf_aliases', '(folder aliases)' },
   { 'show_folderOf_hidesFromSubs', '(folder hidesFromSubs)' },
-  { 'show_folderOf_subscribesTo', '(folder subscribesTo)' },
+  { 'show_folderOf_forks', '(folder forks)' },
   { 'show_folderOf_flags', 'flags' },
   { 'show_folderOf_containers', '(folder containers)' },
   { 'show_folderOf_mentioners', '(folder mentioners)' },

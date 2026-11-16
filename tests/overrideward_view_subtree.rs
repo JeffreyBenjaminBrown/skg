@@ -1,6 +1,6 @@
 // cargo nextest run --test grouped_overrides -E 'test(overrideward_view_subtree::)'
 //
-// The subscription folders under search hits, and suppression in
+// The forks folder under search hits, and suppression in
 // search results ('docs/override.org', "Partner folders in search
 // results").
 //
@@ -62,7 +62,7 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
 /// End-to-end: replay production's search (suppression, the hits as a
 /// stub, then the refresh of the stub, which draws the enrichment) and
 /// check the rendered buffer. The suppressed F is
-/// absent from the top level and reappears in U's subscribee folder,
+/// absent from the top level and reappears in U's forks folder,
 /// since U forks it, carrying its heralds -- U, two levels up, forks
 /// it. G, which F forks, is not shown:
 /// the search buffer's partner folders hold direct relatives only, and
@@ -98,10 +98,10 @@ fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
       . unwrap_or (0) };
   assert_eq! ( level_of ("cooking the owned way"), 1,
     "U is the top-level result.\n{}", buffer );
-  assert_eq! ( level_of ("folded subscribeeFolder"), 2,
-    "U's subscribee folder hangs under it, folded.\n{}", buffer );
+  assert_eq! ( level_of ("folded forksFolder"), 2,
+    "U's forks folder hangs under it, folded.\n{}", buffer );
   assert_eq! ( level_of ("cooking, forked once"), 3,
-    "F (suppressed) reappears in U's subscribee folder.\n{}", buffer );
+    "F (suppressed) reappears in U's forks folder.\n{}", buffer );
   assert_eq! ( level_of ("cooking, the original"), 0,
     "G, which F forks, is not shown.\n{}", buffer );
   let line : String = buffer . lines ()
@@ -163,8 +163,8 @@ fn an_owned_mutual_pair_both_matching_shows_one_hit (
   Ok (( )) }
 
 /// U subscribes to F, which overrides G, and nothing subscribes to U.
-/// So under U hangs, folded, a subscribee folder whose one
-/// write-protected member is F, and no subscriber folder. F holds
+/// So under U hangs, folded, a forks folder whose one
+/// write-protected member is F, and no forks folder. F holds
 /// nothing: G is not drawn under it.
 fn a_hit_shows_the_nodes_it_subscribes_to_in_a_folder (
   graph       : &InRustGraph,
@@ -185,11 +185,11 @@ fn a_hit_shows_the_nodes_it_subscribes_to_in_a_folder (
   let folders : Vec<NodeRef<Viewnode>> = u . children ()
     . filter ( |c| c . value () . kind . is_partner_folder () )
     . collect ();
-  assert_eq! ( folders . len (), 1, "only the subscribee folder" );
+  assert_eq! ( folders . len (), 1, "only the forks folder" );
   assert! ( matches! ( &folders [0] . value () . kind,
-                       ViewnodeKind::Folder (Folder::Subscribee) )
+                       ViewnodeKind::Folder (Folder::Forks) )
             && folders [0] . value () . foldAndFocus . folded,
-            "U's one folder is its subscribee folder, folded" );
+            "U's one folder is its forks folder, folded" );
   let f : NodeRef<Viewnode> =
     find_child ( folders [0], "F" )
     . expect ("F (the node U subscribes to) is in the folder");
@@ -202,7 +202,7 @@ fn a_hit_shows_the_nodes_it_subscribes_to_in_a_folder (
     graph, config, restriction ) }
 
 /// B subscribes to E, and E subscribes to nothing. So under E hangs,
-/// folded, a subscriber folder whose one member is B.
+/// folded, a forks folder whose one member is B.
 fn a_hit_shows_the_nodes_that_subscribe_to_it_in_a_folder (
   graph       : &InRustGraph,
   config      : &SkgConfig,
@@ -222,19 +222,19 @@ fn a_hit_shows_the_nodes_that_subscribe_to_it_in_a_folder (
   let folders : Vec<NodeRef<Viewnode>> = e . children ()
     . filter ( |c| c . value () . kind . is_partner_folder () )
     . collect ();
-  assert_eq! ( folders . len (), 1, "only the subscriber folder" );
+  assert_eq! ( folders . len (), 1, "only the forks folder" );
   assert! ( matches! ( &folders [0] . value () . kind,
-                       ViewnodeKind::Folder (Folder::Subscriber) )
+                       ViewnodeKind::Folder (Folder::Forks) )
             && folders [0] . value () . foldAndFocus . folded,
-            "E's one folder is its subscriber folder, folded" );
+            "E's one folder is its forks folder, folded" );
   assert! ( find_child ( folders [0], "B" ) . is_some (),
             "B (which subscribes to E) is in the folder" );
   Ok (( )) }
 
 /// D subscribes to "gone", which is on disk, in D's file, but not in
-/// the graph. The stub asks the subscribee folder's own goal, the one
+/// the graph. The stub asks the forks folder's own goal, the one
 /// the refresh fills it from, whether the folder has members, so D's
-/// subscribee folder is drawn, holding the unknown that stands for
+/// forks folder is drawn, holding the unknown that stands for
 /// "gone".
 fn a_hit_subscribing_to_an_absent_node_shows_it_in_a_folder (
   graph       : &InRustGraph,
@@ -254,8 +254,8 @@ fn a_hit_subscribing_to_an_absent_node_shows_it_in_a_folder (
     find_result_root ( &tree, "D" ) . expect ("D is a result root");
   let folder : NodeRef<Viewnode> = d . children ()
     . find ( |c| matches! ( &c . value () . kind,
-                            ViewnodeKind::Folder (Folder::Subscribee) ))
-    . expect ("D's subscribee folder is drawn");
+                            ViewnodeKind::Folder (Folder::Forks) ))
+    . expect ("D's forks folder is drawn");
   let members : Vec<NodeRef<Viewnode>> = folder . children () . collect ();
   assert_eq! ( members . len (), 1, "one member, for \"gone\"" );
   assert! ( matches! ( &members [0] . value () . kind,

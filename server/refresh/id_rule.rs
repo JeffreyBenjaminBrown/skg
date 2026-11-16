@@ -253,9 +253,9 @@ fn rekind_to_ghost (
   walk        : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
   forget_editable_occurrence (&other, child, walk);
-  let named_by_the_list : bool =
+  let named_by_the_list : bool = // and claimable there: a forker-only member is named by no list of its viewparent's
     parent_goal . and_then ( |goal| goal . item_for ( &GoalMember::Gnid ( pid . clone () )))
-    . is_some_and ( |item| item . warrant == Warrant::ByGraph );
+    . is_some_and ( |item| item . warrant == Warrant::ByGraph && item . claimable );
   let ghost : Ghost = Ghost {
     // The claim it carried, where the list still names it: a ghost
     // claims nothing else.

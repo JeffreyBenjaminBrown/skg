@@ -15,10 +15,10 @@
 //!
 //! '(editRequest restoreRel)', on a removed membership, re-adds the
 //! one relationship the headline stands for
-//! ('relationship_to_viewparent'), as HEAD recorded it.
+//! ('relationships_to_viewparent'), as HEAD recorded it.
 
 use crate::diff_view::processed_requests::{
-  relationship_to_viewparent, vognode_leaf_pid};
+  relationships_to_viewparent, vognode_leaf_pid};
 use crate::diff_view::change_leaves::{LeafKey, RelationshipAspect};
 use crate::dbs::in_rust_graph::{InRustGraph, RecorderwardRelmap};
 use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
@@ -78,30 +78,39 @@ pub fn add_restore_instructions (
     for relationship in in_links_at_head (before, pid) {
       if exists_after_the_save (&relationship . key . recorder) {
         relationships . push (relationship); }}}
-  for (key, headline) in restoreRel_requests (viewforest, live) {
-    let Some (key) : Option<RelationshipKey> = key else {
+  for (keys, headline) in restoreRel_requests (viewforest, live) {
+    if keys . is_empty () {
       warnings . push ( with_org_subheadlines (
         "A restoreRel request was dropped: its headline stands for no relationship to its viewparent.",
         &[ headline ] ));
-      continue; };
-    let refusal : Option<&str> =
-      if key . relation == NodeRelation::LinksTo {
-        Some ("is a link, which lives in its mentioner's text") }
-      else if ! exists_after_the_save (&key . recorder)
-              || ! exists_after_the_save (&key . member) {
-        Some ("has a deleted node at one end; restore it first") }
-      else { None };
-    if let Some (refusal) = refusal {
-      warnings . push ( with_org_subheadlines (
-        &format! ( "A restoreRel request was dropped: its relationship {}.",
-                   refusal ),
-        &[ headline ] ));
       continue; }
-    match relationship_at_head (before, &key) {
-      Some (relationship) => relationships . push (relationship),
-      None => warnings . push ( with_org_subheadlines (
-        "A restoreRel request names no relationship HEAD records; it was dropped.",
-        &[ headline ] )), }}
+    // A forks folder's member stands for either side of 'forks':
+    // each side HEAD records is restored.
+    let at_head : Vec<RelationshipKey> = keys . iter ()
+      . filter ( |key| relationship_at_head (before, key) . is_some () )
+      . cloned () . collect ();
+    let keys : Vec<RelationshipKey> =
+      if at_head . is_empty () { keys . into_iter () . take (1) . collect () }
+      else { at_head };
+    for key in keys {
+      let refusal : Option<&str> =
+        if key . relation == NodeRelation::LinksTo {
+          Some ("is a link, which lives in its mentioner's text") }
+        else if ! exists_after_the_save (&key . recorder)
+                || ! exists_after_the_save (&key . member) {
+          Some ("has a deleted node at one end; restore it first") }
+        else { None };
+      if let Some (refusal) = refusal {
+        warnings . push ( with_org_subheadlines (
+          &format! ( "A restoreRel request was dropped: its relationship {}.",
+                     refusal ),
+          &[ headline . clone () ] ));
+        continue; }
+      match relationship_at_head (before, &key) {
+        Some (relationship) => relationships . push (relationship),
+        None => warnings . push ( with_org_subheadlines (
+          "A restoreRel request names no relationship HEAD records; it was dropped.",
+          &[ headline . clone () ] )), }}}
   relationships . sort_by_key ( // so that each lands at its index at HEAD
     |relationship| relationship . index );
   for relationship in relationships {
@@ -218,13 +227,14 @@ fn relation_list (
     NodeRelation::HidesFromSubs => Some ( node . hidesFromSubs . or_default () ),
     NodeRelation::LinksTo       => None, } }
 
-/// The relationship each restoreRel request in 'viewforest' stands
-/// for (None when its headline stands for none, as under an
-/// acquisition folder), with its headline, which a warning names.
+/// The relationships each restoreRel request in 'viewforest' stands
+/// for (none when its headline stands for none, as under an
+/// acquisition folder; both sides of 'forks' under a forks folder),
+/// with its headline, which a warning names.
 fn restoreRel_requests (
   viewforest : &ViewForest,
   live       : &InRustGraph,
-) -> Vec<(Option<RelationshipKey>, HeadlineName)> {
+) -> Vec<(Vec<RelationshipKey>, HeadlineName)> {
   let pid_of = |gnid : &ID| -> ID {
     live . pid_else_raw_id (gnid) };
   viewforest . root () . descendants ()
@@ -232,13 +242,15 @@ fn restoreRel_requests (
       ViewnodeKind::Vognode (Vognode::Occurrence (t)) if t . relationshipEditRequest == Some (RelationshipEditRequest::RestoreRel) ))
     . map ( |node : NodeRef<_>| {
       let headline : HeadlineName = node . value () . headline_name ();
-      let key : Option<RelationshipKey> =
+      let key : Vec<RelationshipKey> =
         vognode_leaf_pid (node . value (), &pid_of)
-        . and_then ( |pid| relationship_to_viewparent (
+        . map ( |pid| relationships_to_viewparent (
           node, &pid, &pid_of, RelationshipAspect::Existence ))
-        . and_then ( |leaf| match leaf {
+        . unwrap_or_default () . into_iter ()
+        . filter_map ( |leaf| match leaf {
           LeafKey::Relationship { relationship, .. } => Some (relationship),
-          LeafKey::Node { .. } => None, } );
+          LeafKey::Node { .. } => None, } )
+        . collect ();
       (key, headline) } )
     . collect () }
 

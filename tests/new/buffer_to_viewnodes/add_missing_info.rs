@@ -211,7 +211,7 @@ async fn test_child_of_writeProtected_occurrence_inherits_its_gnid_skgrepo (
 
 /// Regression: a subscribee
 /// pasted from the link stack arrives as a bare id under a
-/// 'subscribeeFolder' non-vognode, with no skgrepo.
+/// 'forksFolder' non-vognode, with no skgrepo.
 /// 'inherit_skgrepo_from_nearest_occurrence_ancestor_if_possible'
 /// would give it the recorder's skgrepo; the parse must resolve the
 /// node's own from the graph by id instead.
@@ -227,7 +227,7 @@ async fn test_repoless_folder_member_gets_graph_skgrepo (
   let input : &str =
     indoc! {"
             * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid root) writeProtected) subscribee reference
         "};
   let viewforest : ViewForest =

@@ -33,8 +33,8 @@
 //! goes when the visit ends. Between 5
 //! and 6 the diff view draws its change viewnodes and tags the
 //! children with their changes ('diff_view.rs'); after 6, in a
-//! subscribee folder, the folder of what the subscriber hides outside
-//! its subscribees goes last; after them, a folder left with no
+//! forks folder, the folder of what its viewparent hides outside its
+//! fork partners goes last; after them, a folder left with no
 //! children and nothing the user could add there is entombstoned, so
 //! that the tail prunes it.
 
@@ -49,8 +49,8 @@ use crate::refresh::editability::{
   merge_editability, write_protect_occurrence};
 use crate::refresh::extent::{Extent, extent_of_parent};
 use crate::refresh::goal::{
-  Goal, GoalItem, GoalMember, goal_of_parent, hidden_in_subscribee,
-  hidden_outside_of_subscribees, member_of_child,
+  Goal, GoalItem, GoalMember, goal_of_parent, has_a_fork_partner,
+  hidden_in_subscribee, hidden_outside_of_subscribees, member_of_child,
   subscriber_of_subscribee_as_such, visible_illegal_edits};
 use crate::refresh::goal::partnerFolder_members_in_graph;
 use crate::telescope::types::IllegalEdit;
@@ -88,6 +88,7 @@ pub(crate) fn visit_parent (
   extend_requested_content (tree, parent, walk);
   add_default_folders (tree, parent, walk);
   add_illegal_edit_folder (tree, parent, walk);
+  add_hidden_outside_folder_to_forks_folder (tree, parent, walk);
   let goal : Option<Goal> = goal_of_parent (tree, parent, walk);
   rekind_children (tree, parent, goal . as_ref (), walk) ?;
   viewnode_merge (tree, parent, walk) ?;
@@ -108,15 +109,15 @@ pub(crate) fn visit_parent (
   drop_editableView_request (tree, parent);
   Ok (( )) }
 
-/// The folders a content view shows without being asked, as it
-/// always has: an occurrence that an editable-view request extends
-/// (a fresh view's roots, and every occurrence the refresh draws
-/// editable, among them) shows its subscribee folder when
-/// it subscribes to something the skgrepo restriction shows (with the folder
-/// of what it hides outside its subscribees, when that holds
-/// anything); and an editable subscribee as such shows the folder of
-/// what its subscriber hides in it, when that holds anything. Not in
-/// the diff view.
+/// The folders a content view shows without being asked: an
+/// occurrence that an editable-view request extends (a fresh view's
+/// roots, and every occurrence the refresh draws editable, among them)
+/// shows its forks folder when it has a fork partner, either way, by a
+/// record the skgrepo restriction shows ('has_a_fork_partner'; with
+/// the folder of what it hides outside its fork partners, when that
+/// holds anything); and an editable forkee as such shows the folder of
+/// what its forker hides in it, when that holds anything. Not in the
+/// diff view.
 fn add_default_folders (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -127,33 +128,50 @@ fn add_default_folders (
     tree . get (parent) . unwrap () . value () . editable_gnid () . cloned ()
     else { return; };
   if carries_editableView_request (tree, parent)
-     && partnerFolder_members_in_graph (
-          walk . truth . graph, &pid, &Folder::Subscribee,
-          walk . truth . restriction )
-        . is_some_and ( |members| ! members . is_empty () )
-  { let had_one : bool = child_folder (tree, parent, &Folder::Subscribee) . is_some ();
-    add_folders (tree, parent, &[ Folder::Subscribee ], walk);
+     && has_a_fork_partner (walk . truth . graph, walk . truth . restriction, &pid)
+  { let had_one : bool = child_folder (tree, parent, &Folder::Forks) . is_some ();
+    add_folders (tree, parent, &[ Folder::Forks ], walk);
     // A new one goes after any folder the occurrence was asked for.
-    if let Some (subscribee_folder) = child_folder (tree, parent, &Folder::Subscribee)
-                                      . filter ( |_| ! had_one ) {
+    if let Some (forks_folder) = child_folder (tree, parent, &Folder::Forks)
+                                 . filter ( |_| ! had_one ) {
       let last_leading_folder : Option<NodeId> =
         tree . get (parent) . unwrap () . children ()
         . take_while ( |child| matches! ( child . value () . kind, ViewnodeKind::Folder (_) ))
-        . filter ( |child| child . id () != subscribee_folder )
+        . filter ( |child| child . id () != forks_folder )
         . map ( |child| child . id () )
         . last ();
       if let Some (folder) = last_leading_folder {
-        move_after (tree, folder, subscribee_folder)
+        move_after (tree, folder, forks_folder)
           . expect ("add_default_folders: both are children"); }}}
   if let Some (subscriber) = subscriber_of_subscribee_as_such (tree, parent) {
-    if child_folder (tree, parent, &Folder::HiddenInSubscribee) . is_none ()
+    if child_folder (tree, parent, &Folder::HiddenInForkPartner) . is_none ()
        && ! hidden_in_subscribee (&pid, &subscriber, walk) . is_empty ()
     { let folder : NodeId = tree . get_mut (parent) . unwrap ()
-        . append ( viewnode_of ( ViewnodeKind::Folder (Folder::HiddenInSubscribee) ))
+        . append ( viewnode_of ( ViewnodeKind::Folder (Folder::HiddenInForkPartner) ))
         . id ();
       move_to_first_child (tree, parent, folder)
         . expect ("add_default_folders: the folder was just added");
       walk . added_compound_folders . insert (folder); }}}
+
+/// In a forks folder of a content view, the compound folder of what
+/// its viewparent hides outside its fork partners, when it hides
+/// something there and the folder lacks one: so a forker that a save
+/// hid, which leaves the forks folder, stands there, where removing it
+/// unhides it.
+fn add_hidden_outside_folder_to_forks_folder (
+  tree   : &mut Tree<Viewnode>,
+  parent : NodeId,
+  walk   : &mut Walk,
+) {
+  if walk . is_diff_view ()
+     || ! matches! ( tree . get (parent) . unwrap () . value () . kind,
+                     ViewnodeKind::Folder (Folder::Forks) )
+  { return; }
+  let Some (note) : Option<ID> =
+    tree . get (parent) . unwrap () . parent ()
+    . and_then ( |note| note . value () . occurrence_gnid () . cloned () )
+    else { return; };
+  add_hidden_outside_folder (tree, parent, &note, walk); }
 
 /// Under an occurrence of a foreign node that the user illegally
 /// edited ('InRustGraph::illegal_edits'), in a skgrepo the skgrepo
@@ -397,16 +415,21 @@ fn merge_requests (
 /// Each child's warrant: 'ByGraph' when the truth's part of the goal
 /// names it, 'ByHead' when only HEAD's does, 'No' otherwise; under a
 /// parent with no goal, whose position implies no relationship,
-/// 'ByGraph'. None for a child that carries no warrant.
+/// 'ByGraph'. A child claiming an item no child may claim (a forks
+/// folder's forker-only member: 'GoalItem::claimable') is warranted
+/// 'No': its viewparent records no such relationship. None for a child
+/// that carries no warrant.
 pub(crate) fn warrant_of_child (
   goal     : Option<&Goal>,
   viewnode : &Viewnode,
 ) -> Option<Warrant> {
   let member : GoalMember = member_of_child (viewnode) ?;
+  let claims : bool = viewnode . claims () == Some (true);
   Some ( match goal {
     None => Warrant::ByGraph,
     Some (goal) => goal . item_for (&member)
-      . map ( |item| item . warrant )
+      . map ( |item| if claims && ! item . claimable { Warrant::No }
+                     else { item . warrant } )
       . unwrap_or (Warrant::No), } ) }
 
 /// Set each child's warrant ('warrant_of_child'); a root's is
@@ -463,7 +486,9 @@ fn orphan_under_a_tombstone (
 /// graphnode a save unhid; under a folder that omits view-ancestors,
 /// one the view shows above the node the folder describes. A hide the
 /// skgrepo restriction keeps out stays, unwarranted, for a skgrepo
-/// widening to show again.
+/// widening to show again. In a forks folder, whether or not it reads
+/// claims, an unwarranted member claiming nothing that its viewparent
+/// hides vanishes too ('hidden_in_its_forks_folder').
 fn mark_claims (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -481,7 +506,10 @@ fn mark_claims (
         tree . get_mut (child) . unwrap () . value () . set_claim (true); }}
     else if claims_are_read {
       let warrant : Option<Warrant> = warrant_of_child (goal, viewnode);
-      vanish_if_unwarranted (tree, child, warrant, walk) ?; }
+      if ! claims && warrant == Some (Warrant::No)
+         && hidden_in_its_forks_folder (tree, parent, child, walk) {
+        vanish (tree, child, walk) ?; }
+      else { vanish_if_unwarranted (tree, child, warrant, walk) ?; }}
     else if warrant_of_child (goal, viewnode) == Some (Warrant::No)
             && leaves_its_write_protected_folder (tree, parent, child, walk) {
       vanish (tree, child, walk) ?; }
@@ -501,7 +529,35 @@ fn leaves_its_write_protected_folder (
   walk   : &Walk,
 ) -> bool {
   unhidden_in_the_hides_folder (tree, parent, child, walk)
-  || view_ancestor_in_its_folder (tree, parent, child) }
+  || view_ancestor_in_its_folder (tree, parent, child)
+  || hidden_in_its_forks_folder (tree, parent, child, walk) }
+
+/// Whether 'child' stands in the forks folder at 'parent' for a note
+/// the folder's viewparent hides, by a record the skgrepo restriction
+/// shows: a forker it hides is no member of the folder
+/// ('forker_only_members') but of the folder of what it hides outside
+/// its fork partners, as a save that deleted the forker from another
+/// view leaves it.
+fn hidden_in_its_forks_folder (
+  tree   : &Tree<Viewnode>,
+  parent : NodeId,
+  child  : NodeId,
+  walk   : &Walk,
+) -> bool {
+  if ! matches! ( tree . get (parent) . unwrap () . value () . kind,
+                  ViewnodeKind::Folder (Folder::Forks) ) { return false; }
+  let Some (note) : Option<ID> = described_node (tree, parent)
+    . and_then ( |described| tree . get (described) . unwrap () . value ()
+                 . occurrence_gnid () . cloned () )
+    else { return false; };
+  let Some (member) : Option<ID> =
+    tree . get (child) . unwrap () . value () . occurrence_gnid () . cloned ()
+    else { return false; };
+  let graph : &InRustGraph = walk . truth . graph;
+  let member : ID = graph . pid_else_raw_id (&member);
+  graph . outbound_gnids_for_relation_gated (
+    &note, NodeRelation::HidesFromSubs, walk . truth . restriction )
+    . iter () . any ( |hidden| graph . pid_else_raw_id (hidden) == member ) }
 
 /// Whether 'child' stands in a folder at 'parent' that omits
 /// view-ancestors ('Folder::omits_view_ancestors') for a gnid the view
@@ -586,9 +642,10 @@ pub(crate) fn vanish (
 // 5. reinstate
 //
 
-/// Draw every goal item that no child stands for. Where the goal has
-/// an order it is appended, and the reorder places it; where it has
-/// none, it follows the last child the goal names (or, when none does,
+/// Draw every goal item that no child stands for. Where the goal
+/// orders it, it is appended, and the reorder places it; where the
+/// goal keeps the view's order for it ('Goal::keeps_the_views_order'),
+/// it follows the last child the goal names (or, when none does,
 /// leads), so that what the user placed after the members stays after
 /// them. A drawn occurrence stands as
 /// 'drawn_occurrence_editability' says; a member of a folder whose
@@ -620,7 +677,7 @@ fn reinstate (
       if ! present . insert (member) { continue; }}
     let treeid : NodeId =
       tree . get_mut (parent) . unwrap () . append (drawn) . id ();
-    if ! goal . ordered {
+    if goal . keeps_the_views_order (&item . member) {
       match last_named {
         Some (named) => move_after (tree, named, treeid) ?,
         None => move_to_first_child (tree, parent, treeid) ?, }
@@ -656,7 +713,9 @@ fn after_drawing (
 /// what the ID rule says (None if a tombstone, which there is no
 /// point in drawing); for a property value, its member. It claims
 /// membership only where the save reads claims, and not when only
-/// HEAD warrants it.
+/// HEAD warrants it, nor for an item no child may claim (a forker-only
+/// member of a forks folder: were it to claim, the next save would
+/// make the folder's viewparent fork it).
 fn draw_item (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
@@ -665,7 +724,8 @@ fn draw_item (
   walk   : &Walk,
 ) -> Result<Option<Viewnode>, Box<dyn Error>> {
   let claims : bool =
-    item . warrant == Warrant::ByGraph && parent_reads_claims (tree, parent);
+    item . warrant == Warrant::ByGraph && item . claimable
+    && parent_reads_claims (tree, parent);
   Ok ( match &item . member {
     GoalMember::Gnid (gnid) => {
       let answer : IdRuleAnswer =
@@ -728,19 +788,19 @@ fn reorder (
       move_to_last_child (tree, parent, child) ?; }}
   Ok (( )) }
 
-/// In a subscribee folder, the compound folder of what the subscriber
-/// hides outside its subscribees stands last, after the subscribees.
+/// In a forks folder, the compound folder of what its viewparent hides
+/// outside its fork partners stands last, after the members.
 fn keep_hidden_outside_folder_last (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
 ) -> Result<(), Box<dyn Error>> {
   if ! matches! ( tree . get (parent) . unwrap () . value () . kind,
-                  ViewnodeKind::Folder (Folder::Subscribee) ) {
+                  ViewnodeKind::Folder (Folder::Forks) ) {
     return Ok (( )); }
   let hidden_outside : Option<NodeId> =
     tree . get (parent) . unwrap () . children ()
     . find ( |child| matches! ( child . value () . kind,
-                                ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) ))
+                                ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners) ))
     . map ( |child| child . id () );
   if let Some (hidden_outside) = hidden_outside {
     move_to_last_child (tree, parent, hidden_outside) ?; }
@@ -759,8 +819,8 @@ fn keep_hidden_outside_folder_last (
 /// owned root, that author's under a foreign one; or one owner's
 /// throughout, in a view switched to that owner's perspective. Not
 /// where the parent itself is shown raw where another mirror would
-/// stand (a root, or a member of a folder other than the subscribee
-/// folder): there its children are raw too. A member already shown in
+/// stand (a root, or a member of a folder that is no forkee as such):
+/// there its children are raw too. A member already shown in
 /// another's place is re-pointed whenever it is not the mirror shown,
 /// as after a switch of perspective. Where the mirror shown is the
 /// original itself, the member shown in its place loses
@@ -865,8 +925,8 @@ fn substitute_roots (
 /// requests rung draws (what contains it, but its view-ancestors, or
 /// no folder where nothing does); and, if the root was editable, to be
 /// extended as an editable root is, which at its own visit adds its
-/// default folders ('add_default_folders'): the subscribee folder,
-/// with its count, where it subscribes. A write-protected root, such as
+/// default folders ('add_default_folders'): the forks folder, where it
+/// has a fork partner. A write-protected root, such as
 /// a search hit, asks for no more than it had. So a root that was
 /// write-protected only because another occurrence held the node it
 /// was re-pointed to ('point_occurrence_at') stays so when switched
@@ -890,14 +950,14 @@ fn redraw_folders (
   let mut drawn : Vec<Folder> = Vec::new ();
   for (treeid, folder) in folders {
     let folded : bool = tree . get (treeid) . unwrap () . value () . foldAndFocus . folded;
-    for kind in kinds_redrawing (&folder, was_editable) {
+    for kind in kinds_redrawing (&folder) {
       if drawn . iter () . any ( |done| discriminant (done) == discriminant (&kind) )
          || ( kind . is_editable () && ! has_members (&pid, &kind, walk) )
       { continue; }
       let mut empty : Viewnode = viewnode_of ( ViewnodeKind::Folder (kind . clone ()) );
       empty . foldAndFocus . folded = folded;
       let new : NodeId = tree . get_mut (treeid) . unwrap () . insert_before (empty) . id ();
-      if matches! ( kind, Folder::Subscribee ) {
+      if matches! ( kind, Folder::Forks ) {
         add_hidden_outside_folder (tree, new, &pid, walk); }
       drawn . push (kind); }
     vanish (tree, treeid, walk) ?; }
@@ -912,36 +972,29 @@ fn redraw_folders (
 /// The folders that stand, for the node a re-pointed root now shows,
 /// where a folder of the kind of 'folder' stood: those a request for
 /// its relation draws, both sides of a partner relation ('(folder
-/// hidesFromSubs)' draws the hider and hidden folders), but for the
-/// subscribee folder of an editable root, alone, which such a root
-/// shows by default where its node subscribes, and which the user's
-/// request would have drawn with a subscriber folder. (A
-/// write-protected root, such as a search hit, shows a subscribee
-/// folder only by request or beside its subscriber folder
-/// ('stub_root_of_hit').) None for the folders drawn inside others
-/// or only in the diff view, for the illegal-edit folder, which each
-/// visit draws, and for the ID folder, which no request draws.
+/// hidesFromSubs)' draws the hider and hidden folders; '(folder
+/// forks)' the one forks folder). None for the folders drawn inside
+/// others or only in the diff view, for the illegal-edit folder, which
+/// each visit draws, and for the ID folder, which no request draws.
 fn kinds_redrawing (
-  folder           : &Folder,
-  root_is_editable : bool,
+  folder : &Folder,
 ) -> Vec<Folder> {
   match folder {
-    Folder::Subscribee if root_is_editable
-                                   => vec! [ Folder::Subscribee ],
-    Folder::Subscribee             => folders_of_relation (FolderRelation::SubscribesTo),
-    Folder::Subscriber             => folders_of_relation (FolderRelation::SubscribesTo),
+    Folder::Forks                  => folders_of_relation (FolderRelation::Forks),
     Folder::Hider | Folder::Hidden => folders_of_relation (FolderRelation::HidesFromSubs),
     Folder::Container              => folders_of_relation (FolderRelation::Containers),
     Folder::Mentioner              => folders_of_relation (FolderRelation::Mentioners),
     Folder::Alias                  => folders_of_relation (FolderRelation::Aliases),
     Folder::Flags { .. }           => vec! [ Folder::flags () ],
-    Folder::HiddenInSubscribee | Folder::HiddenOutsideOfSubscribee
+    Folder::HiddenInForkPartner | Folder::HiddenOutsideOfForkPartners
       | Folder::AcquiredBy | Folder::Acquired
       | Folder::ID | Folder::IllegalEdit { .. } => Vec::new (), } }
 
 /// Whether a folder of the kind of 'folder' under an occurrence of
 /// 'pid' would hold anything: the node's aliases, or its partners in
-/// the folder's relation, as the skgrepo restriction shows them.
+/// the folder's relation, as the skgrepo restriction shows them (for
+/// the forks folder, any fork partner, as 'add_default_folders' asks,
+/// a hidden forker standing in its hidden-outside folder).
 fn has_members (
   pid    : &ID,
   folder : &Folder,
@@ -951,6 +1004,8 @@ fn has_members (
     Folder::Alias => walk . truth . graph . get (pid) . is_some_and (
       |node| ! node . aliases_with_relRepo_unless_home (walk . truth . restriction)
                . is_empty () ),
+    Folder::Forks => has_a_fork_partner (
+      walk . truth . graph, walk . truth . restriction, pid ),
     _ => partnerFolder_members_in_graph (
            walk . truth . graph, pid, folder, walk . truth . restriction )
          . is_some_and ( |members| ! members . is_empty () ), } }
@@ -1017,8 +1072,9 @@ fn reinstate_original_after (
 
 /// Whether the occurrence at 'treeid' is shown raw where, from the
 /// perspective of 'owner', another of its mirrors would stand in its
-/// place: at a root, or as a member of a folder other than the
-/// subscribee folder.
+/// place: at a root, or as a member of a folder that is no forkee as
+/// such ('subscriber_of_subscribee_as_such'): a forker-only member of a
+/// forks folder is raw, as a member of every other folder is.
 fn is_raw_where_another_mirror_would_stand (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
@@ -1031,7 +1087,7 @@ fn is_raw_where_another_mirror_would_stand (
       ViewnodeKind::BufferRoot => true,
       ViewnodeKind::Folder (folder) =>
         ! folder . members_are_properties ()
-        && ! matches! ( folder, Folder::Subscribee ),
+        && subscriber_of_subscribee_as_such (tree, treeid) . is_none (),
       _ => false, } );
   let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) : &ViewnodeKind =
     &node . value () . kind else { return false; };
@@ -1093,7 +1149,7 @@ fn request_stays (
 
 /// Where the folders a request adds stand among those added at one
 /// visit, first first: the containers folder, the mentioners, the
-/// aliases, then the subscription and hiding folders, the
+/// aliases, then the forks and hiding folders, the
 /// flags last. (A node's view requests are a set.)
 fn folder_request_rank (
   request : &ViewRequest,
@@ -1102,7 +1158,7 @@ fn folder_request_rank (
     ViewRequest::Folder (FolderRelation::Containers)    => 0,
     ViewRequest::Folder (FolderRelation::Mentioners)    => 1,
     ViewRequest::Folder (FolderRelation::Aliases)       => 2,
-    ViewRequest::Folder (FolderRelation::SubscribesTo)  => 3,
+    ViewRequest::Folder (FolderRelation::Forks)         => 3,
     ViewRequest::Folder (FolderRelation::HidesFromSubs) => 4,
     ViewRequest::Flags                                  => 5,
     ViewRequest::Editable | ViewRequest::WriteProtected
@@ -1118,15 +1174,15 @@ fn folders_of_relation (
   match relation {
     FolderRelation::Aliases       => vec! [ Folder::Alias ],
     FolderRelation::HidesFromSubs => vec! [ Folder::Hider, Folder::Hidden ],
-    FolderRelation::SubscribesTo  => vec! [ Folder::Subscribee, Folder::Subscriber ],
+    FolderRelation::Forks         => vec! [ Folder::Forks ],
     FolderRelation::Containers    => vec! [ Folder::Container ],
     FolderRelation::Mentioners    => vec! [ Folder::Mentioner ], } }
 
 /// Add each of 'folders' the occurrence at 'treeid' lacks, ahead of
-/// its other children, in the order given. A subscribee folder holds
-/// the compound folder of what the subscriber hides outside its
-/// subscribees, when the subscriber hides something there; new, its
-/// members are drawn folded ('Walk::added_compound_folders').
+/// its other children, in the order given. A forks folder holds the
+/// compound folder of what its viewparent hides outside its fork
+/// partners, when it hides something there; new, its members are drawn
+/// folded ('Walk::added_compound_folders').
 fn add_folders (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
@@ -1142,7 +1198,7 @@ fn add_folders (
           . append ( viewnode_of ( ViewnodeKind::Folder (folder . clone ()) )) . id ();
         added . push (new);
         new }, };
-    if matches! ( folder, Folder::Subscribee ) {
+    if matches! ( folder, Folder::Forks ) {
       let subscriber : Option<ID> =
         tree . get (treeid) . unwrap () . value () . occurrence_gnid () . cloned ();
       if let Some (subscriber) = subscriber {
@@ -1151,22 +1207,21 @@ fn add_folders (
     move_to_first_child (tree, treeid, folder_treeid)
       . expect ("add_folders: the folder was just added"); }}
 
-/// In the subscribee folder at 'subscribee_folder', of 'subscriber',
-/// the compound folder of what the subscriber hides outside its
-/// subscribees, when it hides something there and the folder lacks
-/// one; new, its members are drawn folded
-/// ('Walk::added_compound_folders').
+/// In the forks folder at 'subscribee_folder', of 'subscriber', the
+/// compound folder of what it hides outside its fork partners, when it
+/// hides something there and the folder lacks one; new, its members
+/// are drawn folded ('Walk::added_compound_folders').
 fn add_hidden_outside_folder (
   tree              : &mut Tree<Viewnode>,
   subscribee_folder : NodeId,
   subscriber        : &ID,
   walk              : &mut Walk,
 ) {
-  if child_folder (tree, subscribee_folder, &Folder::HiddenOutsideOfSubscribee) . is_none ()
+  if child_folder (tree, subscribee_folder, &Folder::HiddenOutsideOfForkPartners) . is_none ()
      && ! hidden_outside_of_subscribees (subscriber, walk) . is_empty ()
   { let hidden_outside : NodeId = tree . get_mut (subscribee_folder) . unwrap ()
       . append ( viewnode_of (
-        ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) )) . id ();
+        ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners) )) . id ();
     walk . added_compound_folders . insert (hidden_outside); }}
 
 /// The child of 'under' that is a folder of the kind of 'folder' (a

@@ -75,7 +75,7 @@ fn an_unchanged_save_keeps_a_restricted_hide_of_what_the_subscribee_shows (
       let editable : String = e_editable_under_its_subscriber (f, public) ?;
       assert! ( has_line (&editable, "**** (skg node (gnid h)"),
                 "h stands as e's content:\n{}", editable );
-      assert! ( ! editable . contains ("hiddenInSubscribeeFolder"),
+      assert! ( ! editable . contains ("hiddenInForkPartnerFolder"),
                 "no folder shows the restricted hide:\n{}", editable );
       let saved : String = save (f, &editable, public) ?;
       assert_eq! ( without_viewnode_ids (&saved), without_viewnode_ids (&editable),
@@ -174,17 +174,17 @@ fn a_hide_of_what_the_subscribee_contains_restrictedly_stands_outside_and_its_ed
 // The fixture and the operations
 //
 
-/// The view of r with its subscribee folder requested, as saved.
+/// The view of r with its forks folder requested, as saved.
 fn subscribee_folder_requested (
   f      : &mut Fixture,
   public : &SkgrepoRestriction,
 ) -> Result<String, Box<dyn Error>> {
   let opened : String = open_content_view (f, "r", VIEW, public) ?;
   let requested : String = edit_line ( &opened, "* (skg node (gnid r)", |line|
-    line . replacen ( "(skg ", "(skg (viewRequests (folder subscribesTo)) ", 1 ));
+    line . replacen ( "(skg ", "(skg (viewRequests (folder forks)) ", 1 ));
   save (f, &requested, public) }
 
-/// The view of r with its subscribee folder requested and e made
+/// The view of r with its forks folder requested and e made
 /// editable in it, as saved.
 fn e_editable_under_its_subscriber (
   f      : &mut Fixture,
@@ -229,7 +229,7 @@ fn members_of_the_hidden_outside_folder (
 ) -> Vec<String> {
   let lines : Vec<&str> = view . lines () . collect ();
   let folder : usize = lines . iter ()
-    . position ( |line| line . contains ("hiddenOutsideOfSubscribeeFolder") )
+    . position ( |line| line . contains ("hiddenOutsideOfForkPartnersFolder") )
     . unwrap_or_else ( || panic! ( "no hidden-outside folder:\n{}", view ));
   lines [folder + 1 ..] . iter ()
     . take_while ( |line| line . starts_with ("**** ") )
@@ -252,5 +252,5 @@ fn without_member_line (
 fn with_member_n (
   view : &str,
 ) -> String {
-  edit_line ( view, "*** (skg hiddenOutsideOfSubscribeeFolder)", |line|
+  edit_line ( view, "*** (skg hiddenOutsideOfForkPartnersFolder)", |line|
     format! ("{}\n**** (skg node (gnid n)) n", line) ) }

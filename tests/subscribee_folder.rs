@@ -38,11 +38,11 @@ fn test_subscribee_folder_appears_for_subscribers(
     let (result, _pids, _) : (String, Vec<ID>, _) =
       single_root_view( &config, None, &ID("1" . to_string())
                       )?;
-    println!("SubscribeeFolder test result:\n{}", result);
+    println!("forks folder test result:\n{}", result);
 
-    // Nodes 11 and 12 subscribe to something, so they get SubscribeeFolder children.
-    // Each SubscribeeFolder has Subscribee children showing what the node subscribes to.
-    // Nodes 13 and 14 do not subscribe to anything, so no SubscribeeFolder.
+    // Nodes 11 and 12 subscribe to something, so they get forks folder children.
+    // Each forks folder has Subscribee children showing what the node subscribes to.
+    // Nodes 13 and 14 do not subscribe to anything, so no forks folder.
     // The 11/12 -> *-sees relationships run from owned "home" nodes to foreign
     // "away" nodes. Their default is the recorder's home: that is writable
     // and deliberately exposes the foreign ID/relationship there. Since
@@ -51,18 +51,18 @@ fn test_subscribee_folder_appears_for_subscribers(
     let expected = indoc! {
       "* (skg node (gnid 1) (skgRepos (nodeRepo home)) (view (rels (contains (out 4))) repoBoundary)) 1
       ** (skg node (gnid 11) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1)) (out 1)) (forks (out 1))) (birth (contains in 1)))) 11
-      *** (skg subscribeeFolder)
+      *** (skg forksFolder)
       **** (skg node (gnid 11-sees) (skgRepos (nodeRepo away)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) 11-sees
       *** (skg node (gnid 111) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 111
       ** (skg node (gnid 12) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1))) (forks (out 1))) (birth (contains in 1)))) 12
-      *** (skg subscribeeFolder)
+      *** (skg forksFolder)
       **** (skg node (gnid 12-sees) (skgRepos (nodeRepo away)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) 12-sees
       ** (skg node (gnid 13) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13
       ** (skg node (gnid 14) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 14
       *** (skg node (gnid 141) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 141
 "};
     assert_metadata_eq!(result, expected,
-      "Nodes with subscriptions should have SubscribeeFolder children");
+      "Nodes with subscriptions should have forks folder children");
     cleanup_test(
       test_name,
       &config . tantivy_folder,

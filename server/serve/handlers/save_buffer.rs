@@ -1389,7 +1389,7 @@ fn post_skgsave_commit_hiddenoutside_warnings (
       { containing_subscribees . push (label (&subscribee_node . pid)); }}
     if ! containing_subscribees . is_empty () {
       warnings . push (format! (
-        "Saved hide for {}; its display moved to HiddenInSubscribeeFolder under {}.",
+        "Saved hide for {}; its display moved to HiddenInForkPartnerFolder under {}.",
         label (member), containing_subscribees . join (", ") )); }}
   warnings
 }

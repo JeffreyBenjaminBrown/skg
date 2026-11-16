@@ -22,7 +22,7 @@ names none; nil for what is no '(skg ...)'."
                   ((skg ghost (gnid g) (skgRepos (nodeRepo r))) . "ghost")
                   ((skg alias (skgRepos (relRepo r))) . "alias")
                   ((skg (flag noSearchMatching)) . "flag")
-                  ((skg subscribeeFolder) . "folder")
+                  ((skg forksFolder) . "folder")
                   ((skg folded tombstone) . "tombstone")
                   ((skg (relRepo r)) . "occurrence")
                   ((skg) . "occurrence")

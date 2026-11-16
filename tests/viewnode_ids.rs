@@ -7,7 +7,7 @@
 //
 // Fixture: p contains a; a contains b and c; c subscribes to d. The
 // view of a shows p in a's containers folder, b and c as members, and
-// c's subscribee folder holding d.
+// c's forks folder holding d.
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 
@@ -443,7 +443,7 @@ fn the_record_assigns_fresh_viewnode_ids_and_forgets_what_left (
   let mut tree : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = tree . root () . id ();
   let folder : NodeId = tree . get_mut (root) . unwrap () . append (
-    viewnode_of (ViewnodeKind::Folder (Folder::Subscribee)) ) . id ();
+    viewnode_of (ViewnodeKind::Folder (Folder::Forks)) ) . id ();
   for _ in 0 .. 120 {
     tree . get_mut (folder) . unwrap () . append ( viewnode_of (
       ViewnodeKind::Tombstone )); }

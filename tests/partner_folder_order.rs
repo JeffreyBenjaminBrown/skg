@@ -1,6 +1,6 @@
 // cargo nextest run --test grouped_overrides -E 'test(partner_folder_order::)'
 //
-// A folder whose goal is not ordered (here a SubscriberFolder) respects the
+// A folder whose goal is not ordered (here a forks folder) respects the
 // user's view-local member order across save and rerender
 // ('docs/sharing-model.org', "The write-protected folders: who
 // subscribes to, overrides, or hides this node"): present members
@@ -8,7 +8,7 @@
 // unchanged save. The order never reaches disk; it is view-local.
 //
 // Fixture: r and t both subscribe to n; u subscribes to nothing.  The
-// first test explicitly requests n's subscription folders, whose initial
+// first test explicitly requests n's forks folder, whose initial
 // member order is sorted by ID (r, t), then swaps them in the buffer and
 // saves.  The second also places a note in the folder, then makes u
 // subscribe to n from a view of u: n's view, rerendered collaterally,
@@ -80,7 +80,7 @@ async fn write_protected_folder_order_is_preserved_impl (
       &[ ID ("n" . to_string ()) ] ) ?;
   let folder_request : String = initial_buffer . replacen (
     "node ",
-    "node (viewRequests (folder subscribesTo))", 1 );
+    "node (viewRequests (folder forks))", 1 );
   let complete_buffer : String =
     save_and_rerender (&folder_request, config, tantivy) . await ?;
   assert_member_order (
@@ -172,7 +172,7 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
   let (n_view, _) : (String, Vec<String>) = save_view_and_read_collateral (
     &n_view . replacen (
       "node ",
-      "node (viewRequests (folder subscribesTo))", 1 ),
+      "node (viewRequests (folder forks))", 1 ),
     &n_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   let reordered : String = { // t above r, and a note placed after them
     let r_line : &str = line_containing (&n_view, "(gnid r)");
@@ -195,12 +195,12 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
     let start : usize = u_view . find ("(nodeRepo ") . expect ("u's line names its repo") + 10;
     &u_view [ start .. start + u_view [start ..] . find (')') . unwrap () ] };
   let subscribing : String = format! (
-    "{}** (skg subscribeeFolder)\n*** (skg node (gnid n) (skgRepos (nodeRepo {}))) n\n",
+    "{}** (skg forksFolder)\n*** (skg node (gnid n) (skgRepos (nodeRepo {}))) n\n",
     u_view, repo );
   let (_, collateral_views) : (String, Vec<String>) = save_view_and_read_collateral (
     &subscribing, &u_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   let collateral_n : &String = collateral_views . iter ()
-    . find ( |view| view . contains ("subscriberFolder") )
+    . find ( |view| view . contains ("forksFolder") )
     . unwrap_or_else ( || panic! ( "n's view is rerendered: {:?}", collateral_views ));
   assert_lines_in_order (
     collateral_n, &[ "(gnid t)", "(gnid r)", "(gnid u)", "a placed note" ],

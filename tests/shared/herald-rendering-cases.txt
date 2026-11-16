@@ -217,21 +217,21 @@
 ---- text: A3 I1 F2
 ---- styles: boring*2 -*1 boring*2 -*1 boring*2
 ==== folders: a write-protected folder
-(skg subscriberFolder)
----- text: ☮ These subscribe to it.
----- styles: crucial*1 -*1 message*22
+(skg hiderFolder)
+---- text: ☮ These hide it from their subscriptions.
+---- styles: crucial*1 -*1 message*39
 ==== folders: a writable folder
-(skg subscribeeFolder)
----- text: It subscribes to these.
----- styles: message*23
-==== folders: hidden in a subscribee, its subscriber the great-grandparent
-(skg hiddenInSubscribeeFolder)
+(skg forksFolder)
+---- text: It forks these, or these fork it.
+---- styles: message*33
+==== folders: hidden in a forkee, its forker the great-grandparent
+(skg hiddenInForkPartnerFolder)
 ---- text: ☮ It contains these, but c hides them.
 ---- styles: crucial*1 -*1 message*22 -*1 high*1 -*1 message*11
-==== folders: hidden outside of subscribees, its subscriber the grandparent
-(skg hiddenOutsideOfSubscribeeFolder)
----- text: b hides these, but subscribes to nothing that contains them.
----- styles: high*1 -*1 message*58
+==== folders: hidden outside of its fork partners, the note the grandparent
+(skg hiddenOutsideOfForkPartnersFolder)
+---- text: b hides these, but nothing it forks or that forks it contains them.
+---- styles: high*1 -*1 message*65
 ==== placeholders: unknown node
 (skg unknown (gnid gone))
 ---- text: Reference to unknown node.
@@ -378,11 +378,11 @@
 ---- context: folderChange unprocessed
 ---- text: its aliases changed (this file)
 ---- styles: message*31
-==== diff view: the node's subscribees changed
-(skg subscribeeFolder)
+==== diff view: the node's forks changed, of either side
+(skg forksFolder)
 ---- context: folderChange unprocessed
----- text: its subscribees changed (this file)
----- styles: message*35
+---- text: its forks changed
+---- styles: message*17
 ==== diff view: a node in the skgrepo-changes buffer whose home moved
 (skg node (gnid x) (diff (homeSkgrepoMove (old pub) (new priv))))
 ---- text: -pub +priv

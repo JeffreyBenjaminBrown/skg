@@ -1,6 +1,6 @@
 //! A reply typed in the unread list files the message it answers.
 //!
-//! An owned subscriber F draws, in its subscribee folder, each
+//! An owned subscriber F draws, in its forks folder, each
 //! subscribee S as such: S's members that F neither contains nor
 //! hides ('less_what_the_subscriber_integrates' in
 //! 'server/refresh/goal.rs'). Read as mail, those are the messages F's
@@ -90,7 +90,7 @@ pub fn file_subscribee_members_written_in (
   Ok (( )) }
 
 /// Each member A of the content of a subscribee S as such, in the
-/// subscribee folder of an occurrence F whose contains the save writes
+/// forks folder of an occurrence F whose contains the save writes
 /// ('saves_its_contains'), such that S's contains names A and an
 /// editable occurrence at A or in its content, at any depth, is of a
 /// node in 'written'. A child of S that S's list does not name is no
@@ -104,7 +104,7 @@ fn subscribee_members_written_in (
 ) -> Vec<Filing> {
   let mut filings : Vec<Filing> = Vec::new ();
   for folder in viewforest . nodes () {
-    if ! matches! ( folder . value () . kind, ViewnodeKind::Folder (Folder::Subscribee) )
+    if ! matches! ( folder . value () . kind, ViewnodeKind::Folder (Folder::Forks) )
     { continue; }
     let Some (subscriber) : Option<NodeRef<Viewnode>> = folder . parent ()
       else { continue; };
@@ -162,7 +162,7 @@ fn saves_its_contains (
   let subscribee_as_such : bool =
     occurrence . claimsMembership
     && node . parent () . is_some_and ( |parent| matches! (
-      parent . value () . kind, ViewnodeKind::Folder (Folder::Subscribee) ));
+      parent . value () . kind, ViewnodeKind::Folder (Folder::Forks) ));
   ! occurrence . is_writeProtected ()
   && config . skgrepo_is_owned (&occurrence . home_skgrepo)
   && ! matches! ( occurrence . edit_request (), Some (NodeEditRequest::Delete) )

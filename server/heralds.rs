@@ -442,32 +442,30 @@ pub fn herald_rule_table () -> HeraldRule {
           crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]) ],
       // The write-protected folders carry ☮ ("cannot be changed
-      // from here"); the editable folders (subscribeeFolder,
+      // from here"); the editable folders (forksFolder,
       // aliasFolder) do not.
-      // The two compound folders name the subscriber by its ancestor
-      // letter (docs/heralds.org, "Ancestor flags and floors"), styled
-      // apart from the words around it. It stands three generations up
-      // in subscriber > subscribeeFolder > subscribee >
-      // hiddenInSubscribeeFolder, so 'c', and two up in subscriber >
-      // subscribeeFolder > hiddenOutsideOfSubscribeeFolder, so 'b'
-      // (see 'CompoundFolderParties').
+      // The two compound folders name the note whose hides they show
+      // by its ancestor letter (docs/heralds.org, "Ancestor flags and
+      // floors"), styled apart from the words around it. It stands
+      // three generations up in forker > forksFolder > forkee >
+      // hiddenInForkPartnerFolder, so 'c', and two up in note >
+      // forksFolder > hiddenOutsideOfForkPartnersFolder, so 'b' (see
+      // 'CompoundFolderParties').
       vec! [
       leaf_styled_as ("writeProtected",
-                      Folder::HiddenInSubscribee . repr_in_client (), "☮"),
-      leaf (Folder::HiddenInSubscribee . repr_in_client (),
+                      Folder::HiddenInForkPartner . repr_in_client (), "☮"),
+      leaf (Folder::HiddenInForkPartner . repr_in_client (),
             "It contains these, but"),
-      leaf_styled_as ("hiddenInSubscribeeFolder_subscriber",
-                      Folder::HiddenInSubscribee . repr_in_client (), "c"),
-      leaf (Folder::HiddenInSubscribee . repr_in_client (),
+      leaf_styled_as ("hiddenInForkPartnerFolder_forker",
+                      Folder::HiddenInForkPartner . repr_in_client (), "c"),
+      leaf (Folder::HiddenInForkPartner . repr_in_client (),
             "hides them."),
-      leaf_styled_as ("hiddenOutsideOfSubscribeeFolder_subscriber",
-                      Folder::HiddenOutsideOfSubscribee . repr_in_client (), "b"),
-      leaf (Folder::HiddenOutsideOfSubscribee . repr_in_client (),
-            "hides these, but subscribes to nothing that contains them."),
-      leaf (Folder::Subscribee . repr_in_client (),
-            "It subscribes to these.") ],
-      write_protected_leaves (Folder::Subscriber . repr_in_client (),
-            "These subscribe to it."),
+      leaf_styled_as ("hiddenOutsideOfForkPartnersFolder_forker",
+                      Folder::HiddenOutsideOfForkPartners . repr_in_client (), "b"),
+      leaf (Folder::HiddenOutsideOfForkPartners . repr_in_client (),
+            "hides these, but nothing it forks or that forks it contains them."),
+      leaf (Folder::Forks . repr_in_client (),
+            "It forks these, or these fork it.") ],
       write_protected_leaves (Folder::Hidden . repr_in_client (),
             "It hides these from its subscriptions."),
       write_protected_leaves (Folder::Hider . repr_in_client (),

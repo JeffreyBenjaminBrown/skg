@@ -17,11 +17,11 @@ const CLAIMS_MEMBERSHIP : bool = true;
 #[test]
 fn folder_kind_rules () {
   let ordered : Vec<Folder> = vec! [
-    Folder::Subscribee, Folder::Hidden,
-    Folder::HiddenOutsideOfSubscribee, Folder::Alias ];
+    Folder::Forks, Folder::Hidden,
+    Folder::HiddenOutsideOfForkPartners, Folder::Alias ];
   let unordered : Vec<Folder> = vec! [
-    Folder::Subscriber, Folder::Hider,
-    Folder::HiddenInSubscribee, Folder::Container, Folder::Mentioner,
+    Folder::Hider,
+    Folder::HiddenInForkPartner, Folder::Container, Folder::Mentioner,
     Folder::AcquiredBy, Folder::Acquired, Folder::ID, Folder::flags () ];
   for folder in &ordered {
     assert! ( folder . goal_is_ordered (), "{:?}", folder ); }
@@ -30,8 +30,8 @@ fn folder_kind_rules () {
   for folder in ordered . iter () . chain (&unordered) {
     assert_eq! ( folder . is_editable (),
                  matches! ( folder,
-                            Folder::Subscribee
-                            | Folder::HiddenOutsideOfSubscribee
+                            Folder::Forks
+                            | Folder::HiddenOutsideOfForkPartners
                             | Folder::Alias ),
                  "{:?}", folder ); }
   for folder in ordered . iter () . chain (&unordered) {

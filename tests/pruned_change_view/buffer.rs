@@ -171,13 +171,13 @@ fn a_subscription_change_shows_on_both_sides (
   let buffer : String = kinds_buffer () ?;
   assert_lines_in_order ( &buffer, &[
     "* (skg node (gnid sub)",
-    "** (skg subscribeeFolder)",
+    "** (skg forksFolder)",
     "*** (skg node (gnid s1) (skgRepos (nodeRepo public)) noClaim writeProtected (view ghostWarrant) (diff (rel removed) (leaves 1 rel))) s1",
     "*** (skg node (gnid s2) ", " (diff (rel added) (leaves 1 rel))) s2" ] );
   assert_lines_in_order ( &buffer, &[
     "* (skg node (gnid s1)",
-    "** (skg subscriberFolder)",
-    "*** (skg node (gnid sub) (skgRepos (nodeRepo public)) writeProtected",
+    "** (skg forksFolder)",
+    "*** (skg node (gnid sub) (skgRepos (nodeRepo public)) noClaim writeProtected",
     "(diff (rel removed) (properties changed) (leaves 2 node rel))) sub" ] );
   Ok (( )) }
 
@@ -235,8 +235,8 @@ fn a_deleted_subscriber_is_shown_in_the_changed_subscriber_folder (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &kinds_buffer () ?, &[
     "* (skg node (gnid orph)",
-    "** (skg subscriberFolder)",
-    "*** (skg ghost (gnid gone) (skgRepos (nodeRepo public)) (diff (node removed) (rel removed) (leaves 2 node rel))) gone" ] );
+    "** (skg forksFolder)",
+    "*** (skg ghost (gnid gone) (skgRepos (nodeRepo public)) noClaim (diff (node removed) (rel removed) (leaves 2 node rel))) gone" ] );
   Ok (( )) }
 
 #[test]
@@ -313,32 +313,33 @@ fn a_removed_member_first_in_level_order_is_editable_with_its_changes (
   Ok (( )) }
 
 /// The 'subscribee_member' fixture (one skgrepo, main): s1
-/// subscribes to s0; since HEAD, sub subscribes to s1; c contains s1
-/// and p contains sub. So the stub roots c and p show s1 and sub, and
-/// s1's changed subscriber folder holds sub, its relationship added,
-/// with sub's containerward chain under it: p, write-protected, with
-/// no claim atom (under a write-protected parent nothing claims), and
-/// carrying no change facts. Likewise sub's changed
-/// subscribee folder holds s1, with c under it. The buffer saves back
-/// unchanged.
+/// forks s0; since HEAD, sub forks s1; c contains s1 and p contains
+/// sub. So the stub roots c and p show s1 and sub, and s1's changed
+/// forks folder holds, after s0, sub, its relationship added, with
+/// sub's containerward chain under it: p, write-protected, with no
+/// claim atom (under a write-protected parent nothing claims), and
+/// carrying no change facts. Likewise sub's changed forks folder holds
+/// s1, with c under it. The buffer saves back unchanged.
 #[test]
 fn a_member_of_a_changed_subscriber_folder_holds_its_chain (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("subscribee_member", &["main"], |f| {
     let buffer : String = without_viewnode_ids (&buffer_of (f) ?);
     let lines : Vec<&str> = buffer . lines () . collect ();
-    for (folder, member, chain_node) in [ ("subscriberFolder", "sub", "p"),
-                                          ("subscribeeFolder", "s1", "c") ] {
+    for (folder, member, chain_node) in [ ("forksFolder", "sub", "p"),
+                                          ("forksFolder", "s1", "c") ] {
       let folder_index : usize = lines . iter ()
         . position ( |line| line . starts_with (
           &format! ( "*** (skg {})", folder )) )
         . unwrap_or_else ( || panic! ( "a changed {}:\n{}", folder, buffer ));
-      let member_line : &str = lines [folder_index + 1];
-      assert! ( member_line . starts_with (
-                  &format! ( "**** (skg node (gnid {}) ", member ))
-                && member_line . contains ("(diff (rel added)"),
+      let member_index : usize = folder_index + 1 + lines [folder_index + 1 ..] . iter ()
+        . position ( |line| line . starts_with (
+          &format! ( "**** (skg node (gnid {}) ", member )) )
+        . unwrap_or_else ( || panic! ( "{} in the changed {}:\n{}", member, folder, buffer ));
+      let member_line : &str = lines [member_index];
+      assert! ( member_line . contains ("(diff (rel added)"),
                 "{} is the folder's added member:\n{}", member, buffer );
-      let chain_line : &str = lines . get (folder_index + 2) . copied () . unwrap_or ("");
+      let chain_line : &str = lines . get (member_index + 1) . copied () . unwrap_or ("");
       assert! ( chain_line . starts_with (
                   &format! ( "***** (skg node (gnid {}) ", chain_node ))
                 && ! chain_line . contains ("noClaim")
@@ -411,14 +412,14 @@ fn a_removed_member_editable_before_a_save_stays_editable_after_it (
     assert_eq! ( editable . len (), 1, "{}", saved );
     Ok (( )) }) }
 
-/// s's subscribee folder shows s2, the subscribee it lost, where it
+/// s's forks folder shows s2, the subscribee it lost, where it
 /// stood in s's list, not after the subscribees it kept.
 #[test]
 fn a_removed_subscribee_is_shown_where_it_stood (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &removed_partners_buffer () ?, &[
     "* (skg node (gnid s)",
-    "** (skg subscribeeFolder)",
+    "** (skg forksFolder)",
     "*** (skg node (gnid s1) (skgRepos (nodeRepo main)) writeProtected",
     "*** (skg node (gnid s2) (skgRepos (nodeRepo main)) noClaim writeProtected (view ghostWarrant) (diff (rel removed) (leaves 1 rel))) s2",
     "*** (skg node (gnid s3) (skgRepos (nodeRepo main)) writeProtected" ] );

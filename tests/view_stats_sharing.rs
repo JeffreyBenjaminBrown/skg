@@ -10,7 +10,7 @@
 //   relations);
 // - overridesParent ("Op"): a node shown under a vognode it forks.
 // One fixture serves both: R forks E and F (each under R's
-// subscribeeFolder, born of the fork); R contains P,
+// forksFolder, born of the fork); R contains P,
 // P contains C, and C forks P (so C as content of P carries Op,
 // and C as a view root does not). Each stat round-trips through a
 // save (the viewStats parser errors on unknown atoms, so this also
@@ -57,7 +57,7 @@ fn e_lines_by_enclosing_folder (
   let mut current_folder : &'static str = "";
   let mut result : Vec<(&'static str, &str)> = Vec::new ();
   for line in buf . lines () {
-    if without_viewnode_ids (line) . contains ("subscribeeFolder)") { current_folder = "subscribeeFolder"; }
+    if without_viewnode_ids (line) . contains ("forksFolder)") { current_folder = "forksFolder"; }
     else if line . contains ("(gnid E)") {
       result . push ((current_folder, line)); }}
   result }
@@ -69,14 +69,14 @@ fn assert_sharing_stats_in_view_of_R (
   let e_lines : Vec<(&'static str, &str)> =
     e_lines_by_enclosing_folder (buf);
   assert_eq! ( e_lines . len (), 1,
-    "{}: E should appear under the subscribeeFolder:\n{}", label, buf );
+    "{}: E should appear under the forksFolder:\n{}", label, buf );
   // In the semantic wire the parent-relative stat is the relationship
   // to E's grandparent R (generation 2): R forks E. Under a folder,
   // the folder relation is E's birth, and the relation carries
   // (ancestors 2). F, which R forks too, shows the same.
   for (folder, line) in &e_lines {
     match *folder {
-      "subscribeeFolder" => {
+      "forksFolder" => {
         assert! ( line . contains ("(birth (forks in 2))"),
           "{}: E-as-subscribee is born of the fork:\n{}", label, buf );
         assert! ( line . contains ("(forks (in 1 (ancestors 2)))"),

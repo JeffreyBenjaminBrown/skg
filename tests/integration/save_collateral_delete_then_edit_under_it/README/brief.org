@@ -3,7 +3,7 @@ that other buffer, from which the node vanished, is then edited and
 saved twice. 'detail.org' says what each phase checks.
 
 The data (titles equal IDs, as usual in tests): node 1 contains 11;
-11 subscribes to subee, hides subee-1 and also-hidden, and has the
+11 forks subee, hides subee-1 and also-hidden, and has the
 alias "eleven"; subee contains subee-1; also-hidden is related to
 nothing else.
 
@@ -15,9 +15,9 @@ root, subee, appended by hand:
   ** 11
   *** (aliasFolder)
   **** (alias) eleven
-  *** (subscribeeFolder)
+  *** (forksFolder)
   **** subee
-  **** (hiddenOutsideOfSubscribeeFolder)
+  **** (hiddenOutsideOfForkPartnersFolder)
   ***** also-hidden
   * subee
   ** subee-1

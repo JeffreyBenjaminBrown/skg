@@ -327,7 +327,7 @@ fn an_editable_view_request_cascades_within_the_node_budget (
       assert! ( ! node_lines (&saved, node) . is_empty ()
                 && ! shown_editable (&saved, node),
                 "{} must be write-protected:\n{}", node, saved ); }
-    assert! ( ! saved . contains ("subscribeeFolder"),
+    assert! ( ! saved . contains ("forksFolder"),
               "no default folder is added:\n{}", saved );
     assert! ( ! saved . contains ("viewRequests"), "{}", saved );
     let again : String = save_cleanly (f, &all_changes_view (), &saved) ? . saved_view;

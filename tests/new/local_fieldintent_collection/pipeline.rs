@@ -106,11 +106,11 @@ async fn pipeline_basic_mixed_tree (
             ** (skg node (gnid child) (skgRepos (nodeRepo main))) child
             *** (skg node (gnid grandchild) (skgRepos (nodeRepo main))) grandchild
             ** (skg node (gnid independent) (skgRepos (nodeRepo main)) noClaim) independent
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid s1) (skgRepos (nodeRepo main)) writeProtected) s1
             * (skg node (gnid explicit) (skgRepos (nodeRepo main))) explicit
             ** (skg aliasFolder) aliases
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
             "};
       let (plan, nodeMerge_acquisitions)
@@ -154,7 +154,7 @@ async fn pipeline_subscribee_hiderels (
       let input : &str =
         indoc! {"
             * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
             **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
             "};
@@ -183,8 +183,8 @@ async fn pipeline_write_protected_folder_member_edits (
       let input : &str =
         indoc! {"
             * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
-            ** (skg subscriberFolder)
-            *** (skg node (gnid intruder) (skgRepos (nodeRepo main))) intruder
+            ** (skg forksFolder)
+            *** (skg node (gnid intruder) (skgRepos (nodeRepo main)) noClaim) intruder
             **** (skg node (gnid intruder-child) (skgRepos (nodeRepo main))) intruder child
             ** (skg hiddenFolder)
             *** (skg node (gnid lurker) (skgRepos (nodeRepo main))) lurker
@@ -290,7 +290,7 @@ async fn pipeline_rejects_text_claim_mismatch (
       let input : &str =
         indoc! {"
             * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
-            ** (skg subscribeeFolder)
+            ** (skg forksFolder)
             *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) changed title
             **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
             "};

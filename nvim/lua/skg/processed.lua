@@ -599,10 +599,14 @@ end
 
 ---Is the headline at LINE_NUMBER, with METADATA_SEXP, a write-protected
 ---occurrence (☮, not a ghost), its parent a folder
----'shared/herald-styles.json' lists in 'folder_heralds.other_files'?
----Its changes are drawn at its node's own editable occurrence, so the
----plain motions skip it there. A ghost is visited: a deleted
----subscriber's subscription, say, is drawn nowhere else.
+---'shared/herald-styles.json' lists in 'folder_heralds.other_files', or
+---a forksFolder where it is born only of forking the folder's
+---viewparent (metadata.born_only_forking_its_folders_viewparent_p),
+---which it records in its own file? Its changes are drawn at its node's
+---own editable occurrence, so the plain motions skip it there. A ghost
+---is visited: a deleted forker's fork, say, is drawn nowhere else. So
+---is a forkee or a mutual in a forksFolder: the viewparent records
+---that fork. Mirrors skg--diffView-change-of-other-files-p.
 ---@param line_number integer
 ---@param metadata_sexp any
 ---@return boolean
@@ -613,8 +617,12 @@ function M.diffView_change_of_other_files_p (line_number, metadata_sexp)
   local parent = metadata.parent_line(line_number)
   local folder = parent and metadata.folder_atom(
     metadata.metadata_sexp_at_line_or_nil(parent))
-  return folder ~= nil and vim.tbl_contains(
-    shared.herald_styles.folder_heralds.other_files, folder)
+  return folder ~= nil
+         and (vim.tbl_contains(
+                shared.herald_styles.folder_heralds.other_files, folder)
+              or (folder == 'forksFolder'
+                  and metadata.born_only_forking_its_folders_viewparent_p(
+                        metadata_sexp)))
 end
 
 -- ── the processed summary ──────────────────────────────────────────

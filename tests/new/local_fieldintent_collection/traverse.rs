@@ -37,7 +37,7 @@ fn ordinary_editable_emissions () {
       ** (skg node (gnid independent) (skgRepos (nodeRepo main)) noClaim) independent
       ** (skg aliasFolder) aliases
       *** (skg alias) nickname
-      ** (skg subscribeeFolder)
+      ** (skg forksFolder)
       *** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected) s
       * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
       * (skg node (gnid acquirer) (skgRepos (nodeRepo main)) (editRequest (merge acquiree))) acquirer
@@ -78,7 +78,7 @@ fn writeProtected_members_relRepo_requests_reach_their_editable_recorder () {
     collected_from_org ( indoc! {"
       * (skg node (gnid root) (skgRepos (nodeRepo main))) root
       ** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo private))) c
-      ** (skg subscribeeFolder)
+      ** (skg forksFolder)
       *** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo private))) s
       "} );
   let root : &FieldIntentsForOneId = entry (&collected, "root");
@@ -93,7 +93,7 @@ fn subscribee_as_such_emits_claim_and_visibility () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
-      ** (skg subscribeeFolder)
+      ** (skg forksFolder)
       *** (skg node (gnid e) (skgRepos (nodeRepo main))) e
       Subscribee body
       **** (skg node (gnid visible) (skgRepos (nodeRepo main))) visible
@@ -131,7 +131,7 @@ fn aliasfolder_under_subscribee_as_such_emits_nothing () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
-      ** (skg subscribeeFolder)
+      ** (skg forksFolder)
       *** (skg node (gnid e) (skgRepos (nodeRepo main))) e
       **** (skg aliasFolder) aliases
       ***** (skg alias) sneaky alias
@@ -145,7 +145,7 @@ fn folders_under_toDelete_or_writeProtected_recorders_emit_nothing () {
       * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
       ** (skg aliasFolder) aliases
       *** (skg alias) dead alias
-      ** (skg subscribeeFolder)
+      ** (skg forksFolder)
       *** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected) s
       * (skg node (gnid ghost) (skgRepos (nodeRepo main)) writeProtected) ghost
       ** (skg aliasFolder) aliases
@@ -163,8 +163,8 @@ fn editable_member_of_write_protected_folder_emits_for_itself_only () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
-      ** (skg subscriberFolder)
-      *** (skg node (gnid intruder) (skgRepos (nodeRepo main))) intruder
+      ** (skg forksFolder)
+      *** (skg node (gnid intruder) (skgRepos (nodeRepo main)) noClaim) intruder
       Intruder body
       **** (skg node (gnid intruder-child) (skgRepos (nodeRepo main))) intruder child
       "} );
@@ -174,10 +174,11 @@ fn editable_member_of_write_protected_folder_emits_for_itself_only () {
                         Some ("Intruder body" . to_string()) )) );
     assert_eq!( intruder . contains,
                 Some (vec![(ID::from ("intruder-child"), None)]) ); }
-  { // The folder's recorder is unaffected by the folder's membership.
+  { // A member of the forks folder claiming nothing (a forker-only
+    // member) is no fork of the folder's recorder.
     let recorder : &FieldIntentsForOneId = entry (&collected, "recorder");
     assert_eq!( recorder . contains, Some (vec![]) );
-    assert_eq!( recorder . forks, None ); }}
+    assert_eq!( recorder . forks, Some (vec![]) ); }}
 
 #[test]
 fn editable_child_of_tombstone_emits () {
@@ -242,7 +243,7 @@ fn writeProtected_subscribee_as_such_emits_nothing () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
-      ** (skg subscribeeFolder)
+      ** (skg forksFolder)
       *** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected) e
       **** (skg node (gnid under) (skgRepos (nodeRepo main)) writeProtected) under
       "} );
@@ -254,7 +255,7 @@ fn editable_subscribee_under_writeProtected_subscriber_claims_without_visibility
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg node (gnid subscriber) (skgRepos (nodeRepo main)) writeProtected) subscriber
-      ** (skg subscribeeFolder)
+      ** (skg forksFolder)
       *** (skg node (gnid e) (skgRepos (nodeRepo main))) e
       **** (skg node (gnid visible) (skgRepos (nodeRepo main))) visible
       "} );
@@ -273,7 +274,7 @@ fn present_but_empty_folders_differ_from_absent_folders () {
     collected_from_org ( indoc! {"
       * (skg node (gnid explicit) (skgRepos (nodeRepo main))) explicit
       ** (skg aliasFolder) aliases
-      ** (skg subscribeeFolder)
+      ** (skg forksFolder)
       * (skg node (gnid silent) (skgRepos (nodeRepo main))) silent
       "} );
   { let explicit : &FieldIntentsForOneId = entry (&collected, "explicit");
@@ -294,7 +295,7 @@ fn duplicate_defining_folder_members_dedup_preserving_order () {
       *** (skg alias) echo
       *** (skg alias) other
       *** (skg alias) echo
-      ** (skg subscribeeFolder)
+      ** (skg forksFolder)
       *** (skg node (gnid s1) (skgRepos (nodeRepo main)) writeProtected) s1
       *** (skg node (gnid s2) (skgRepos (nodeRepo main)) writeProtected) s2
       *** (skg node (gnid s1) (skgRepos (nodeRepo main)) writeProtected) s1

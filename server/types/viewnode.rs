@@ -506,8 +506,8 @@ pub struct ViewnodeStats {
   /// which has no privacy rank, and which only that skgrepo's own node
   /// records; for a node that is not genuinely a member here
   /// (one claiming nothing); and for the two
-  /// compound partner folders (HiddenInSubscribee /
-  /// HiddenOutsideOfSubscribee), which have no single
+  /// compound partner folders (HiddenInForkPartner /
+  /// HiddenOutsideOfForkPartners), which have no single
   /// 'relation_member_role' to read a skgrepo from.
   /// This is a derived fact, unlike a requested replacement stored in
   /// 'Occurrence::relationshipEditRequest'.  Save extraction never
@@ -584,22 +584,26 @@ pub enum ChangesetMarkerKind {
 }
 
 /// A viewnode grouping the children of one kind of relationship of
-/// its viewparent: the ten partner folders, whose members are
-/// nodes (six relation roles, the two compound partner folders, and
+/// its viewparent: the nine partner folders, whose members are
+/// nodes (five of one relation each, the two compound partner folders, and
 /// the diff view's two acquisition folders), and the three property
 /// folders, whose members are the viewparent's aliases, IDs and true
 /// flags.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Folder {
-  Subscribee, // Collects subscribees its parent subscribes to. Writable.
-  Subscriber, // Collects nodes that subscribe to its parent. Write-protected (editable from the other side of the relationship).
+  /// Collects its parent's fork partners, each once: the notes its
+  /// parent forks (the forkees, in its list's order, each claiming),
+  /// then the notes that fork its parent and that it neither forks
+  /// nor hides (the forker-only members, claiming nothing). Editable:
+  /// the save reads its claiming members as the parent's 'forks'.
+  Forks,
   Hider, // Collects nodes that hide its parent. Write-protected (editable from the other side of the relationship).
   // This folder is not itself hidden. Its children represent the nodes hidden
   // by the node represented by its parent. The relationships are write-protected
-  // here, but editable within the parent's subscribeeFolder.
+  // here, but editable within the parent's forks folder.
   Hidden,
-  HiddenInSubscribee, // Child of a subscribee-as-such. Collects children of the subscribee that the subscriber hides. Write-protected (but these relationships are editable by modifying the listed contents of the subscribee-as-such).
-  HiddenOutsideOfSubscribee, // Child of a subscribeeFolder. Collects things hidden by the subscribeeFolder's parent but absent from every subscribee's content. This compound partner folder is editable as an exclusive visible-outside subset; its hide skgrepos remain derived. Shown after all Subscribees, under the same subscribeeFolder.
+  HiddenInForkPartner, // Child of a forkee as such. Collects children of the forkee that its forker hides. Write-protected (but these relationships are editable by modifying the listed contents of the forkee as such).
+  HiddenOutsideOfForkPartners, // Child of a forks folder. Collects things hidden by the forks folder's parent but absent from every forkee's content, a forker it hides among them. This compound partner folder is editable as an exclusive visible-outside subset; its hide skgrepos remain derived. Shown after every member, under the same forks folder.
   Container, // Collects nodes that contain its parent. Write-protected (editable from the other side of the relationship).
   Mentioner, // Collects nodes that link to its parent. Write-protected (a link lives in the linking node's text).
   // The diff view's two derived folders. Their membership comes from the extra IDs of the graph straddle's after-graph; both are save-inert.
@@ -652,13 +656,13 @@ impl RelationshipEditRequest {
 }
 
 /// Which relation's folders a 'Folder' view-request builds. A Folder
-/// builds both folders of its relation, so it is named by the relation
+/// builds every folder of its relation, so it is named by the relation
 /// (relname), unlike a Path, which is named by a single partner role.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FolderRelation {
   Aliases,
   HidesFromSubs,
-  SubscribesTo,
+  Forks, // the one forks folder, holding both sides of the relation
   // These two build one write-protected folder each: their other
   // side is the node's content, or its links, shown without a folder.
   Containers,
@@ -669,7 +673,7 @@ impl FolderRelation {
   pub const ALL : [FolderRelation; 5] = [
     FolderRelation::Aliases,
     FolderRelation::HidesFromSubs,
-    FolderRelation::SubscribesTo,
+    FolderRelation::Forks,
     FolderRelation::Containers,
     FolderRelation::Mentioners ];
 
@@ -679,7 +683,7 @@ impl FolderRelation {
     match self {
       FolderRelation::Aliases                   => "aliases",
       FolderRelation::HidesFromSubs             => "hidesFromSubs",
-      FolderRelation::SubscribesTo              => "subscribesTo",
+      FolderRelation::Forks                     => "forks",
       FolderRelation::Containers                => "containers",
       FolderRelation::Mentioners                => "mentioners", } }
 
@@ -752,6 +756,13 @@ impl Occurrence {
     . unwrap_or_else ( || self . gnid . clone () ) }
 }
 
+/// The roles a member of the forks folder may play, of which the note
+/// the folder describes plays the other: forkee (the note forks it,
+/// and so it claims) and forker (it forks the note). A mutual plays
+/// both.
+pub const FORKS_FOLDER_MEMBER_ROLES : [RelationRole; 2] =
+  [ RelationRole::FORKEE, RelationRole::FORKER ];
+
 impl Folder {
   pub fn flags () -> Folder {
     Folder::Flags { title : String::new (), body : None } }
@@ -769,35 +780,39 @@ impl Folder {
 
   /// Whether the folder's goal has an order the view follows: the
   /// viewparent's own file records the members in order (the
-  /// subscribee, hidden and alias folders), or the folder
-  /// is the compound partner folder of what the subscriber hides
-  /// outside its subscribees, in the order of the subscriber's hides
-  /// list. False when other nodes' files record the members, or they
-  /// are derived or unordered: the view then keeps the order its
-  /// members already have.
+  /// hidden and alias folders, and the forkees that lead the forks
+  /// folder, whose forker-only members follow them in the order the
+  /// view already has: 'Goal::ordered_then_unordered'), or the folder
+  /// is the compound partner folder of what a note hides outside its
+  /// fork partners, in the order of its hides list. False when other
+  /// nodes' files record the members, or they are derived or
+  /// unordered: the view then keeps the order its members already
+  /// have.
   pub fn goal_is_ordered (&self) -> bool {
     match self {
-      Folder::Subscribee | Folder::Hidden
-        | Folder::HiddenOutsideOfSubscribee | Folder::Alias
+      Folder::Forks | Folder::Hidden
+        | Folder::HiddenOutsideOfForkPartners | Folder::Alias
         | Folder::IllegalEdit { .. } => true,
-      Folder::Subscriber | Folder::Hider
-        | Folder::HiddenInSubscribee
+      Folder::Hider
+        | Folder::HiddenInForkPartner
         | Folder::Container | Folder::Mentioner
         | Folder::AcquiredBy | Folder::Acquired
         | Folder::ID | Folder::Flags { .. } => false, } }
 
   /// Whether the save reads the folder's membership, so that a member
-  /// typed or removed there edits the graph: the subscribee and alias
+  /// typed or removed there edits the graph: the forks and alias
   /// folders, and the compound partner folder of
-  /// what the subscriber hides outside its subscribees. Every other
+  /// what a note hides outside its fork partners. Every other
   /// folder is write-protected: its members are edited from the other
-  /// side of the relationship, or derived.
+  /// side of the relationship, or derived. (In the forks folder only a
+  /// claiming member is the note's record: a forker-only member, which
+  /// records its own fork, claims nothing.)
   pub fn is_editable (&self) -> bool {
     match self {
-      Folder::Subscribee
-        | Folder::HiddenOutsideOfSubscribee | Folder::Alias => true,
-      Folder::Subscriber | Folder::Hider
-        | Folder::Hidden | Folder::HiddenInSubscribee
+      Folder::Forks
+        | Folder::HiddenOutsideOfForkPartners | Folder::Alias => true,
+      Folder::Hider
+        | Folder::Hidden | Folder::HiddenInForkPartner
         | Folder::Container | Folder::Mentioner
         | Folder::AcquiredBy | Folder::Acquired
         | Folder::ID | Folder::Flags { .. }
@@ -823,12 +838,11 @@ impl Folder {
 
   pub fn repr_in_client (&self) -> &'static str {
     match self {
-      Folder::Subscribee                => "subscribeeFolder",
-      Folder::Subscriber                => "subscriberFolder",
-      Folder::Hider                     => "hiderFolder",
-      Folder::Hidden                    => "hiddenFolder",
-      Folder::HiddenInSubscribee        => "hiddenInSubscribeeFolder",
-      Folder::HiddenOutsideOfSubscribee => "hiddenOutsideOfSubscribeeFolder",
+      Folder::Forks                       => "forksFolder",
+      Folder::Hider                       => "hiderFolder",
+      Folder::Hidden                      => "hiddenFolder",
+      Folder::HiddenInForkPartner         => "hiddenInForkPartnerFolder",
+      Folder::HiddenOutsideOfForkPartners => "hiddenOutsideOfForkPartnersFolder",
       Folder::Container                 => "containerFolder",
       Folder::Mentioner                 => "mentionerFolder",
       Folder::AcquiredBy                => "acquiredByFolder",
@@ -845,25 +859,25 @@ impl Folder {
     Folder::all () . into_iter ()
       . find ( |folder| folder . repr_in_client () == s ) }
 
-  /// Every kind of folder: the ten partner folders, the three
+  /// Every kind of folder: the nine partner folders, the three
   /// property folders, a flags folder with no text, and an
   /// illegal-edit folder with none.
-  pub fn all () -> [Folder; 14] {
+  pub fn all () -> [Folder; 13] {
     fn guard ( folder : &Folder ) { // compile error here = update the list below
       match folder {
-        Folder::Subscribee | Folder::Subscriber
+        Folder::Forks
         | Folder::Hider | Folder::Hidden
-        | Folder::HiddenInSubscribee
-        | Folder::HiddenOutsideOfSubscribee
+        | Folder::HiddenInForkPartner
+        | Folder::HiddenOutsideOfForkPartners
         | Folder::Container | Folder::Mentioner
         | Folder::AcquiredBy | Folder::Acquired
         | Folder::ID | Folder::Alias | Folder::Flags { .. }
         | Folder::IllegalEdit { .. } => () }}
     let _ = guard;
-    [ Folder::Subscribee, Folder::Subscriber,
+    [ Folder::Forks,
       Folder::Hider, Folder::Hidden,
-      Folder::HiddenInSubscribee,
-      Folder::HiddenOutsideOfSubscribee,
+      Folder::HiddenInForkPartner,
+      Folder::HiddenOutsideOfForkPartners,
       Folder::Container, Folder::Mentioner,
       Folder::AcquiredBy, Folder::Acquired,
       Folder::ID, Folder::Alias, Folder::flags (),
@@ -883,17 +897,15 @@ impl Folder {
 
   /// The role its members play in the relation the folder shows, of
   /// which the node it describes plays the other; None for a folder that shows no
-  /// one relation.
+  /// one relation, and for the forks folder, whose members play either
+  /// role of 'forks' or both: each reader of a member's role asks the
+  /// member's side there ('FORKS_FOLDER_MEMBER_ROLES').
   pub fn relation_member_role (
     &self,
   ) -> Option<RelationRole> {
     match self {
-      Folder::Subscribee =>
-        Some (RelationRole::new (
-          NodeRelation::Forks, BinaryRolePosition::Second)),
-      Folder::Subscriber =>
-        Some (RelationRole::new (
-          NodeRelation::Forks, BinaryRolePosition::First)),
+      Folder::Forks =>
+        None,
       Folder::Hider =>
         Some (RelationRole::new (
           NodeRelation::HidesFromSubs, BinaryRolePosition::First)),
@@ -906,8 +918,8 @@ impl Folder {
       Folder::Mentioner =>
         Some (RelationRole::new (
           NodeRelation::LinksTo, BinaryRolePosition::First)),
-      Folder::HiddenInSubscribee |
-      Folder::HiddenOutsideOfSubscribee =>
+      Folder::HiddenInForkPartner |
+      Folder::HiddenOutsideOfForkPartners =>
         None,
       // A nodeMerge is no relation: these come from extra IDs.
       Folder::AcquiredBy |

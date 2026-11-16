@@ -1,15 +1,15 @@
 // cargo nextest run --test grouped_views -E 'test(subscribee_folder_empty_persists::)'
 //
-// An exception to the prune: an *empty* SubscribeeFolder is preserved, not
-// self-deleted. It is the editable interface onto the origin's outgoing
-// subscriptions; if it vanished when emptied, the user would lose the place to
-// add one back.
+// An exception to the prune: an *empty* forks folder is preserved, not
+// self-deleted. It is the editable interface onto the origin's forks; if
+// it vanished when emptied, the user would lose the place to add one
+// back.
 //
-// Fixture: node s subscribes to nothing. The input buffer nonetheless carries
-// an (skg subscribeeFolder) under s (as it would right after the user deleted s's
-// last subscription). On rerender the SubscribeeFolder's goal list is empty; the
-// folder must survive as an empty `subscribeeFolder` headline rather than being
-// detached (the pre-fix behavior).
+// Fixture: node s forks nothing, and nothing forks it. The input buffer
+// nonetheless carries an (skg forksFolder) under s (as it would right
+// after the user deleted s's last fork). On rerender the forks folder's
+// goal list is empty; the folder must survive as an empty `forksFolder`
+// headline rather than being detached (the pre-fix behavior).
 
 use indoc::indoc;
 use std::error::Error;
@@ -51,11 +51,11 @@ async fn empty_subscribee_folder_persists_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // s subscribes to nothing (fixture has no subscribesTo), but the buffer
-  // still shows a subscribeeFolder -- the editable interface the user just emptied.
+  // s forks nothing (fixture has no forks), but the buffer
+  // still shows a forksFolder -- the editable interface the user just emptied.
   let input_org_text : &str = indoc! {"
     * (skg node (gnid s) (skgRepos (nodeRepo main))) s
-    ** (skg subscribeeFolder)
+    ** (skg forksFolder)
   "};
 
   let graph : InRustGraphHandle =
@@ -75,18 +75,18 @@ async fn empty_subscribee_folder_persists_impl (
   if ! response . errors . is_empty () {
     println!("Errors: {:?}", response . errors); }
 
-  assert! ( response . saved_view . contains ("subscribeeFolder"),
-    "an empty SubscribeeFolder must be PRESERVED on rerender (the editable \
-     interface onto the origin's subscriptions), not self-deleted; got:\n{}",
+  assert! ( response . saved_view . contains ("forksFolder"),
+    "an empty forks folder must be PRESERVED on rerender (the editable \
+     interface onto the origin's forks), not self-deleted; got:\n{}",
     response . saved_view );
   assert! ( response . errors . is_empty (),
-    "rerender of a node with an empty SubscribeeFolder must not error; got: {:?}",
+    "rerender of a node with an empty forks folder must not error; got: {:?}",
     response . errors );
   Ok (( )) }
 
 // Contrast: an empty *write-protected* partner folder -- here a
-// subscriberFolder -- is removed by the postorder prune sweep, because (unlike the
-// SubscribeeFolder) it is not an editable interface; an emptied one is just noise.
+// hiderFolder -- is removed by the postorder prune sweep, because (unlike the
+// forks folder) it is not an editable interface; an emptied one is just noise.
 async fn test_empty_subscriber_folder_is_removed (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -98,10 +98,10 @@ async fn empty_subscriber_folder_removed_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // Nobody subscribes to s, but the buffer carries a subscriberFolder under it.
+  // Nobody hides s, but the buffer carries a hiderFolder under it.
   let input_org_text : &str = indoc! {"
     * (skg node (gnid s) (skgRepos (nodeRepo main))) s
-    ** (skg subscriberFolder)
+    ** (skg hiderFolder)
   "};
 
   let graph : InRustGraphHandle =
@@ -118,8 +118,8 @@ async fn empty_subscriber_folder_removed_impl (
     &Err ( String::new () ), &mut views_state ) . await ?;
 
   println!("Rendered buffer:\n{}", response . saved_view);
-  assert! ( ! response . saved_view . contains ("subscriberFolder"),
-    "an empty write-protected subscriberFolder must be REMOVED by the §3.4 prune sweep; \
+  assert! ( ! response . saved_view . contains ("hiderFolder"),
+    "an empty write-protected hiderFolder must be REMOVED by the §3.4 prune sweep; \
      got:\n{}", response . saved_view );
   assert! ( response . errors . is_empty (),
     "rerender must not error; got: {:?}", response . errors );

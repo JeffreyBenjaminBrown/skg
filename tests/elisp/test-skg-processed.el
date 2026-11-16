@@ -154,15 +154,15 @@ its view requests and its derived facts."
     (test-skg-processed--refused lines 2 #'skg-mark-rel-processed))
   ;; A partner folder: 'r' names each member's relationship, 'n' only
   ;; the members whose node changed.
-  (let ((lines '("** (skg subscriberFolder)"
+  (let ((lines '("** (skg hiderFolder)"
                  "*** (skg node (gnid s1) (skgRepos (nodeRepo r)) (diff (rel added) (leaves 1 rel))) s1"
                  "*** (skg node (gnid s2) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) s2")))
     (should (equal (test-skg-processed--run lines 1 #'skg-mark-rel-processed)
-                   '("** (skg subscriberFolder)"
+                   '("** (skg hiderFolder)"
                      "*** (skg node (gnid s1) (skgRepos (nodeRepo r)) (editRequest (processed rel)) (diff (rel added) (leaves 1 rel))) s1"
                      "*** (skg node (gnid s2) (skgRepos (nodeRepo r)) (editRequest (processed rel)) (diff (node added) (rel added) (leaves 2 node rel))) s2")))
     (should (equal (test-skg-processed--run lines 1 #'skg-mark-node-processed)
-                   '("** (skg subscriberFolder)"
+                   '("** (skg hiderFolder)"
                      "*** (skg node (gnid s1) (skgRepos (nodeRepo r)) (diff (rel added) (leaves 1 rel))) s1"
                      "*** (skg node (gnid s2) (skgRepos (nodeRepo r)) (editRequest (processed node)) (diff (node added) (rel added) (leaves 2 node rel))) s2")))))
 
@@ -233,7 +233,7 @@ it lists, its members naming their own leaves."
                  "** (skg node (gnid n) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n"
                  "*** (skg node (gnid n2) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n2"
                  "*** (skg node (gnid m) (skgRepos (nodeRepo r)) writeProtected (diff (rel added) (properties changed) (leaves 3 node rel))) m"
-                 "** (skg subscriberFolder)"
+                 "** (skg hiderFolder)"
                  "*** (skg node (gnid s) (skgRepos (nodeRepo r)) writeProtected (diff (node added) (rel added) (leaves 2 node rel))) s"
                  "** (skg node (gnid c) (skgRepos (nodeRepo r)) (diff (rel added) (leaves 1 rel))) c")))
     (dolist (case '(((4) . "newContent") ((16) . "newOutward")))
@@ -536,13 +536,13 @@ buffer order and reports the end without wrapping."
     "**** (skg (vnid 0e) node (gnid x) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 2)))) (birth (contains out 2)))) x"
     "*** (skg (vnid 0f) mentionerFolder)"
     "**** (skg (vnid 0g) node (gnid y) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (linksTo (out 1 (ancestors 2)))) (birth (linksTo out 2))) (diff (rel added) (properties changed) (leaves 1 node))) y2"
-    "*** (skg (vnid 0h) subscriberFolder)"
+    "*** (skg (vnid 0h) forksFolder)"
     "**** (skg (vnid 0i) node (gnid s) (skgRepos (nodeRepo main)) writeProtected (view (rels (forks (out 1 (ancestors 2)))) (birth (forks out 2))) (diff (rel added) (leaves 1 rel))) s"
     "* (skg (vnid 0j) node (gnid r2) (skgRepos (nodeRepo main)) (view (rels (contains (out 1))))) r2"
     "** (skg (vnid 0k) (changesetMarker content) (diff (leaves 1 rel)))"
     "** (skg (vnid 0l) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 1))) (linksTo (in 1 (substantive 1))) (forks (in 1))) (birth (contains in 1))) (diff (rel added) (leaves 1 rel))) a"
     "* (skg (vnid 0m) node (gnid s) (skgRepos (nodeRepo main)) (view (rels (forks (out 1))))) s"
-    "** (skg (vnid 0n) subscribeeFolder)"
+    "** (skg (vnid 0n) forksFolder)"
     "*** (skg (vnid 0o) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2) (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2))) (diff (rel added) (leaves 1 rel))) a"
     "**** (skg (vnid 0p) ghost (gnid m) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) m"
     "***** (skg (vnid 0q) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2)) (linksTo (in 1 (substantive 1))) (forks (in 1))) ghostWarrant cycle) (diff (rel removed) (leaves 1 rel))) a"
@@ -554,11 +554,13 @@ buffer order and reports the end without wrapping."
     "*** (skg (vnid 0v) bodyDiff)"
     "+see [[id:a][a]]")
   "A diff view the server drew, every change in it editable. At HEAD m
-contains a; in the worktree m is deleted, r2 contains a, s subscribes
-to a, and y, retitled, mentions a. So a's containers (line 4), mentioners
-\(7) and subscribers (9) changed, each member write-protected, while
-each member's change is drawn where its node stands editable: r2's
-at 11 and 12, y's at 20 and 22, s's at 15 and 17.")
+contains a; in the worktree m is deleted, r2 contains a, s forks a,
+and y, retitled, mentions a. So a's containers (line 4), mentioners
+\(7) and forks (9) changed, each member write-protected, while each
+member's change is drawn where its node stands editable: r2's at 11
+and 12, y's at 20 and 22, s's at 15 and 17. In a's forks folder s,
+born only of forking a, records that fork in its own file, so the
+plain motions skip it, as a member of a folder of other files.")
 
 (defconst test-skg-processed--diff-view-with-an-editable-member
   '("* (skg (vnid 0a) ghost (gnid m) (skgRepos (nodeRepo main)) (diff (node removed) (leaves 1 node))) m"
@@ -572,13 +574,13 @@ at 11 and 12, y's at 20 and 22, s's at 15 and 17.")
     "***** (skg (vnid 0w) (oldText titleAndBody) (diff (leaves 1))) y"
     "****** (skg (vnid 0x) bodyDiff)"
     "+see [[id:a][a]]"
-    "*** (skg (vnid 0h) subscriberFolder)"
+    "*** (skg (vnid 0h) forksFolder)"
     "**** (skg (vnid 0i) node (gnid s) (skgRepos (nodeRepo main)) writeProtected (view (rels (forks (out 1 (ancestors 2)))) (birth (forks out 2))) (diff (rel added) (leaves 1 rel))) s"
     "* (skg (vnid 0j) node (gnid r2) (skgRepos (nodeRepo main)) (view (rels (contains (out 1))))) r2"
     "** (skg (vnid 0k) (changesetMarker content) (diff (leaves 1 rel)))"
     "** (skg (vnid 0l) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 1))) (linksTo (in 1 (substantive 1))) (forks (in 1))) (birth (contains in 1))) (diff (rel added) (leaves 1 rel))) a"
     "* (skg (vnid 0m) node (gnid s) (skgRepos (nodeRepo main)) (view (rels (forks (out 1))))) s"
-    "** (skg (vnid 0n) subscribeeFolder)"
+    "** (skg (vnid 0n) forksFolder)"
     "*** (skg (vnid 0o) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2) (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2))) (diff (rel added) (leaves 1 rel))) a"
     "**** (skg (vnid 0p) ghost (gnid m) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) m"
     "***** (skg (vnid 0q) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2)) (linksTo (in 1 (substantive 1))) (forks (in 1))) ghostWarrant cycle) (diff (rel removed) (leaves 1 rel))) a"
@@ -656,7 +658,7 @@ Returns the skipped lines."
 
 (ert-deftest test-skg-diffView-plain-motions-skip-members-of-other-files-folders ()
   "C-c r n c and C-c r p c skip the ☮ members of a's containers,
-mentioners and subscribers folders; the capitals visit them."
+mentioners and forks folders (s there forking a alone); the capitals visit them."
   (let ((lines test-skg-processed--complete-diff-view))
     (should (equal (test-skg-processed--goto-changes
                     lines 1 #'skg-diffView-goto-next-change 8)
@@ -689,18 +691,18 @@ are visited inside the folder."
 
 (ert-deftest test-skg-diffView-plain-motions-visit-ghosts-and-restricted-members ()
   "Only a write-protected occurrence is skipped. A ghost in a folder of
-other files is visited: a deleted subscriber's subscription stands
-only there. A restricted member is visited: its relationship's
-recorder cannot be drawn editable. A member of a folder of the
-viewparent's own file (its subscribees) is visited."
+other files is visited: a deleted hider's hide stands only there. A
+restricted member is visited: its relationship's recorder cannot be
+drawn editable. A member of the forks folder that the viewparent
+forks (no birth of forking it alone) is visited."
   (let ((lines
          '("* (skg node (gnid x) (skgRepos (nodeRepo main))) x"
-           "** (skg subscriberFolder)"
+           "** (skg hiderFolder)"
            "*** (skg ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel))) g"
            "** (skg containerFolder)"
            "*** (skg restricted (gnid h) (diff (rel added) (leaves 1 rel)))"
            "*** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (leaves 1 rel))) c"
-           "** (skg subscribeeFolder)"
+           "** (skg forksFolder)"
            "*** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (leaves 1 rel))) e")))
     (should (equal (test-skg-processed--goto-changes
                     lines 1 #'skg-diffView-goto-next-change 4)

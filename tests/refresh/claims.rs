@@ -63,7 +63,7 @@ fn in_an_editable_folder_an_unwarranted_member_vanishes () {
     node ("e"), node ("z"), ]);
   let input : String = formatdoc! ("
     * {} s
-    ** (skg subscribeeFolder)
+    ** (skg forksFolder)
     *** {} e
     *** {} z
     ", occurrence_metadata ("s", ""), occurrence_metadata ("e", "writeProtected"),
@@ -71,7 +71,7 @@ fn in_an_editable_folder_an_unwarranted_member_vanishes () {
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node s
-  subscribeeFolder
+  forksFolder
     node e wp" ); }
 
 #[test]
@@ -81,11 +81,59 @@ fn in_an_editable_folder_of_a_write_protected_node_no_member_claims () {
     node ("e"), ]);
   let input : String = formatdoc! ("
     * {} s
-    ** (skg subscribeeFolder)
+    ** (skg forksFolder)
     *** {} e
     ", occurrence_metadata ("s", "writeProtected"),
        occurrence_metadata ("e", "writeProtected") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node s wp
-  subscribeeFolder
+  forksFolder
     node e wp noClaim" ); }
+
+/// In a forks folder a member claims exactly when the folder's
+/// viewparent forks it. s forks neither e nor f, and f forks s: e,
+/// claiming, as in a collateral view drawn before s stopped forking
+/// it, vanishes; f, claiming, vanishes and is drawn again claiming
+/// nothing, since s does not fork it, and the next save must not make
+/// s fork it. g, a forker drawn claiming nothing, stays so.
+#[test]
+fn in_a_forks_folder_a_member_claims_only_what_its_viewparent_forks () {
+  let graph : InRustGraph = graph (&[
+    node ("s"), node ("e"),
+    Graphnode { forks : msv_ids (&["s"]), .. node ("f") },
+    Graphnode { forks : msv_ids (&["s"]), .. node ("g") }, ]);
+  let input : String = formatdoc! ("
+    * {} s
+    ** (skg forksFolder)
+    *** {} e
+    *** {} f
+    *** {} g
+    ", occurrence_metadata ("s", ""), occurrence_metadata ("e", "writeProtected"),
+       occurrence_metadata ("f", "writeProtected"),
+       occurrence_metadata ("g", "writeProtected noClaim") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
+node s
+  forksFolder
+    node g wp noClaim
+    node f wp noClaim" ); }
+
+/// A forker its viewparent hides is no member of the forks folder: f,
+/// drawn there claiming nothing before s hid it (in another view, say),
+/// vanishes, and stands in the folder of what s hides outside its fork
+/// partners, whence removing it unhides it.
+#[test]
+fn in_a_forks_folder_a_forker_its_viewparent_hides_vanishes () {
+  let graph : InRustGraph = graph (&[
+    Graphnode { hidesFromSubs : msv_ids (&["f"]), .. node ("s") },
+    Graphnode { forks : msv_ids (&["s"]), .. node ("f") }, ]);
+  let input : String = formatdoc! ("
+    * {} s
+    ** (skg forksFolder)
+    *** {} f
+    ", occurrence_metadata ("s", ""),
+       occurrence_metadata ("f", "writeProtected noClaim") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
+node s
+  forksFolder
+    hiddenOutsideOfForkPartnersFolder
+      node f wp folded" ); }

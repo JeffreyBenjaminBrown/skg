@@ -109,7 +109,7 @@ fn forker_of_its_grandparent_out_side () {
 
 #[test]
 fn compound_partner_folders_two_births_in_fixed_order () {
-  // HiddenInSubscribee: born of both hides (gen 4) and contains (gen 2).
+  // HiddenInForkPartner: born of both hides (gen 4) and contains (gen 2).
   // Relations emitted contains-first; birth lists in the given order.
   let c = RelationCounts { hiders : 1, containers : 1, .. counts () };
   let mut f = AncestorFlags::default ();

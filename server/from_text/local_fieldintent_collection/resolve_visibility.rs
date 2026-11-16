@@ -25,6 +25,11 @@
 //! inferred of a member that only a restricted record of E's
 //! explains.
 //! .
+//! A forks folder adds one more signal ('ForksFolderMembers'): a note
+//! that forks the subscriber, that the subscriber does not fork after
+//! the save, and that its forks folder no longer shows, was deleted
+//! there, and is hidden from it ('resolve_forks_folder_removals').
+//! .
 //! Resolution cannot run during collection, even in principle: it
 //! needs disk (the subscribee's contains, the subscriber's hides)
 //! and the subscriber's own post-save contains -- a finished entry
@@ -34,8 +39,9 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::mirrors::{Mirrors, mirrors_of};
 use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::from_text::local_fieldintent_collection::lower::LoweredNodeIntents;
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::from_text::local_fieldintent_collection::types::{
-  HiddenOutsideEdit, SubscribeeVisibility };
+  ForksFolderMembers, HiddenOutsideEdit, SubscribeeVisibility };
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, members_of};
@@ -51,6 +57,7 @@ pub fn resolve_visibility (
   mut lowered : LoweredNodeIntents,
   visibility  : &[(ID, SubscribeeVisibility)],
   hidden_outside : &[(ID, HiddenOutsideEdit)],
+  forks_folder_members : &[(ID, ForksFolderMembers)],
   graph       : &InRustGraph,
   config      : &SkgConfig,
   skgrepo_restriction : &SkgrepoRestriction,
@@ -102,10 +109,60 @@ pub fn resolve_visibility (
       subscriber_from_disk,
       &inferred_hides,
       &inferred_unhides ); }
+  resolve_forks_folder_removals (
+    &mut lowered, forks_folder_members, graph, config,
+    skgrepo_restriction ) ?;
   let post_skgsave_commit_notice_candidates = apply_hiddenoutside_edits (
     &mut lowered, hidden_outside, graph, config,
     skgrepo_restriction ) ?;
   Ok ((lowered, post_skgsave_commit_notice_candidates)) }
+
+/// A note N's forks folder shows a forker of N claiming nothing (a
+/// forker-only member, which N does not fork) and each mutual
+/// claiming; N hides neither. Deleting either from the folder hides it
+/// in N, so that it leaves the folder (where a forker N hides is not
+/// drawn) for the folder of what N hides outside its fork partners,
+/// whence removing it unhides it. So each note that forks N by a
+/// record the skgrepo restriction shows, that N does not fork after the
+/// save (a deleted mutual's fork the same save ends), that the folder
+/// no longer shows, and that N does not hide already, joins N's hides.
+/// A forker the restriction keeps out was never drawn, so it is never
+/// hidden here. Only an owned N is written. This runs before the edits
+/// of the hidden-outside folder, which may unhide it again.
+fn resolve_forks_folder_removals (
+  lowered             : &mut LoweredNodeIntents,
+  signals             : &[(ID, ForksFolderMembers)],
+  graph               : &InRustGraph,
+  config              : &SkgConfig,
+  skgrepo_restriction : &SkgrepoRestriction,
+) -> Result<(), Box<dyn Error>> {
+  for (note, signal) in signals {
+    let Some (note_from_disk) : Option<Graphnode> =
+      opt_graphnode_by_gnid (graph, config, note) ?
+      else { continue; };
+    if ! config . skgrepo_is_owned (&note_from_disk . home_skgrepo) {
+      continue; }
+    let key : &dyn Fn (&ID) -> ID =
+      &|gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
+    let shown : HashSet<ID> = signal . members . iter () . map (key) . collect ();
+    let forked_after_save : HashSet<ID> =
+      lowered . subscriber_subscribes_after_save (&note_from_disk) . iter ()
+      . map (key) . collect ();
+    let hidden : HashSet<ID> =
+      lowered . subscriber_hides_after_resolution (&note_from_disk) . iter ()
+      . map (key) . collect ();
+    let deleted_forkers : Vec<ID> =
+      graph . inbound_pids_for_relation_gated (
+        &note_from_disk . pid, NodeRelation::Forks, skgrepo_restriction )
+      . into_iter ()
+      . filter ( |forker| ! shown . contains (forker)
+                          && ! forked_after_save . contains (forker)
+                          && ! hidden . contains (forker) )
+      . collect ();
+    if ! deleted_forkers . is_empty () {
+      lowered . apply_hiderel_delta_to_subscriber (
+        note_from_disk, &deleted_forkers, &[] ); }}
+  Ok (( )) }
 
 /// The members of 'list' whose records the skgrepo restriction shows
 /// ('SkgrepoRestriction::record_is_visible'), as written.
@@ -143,7 +200,7 @@ fn apply_hiddenoutside_edits (
   for (subscriber, edit) in edits {
     if ! seen . insert (subscriber . clone ()) {
       return Err (Box::new (BufferValidationError::Other (
-        format! ("More than one HiddenOutsideOfSubscribee edit was submitted for subscriber {}", subscriber) ))); }
+        format! ("More than one HiddenOutsideOfForkPartners edit was submitted for subscriber {}", subscriber) ))); }
     let Some (subscriber_from_disk) =
       opt_graphnode_by_gnid (graph, config, subscriber) ?
     else { continue; };

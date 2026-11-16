@@ -23,14 +23,15 @@ use crate::types::viewnode::{
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
-/// The folders of a node's recorders (its in-set changed when one
-/// was added or removed), then those of the relationships it records
-/// (changed when one was added, removed or moved to another skgrepo).
-const IN_FOLDERS : [Folder; 4] = [
+/// The folders of a node's partners, in the order the diff view draws
+/// them: those of its recorders (its in-set changed when one was added
+/// or removed); the forks folder, of both sides; then those of the
+/// relationships it records (changed when one was added, removed or
+/// moved to another skgrepo).
+const PARTNER_FOLDERS : [Folder; 5] = [
   Folder::Container, Folder::Mentioner,
-  Folder::Subscriber, Folder::Hider ];
-const OUT_FOLDERS : [Folder; 2] = [
-  Folder::Subscribee, Folder::Hidden ];
+  Folder::Forks, Folder::Hider,
+  Folder::Hidden ];
 
 /// What the change leaves that mention a node say changed about it,
 /// grouped by aspect: what the diff view draws ahead of its content
@@ -131,28 +132,37 @@ pub(crate) fn model_of_front_change_viewnodes (
   model }
 
 /// The kinds of the node's partner folders whose membership changed,
-/// in the order the diff view draws them: the folders of its recorders
-/// (changed when one was added or removed), then those of the
-/// relationships it records (changed when one was added, removed or
-/// moved to another skgrepo). A folder that omits view-ancestors
+/// in the order the diff view draws them ('PARTNER_FOLDERS'): a folder
+/// of its recorders changed when one was added or removed; one of the
+/// relationships it records, when one was added, removed or moved to
+/// another skgrepo; the forks folder, which holds both sides of
+/// 'forks', when either did. A folder that omits view-ancestors
 /// ('Folder::omits_view_ancestors') changed only if a recorder not
 /// among 'view_ancestors' did, since only such a one stands in it.
 pub(crate) fn changed_partner_folder_kinds (
   aspects        : &ChangedAspects,
   view_ancestors : &HashSet<ID>,
 ) -> Vec<Folder> {
-  IN_FOLDERS . into_iter () . chain (OUT_FOLDERS)
-    . filter ( |kind| {
-      let relation : NodeRelation = kind . relation_member_role ()
-        . expect ("a relation folder has a member role") . relation;
-      if OUT_FOLDERS . contains (kind) {
-        aspects . recorded_changed (relation, RelationshipAspect::Existence)
-        || aspects . recorded_changed (relation, RelationshipAspect::RelRepo) }
-      else if relation == NodeRelation::LinksTo { aspects . mentioners }
-      else { aspects . recorders . get (&relation)
-             . is_some_and ( |recorders| recorders . iter () . any (
-               |recorder| ! ( kind . omits_view_ancestors ()
-                              && view_ancestors . contains (recorder) ))) } } )
+  let records_changed : &dyn Fn (NodeRelation) -> bool =
+    &|relation : NodeRelation| -> bool {
+    aspects . recorded_changed (relation, RelationshipAspect::Existence)
+    || aspects . recorded_changed (relation, RelationshipAspect::RelRepo) };
+  let recorders_changed : &dyn Fn (&Folder, NodeRelation) -> bool =
+    &|kind : &Folder, relation : NodeRelation| -> bool {
+    aspects . recorders . get (&relation)
+    . is_some_and ( |recorders| recorders . iter () . any (
+      |recorder| ! ( kind . omits_view_ancestors ()
+                     && view_ancestors . contains (recorder) ))) };
+  PARTNER_FOLDERS . into_iter ()
+    . filter ( |kind| match kind . relation_member_role () {
+      None => // the forks folder, of both sides
+        records_changed (NodeRelation::Forks)
+        || recorders_changed (kind, NodeRelation::Forks),
+      Some (role) if role . opposite_role () . is_first_role () =>
+        records_changed (role . relation),
+      Some (role) if role . relation == NodeRelation::LinksTo =>
+        aspects . mentioners,
+      Some (role) => recorders_changed (kind, role . relation), } )
     . collect () }
 
 /// The node's alias, ID and flags folders whose list changed, drawn

@@ -42,8 +42,9 @@ use crate::types::errors::{HeadlineName, with_org_subheadlines};
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ChangeFacts, ChangesetMarkerKind, LeavesFact, PropertyMember, ChangeViewnode, DiffObject,
-  ProcessedRequest, Viewnode, ViewnodeKind, Vognode};
+  ChangeFacts, ChangesetMarkerKind, FORKS_FOLDER_MEMBER_ROLES, Folder, LeavesFact,
+  PropertyMember, ChangeViewnode, DiffObject, ProcessedRequest, Viewnode, ViewnodeKind,
+  Vognode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::collections::{BTreeSet, HashSet};
@@ -409,9 +410,9 @@ fn leaves_named_at (
               relationships_named_elsewhere (node, pid_of) )),
           DiffObject::Node => {},
           DiffObject::Rel =>
-            named . extend ( relationship_to_viewparent (
+            named . extend ( relationships_to_viewparent (
               node, &pid, pid_of, RelationshipAspect::Existence )
-              . map (NamedLeafSet::Leaf) ),
+              . into_iter () . map (NamedLeafSet::Leaf) ),
           DiffObject::NewContent =>
             named . push ( NamedLeafSet::NewNodesFrom (
               pid . clone (), NewNodeWalk::Contentward, walk_leaf_kinds )),
@@ -442,10 +443,10 @@ fn leaves_named_at (
           named . push ( NamedLeafSet::Leaf ( LeafKey::Node {
             pid : parent_pid () ?, aspect : NodeAspect::HomeSkgrepo } )),
         ChangeViewnode::RelRepoMove { .. } =>
-          named . extend ( relationship_to_viewparent (
+          named . extend ( relationships_to_viewparent (
             parent, &parent_pid () ?, pid_of,
             RelationshipAspect::RelRepo )
-            . map (NamedLeafSet::Leaf) ),
+            . into_iter () . map (NamedLeafSet::Leaf) ),
         ChangeViewnode::ChangesetMarker { kind } => {
           let aspect : RelationshipAspect = match kind {
             ChangesetMarkerKind::Content   => RelationshipAspect::Existence,
@@ -476,12 +477,15 @@ fn relationships_named_elsewhere (
   node   : NodeRef<Viewnode>,
   pid_of : &dyn Fn (&ID) -> ID,
 ) -> RelationshipsNamedElsewhere {
-  let relationship_of = |vognode : NodeRef<Viewnode>| -> Option<RelationshipKey> {
-    let member_pid : ID = vognode_leaf_pid (vognode . value (), pid_of) ?;
-    match relationship_to_viewparent (
-      vognode, &member_pid, pid_of, RelationshipAspect::Existence ) ? {
+  let relationship_of = |vognode : NodeRef<Viewnode>| -> Vec<RelationshipKey> {
+    let Some (member_pid) : Option<ID> = vognode_leaf_pid (vognode . value (), pid_of)
+      else { return Vec::new (); };
+    relationships_to_viewparent (
+      vognode, &member_pid, pid_of, RelationshipAspect::Existence ) . into_iter ()
+    . filter_map ( |leaf| match leaf {
       LeafKey::Relationship { relationship, .. } => Some (relationship),
-      LeafKey::Node { .. } => None, } };
+      LeafKey::Node { .. } => None, } )
+    . collect () };
   let mut elsewhere : RelationshipsNamedElsewhere =
     RelationshipsNamedElsewhere::default ();
   elsewhere . relationships . extend ( relationship_of (node) );
@@ -494,7 +498,7 @@ fn relationships_named_elsewhere (
           child . children ()
             . filter ( |member| matches! ( member . value () . kind,
                                            ViewnodeKind::Vognode (_) ))
-            . filter_map (relationship_of) ),
+            . flat_map (relationship_of) ),
       ViewnodeKind::ChangeViewnode (
         ChangeViewnode::ChangesetMarker { kind } ) => match kind {
         ChangesetMarkerKind::Content =>
@@ -661,18 +665,30 @@ pub fn apply_processed_requests (
       } else { store . unmark (&key); }} }
   warnings }
 
-/// The relationship by which a vognode is shown here, read from where
+/// The relationships by which a vognode is shown here, read from where
 /// it stands: under a vognode, its viewparent's content; under a
 /// partner folder, the relation of the folder, between it and the
-/// folder's viewparent. None for a node of the containerward chain
+/// folder's viewparent; under a forks folder, both sides of 'forks'
+/// (the viewparent forking it, and it forking the viewparent), so that
+/// the leaf of whichever side changed, or of both, is the member's.
+/// None for a node of the containerward chain
 /// ('stands_in_containerward_chain'), which stands for no relationship
 /// the diff view tracks, at a root, or under anything else.
-pub(crate) fn relationship_to_viewparent (
+pub(crate) fn relationships_to_viewparent (
   node   : NodeRef<Viewnode>,
   pid    : &ID,
   pid_of : &dyn Fn (&ID) -> ID,
   aspect : RelationshipAspect,
-) -> Option<LeafKey> {
+) -> Vec<LeafKey> {
+  relationship_keys_to_viewparent (node, pid, pid_of, aspect)
+    . unwrap_or_default () }
+
+fn relationship_keys_to_viewparent (
+  node   : NodeRef<Viewnode>,
+  pid    : &ID,
+  pid_of : &dyn Fn (&ID) -> ID,
+  aspect : RelationshipAspect,
+) -> Option<Vec<LeafKey>> {
   let parent : NodeRef<Viewnode> = node . parent () ?;
   let key_for_role = |role : RelationRole, partner : ID| -> LeafKey {
     let (recorder, member) : (ID, ID) =
@@ -685,12 +701,16 @@ pub(crate) fn relationship_to_viewparent (
     ViewnodeKind::Vognode (_) if stands_in_containerward_chain (node) => None,
     ViewnodeKind::Vognode (_) => {
       let viewparent : ID = vognode_leaf_pid (parent . value (), pid_of) ?;
-      Some ( key_for_role (RelationRole::CONTENT, viewparent) ) },
+      Some ( vec! [ key_for_role (RelationRole::CONTENT, viewparent) ] ) },
     ViewnodeKind::Folder (folder) => { // a property folder has no role
-      let role : RelationRole = folder . relation_member_role () ?;
+      let roles : Vec<RelationRole> = match folder {
+        Folder::Forks => FORKS_FOLDER_MEMBER_ROLES . to_vec (),
+        _ => vec! [ folder . relation_member_role () ? ], };
       let folder_viewparent : ID = vognode_leaf_pid (
         parent . parent () ? . value (), pid_of ) ?;
-      Some ( key_for_role (role, folder_viewparent) ) },
+      Some ( roles . into_iter ()
+             . map ( |role| key_for_role (role, folder_viewparent . clone ()) )
+             . collect () ) },
     _ => None, } }
 
 /// The ID of the vognode two levels up: the node that owns a

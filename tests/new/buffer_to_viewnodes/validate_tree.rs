@@ -151,7 +151,7 @@ async fn test_writeProtected_relRepo_request_needs_an_editable_recorder (
     indoc! {"
       * (skg node (gnid root) (skgRepos (nodeRepo main))) root
       ** (skg node (gnid collected) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo main))) under an editable parent
-      ** (skg subscribeeFolder)
+      ** (skg forksFolder)
       *** (skg node (gnid collected_subscribee) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo main))) in an editable recorder's folder
       ** (skg node (gnid protected_parent) (skgRepos (nodeRepo main)) writeProtected) write-protected parent
       *** (skg node (gnid orphaned) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo main))) under a write-protected parent
@@ -829,12 +829,12 @@ fn a_tombstone_does_not_collide_with_content () {
 
 #[test]
 fn duplicate_members_of_defining_folders_pass_validation () {
-  // Defining folders (SubscribeeFolder; aliases were always exempt)
+  // Defining folders (forks folder; aliases were always exempt)
   // silently deduplicate at emission instead of bouncing the save.
   let input : &str =
     indoc! {"
       * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
-      ** (skg subscribeeFolder)
+      ** (skg forksFolder)
       *** (skg node (gnid dup) (skgRepos (nodeRepo main)) writeProtected) dup
       *** (skg node (gnid dup) (skgRepos (nodeRepo main)) writeProtected) dup
     "};
@@ -891,13 +891,13 @@ fn a_gnid_only_vognode_counts_in_the_distinctness_checks_when_it_claims () {
       "}, kind, claim );
       let folder : String = format! ( indoc! {"
         * (skg node (gnid r) (skgRepos (nodeRepo main))) r
-        ** (skg subscribeeFolder)
-        *** (skg hiddenOutsideOfSubscribeeFolder)
+        ** (skg forksFolder)
+        *** (skg hiddenOutsideOfForkPartnersFolder)
         **** (skg node (gnid x) (skgRepos (nodeRepo main)) writeProtected) x
         **** (skg {} (gnid x) {})
       "}, kind, claim );
       for (input, checked) in [ (content_list, "the content list"),
-                                (folder, "the hiddenOutsideOfSubscribeeFolder") ] {
+                                (folder, "the hiddenOutsideOfForkPartnersFolder") ] {
         let (viewforest, parsing_errors, _warnings, _supplied)
           : (ViewForest, Vec<BufferValidationError>, Vec<String>, WhatTheParseSupplied)
           = org_to_viewforest (&input, IdResolution::AsWritten) . unwrap ();
@@ -926,7 +926,7 @@ fn a_gnid_only_vognode_of_either_kind_stands_in_every_partner_folder_and_the_acq
   let config : SkgConfig = validation_config ();
   for kind in ["unknown", "restricted"] {
     let mut inputs : Vec<(String, String)> =
-      [ "subscribeeFolder", "subscriberFolder",
+      [ "forksFolder", "forksFolder",
         "hiderFolder", "hiddenFolder",
         "containerFolder", "mentionerFolder" ]
       . iter ()
@@ -941,12 +941,12 @@ fn a_gnid_only_vognode_of_either_kind_stands_in_every_partner_folder_and_the_acq
     inputs . push ((
       format! ( indoc! {"
         * (skg node (gnid r) (skgRepos (nodeRepo main))) r
-        ** (skg subscribeeFolder)
+        ** (skg forksFolder)
         *** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected) s
-        **** (skg hiddenInSubscribeeFolder)
+        **** (skg hiddenInForkPartnerFolder)
         ***** (skg {} (gnid x))
       "}, kind ),
-      "hiddenInSubscribeeFolder" . to_string () ));
+      "hiddenInForkPartnerFolder" . to_string () ));
     inputs . push ((
       format! ( indoc! {"
         * (skg node (gnid r) (skgRepos (nodeRepo main))) r
@@ -977,7 +977,7 @@ fn a_gnid_only_vognode_of_either_kind_stands_in_every_partner_folder_and_the_acq
         assert! ( result . is_ok (),
                   "{} in a {}: {:?}", kind, folder, result ); }}}}
 
-/// A relation folder, the subscribee folder and the two compound
+/// A relation folder, the forks folder and the two compound
 /// hidden folders refuse a child of a kind they do not admit (here an
 /// alias folder) by naming the kinds they admit, and say nothing of
 /// 'noClaim', which no such child carries.
@@ -989,12 +989,12 @@ fn a_folder_refusing_a_childs_kind_says_nothing_of_noClaim () {
       * (skg node (gnid r) (skgRepos (nodeRepo main))) r
       ** (skg hiddenFolder)
       *** (skg aliasFolder)
-      ** (skg subscribeeFolder)
+      ** (skg forksFolder)
       *** (skg aliasFolder)
       *** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected) s
-      **** (skg hiddenInSubscribeeFolder)
+      **** (skg hiddenInForkPartnerFolder)
       ***** (skg aliasFolder)
-      *** (skg hiddenOutsideOfSubscribeeFolder)
+      *** (skg hiddenOutsideOfForkPartnersFolder)
       **** (skg aliasFolder)
     "};
   let (viewforest, parsing_errors, _warnings, _supplied)

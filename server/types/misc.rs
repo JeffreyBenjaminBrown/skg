@@ -33,7 +33,7 @@ use crate::consts::{DEFAULT_INITIAL_NODE_LIMIT, DEFAULT_PORT};
 /// ('server/from_text/local_fieldintent_collection/traverse.rs'
 /// enforces it; 'supplement_unspecified_fields_from_disk' consumes
 /// it): a buffer with no folder for a field (no aliasFolder or
-/// subscribeeFolder under the defining node) emits no intent for that
+/// forksFolder under the defining node) emits no intent for that
 /// field, which lowers to 'Unspecified' -- no opinion, so the value
 /// is filled from disk. A present-but-empty folder emits an empty list,
 /// which lowers to 'Specified(vec![])' -- the user explicitly wants

@@ -124,7 +124,7 @@ and hide INTERNAL from M-x completion."
     ;; view change the server fulfills on save. Each command auto-saves.
     (define-key map (kbd "C-c l a") #'skg-show-folderOf-aliases)
     (define-key map (kbd "C-c l h") #'skg-show-folderOf-hidesFromSubs)
-    (define-key map (kbd "C-c l s") #'skg-show-folderOf-subscribesTo)
+    (define-key map (kbd "C-c l f") #'skg-show-folderOf-forks)
     (define-key map (kbd "C-c l p") #'skg-show-folderOf-flags)
     (define-key map (kbd "C-c l c") #'skg-show-folderOf-containers)
     (define-key map (kbd "C-c l m") #'skg-show-folderOf-mentioners))

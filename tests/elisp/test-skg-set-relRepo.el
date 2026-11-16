@@ -80,12 +80,12 @@ skg-config-file-path is set and `skg--repo-names' works."
                       :relation "contains"))))))
 
 (ert-deftest test-rel-writable-folder-member ()
-  "A subscribeeFolder member's relationship: recorder = the folder's
+  "A forksFolder member's relationship: recorder = the folder's
 viewparent, relation = the folder's relation."
   (test--with-skg-content-view
    (concat
     "* (skg node (gnid anchor) (skgRepos (nodeRepo public))) anchor\n"
-    "** (skg subscribeeFolder)\n"
+    "** (skg forksFolder)\n"
     "*** (skg node (gnid seen) (skgRepos (nodeRepo public)) writeProtected) seen\n")
    test--config-public-private-trusted
    (lambda ()
@@ -106,7 +106,7 @@ with none, is refused in words that name the folder's viewparent."
               "Could not find the folder's viewparent")))
     (test--with-skg-content-view
      (concat (car case)
-             "** (skg subscribeeFolder)\n"
+             "** (skg forksFolder)\n"
              "*** (skg node (gnid seen) (skgRepos (nodeRepo public))) seen\n")
      test--config-public-private-trusted
      (lambda ()
@@ -155,7 +155,7 @@ would not let write the relationship."
   (test--with-skg-content-view
    (concat
     "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
-    "** (skg subscriberFolder)\n"
+    "** (skg hiderFolder)\n"
     "*** (skg node (gnid sub) (skgRepos (nodeRepo public))) sub\n")
    test--config-public-private-trusted
    (lambda ()
@@ -165,7 +165,31 @@ would not let write the relationship."
      (let ((err (should-error (skg--rel-at-point)
                               :type 'user-error)))
        (should (string-match-p "write-protected" (cadr err)))
-       (should (string-match-p "subscriberFolder" (cadr err)))))))
+       (should (string-match-p "hiderFolder" (cadr err)))))))
+
+(ert-deftest test-rel-in-a-forks-folder-needs-a-claim ()
+  "In a forksFolder, a member claiming nothing (a forker the viewparent
+does not fork, which records its fork in its own file) is refused; a
+claiming member is the viewparent's fork."
+  (test--with-skg-content-view
+   (concat
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
+    "** (skg forksFolder)\n"
+    "*** (skg node (gnid forker) (skgRepos (nodeRepo public)) noClaim) forker\n"
+    "*** (skg node (gnid forkee) (skgRepos (nodeRepo public))) forkee\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (search-forward "(gnid forker)" nil t)
+     (beginning-of-line)
+     (let ((err (should-error (skg--rel-at-point)
+                              :type 'user-error)))
+       (should (string-match-p "claims nothing" (cadr err))))
+     (search-forward "(gnid forkee)" nil t)
+     (beginning-of-line)
+     (should (equal (skg--rel-at-point)
+                    '(:recorder "recorder" :member "forkee"
+                      :relation "forks"))))))
 
 (ert-deftest test-rel-refuses-on-root ()
   "Refuses on a root headline: with no viewparent there is no relationship."
@@ -536,14 +560,14 @@ choices, so the prompt pre-fills with the default instead."
    "*** (skg node (gnid d) (skgRepos (nodeRepo public))) d\n"
    "** (skg node (gnid e) (skgRepos (nodeRepo public)) writeProtected) e\n"
    "*** (skg node (gnid f) (skgRepos (nodeRepo public))) f\n"
-   "** (skg subscribeeFolder)\n"
+   "** (skg forksFolder)\n"
    "*** (skg node (gnid g) (skgRepos (nodeRepo public))) g\n"
    "**** (skg node (gnid h) (skgRepos (nodeRepo public))) h\n"
    "** (skg aliasFolder) aliases\n")
   "A view-root tree exercising the walk's qualification and pruning:
 true content (a, b), an false branch (c, d), an
 write-protected-but-true member (e) over content (f), a
-subscribeeFolder member (g) over subscribee-as-such content (h), and an
+forksFolder member (g) over subscribee-as-such content (h), and an
 aliasFolder.")
 
 (defun test--line-of-id (gnid)
@@ -574,8 +598,8 @@ subscribee-as-such member are pruned, and folder members are untouched."
          (should-not (string-match-p "relRepo"
                                      (test--line-of-id gnid))))))))
 
-(ert-deftest test-recursive-walk-subscribee ()
-  "Kind `subscribee' hits only subscribeeFolder members, leaving content
+(ert-deftest test-recursive-walk-forkee ()
+  "Kind `forkee' hits only the claiming forksFolder members, leaving content
 children and subscribee-as-such content untouched."
   (test--with-skg-content-view
    test--recursive-content-tree
@@ -583,7 +607,7 @@ children and subscribee-as-such content untouched."
    (lambda ()
      (goto-char (point-min))
      (let ((count (skg--set-relRepo-recursive-walk
-                   'subscribee "private")))
+                   'forkee "private")))
        (should (= count 1)) ;; g
        (should (string-match-p "(relRepo private)"
                                (test--line-of-id "g")))
@@ -615,7 +639,7 @@ member's content children are not reached."
   (test--with-skg-content-view
    (concat
     "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
-    "** (skg subscriberFolder)\n"
+    "** (skg hiderFolder)\n"
     "*** (skg node (gnid s) (skgRepos (nodeRepo public))) s\n"
     "**** (skg node (gnid sc) (skgRepos (nodeRepo public))) sc\n")
    test--config-public-private-trusted
@@ -634,24 +658,24 @@ folder's viewparent (pruned below the write-protected node) or at the
 folder itself (refused by `skg--folder-viewparent-editable-p')."
   (let ((tree (concat
                "* (skg node (gnid anchor) (skgRepos (nodeRepo public)) writeProtected) anchor\n"
-               "** (skg subscribeeFolder)\n"
+               "** (skg forksFolder)\n"
                "*** (skg node (gnid g) (skgRepos (nodeRepo public))) g\n")))
     (test--with-skg-content-view
      tree test--config-public-private-trusted
      (lambda ()
        (goto-char (point-min))
        (should (= 0 (skg--set-relRepo-recursive-walk
-                     'subscribee "trusted")))
+                     'forkee "trusted")))
        (should-not (string-match-p "relRepo"
                                    (test--line-of-id "g")))))
     (test--with-skg-content-view
      tree test--config-public-private-trusted
      (lambda ()
        (goto-char (point-min))
-       (search-forward "subscribeeFolder")
+       (search-forward "forksFolder")
        (beginning-of-line)
        (should (= 0 (skg--set-relRepo-recursive-walk
-                     'subscribee "trusted")))
+                     'forkee "trusted")))
        (should-not (string-match-p "relRepo"
                                    (test--line-of-id "g")))))))
 
@@ -684,7 +708,7 @@ writable position, and covers all four schema relations."
                                (apply #'append
                                       (mapcar #'cdr
                                               (skg--relationship-kind-menu-tree)))))
-                 '(content subscribee))))
+                 '(content forkee))))
 
 (defun test--choose-menu-role (role-line)
   "In the relationship-kind menu buffer, move to ROLE-LINE and choose it."

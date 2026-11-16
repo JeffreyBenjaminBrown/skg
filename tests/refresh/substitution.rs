@@ -4,8 +4,9 @@
 // the override is gone, the shown headline loses 'overridesHere',
 // becomes unwarranted (so, under an editable parent, 'noClaim'), and
 // the overridden node is reinstated beside it. A shown mirror that
-// forks the original draws the original in its subscribee folder, as
-// any editable fork does.
+// forks the original draws the original in its forks folder, as any
+// editable fork does; and an editable node that a note forks draws that
+// forker there, claiming nothing.
 
 use super::*;
 use indoc::formatdoc;
@@ -23,7 +24,7 @@ fn a_drawn_member_is_shown_as_its_overrider () {
     &format! ("* {} p\n", occurrence_metadata ("p", "")), &overridden () ) . outline (), "\
 node p
   node o (overridesHere n)
-    subscribeeFolder
+    forksFolder
       node n wp
         node p wp noClaim" ); }
 
@@ -85,7 +86,9 @@ fn the_content_of_an_overridden_node_shown_raw_is_shown_raw () {
   assert_eq! ( run_asserting_fixpoint (
     &format! ("* {} r\n", occurrence_metadata ("r", "")), &graph ) . outline (), "\
 node r
-  node n" ); }
+  node n
+    forksFolder
+      node o wp noClaim" ); }
 
 // An overrider shown in place of an editable occurrence of the node
 // it overrides, while another occurrence holds the overrider's one
@@ -143,7 +146,7 @@ fn under_a_foreign_root_its_authors_overrider_is_shown_and_not_the_users () {
     &m_overridden_by_its_author_and_the_user () ) . outline (), "\
 node r
   node a (overridesHere m)
-    subscribeeFolder
+    forksFolder
       node m wp
         node p wp noClaim
         node r wp noClaim" ); }
@@ -155,7 +158,7 @@ fn under_an_owned_root_the_users_overrider_is_shown () {
     &m_overridden_by_its_author_and_the_user () ) . outline (), "\
 node p
   node u (overridesHere m)
-    subscribeeFolder
+    forksFolder
       node m wp
         node p wp noClaim
         node r wp noClaim" ); }
@@ -179,7 +182,7 @@ fn under_a_foreign_root_its_authors_overrides_are_followed_beneath_a_third_autho
 node r
   node e
     node j (overridesHere c)
-      subscribeeFolder
+      forksFolder
         node c wp
           node e wp noClaim
             node r wp noClaim" ); }
@@ -199,9 +202,10 @@ fn under_a_foreign_root_a_chain_stops_before_the_users_overrider () {
     &graph ) . outline (), "\
 node r
   node a (overridesHere m)
-    subscribeeFolder
+    forksFolder
       node m wp
-        node r wp noClaim" ); }
+        node r wp noClaim
+      node u wp noClaim" ); }
 
 /// Whether a foreign root is overridden and so shows its content raw
 /// asks of its author's overrides, not the user's: the user's k
@@ -223,9 +227,11 @@ fn a_foreign_root_is_shown_raw_only_when_its_author_overrides_it () {
     &graph ) . outline (), "\
 node r
   node a (overridesHere m)
-    subscribeeFolder
+    forksFolder
       node m wp
         node q wp noClaim
         node r wp noClaim
 node q
-  node m" ); }
+  node m
+    forksFolder
+      node a wp noClaim" ); }

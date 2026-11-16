@@ -11,9 +11,9 @@
 // metadata; the fixpoint is specifically that a second rerender changes nothing.)
 //
 // Fixture exercises several Viewnode kinds in one view: occurrences as content (a -> b,
-// c), an AliasFolder + Alias (b has alias "bee"), the IDFolders, a SubscribeeFolder +
-// subscribee-as-such (c subscribes to d), the HiddenOutsideOfSubscribeeFolder, and
-// a partner folder -- e subscribes to b, so b shows a SubscriberFolder listing e.
+// c), an AliasFolder + Alias (b has alias "bee"), the IDFolders, a forks folder +
+// subscribee-as-such (c subscribes to d), the hiddenOutsideOfForkPartnersFolder, and
+// a partner folder -- e subscribes to b, so b shows a forks folder listing e.
 // (The death-cleanup path for an orphan folder -- a folder whose owning node was
 // deleted -- is covered separately by the save_collateral_delete_then_edit_under_it
 // integration test, which only a delete can trigger, not an unchanged-graph rerender.)

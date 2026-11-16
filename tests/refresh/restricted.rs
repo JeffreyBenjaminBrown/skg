@@ -352,7 +352,7 @@ fn an_editable_folder_a_narrowing_empties_stays_and_fills_again_on_widening () {
   let restriction : SkgrepoRestriction = main_only ();
   let input : String = formatdoc! ("
     * {} s
-    ** (skg subscribeeFolder)
+    ** (skg forksFolder)
     *** {} e
     ", occurrence_metadata ("s", ""),
        "(skg node (gnid e) (skgRepos (nodeRepo private)))" );
@@ -362,9 +362,9 @@ fn an_editable_folder_a_narrowing_empties_stays_and_fills_again_on_widening () {
     . into_iter () . map ( |(_text, outline)| outline ) . collect ();
   assert_eq! ( outlines, vec! [ "\
 node s
-  subscribeeFolder" . to_string (), "\
+  forksFolder" . to_string (), "\
 node s
-  subscribeeFolder
+  forksFolder
     node e wp" . to_string () ],
     "the editable folder stays, empty, where a save would read it, and \
      the skgrepo widening fills it again, claiming" ); }

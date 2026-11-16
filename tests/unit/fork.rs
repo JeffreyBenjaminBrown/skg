@@ -38,12 +38,12 @@ fn restriction (gnid : &str, skgrepo : &str) -> Viewnode {
     ID::from (gnid), SkgrepoName::from (skgrepo), gnid . to_string (), None ) }
 
 fn subscribee_folder () -> Viewnode {
-  viewnode_of (ViewnodeKind::Folder (Folder::Subscribee)) }
+  viewnode_of (ViewnodeKind::Folder (Folder::Forks)) }
 
 /// Build a forest exercising the three shapes:
 /// - owned2 P -> foreign F -> foreign N   (must infer nothing for N)
 /// - owned2 Q -> foreign M                (must infer owned2 for M)
-/// - owned1 R -> subscribeeFolder -> foreign S  (folder skipped: owned1 for S)
+/// - owned1 R -> forksFolder -> foreign S  (folder skipped: owned1 for S)
 fn build_forest () -> ViewForest {
   let mut f : ViewForest = ViewForest::new ();
   let p : ego_tree::NodeId = f . append_root ( restriction ("P", "owned2") );
@@ -84,7 +84,7 @@ fn owned_N_still_infers_the_owned_skgrepo () {
 
 #[test]
 fn non_vognode_ancestor_is_skipped () {
-  // owned1 R -> subscribeeFolder -> foreign S: the folder is a non-vognode, so
+  // owned1 R -> forksFolder -> foreign S: the folder is a non-vognode, so
   // S's nearest vognode ancestor is the owned R.
   let config : SkgConfig = config_two_owned_one_foreign ();
   let map = owned_ancestor_skgrepos_for_foreign_vognodes (

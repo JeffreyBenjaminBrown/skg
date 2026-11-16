@@ -38,6 +38,9 @@ mod collateral_skgrepo_move;
 #[path = "extend_partner_folder_member.rs"]
 mod extend_partner_folder_member;
 
+#[path = "forks_folder.rs"]
+mod forks_folder;
+
 #[path = "extend_raw_overridden_children.rs"]
 mod extend_raw_overridden_children;
 

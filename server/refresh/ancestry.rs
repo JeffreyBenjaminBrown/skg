@@ -43,11 +43,11 @@ pub enum ExpectedAncestor {
 const ANC_OCCURRENCE : &[ExpectedAncestor] =
   &[ ExpectedAncestor::Occurrence ];
 const ANC_HIDDEN_OUTSIDE : &[ExpectedAncestor] =
-  &[ ExpectedAncestor::Folder (Folder::Subscribee),
+  &[ ExpectedAncestor::Folder (Folder::Forks),
      ExpectedAncestor::Occurrence ];
 const ANC_HIDDEN_IN : &[ExpectedAncestor] =
   &[ ExpectedAncestor::Occurrence,
-     ExpectedAncestor::Folder (Folder::Subscribee),
+     ExpectedAncestor::Folder (Folder::Forks),
      ExpectedAncestor::Occurrence ];
 const ANC_GHOST : &[ExpectedAncestor] =
   &[ ExpectedAncestor::Ghost ];
@@ -98,9 +98,9 @@ pub fn parent_reads_claims (
 
 /// The node the folder at 'folder' describes, whose relationships,
 /// properties or hides it shows: for a compound folder, the
-/// subscribee as such of the folder of what a subscriber hides in it,
-/// or the subscriber whose hides outside its subscribees the other
-/// shows ('compound_folder_parties'); for any other folder, its
+/// forkee as such of the folder of what its forker hides in it, or the
+/// note whose hides outside its fork partners the other shows
+/// ('compound_folder_parties'); for any other folder, its
 /// viewparent. None if 'folder' is no folder, or stands where its
 /// ancestry is missing.
 pub fn described_node (
@@ -110,7 +110,7 @@ pub fn described_node (
   let ViewnodeKind::Folder (kind) : &ViewnodeKind =
     &tree . get (folder) ? . value () . kind else { return None; };
   match kind {
-    Folder::HiddenInSubscribee | Folder::HiddenOutsideOfSubscribee => {
+    Folder::HiddenInForkPartner | Folder::HiddenOutsideOfForkPartners => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       Some ( parties . subscribee . unwrap_or (parties . subscriber) ) },
     _ => required_ancestors (tree, folder) . first () . copied (), } }
@@ -134,14 +134,15 @@ pub fn view_ancestor_gnids (
       _ => Vec::new (), } )
     . collect () }
 
-/// A compound folder's two parties, where they stand: the subscriber
-/// whose hides it shows, and, for the folder of what the subscriber
-/// hides in one subscribee, that subscribee as such. In
-///   subscriber > subscribeeFolder > subscribee > hiddenInSubscribeeFolder
-/// the subscribee is the folder's viewparent and the subscriber three
+/// A compound folder's two parties, where they stand: the note whose
+/// hides it shows (the 'subscriber', its forker), and, for the folder
+/// of what that note hides in one forkee, that forkee as such (the
+/// 'subscribee'). In
+///   forker > forksFolder > forkee > hiddenInForkPartnerFolder
+/// the forkee is the folder's viewparent and the forker three
 /// generations up; in
-///   subscriber > subscribeeFolder > hiddenOutsideOfSubscribeeFolder
-/// the subscriber is two up.
+///   note > forksFolder > hiddenOutsideOfForkPartnersFolder
+/// the note is two up.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CompoundFolderParties {
   pub subscriber : NodeId,
@@ -159,10 +160,10 @@ pub fn compound_folder_parties (
     &tree . get (folder) ? . value () . kind else { return None; };
   let required : Vec<NodeId> = required_ancestors (tree, folder);
   match kind { // the places are those of the rows ANC_HIDDEN_IN and ANC_HIDDEN_OUTSIDE
-    Folder::HiddenInSubscribee => Some ( CompoundFolderParties {
+    Folder::HiddenInForkPartner => Some ( CompoundFolderParties {
       subscriber : *required . get (2) ?,
       subscribee : Some ( *required . first () ? ) } ),
-    Folder::HiddenOutsideOfSubscribee => Some ( CompoundFolderParties {
+    Folder::HiddenOutsideOfForkPartners => Some ( CompoundFolderParties {
       subscriber : *required . get (1) ?,
       subscribee : None } ),
     _ => None, } }
@@ -189,13 +190,13 @@ pub fn required_ancestry (
   match kind {
     ViewnodeKind::Folder (folder) => match folder {
       Folder::Alias | Folder::ID | Folder::Flags { .. }
-        | Folder::Subscribee | Folder::Subscriber
+        | Folder::Forks
         | Folder::Hider | Folder::Hidden
         | Folder::Container | Folder::Mentioner
         | Folder::Acquired | Folder::IllegalEdit { .. } => ANC_OCCURRENCE,
       Folder::AcquiredBy => ANC_GHOST,
-      Folder::HiddenOutsideOfSubscribee => ANC_HIDDEN_OUTSIDE,
-      Folder::HiddenInSubscribee => ANC_HIDDEN_IN, },
+      Folder::HiddenOutsideOfForkPartners => ANC_HIDDEN_OUTSIDE,
+      Folder::HiddenInForkPartner => ANC_HIDDEN_IN, },
     ViewnodeKind::PropertyMember (member) => match member {
       PropertyMember::Alias { .. } => ANC_ALIAS_FOLDER,
       PropertyMember::ID { .. }    => ANC_ID_FOLDER,

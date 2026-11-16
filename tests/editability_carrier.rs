@@ -33,7 +33,7 @@ fn write_fixture (
 /// Two views of p. A save of the first adds s to p's contents; the
 /// collateral rerender of the second draws s under its editable p,
 /// carrying the editable-view request, so s is editable and shows its
-/// subscribee folder, as a fresh view's members do.
+/// forks folder, as a fresh view's members do.
 #[test]
 fn a_member_a_save_draws_shows_its_default_subscribee_folder (
 ) -> Result<(), Box<dyn Error>> {
@@ -63,8 +63,8 @@ fn a_member_a_save_draws_shows_its_default_subscribee_folder (
         . skip_while ( |line| ! line . contains ("(gnid s)") )
         . collect ();
       assert! ( after_s . get (1) . is_some_and ( |line|
-                  line . starts_with ("*** ") && line . contains ("subscribeeFolder") )
+                  line . starts_with ("*** ") && line . contains ("forksFolder") )
                 && after_s . get (2) . is_some_and ( |line|
                   line . starts_with ("**** ") && line . contains ("(gnid e)") ),
-                "s shows its subscribee folder, holding e: {}", text );
+                "s shows its forks folder, holding e: {}", text );
       Ok (( )) } ) }

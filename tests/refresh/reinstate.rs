@@ -98,11 +98,11 @@ fn an_empty_write_protected_folder_goes_and_an_empty_editable_one_stays () {
   let input : String = formatdoc! ("
     * {} p
     ** (skg containerFolder)
-    ** (skg subscribeeFolder)
+    ** (skg forksFolder)
     ", occurrence_metadata ("p", "") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
-  subscribeeFolder" ); }
+  forksFolder" ); }
 
 #[test]
 fn a_subscribee_as_such_shows_what_its_subscriber_neither_hides_nor_contains () {
@@ -114,14 +114,14 @@ fn a_subscribee_as_such_shows_what_its_subscriber_neither_hides_nor_contains () 
     node ("h"), node ("i"), node ("k"), ]);
   let input : String = formatdoc! ("
     * {} s
-    ** (skg subscribeeFolder)
+    ** (skg forksFolder)
     *** {} e
     ", occurrence_metadata ("s", ""), occurrence_metadata ("e", "") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node s
-  subscribeeFolder
+  forksFolder
     node e
-      hiddenInSubscribeeFolder
+      hiddenInForkPartnerFolder
         node h wp noClaim folded
           node e wp noClaim
       node k
@@ -166,19 +166,22 @@ fn the_hidden_in_subscribee_folder_holds_what_the_subscriber_hides_of_the_subscr
     node ("h"), node ("k"), node ("o"), ]);
   let input : String = formatdoc! ("
     * {} s
-    ** (skg subscribeeFolder)
+    ** (skg forksFolder)
     *** {} e
-    **** (skg hiddenInSubscribeeFolder)
+    **** (skg hiddenInForkPartnerFolder)
     ", occurrence_metadata ("s", ""), occurrence_metadata ("e", "") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node s
-  subscribeeFolder
+  forksFolder
     node e
-      hiddenInSubscribeeFolder
+      hiddenInForkPartnerFolder
         node h wp noClaim
           node e wp noClaim
-      node k",
-    "h, a folder member, carries its chain" ); }
+      node k
+    hiddenOutsideOfForkPartnersFolder
+      node o wp folded",
+    "h, a folder member, carries its chain; the forks folder holds, last, \
+     what s hides outside its fork partners" ); }
 
 #[test]
 fn a_buffer_of_many_kinds_is_a_fixpoint () {
@@ -203,12 +206,12 @@ fn a_buffer_of_many_kinds_is_a_fixpoint () {
     ** {} c
     *** {} note
     ** {} s
-    *** (skg subscribeeFolder)
+    *** (skg forksFolder)
     * {} c1
     ", occurrence_metadata ("p", "(viewRequests (folder containers) flags)"),
        occurrence_metadata ("c", "writeProtected"),
        occurrence_metadata ("q", "writeProtected"),
-       occurrence_metadata ("s", "(viewRequests (folder subscribesTo))"),
+       occurrence_metadata ("s", "(viewRequests (folder forks))"),
        occurrence_metadata ("c1", "(viewRequests writeProtectedSubtreeView)") );
   let run : Run = run_asserting_fixpoint_in ( &input, &graph, &unrestricted (), RefreshMode::ContentView, 3 );
   assert_eq! ( run . outline (), "\
@@ -222,15 +225,15 @@ node p
   node c wp
     node q wp noClaim ⊥
   node o (overridesHere n)
-    subscribeeFolder
+    forksFolder
       node n wp
         node p wp noClaim
           node q wp noClaim
             node top wp noClaim
   unknown x
   node s
-    subscribeeFolder
+    forksFolder
       node e wp
-      hiddenOutsideOfSubscribeeFolder
+      hiddenOutsideOfForkPartnersFolder
         node away wp folded
 node c1 wp" ); }

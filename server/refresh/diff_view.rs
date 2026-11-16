@@ -123,6 +123,51 @@ pub(crate) fn folder_goal (
       walk ),
     kind . goal_is_ordered () )) }
 
+/// The forks folder's members over the straddle: the partners the
+/// described node forks, in its list's order, then those forking it
+/// that it forks in neither graph, after them in the order the view
+/// has them; a removed member that neither graph has is left out. A
+/// mutual is one item: claimable if the worktree has the node fork it,
+/// warranted by the truth if the worktree holds either side, its
+/// relationship change the forkee side's, else the forker side's, so
+/// that a change of either side shows on it.
+pub(crate) fn forks_folder_goal (
+  described : &ID,
+  walk      : &Walk,
+) -> Option<Goal> {
+  let (straddle, _) : (&GraphStraddle, DiffViewBufferKind) = diff_view_of (walk) ?;
+  let side_items : &dyn Fn (RelationRole) -> Vec<GoalItem> =
+    &|member_role : RelationRole| -> Vec<GoalItem> {
+    partner_items (
+      straddle . partners (described, member_role) . iter ()
+      . filter ( |partner| partner . existence != Some (Existence::Removed)
+                           || straddle . node_in_either_graph (&partner . id) ),
+      walk ) };
+  let forker_items : Vec<GoalItem> = side_items (RelationRole::FORKER);
+  let forker_item_of : HashMap<GoalMember, GoalItem> =
+    forker_items . iter ()
+    . map ( |item| ( item . member . clone (), item . clone () ))
+    . collect ();
+  let forkee_items : Vec<GoalItem> = side_items (RelationRole::FORKEE);
+  let forkees : HashSet<GoalMember> =
+    forkee_items . iter () . map ( |item| item . member . clone () ) . collect ();
+  let leading : Vec<GoalItem> = forkee_items . into_iter ()
+    . map ( |forkee| match forker_item_of . get (&forkee . member) {
+      Some (forker) => GoalItem {
+        claimable : forkee . warrant == Warrant::ByGraph,
+        warrant   : if forkee . warrant == Warrant::ByGraph
+                       || forker . warrant == Warrant::ByGraph
+                    { Warrant::ByGraph } else { Warrant::ByHead },
+        rel       : forkee . rel . or (forker . rel),
+        .. forkee },
+      None => forkee, } )
+    . collect ();
+  let following : Vec<GoalItem> = forker_items . into_iter ()
+    . filter ( |forker| ! forkees . contains (&forker . member) )
+    . map ( |forker| GoalItem { claimable : false, .. forker } )
+    . collect ();
+  Some ( Goal::ordered_then_unordered (leading, following) ) }
+
 /// A property folder's members over the straddle: the union of the
 /// node's aliases (those whose records the skgrepo restriction shows),
 /// IDs or true flags in the two graphs, each lost one warranted by
@@ -250,7 +295,8 @@ fn partner_item (
                 Warrant::ByHead } else { Warrant::ByGraph },
     relRepo : None,
     rel     : partner . existence,
-    partner : Some ( partner . clone () ), } }
+    partner : Some ( partner . clone () ),
+    claimable : true, } }
 
 //
 // The change viewnodes

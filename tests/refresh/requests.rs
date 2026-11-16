@@ -276,12 +276,12 @@ fn a_subscriptions_request_adds_the_subscribee_folder_and_drops_an_empty_subscri
                 hidesFromSubs : msv_ids (&["o"]), .. node ("s") },
     node ("e"), node ("o"), ]);
   let input : String = format! ( "* {} s\n",
-    occurrence_metadata ("s", "(viewRequests (folder subscribesTo))") );
+    occurrence_metadata ("s", "(viewRequests (folder forks))") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node s
-  subscribeeFolder
+  forksFolder
     node e wp
-    hiddenOutsideOfSubscribeeFolder
+    hiddenOutsideOfForkPartnersFolder
       node o wp folded" ); }
 
 #[test]
@@ -413,13 +413,13 @@ fn a_subscriptions_request_completes_a_subscribee_folder_already_there () {
     node ("e"), node ("o"), ]);
   let input : String = formatdoc! ("
     * {} s
-    ** (skg subscribeeFolder)
+    ** (skg forksFolder)
     *** {} e
-    ", occurrence_metadata ("s", "(viewRequests (folder subscribesTo))"),
+    ", occurrence_metadata ("s", "(viewRequests (folder forks))"),
        occurrence_metadata ("e", "writeProtected") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node s
-  subscribeeFolder
+  forksFolder
     node e wp
-    hiddenOutsideOfSubscribeeFolder
+    hiddenOutsideOfForkPartnersFolder
       node o wp folded" ); }

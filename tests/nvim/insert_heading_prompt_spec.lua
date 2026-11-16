@@ -104,7 +104,7 @@ describe('the skgrepo prompt after inserting a headline', function ()
     it(action .. ' prompts only when the headline cannot inherit',
        function ()
       for _, case in ipairs({
-        { '** (skg subscribeeFolder)', false },
+        { '** (skg forksFolder)', false },
         { '** (skg ghost (gnid d) (skgRepos (nodeRepo public))) d', false },
         { '** (skg unknown (gnid u))', false },
         { '** (skg restricted (gnid h))', false },

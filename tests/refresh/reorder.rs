@@ -87,7 +87,7 @@ fn the_editable_ordered_folders_take_the_goals_order () {
     ** (skg aliasFolder)
     *** (skg alias) y
     *** (skg alias) x
-    ** (skg subscribeeFolder)
+    ** (skg forksFolder)
     *** {} b
     *** {} a
     ", occurrence_metadata ("p", ""),
@@ -98,6 +98,6 @@ node p
   aliasFolder
     alias x
     alias y
-  subscribeeFolder
+  forksFolder
     node a wp
     node b wp" ); }

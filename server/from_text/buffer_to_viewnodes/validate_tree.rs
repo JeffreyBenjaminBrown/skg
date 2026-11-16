@@ -346,6 +346,14 @@ fn writeProtected_relRepo_request_errors (
     let Edge::Open (node_ref) = edge else { continue; };
     let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
       &node_ref . value () . kind else { continue; };
+    if RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . is_some ()
+       && is_forks_folder_member_claiming_nothing (node_ref, t)
+    { errors . push ( BufferValidationError::Other ( with_org_subheadlines (
+        &format! (
+          "relRepo request on {}, a member of a forks folder that claims nothing:\n- Its view-parent's note does not fork it; it forks that note, and records so in its own file.\n- Set that relationship's skgrepo where it is recorded, or attach the member first to make the view-parent's note fork it.\n",
+          t . gnid . 0 ),
+        &[ node_ref . value () . headline_name () ] )));
+      continue; }
     if t . is_writeProtected ()
        && RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . is_some ()
        && ! relRepo_request_is_collected (node_ref, t)
@@ -355,6 +363,17 @@ fn writeProtected_relRepo_request_errors (
           "relRepo request on write-protected node {} that no editable node collects:\n- Its view-parent is write-protected (or marked for deletion, or a subscribee shown as such), or it is not a member of that view-parent.\n- Make the relRepo request from a view where the view-parent is editable.\n",
           t . gnid . 0 ),
         &[ headline ] ))); }} }
+
+/// Whether the occurrence is a member of a forks folder that claims
+/// nothing: one its view-parent's note does not fork (a forker-only
+/// member, or a detached one), whose relRepo the save never reads.
+fn is_forks_folder_member_claiming_nothing (
+  node_ref : NodeRef<Viewnode>,
+  t        : &Occurrence,
+) -> bool {
+  ! t . claimsMembership
+  && node_ref . parent () . is_some_and ( |parent| matches! (
+       &parent . value () . kind, ViewnodeKind::Folder (Folder::Forks) )) }
 
 /// Whether save reads the relRepo request on this occurrence:
 /// the node is a member of its view-parent, and the relationship's
@@ -371,7 +390,7 @@ fn relRepo_request_is_collected (
     Some (parent) => match &parent . value () . kind {
       ViewnodeKind::Vognode (Vognode::Occurrence (_)) =>
         is_saveEligible_occurrence (parent),
-      ViewnodeKind::Folder (Folder::Subscribee) =>
+      ViewnodeKind::Folder (Folder::Forks) =>
         parent . parent ()
         . map ( is_saveEligible_occurrence )
         . unwrap_or (false),
@@ -381,7 +400,8 @@ fn relRepo_request_is_collected (
 /// As the save-eligibility of
 /// 'from_text/local_fieldintent_collection/traverse.rs', at the
 /// tree validation stage: an editable occurrence, not marked for
-/// deletion, not in subscribee-as-such position.
+/// deletion, not in forkee-as-such position (a claiming member of a
+/// forks folder).
 #[allow(non_snake_case)]
 fn is_saveEligible_occurrence (
   node_ref : NodeRef<Viewnode>,
@@ -392,7 +412,7 @@ fn is_saveEligible_occurrence (
     t . claimsMembership
     && node_ref . parent ()
        . map ( |p| matches! ( &p . value () . kind,
-                 ViewnodeKind::Folder (Folder::Subscribee) ))
+                 ViewnodeKind::Folder (Folder::Forks) ))
        . unwrap_or (false);
   ! t . is_writeProtected ()
   && ! matches! ( t . edit_request (), Some (&NodeEditRequest::Delete) )

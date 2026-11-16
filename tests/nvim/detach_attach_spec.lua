@@ -74,7 +74,7 @@ describe('skg.metadata detach and attach', function ()
 
   it('detaches under an editable folder', function ()
     buffer_with(editable_parent
-      .. '\n** (skg subscribeeFolder)'
+      .. '\n** (skg forksFolder)'
       .. '\n*** (skg node (gnid s) (skgRepos (nodeRepo r))) s', 3)
     metadata.detach()
     assert.are.equal(
@@ -86,7 +86,7 @@ describe('skg.metadata detach and attach', function ()
     for _, case in ipairs({
         { '* (skg node (gnid p) (skgRepos (nodeRepo r)) writeProtected) p'
           .. '\n** (skg node (gnid c) (skgRepos (nodeRepo r))) c', 2 },
-        { editable_parent .. '\n** (skg subscriberFolder)'
+        { editable_parent .. '\n** (skg hiderFolder)'
           .. '\n*** (skg node (gnid s) (skgRepos (nodeRepo r)) noClaim) s', 3 },
         { editable_parent, 1 } }) do
       for _, command in ipairs({ metadata.detach, metadata.attach }) do
@@ -133,5 +133,25 @@ describe('skg.metadata detach and attach', function ()
     assert.are.equal('Attach', bound.sa)
     assert.are.equal('detach', keymaps.commands.Detach.fn)
     assert.are.equal('attach', keymaps.commands.Attach.fn)
+  end)
+
+  it('in a forks folder, holds a member claiming nothing for a pending'
+     .. ' detachment only where the viewparent still forks it', function ()
+    -- Mirrors test-skg-pending-detachment-in-a-forks-folder: a detached
+    -- forkee E or mutual M names ancestor generation 2 on the 'in' side
+    -- of 'forks'; a forker F the viewparent does not fork does not.
+    local sexpr = require('skg.sexpr.parse')
+    local parent = sexpr.read('(skg forksFolder)')
+    local grandparent = sexpr.read('(skg node (gnid n) (skgRepos (nodeRepo r)))')
+    local function pending (text)
+      return metadata.pending_detachment_p(sexpr.read(text), parent, grandparent)
+    end
+    assert.is_true(pending('(skg node (gnid e) noClaim writeProtected'
+      .. ' (view (rels (forks (in 1 (ancestors 2)))) (birth (forks in 2))))'))
+    assert.is_true(pending('(skg node (gnid m) noClaim writeProtected'
+      .. ' (view (rels (forks (in 1 (ancestors 2)) (out 1 (ancestors 2))))'
+      .. ' (birth (forks out 2))))'))
+    assert.is_false(pending('(skg node (gnid f) noClaim writeProtected'
+      .. ' (view (rels (forks (out 1 (ancestors 2)))) (birth (forks out 2))))'))
   end)
 end)

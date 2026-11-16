@@ -18,7 +18,8 @@
 //!   before lowering consumes the map.)
 
 use crate::from_text::local_fieldintent_collection::types::{
-  CollectedFieldIntents, HiddenOutsideEdit, FieldIntentsForOneId, SubscribeeVisibility };
+  CollectedFieldIntents, ForksFolderMembers, HiddenOutsideEdit, FieldIntentsForOneId,
+  SubscribeeVisibility };
 use crate::types::misc::{
   ID, MSV, RelPartner, SkgrepoName, members_msv, members_of,
   rel_partners_at_relRepo, rel_partners_at_relRepo_msv };
@@ -279,6 +280,7 @@ pub struct LoweringOutput {
   pub intents        : LoweredNodeIntents,
   pub visibility     : Vec<(ID, SubscribeeVisibility)>, // Each pair is (subscriber, signal); the list is in subscriber first-emission order.
   pub hidden_outside : Vec<(ID, HiddenOutsideEdit)>,
+  pub forks_folder_members : Vec<(ID, ForksFolderMembers)>, // Each pair is (the note the forks folder describes, its members).
 }
 
 /// This returns the (acquirer, acquiree) pair of every nodeMerge
@@ -322,6 +324,14 @@ pub fn lower_collected_fieldIntents (
       for edit in &entry . hidden_outside {
         edits . push ((pid . clone (), edit . clone ())); }}
     edits };
+  let forks_folder_members : Vec<(ID, ForksFolderMembers)> = {
+    let mut signals : Vec<(ID, ForksFolderMembers)> = Vec::new ();
+    for pid in &order {
+      let entry : &FieldIntentsForOneId = by_pid . get (pid)
+        . ok_or ( "lower_collected_fieldIntents: order names a PID missing from the map" . to_string () ) ?;
+      for signal in &entry . forks_folder_members {
+        signals . push ((pid . clone (), signal . clone ())); }}
+    signals };
   let mut intents : LoweredNodeIntents =
     LoweredNodeIntents {
       order  : Vec::with_capacity (lowerable_order . len()),
@@ -347,7 +357,7 @@ pub fn lower_collected_fieldIntents (
     { return Err ( format!(
         "lower_collected_fieldIntents: entry for {} has field intents but no title/body",
         pid )); }}
-  Ok (LoweringOutput { intents, visibility, hidden_outside }) }
+  Ok (LoweringOutput { intents, visibility, hidden_outside, forks_folder_members }) }
 
 /// This assumes the entry is lowerable: it holds a delete or a
 /// title/body, having been named by 'lowerable_order'.

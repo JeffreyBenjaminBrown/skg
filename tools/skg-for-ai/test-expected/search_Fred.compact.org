@@ -10,7 +10,7 @@
 # Links 0, distinct targets 0, resolved 0, unresolved 0.
 # Server errors 0, warnings 0.
 * Fred's note ⟨0a ☮ C1 1/L 1K ⌂:fred⟩
-** ⟨0b ☮ These subscribe to it. folded⟩
+** ⟨0b It forks these, or these fork it. folded⟩
 *** Second child, a subscriber ⟨0c ☮ 1C 1/L Kb H2 ⌂:main⟩
 **** The fixture root ⟨0d ☮B 1C2a L2a⟩
 ***** Above the root ⟨0e ☮ Ca⟩

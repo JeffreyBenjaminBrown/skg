@@ -128,8 +128,8 @@ async fn test_multi_root_view_with_shared_nodes (
       // so node 2 appears first as a root, then as a child (marked write-protected),
       // and again in place of node 3, its mirror (2 and 3 fork 4 and 5,
       // and 5 forks 3; 2 alone is forked by no other mirror: Q3, rule 2).
-      // Editable nodes with forks get SubscribeeFolder children,
-      // and each SubscribeeFolder has Subscribee children with the subscribed IDs.
+      // Editable nodes with forks get forks folder children,
+      // and each forks folder has Subscribee children with the subscribed IDs.
       // Because node 2 has node 1 as a container, the root 2 gets a
       // containers folder, whose one write-protected member is node 1;
       // node 1 has no container, so no chain hangs under it.
@@ -143,7 +143,7 @@ async fn test_multi_root_view_with_shared_nodes (
          this one string could span pages
          ** (skg containerFolder)
          *** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 2 (ancestors 2))) (hidesFromSubs (out 2))) (birth (contains out 2)))) title 1
-         ** (skg subscribeeFolder)
+         ** (skg forksFolder)
          *** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hidesFromSubs (in 1))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2)) (hidesFromSubs (in 1))) (props (extraIds 1)) (birth (forks in 2)))) this title includes a [[id:22][textlink to another file]]
          "};
@@ -192,7 +192,7 @@ async fn test_multi_root_view_with_node_limit (
          this one string could span pages
          ** (skg containerFolder)
          *** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 2 (ancestors 2))) (hidesFromSubs (out 2))) (birth (contains out 2)))) title 1
-         ** (skg subscribeeFolder)
+         ** (skg forksFolder)
          *** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hidesFromSubs (in 1))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2)) (hidesFromSubs (in 1))) (props (extraIds 1)) (birth (forks in 2)))) this title includes a [[id:22][textlink to another file]]
          "};

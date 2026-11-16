@@ -1,14 +1,15 @@
 // cargo nextest run --test grouped_overrides -E 'test(partner_folder_matrix::)'
 //
 // The batched relationship-matrix target
-// ('docs/sharing-model.org', "The write-protected folders: who
-// subscribes to or hides this node"). One test function builds
-// one database of mutually independent subgraphs (IDs prefixed by
-// scenario), then runs the matrix scenarios serially against it: de
-// novo omission of unrequested write-protected folders, and -- after explicit
-// folder requests, per folder -- save after
-// reorder, insertion of a child claiming nothing, deletion of a member, plus the
-// editable folders' membership edits and the restricted-set omission.
+// ('docs/sharing-model.org', "The write-protected folders"). One test
+// function builds one database of mutually independent subgraphs (IDs
+// prefixed by scenario), then runs the matrix scenarios serially
+// against it: de novo omission of unrequested write-protected folders,
+// and -- after explicit folder requests, per folder -- save after
+// reorder, insertion of a child claiming nothing, deletion of a member;
+// the same three for the forks folder's forker-only members, which
+// claim nothing; plus the forks folder's membership edits and the
+// restricted-set omission.
 // Scenario failures accumulate: every mismatch is collected and the
 // test fails once at the end, so one broken folder does not mask the
 // rest. The last scenarios check the containerward chain under each
@@ -181,7 +182,7 @@ fn intruder_with_child (
 //////////////////////////////////////////////////////////////
 
 struct FolderSpec {
-  atom     : &'static str, // e.g. "subscriberFolder"
+  atom     : &'static str, // e.g. "forksFolder"
   relation : &'static str,
   recorder : &'static str,
   member_a : &'static str, // sorts before member_b
@@ -189,11 +190,7 @@ struct FolderSpec {
   intruder : &'static str, // a public node to place in the folder, claiming nothing
 }
 
-const WRITE_PROTECTED_FOLDERS : [FolderSpec; 5] = [
-  FolderSpec { atom : "subscriberFolder", recorder : "roSub-owner",
-            relation : "subscribesTo",
-            member_a : "roSub-a", member_b : "roSub-b",
-            intruder : "roSub-x" },
+const WRITE_PROTECTED_FOLDERS : [FolderSpec; 4] = [
   FolderSpec { atom : "hiderFolder", recorder : "roHider-owner",
             relation : "hidesFromSubs",
             member_a : "roHider-a", member_b : "roHider-b",
@@ -320,6 +317,66 @@ async fn write_protected_delete (
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
+// The forks folder's forker-only members: roSub-a and roSub-b fork
+// roSub-owner, which forks nothing. Its forks folder, drawn unasked,
+// holds them claiming nothing. Reordering them keeps the order the
+// view has; a note placed there claiming nothing stays, unwarranted;
+// and deleting one hides it in roSub-owner, so that it leaves the
+// folder for the folder of what roSub-owner hides outside its fork
+// partners. They run in that order: the deletion writes the hide.
+//////////////////////////////////////////////////////////////
+
+async fn forker_only_members (
+  fails : &mut Fails,
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
+) -> Result<(), Box<dyn Error>> {
+  let buf : String = render ("roSub-owner", config) . await ?;
+  for member in [ "roSub-a", "roSub-b" ] {
+    let line : &str = line_containing (&buf, &format! ("(gnid {})", member));
+    if ! line . contains ("noClaim") {
+      fails . record ("forksFolder/forker-only", format! (
+        "a forker-only member must claim nothing: {}", line )); }}
+  { let s : &str = "forksFolder/forker-only/reorder";
+    let swapped : String = swap_lines (&buf, "(gnid roSub-a)", "(gnid roSub-b)");
+    let resp : SaveResponse = save (&swapped, config, tantivy, graph) . await ?;
+    if ! resp . errors . is_empty () {
+      fails . record (s, format! ("save reported errors: {:?}", resp . errors)); }
+    fails . want_before (s, &resp . saved_view, "(gnid roSub-b)", "(gnid roSub-a)"); }
+  { let s : &str = "forksFolder/forker-only/insert";
+    let b_line : String = line_containing (&buf, "(gnid roSub-b)") . to_string ();
+    let (intruder_line, child_line) : (String, String) =
+      intruder_with_child (&b_line, "roSub-x");
+    let intruder_line : String = intruder_line . replace (
+      "(nodeRepo public))", "(nodeRepo public)) noClaim" );
+    let edited : String = buf . replace (
+      &b_line, &format! ("{}
+{}
+{}", b_line, intruder_line, child_line) );
+    let resp : SaveResponse = save (&edited, config, tantivy, graph) . await ?;
+    if ! resp . errors . is_empty () {
+      fails . record (s, format! ("save reported errors: {:?}", resp . errors)); }
+    let intruder_after : &str = line_containing (&resp . saved_view, "(gnid roSub-x)");
+    if ! ( intruder_after . contains ("noWarrant") && intruder_after . contains ("noClaim") ) {
+      fails . record (s, format! (
+        "the intruder must stay unwarranted, claiming nothing: {}", intruder_after )); } }
+  { let s : &str = "forksFolder/forker-only/delete";
+    let a_line : String = line_containing (&buf, "(gnid roSub-a)") . to_string ();
+    let edited : String = buf . replace (&format! ("{}\n", a_line), "");
+    let resp : SaveResponse = save (&edited, config, tantivy, graph) . await ?;
+    if ! resp . errors . is_empty () {
+      fails . record (s, format! ("save reported errors: {:?}", resp . errors)); }
+    fails . want_before (s, &resp . saved_view,
+                         "(skg hiddenOutsideOfForkPartnersFolder)", "(gnid roSub-a)");
+    let owner : Graphnode = graphnode_by_gnid (
+      &graph . load_full (), config, &ID::from ("roSub-owner") ) ?;
+    if members_of (owner . hidesFromSubs . or_default ()) != vec! [ ID::from ("roSub-a") ] {
+      fails . record (s, format! (
+        "deleting a forker-only member must hide it: hides = {:?}",
+        owner . hidesFromSubs )); } }
+  Ok (( )) }
+
+//////////////////////////////////////////////////////////////
 // De-novo omission of the unrequested write-protected folders
 //////////////////////////////////////////////////////////////
 
@@ -329,12 +386,15 @@ async fn denovo_omits_unrequested_write_protected_folders (
 ) -> Result<(), Box<dyn Error>> {
   let s : &str = "denovo/write-protected-folders";
   let buf : String = render ("dn-owner", config) . await ?;
-  for atom in ["subscriberFolder",
-               "hiderFolder", "hiddenFolder", "mentionerFolder"] {
+  for atom in ["hiderFolder", "hiddenFolder", "mentionerFolder"] {
     fails . want_absent (s, &buf, &format! ("(skg {})", atom)); }
   // But a root shows its containers folder, with the containerward
-  // chain under its members.
+  // chain under its members, and its forks folder, holding the notes
+  // forking it, claiming nothing.
   fails . want_contains (s, &buf, "** (skg containerFolder)");
+  fails . want_contains (s, &buf, "** (skg forksFolder)");
+  if ! line_containing (&buf, "(gnid dn-sub-a)") . contains ("noClaim") {
+    fails . record (s, format! ("a forker must claim nothing:\n{}", buf )); }
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
@@ -363,7 +423,9 @@ fn relationship_matrix
         write_protected_delete (
           &mut fails, spec, config, tantivy, &graph) . await ?;
       }
-      editable_subscribeeFolder (&mut fails, config) . await ?;
+      forker_only_members (
+        &mut fails, config, tantivy, &graph ) . await ?;
+      editable_forksFolder (&mut fails, config) . await ?;
       hiddenFolder_delete_does_not_unhide (
         &mut fails, config, tantivy, &graph ) . await ?;
       omission_scenarios (&mut fails, config) . await ?;
@@ -394,9 +456,9 @@ struct ChainFolderSpec {
 }
 
 const CHAIN_FOLDERS : [ChainFolderSpec; 6] = [
-  ChainFolderSpec { atom : "subscriberFolder", owner : "chSubr-owner",
-                    member : "chSubr-m", relation : Some ("subscribesTo") },
-  ChainFolderSpec { atom : "subscribeeFolder", owner : "chSube-owner",
+  ChainFolderSpec { atom : "forksFolder", owner : "chSubr-owner",
+                    member : "chSubr-m", relation : None },
+  ChainFolderSpec { atom : "forksFolder", owner : "chSube-owner",
                     member : "chSube-m", relation : None },
   ChainFolderSpec { atom : "hiderFolder", owner : "chHider-owner",
                     member : "chHider-m", relation : Some ("hidesFromSubs") },
@@ -463,8 +525,8 @@ async fn roleTree_request_is_refused (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
-  for role in [ "container", "mentioner", "mentioned", "overridden",
-                "subscriber" ] {
+  for role in [ "container", "mentioner", "mentioned", "forkee",
+                "forker" ] {
     let s : String = format! ("roleTree/{}", role);
     let buffer : String = format! (
       "* (skg node (gnid wOvr-owner) (skgRepos (nodeRepo public)) (viewRequests (roleTree {}))) wOvr-owner\n",
@@ -512,14 +574,14 @@ async fn folder_request_scenarios (
         fails . record (s, format! (
           "expected a refusal, got the view:\n{}", resp . saved_view )),
       Ok (_) | Err (_) => {}, } }
-  { // (folder subscribesTo) on wSub-owner: subscribeeFolder populated (a,b,c).
-    let s : &str = "folder-request/subscribes-populated";
+  { // (folder forks) on wSub-owner: forksFolder populated (a,b,c).
+    let s : &str = "folder-request/forks-populated";
     let resp : SaveResponse = save (
-      &request_buf ("wSub-owner", "subscribesTo"),
+      &request_buf ("wSub-owner", "forks"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
-    fails . want_contains (s, &resp . saved_view, "(skg subscribeeFolder)");
+    fails . want_contains (s, &resp . saved_view, "(skg forksFolder)");
     fails . want_contains (s, &resp . saved_view, "(gnid wSub-a)"); }
   { // (folder hidesFromSubs) on wSub-owner, which neither hides nor is hidden:
     // both sides write-protected and empty, so nothing appears.
@@ -534,7 +596,7 @@ async fn folder_request_scenarios (
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
-// The editable subscribeeFolder: the membership
+// The editable forksFolder: the membership
 // edits land on disk. Checked through buffer_to_validated_saveplan,
 // which builds (but does not write) the plan, so we read the
 // would-be Graphnode for the recorder.
@@ -558,14 +620,14 @@ fn folder_member_stars ( buf : &str, any_member_fragment : &str ) -> usize {
   line_containing (buf, any_member_fragment)
     . chars () . take_while ( |c| *c == '*' ) . count () }
 
-async fn editable_subscribeeFolder (
+async fn editable_forksFolder (
   fails : &mut Fails,
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let buf : String = render ("wSub-owner", config) . await ?;
   let stars : usize = folder_member_stars (&buf, "(gnid wSub-a)");
   { // reorder: [a,b,c] -> swap a,c -> [c,b,a]
-    let s : &str = "subscribeeFolder/reorder";
+    let s : &str = "forksFolder/reorder";
     let reordered : String =
       swap_lines (&buf, "(gnid wSub-a)", "(gnid wSub-c)");
     let nodes : Vec<NodeInstruction> =
@@ -574,10 +636,10 @@ async fn editable_subscribeeFolder (
       Some (n) => if members_msv (&n . forks) != MSV::Specified (vec![
           ID::from ("wSub-c"), ID::from ("wSub-b"), ID::from ("wSub-a")]) {
         fails . record (s, format! (
-          "reordered subscribesTo wrong: {:?}", n . forks)); },
+          "reordered forks wrong: {:?}", n . forks)); },
       None => fails . record (s, "no SaveNode for wSub-owner" . into ()), } }
   { // delete one: remove b -> [a,c]
-    let s : &str = "subscribeeFolder/delete";
+    let s : &str = "forksFolder/delete";
     let b_line : String =
       line_containing (&buf, "(gnid wSub-b)") . to_string ();
     let edited : String = buf . replace (&format! ("{}\n", b_line), "");
@@ -587,10 +649,10 @@ async fn editable_subscribeeFolder (
       Some (n) => if members_msv (&n . forks) != MSV::Specified (vec![
           ID::from ("wSub-a"), ID::from ("wSub-c")]) {
         fails . record (s, format! (
-          "after delete, subscribesTo wrong: {:?}", n . forks)); },
+          "after delete, forks wrong: {:?}", n . forks)); },
       None => fails . record (s, "no SaveNode for wSub-owner" . into ()), } }
   { // insert a member: add d -> [a,b,c,d]
-    let s : &str = "subscribeeFolder/insert";
+    let s : &str = "forksFolder/insert";
     let c_line : String =
       line_containing (&buf, "(gnid wSub-c)") . to_string ();
     let edited : String = buf . replace (
@@ -602,7 +664,7 @@ async fn editable_subscribeeFolder (
           ID::from ("wSub-a"), ID::from ("wSub-b"),
           ID::from ("wSub-c"), ID::from ("wSub-d")]) {
         fails . record (s, format! (
-          "after insert, subscribesTo wrong: {:?}", n . forks)); },
+          "after insert, forks wrong: {:?}", n . forks)); },
       None => fails . record (s, "no SaveNode for wSub-owner" . into ()), } }
   Ok (( )) }
 
@@ -650,20 +712,20 @@ async fn omission_scenarios (
 ) -> Result<(), Box<dyn Error>> {
   let restriction : SkgrepoRestriction =
     SkgrepoRestriction::named (config, SkgrepoName::from ("public")) ?;
-  { // write-protected subscriberFolder: restricted omitted, unrestricted shown
-    let s : &str = "subscriberFolder/omission";
+  { // the forks folder's forkers, drawn unasked: the one whose record
+    // the restriction keeps out is omitted, the other shown
+    let s : &str = "forksFolder/forker-omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view_with_skgrepo_set (
         config, None, &[ID::from ("omSub-owner")], &restriction ) ?;
-    fails . want_absent (s, &buf, "subscriberFolder");
-    fails . want_absent (s, &buf, "omSub-active");
+    fails . want_contains (s, &buf, "(gnid omSub-active)");
     fails . want_absent (s, &buf, "omSub-inactive"); }
-  { // editable subscribeeFolder: omWsub-inactive, private, recorded in
+  { // editable forksFolder: omWsub-inactive, private, recorded in
     // the owner's public section, stands as a Restricted vognode;
     // omWsub-unseen, recorded in its private section, is omitted from
     // the render, and the restricted save weaves it back into
     // subscribesTo.
-    let s : &str = "subscribeeFolder/omission";
+    let s : &str = "forksFolder/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view_with_skgrepo_set (
         config, None, &[ID::from ("omWsub-owner")], &restriction ) ?;
@@ -741,7 +803,7 @@ fn buffer_save_refuses_a_self_subscription
         graph_handle_from_config (config) ?;
       let buffer : &str = indoc! {"
         * (skg node (gnid mono-r2) (skgRepos (nodeRepo public))) mono-r2
-        ** (skg subscribeeFolder)
+        ** (skg forksFolder)
         *** (skg node (gnid mono-r2) (skgRepos (nodeRepo public)) writeProtected) mono-r2
       "};
       let result : Result<SaveResponse, Box<dyn Error>> =

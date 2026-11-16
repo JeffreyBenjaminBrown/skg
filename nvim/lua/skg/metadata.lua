@@ -1132,13 +1132,64 @@ end
 ---@return boolean is METADATA_SEXP, under a parent with PARENT_SEXP
 ---whose own parent has GRANDPARENT_SEXP, a pending detachment: does it
 ---carry 'noClaim', does the graph warrant it, and is its parent
----editable?
+---editable? In a forks folder, where a forker the viewparent does not
+---fork claims nothing too, it must also be a note the viewparent still
+---forks (M.forked_by_its_folders_viewparent_p): a detached forkee or
+---mutual.
 function M.pending_detachment_p (metadata_sexp, parent_sexp,
                                  grandparent_sexp)
   return sexpr.is_list(metadata_sexp)
          and not M.claims_membership_p(metadata_sexp)
          and M.warranted_by_the_graph_p(metadata_sexp)
          and M.reads_claims_p(parent_sexp, grandparent_sexp)
+         and (M.folder_atom(parent_sexp) ~= 'forksFolder'
+              or M.forked_by_its_folders_viewparent_p(metadata_sexp))
+end
+
+---The form at PATH (heads after the metadata's own) in METADATA_SEXP,
+---or nil.
+---@param metadata_sexp any
+---@param path string[]
+---@return any|nil
+local function form_at (metadata_sexp, path)
+  local form = metadata_sexp
+  for _, key in ipairs(path) do
+    if not sexpr.is_list(form) then return nil end
+    form = child_with_head(form, key)
+  end
+  return form
+end
+
+---@param metadata_sexp any
+---@return boolean does METADATA_SEXP, a member of a folder, name its
+---folder's viewparent (ancestor generation 2) among the notes forking
+---it: '(view (rels (forks (in N (ancestors ... 2 ...)))))'? Mirrors
+---skg--forked-by-its-folders-viewparent-p.
+function M.forked_by_its_folders_viewparent_p (metadata_sexp)
+  return vim.tbl_contains(
+    arguments(form_at(metadata_sexp,
+                      { 'view', 'rels', 'forks', 'in', 'ancestors' })),
+    '2')
+end
+
+---@param metadata_sexp any
+---@return boolean do METADATA_SEXP's birth facts name '(forks out 2)'
+---and no '(forks in 2)': is it a member of a forks folder that forks
+---the folder's viewparent, which does not fork it? Mirrors
+---skg--born-only-forking-its-folders-viewparent-p.
+function M.born_only_forking_its_folders_viewparent_p (metadata_sexp)
+  local birth = form_at(metadata_sexp, { 'view', 'birth' })
+  local function born_of (side)
+    if not birth then return false end
+    for i = 2, #birth do
+      local fact = birth[i]
+      if head_name(fact) == 'forks'
+         and vim.deep_equal(arguments(fact), { side, '2' }) then
+        return true end
+    end
+    return false
+  end
+  return born_of('out') and not born_of('in')
 end
 
 ---@param metadata_sexp any
@@ -1447,22 +1498,24 @@ end
 
 ---The partner folder atoms where an explicit relRepo request is
 ---unsupported from this side: the relationship belongs to the other
----end. The membership of hiddenOutsideOfSubscribeeFolder, a compound
+---end. The membership of hiddenOutsideOfForkPartnersFolder, a compound
 ---partner folder, is editable, but hide repos are still derived and
 ---cannot carry this request. Mirrors
 ---skg--relRepo-unsupported-folder-atoms.
 M.relRepo_unsupported_folder_atoms = {
-  'subscriberFolder', 'hiderFolder', 'hiddenFolder',
+  'hiderFolder', 'hiddenFolder',
   'containerFolder', 'mentionerFolder', 'acquiredByFolder',
-  'acquiredFolder', 'illegalEditFolder', 'hiddenInSubscribeeFolder',
-  'hiddenOutsideOfSubscribeeFolder' }
+  'acquiredFolder', 'illegalEditFolder', 'hiddenInForkPartnerFolder',
+  'hiddenOutsideOfForkPartnersFolder' }
 
 ---The partner folder atoms whose members' relationships are writable
 ---from this side, each with its relation's wire name. The folder's
----viewparent records the relationship to each member.
----Mirrors skg--writable-folder-relations.
+---viewparent records the relationship to each member that claims; a
+---member of the forks folder claiming nothing forks the viewparent
+---instead, recording that in its own file, so no relRepo is set on it
+---from here. Mirrors skg--writable-folder-relations.
 M.writable_folder_relations = {
-  { atom = 'subscribeeFolder', relation = 'forks' } }
+  { atom = 'forksFolder', relation = 'forks' } }
 
 ---The menu entry that removes the pending '(editRequest (relRepo
 ---...))' request instead of setting one. For a relationship already on
@@ -1547,6 +1600,11 @@ function M.rel_at_line (line_number)
           .. ' %s position', atom), 0) end
   end
   local writable_folder = writable_folder_relation(parent_sexp)
+  if writable_folder and not M.claims_membership_p(member_sexp) then
+    error(string.format(
+      'This member of the %s claims nothing: it forks the view-parent'
+        .. ' and records that in its own file; attach it first to make'
+        .. ' the view-parent fork it', writable_folder.atom), 0) end
   if writable_folder then
     local folder_viewparent = M.parent_line(parent)
     local folder_viewparent_sexp = folder_viewparent
@@ -1662,7 +1720,7 @@ end
 ---For each relation role in 'shared/relations.json', as the
 ---relationship-kind menu of M.set_relRepo_recursive shows it: the role
 ---the view-child would play toward its view-parent; the kind the walk
----dispatches on ('content' or 'subscribee') for the two roles whose
+---dispatches on ('content' or 'forkee') for the two roles whose
 ---relationship is writable from the child's position, else
 ---false; and a description, which says why when it is not. Mirrors
 ---skg--relationship-role-menu-prose.
@@ -1676,9 +1734,9 @@ M.relationship_role_menu_prose = {
   mentioned = { kind = false, description =
     'Links are inferred from body text; they carry no false relRepo, so there is nothing to set.' },
   forker = { kind = false, description =
-    'A subscriberFolder member: the forks relationship belongs to the member (the forker), not to the view-parent. Write-protected from here.' },
-  forkee = { kind = 'subscribee', description =
-    "A member of the view-parent's subscribeeFolder. Sets the repo of each forks relationship from the view-parent." },
+    "A member of the view-parent's forksFolder that claims nothing: it forks the view-parent, and the forks relationship belongs to the member (the forker), recorded in its own file. Refused from here." },
+  forkee = { kind = 'forkee', description =
+    "A member of the view-parent's forksFolder that claims: the view-parent forks it. Sets the repo of each forks relationship from the view-parent." },
   hider = { kind = false, description =
     'Hide repos are derived at save, floored at the most public explaining subscription; the hiderFolder is write-protected.' },
   hidden = { kind = false, description =
@@ -1711,7 +1769,7 @@ local relRepo_namespace =
 ---Set the relRepo of every matching relationship in the subtree at
 ---point. First a menu of the relation roles (M.select_relationship_kind)
 ---asks which role the view-children should play toward their
----view-parents; only 'content' and 'subscribee' are
+---view-parents; only 'content' and 'forkee' are
 ---settable from the child's position. Then a prompt over the whole
 ---ladder, plus the no-override choice, which removes the pending
 ---requests instead. No per-relationship default is fetched: the
@@ -1870,8 +1928,10 @@ end
 ---an unknown viewnode or a restricted viewnode, whose
 ---relationship to its view-parent is of KIND and is collected at save from this position?
 ---For 'content', the view-parent is an editable occurrence not in
----subscribee-as-such position; for 'subscribee', it is the writable
----subscribeeFolder with an editable viewparent. Mirrors
+---subscribee-as-such position; for 'forkee', it is the writable
+---forksFolder with an editable viewparent, and the headline claims (a
+---member claiming nothing forks the viewparent; its record is its
+---own). Mirrors
 ---skg--relationship-kind-matches-p.
 ---@param line_number integer
 ---@param kind string
@@ -1888,8 +1948,8 @@ function M.relationship_kind_matches_p (line_number, kind)
     return kind == 'content'
            and not M.node_write_protected_p(parent_sexp)
            and not M.subscribee_as_such_at_line_p(parent) end
-  if M.non_vognode_atom_present_p(parent_sexp, 'subscribeeFolder') then
-    return kind == 'subscribee' and M.folder_viewparent_editable_p(parent) end
+  if M.non_vognode_atom_present_p(parent_sexp, 'forksFolder') then
+    return kind == 'forkee' and M.folder_viewparent_editable_p(parent) end
   return false
 end
 
@@ -1908,14 +1968,16 @@ end
 
 ---@param line_number integer
 ---@return boolean is the headline an occurrence claiming membership
----under a subscribeeFolder? Mirrors skg--subscribee-as-such-at-point-p.
+---under a forksFolder, a forkee as such (one claiming nothing forks the
+---folder's viewparent, or was detached)? Mirrors
+---skg--subscribee-as-such-at-point-p.
 function M.subscribee_as_such_at_line_p (line_number)
   local meta = M.metadata_sexp_at_line_or_nil(line_number)
   if not (M.occurrence_sexp_p(meta) and M.claims_membership_p(meta)) then
     return false end
   local parent = M.parent_line(line_number)
   return parent ~= nil and M.non_vognode_atom_present_p(
-    M.metadata_sexp_at_line_or_nil(parent), 'subscribeeFolder')
+    M.metadata_sexp_at_line_or_nil(parent), 'forksFolder')
 end
 
 ---@param line_number integer

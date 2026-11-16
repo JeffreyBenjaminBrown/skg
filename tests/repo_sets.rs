@@ -801,7 +801,7 @@ async fn tombstones_under_folders_save_without_error (
   // members stood; saving it must not error.
       let buffer = indoc! {"
         * (skg node (gnid root) (skgRepos (nodeRepo public))) root
-        ** (skg subscriberFolder)
+        ** (skg forksFolder)
         *** (skg tombstone)
         ** (skg node (gnid active-b) (skgRepos (nodeRepo public)) writeProtected) active-b
       "};
@@ -824,11 +824,11 @@ async fn tombstone_in_subscribee_folder_does_not_contribute_to_forks (
   // no contains relationship_axes: 'forks' is
   // order-meaningful, but the disk merge (weave) owns invisible
   // subscribees, so a tombstone where one stood must not feed the
-  // recorder's subscribeeFolder. (root has no forks on disk, so the
+  // recorder's forksFolder. (root has no forks on disk, so the
   // unrestricted member is the only one written.)
       let buffer = indoc! {"
         * (skg node (gnid root) (skgRepos (nodeRepo public))) root
-        ** (skg subscribeeFolder)
+        ** (skg forksFolder)
         *** (skg tombstone)
         *** (skg node (gnid active-b) (skgRepos (nodeRepo public)) writeProtected) active-b
       "};
@@ -921,7 +921,7 @@ async fn restricted_save_preserves_invisible_fork_targets (
   // retention, and save preservation"): a node forks [ovr-visible,
   // ovr-inactive] where ovr-inactive's skgrepo, and the section of
   // ovr-owner that records it, are restricted. A restricted save of
-  // the node that draws no subscribee folder keeps both.
+  // the node that draws no forks folder keeps both.
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           &config, SkgrepoName::from ("public") )?;

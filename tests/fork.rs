@@ -6,7 +6,7 @@
 // contains, subscribes to N and overrides N; N itself is untouched.
 //
 // Installs the explicit graph handle (override substitution and
-// subscribeeFolder content read it), so it belongs among the
+// forksFolder content read it), so it belongs among the
 // grouped_overrides installers.
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
@@ -273,7 +273,7 @@ fn subtree_of<'a> (
     . collect () }
 
 /// The reader's view of 'f', its fork of the sender's 't', with 't'
-/// made editable in the subscribee folder, as the reader's client
+/// made editable in the forks folder, as the reader's client
 /// shows the unread list: the saved view of a save asking for it.
 async fn reader_view_with_unread_list (
   config      : &SkgConfig,
@@ -324,7 +324,7 @@ fn second_level (
 /// Mail between two skgrepos: the sender's note 't' holds messages
 /// 'm1' and 'm2'. The reader's 'f' forks 't' (subscribes to it,
 /// overrides it, contains only 'maybe done'), so 't' stands in f's
-/// subscribee folder listing the messages f has neither filed nor
+/// forks folder listing the messages f has neither filed nor
 /// hidden: the reader's unread list. The reader types a reply under
 /// 'm1' there, which forks 'm1', and saves, approving the fork.
 /// The redrawn view must show the reply, under the reader's clone of
@@ -1093,7 +1093,7 @@ async fn fork_fixture_files (
   Ok (( )) }
 
 /// Round-trip: after the fork, reopening P shows the clone in N's
-/// place, carrying (overridesHere N), with the default subscribeeFolder
+/// place, carrying (overridesHere N), with the default forksFolder
 /// listing N. The load-bearing property:
 /// P's stored
 /// 'contains' is not rewritten to the clone -- it still lists N, so the
@@ -1129,8 +1129,8 @@ async fn fork_round_trip (
     p_view );
   assert! ( p_view . contains (& format! ("(gnid {})", clone_gnid . 0)),
     "the shown substitute must be the clone {}:\n{}", clone_gnid . 0, p_view );
-  assert! ( p_view . contains ("subscribeeFolder"),
-    "the clone (a subscriber of N) shows a subscribeeFolder:\n{}", p_view );
+  assert! ( p_view . contains ("forksFolder"),
+    "the clone (a subscriber of N) shows a forksFolder:\n{}", p_view );
 
   // The load-bearing round-trip: P's stored contains was not rewritten
   // to the clone; it still lists N (the fact collected N, not C).

@@ -132,7 +132,7 @@ WIDE_UNMARK_QUESTION = (
 FOREST_VIEW_REQUESTS = {
   "containers"    : None,
   "mentioners"    : "(folder mentioners)",
-  "subscribesTo"  : "(folder subscribesTo)",
+  "forks"         : "(folder forks)",
   "hidesFromSubs" : "(folder hidesFromSubs)",
   "aliases"       : "(folder aliases)",
   "flags"         : "flags" }
@@ -2525,7 +2525,10 @@ def is_pending_detachment (metadata, parent, grandparent):
   the graph (no 'noWarrant' or 'ghostWarrant', no '(rel removed)'),
   and stands under a parent that reads its children's claims: a node
   that is not write-protected, or a folder that is not write-protected
-  whose viewparent is such a node."""
+  whose viewparent is such a node. In a forks folder, where a forker
+  the viewparent does not fork claims nothing too, it must also be a
+  note the viewparent still forks ('is_forked_by_its_folders_viewparent'):
+  a detached forkee or mutual ('skg--pending-detachment-p')."""
   view = metadata_form (metadata, "view") or []
   rel = metadata_form ( metadata_form (metadata, "diff"), "rel" )
   if ( not metadata_has_atom (metadata, "noClaim")
@@ -2534,7 +2537,22 @@ def is_pending_detachment (metadata, parent, grandparent):
        or ( rel is not None and len (rel) == 2
             and is_symbol_named ( rel [1], "removed" ))):
     return False
+  if ( parent is not None and folder_atom (parent) == "forksFolder"
+       and not is_forked_by_its_folders_viewparent (metadata) ):
+    return False
   return reads_claims (parent, grandparent)
+
+def is_forked_by_its_folders_viewparent (metadata):
+  """Whether METADATA, a member of a folder, names its folder's
+  viewparent (ancestor generation 2) among the notes forking it:
+  '(view (rels (forks (in N (ancestors ... 2 ...)))))'
+  ('skg--forked-by-its-folders-viewparent-p')."""
+  form = metadata
+  for key in ( "view", "rels", "forks", "in", "ancestors" ):
+    form = metadata_form (form, key)
+    if form is None:
+      return False
+  return 2 in form [ 1 : ]
 
 # ============================================================
 # Change facts: a headline's '(diff (leaves ...) (processed ...))', which
@@ -2956,12 +2974,24 @@ def parse_edited_compact_view (compact_text):
   assign_parents (headlines)
   return headlines
 
+# The heralds whose words include a handle word, which a handle's words
+# leave out: the forks folder's label holds 'fork', the word for the
+# fork operation, which no folder takes.
+HERALD_PHRASES_HOLDING_HANDLE_WORDS = ( "It forks these, or these fork it.", )
+
+def handle_words (display_text):
+  """The words of a handle's display text: its tokens, the heralds of
+  'HERALD_PHRASES_HOLDING_HANDLE_WORDS' left out."""
+  for phrase in HERALD_PHRASES_HOLDING_HANDLE_WORDS:
+    display_text = display_text . replace (phrase, " ")
+  return display_text . split ()
+
 def edited_headline (compact_line_number, level, text_after_stars):
   placed = PLACED_NODE_HANDLE_PATTERN . match (text_after_stars)
   if placed:
     return OutlineHeadline (
       None, level, strip_link_annotations ( placed . group (1) ),
-      placed . group (3) . split (), compact_line_number,
+      handle_words ( placed . group (3) ), compact_line_number,
       placed_node_id = placed . group (2) )
   match = COMPACT_HANDLE_PATTERN . match (text_after_stars)
   if not match:
@@ -2972,7 +3002,7 @@ def edited_headline (compact_line_number, level, text_after_stars):
   return OutlineHeadline (
     None if marked_new else match . group (2), level,
     strip_link_annotations ( match . group (1) ),
-    match . group (3) . split (), compact_line_number, marked_new )
+    handle_words ( match . group (3) ), compact_line_number, marked_new )
 
 def strip_link_annotations (text):
   return ANNOTATED_LINK_PATTERN . sub ( r'\1', text )
@@ -3230,16 +3260,18 @@ def words_with_a_subtree_form (headline):
 
 # The writable partner folders, each with the kind of relationship
 # 'relRepo:NAME subtree' sets from it ('skg--writable-folder-relations'
-# in 'elisp/skg-metadata.el').
-WRITABLE_FOLDER_RELATIONSHIP_KINDS = { "subscribeeFolder" : "subscribee" }
+# in 'elisp/skg-metadata.el'). The folder's viewparent records the
+# relationship to each member that claims; a member of the forks folder
+# claiming nothing forks the viewparent, recording that in its own file.
+WRITABLE_FOLDER_RELATIONSHIP_KINDS = { "forksFolder" : "forkee" }
 # The partner folders whose members' relationships belong to the other
 # end, so that no relRepo can be set from there
 # ('skg--relRepo-unsupported-folder-atoms').
 RELREPO_UNSUPPORTED_FOLDERS = (
-  "subscriberFolder", "hiderFolder", "hiddenFolder",
+  "hiderFolder", "hiddenFolder",
   "containerFolder", "mentionerFolder", "acquiredByFolder",
-  "acquiredFolder", "illegalEditFolder", "hiddenInSubscribeeFolder",
-  "hiddenOutsideOfSubscribeeFolder" )
+  "acquiredFolder", "illegalEditFolder", "hiddenInForkPartnerFolder",
+  "hiddenOutsideOfForkPartnersFolder" )
 
 class OutlineWordCheck:
   """What reading the handles' words against the outline found:
@@ -3381,8 +3413,10 @@ def relRepo_problems (edited, index, headline_of_handle, ownership):
   NAME is no owned skgrepo; the headline is a root; its parent is a
   folder whose relationships belong to the other end, a writable folder
   under a write-protected viewparent, a write-protected node, or
-  neither a node nor a writable folder. An alias sets its own
-  relationship to its node."""
+  neither a node nor a writable folder; or it is a member of the forks
+  folder claiming nothing, which forks the folder's viewparent and
+  records that in its own file. An alias sets its own relationship to
+  its node."""
   headline = edited [index]
   words = [ word for word in headline . edit_request_words ()
             if word . startswith (RELREPO_WORD_PREFIX) and word in headline . tokens ]
@@ -3404,6 +3438,12 @@ def relRepo_problems (edited, index, headline_of_handle, ownership):
     return [ f"carries '{words [0]}', but stands in a {folder}, whose "
              "relationships belong to the other end." ]
   if folder in WRITABLE_FOLDER_RELATIONSHIP_KINDS:
+    if metadata_has_atom (
+        headline_of_handle [ headline . handle ] . metadata, "noClaim" ):
+      return [ f"carries '{words [0]}', but this member of the {folder} "
+               "claims nothing: it forks the view-parent and records that "
+               "in its own file; attach it first to make the view-parent "
+               "fork it." ]
     if not is_editable_node ( outline_metadata (
         edited, edited [parent] . parent, headline_of_handle )):
       return [ f"carries '{words [0]}', but the folder's viewparent is "
@@ -3700,8 +3740,8 @@ def expand_repo_subtree (edited, root, word, headline_of_handle, check):
 def expand_relRepo_subtree (edited, root, word, headline_of_handle, check):
   """'relRepo:NAME subtree', the clients' 'skg-set-relRepo-recursive'
   ('C-c s R'), for the kind of relationship its headline names: on a
-  node its content relationships, on a subscribee folder the
-  subscriptions, the walk of
+  node its content relationships, on a forks folder the forks of its
+  claiming members, the walk of
   'skg--relRepo-recursive-targets'. The headline itself takes it only
   when its own relationship is of that kind."""
   root_metadata = headline_of_handle [ edited [root] . handle ] . metadata
@@ -3713,7 +3753,7 @@ def expand_relRepo_subtree (edited, root, word, headline_of_handle, check):
       f"Error: ⟨{edited [root] . handle}⟩ on line "
       f"{edited [root] . compact_line_number} of the compact view carries "
       f"'{word} subtree', which applies on a node (its content "
-      "relationships) or a subscribee folder." )
+      "relationships) or a forks folder." )
     return
   def metadata_of (index):
     return outline_metadata (edited, index, headline_of_handle)
@@ -3722,7 +3762,7 @@ def expand_relRepo_subtree (edited, root, word, headline_of_handle, check):
     return ( metadata is not None and headline_kind (metadata) == "node"
              and not metadata_has_atom (metadata, "noClaim")
              and folder_atom ( metadata_of ( edited [index] . parent ) or
-                               [ Symbol ("skg") ] ) == "subscribeeFolder" )
+                               [ Symbol ("skg") ] ) == "forksFolder" )
   def prune_below (index):
     return ( metadata_has_atom ( metadata_of (index), "writeProtected" )
              or subscribee_as_such (index) )

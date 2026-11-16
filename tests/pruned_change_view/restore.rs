@@ -7,7 +7,7 @@
 // content and s drops its subscribee s2. Its "all changes" buffer holds
 // b with x as an editable removed member, d with c likewise, and under
 // x's container folder e as a '~-' container (b, above x, stands in no
-// folder); and s2 with s, in its subscriber folder, as a '~-'
+// folder); and s2 with s, in its forks folder, as a '~-'
 // subscriber.
 //
 // In the 'restore' fixture g, deleted since HEAD, was contained by q
@@ -15,7 +15,7 @@
 // is deleted too, and r dropped gc from its content. Its buffer holds
 // q with g as a ghost (gc and gd under it), r with gc as
 // a removed member (g, historical, in gc's container folder), and t
-// with g in its subscribee folder.
+// with g in its forks folder.
 
 use crate::pruned_change_view::common::{
   assert_lines_in_order, open_all_changes_buffer, save, saved_and_rerendered, with_fixture};
@@ -51,7 +51,7 @@ const X_REMOVED_FROM_B : &str =
 const E_REMOVED_AS_XS_CONTAINER : &str =
   "**** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected (view ghostWarrant)";
 const S_REMOVED_AS_S2S_SUBSCRIBER : &str =
-  "*** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected";
+  "*** (skg node (gnid s) (skgRepos (nodeRepo main)) noClaim writeProtected";
 /// d, a node of the containerward chain under c, a member of x's
 /// containers folder.
 const D_IN_THE_CHAIN_UNDER_C : &str =
@@ -139,8 +139,9 @@ fn restoring_a_removed_container_from_a_folder () -> Result<(), Box<dyn Error>> 
     saved_and_rerendered (f, &response . saved_view) ?;
     Ok (( )) }) }
 
-/// A removed subscription, from the subscriber folder of the
-/// subscribee: it returns to its index at HEAD in the subscriber's list.
+/// A removed fork, from the forks folder of the forkee, where the
+/// forker stands claiming nothing: it returns to its index at HEAD in
+/// the forker's list.
 #[test]
 fn restoring_a_removed_subscription_from_a_subscriber_folder (
 ) -> Result<(), Box<dyn Error>> {
@@ -244,7 +245,7 @@ fn restore_requests_on_the_wrong_kind_stop_the_save () -> Result<(), Box<dyn Err
     Ok (( )) }) }
 
 /// In the 'subscribee_member' fixture, p hangs under sub, the added
-/// member of s1's changed subscriber folder, as sub's containerward
+/// member of s1's changed forks folder, as sub's containerward
 /// chain. A restoreRel with '(rel removed)' typed beside it there is
 /// refused, as on a chain node under a containers folder's member.
 #[test]

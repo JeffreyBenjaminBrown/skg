@@ -12,7 +12,7 @@
 use crate::types::viewnode::{NodeEditRequest, Occurrence};
 
 /// This returns true iff the given occurrence counts as a
-/// member of the writable partner folder (a subscribeeFolder) that is
+/// member of the writable partner folder (a forksFolder) that is
 /// its parent. To count, it must be a member
 /// and not marked for deletion.
 pub fn member_counts_for_partnerFolder (

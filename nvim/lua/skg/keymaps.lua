@@ -64,8 +64,8 @@ M.commands = {
                             desc = 'Request the alias folder (auto-saves)' },
   ShowFolderOfHidesFromSubs = { module = 'skg.views', fn = 'show_folderOf_hidesFromSubs',
                           desc = 'Request the hide folders (auto-saves)' },
-  ShowFolderOfSubscribesTo = { module = 'skg.views', fn = 'show_folderOf_subscribesTo',
-                               desc = 'Request the subscribe folders (auto-saves)' },
+  ShowFolderOfForks = { module = 'skg.views', fn = 'show_folderOf_forks',
+                        desc = 'Request the forks folder (auto-saves)' },
   ShowFolderOfContainers = { module = 'skg.views', fn = 'show_folderOf_containers',
                              desc = 'Request the container folder (auto-saves)' },
   ShowFolderOfMentioners = { module = 'skg.views', fn = 'show_folderOf_mentioners',
@@ -347,7 +347,7 @@ M.content_view_bindings = {
   { 'gv', 'GotoViewnodeId' },            -- C-c g v
   { 'la', 'ShowFolderOfAliases' },       -- C-c l a
   { 'lh', 'ShowFolderOfHidesFromSubs' }, -- C-c l h
-  { 'ls', 'ShowFolderOfSubscribesTo' },  -- C-c l s
+  { 'lf', 'ShowFolderOfForks' },         -- C-c l f
   { 'lp', 'ShowFolderOfFlags' },         -- C-c l p
   { 'lc', 'ShowFolderOfContainers' },    -- C-c l c
   { 'lm', 'ShowFolderOfMentioners' },    -- C-c l m

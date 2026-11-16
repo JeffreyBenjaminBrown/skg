@@ -1,3 +1,5 @@
 * An overridden node, outside the view ⟨0a 1K A1 ⌂:main⟩
-** ⟨0b aliases⟩
-*** Another name for it ⟨0c alias⟩
+** ⟨0d aliases⟩
+*** Another name for it ⟨0e alias⟩
+** ⟨0b It forks these, or these fork it.⟩
+*** An overrider, outside the view ⟨0c ☮ Kb F1⟩

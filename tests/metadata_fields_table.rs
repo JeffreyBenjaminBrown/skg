@@ -76,19 +76,19 @@ fn every_kind_atom (
         | ChangeViewnode::ChangesetMarker { .. } => (), } }
   let folders : Vec<Folder> = vec! [
     Folder::Alias, Folder::ID, Folder::flags (),
-    Folder::Subscribee, Folder::Subscriber,
+    Folder::Forks,
     Folder::Hider, Folder::Hidden,
-    Folder::HiddenInSubscribee,
-    Folder::HiddenOutsideOfSubscribee,
+    Folder::HiddenInForkPartner,
+    Folder::HiddenOutsideOfForkPartners,
     Folder::Container, Folder::Mentioner,
     Folder::AcquiredBy, Folder::Acquired, Folder::illegal_edit () ];
   for folder in &folders {
     match folder {
       Folder::Alias | Folder::ID | Folder::Flags { .. }
-        | Folder::Subscribee | Folder::Subscriber
+        | Folder::Forks
         | Folder::Hider | Folder::Hidden
-        | Folder::HiddenInSubscribee
-        | Folder::HiddenOutsideOfSubscribee
+        | Folder::HiddenInForkPartner
+        | Folder::HiddenOutsideOfForkPartners
         | Folder::Container | Folder::Mentioner
         | Folder::AcquiredBy | Folder::Acquired
         | Folder::IllegalEdit { .. } => (), } }

@@ -46,8 +46,8 @@ In order, it:
   write-protected foreign node, makes it editable with 'editable',
   forks a placed foreign node by adding a child to it (declined
   without '--yes', approved with it: the clone forks it), forks an owned node with 'fork' (refused beside
-  another edit, then approved), and subscribes and hides by editing a
-  subscribee folder;
+  another edit, then approved), and forks and hides by editing a
+  forks folder;
 - on a fourth scratch server, writes the words of a handle:
   'detach' and 'attach', 'write-protect' (and 'subtree'),
   'noSearchMatching' and 'searchMatching' (and 'subtree', skipping
@@ -141,7 +141,7 @@ TOOL_RUNS = [
     [ "forest", kind, node_id, "--no-summary" ], "content-view:" + node_id )
   for kind, node_id in [ ( "containers",    "shared-id" ),
                          ( "mentioners",    "child-b-id" ),
-                         ( "subscribesTo",  "fred-note-id" ),
+                         ( "forks",         "fred-note-id" ),
                          ( "hidesFromSubs", "fred-aside-id" ),
                          ( "aliases",       "overridden-id" ),
                          ( "flags",         "overrider-id" ) ] ]
@@ -162,6 +162,7 @@ def main (argv):
   failures += failures_of_link_annotation_round_trip ()
   failures += failures_of_link_annotations ()
   failures += failures_of_shared_herald_cases ()
+  failures += failures_of_forks_folder_claims ()
   failures += failures_against_scratch_servers (update_expected)
   shutil . rmtree ( os . environ [ "XDG_RUNTIME_DIR" ], ignore_errors = True )
   for failure in failures:
@@ -169,6 +170,60 @@ def main (argv):
   if failures:
     sys . exit (1)
   print ( "PASS" + ( " (expected files rewritten)" if update_expected else "" ))
+
+# ============================================================
+# The forks folder's claims
+# ============================================================
+
+def failures_of_forks_folder_claims ():
+  """In a forks folder a member claims exactly when the folder's
+  viewparent forks it. One claiming nothing is a pending detachment
+  only when the viewparent still forks it (a detached forkee or
+  mutual, whose '(rels (forks (in ...)))' names ancestor generation
+  2), not a forker the viewparent does not fork; and 'relRepo:NAME' is
+  refused on it, since such a forker records its fork in its own
+  file, while a claiming member takes it."""
+  full = ( "* (skg (vnid 0a) node (gnid n) (skgRepos (nodeRepo main))) n\n"
+           "** (skg (vnid 0b) forksFolder)\n"
+           "*** (skg (vnid 0c) node (gnid f) (skgRepos (nodeRepo main)) noClaim writeProtected "
+           "(view (rels (forks (out 1 (ancestors 2)))) (birth (forks out 2)))) f\n"
+           "*** (skg (vnid 0d) node (gnid e) (skgRepos (nodeRepo main)) noClaim writeProtected "
+           "(view (rels (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) e\n"
+           "*** (skg (vnid 0e) node (gnid m) (skgRepos (nodeRepo main)) noClaim writeProtected "
+           "(view (rels (forks (in 1 (ancestors 2)) (out 1 (ancestors 2)))) "
+           "(birth (forks in 2) (forks out 2)))) m\n"
+           "*** (skg (vnid 0g) node (gnid k) (skgRepos (nodeRepo main)) writeProtected "
+           "(view (rels (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) k\n" )
+  compact = ( "* n ⟨0a⟩\n** ⟨0b⟩\n*** f ⟨0c relRepo:main⟩\n"
+              "*** e ⟨0d⟩\n*** m ⟨0e⟩\n*** k ⟨0g relRepo:main⟩\n" )
+  headline_of_handle = skg_for_ai . headlines_by_viewnode_id (
+    skg_for_ai . parse_full_view (full) )
+  edited = skg_for_ai . parse_edited_compact_view (compact)
+  def metadata (handle):
+    return headline_of_handle [handle] . metadata
+  failures = []
+  for handle, pending in [ ( "0c", False ), ( "0d", True ), ( "0e", True ) ]:
+    if skg_for_ai . is_pending_detachment (
+        metadata (handle), metadata ("0b"), metadata ("0a") ) != pending:
+      failures . append ( f"the forks folder's member {handle} should "
+                          f"{'' if pending else 'not '}be a pending detachment" )
+  refusal = skg_for_ai . relRepo_problems (
+    edited, 2, headline_of_handle, { "main" : True } )
+  if not ( len (refusal) == 1 and "claims nothing" in refusal [0] ):
+    failures . append ( f"'relRepo:main' on a forker claiming nothing gave {refusal!r}" )
+  allowed = skg_for_ai . relRepo_problems (
+    edited, 5, headline_of_handle, { "main" : True } )
+  if allowed:
+    failures . append ( f"'relRepo:main' on a claiming forkee gave {allowed!r}" )
+  # The folder's label holds 'fork', which its handle's words leave out.
+  for text, words in [
+      ( "** ⟨0b It forks these, or these fork it.⟩", [] ),
+      ( "** ⟨0b It forks these, or these fork it. relRepo:main subtree⟩",
+        [ "relRepo:main", "subtree" ] ) ]:
+    folder = skg_for_ai . parse_edited_compact_view (text) [0]
+    if folder . words () != words:
+      failures . append ( f"the words of {text!r} are {folder . words ()!r}, not {words!r}" )
+  return failures
 
 # ============================================================
 # The save envelope
@@ -1319,7 +1374,7 @@ def failures_of_placing_and_forking (scratch, data_root):
                 check_write_protected_foreign_edit_refused,
                 check_making_a_foreign_node_editable, check_implicit_fork_declined,
                 check_implicit_fork_approved, check_explicit_fork,
-                check_subscribing_and_hiding_by_placing ]:
+                check_forking_and_hiding_by_placing ]:
     try:
       case (context)
     except CaseFailure as failure:
@@ -1613,25 +1668,25 @@ def check_explicit_fork (context):
   require_equal ( "the forked node's title", skg_title (context, "shared-id"),
                   "Contained twice" )
 
-def check_subscribing_and_hiding_by_placing (context):
-  """In the editable subscribee folder 'forest subscribesTo' draws, a
-  placed foreign node is subscribed to; its unintegrated child, then
-  removed from under it, is hidden from the subscription, which the
+def check_forking_and_hiding_by_placing (context):
+  """In the editable forks folder 'forest forks' draws, a
+  placed foreign node is forked; its unintegrated child, then removed
+  from under it, is hidden from the fork, which the
   report says before the save and the save says after. Neither forks.
-  Then the report says that removing a child the subscribee does not
+  Then the report says that removing a child the forkee does not
   contain hides nothing."""
-  folder = os . path . join ( context [ "scratch" ], "write", "subscribe" )
-  require_tool_run ([ "forest", "subscribesTo", "elsewhere-id", "--out-dir",
+  folder = os . path . join ( context [ "scratch" ], "write", "fork-by-placing" )
+  require_tool_run ([ "forest", "forks", "elsewhere-id", "--out-dir",
                       folder, "--no-summary" ])
-  base_name = "forest-subscribesTo_elsewhere-id"
+  base_name = "forest-forks_elsewhere-id"
   compact_path = os . path . join ( folder, base_name + ".compact.org" )
   compact = read_file (compact_path)
   folder_line = next ( line for line in compact . split ("\n")
-                       if "It subscribes to these." in line )
+                       if "It forks these, or these fork it." in line )
   edit_compact ( folder, [ ( folder_line + "\n", folder_line +
                              "\n*** Fred's ⟨node:fred-note-id⟩\n" ) ], base_name )
   if "Server: saved," not in run_save (folder, "--yes") . stdout:
-    raise CaseFailure ( "the subscribing save failed" )
+    raise CaseFailure ( "the forking save failed" )
   require_equal ( "what the node forks",
                   skg_list (context, "elsewhere-id", "forks"),
                   [ "fred-note-id" ] )
@@ -3097,9 +3152,9 @@ FOLLOWS_YOURS_SUMMARY = (
   "# Perspective: your overrides (each root author's overrides are the default).\n" )
 FOLLOWS_THIRDS_SUMMARY = (
   "# Perspective: third's overrides (each root author's overrides are the default).\n" )
-R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨0c It subscribes to these.⟩\n**** M ⟨0d ☮ 2C 3bK⟩\n***** P ⟨0e ☮ Ca ⌂:main⟩\n***** R ⟨0f ☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
-R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨0c It subscribes to these.⟩\n**** M ⟨0d ☮ 2C 3bK ⌂:foreign⟩\n***** P ⟨0e ☮ Ca ⌂:main⟩\n***** R ⟨0f ☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
-R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨0c It subscribes to these.⟩\n**** M ⟨0d ☮ 2C 3bK ⌂:foreign⟩\n***** P ⟨0e ☮ Ca ⌂:main⟩\n***** R ⟨0f ☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
+R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨0c It forks these, or these fork it.⟩\n**** M ⟨0d ☮ 2C 3bK⟩\n***** P ⟨0e ☮ Ca ⌂:main⟩\n***** R ⟨0f ☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
+R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨0c It forks these, or these fork it.⟩\n**** M ⟨0d ☮ 2C 3bK ⌂:foreign⟩\n***** P ⟨0e ☮ Ca ⌂:main⟩\n***** R ⟨0f ☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
+R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨0c It forks these, or these fork it.⟩\n**** M ⟨0d ☮ 2C 3bK ⌂:foreign⟩\n***** P ⟨0e ☮ Ca ⌂:main⟩\n***** R ⟨0f ☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
 
 def copy_overrides_followed_fixture (data_root):
   """The overrides-followed data, with a config naming its two foreign

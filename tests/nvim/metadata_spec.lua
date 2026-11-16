@@ -457,7 +457,7 @@ describe('skg.metadata commands', function ()
         .. ' (diff (rel removed))) d',
       -- a node of the chain under another folder's member
       '* (skg node (gnid r) (skgRepos (nodeRepo main))) r\n'
-        .. '** (skg subscriberFolder) subscribers\n'
+        .. '** (skg hiderFolder) hiders\n'
         .. '*** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected) s\n'
         .. '**** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected'
         .. ' (diff (rel removed))) d' }) do
@@ -525,7 +525,7 @@ describe('skg.metadata commands', function ()
       { '* (skg alias) an alias',
         { editRequest = { 'none (default)', 'relRepo' } } },
       { '* (skg tombstone)', {} },
-      { '* (skg subscribeeFolder)', {} },
+      { '* (skg forksFolder)', {} },
       { '* (skg (flag noSearchMatching)) no search matching', {} } }) do
       with_metadata_editor_on(case[1], function (source)
         for field, values in pairs(case[2]) do
@@ -617,7 +617,8 @@ describe('skg.metadata keybinding surface', function ()
     assert.are.equal('RequestWriteProtectedRecursive', by_lhs['sW'])
     assert.are.equal('ShowFolderOfAliases', by_lhs['la'])
     assert.is_nil(by_lhs['lo'])
-    assert.are.equal('ShowFolderOfSubscribesTo', by_lhs['ls'])
+    assert.is_nil(by_lhs['ls'])
+    assert.are.equal('ShowFolderOfForks', by_lhs['lf'])
     assert.are.equal('ShowFolderOfFlags', by_lhs['lp'])
     assert.is_nil(by_lhs['cb'])
     assert.are.equal('ShowFolderOfContainers', by_lhs['lc'])
@@ -701,7 +702,7 @@ describe('skg.metadata relRepo gesture', function ()
   it("classifies a writable folder's member", function ()
     buffer_with({
       '* (skg node (gnid anchor) (skgRepos (nodeRepo public))) anchor',
-      '** (skg subscribeeFolder)',
+      '** (skg forksFolder)',
       '*** (skg node (gnid seen) (skgRepos (nodeRepo public)) writeProtected) seen' })
     assert.are.same({ recorder = 'anchor', member = 'seen',
                       relation = 'forks' }, metadata.rel_at_line(3))
@@ -716,7 +717,7 @@ describe('skg.metadata relRepo gesture', function ()
           .. " folder's viewparent is editable" },
         { '* (skg aliasFolder) not a node',
           "Could not find the folder's viewparent" } }) do
-      buffer_with({ case[1], '** (skg subscribeeFolder)',
+      buffer_with({ case[1], '** (skg forksFolder)',
         '*** (skg node (gnid seen) (skgRepos (nodeRepo public))) seen' })
       local ok, refusal = pcall(metadata.rel_at_line, 3)
       assert.is_false(ok)
@@ -742,11 +743,23 @@ describe('skg.metadata relRepo gesture', function ()
   it("refuses on a write-protected folder's member", function ()
     buffer_with({
       '* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder',
-      '** (skg subscriberFolder)',
+      '** (skg hiderFolder)',
       '*** (skg node (gnid sub) (skgRepos (nodeRepo public))) sub' })
     local err = refusal(metadata.rel_at_line, 3)
     assert.is_truthy(err:find('write-protected', 1, true))
-    assert.is_truthy(err:find('subscriberFolder'))
+    assert.is_truthy(err:find('hiderFolder'))
+  end)
+
+  it("refuses a forks folder's member claiming nothing", function ()
+    -- Mirrors test-rel-in-a-forks-folder-needs-a-claim.
+    buffer_with({
+      '* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder',
+      '** (skg forksFolder)',
+      '*** (skg node (gnid forker) (skgRepos (nodeRepo public)) noClaim) forker',
+      '*** (skg node (gnid forkee) (skgRepos (nodeRepo public))) forkee' })
+    assert.is_truthy(refusal(metadata.rel_at_line, 3):find('claims nothing', 1, true))
+    assert.are.same({ recorder = 'recorder', member = 'forkee', relation = 'forks' },
+                    metadata.rel_at_line(4))
   end)
 
   it('refuses on a root headline', function ()
@@ -889,7 +902,7 @@ describe('skg.metadata relRepo gesture', function ()
     '*** (skg node (gnid d) (skgRepos (nodeRepo public))) d',
     '** (skg node (gnid e) (skgRepos (nodeRepo public)) writeProtected) e',
     '*** (skg node (gnid f) (skgRepos (nodeRepo public))) f',
-    '** (skg subscribeeFolder)',
+    '** (skg forksFolder)',
     '*** (skg node (gnid g) (skgRepos (nodeRepo public))) g',
     '**** (skg node (gnid h) (skgRepos (nodeRepo public))) h',
     '** (skg aliasFolder) aliases' }
@@ -905,10 +918,10 @@ describe('skg.metadata relRepo gesture', function ()
       assert.is_falsy(text_of_id(gnid):find('relRepo')) end
   end)
 
-  it("walks the kind 'subscribee'", function ()
+  it("walks the kind 'forkee'", function ()
     buffer_with(recursive_content_tree)
     assert.are.equal(1, metadata.set_relRepo_recursive_walk(
-      1, 'subscribee', 'private'))
+      1, 'forkee', 'private'))
     assert.is_truthy(text_of_id('g'):find('(relRepo private)', 1, true))
     for _, gnid in ipairs({ 'r', 'a', 'b', 'c', 'd', 'e', 'f', 'h' }) do
       assert.is_falsy(text_of_id(gnid):find('relRepo')) end
@@ -925,7 +938,7 @@ describe('skg.metadata relRepo gesture', function ()
   it('prunes a write-protected folder', function ()
     buffer_with({
       '* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder',
-      '** (skg subscriberFolder)',
+      '** (skg hiderFolder)',
       '*** (skg node (gnid s) (skgRepos (nodeRepo public))) s',
       '**** (skg node (gnid sc) (skgRepos (nodeRepo public))) sc' })
     assert.are.equal(0, metadata.set_relRepo_recursive_walk(
@@ -937,15 +950,15 @@ describe('skg.metadata relRepo gesture', function ()
      function ()
     local tree = {
       '* (skg node (gnid anchor) (skgRepos (nodeRepo public)) writeProtected) anchor',
-      '** (skg subscribeeFolder)',
+      '** (skg forksFolder)',
       '*** (skg node (gnid g) (skgRepos (nodeRepo public))) g' }
     buffer_with(tree)
     assert.are.equal(0, metadata.set_relRepo_recursive_walk(
-      1, 'subscribee', 'trusted'))
+      1, 'forkee', 'trusted'))
     assert.is_falsy(text_of_id('g'):find('relRepo'))
     buffer_with(tree)
     assert.are.equal(0, metadata.set_relRepo_recursive_walk(
-      2, 'subscribee', 'trusted'))
+      2, 'forkee', 'trusted'))
     assert.is_falsy(text_of_id('g'):find('relRepo'))
   end)
 
@@ -969,7 +982,7 @@ describe('skg.metadata relRepo gesture', function ()
     end
     assert.are.same({ 'contains', 'linksTo', 'forks',
                       'hidesFromSubs' }, relations)
-    assert.are.same({ 'content', 'subscribee' }, kinds)
+    assert.are.same({ 'content', 'forkee' }, kinds)
   end)
 
   it('chooses a settable kind and refuses the others', function ()

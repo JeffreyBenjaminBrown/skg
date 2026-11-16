@@ -339,10 +339,9 @@ pub fn draw_search_buffer (
 
 /// Make the hit at 'hit' a root of the search's stub: a
 /// write-protected occurrence asking for its containers folder,
-/// holding, after any alias folder it has, a folder of the nodes it
-/// subscribes to and then one of the nodes that subscribe to it, each
-/// only when the folder's own goal, the one the refresh fills it from,
-/// has members.
+/// holding, after any alias folder it has, its forks folder, only
+/// when the folder's own goal, the one the refresh fills it from, has
+/// members.
 fn stub_root_of_hit (
   viewforest  : &mut ViewForest,
   hit         : NodeId,
@@ -358,11 +357,10 @@ fn stub_root_of_hit (
     occurrence . view_requests . insert (
       ViewRequest::Folder (FolderRelation::Containers) );
     occurrence . gnid . clone () };
-  for folder in [ Folder::Subscribee, Folder::Subscriber ] {
-    if partnerFolder_members_in_graph (graph, &gnid, &folder, restriction)
-       . is_some_and ( |members| ! members . is_empty () ) {
-      viewforest . get_mut (hit) . unwrap ()
-        . append ( viewnode_of ( ViewnodeKind::Folder (folder) )); }}}
+  if partnerFolder_members_in_graph (graph, &gnid, &Folder::Forks, restriction)
+     . is_some_and ( |members| ! members . is_empty () ) {
+    viewforest . get_mut (hit) . unwrap ()
+      . append ( viewnode_of ( ViewnodeKind::Folder (Folder::Forks) )); }}
 
 /// Fold what the refresh drew under the hit at 'hit', so that it
 /// shows collapsed. (In the clients' encoding, a viewnode marked

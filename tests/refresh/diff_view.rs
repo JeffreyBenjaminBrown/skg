@@ -231,7 +231,7 @@ node p
     bodyDiff" ); }
 
 /// What a content view adds unasked, the diff view does not: s's
-/// subscribee folder, though an editable-view request extends s, and
+/// forks folder, though an editable-view request extends s, and
 /// the folder of what s hides in e, though e is an editable subscribee
 /// as such.
 #[test]
@@ -245,25 +245,25 @@ fn the_diff_view_adds_no_default_folders () {
   let straddle : GraphStraddle = straddle (&graph_nodes, &graph_nodes);
   let input : String = formatdoc! ("
     * {} s
-    ** (skg subscribeeFolder)
+    ** (skg forksFolder)
     *** {} e
     * {} u
     ", occurrence_metadata ("s", ""), occurrence_metadata ("e", ""),
        occurrence_metadata ("u", "(viewRequests editableView)") );
   assert_eq! ( diff_run_asserting_fixpoint (&input, &straddle) . outline (), "\
 node s
-  subscribeeFolder
+  forksFolder
     node e
 node u" );
   assert_eq! ( run_asserting_fixpoint (&input, &graph (&graph_nodes)) . outline (), "\
 node s
-  subscribeeFolder
+  forksFolder
     node e
-      hiddenInSubscribeeFolder
+      hiddenInForkPartnerFolder
         node h wp noClaim folded
           node e wp noClaim
 node u
-  subscribeeFolder
+  forksFolder
     node e wp",
     "a content view adds both" ); }
 

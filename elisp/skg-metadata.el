@@ -250,13 +250,13 @@ write-protected -- the save would refuse that edit. Returns
       (cons (skg--change-repo-at-point new-skgrepo) nil))))
 
 (defconst skg--relRepo-unsupported-folder-atoms
-  '(subscriberFolder hiderFolder hiddenFolder
+  '(hiderFolder hiddenFolder
     containerFolder mentionerFolder acquiredByFolder acquiredFolder
     illegalEditFolder
-    hiddenInSubscribeeFolder hiddenOutsideOfSubscribeeFolder)
+    hiddenInForkPartnerFolder hiddenOutsideOfForkPartnersFolder)
   "The partner folder atoms where an explicit relRepo
 request is unsupported from this side.  The membership of
-hiddenOutsideOfSubscribeeFolder, a compound partner folder, is
+hiddenOutsideOfForkPartnersFolder, a compound partner folder, is
 editable, but hide repos are still derived and cannot carry this
 request.
 `skg-set-relRepo' refuses on a member of one of these:
@@ -264,12 +264,14 @@ the relationship belongs to the other end, so setting its repo here would
 be meaningless.")
 
 (defconst skg--writable-folder-relations
-  '((subscribeeFolder . "forks"))
+  '((forksFolder . "forks"))
   "The partner folder atoms whose members' relationships are writable
 from this side, each mapped to its relation's wire name
 (NodeRelation::relation_name, server/dbs/in_rust_graph/
 relation_accessors.rs). The folder's viewparent owns the outbound
-relationship to each member.")
+relationship to each member that claims; a member of the forks
+folder claiming nothing forks the viewparent instead, recording that
+in its own file, so no relRepo is set on it from here.")
 
 (defun skg--rel-at-point ()
   "Classify the relationship the headline at point represents.
@@ -311,6 +313,11 @@ an ID missing."
                               (memq (car entry) (cdr parent-sexp)))
                             skg--writable-folder-relations))))
         (cond
+         ((and writable-folder
+               (not (skg--claims-membership-p member-sexp)))
+          (user-error
+           "This member of the %s claims nothing: it forks the view-parent and records that in its own file; attach it first to make the view-parent fork it"
+           (car writable-folder)))
          (writable-folder
           (let* ((folder-viewparent-sexp
                   (save-excursion
@@ -431,9 +438,9 @@ next save will do with the relationship."
     ("mentioned" nil
      "Links are inferred from body text; they carry no false relRepo, so there is nothing to set.")
     ("forker" nil
-     "A subscriberFolder member: the forks relationship belongs to the member (the forker), not to the view-parent. Write-protected from here.")
-    ("forkee" subscribee
-     "A member of the view-parent's subscribeeFolder. Sets the repo of each forks relationship from the view-parent.")
+     "A member of the view-parent's forksFolder that claims nothing: it forks the view-parent, and the forks relationship belongs to the member (the forker), recorded in its own file. Refused from here.")
+    ("forkee" forkee
+     "A member of the view-parent's forksFolder that claims: the view-parent forks it. Sets the repo of each forks relationship from the view-parent.")
     ("hider" nil
      "Hide repos are derived at save, floored at the most public explaining subscription; the hiderFolder is write-protected.")
     ("hidden" nil
@@ -442,7 +449,7 @@ next save will do with the relationship."
 (ROLE-NAME KIND-OR-NIL DESCRIPTION), as the relationship-kind menu of
 `skg-set-relRepo-recursive' shows it. ROLE-NAME is the role the
 VIEW-CHILD would play toward its view-parent. KIND-OR-NIL is the
-symbol the walk dispatches on (`content' or `subscribee') for the two
+symbol the walk dispatches on (`content' or `forkee') for the two
 roles whose relationship is writable from the child's buffer
 position, and nil for the rest; DESCRIPTION then
 explains why the relationship cannot be set from that position.")
@@ -472,8 +479,8 @@ First presents an org-menu of the schema's five node-node relations
 (level-1 headlines) and their roles (level-2 headlines); pick, with
 RET, the role the view-children should play toward their
 view-parents. Only two roles are settable from the child's
-position: `content' (ordinary content) and `subscribee' (a
-subscribeeFolder member); RET on any other role explains why it
+position: `content' (ordinary content) and `forkee' (a
+claiming forksFolder member); RET on any other role explains why it
 cannot be set from there.
 
 Then prompts for a repo over the whole ladder, plus the
@@ -585,13 +592,13 @@ explains the refusal; q aborts."
   "Apply CHOICE (a repo name, or
 `skg--relRepo-no-override') to every headline in the
 subtree at point, the headline at point included, whose relationship
-to its view-parent is of KIND (`content' or `subscribee'; see
+to its view-parent is of KIND (`content' or `forkee'; see
 `skg--relationship-kind-matches-p'). Recurses only
 where edits still affect the graph: it prunes below write-protected
 nodes and subscribee-as-such members, prunes noClaim
 nodes -- except the walk's root, which the
 user chose deliberately -- and prunes non-vognodes other than the
-writable subscribeeFolder. Returns how many headlines it applied CHOICE to."
+writable forksFolder. Returns how many headlines it applied CHOICE to."
   (let ((targets (skg--relRepo-recursive-targets kind)))
     ;; Do not let a late conflict leave earlier targets edited.  This
     ;; preflight is deliberately before the first metadata rewrite.
@@ -653,8 +660,9 @@ from this position: for `content', the view-parent must be a
 editable occurrence not in subscribee-as-such position (an
 write-protected or subscribee-as-such parent's contains is not
 collected at save, so a relRepo request under one would be
-inert); for `subscribee', the viewparent must be the writable
-subscribeeFolder with an editable viewparent."
+inert); for `forkee', the viewparent must be the writable
+forksFolder with an editable viewparent, and the headline must claim
+\(a member claiming nothing forks the viewparent; its record is its own)."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (or (and (skg--occurrence-sexp-p meta)
                   (skg--claims-membership-p meta))
@@ -668,8 +676,8 @@ subscribeeFolder with an editable viewparent."
                          (not (skg--node-write-protected-p parent-sexp))
                          (not (skg--subscribee-as-such-at-point-p))))
                    ((skg--non-vognode-atom-present-p parent-sexp
-                                                  'subscribeeFolder)
-                    (and (eq kind 'subscribee)
+                                                  'forksFolder)
+                    (and (eq kind 'forkee)
                          (skg--folder-viewparent-editable-p)))
                    (t nil))))))))
 
@@ -684,7 +692,9 @@ not writable relationships."
 
 (defun skg--subscribee-as-such-at-point-p ()
   "Non-nil iff the headline at point sits in subscribee-as-such
-position: an true occurrence member of a subscribeeFolder."
+position, a forkee as such: an occurrence member of a forksFolder that
+claims (one claiming nothing forks the folder's viewparent, or was
+detached)."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (skg--occurrence-sexp-p meta)
          (skg--claims-membership-p meta)
@@ -692,7 +702,7 @@ position: an true occurrence member of a subscribeeFolder."
            (and (org-up-heading-safe)
                 (skg--non-vognode-atom-present-p
                  (skg--metadata-sexp-at-point-or-nil)
-                 'subscribeeFolder))))))
+                 'forksFolder))))))
 
 (defun skg--folder-viewparent-editable-p ()
   "Non-nil iff the folder headline at point has an editable occurrence
@@ -983,11 +993,24 @@ headlines, nil where a headline carries none. Moves point."
 (defun skg--pending-detachment-p (metadata-sexp parent-sexp grandparent-sexp)
   "Non-nil when METADATA-SEXP, under a parent with PARENT-SEXP whose own
 parent has GRANDPARENT-SEXP, is a pending detachment: it carries
-'noClaim', the graph warrants it, and its parent is editable."
+'noClaim', the graph warrants it, and its parent is editable. In a
+forks folder, where a forker the viewparent does not fork claims
+nothing too, it must also be a note the viewparent still forks
+\(`skg--forked-by-its-folders-viewparent-p'): a detached forkee or
+mutual."
   (and (consp metadata-sexp)
        (memq 'noClaim (cdr metadata-sexp))
        (skg--warranted-by-the-graph-p metadata-sexp)
-       (skg--reads-claims-p parent-sexp grandparent-sexp)))
+       (skg--reads-claims-p parent-sexp grandparent-sexp)
+       (or (not (eq (skg--folder-atom parent-sexp) 'forksFolder))
+           (skg--forked-by-its-folders-viewparent-p metadata-sexp))))
+
+(defun skg--forked-by-its-folders-viewparent-p (metadata-sexp)
+  "Non-nil when METADATA-SEXP, a member of a folder, names its folder's
+viewparent (ancestor generation 2) among the notes forking it:
+'(view (rels (forks (in N (ancestors ... 2 ...)))))'."
+  (let ((in-side (skg-sexp-cdr-at-path metadata-sexp '(skg view rels forks in))))
+    (memq 2 (cdr (assq 'ancestors in-side)))))
 
 (defun skg--warranted-by-the-graph-p (metadata-sexp)
   "Non-nil unless METADATA-SEXP's '(view ...)' carries 'noWarrant' or

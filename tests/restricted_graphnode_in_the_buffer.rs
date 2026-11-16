@@ -103,13 +103,13 @@ fn a_hide_only_a_restricted_subscription_explains_is_refused (
     |f, public| {
       let opened : String = open_content_view (f, "r", VIEW, public) ?;
       let requested : String = edit_line ( &opened, "* (skg node (gnid r)", |line|
-        line . replacen ( "(skg ", "(skg (viewRequests (folder subscribesTo)) ", 1 ));
+        line . replacen ( "(skg ", "(skg (viewRequests (folder forks)) ", 1 ));
       let with_folder : SaveResponse = save_under (
         f, VIEW, &requested, public, true, DeleteFrom::NotChosen ) ?;
       assert! ( with_folder . errors . is_empty (), "{:?}", with_folder . errors );
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
       let with_hide : String = edit_line (
-        &with_folder . saved_view, "*** (skg hiddenOutsideOfSubscribeeFolder)", |line|
+        &with_folder . saved_view, "*** (skg hiddenOutsideOfForkPartnersFolder)", |line|
           format! ("{}\n**** (skg node (gnid h)) h", line) );
       assert_refused_naming_private ( save_under (
         f, VIEW, &with_hide, public, true, DeleteFrom::NotChosen ),

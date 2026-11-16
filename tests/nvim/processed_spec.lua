@@ -175,19 +175,19 @@ describe('skg.processed', function ()
     refused(aliases, 2, processed.mark_rel_processed)
     -- A partner folder: 'r' names each member's relationship, 'n' only
     -- the members whose node changed.
-    local subscribers = {
-      '** (skg subscriberFolder)',
+    local hiders = {
+      '** (skg hiderFolder)',
       '*** (skg node (gnid s1) (skgRepos (nodeRepo r)) (diff (rel added) (leaves 1 rel))) s1',
       '*** (skg node (gnid s2) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) s2' }
     assert.are.same({
-      subscribers[1],
+      hiders[1],
       '*** (skg node (gnid s1) (skgRepos (nodeRepo r)) (editRequest (processed rel)) (diff (rel added) (leaves 1 rel))) s1',
       '*** (skg node (gnid s2) (skgRepos (nodeRepo r)) (editRequest (processed rel)) (diff (node added) (rel added) (leaves 2 node rel))) s2' },
-      run(subscribers, 1, processed.mark_rel_processed))
+      run(hiders, 1, processed.mark_rel_processed))
     assert.are.same({
-      subscribers[1], subscribers[2],
+      hiders[1], hiders[2],
       '*** (skg node (gnid s2) (skgRepos (nodeRepo r)) (editRequest (processed node)) (diff (node added) (rel added) (leaves 2 node rel))) s2' },
-      run(subscribers, 1, processed.mark_node_processed))
+      run(hiders, 1, processed.mark_node_processed))
   end)
 
   it('takes the letters as they are on a changeset marker at point', function ()
@@ -259,7 +259,7 @@ describe('skg.processed', function ()
       '** (skg node (gnid n) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n',
       '*** (skg node (gnid n2) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel))) n2',
       '*** (skg node (gnid m) (skgRepos (nodeRepo r)) writeProtected (diff (rel added) (properties changed) (leaves 3 node rel))) m',
-      '** (skg subscriberFolder)',
+      '** (skg hiderFolder)',
       '*** (skg node (gnid s) (skgRepos (nodeRepo r)) writeProtected (diff (node added) (rel added) (leaves 2 node rel))) s',
       '** (skg node (gnid c) (skgRepos (nodeRepo r)) (diff (rel added) (leaves 1 rel))) c' }
     for command, walk in pairs({ mark_both_processed_contentward = 'newContent',
@@ -661,13 +661,13 @@ describe('skg.processed moving between headlines with change facts', function ()
     '**** (skg (vnid 0e) node (gnid x) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 2)))) (birth (contains out 2)))) x',
     '*** (skg (vnid 0f) mentionerFolder)',
     '**** (skg (vnid 0g) node (gnid y) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (linksTo (out 1 (ancestors 2)))) (birth (linksTo out 2))) (diff (rel added) (properties changed) (leaves 1 node))) y2',
-    '*** (skg (vnid 0h) subscriberFolder)',
+    '*** (skg (vnid 0h) forksFolder)',
     '**** (skg (vnid 0i) node (gnid s) (skgRepos (nodeRepo main)) writeProtected (view (rels (forks (out 1 (ancestors 2)))) (birth (forks out 2))) (diff (rel added) (leaves 1 rel))) s',
     '* (skg (vnid 0j) node (gnid r2) (skgRepos (nodeRepo main)) (view (rels (contains (out 1))))) r2',
     '** (skg (vnid 0k) (changesetMarker content) (diff (leaves 1 rel)))',
     '** (skg (vnid 0l) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 1))) (linksTo (in 1 (substantive 1))) (forks (in 1))) (birth (contains in 1))) (diff (rel added) (leaves 1 rel))) a',
     '* (skg (vnid 0m) node (gnid s) (skgRepos (nodeRepo main)) (view (rels (forks (out 1))))) s',
-    '** (skg (vnid 0n) subscribeeFolder)',
+    '** (skg (vnid 0n) forksFolder)',
     '*** (skg (vnid 0o) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2) (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2))) (diff (rel added) (leaves 1 rel))) a',
     '**** (skg (vnid 0p) ghost (gnid m) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) m',
     '***** (skg (vnid 0q) node (gnid a) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2)) (linksTo (in 1 (substantive 1))) (forks (in 1))) ghostWarrant cycle) (diff (rel removed) (leaves 1 rel))) a',
@@ -795,12 +795,12 @@ describe('skg.processed moving between headlines with change facts', function ()
      function ()
     local lines = {
       '* (skg node (gnid x) (skgRepos (nodeRepo main))) x',
-      '** (skg subscriberFolder)',
+      '** (skg hiderFolder)',
       '*** (skg ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel))) g',
       '** (skg containerFolder)',
       '*** (skg restricted (gnid h) (diff (rel added) (leaves 1 rel)))',
       '*** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (leaves 1 rel))) c',
-      '** (skg subscribeeFolder)',
+      '** (skg forksFolder)',
       '*** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (leaves 1 rel))) e' }
     assert.are.same({ 3, 5, 8, 'No further change' },
       goto_changes(lines, 1, processed.diffView_goto_next_change, 4))

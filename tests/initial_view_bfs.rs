@@ -197,14 +197,14 @@ async fn test_bfs_limit_8_two_branches (
 
       Ok (( )) }
 
-// §5.5: content wins the budget race; a folder (here a SubscribeeFolder) fills whole
+// §5.5: content wins the budget race; a folder (here a forks folder) fills whole
 // and is budget-neutral. Fixture: root r -> content chain c1 -> c2, and r also
 // subscribes to s1, s2. With budget = 3 (exactly the content chain r, c1, c2):
 // the chain fully extends (c2 is editable, body and all), and both subscribers
 // are shown (the folder is whole), write-protected. If the folder had spent the budget,
 // s1 and s2 would have eaten two of the three units and c2 would be left
 // write-protected -- it is not, which is the guarantee this test pins. Subscribers
-// also sit one level deeper than content (r -> SubscribeeFolder -> subscriber vs
+// also sit one level deeper than content (r -> forks folder -> subscriber vs
 // r -> c1), so BFS-by-depth reaches content first regardless.
 async fn test_budget_content_beats_subscribers (
   config : &SkgConfig,
@@ -221,13 +221,13 @@ async fn test_budget_content_beats_subscribers (
       println!("content-vs-subscribers (budget 3):\n{}", result);
 
       let expected = indoc! {"* (skg node (gnid r) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2))))) r
-                              ** (skg subscribeeFolder)
+                              ** (skg forksFolder)
                               *** (skg node (gnid s1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) s1
                               *** (skg node (gnid s2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) s2
                               ** (skg node (gnid c1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) c1
                               *** (skg node (gnid c2) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) c2
                               "};
       assert_metadata_eq!(result, expected,
-                 "budget 3 extends the whole content chain; the SubscribeeFolder is whole + budget-neutral");
+                 "budget 3 extends the whole content chain; the forks folder is whole + budget-neutral");
 
       Ok (( )) }
