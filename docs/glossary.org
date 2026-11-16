@@ -364,10 +364,10 @@ graphnode its viewparent hides by no record vanishes, so that a
 graphnode a save unhid leaves it; a hide the skgrepo restriction
 keeps out stays, unwarranted ('mark_claims' in
 'server/refresh/visit.rs'). In the hidden-by folder
-(=hiddenByForkPartnerFolder=) under a member that is no forker as
+(=hiddenByForkerFolder=) under a member that is no forker as
 such, a forker a cut made a forkee, every member vanishes, so the
 folder goes, as a fresh view would not draw it
-('is_hidden_by_folder_of_no_forker_as_such').
+('is_hiddenByForkerFolder_under_no_forker_as_such').
 The refresh keeps an unwarranted child where it stands; it never
 removes a child.
 
@@ -453,7 +453,7 @@ each join three relationships -- forking, hiding and containment:
 - a *hiddenInForkPartnerFolder*, under a member as such of a forks
   folder (a forkee or forker as such), lists that member's contents
   which the note whose folder holds it hides;
-- a *hiddenByForkPartnerFolder*, under a forker as such, lists what
+- a *hiddenByForkerFolder*, under a forker as such, lists what
   that forker hides of the note's content;
 - a *hiddenOutsideOfForkPartnersFolder*, last in a forks folder, lists
   the nodes its parent hides that no fork partner the folder shows
@@ -491,7 +491,7 @@ forks folder where it has a fork partner. An editable member as such
 also gets its nonempty =hiddenInForkPartnerFolder=, the hidden-in
 compound partner folder specific to how the note sees that member;
 and an editable forker as such its nonempty
-=hiddenByForkPartnerFolder=, of what it hides of the note's content.
+=hiddenByForkerFolder=, of what it hides of the note's content.
 The diff view draws no default folder. Under each member of a partner folder hangs its
 containerward chain, under a member of the forks folder in a
 containers folder of its own (see "foldering, the containerward
@@ -537,7 +537,7 @@ N's forks folder, where S is a member as such (a forkee or forker as
 such), and holds N's hides that S contains, in the order of N's
 hides list. The label is the same in both positions: the viewparent
 S contains, and N, three generations up, hides. The *hidden-by
-compound partner folder* (=hiddenByForkPartnerFolder=, label "☮ a
+compound partner folder* (=hiddenByForkerFolder=, label "☮ a
 hides these, which c contains.") stands under S where S is a forker
 as such, after the hidden-in folder, and holds S's hides that N
 contains, in the order of S's hides list: what the forker deleted
@@ -2030,7 +2030,7 @@ acquire inconsistent treatment in different layers:
   =hiderFolder=, =containerFolder= and =mentionerFolder= (the folders
   of =C-c l c= and =C-c l m=; the other side of each is the node's
   content, or its links, shown without a folder),
-  =hiddenInForkPartnerFolder= and =hiddenByForkPartnerFolder=
+  =hiddenInForkPartnerFolder= and =hiddenByForkerFolder=
   (derived from hide state), the diff
   view's =acquiredByFolder= and =acquiredFolder= (derived from the
   graph straddle, and save-inert), and =idFolder= and =flagsFolder=.

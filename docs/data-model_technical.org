@@ -521,9 +521,9 @@ editable member as such of a forks folder (a forkee or forker as
 such) shows, first, the folder of what the note whose folder holds it
 hides in it, when that holds anything; and an editable forker as such
 shows, after that, the folder of what it hides of that note's
-content ('Folder::HiddenByForkPartner'), when that holds anything;
+content ('Folder::HiddenByForker'), when that holds anything;
 once a cut makes that forker a forkee, the folder's members vanish
-and it goes ('is_hidden_by_folder_of_no_forker_as_such' in
+and it goes ('is_hiddenByForkerFolder_under_no_forker_as_such' in
 'server/refresh/visit.rs'). A
 member as such the refresh draws under an editable occurrence is
 itself such an occurrence: it is drawn editable, as content is (see

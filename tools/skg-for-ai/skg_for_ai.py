@@ -3275,7 +3275,7 @@ RELREPO_UNSUPPORTED_FOLDERS = (
   "hiderFolder", "hiddenFolder",
   "containerFolder", "mentionerFolder", "acquiredByFolder",
   "acquiredFolder", "illegalEditFolder", "hiddenInForkPartnerFolder",
-  "hiddenByForkPartnerFolder", "hiddenOutsideOfForkPartnersFolder" )
+  "hiddenByForkerFolder", "hiddenOutsideOfForkPartnersFolder" )
 
 class OutlineWordCheck:
   """What reading the handles' words against the outline found:

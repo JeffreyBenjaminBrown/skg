@@ -322,7 +322,7 @@ X2. Each view shows the others, through the forks folders:
 ,***** R                (Kb: a repeat, write-protected, showing nothing)
 ,***** T                (Kb: editable)
 ,****** hiddenInForkPartnerFolder     (Z, folded: N hides it)
-,****** hiddenByForkPartnerFolder     (X2, folded: T hides it)
+,****** hiddenByForkerFolder     (X2, folded: T hides it)
 ,****** Y
 ,**** X4                -- what N adds to R
 ,** X1

@@ -52,7 +52,7 @@ use crate::refresh::editability::{
 use crate::refresh::extent::{Extent, extent_of_parent};
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, goal_of_parent, has_a_fork_partner,
-  hidden_by_fork_partner, hidden_in_fork_partner, hidden_outside_of_fork_partners,
+  hidden_by_forker, hidden_in_fork_partner, hidden_outside_of_fork_partners,
   member_of_child, note_of_forker_as_such, note_of_member_as_such,
   visible_illegal_edits};
 use crate::refresh::goal::partnerFolder_members_in_graph;
@@ -166,10 +166,10 @@ fn add_default_folders (
         Some (folder)
       } else { child_folder (tree, parent, &Folder::HiddenInForkPartner) };
     if note_of_forker_as_such (tree, parent) . is_some ()
-       && child_folder (tree, parent, &Folder::HiddenByForkPartner) . is_none ()
-       && ! hidden_by_fork_partner (&pid, &note, walk) . is_empty ()
+       && child_folder (tree, parent, &Folder::HiddenByForker) . is_none ()
+       && ! hidden_by_forker (&pid, &note, walk) . is_empty ()
     { let folder : NodeId = tree . get_mut (parent) . unwrap ()
-        . append ( viewnode_of ( ViewnodeKind::Folder (Folder::HiddenByForkPartner) ))
+        . append ( viewnode_of ( ViewnodeKind::Folder (Folder::HiddenByForker) ))
         . id ();
       match hidden_in {
         Some (hidden_in) => move_after (tree, hidden_in, folder),
@@ -581,7 +581,7 @@ fn mark_claims (
 /// no longer stands for it by any record, visible or not
 /// ('unhidden_in_the_hides_folder'), or by design
 /// ('view_ancestor_in_its_folder',
-/// 'is_hidden_by_folder_of_no_forker_as_such').
+/// 'is_hiddenByForkerFolder_under_no_forker_as_such').
 fn leaves_its_write_protected_folder (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
@@ -591,21 +591,21 @@ fn leaves_its_write_protected_folder (
   unhidden_in_the_hides_folder (tree, parent, child, walk)
   || view_ancestor_in_its_folder (tree, parent, child)
   || is_hidden_by_the_forks_folders_viewparent (tree, parent, child, walk)
-  || is_hidden_by_folder_of_no_forker_as_such (tree, parent) }
+  || is_hiddenByForkerFolder_under_no_forker_as_such (tree, parent) }
 
-/// Whether 'parent' is a folder of what a fork partner hides of the
-/// note's content ('Folder::HiddenByForkPartner') whose viewparent is
+/// Whether 'parent' is a folder of what a forker hides of the
+/// note's content ('Folder::HiddenByForker') whose viewparent is
 /// no forker as such. That folder is drawn under a forker as such
 /// only; under a forker a cut made a forkee (now claiming) it holds
 /// nothing, so its members vanish and it goes, as a fresh view would
 /// not draw it.
-fn is_hidden_by_folder_of_no_forker_as_such (
+fn is_hiddenByForkerFolder_under_no_forker_as_such (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
 ) -> bool {
   let folder : NodeRef<Viewnode> = tree . get (parent) . unwrap ();
   matches! ( folder . value () . kind,
-             ViewnodeKind::Folder (Folder::HiddenByForkPartner) )
+             ViewnodeKind::Folder (Folder::HiddenByForker) )
   && folder . parent () . map_or (
        true, |member| note_of_forker_as_such (tree, member . id ()) . is_none () ) }
 
@@ -1131,7 +1131,7 @@ fn kinds_redrawing (
     Folder::Mentioner              => folders_of_relation (FolderRelation::Mentioners),
     Folder::Alias                  => folders_of_relation (FolderRelation::Aliases),
     Folder::Flags { .. }           => vec! [ Folder::flags () ],
-    Folder::HiddenInForkPartner | Folder::HiddenByForkPartner
+    Folder::HiddenInForkPartner | Folder::HiddenByForker
       | Folder::HiddenOutsideOfForkPartners
       | Folder::AcquiredBy | Folder::Acquired
       | Folder::ID | Folder::IllegalEdit { .. } => Vec::new (), } }

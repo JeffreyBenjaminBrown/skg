@@ -404,13 +404,13 @@ fn folder_goal (
           &occurrence_pid_of (parties . container ?) ?,
           &occurrence_pid_of (parties . hider) ?, walk ),
         &HashMap::new ()))) },
-    Folder::HiddenByForkPartner => {
+    Folder::HiddenByForker => {
       // Under a forker as such only: under a forkee as such (a forker
       // the user made a forkee) it holds nothing, and goes.
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       Some ( Goal::unordered ( gnid_items (
         if note_of_forker_as_such (tree, parties . hider) . is_some () {
-          hidden_by_fork_partner (
+          hidden_by_forker (
             &occurrence_pid_of (parties . hider) ?,
             &occurrence_pid_of (parties . container ?) ?, walk )
         } else { Vec::new () },
@@ -608,9 +608,9 @@ pub(crate) fn hidden_in_fork_partner (
 /// What 'forker', a forker as such in the forks folder of 'note',
 /// hides of the note's content, by the records the skgrepo
 /// restriction shows: the goal of the compound folder
-/// 'HiddenByForkPartner' under the forker. The same intersection as
+/// 'HiddenByForker' under the forker. The same intersection as
 /// the hidden-in folder's, with the parties' roles swapped.
-pub(crate) fn hidden_by_fork_partner (
+pub(crate) fn hidden_by_forker (
   forker     : &ID,
   note       : &ID,
   walk       : &Walk,

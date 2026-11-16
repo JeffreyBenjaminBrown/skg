@@ -54,7 +54,7 @@ pub fn validate_local_structure (
       ViewnodeKind::Folder (Folder::Alias) =>
           validate_aliasfolder(tree, treeid),
       ViewnodeKind::Folder (
-        kind @ (Folder::HiddenInForkPartner | Folder::HiddenByForkPartner)) =>
+        kind @ (Folder::HiddenInForkPartner | Folder::HiddenByForker)) =>
           validate_folder_under_a_member_as_such(tree, treeid, kind),
       ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners) =>
           validate_hiddenOutsideOfForkPartners_folder(tree, treeid),
@@ -211,7 +211,7 @@ fn validate_folder_under_a_member_as_such (
   kind    : &Folder,
 ) -> Vec<String> {
   let label : &str = match kind {
-    Folder::HiddenByForkPartner => "HiddenByForkPartnerFolder",
+    Folder::HiddenByForker => "HiddenByForkerFolder",
     _ => "HiddenInForkPartnerFolder", };
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(
@@ -562,7 +562,7 @@ fn validate_vognode_identity_and_structure (
   let is_member_as_such : bool =
     // A member of a forks folder is the one vognode position that
     // legitimately carries a hiddenInForkPartnerFolder or a
-    // hiddenByForkPartnerFolder (the refresh puts them under a forkee
+    // hiddenByForkerFolder (the refresh puts them under a forkee
     // or forker as such); rendering puts the folders there, so a saved
     // buffer must round-trip them.
     tree . get (treeid)
@@ -573,7 +573,7 @@ fn validate_vognode_identity_and_structure (
   if !generation_includes_only(
     tree, treeid, 1, true,
     |node| !cannot_be_child_of_vognode (node, is_member_as_such))
-    { errors . push( format!("{} has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInForkPartnerFolder or HiddenByForkPartnerFolder (outside a forks folder's member), or HiddenOutsideOfForkPartnersFolder.", label) ); }
+    { errors . push( format!("{} has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInForkPartnerFolder or HiddenByForkerFolder (outside a forks folder's member), or HiddenOutsideOfForkPartnersFolder.", label) ); }
   if !claiming_children_have_distinct_gnids(tree, treeid) {
     errors . push( format!("Two claiming children of this {} stand for one node; only one may claim.", label . to_lowercase ()) ); }
   errors }
@@ -635,7 +635,7 @@ fn cannot_be_child_of_vognode (
        // parent; a member as such is the position that warrants one.
        && matches!(&node . kind,
             ViewnodeKind::Folder (
-              Folder::HiddenInForkPartner | Folder::HiddenByForkPartner )) ) }
+              Folder::HiddenInForkPartner | Folder::HiddenByForker )) ) }
 
 /// Check if an Occurrence has a skgrepo and it exists in the config.
 pub fn has_valid_skgrepo (

@@ -1721,11 +1721,11 @@ are read as a forkee as such's, never its content as its whole
 list. A save that cuts one of its children makes the note fork it,
 and hides the child in the note unless the note contains it after the
 save; the saved view gives the forker its claim, so it is redrawn a
-mutual among the forkees, without a =hiddenByForkPartnerFolder=. Under
+mutual among the forkees, without a =hiddenByForkerFolder=. Under
 a foreign note such a save is refused.
 An editable member as such of either kind additionally includes its
 nonempty =hiddenInForkPartnerFolder=, first; an editable forker as
-such its nonempty =hiddenByForkPartnerFolder= (what it hides of the
+such its nonempty =hiddenByForkerFolder= (what it hides of the
 note's content), after that;
 =hiddenOutsideOfForkPartnersFolder=, when nonempty, stands last in
 every =forksFolder= of a content view. Use a
@@ -1766,7 +1766,7 @@ no folder unasked but where something changed.
   is no repeat (an occurrence of a node another occurrence holds the
   editability of), it draws a =containerFolder= under it, as its
   first child (after a =hiddenInForkPartnerFolder= and a
-  =hiddenByForkPartnerFolder=, if they are added later, before every
+  =hiddenByForkerFolder=, if they are added later, before every
   other child), its members marked =folded=, so
   that only the folder's headline shows; each of its members carries
   the chain as above, and the folder, like any, lists no
@@ -2591,7 +2591,7 @@ Partner folders are represented in Rust as
 remains the established bare non-vognode atom:
 =forksFolder=,
 =hiderFolder=, =hiddenFolder=, =hiddenInForkPartnerFolder=,
-=hiddenByForkPartnerFolder=,
+=hiddenByForkerFolder=,
 =hiddenOutsideOfForkPartnersFolder=, =containerFolder=, =mentionerFolder=,
 or, in the diff view only, =acquiredByFolder= or =acquiredFolder=;
 and, outside the diff view, =illegalEditFolder=.

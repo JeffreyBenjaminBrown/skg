@@ -449,7 +449,7 @@ marks a folder you cannot change from here. Every command auto-saves.
 Without such a request, an editable node shows only its forksFolder,
 where it has a fork partner, either way (plus, on an editable member
 of a forksFolder, the nonempty hiddenInForkPartnerFolder, and on an
-editable forker there the nonempty hiddenByForkPartnerFolder); the
+editable forker there the nonempty hiddenByForkerFolder); the
 heralds advertise other nonempty relations.
 
 In a content view, each node a forksFolder holds that the node forks

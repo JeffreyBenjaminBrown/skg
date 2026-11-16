@@ -214,7 +214,7 @@ async fn moving_y_from_t_into_n_makes_n_fork_t (
   assert_eq! ( forks_folder_members_of (&view, "N"), vec! ["K", "FF", "R", "T"],
                "{}", view );
   assert! ( content_of (&view, "R") . is_empty (), "R adds nothing:\n{}", view );
-  assert! ( ! folder_members_under (&view, "T", "hiddenByForkPartnerFolder") . is_empty (),
+  assert! ( ! folder_members_under (&view, "T", "hiddenByForkerFolder") . is_empty (),
             "before the cut, T, a forker, shows what it hides of N's content:\n{}", view );
   let t_before : String = skg_files (config) ? ["main/T.skg"] . clone ();
   let y_line : &str = line_of (&view, "Y");
@@ -242,9 +242,9 @@ async fn moving_y_from_t_into_n_makes_n_fork_t (
     folder_members_under (&saved, "T", "hiddenInForkPartnerFolder");
   assert! ( hidden_in_t . len () == 1 && hidden_in_t [0] . contains ("(gnid Z)"),
             "T's folder of what N hides in it holds Z:\n{}", saved );
-  assert! ( folder_members_under (&saved, "T", "hiddenByForkPartnerFolder") . is_empty ()
+  assert! ( folder_members_under (&saved, "T", "hiddenByForkerFolder") . is_empty ()
             && ! under (&saved, "T") . iter ()
-                 . any ( |line| line . contains ("hiddenByForkPartnerFolder") ),
+                 . any ( |line| line . contains ("hiddenByForkerFolder") ),
             "T, now a forkee, has no folder of what it hides of N's content:\n{}", saved );
   let n_content : Vec<&str> = content_of (&saved, "N");
   assert! ( n_content . last () . is_some_and ( |line| line . contains ("(gnid Y)") ),

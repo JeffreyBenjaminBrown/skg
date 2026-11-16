@@ -165,14 +165,14 @@ async fn a_forkers_folders_stand_in_order (
   let children : Vec<&str> = children_of (&view, "T");
   let kinds : Vec<&str> = children . iter ()
     . map ( |line| if line . contains ("hiddenInForkPartnerFolder") { "hiddenIn" }
-                   else if line . contains ("hiddenByForkPartnerFolder") { "hiddenBy" }
+                   else if line . contains ("hiddenByForkerFolder") { "hiddenBy" }
                    else if line . contains ("forksFolder") { "forks" }
                    else if line . contains ("(gnid Y)") { "Y" }
                    else { "other" } )
     . collect ();
   assert_eq! ( kinds, vec! ["hiddenIn", "hiddenBy", "forks", "Y"], "{}", view );
   let hidden_by_at : usize = view . lines ()
-    . position ( |line| line . contains ("hiddenByForkPartnerFolder") ) . unwrap ();
+    . position ( |line| line . contains ("hiddenByForkerFolder") ) . unwrap ();
   let first_member : &str = view . lines () . nth (hidden_by_at + 1) . unwrap ();
   assert! ( first_member . contains ("(gnid X2)") && first_member . contains ("folded"),
             "T's folder of what it hides of N's content holds X2, folded:\n{}", view );
@@ -180,7 +180,7 @@ async fn a_forkers_folders_stand_in_order (
               line . contains ("(gnid Z)") && line . contains ("folded") ),
             "T's folder of what N hides in it holds Z:\n{}", view );
   assert! ( ! under (&view, "K") . iter () . any ( |line|
-              line . contains ("hiddenByForkPartnerFolder")
+              line . contains ("hiddenByForkerFolder")
               || line . contains ("hiddenInForkPartnerFolder") ),
             "K has neither folder:\n{}", view );
   Ok (( )) }

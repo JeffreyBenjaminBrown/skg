@@ -195,8 +195,8 @@ it is editable. The labels of the three folders of what a note hides
 name the notes they relate by their ancestor letters (see [[*Ancestor flags and floors][Ancestor flags and floors]]),
 shown high (the style keys 'hiddenInForkPartnerFolder_hider',
 'hiddenOutsideOfForkPartnersFolder_hider',
-'hiddenByForkPartnerFolder_hider' and
-'hiddenByForkPartnerFolder_container' in
+'hiddenByForkerFolder_hider' and
+'hiddenByForkerFolder_container' in
 'shared/herald-styles.json'). Under a member as such of a forks
 folder, a forkee or forker as such, the note whose folder holds it is
 the great-grandparent (the note, its forks folder, the member, the

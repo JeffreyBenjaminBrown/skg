@@ -456,13 +456,13 @@ fn birth_facts_for_folder (
     // the note (generation 4) hides it, and the member as such
     // (generation 2) contains it; in
     //   note > forksFolder > forker
-    //     > hiddenByForkPartnerFolder > member of it
+    //     > hiddenByForkerFolder > member of it
     // the forker (generation 2) hides it, and the note (generation 4)
     // contains it. In
     //   note > forksFolder
     //     > hiddenOutsideOfForkPartnersFolder > member of it
     // the note (generation 3) hides it.
-    Folder::HiddenInForkPartner | Folder::HiddenByForkPartner
+    Folder::HiddenInForkPartner | Folder::HiddenByForker
       | Folder::HiddenOutsideOfForkPartners => {
       let Some (parties) : Option<CompoundFolderParties> =
         compound_folder_parties (tree, folder_treeid)
@@ -510,7 +510,7 @@ fn set_omitted_body (
 /// actual skgrepo ('InRustGraph::relRepo') against its applicable
 /// relationship default. None on any of: the viewnode does not
 /// stand as a member here ('stands_as_member'); a compound partner folder
-/// (HiddenInForkPartner, HiddenByForkPartner, HiddenOutsideOfForkPartners: no single
+/// (HiddenInForkPartner, HiddenByForker, HiddenOutsideOfForkPartners: no single
 /// 'relation_member_role'); no recorded relationship; a relationship
 /// recorded in a foreign skgrepo; unresolvable homes;
 /// or the skgrepo equalling the default.

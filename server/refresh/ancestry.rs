@@ -114,7 +114,7 @@ pub fn described_node (
     Folder::HiddenInForkPartner => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       parties . container },
-    Folder::HiddenOutsideOfForkPartners | Folder::HiddenByForkPartner => {
+    Folder::HiddenOutsideOfForkPartners | Folder::HiddenByForker => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       Some ( parties . hider ) },
     _ => required_ancestors (tree, folder) . first () . copied (), } }
@@ -146,7 +146,7 @@ pub fn view_ancestor_gnids (
 /// (what the note hides of the member's content) the member is the
 /// container, the folder's viewparent, and the note the hider, three
 /// generations up; in
-///   note > forksFolder > forker > hiddenByForkPartnerFolder
+///   note > forksFolder > forker > hiddenByForkerFolder
 /// (what a forker as such hides of the note's content) the forker is
 /// the hider and the note the container; in
 ///   note > forksFolder > hiddenOutsideOfForkPartnersFolder
@@ -171,7 +171,7 @@ pub fn compound_folder_parties (
     Folder::HiddenInForkPartner => Some ( CompoundFolderParties {
       hider      : *required . get (2) ?,
       container  : Some ( *required . first () ? ) } ),
-    Folder::HiddenByForkPartner => Some ( CompoundFolderParties {
+    Folder::HiddenByForker => Some ( CompoundFolderParties {
       hider      : *required . first () ?,
       container  : Some ( *required . get (2) ? ) } ),
     Folder::HiddenOutsideOfForkPartners => Some ( CompoundFolderParties {
@@ -208,7 +208,7 @@ pub fn required_ancestry (
       Folder::AcquiredBy => ANC_GHOST,
       Folder::HiddenOutsideOfForkPartners => ANC_HIDDEN_OUTSIDE,
       Folder::HiddenInForkPartner
-        | Folder::HiddenByForkPartner => ANC_UNDER_A_MEMBER_AS_SUCH, },
+        | Folder::HiddenByForker => ANC_UNDER_A_MEMBER_AS_SUCH, },
     ViewnodeKind::PropertyMember (member) => match member {
       PropertyMember::Alias { .. } => ANC_ALIAS_FOLDER,
       PropertyMember::ID { .. }    => ANC_ID_FOLDER,
