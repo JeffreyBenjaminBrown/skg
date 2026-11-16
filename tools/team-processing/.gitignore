@@ -16,6 +16,8 @@ pacer/nohup.out
 pacer/restart.out
 pacer/jeff-files/
 pacer/jeff-check.log
+# A table or the ports file being rewritten, left only by a crash:
+*.tmp
 
 # Untracked for now: they hold session summaries that may name Jeff's notes, and Jeff decides whether those go in the code repo.
 pacer/pacer.log
