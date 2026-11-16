@@ -3,3 +3,68 @@
 * Plan 1
 Started 2026-11-16 08:15 UTC, when Jeff said go; Claude orchestrates,
 one agent per slice.
+** Slice 1: the one-time migration tool
+*** Commits
+- b9fea435 every-mirror plan 1 slice 1: the one-time migration tool to 'forks'
+- (the commit carrying this record) every-mirror plan 1 slice 1: README, record, DONE
+*** Suites
+- 'python3 tools/migrate-forks-2026-11/test_migrate.py': 16 of 16
+  pass. No other suite: no server, client or fixture changed, and no
+  suite runs the tool (checked: 'bash/all-tests.sh' globs only
+  'tools/team/test_*.py').
+- Also, the tool over copies (in '/tmp', deleted after) of every
+  '.skg' file of Jeff's six and Claude's skgrepos, with copies of
+  both marks files: the dry run and the run reported the same counts,
+  nothing refused, and a second run changed nothing. Every changed
+  line was a key renamed or an 'overrides' list removed. Counts in
+  the README.
+- And a dry run over copies of every fixture under 'tests/' and
+  'tools/skg-for-ai/test-fixture/': 157 files would change (the 145
+  holding 'subscribesTo' or 'overrides', and files holding only
+  'hidesFromSubs'), nothing refused.
+Logs: 'tests/results/every-mirror/slice1-plan1/'.
+*** Deviations from the plan's "how"
+**** Logs under 'tests/results/every-mirror/slice1-plan1/'
+As the launch brief said, not the plan's 'every-mirror-1/slice1/'.
+**** A refused section leaves its whole telescope unchanged
+The plan leaves a refused file unchanged. The tool also leaves every
+other section of that pid unchanged, and lists them: how the refused
+section's relations pair with the others' is unknown, so migrating
+them alone could append an override another section subscribes to.
+**** More refusals than the plan names
+Besides a flow-style list and an October 2026 key, a file is refused
+if it holds a key twice, an old key beside its new one ('subscribesTo'
+and 'forks', 'hidesFromSubs' and 'hides'), an anchor in 'overrides',
+or keys to migrate but no readable 'pid'. Each would otherwise be
+migrated into something the server misreads.
+**** An existing 'forks' list pairs like 'subscribesTo'
+So that a rerun after fixing a refused file, when other sections of
+its pid were migrated in an earlier run, still drops an override that
+a migrated section records.
+**** 'HidesFromSubs' marks are renamed 'Hides'
+The plan has the tool drop only marks of 'SubscribesTo' and
+'Overrides'. Q10 renames 'NodeRelation::HidesFromSubs' to
+'NodeRelation::Hides' in slice 7, after which a mark naming
+'HidesFromSubs' would make the whole marks file unreadable (the
+pitfall "The processed marks file is all or nothing"). The tool runs
+after the plan, so it renames them; a relationship's fingerprint does
+not include the relation name, so a renamed mark stays valid. Slice 7
+must keep the variant's serialized name 'Hides' (serde's default).
+**** The README's counts are recounted
+The plan's table (jeff/public: 32 paired, 4 subscribe-only;
+claude/public: 99 paired) was taken earlier on 2026-11-16. At 08:20
+UTC the copies held more, since forks were made this morning:
+Jeff's 49 paired, 4 subscribe-only, 0 override-only, 53 files changed;
+Claude's 103 paired, 0, 0, 103 files; 7 and 3 'hidesFromSubs' keys.
+The README gives both rows and says the counts grow with each fork.
+*** Fixtures changed
+None.
+*** Unfinished
+Nothing of this slice. A note for slice 5: run the tool once per
+fixture's own set of skgrepos, not over all of 'tests/' at once. It
+groups sections by pid across every DIR it is given, so unrelated
+fixtures sharing a pid ('a', '1') would pair with each other; the
+all-at-once dry run counted 3 overrides "recorded in another section",
+which may be such pairings.
+*** DONE
+The slice's headline in '1_plan.org' is DONE.

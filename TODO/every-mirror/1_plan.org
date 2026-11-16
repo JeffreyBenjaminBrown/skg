@@ -1316,7 +1316,7 @@ fixture adaptation; a test pinning a save's effect on the graph or what
 a view shows must not change unless a slice's behavior says so.
 
 * Implementation sequence
-** TODO Slice 1: the one-time migration tool
+** DONE Slice 1: the one-time migration tool
 Questions: Q7 (self-forks dropped), Q10 (if it holds, the tool also
 renames the key 'hidesFromSubs' to 'hides', and counts it).
 - 'tools/migrate-forks-2026-11/migrate.py' as behavior 2 says, with

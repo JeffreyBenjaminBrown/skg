@@ -1,0 +1,129 @@
+#+title: One-time: 'subscribesTo' and 'overrides' become 'forks' (November 2026)
+* What changed, and why this tool exists
+The relations 'subscribesTo' and 'overrides' became one relation,
+'forks' ("forker forks forkee"), and the key 'hidesFromSubs' became
+'hides'. A server built after the change refuses to start on a
+skgrepo whose '.skg' files still hold 'subscribesTo', 'overrides' or
+'hidesFromSubs', and its diff view refuses a HEAD that holds them. So
+each owner runs this tool once over their own skgrepos, and commits.
+Nobody runs it on another owner's skgrepos.
+
+* How to run it
+Pass all of your skgrepos at once, with your processed marks file:
+the tool groups the sections of each node across the directories it
+is given, so that a subscription in one section pairs with an
+override in another.
+#+begin_src sh
+python3 tools/migrate-forks-2026-11/migrate.py --dry-run \
+  --marks MARKS_FILE SKGREPO...
+python3 tools/migrate-forks-2026-11/migrate.py \
+  --marks MARKS_FILE SKGREPO...
+#+end_src
+Compare the dry run's counts with "The counts to expect", below. Then,
+for each changed skgrepo, at once, commit:
+#+begin_src sh
+git -C SKGREPO commit -am 'Migrate to forks'
+#+end_src
+The tool prints that line for each changed directory that is in a
+gitrepo. Until the commit, the diff view and stage-and-commit refuse,
+since HEAD is still in the old format.
+
+* What it does to each file
+** The relations
+For each node (pid), over all of its sections:
+*** Each section's 'subscribesTo' list becomes its 'forks' list
+Members and anchors, in order, in the same place in the file.
+*** An 'overrides' target nothing subscribes to is appended
+To the 'forks' list of the section that recorded the override, so the
+relationship keeps its relRepo. If that section had no 'subscribesTo',
+the 'forks' list goes after the last of the keys the server writes
+before it ('title', 'aliases', 'pid', 'extra_ids', 'body', 'contains').
+*** An 'overrides' target some section subscribes to is dropped
+The relationship is then recorded once, where the subscription stood.
+If that is a different section from the override's, the report counts
+it ("overrides dropped as recorded in another section").
+*** Repeats and self-references are dropped
+A target listed twice in one section's 'forks' is kept once
+("duplicates dropped"). A target that is one of the node's own IDs
+(its pid or an extra ID) is dropped and named in the report
+("self-forks dropped"): a note may not fork itself.
+*** The 'overrides' key goes
+** 'hidesFromSubs' becomes 'hides'
+The key is renamed; its list is untouched.
+** What it never touches
+Only top-level keys at the start of a line are read or changed, so
+titles and bodies (whose lines YAML indents) never are. A file with
+none of the three keys is not rewritten.
+** What it refuses
+A file is left unchanged, and the tool exits 1, if a list it must
+read ('subscribesTo', 'overrides', 'extra_ids') is not in block style,
+if it holds a key twice, or both an old key and its new one, or if it
+holds a key of October 2026 ('subscribes_to', 'overrides_view_of',
+'hides_from_its_subscriptions', 'misc'), for which
+'tools/migrate-skg-keys-2026-10/migrate.py' must run first. When one
+section of a node is refused, every other section of that node is
+left unchanged too (the report lists them), since how its relations
+pair is unknown. Fix the file and run the tool again: a file it has
+migrated holds no old key, so a second run changes nothing, and an
+existing 'forks' list pairs with an 'overrides' list elsewhere as a
+'subscribesTo' list would.
+
+* The processed marks file
+A mark names its relationship's relation by name, and the server
+reads a marks file it cannot parse as empty, so one mark naming a
+relation that no longer exists would lose every mark. The tool drops
+each mark of a 'SubscribesTo' or 'Overrides' relationship ("marks
+dropped"), and renames the relation of each 'HidesFromSubs' mark to
+'Hides' ("marks renamed").
+
+* The counts to expect
+Counted on 2026-11-16, from copies, before anyone ran the tool. Your
+counts grow by each fork made since. "Paired" is a node that both
+subscribed to and overrode one target; "subscribe-only" subscribed
+without overriding; "override-only" overrode without subscribing.
+** Jeff's skgrepos
+'data/jeff/{public, personal-ish, deciduous, personal-proc,
+personal-deprecated, personal-most}', with
+'data/jeff/processed-marks-skgconfig.json'. Only 'public' holds any
+of the keys.
+| when             | files changed | paired | subscribe-only | override-only | 'hidesFromSubs' renamed |
+|------------------+---------------+--------+----------------+---------------+-------------------------|
+| early 2026-11-16 |               |     32 |              4 |             0 |                       7 |
+| 08:20 UTC        |            53 |     49 |              4 |             0 |                       7 |
+Three of the four subscribe-only relationships are Jeff's notes
+subscribing back to Claude's forks of them; after the migration each
+is a mutual fork. The fourth ('95fc4b53...') names an ID no '.skg'
+file holds, and stays dangling.
+** Claude's skgrepos
+'data/claude/{public, private}' and 'data/claude/team/*/notes', with
+'data/claude/processed-marks-skgconfig.json'. Only 'public' holds any
+of the keys.
+| when             | files changed | paired | subscribe-only | override-only | 'hidesFromSubs' renamed |
+|------------------+---------------+--------+----------------+---------------+-------------------------|
+| early 2026-11-16 |               |     99 |              0 |             0 |                       3 |
+| 08:20 UTC        |           103 |    103 |              0 |             0 |                       3 |
+** Both
+No overrides recorded in another section, no duplicates, no
+self-forks, no marks to drop (both marks files were empty), no file
+refused. A second run changed nothing.
+
+* The order of the transition
+1. The running servers keep running on their old binaries. Neither is
+   restarted on the new code before both owners have migrated, since
+   each reads the other's skgrepos as foreign, and a server refuses an
+   unmigrated skgrepo, foreign or owned.
+2. Jeff runs the tool, with '--dry-run' and then without, over his
+   skgrepos and marks file, compares the counts, and commits each
+   gitrepo.
+3. Claude does the same over its own, in a session where Jeff asks
+   for it.
+4. Both servers restart, on the new code.
+5. The AI tool's saved views are fetched again: they hold the old
+   folder atoms and parts.
+
+* Tests
+'test_migrate.py', over temporary directories. One-time, like the
+tool, so no suite runs it:
+#+begin_src sh
+python3 tools/migrate-forks-2026-11/test_migrate.py
+#+end_src
