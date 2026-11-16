@@ -3399,3 +3399,7 @@ letters); the write-protected folders carry ☮:
   (Jeff's).
 - Undo past a save, then save, ends a fork, as any detachment does
   (by design; in 'TODO/DONE/problems.org').
+
+* Plan 3
+Started 2026-11-16 19:35 UTC; Jeff settled its two questions; one
+agent per slice.

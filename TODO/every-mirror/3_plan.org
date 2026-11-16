@@ -1,7 +1,7 @@
 #+title: Plan 3 of every-mirror: a skgrepo's perspective, flat forks folders, hides by integration
 #+startup: overview
 
-* Status: approved; to be executed
+* Status: being executed, since 2026-11-16 19:35 UTC
 Jeff gave this plan's decisions on 2026-11-16 (quoted under "Agreed
 behavior"). The two questions below are the only ones the code forced;
 each slice follows the provisional answer unless Jeff gives another,
@@ -10,6 +10,12 @@ its launch.
 
 * Open questions for Jeff
 ** Q1. Several mirrors in the skgrepo that decides
+*** Settled by Jeff (2026-11-16): the note itself; any remaining tie however is convenient
+"the note itself. And where it's still ambiguous -- say, my skgrepo R
+holds F and G which both fork Q from another repo, and we have to
+decide how to show Q -- pick arbitrarily in whatever way is
+convenient." So the provisional rules hold; the later tie rules may be
+simplified if that is easier, as long as the choice is deterministic.
 Slice 1. Decision D says which skgrepo decides: the perspective's, or
 else the first the config lists that holds a mirror. It does not say
 which mirror stands when that skgrepo holds several (two forks of one
@@ -31,6 +37,7 @@ node itself"), and roots now substitute under every perspective
 not D, wherever the perspective is that skgrepo; D stands where N's
 skgrepo is not the perspective's and D's is first.
 ** Q2. The order within a flat forks folder
+*** Settled by Jeff (2026-11-16): as provisional
 Slice 2. Decision A orders the folder "first what it forks, then what
 forks it, then the rest of the family, nearest first"; decision D puts
 "the other mirrors ... in its forks folder in config order". The first
