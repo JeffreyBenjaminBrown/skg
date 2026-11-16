@@ -153,6 +153,14 @@ A save that leaves an owned note forking itself is refused (a new
 'SelfFork' violation, in the module where the cycle check was), and
 the nodeMerge drops the merged note's own IDs from its 'forks', as it
 does from 'contains'.
+** Q9. A forkee containing its forker
+Slice 3. Decision 7 refuses R containing E where R forks E. The same
+reasoning ("containing it is like self-containment") covers E
+containing R.
+*** Provisional
+Refused too: a save that leaves an owned note containing a note that
+forks it, or forking a note that contains it, is refused, by the same
+check as decision 7.
 ** Q8. Names
 Slices 4 to 7. Decision 1 retires 'subscribesTo' and 'overrides'
 everywhere; these names would follow. Provisional, each:
@@ -392,6 +400,14 @@ update" ('elisp/skg-id-search.el'); 'overPrivateText'.
    one-time tool each owner runs on their own.
 6. Out of scope: the display of mirrors (plan 2), the diff view beyond
    renaming what it shows, any new folder.
+7. A note may not contain what it forks: "If node R forks E and also
+   contains E, the user is confused. You fork something when it is the
+   same; containing it is like self-containment. We should refuse the
+   save." (Jeff, later on 2026-11-16.) No note in any skgrepo either
+   server reads does so today, in either direction (counted
+   read-only, both 'subscribesTo' and 'overrides' against 'contains'),
+   so the migration meets none. Whether the reverse, E containing a
+   note that forks it, is refused too is Q9.
 
 ** 1. The relation 'forks'
 *** In the graph
@@ -595,8 +611,14 @@ operation keeps its check (Q6), moved out of the invariants module.
 search's suppression would otherwise drop both of an owned mutual
 pair (behavior 3). A self-fork is refused instead (Q7), and the
 nodeMerge drops one.
-*** What stays in the module
-'UnknownSkgrepo', and 'SelfFork' (Q7). The module and its scope
+*** What stays in the module, and what joins it
+'UnknownSkgrepo', 'SelfFork' (Q7), and a new 'ForkeeContained'
+violation (decision 7, and Q9's reverse): a save that leaves an owned
+note both forking and containing one note is refused, naming both.
+Its scope is the notes the save touches, as for 'SelfFork': the check
+reads each touched note's 'forks' against its 'contains' (and, for
+Q9, the 'contains' of each note it forks, and the 'forks' of each
+note it contains). The module and its scope
 derivation shrink to what those need: a self-fork can only appear on a
 note the save touches, so 'derive_affected_override_scope' reduces to
 the touched pids and the nodes a nodeMerge re-keys.
@@ -1060,7 +1082,7 @@ data still has no cycle or second owned overrider; foreign data may.
   'bash/nextest.sh', the AI tool's tests, 'bash/integration-tests.sh',
   then 'bash/all-tests.sh'.
 
-** TODO Slice 3: monogamy and the owned-cycle refusal go
+** TODO Slice 3: monogamy and the owned-cycle refusal go; a note may not contain what it forks
 Questions: Q6, Q7.
 - 'override_invariants.rs': remove 'MultipleOwnedOverriders' and
   'OwnedOverrideCycle'; add 'SelfFork' (Q7) for an owned note listing
