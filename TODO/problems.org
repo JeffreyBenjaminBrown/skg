@@ -6,21 +6,6 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
-* A buffer that shows a forker as claiming nothing can undo a fork another view made (2026-11-16)
-Found by every-mirror plan 1 slice 6 (its record, "Unfinished"). In
-the forks folder a member that claims nothing is a forker the note
-does not fork. If another view makes the note fork it (a mutual), and
-this buffer still shows it claiming nothing, the clients read it as a
-pending detachment, and saving this buffer stops the fork. Whether the
-collateral rerender reaches this buffer first in every case is not
-checked. The cause is in 'mark_claims' ('server/refresh/visit.rs'):
-under an editable parent a child that claims nothing stays, since that
-is how a detachment the user wrote survives a refresh; nothing tells a
-member drawn claiming nothing because it was forker-only from one the
-user detached. (A related case, a content occurrence re-pointed to
-another mirror keeping the forks folder of the note it showed before,
-was fixed by the review of every-mirror plan 1: a re-pointed
-occurrence's folders are drawn afresh, 'redraw_folders'.)
 * An opened view keeps the server's fold atoms as text (2026-11-12)
   'skg-open-org-buffer-from-text' ('elisp/skg-buffer.el'), which
   both the content view and the diff view open through, inserts the

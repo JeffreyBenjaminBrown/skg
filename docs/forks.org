@@ -283,10 +283,9 @@ Cut without the paste, =y= is hidden in your x, and stands under
 theirs, in its folder of what your x hides in it. The fork is
 recorded in your note's file, so where your note is foreign (you are
 reading another's note) the save is refused, as a cut from a forkee
-there is. The save gives the forker's headline its claim in the view
-it redraws: otherwise a member your note forks would stand claiming
-nothing, which reads as a pending detachment, and the next save would
-end the fork ('server/from_text/forkers_made_forkees.rs').
+there is. The view the save redraws gives the forker's headline its
+claim, as every view the server draws does (see "Claims in a redrawn
+view").
 
 *** Forks of one note meet
 
@@ -327,6 +326,26 @@ drawn under a forker as such only. Each of these saved views, saved
 again unchanged, writes nothing ('tests/forks_meet.rs';
 'tests/integration/forks-meet/' drives the same scenario through each
 client).
+
+*** Claims in a redrawn view
+
+In a forks folder a member claims exactly when your note forks it;
+taking its claim away (a detachment) and saving ends the fork. So
+every view the server draws gives each member the claim the graph
+gives it: after any save, in the view saved, in each other view the
+save redraws, and in any view another client saves, a member your
+note now forks claims, and a forker-only member claims nothing
+('claim_forks_folder_members_as_the_graph_does' in
+'server/refresh/visit.rs'). A view the server redraws holds no
+gesture of yours still to be saved: it is one the server drew, or
+one whose gestures the save just carried out. Without this, a view
+drawn before another view made your note fork a forker (by a cut
+from it, say) would show that forker claiming nothing, a detachment
+nobody wrote, which the next save of that view would carry out.
+
+What the server cannot tell from a detachment is text you send back
+yourself: undoing past a save and saving the old text again, where
+the forker claimed nothing, ends the fork, as any detachment does.
 
 ** Editing the clone: deletions become hides
 

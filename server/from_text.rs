@@ -8,7 +8,6 @@
 pub mod buffer_to_viewnodes;
 pub mod file_what_is_written_in;
 pub mod fork;
-pub mod forkers_made_forkees;
 pub mod hide_report;
 pub mod write_protected_edits;
 pub mod local_fieldintent_collection;
@@ -262,11 +261,6 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     . map_err ( |error| SaveError::BufferValidationErrors {
         errors   : vec! [ BufferValidationError::Other (error) ],
         warnings : parsing_warnings . clone () } ) ?;
-  // A cut from a forker as such made its note fork it: the saved view
-  // gives the forker its claim, so that the rerender draws it as a
-  // forkee, not as a pending detachment.
-  forkers_made_forkees::claim_forkers_the_save_makes_forkees (
-    &mut viewforest, graph, &node_instructions );
   { // A record that would land where the skgrepo restriction keeps
     // it out of sight is refused, before anything is written.
     let errors : Vec<BufferValidationError> =

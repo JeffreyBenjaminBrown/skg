@@ -14,7 +14,9 @@
 //!     goal;
 //!  4. claims: under an editable parent, every child that claims and
 //!     that the truth does not warrant vanishes, with its subtree;
-//!     under any other, no child claims;
+//!     under any other, no child claims; in a forks folder whose
+//!     claims the save reads, each member the goal names first takes
+//!     the claim the graph gives it;
 //!  5. reinstate: every goal item without a child is drawn, within the
 //!     extent;
 //!  6. reorder: where the goal has an order, the warranted children
@@ -93,6 +95,7 @@ pub(crate) fn visit_parent (
   let goal : Option<Goal> = goal_of_parent (tree, parent, walk);
   rekind_children (tree, parent, goal . as_ref (), walk) ?;
   viewnode_merge (tree, parent, walk) ?;
+  claim_forks_folder_members_as_the_graph_does (tree, parent, goal . as_ref (), walk);
   set_warrants (tree, parent, goal . as_ref (), walk);
   mark_claims (tree, parent, goal . as_ref (), walk) ?;
   if let Some (goal) = &goal {
@@ -495,12 +498,47 @@ fn orphan_under_a_tombstone (
 // 4. claims
 //
 
+/// In a content view's forks folder whose claims the save reads, each
+/// member the goal names takes the claim the graph gives it: a note
+/// the folder's viewparent forks claims, and a forker-only member
+/// claims nothing ('GoalItem::claimable'). A refresh draws a view from
+/// the graph, and a buffer it draws holds no gesture the user has yet
+/// to save: it is one the server drew, or one a save just consumed. So
+/// a member drawn claiming nothing before another view, another
+/// client or this very save made the note fork it claims once
+/// redrawn, rather than standing as a detachment nobody wrote, which
+/// the clients would show and the next save would carry out
+/// ('docs/forks.org', "Claims in a redrawn view"). A member the goal
+/// does not name keeps what it carries. Not in the diff view.
+fn claim_forks_folder_members_as_the_graph_does (
+  tree   : &mut Tree<Viewnode>,
+  parent : NodeId,
+  goal   : Option<&Goal>,
+  walk   : &Walk,
+) {
+  let Some (goal) : Option<&Goal> = goal else { return; };
+  if walk . is_diff_view ()
+     || ! matches! ( tree . get (parent) . unwrap () . value () . kind,
+                     ViewnodeKind::Folder (Folder::Forks) )
+     || ! parent_reads_claims (tree, parent)
+  { return; }
+  for child in children_of (tree, parent) {
+    let Some (claimable) : Option<bool> =
+      member_of_child ( tree . get (child) . unwrap () . value () )
+      . and_then ( |member| goal . item_for (&member) )
+      . filter ( |item| item . warrant == Warrant::ByGraph )
+      . map ( |item| item . claimable )
+      else { continue; };
+    tree . get_mut (child) . unwrap () . value () . set_claim (claimable); }}
+
 /// Under the buffer root every occurrence root claims; any other root
 /// keeps what it carries. Under an editable occurrence or an editable
 /// folder, each child that claims and that the truth does not warrant
 /// (a ghost warrant included: the worktree lacks that relationship)
-/// vanishes ('vanish_if_unwarranted'); a child that claims nothing (a
-/// pending detachment the user wrote) stays. Under any other parent
+/// vanishes ('vanish_if_unwarranted'); a child that claims nothing
+/// stays (in content, one the user detached; in a forks folder, the
+/// goal's members already claim as the graph says,
+/// 'claim_forks_folder_members_as_the_graph_does'). Under any other parent
 /// no child claims; but an unwarranted child of a write-protected
 /// folder vanishes where the folder no longer stands for it at all
 /// ('leaves_its_write_protected_folder'): under the hides folder, a

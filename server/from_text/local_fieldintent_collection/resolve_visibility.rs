@@ -241,8 +241,10 @@ fn add_children_typed_under_member_as_such (
 ///   does not contain after the save, as a cut from a forkee does. A
 ///   forker N already forks (a mutual the user detached there, in the
 ///   same save) is not forked again: the detachment stands, and the
-///   cut only hides. The saved view gives F its claim
-///   ('claim_forkers_the_save_makes_forkees').
+///   cut only hides. The view the save draws gives F its claim, as
+///   every view the refresh draws gives each member of a forks folder
+///   the claim the graph gives it ('claim_forks_folder_members_as_the_graph_does'
+///   in 'server/refresh/visit.rs').
 /// A foreign N can record neither a fork nor a hide, so a save that
 /// cuts from F or unhides under it is refused
 /// ('cut_under_a_foreign_note'). A child F does not show (one N

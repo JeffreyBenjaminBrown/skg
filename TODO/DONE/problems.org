@@ -1,3 +1,35 @@
+* A buffer that shows a forker as claiming nothing can undo a fork another view made (noted 2026-11-16; fixed 2026-11-16)
+  Fixed by the review of every-mirror plan 2 (its probes 36 and 37):
+  every view the refresh draws gives each member of a forks folder the
+  claim the graph gives it ('claim_forks_folder_members_as_the_graph_does',
+  'server/refresh/visit.rs'; 'docs/forks.org', "Claims in a redrawn
+  view"), since a buffer the server redraws holds no gesture still to
+  be saved. So a stale view another client saves, the view saved, and
+  every collateral view show a forker the note now forks claiming, and
+  can edit the note. The save-side patch that gave a forker made a
+  forkee its claim in the saved view alone
+  ('claim_forkers_the_save_makes_forkees') is gone.
+  Still possible, and not the server's to tell apart from a
+  detachment: text the client sends back itself. Undoing past a save
+  and saving the old text again (plan 2 slice 6 found it: the
+  pre-save text of N's view, where T claimed nothing, sent after the
+  save that made T a mutual) ends the fork, as any detachment does;
+  its baseline is the redrawn view, so the stale check sees an edit,
+  not a stale buffer. The entry as it stood:
+    Found by every-mirror plan 1 slice 6 (its record, "Unfinished"). In
+    the forks folder a member that claims nothing is a forker the note
+    does not fork. If another view makes the note fork it (a mutual), and
+    this buffer still shows it claiming nothing, the clients read it as a
+    pending detachment, and saving this buffer stops the fork. Whether the
+    collateral rerender reaches this buffer first in every case is not
+    checked. The cause is in 'mark_claims' ('server/refresh/visit.rs'):
+    under an editable parent a child that claims nothing stays, since that
+    is how a detachment the user wrote survives a refresh; nothing tells a
+    member drawn claiming nothing because it was forker-only from one the
+    user detached. (A related case, a content occurrence re-pointed to
+    another mirror keeping the forks folder of the note it showed before,
+    was fixed by the review of every-mirror plan 1: a re-pointed
+    occurrence's folders are drawn afresh, 'redraw_folders'.)
 * A headline typed under an editable subscribee as such is created, then lost (noted 2026-11-16; fixed 2026-11-16)
   Fixed in every-mirror plan 2, slice 2 (its Q2): a headline typed
   under a forkee as such joins the forkee's content, after the sibling

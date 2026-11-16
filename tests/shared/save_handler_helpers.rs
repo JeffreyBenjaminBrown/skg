@@ -142,7 +142,8 @@ pub fn collateral_view (
 ) -> Option<String> {
   messages . iter ()
     . filter ( |message| message . starts_with ("((response-type collateral-view)") )
-    . find ( |message| message . contains (&format! ("(view-id \"{}\")", view_id)) )
+    . find ( |message| message . contains (&format! ("(view-id {})", view_id))
+                       || message . contains (&format! ("(view-id \"{}\")", view_id)) )
     . and_then ( |message| extract_string_field_from_sexp (message, "content") ) }
 
 /// The view a successful save drew, from its terminal message.

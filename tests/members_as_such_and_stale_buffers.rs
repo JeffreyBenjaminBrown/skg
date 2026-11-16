@@ -25,7 +25,7 @@
 // - A forks E and contains a1; E contains e1, e2.
 
 use crate::save_handler_helpers::{
-  Fixture, collateral_view, errors_of, fixture_from, left_as_the_graph_has_it,
+  Fixture, collateral_view, fixture_from, left_as_the_graph_has_it,
   new_connection, open_view, save, save_with_other_views, saved, saved_view,
   warnings_of};
 use crate::view_and_save_helpers::{line_of, under, without_subtree_of};
@@ -152,4 +152,83 @@ fn a_cut_from_a_forkee_nested_under_an_owned_member_hides_it_there
   assert! ( list_in (&w, "hides") == vec! ["u2"]
             && list_in (&w, "contains") == vec! ["u1", "w1"],
             "W hides u2 alone:\n{}", w );
+  Ok (()) }
+
+//
+// Claims in a redrawn view
+//
+
+#[test]
+fn another_clients_stale_view_redraws_a_fork_made_elsewhere_as_a_claim
+  () -> Result<(), Box<dyn Error>> {
+  // Two clients each hold a view of P, where Pf, a forker as such,
+  // claims nothing. The second cuts pf1 from Pf, so P forks Pf. The
+  // first saves its view unchanged: P is left as the graph has it,
+  // and the view it draws shows Pf claiming. Saved again, that view
+  // finds nothing stale and writes nothing, and an edit of P there
+  // saves, P still forking Pf.
+  let mut f : Fixture = fixture () ?;
+  let mut first : ViewsState = new_connection ();
+  let mut second : ViewsState = new_connection ();
+  let p_in_first : String = open_view (&mut f, &mut first, "P", "P-first");
+  let p_in_second : String = open_view (&mut f, &mut second, "P", "P-second");
+  assert! ( line_of (&p_in_first, "Pf") . contains ("noClaim"), "{}", p_in_first );
+  let cut : String = save (
+    &mut f, &mut second, "P-second",
+    &without_subtree_of (&p_in_second, "pf1"), Some (&p_in_second) );
+  assert! ( saved (&cut), "{}", cut );
+  assert_eq! ( list_in (&file_text (&f, "main", "P"), "forks"), vec! ["Pe", "Pf"] );
+  let result : String = save (
+    &mut f, &mut first, "P-first", &p_in_first, Some (&p_in_first) );
+  assert! ( saved (&result)
+            && warnings_of (&result) . contains (&left_as_the_graph_has_it ("P", "P")),
+            "{}", result );
+  let redrawn : String = saved_view (&result);
+  assert! ( ! line_of (&redrawn, "Pf") . contains ("noClaim"),
+            "Pf, which P now forks, claims:\n{}", redrawn );
+  let redrawn : String = saves_unchanged_writing_nothing (
+    &mut f, &mut first, "P-first", &redrawn );
+  let edited : String = save (
+    &mut f, &mut first, "P-first", &retitled (&redrawn, "P", "P retitled"),
+    Some (&redrawn) );
+  assert! ( saved (&edited), "{}", edited );
+  let p : String = file_text (&f, "main", "P");
+  assert! ( p . contains ("title: P retitled")
+            && list_in (&p, "forks") == vec! ["Pe", "Pf"],
+            "{}", p );
+  Ok (()) }
+
+#[test]
+fn a_collateral_view_redraws_a_fork_the_save_made_as_a_claim
+  () -> Result<(), Box<dyn Error>> {
+  // One client holds a view of Box and one of bx. In bx's view, bw1
+  // is cut from byx, a foreign forker as such, so bx forks byx. The
+  // save redraws Box's view, a collateral view, showing byx claiming
+  // under bx. Saved unchanged, that view finds nothing stale and
+  // writes nothing; and an edit of bx there saves.
+  let mut f : Fixture = fixture () ?;
+  let mut connection : ViewsState = new_connection ();
+  let box_view : String = open_view (&mut f, &mut connection, "Box", "Box");
+  let bx_view : String = open_view (&mut f, &mut connection, "bx", "bx");
+  assert! ( line_of (&box_view, "byx") . contains ("noClaim"), "{}", box_view );
+  let messages : Vec<String> = save_with_other_views (
+    &mut f, &mut connection, "bx", &without_subtree_of (&bx_view, "bw1"),
+    Some (&bx_view), &["Box"] );
+  let result : &String = messages . last () . unwrap ();
+  assert! ( saved (result), "{}", result );
+  assert_eq! ( list_in (&file_text (&f, "main", "bx"), "forks"), vec! ["byx"] );
+  let collateral : String = collateral_view (&messages, "Box")
+    . unwrap_or_else ( || panic! ( "Box's view is redrawn:\n{:?}", messages ));
+  assert! ( ! line_of (&collateral, "byx") . contains ("noClaim"),
+            "byx, which bx now forks, claims:\n{}", collateral );
+  let collateral : String = saves_unchanged_writing_nothing (
+    &mut f, &mut connection, "Box", &collateral );
+  let edited : String = save (
+    &mut f, &mut connection, "Box", &retitled (&collateral, "bx", "bx retitled"),
+    Some (&collateral) );
+  assert! ( saved (&edited), "{}", edited );
+  let bx : String = file_text (&f, "main", "bx");
+  assert! ( bx . contains ("title: bx retitled")
+            && list_in (&bx, "forks") == vec! ["byx"],
+            "{}", bx );
   Ok (()) }

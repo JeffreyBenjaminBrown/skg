@@ -322,17 +322,26 @@ with its subtree, and the next save makes every claim warranted. They differ onl
 the user typed since the last save: a new child claims and is not yet
 warranted, and a child the user marked =noClaim= to detach it is
 warranted and claims nothing (a *pending detachment*, herald
-"detach"). The refresh sets no claim but a root's: the user's claims
-are the user's to make, and a claim the truth does not warrant the
-refresh does not mark but removes, with the child that made it.
+"detach"). The refresh sets no claim but a root's and a forks-folder
+member's (below): the user's claims are the user's to make, and a
+claim the truth does not warrant the refresh does not mark but
+removes, with the child that made it.
 
 In the forks folder a claim says "the folder's viewparent forks it".
 A goal item there may refuse a claim (=GoalItem::claimable= false, a
-forker-only member's): a child claiming it is unwarranted
-(=warrant_of_child=), and vanishes, and the item is drawn again
-claiming nothing (=draw_item=). So a member claims exactly when the
-note forks it, and a save of the view never makes the note fork a
-forker it only showed.
+forker-only member's), and one drawn for it claims nothing
+(=draw_item=). Before the warrants are set, in a content view, each
+member the folder's goal names takes the claim the graph gives it,
+whatever the buffer gave it
+(=claim_forks_folder_members_as_the_graph_does=): a refresh draws a
+buffer that holds no gesture still to be saved, being one the server
+drew or one whose save just consumed its gestures, so a member there
+claiming nothing that the note now forks (another view made the
+fork) is no detachment, and a member claiming that is now a
+forker-only member is no request to fork it. So a member claims
+exactly when the note forks it, in every view the server draws, and a
+save of the view never makes the note fork a forker it only showed,
+nor ends a fork another view made.
 
 *** The goal
 A parent's *goal* is what the truth says its children should be
@@ -560,10 +569,12 @@ the forker-only members keep the order the view has them in, after
 the last forkee (=Goal::ordered_then_unordered=). So a member claims
 exactly when N forks it: a forkee or a mutual claims, a forker-only
 member claims nothing. A member claiming what N no longer forks
-(another view's save removed the fork) is unwarranted and vanishes,
-and, if it still forks N, is drawn again claiming nothing. A member
-claiming nothing that N forks is a pending detachment, as anywhere; a
-forker-only member is none.
+(another view's save removed the fork) vanishes, unwarranted, unless
+it still forks N: then it stays where it stands, claiming nothing, as
+the refresh gives each member the goal names the graph's claim
+(=claim_forks_folder_members_as_the_graph_does=). So in a view the
+server draws no member is a pending detachment; one is only where the
+user removes a forkee's claim before saving.
 
 The folder is editable: it stays when empty, and is drawn unasked
 where N has a fork partner either way ('add_default_folders'); a
@@ -624,9 +635,10 @@ the edits of the hidden-outside folder, which run last. So:
   unhidden; a child F showed that the buffer no longer shows under
   F was cut from it, which makes N fork F (a mutual now) and hides
   the child in N unless N contains it after the save (the
-  forker-visibility step, 'resolve_forker_visibility'); the saved
-  view gives F's headline its claim, so the rerender draws it among
-  the forkees ('claim_forkers_the_save_makes_forkees'); under a
+  forker-visibility step, 'resolve_forker_visibility'); the view
+  the save redraws gives F's headline its claim, as every refresh
+  gives each member of a forks folder the claim the graph gives it
+  ('claim_forks_folder_members_as_the_graph_does'); under a
   foreign N such a save is refused, as under E; a cut from a mutual
   whose claim the same save removes only hides;
 - deleting a restricted viewnode (a member whose node the skgrepo

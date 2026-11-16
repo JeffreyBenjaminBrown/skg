@@ -315,6 +315,9 @@ save takes out of the list. In the forks folder a member claiming
 nothing is a pending detachment only where the folder's viewparent
 still forks it on disk (its '(rels (forks (in ...)))' names ancestor
 generation 2): a detached forkee or mutual, not a forker-only member.
+Every view the server draws gives each member there the claim the
+graph gives it, so only the user's own unsaved gesture makes one
+('docs/forks.org', "Claims in a redrawn view").
 No wire says it; each client sees it and
 writes the atom =pendingDetachment= into the metadata it hands the
 herald rules ('docs/heralds.org', "What the server serves, and what
@@ -695,10 +698,13 @@ under a forkee; and a child F showed that the buffer no longer shows
 claiming under F was cut from it (see "cut"). A cut from a forker
 makes N fork F, so that F, which forks N, becomes a mutual, and N
 hides each child cut that it does not contain after the save (one
-pasted into N's content is not hidden). The saved view gives F's
-headline its claim, so that the rerender draws F among the forkees,
-not as a pending detachment ('claim_forkers_the_save_makes_forkees' in
-'server/from_text/forkers_made_forkees.rs'). Where the same save
+pasted into N's content is not hidden). The view the save redraws
+gives F's headline its claim, so that it stands among the forkees,
+not as a pending detachment: every view the refresh draws gives each
+member of a forks folder the claim the graph gives it
+('claim_forks_folder_members_as_the_graph_does' in
+'server/refresh/visit.rs'; 'docs/forks.org', "Claims in a redrawn
+view"). Where the same save
 removes the claim of a mutual (a detachment), a cut from it only
 hides: the detachment stands. A foreign N can record neither a fork
 nor a hide, so a save that cuts from F or unhides under it is refused,
