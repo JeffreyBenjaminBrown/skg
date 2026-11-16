@@ -14,7 +14,7 @@
 //! prepend if it is first ('docs/api-and-formats.org', "The .skg file
 //! format").
 //!
-//! Unordered relations (hides, overrides) and aliases: union in
+//! Unordered relations (hides) and aliases: union in
 //! Skgrepo order; a member repeated across skgrepos keeps its most
 //! public occurrence, with a warning.
 
@@ -39,9 +39,8 @@ pub struct ComposedNode {
   // Graphnode's.
   pub aliases                      : Option<Vec<RelPartner<String>>>,
   pub contains                     : Vec<RelPartner<ID>>,
-  pub subscribesTo                 : Option<Vec<RelPartner<ID>>>,
+  pub forks                        : Option<Vec<RelPartner<ID>>>,
   pub hidesFromSubs                : Option<Vec<RelPartner<ID>>>,
-  pub overrides                    : Option<Vec<RelPartner<ID>>>,
 }
 
 /// The compose entry point: one telescope on disk -> the effective
@@ -118,10 +117,9 @@ pub fn graphnode_from_composition (
     extra_ids,
     body                         : composed . body,
     contains                     : composed . contains,
-    subscribesTo                 : msv ( composed . subscribesTo ),
+    forks                        : msv ( composed . forks ),
     hidesFromSubs                :
       msv ( composed . hidesFromSubs ),
-    overrides                    : msv ( composed . overrides ),
     flags, } ) }
 
 /// Compose sections (already in fold order, most public first -- the
@@ -175,22 +173,16 @@ pub fn compose_sections (
     resolve, &mut warnings );
   let mentioned = |proj : &dyn Fn (&SectionSlices) -> bool| -> bool {
     sections . iter () . any ( |(_, s)| proj (s) ) };
-  composed . subscribesTo =
-    if mentioned ( &|s| s . subscribesTo . is_some () ) {
+  composed . forks =
+    if mentioned ( &|s| s . forks . is_some () ) {
       Some ( compose_ordered (
-        sections, |s| s . subscribesTo . as_deref (),
+        sections, |s| s . forks . as_deref (),
         resolve, &mut warnings ) ) }
     else { None };
   composed . hidesFromSubs =
     if mentioned ( &|s| s . hidesFromSubs . is_some () ) {
       Some ( compose_unordered (
         sections, |s| s . hidesFromSubs . as_deref (),
-        resolve, &mut warnings ) ) }
-    else { None };
-  composed . overrides =
-    if mentioned ( &|s| s . overrides . is_some () ) {
-      Some ( compose_unordered (
-        sections, |s| s . overrides . as_deref (),
         resolve, &mut warnings ) ) }
     else { None };
   composed . aliases = {

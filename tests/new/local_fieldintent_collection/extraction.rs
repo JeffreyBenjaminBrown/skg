@@ -109,7 +109,7 @@ fn unknown_members_write_their_editable_relationship_recorders_only () {
               "an Unknown must not create a node save, delete, merge, or fork instruction");
   let recorder = saved_node_by_gnid (&instructions, "recorder");
   assert_eq! (members_of (&recorder . contains), vec! [ID::from ("content-unknown")]);
-  assert_eq! (members_msv (&recorder . subscribesTo),
+  assert_eq! (members_msv (&recorder . forks),
               MSV::Specified (vec! [ID::from ("subscribee-unknown")]));
   assert_eq! (hiddenoutside_edits_from_tree (viewnode_tree_as_written (input)),
               vec! [(ID::from ("recorder"),
@@ -413,7 +413,7 @@ fn extraction_collects_subscribees_without_hidden_branches (
       ID::from ("subscribee-content"),
       ID::from ("hidden-outside")]);
   assert_eq!(
-    members_msv (&saved_node_by_gnid (&instructions, "subscriber") . subscribesTo),
+    members_msv (&saved_node_by_gnid (&instructions, "subscriber") . forks),
     MSV::Specified (vec![ID::from ("subscribee")]));
   assert_eq!(
     saved_node_by_gnid (&instructions, "subscriber") . contains,
@@ -637,7 +637,7 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
   assert_eq!(members_msv (&root . aliases), MSV::Specified (vec![
     "root alias" . to_string()]));
   assert_eq!(members_of (&root . contains), vec![ID::from ("child")]);
-  assert_eq!(members_msv (&root . subscribesTo), MSV::Specified (vec![
+  assert_eq!(members_msv (&root . forks), MSV::Specified (vec![
     ID::from ("subscribee")]));
   assert!(matches!(
     instructions . last(),
@@ -680,7 +680,7 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
   assert_eq!(members_of (&root . contains), vec![ID::from ("content")]);
   assert_eq!(members_msv (&root . aliases), MSV::Specified (vec![
     "root alias" . to_string()]));
-  assert_eq!(members_msv (&root . subscribesTo), MSV::Specified (vec![
+  assert_eq!(members_msv (&root . forks), MSV::Specified (vec![
     ID::from ("subscribee")]));
   assert_eq!(
     saved_node_by_gnid (&instructions, "independent") . contains,
@@ -1291,7 +1291,7 @@ fn toDelete_member_is_excluded_from_subscribees (
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    members_msv (&saved_node_by_gnid (&instructions, "subscriber") . subscribesTo),
+    members_msv (&saved_node_by_gnid (&instructions, "subscriber") . forks),
     MSV::Specified (vec![ID::from ("keep")])); }
 
 #[test]
@@ -1322,7 +1322,7 @@ fn duplicate_members_of_defining_folders_are_silently_deduplicated (
     MSV::Specified (vec![
       "echo" . to_string(), "other" . to_string()]));
   assert_eq!(
-    members_msv (&recorder . subscribesTo),
+    members_msv (&recorder . forks),
     MSV::Specified (vec![ID::from ("s1"), ID::from ("s2")])); }
 
 // The next three tests pin the editable-folder membership semantics that
@@ -1350,7 +1350,7 @@ fn reordering_subscribees_reorders_subscribesTo (
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    members_msv (&saved_node_by_gnid (&instructions, "recorder") . subscribesTo),
+    members_msv (&saved_node_by_gnid (&instructions, "recorder") . forks),
     MSV::Specified (vec![
       ID::from ("c"), ID::from ("a"), ID::from ("b")])); }
 
@@ -1371,7 +1371,7 @@ fn removing_one_subscribee_keeps_the_rest (
   let instructions : Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    members_msv (&saved_node_by_gnid (&instructions, "recorder") . subscribesTo),
+    members_msv (&saved_node_by_gnid (&instructions, "recorder") . forks),
     MSV::Specified (vec![ID::from ("a"), ID::from ("c")])); }
 
 #[test]

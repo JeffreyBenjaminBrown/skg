@@ -352,9 +352,8 @@ pub struct SectionSlices {
   pub body                         : Option<String>,
   pub aliases                      : Option<Vec<String>>,
   pub contains                     : Option<Vec<ListItem>>,
-  pub subscribesTo                 : Option<Vec<ListItem>>,
+  pub forks                        : Option<Vec<ListItem>>,
   pub hidesFromSubs                : Option<Vec<ID>>,
-  pub overrides                    : Option<Vec<ID>>,
 }
 
 /// Nonfatal compose trouble. The compose is total: junk degrades to one of
@@ -464,9 +463,8 @@ mod telescope_construction_tests {
       extra_ids                    : Vec::new (),
       body                         : None,
       contains                     : Vec::new (),
-      subscribesTo                 : Vec::new (),
+      forks                        : Vec::new (),
       hidesFromSubs                : Vec::new (),
-      overrides                    : Vec::new (),
       flags                        : Vec::new (), } }
 
   fn config () -> SkgConfig {

@@ -4,13 +4,14 @@
 // ('docs/api-and-formats.org', "Stats metadata: graphStats and
 // viewStats"; the tokens in 'docs/heralds.org', "Ancestor flags and
 // floors"):
-// - grandparentOverrides ("gO"): a subscribee-as-such whose folder recorder
-//   also overrides it;
-// - overridesParent ("Op"): a node shown under a vognode it overrides.
-// One fixture serves both: R subscribes to E and F and overrides
-// E (so E under R's subscribeeFolder carries gO, while F does not);
-// R contains P,
-// P contains C, and C overrides P (so C as content of P carries Op,
+// - a subscribee-as-such is born of its folder recorder's fork of it,
+//   and shows that fork as its relation to generation 2 (once
+//   "grandparentOverrides", when subscriptions and overrides were two
+//   relations);
+// - overridesParent ("Op"): a node shown under a vognode it forks.
+// One fixture serves both: R forks E and F (each under R's
+// subscribeeFolder, born of the fork); R contains P,
+// P contains C, and C forks P (so C as content of P carries Op,
 // and C as a view root does not). Each stat round-trips through a
 // save (the viewStats parser errors on unknown atoms, so this also
 // pins the parse arms).
@@ -69,31 +70,27 @@ fn assert_sharing_stats_in_view_of_R (
     e_lines_by_enclosing_folder (buf);
   assert_eq! ( e_lines . len (), 1,
     "{}: E should appear under the subscribeeFolder:\n{}", label, buf );
-  // In the semantic wire the parent-relative stats are relationships to
-  // E's grandparent R (generation 2): R both subscribes to and overrides
-  // E. Under a folder, the folder relation is E's birth; the
-  // other (the old gO sharing stat) shows as an ordinary relation.
-  // Both carry (ancestors 2).
+  // In the semantic wire the parent-relative stat is the relationship
+  // to E's grandparent R (generation 2): R forks E. Under a folder,
+  // the folder relation is E's birth, and the relation carries
+  // (ancestors 2). F, which R forks too, shows the same.
   for (folder, line) in &e_lines {
     match *folder {
       "subscribeeFolder" => {
-        assert! ( line . contains ("(birth (subscribesTo in 2))"),
-          "{}: E-as-subscribee is born of the subscribe:\n{}", label, buf );
-        assert! ( line . contains ("(overrides")
-                  && line . contains ("(ancestors 2)"),
-          "{}: E-as-subscribee also shows gO (R overrides E, gen 2):\n{}",
+        assert! ( line . contains ("(birth (forks in 2))"),
+          "{}: E-as-subscribee is born of the fork:\n{}", label, buf );
+        assert! ( line . contains ("(forks (in 1 (ancestors 2)))"),
+          "{}: E-as-subscribee shows R's fork of it (gen 2):\n{}",
           label, buf ); },
       other => panic! (
         "{}: E shown outside any folder ({:?}):\n{}", label, other, buf ),
     }}
   for f_line in lines_containing (buf, "(gnid F)") {
-    // F is a subscribee R does not override, so it has no overrides
-    // relation at all -- only its folder subscribe (its birth).
-    assert! ( ! f_line . contains ("(overrides"),
-      "{}: F, a subscribee R does not override, shows no override \
-       relation:\n{}", label, buf ); }
-  { // Because of override substitution, a fresh view of R shows
-    // C in place of P (C overrides P), marked; the Op position (C
+    assert! ( f_line . contains ("(birth (forks in 2))")
+              && f_line . contains ("(forks (in 1 (ancestors 2)))"),
+      "{}: F, like E, is born of R's fork of it:\n{}", label, buf ); }
+  { // Because of mirror substitution, a fresh view of R shows
+    // C in place of P (C forks P), marked; the Op position (C
     // under a shown P) is asserted from a view of P instead, in
     // assert_op_in_view_of_P.
     let c_lines : Vec<&str> = lines_containing (buf, "(gnid C)");
@@ -106,13 +103,13 @@ fn assert_op_in_view_of_P (
   label : &str,
 ) {
   let c_lines : Vec<&str> = lines_containing (buf, "(gnid C)");
-  // Op ("overridesParent"): C overrides its viewparent (a = P), so
-  // it is born of an overrides-out relation to generation 1.
+  // Op ("overridesParent"): C forks its viewparent (a = P), so it
+  // shows a forks-out relation to generation 1.
   assert! ( c_lines . iter ()
-            . any ( |l| l . contains ("(overrides (out")
+            . any ( |l| l . contains ("(forks (out")
                         && l . contains ("(ancestors 1)") ),
-    "{}: C shown as content of P (which it overrides) is born of an \
-     overrides-out to P (gen 1):\n{}", label, buf ); }
+    "{}: C shown as content of P (which it forks) shows a forks-out \
+     to P (gen 1):\n{}", label, buf ); }
 
 async fn sharing_view_stats_appear_and_roundtrip (
   config : &SkgConfig,

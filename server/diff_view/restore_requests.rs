@@ -173,10 +173,9 @@ fn in_links_at_head (
   before : &InRustGraph,
   pid    : &ID,
 ) -> Vec<RestoredRelationship> {
-  let inbound : [(NodeRelation, &RecorderwardRelmap); 4] = [
+  let inbound : [(NodeRelation, &RecorderwardRelmap); 3] = [
     (NodeRelation::Contains,      &before . contained_by),
-    (NodeRelation::SubscribesTo,  &before . subscribers_of),
-    (NodeRelation::Overrides,     &before . overriders_of),
+    (NodeRelation::Forks,         &before . forkers_of),
     (NodeRelation::HidesFromSubs, &before . hiders_of) ];
   let mut relationships : Vec<RestoredRelationship> = Vec::new ();
   for (relation, recorders_of) in inbound {
@@ -215,9 +214,8 @@ fn relation_list (
 ) -> Option<&[RelPartner<ID>]> {
   match relation {
     NodeRelation::Contains      => Some ( &node . contains ),
-    NodeRelation::SubscribesTo  => Some ( node . subscribesTo . or_default () ),
+    NodeRelation::Forks         => Some ( node . forks . or_default () ),
     NodeRelation::HidesFromSubs => Some ( node . hidesFromSubs . or_default () ),
-    NodeRelation::Overrides     => Some ( node . overrides . or_default () ),
     NodeRelation::LinksTo       => None, } }
 
 /// The relationship each restoreRel request in 'viewforest' stands
@@ -283,9 +281,8 @@ fn add_relationship (
     . unwrap_or_default ();
   let list : &mut Vec<RelPartner<ID>> = match key . relation {
     NodeRelation::Contains      => &mut recorder . contains,
-    NodeRelation::SubscribesTo  => specified (&mut recorder . subscribesTo, live_list),
+    NodeRelation::Forks         => specified (&mut recorder . forks, live_list),
     NodeRelation::HidesFromSubs => specified (&mut recorder . hidesFromSubs, live_list),
-    NodeRelation::Overrides     => specified (&mut recorder . overrides, live_list),
     NodeRelation::LinksTo       => return Ok (( )), };
   let member_of = |stored : &ID| -> ID {
     if restored_pids . contains (stored) { stored . clone () }

@@ -34,7 +34,9 @@ use crate::types::nodes::complete::Flag;
 pub struct GraphnodeOnDisk {
   // The aliases read the keys used before October 2026, so old files
   // and old git blobs still load; writes use the new keys.
-  // tools/migrate-skg-keys-2026-10/ rewrites old files.
+  // tools/migrate-skg-keys-2026-10/ rewrites old files. The keys
+  // retired in November 2026 are refused, never read
+  // ('RETIRED_SKG_KEYS' in [[../../dbs/filesystem/retired_keys.rs]]).
   // Field order fixes YAML output order. When anything here changes,
   // update 'Graphnode' (see [[./complete.rs][server/types/nodes/complete.rs]]) and vice versa.
 
@@ -55,14 +57,11 @@ pub struct GraphnodeOnDisk {
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub contains: Vec<ListItem>,
 
-  #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "subscribes_to")]
-  pub subscribesTo: Vec<ListItem>,
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub forks: Vec<ListItem>,
 
-  #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "hides_from_its_subscriptions")]
+  #[serde(default, skip_serializing_if = "Vec::is_empty", rename = "hides", alias = "hides_from_its_subscriptions")]
   pub hidesFromSubs: Vec<ID>,
-
-  #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "overrides_view_of")]
-  pub overrides: Vec<ID>,
 
   #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "misc")]
   pub flags: Vec<Flag>,
@@ -85,12 +84,10 @@ impl GraphnodeOnDisk {
         else { Some ( self . aliases ) },
       contains                     :
         nonempty_items ( self . contains ),
-      subscribesTo                 :
-        nonempty_items ( self . subscribesTo ),
+      forks                        :
+        nonempty_items ( self . forks ),
       hidesFromSubs                :
-        nonempty_gnids ( self . hidesFromSubs ),
-      overrides                    :
-        nonempty_gnids ( self . overrides ), }}
+        nonempty_gnids ( self . hidesFromSubs ), }}
 
   /// Treat one section as a whole node: exact for single-section
   /// telescopes; the per-file git/diff paths use it as interim
@@ -124,13 +121,11 @@ impl GraphnodeOnDisk {
       body                         : self . body,
       contains                     : rel_partners_at_relRepo (
         &skgrepo, members_only ( self . contains ) ),
-      subscribesTo                 : rel_partners_at_relRepo_msv (
-        &skgrepo, msv_gnids ( members_only ( self . subscribesTo ) ) ),
+      forks                        : rel_partners_at_relRepo_msv (
+        &skgrepo, msv_gnids ( members_only ( self . forks ) ) ),
       hidesFromSubs                : rel_partners_at_relRepo_msv (
         &skgrepo,
         msv_gnids ( self . hidesFromSubs ) ),
-      overrides                    : rel_partners_at_relRepo_msv (
-        &skgrepo, msv_gnids ( self . overrides ) ),
       flags                         : self . flags,
       home_skgrepo: skgrepo,
     }}
@@ -200,12 +195,10 @@ pub fn graphnode_on_disk_from_section (
         slices . body ),
     contains                     :
       slices . contains . unwrap_or_default (),
-    subscribesTo                 :
-      slices . subscribesTo . unwrap_or_default (),
+    forks                        :
+      slices . forks . unwrap_or_default (),
     hidesFromSubs                :
       slices . hidesFromSubs . unwrap_or_default (),
-    overrides                    :
-      slices . overrides . unwrap_or_default (),
     flags                        :
       if is_home { flags . to_vec () } else { Vec::new () }, }}
 

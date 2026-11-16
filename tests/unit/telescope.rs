@@ -88,11 +88,10 @@ fn composed_from_lists (
     home                         : Some ( home . clone () ),
     aliases                      : None,
     contains,
-    subscribesTo                 :
+    forks                        :
       if subs . is_empty () { None } else { Some (subs) },
     hidesFromSubs                :
-      if hides . is_empty () { None } else { Some (hides) },
-    overrides                    : None, }}
+      if hides . is_empty () { None } else { Some (hides) }, }}
 
 fn decompose_then_compose (
   composed : &ComposedNode,
@@ -111,13 +110,10 @@ fn decompose_then_compose (
         aliases  : composed . aliases . as_deref ()
                    . unwrap_or (&[]),
         contains : &composed . contains,
-        subscribesTo :
-          composed . subscribesTo . as_deref () . unwrap_or (&[]),
+        forks :
+          composed . forks . as_deref () . unwrap_or (&[]),
         hidesFromSubs :
           composed . hidesFromSubs . as_deref ()
-          . unwrap_or (&[]),
-        overrides :
-          composed . overrides . as_deref ()
           . unwrap_or (&[]), } );
   compose_sections ( &sections, &identity_resolve ) }
 
@@ -133,8 +129,8 @@ fn flags_write_at_home_and_compose_defensively_from_all_sections () {
   let mut sections = decompose_node (&DecompositionInput {
     pid: &ID::from ("p"), extra_ids: &[], flags: &misc,
     title: Some ("title"), body: None, home: &home,
-    aliases: &[], contains: &contains, subscribesTo: &[],
-    hidesFromSubs: &[], overrides: &[],
+    aliases: &[], contains: &contains, forks: &[],
+    hidesFromSubs: &[],
   }, &telescope_config ()) . unwrap () . into_sections ();
   assert_eq! (sections . first () . unwrap () . 1 . flags, misc);
   assert! (sections . iter () . skip (1)
@@ -180,8 +176,8 @@ proptest! {
     // The one asymmetry: compose cannot learn a home the decomposition did not
     // write title/body text into; everything else must round-trip exactly.
     prop_assert_eq! ( &recomposed . contains, &composed . contains );
-    prop_assert_eq! ( &recomposed . subscribesTo,
-                      &composed . subscribesTo );
+    prop_assert_eq! ( &recomposed . forks,
+                      &composed . forks );
     { // Unordered relations have no order to preserve: sections
       // cannot express cross-repo interleavings without anchors,
       // which unordered relations deliberately lack, so the composition's
@@ -218,9 +214,8 @@ proptest! {
           title : composed . title . as_deref (),
           body : None, home : &home,
           aliases : &[], contains : &composed . contains,
-          subscribesTo : &[],
-          hidesFromSubs : &[],
-          overrides : &[], } );
+          forks : &[],
+          hidesFromSubs : &[], } );
     let sections_twice : Vec<(SkgrepoName, SectionSlices)> =
       decompose_sections (
         & DecompositionInput {
@@ -228,9 +223,8 @@ proptest! {
           title : recomposed . title . as_deref (),
           body : None, home : &home,
           aliases : &[], contains : &recomposed . contains,
-          subscribesTo : &[],
-          hidesFromSubs : &[],
-          overrides : &[], } );
+          forks : &[],
+          hidesFromSubs : &[], } );
     prop_assert_eq! (sections_once, sections_twice);
   }
 
@@ -511,18 +505,19 @@ fn later_text_reports_the_repo_that_actually_won (
     skgrepo : private, selected_at : public }));
 }
 
+/// The pre-October-2026 names of the hides and flags keys still load,
+/// and are written under today's keys. (Those of the subscription and
+/// the override are retired, and refused: 'retired_keys.rs'.)
 #[test]
-fn pre_october_2026_keys_still_load () {
+fn pre_october_2026_hides_and_flags_keys_still_load () {
   use crate::types::nodes::fs::GraphnodeOnDisk;
   let old : GraphnodeOnDisk = yaml_serde::from_str (
-    "pid: p\ntitle: t\nsubscribes_to:\n- s\nhides_from_its_subscriptions:\n- h\noverrides_view_of:\n- o\nmisc:\n- NoSearchMatching\n"
+    "pid: p\ntitle: t\nhides_from_its_subscriptions:\n- h\nmisc:\n- NoSearchMatching\n"
   ) . unwrap ();
   assert_eq! (old . hidesFromSubs, vec! [ID::from ("h")]);
-  assert_eq! (old . overrides,     vec! [ID::from ("o")]);
   assert_eq! (old . flags,         vec! [Flag::NoSearchMatching]);
-  assert_eq! (old . subscribesTo . len (), 1);
   let yaml : String = old . to_yaml () . unwrap ();
-  for new_key in ["subscribesTo:", "hidesFromSubs:", "overrides:", "flags:"] {
+  for new_key in ["hides:", "flags:"] {
     assert! (yaml . contains (new_key), "missing {}:\n{}", new_key, yaml); }
-  for old_key in ["subscribes_to", "hides_from_its", "overrides_view_of", "misc"] {
+  for old_key in ["hides_from_its", "misc"] {
     assert! (! yaml . contains (old_key), "still writes {}:\n{}", old_key, yaml); } }

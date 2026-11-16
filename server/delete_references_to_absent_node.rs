@@ -13,18 +13,16 @@ use crate::types::links::links_with_ranges_from_text;
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum StructuredField {
   Contains,
-  SubscribesTo,
+  Forks,
   HidesFromSubs,
-  Overrides,
 }
 
 impl StructuredField {
   pub fn label (self) -> &'static str {
     match self {
       Self::Contains => "contains",
-      Self::SubscribesTo => "subscribesTo",
-      Self::HidesFromSubs => "hidesFromSubs",
-      Self::Overrides => "overrides", } }
+      Self::Forks => "forks",
+      Self::HidesFromSubs => "hidesFromSubs", } }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -142,11 +140,9 @@ pub fn preview (
           raw_gnid          : raw_gnid . clone (),
           relRepo : member . relRepo . clone (), }); }};
     record (StructuredField::Contains, &node . contains);
-    record (StructuredField::SubscribesTo, node . subscribesTo . or_default ());
+    record (StructuredField::Forks, node . forks . or_default ());
     record (StructuredField::HidesFromSubs,
             node . hidesFromSubs . or_default ());
-    record (StructuredField::Overrides,
-            node . overrides . or_default ());
     record_links (&mut result . links, node, raw_gnid, TextField::Title,
                        &node . title);
     if let Some (body) = &node . body {
@@ -198,12 +194,10 @@ pub fn rewrite (
       .ok_or_else (|| format! ("Cleanup recorder disappeared: {}", pid))?;
     let mut rewritten = graphnode_from_graphnodeInRust (node);
     rewritten . contains . retain (|m| m . member != fresh . raw_gnid);
-    rewritten . subscribesTo = remove_exact (
-      &rewritten . subscribesTo, &fresh . raw_gnid);
+    rewritten . forks = remove_exact (
+      &rewritten . forks, &fresh . raw_gnid);
     rewritten . hidesFromSubs = remove_exact (
       &rewritten . hidesFromSubs, &fresh . raw_gnid);
-    rewritten . overrides = remove_exact (
-      &rewritten . overrides, &fresh . raw_gnid);
     writes . push (NodeInstruction::Save (SaveNode (rewritten))); }
   Ok (writes)
 }
@@ -257,16 +251,15 @@ mod tests {
   fn scans_owned_exact_members_and_leaves_everything_else_verbatim () {
     let mut owned = node ("owned", "main");
     owned . contains = vec! [member ("main", "gone"), member ("main", "keep")];
-    owned . subscribesTo = MSV::Specified (vec! [member ("main", "gone")]);
+    owned . forks = MSV::Specified (vec! [member ("main", "gone")]);
     owned . hidesFromSubs =
       MSV::Specified (vec! [member ("private", "gone")]);
-    owned . overrides = MSV::Specified (vec! [member ("main", "gone")]);
     let mut foreign = node ("foreign", "foreign");
     foreign . contains = vec! [member ("foreign", "gone")];
     let graph = InRustGraph::from_graphnodes (&[owned, foreign]);
 
     let scanned = preview (&graph, &config (), &gnid ("gone")) . unwrap ();
-    assert_eq! (scanned . structural . len (), 4);
+    assert_eq! (scanned . structural . len (), 3);
     assert_eq! (scanned . links . len (), 2);
     assert! (scanned . structural . iter ()
               . all (|occurrence| occurrence . recorder_pid == gnid ("owned")));
@@ -280,10 +273,9 @@ mod tests {
     let NodeInstruction::Save (SaveNode (rewritten)) = &rewrites [0] else {
       panic! ("cleanup must produce a SaveNode"); };
     assert_eq! (rewritten . contains, vec! [member ("main", "keep")]);
-    assert_eq! (rewritten . subscribesTo, MSV::Specified (Vec::new ()));
+    assert_eq! (rewritten . forks, MSV::Specified (Vec::new ()));
     assert_eq! (rewritten . hidesFromSubs,
                 MSV::Specified (Vec::new ()));
-    assert_eq! (rewritten . overrides, MSV::Specified (Vec::new ()));
     assert_eq! (graph . get (&gnid ("foreign")) . unwrap () . contains,
                 vec! [member ("foreign", "gone")]);
   }

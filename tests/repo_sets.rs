@@ -74,14 +74,14 @@ fn all_tests
       s . reset ("tombstones_under_folders_save_without_error", fixtures) ?;
       tombstones_under_folders_save_without_error (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("tombstone_in_subscribee_folder_does_not_contribute_to_subscribesTo", fixtures) ?;
-      tombstone_in_subscribee_folder_does_not_contribute_to_subscribesTo (
+      s . reset ("tombstone_in_subscribee_folder_does_not_contribute_to_forks", fixtures) ?;
+      tombstone_in_subscribee_folder_does_not_contribute_to_forks (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("weave_preserves_omitted_restricted_content_members", fixtures) ?;
       weave_preserves_omitted_restricted_content_members (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("restricted_save_preserves_invisible_override_targets", fixtures) ?;
-      restricted_save_preserves_invisible_override_targets (
+      s . reset ("restricted_save_preserves_invisible_fork_targets", fixtures) ?;
+      restricted_save_preserves_invisible_fork_targets (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_save_of_a_view_rendered_under_another_restriction_is_refused", fixtures) ?;
       a_save_of_a_view_rendered_under_another_restriction_is_refused (
@@ -816,15 +816,15 @@ async fn tombstones_under_folders_save_without_error (
         result . err () . map ( |e| format! ("{:?}", e)) );
       Ok (( )) }
 
-async fn tombstone_in_subscribee_folder_does_not_contribute_to_subscribesTo (
+async fn tombstone_in_subscribee_folder_does_not_contribute_to_forks (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // A tombstone emits no subscribesTo membership, just as it emits
-  // no contains relationship_axes: 'subscribesTo' is
+  // A tombstone emits no forks membership, just as it emits
+  // no contains relationship_axes: 'forks' is
   // order-meaningful, but the disk merge (weave) owns invisible
   // subscribees, so a tombstone where one stood must not feed the
-  // recorder's subscribeeFolder. (root has no subscribesTo on disk, so the
+  // recorder's subscribeeFolder. (root has no forks on disk, so the
   // unrestricted member is the only one written.)
       let buffer = indoc! {"
         * (skg node (gnid root) (skgRepos (nodeRepo public))) root
@@ -842,7 +842,7 @@ async fn tombstone_in_subscribee_folder_does_not_contribute_to_subscribesTo (
       assert_eq! (
         members_of (
           saved_node_by_gnid (&instructions, "root")
-            . subscribesTo . or_default () ),
+            . forks . or_default () ),
         vec! [ ID::from ("active-b") ],
         "the tombstone must not be a subscribee member" );
       Ok (( )) }
@@ -912,21 +912,21 @@ async fn weave_preserves_omitted_restricted_content_members (
       Ok (( )) }
 
 
-async fn restricted_save_preserves_invisible_override_targets (
+async fn restricted_save_preserves_invisible_fork_targets (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // The pipeline-level half of the second named regression
   // ('docs/api-and-formats.org', "Restricted-skgrepo nodes: omission,
-  // retention, and save preservation"): a node overrides [ovr-visible,
+  // retention, and save preservation"): a node forks [ovr-visible,
   // ovr-inactive] where ovr-inactive's skgrepo, and the section of
-  // ovr-owner that records it, are restricted. No buffer position
-  // edits overrides, so a restricted save of the node keeps both.
+  // ovr-owner that records it, are restricted. A restricted save of
+  // the node that draws no subscribee folder keeps both.
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           &config, SkgrepoName::from ("public") )?;
-      let override_set = |node : &Graphnode| -> Vec<ID> {
-        match &node . overrides {
+      let fork_set = |node : &Graphnode| -> Vec<ID> {
+        match &node . forks {
           MSV::Specified (gnids) => {
             let mut v : Vec<ID> = members_of (gnids); v . sort (); v }
           MSV::Unspecified => Vec::new (), } };
@@ -939,7 +939,7 @@ async fn restricted_save_preserves_invisible_override_targets (
             retitled, &config, &restriction ) ?
           . 1 . node_instructions;
         assert_eq! (
-          override_set ( saved_node_by_gnid (&instructions, "ovr-owner") ),
+          fork_set ( saved_node_by_gnid (&instructions, "ovr-owner") ),
           vec![ID::from ("ovr-inactive"), ID::from ("ovr-visible")],
-          "a restricted save must keep every override target" ); }
+          "a restricted save must keep every fork target" ); }
       Ok (( )) }

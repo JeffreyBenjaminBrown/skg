@@ -102,7 +102,7 @@ fn nodeMerge_from_acquirer_and_acquiree (
 /// - Combined IDs from both nodes
 /// - contains: [acquiree_text_preserver] + acquirer's + acquiree's novel contents
 ///   - 'Novel' = not among the acquirer's contents
-/// - Combined relationship fields (subscribesTo, overrides)
+/// - Combined forks
 /// - Filtered hidesFromSubs: can't hide your own
 ///   content, and can't hide what either member showed pre-merge
 ///   ('shown_pre_merge')
@@ -195,12 +195,12 @@ fn three_nodeMerged_graphnodes(
             skgrepo, m . member . clone () )), }} }
     updated_acquirer . aliases =
       MSV::Specified (combined); }
-  { // Combine subscribesTo
+  { // Combine forks
     let mut combined : Vec<RelPartner<ID>> = combine_rel_partners (
-      & [ acquirer_from_disk . subscribesTo . or_default (),
-          acquiree_from_disk . subscribesTo . or_default () ] );
+      & [ acquirer_from_disk . forks . or_default (),
+          acquiree_from_disk . forks . or_default () ] );
     combined . retain (not_own);
-    updated_acquirer . subscribesTo =
+    updated_acquirer . forks =
       MSV::Specified (combined); }
   { // Combine hidesFromSubs, filtering to hide
     // nothing that the acquirer contains, and nothing either member
@@ -222,13 +222,6 @@ fn three_nodeMerged_graphnodes(
     combined . retain (not_own);
     updated_acquirer . hidesFromSubs =
       MSV::Specified (combined); }
-  { // Combine overrides
-    let mut combined : Vec<RelPartner<ID>> = combine_rel_partners (
-      & [ acquirer_from_disk . overrides . or_default (),
-          acquiree_from_disk . overrides . or_default () ] );
-    combined . retain (not_own);
-    updated_acquirer . overrides =
-      MSV::Specified (combined); }
   Ok (updated_acquirer) }
 
 /// The ids 'node' shows as unintegrated subscribed content: contained
@@ -246,7 +239,7 @@ fn gnids_shown_through_subscriptions (
     members_of ( node . hidesFromSubs . or_default () );
   let contains : Vec<ID> =
     members_of ( & node . contains );
-  for subscribee_gnid in members_of ( node . subscribesTo . or_default () ) {
+  for subscribee_gnid in members_of ( node . forks . or_default () ) {
     let Some (subscribee) = opt_graphnode_by_gnid (
       graph, config, &subscribee_gnid ) ?
     else { continue; };
@@ -273,9 +266,8 @@ fn create_acquiree_text_preserver(acquiree: &Graphnode) -> Graphnode {
     extra_ids: vec![],
     body: acquiree . body . clone(),
     contains                     : vec![],
-    subscribesTo                 : MSV::Specified(vec![]),
+    forks                        : MSV::Specified(vec![]),
     hidesFromSubs                : MSV::Specified(vec![]),
-    overrides                    : MSV::Specified(vec![]),
     flags                        : if flag_is_true (
       &acquiree . flags, Flag::NoSearchMatching)
       { vec![Flag::NoSearchMatching] }

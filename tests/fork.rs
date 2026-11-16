@@ -105,16 +105,16 @@ const EXPLICIT_FORK_UNKNOWN_BUFFER : &str = indoc! {"
   * (skg node (skgRepos (nodeRepo owned)) (viewRequests fork)) Brand New
   "};
 
-fn clone_overriding_on_disk (
+fn clone_forking_on_disk (
   config : &SkgConfig,
   target : &str,
 ) -> Result<Graphnode, Box<dyn Error>> {
   read_all_skg_files_from_skgrepos (config) ?
     . into_iter ()
-    . find ( |node| node . overrides . or_default () . iter ()
+    . find ( |node| node . forks . or_default () . iter ()
              . any ( |m| m . member == ID::from (target) ) )
     . ok_or_else ( || format! (
-        "no clone (overrides [{}]) on disk", target ) . into () ) }
+        "no clone (forks [{}]) on disk", target ) . into () ) }
 
 async fn fork_specs_from (
   buffer : &str,
@@ -134,7 +134,7 @@ fn node_from_disk (
     . ok_or_else ( || format! ("node not found on disk: {}", pid) . into () ) }
 
 /// The single clone produced by saving the FORK_BUFFER -- the owned
-/// node whose overrides names N. (Its pid is a fresh uuid we
+/// node whose forks names N. (Its pid is a fresh uuid we
 /// do not know in advance.)
 fn clone_on_disk (
   config : &SkgConfig,
@@ -142,9 +142,9 @@ fn clone_on_disk (
   read_all_skg_files_from_skgrepos (config) ?
     . into_iter ()
     . find ( |node|
-      node . overrides . or_default () . iter ()
+      node . forks . or_default () . iter ()
         . any ( |m| m . member == ID::from ("N") ) )
-    . ok_or_else ( || "no clone (overrides [N]) on disk" . into () ) }
+    . ok_or_else ( || "no clone (forks [N]) on disk" . into () ) }
 
 #[test]
 fn all_tests
@@ -362,7 +362,7 @@ async fn a_reply_under_an_unread_message_integrates_it (
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   assert! ( response . warnings . is_empty (),
     "the reader's own view shows the fork, so nothing warns: {:?}", response . warnings );
-  let clone : Graphnode = clone_overriding_on_disk (config, "m1") ?;
+  let clone : Graphnode = clone_forking_on_disk (config, "m1") ?;
   assert_eq! ( clone . home_skgrepo, SkgrepoName::from ("reader") );
   let f_disk : Graphnode = node_from_disk (config, "f") ?;
   assert_eq! ( members_of (& f_disk . contains),
@@ -478,7 +478,7 @@ async fn a_reply_deeper_in_an_unread_message_integrates_the_message (
     &mut stream, &replied, config, tantivy, &graph,
     &Ok (view_id . clone ()), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
-  let clone : Graphnode = clone_overriding_on_disk (config, "q1") ?;
+  let clone : Graphnode = clone_forking_on_disk (config, "q1") ?;
   assert_eq! ( members_of (& node_from_disk (config, "f") ? . contains),
                vec! [ ID::from ("d"), ID::from ("m1") ],
     "the answer must file m1, the message it is in, in f" );
@@ -516,7 +516,7 @@ async fn a_third_partys_reply_in_anothers_unread_list_warns (
     &mut stream, &replied, config, tantivy, &graph,
     &Ok (view_id . clone ()), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
-  assert_eq! ( clone_overriding_on_disk (config, "m1") ? . home_skgrepo,
+  assert_eq! ( clone_forking_on_disk (config, "m1") ? . home_skgrepo,
                SkgrepoName::from ("third") );
   assert_eq! ( members_of (& node_from_disk (config, "f") ? . contains),
                vec! [ ID::from ("d") ], "f is foreign here: nothing is filed" );
@@ -532,7 +532,7 @@ async fn a_third_partys_reply_in_anothers_unread_list_warns (
 
 /// The explicit fork of an owned node P: the SavePlan carries one
 /// ForkSpec whose clone copies P's disk snapshot (title/contains),
-/// subscribesTo=[P], overrides=[P], in the config-first owned
+/// forks=[P], in the config-first owned
 /// skgrepo. P itself keeps its own (owned) save -- it is not dropped like
 /// a foreign fork's original.
 async fn explicit_fork_save_instruction (
@@ -549,10 +549,8 @@ async fn explicit_fork_save_instruction (
     "clone copies P's disk title (not a buffer edit)" );
   assert_eq! ( members_of (& c . contains), vec! [ ID::from ("N") ],
     "clone copies P's disk contains (shallow)" );
-  assert_eq! ( members_of ( c . subscribesTo . or_default () ), vec! [ ID::from ("P") ],
-    "clone subscribes to P" );
-  assert_eq! ( members_of ( c . overrides . or_default () ), vec! [ ID::from ("P") ],
-    "clone overrides P" );
+  assert_eq! ( members_of ( c . forks . or_default () ), vec! [ ID::from ("P") ],
+    "clone forks P" );
   assert_eq! ( c . home_skgrepo, SkgrepoName::from ("owned"),
     "clone defaults to the config-first owned repo; got {:?}",
     c . home_skgrepo );
@@ -597,8 +595,8 @@ async fn explicit_fork_round_trip_and_refork_refusal (
     /* approved_forks = */ true ) . await ?;
   assert! ( response . errors . is_empty (),
     "the approved explicit fork must skgsave-commit: {:?}", response . errors );
-  let clone : Graphnode = clone_overriding_on_disk (config, "P") ?;
-  assert_eq! ( members_of ( clone . subscribesTo . or_default () ), vec! [ ID::from ("P") ],
+  let clone : Graphnode = clone_forking_on_disk (config, "P") ?;
+  assert_eq! ( members_of ( clone . forks . or_default () ), vec! [ ID::from ("P") ],
     "the clone subscribes to P" );
   assert! ( config . skgrepo_is_owned (& clone . home_skgrepo),
     "the clone lives in an owned repo" );
@@ -1028,7 +1026,7 @@ async fn fork_skgrepo_restricted (
 
 /// The SavePlan a foreign edit produces carries one ForkSpec whose
 /// clone copies N's title/body/contains (shallow -- the child IDs only,
-/// no descendants), subscribesTo=[N], overrides=[N], and no
+/// no descendants), forks=[N], and no
 /// hides; in an owned skgrepo inferred from the owned ancestor P.
 async fn fork_save_instruction (
   config : &SkgConfig,
@@ -1044,10 +1042,8 @@ async fn fork_save_instruction (
     "clone copies the edited title" );
   assert_eq! ( members_of (& c . contains), vec! [ ID::from ("N1"), ID::from ("N2") ],
     "clone copies N's child IDs shallow (not descendants)" );
-  assert_eq! ( members_of ( c . subscribesTo . or_default () ), vec! [ ID::from ("N") ],
-    "clone subscribes to N" );
-  assert_eq! ( members_of ( c . overrides . or_default () ), vec! [ ID::from ("N") ],
-    "clone overrides N" );
+  assert_eq! ( members_of ( c . forks . or_default () ), vec! [ ID::from ("N") ],
+    "clone forks N" );
   assert! ( c . hidesFromSubs . or_default () . is_empty (),
     "clone records no hides" );
   assert! ( config . skgrepo_is_owned (& c . home_skgrepo),
@@ -1086,7 +1082,7 @@ async fn fork_fixture_files (
   let c : Graphnode = clone_on_disk (config) ?;
   assert_eq! ( c . title, "N-edited" );
   assert_eq! ( members_of (& c . contains), vec! [ ID::from ("N1"), ID::from ("N2") ] );
-  assert_eq! ( members_of ( c . subscribesTo . or_default () ), vec! [ ID::from ("N") ] );
+  assert_eq! ( members_of ( c . forks . or_default () ), vec! [ ID::from ("N") ] );
   assert_eq! ( c . home_skgrepo, SkgrepoName::from ("owned") );
 
   let n_after : String = std::fs::read_to_string (&n_path) ?;

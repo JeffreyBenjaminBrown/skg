@@ -85,10 +85,10 @@ pub fn hide_report_lines (
     let hides_after : Vec<ID> = match &node . hidesFromSubs {
       MSV::Specified (hides) => visible_members (hides),
       MSV::Unspecified => disk_hides . clone (), };
-    let subscribees : Vec<ID> = match &node . subscribesTo {
+    let subscribees : Vec<ID> = match &node . forks {
       MSV::Specified (subscribes) => visible_members (subscribes),
       MSV::Unspecified => on_disk . as_ref ()
-        . map ( |disk| visible_members (disk . subscribesTo . or_default ()) )
+        . map ( |disk| visible_members (disk . forks . or_default ()) )
         . unwrap_or_default (), };
     let subscribee_contents : Vec<(ID, Vec<ID>)> =
       subscribees . iter ()
@@ -138,7 +138,7 @@ pub fn hide_report_lines (
         if member == child { "it" . to_string () } else { label (member) } };
       let why : String = match stands_for {
         None => format! (
-          "it is no content of {}, nor overrides any",
+          "it is no content of {}, nor a mirror of any",
           subscribee_contents . iter ()
             . map ( |(subscribee, _)| label (subscribee) )
             . collect::<Vec<String>> () . join (" or ") ),

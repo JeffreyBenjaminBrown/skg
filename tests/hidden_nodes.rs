@@ -80,7 +80,7 @@ fn a_save_under_a_restriction_keeps_the_members_its_restricted_vognodes_stand_fo
         assert_eq! ( contains [1 ..] . to_vec (),
                      vec! [ ID::from ("a"), ID::from ("h"), ID::from ("b") ],
                      "the restricted member h stays where it stood" );
-        assert_eq! ( members_of ( r . subscribesTo . or_default () ),
+        assert_eq! ( members_of ( r . forks . or_default () ),
                      vec! [ ID::from ("hs") ],
                      "the restricted subscribee hs stays" ); }
       { // drawn under "private", then switched to "public"
@@ -99,7 +99,7 @@ fn a_save_under_a_restriction_keeps_the_members_its_restricted_vognodes_stand_fo
         assert_eq! ( members_of (&r . contains) [1 ..] . to_vec (),
                      vec! [ ID::from ("a"), ID::from ("h"), ID::from ("b") ],
                      "the restricted member h stays where it stood" );
-        assert_eq! ( members_of ( r . subscribesTo . or_default () ),
+        assert_eq! ( members_of ( r . forks . or_default () ),
                      vec! [ ID::from ("hs") ],
                      "the restricted subscribee hs stays" ); }
       Ok (( )) } ) }
@@ -187,7 +187,7 @@ fn deleting_a_restricted_vognode_whose_hide_would_land_restricted_is_refused (
   let case : tempfile::TempDir = tempfile::TempDir::new () ?;
   write_unchanged_skgrepos (case . path (), &[
     ( "public", &[
-      ("r", "pid: r\ntitle: r\ncontains:\n- x\nsubscribesTo:\n- e\n"),
+      ("r", "pid: r\ntitle: r\ncontains:\n- x\nforks:\n- e\n"),
       ("e", "pid: e\ntitle: e\ncontains:\n- x\n") ] ),
     ( "private", &[ ("x", "pid: x\ntitle: x secret\n") ] ) ]) ?;
   with_git_fixture (
@@ -376,9 +376,9 @@ fn a_switch_draws_restricted_vognodes_in_the_folders (
 ** (skg (vnid 0i) node (gnid b) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) b
 " );
       assert_eq! ( widened, "\
-* (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 3)) (subscribesTo (out 1)) (hidesFromSubs (out 1))) repoBoundary)) r
+* (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 3)) (forks (out 1)) (hidesFromSubs (out 1))) repoBoundary)) r
 ** (skg (vnid 0b) subscribeeFolder)
-*** (skg (vnid 0c) node (gnid hs) (skgRepos (nodeRepo private) (relRepo public)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)) repoBoundary)) hs secret
+*** (skg (vnid 0c) node (gnid hs) (skgRepos (nodeRepo private) (relRepo public)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) hs secret
 *** (skg (vnid 0d) hiddenOutsideOfSubscribeeFolder)
 **** (skg (vnid 0e) folded node (gnid hh) (skgRepos (nodeRepo private)) writeProtected (view (rels (hidesFromSubs (in 1 (ancestors 3)))) (birth (hidesFromSubs in 3)) repoBoundary)) hh secret
 ** (skg (vnid 0f) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
@@ -399,9 +399,9 @@ const SWITCHED_TO_PUBLIC : &str = "\
 ";
 
 const SWITCHED_BACK_TO_ALL : &str = "\
-* (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 3)) (subscribesTo (out 1))) repoBoundary)) r
+* (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 3)) (forks (out 1))) repoBoundary)) r
 ** (skg (vnid 0b) subscribeeFolder)
-*** (skg (vnid 0c) node (gnid hs) (skgRepos (nodeRepo private) (relRepo public)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)) repoBoundary)) hs secret
+*** (skg (vnid 0c) node (gnid hs) (skgRepos (nodeRepo private) (relRepo public)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) hs secret
 ** (skg (vnid 0d) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
 ** (skg (vnid 0e) node (gnid h) (skgRepos (nodeRepo private) (relRepo public)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (props (aliases 1)) (birth (contains in 1)) repoBoundary)) h secret
 *** (skg (vnid 0f) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
@@ -411,7 +411,7 @@ const SWITCHED_BACK_TO_ALL : &str = "\
 const VIEW_OF_H_UNDER_ALL : &str = "\
 * (skg (vnid 0a) node (gnid h) (skgRepos (nodeRepo private)) (view (rels (contains (in 1) (out 1))) (props (aliases 1)) repoBoundary)) h secret
 ** (skg (vnid 0b) containerFolder)
-*** (skg (vnid 0c) node (gnid r) (skgRepos (nodeRepo public) (relRepo public)) writeProtected (view (rels (contains (out 3 (ancestors 2))) (subscribesTo (out 1))) (birth (contains out 2)) repoBoundary)) r
+*** (skg (vnid 0c) node (gnid r) (skgRepos (nodeRepo public) (relRepo public)) writeProtected (view (rels (contains (out 3 (ancestors 2))) (forks (out 1))) (birth (contains out 2)) repoBoundary)) r
 ** (skg (vnid 0d) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
 ";
 
@@ -425,7 +425,7 @@ const VIEW_OF_H_SWITCHED_TO_PUBLIC : &str = "\
 const VIEW_OF_H_SWITCHED_BACK_TO_ALL : &str = "\
 * (skg (vnid 0a) node (gnid h) (skgRepos (nodeRepo private)) (view (rels (contains (in 1) (out 1))) (props (aliases 1)) repoBoundary)) h secret
 ** (skg (vnid 0b) tombstone)
-*** (skg (vnid 0c) node (gnid r) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (out 3)) (subscribesTo (out 1))) noWarrant repoBoundary)) r
+*** (skg (vnid 0c) node (gnid r) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (out 3)) (forks (out 1))) noWarrant repoBoundary)) r
 ** (skg (vnid 0d) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
 ";
 
@@ -594,7 +594,7 @@ const VIEW_OF_O : &str = "view of o";
 enum PrivateRecordsOfR {
   /// r contains pc.
   Containment,
-  /// r subscribes to s, hides s1 from its subscribers and overrides o.
+  /// r forks s and o, and hides s1 from its forks.
   PartnerRecords,
 }
 
@@ -608,7 +608,7 @@ fn write_fixture_where_r_records_pc_privately (
   let private_r : &str = match private_records {
     PrivateRecordsOfR::Containment => "pid: r\ncontains:\n- pc\n",
     PrivateRecordsOfR::PartnerRecords =>
-      "pid: r\nsubscribesTo:\n- s\nhidesFromSubs:\n- s1\noverrides:\n- o\n", };
+      "pid: r\nforks:\n- s\n- o\nhides:\n- s1\n", };
   write_unchanged_skgrepos ( dir, &[
     ( "public", &[
       ("r",  "pid: r\ntitle: r\ncontains:\n- a\n"),
@@ -714,7 +714,7 @@ fn a_restricted_headline_whose_record_a_save_removed_goes_quietly (
   let case : tempfile::TempDir = tempfile::TempDir::new () ?;
   write_unchanged_skgrepos ( case . path (), &[
     ( "public", &[
-      ("r",  "pid: r\ntitle: r\ncontains:\n- c1\nsubscribesTo:\n- s\nhidesFromSubs:\n- s1\n- hh\n"),
+      ("r",  "pid: r\ntitle: r\ncontains:\n- c1\nforks:\n- s\nhides:\n- s1\n- hh\n"),
       ("c1", "pid: c1\ntitle: c1\n"),
       ("s",  "pid: s\ntitle: s\ncontains:\n- s1\n"),
       ("s1", "pid: s1\ntitle: s1\n") ] ),
@@ -881,7 +881,7 @@ fn a_requested_hidden_folder_holding_a_dangling_hide_saves (
   let case : tempfile::TempDir = tempfile::TempDir::new () ?;
   write_unchanged_skgrepos ( case . path (), &[
     ( "public", &[
-      ("r",  "pid: r\ntitle: r\ncontains:\n- c1\nsubscribesTo:\n- s\nhidesFromSubs:\n- s1\n- nowhere\n"),
+      ("r",  "pid: r\ntitle: r\ncontains:\n- c1\nforks:\n- s\nhides:\n- s1\n- nowhere\n"),
       ("c1", "pid: c1\ntitle: c1\n"),
       ("s",  "pid: s\ntitle: s\ncontains:\n- s1\n"),
       ("s1", "pid: s1\ntitle: s1\n") ] ),
@@ -953,7 +953,7 @@ fn assert_r_keeps_its_members (
   assert_eq! ( members_of (&r . contains),
                vec! [ ID::from ("a"), ID::from ("h"), ID::from ("b"), ID::from ("hc") ],
                "r keeps its members, hc after b" );
-  assert_eq! ( members_of ( r . subscribesTo . or_default () ),
+  assert_eq! ( members_of ( r . forks . or_default () ),
                vec! [ ID::from ("hs") ],
                "r keeps its subscription to hs" ); }
 
@@ -997,11 +997,11 @@ fn write_fixture_where_r_hides (
 ) -> Result<(), Box<dyn Error>> {
   let hidesFromSubs : String =
     if hides . is_empty () { String::new () }
-    else { format! ( "hidesFromSubs:\n{}",
+    else { format! ( "hides:\n{}",
                      hides . iter () . map ( |hide| format! ("- {}\n", hide) )
                      . collect::<String> () ) };
   let r : String = format! (
-    "pid: r\ntitle: r\ncontains:\n- a\n- h\n- b\nsubscribesTo:\n- hs\n{}",
+    "pid: r\ntitle: r\ncontains:\n- a\n- h\n- b\nforks:\n- hs\n{}",
     hidesFromSubs );
   let public : &[(&str, &str)] = &[
     ("r",  &r),
@@ -1015,7 +1015,7 @@ fn write_fixture_where_r_hides (
     ("hh", "pid: hh\ntitle: hh secret\n"), ];
   if private_section == PrivateSectionOfR::Written {
     private . extend ([
-      ("r",  "pid: r\ncontains:\n- anchor: b\n- hc\nhidesFromSubs:\n- hp\n"),
+      ("r",  "pid: r\ncontains:\n- anchor: b\n- hc\nhides:\n- hp\n"),
       ("hc", "pid: hc\ntitle: hc secret\n"),
       ("hp", "pid: hp\ntitle: hp secret\n") ]); }
   write_unchanged_skgrepos (dir, &[("public", public), ("private", &private)]) }

@@ -130,9 +130,9 @@ fn raw_unresolved_member_keeps_its_exact_relRepo (
 fn only_atom_bearing_relations_are_accepted (
 ) {
   assert! ( relation_from_client_string ("contains") . is_ok () );
-  assert! ( relation_from_client_string ("subscribesTo") . is_ok () );
-  assert! ( relation_from_client_string ("overrides") . is_err (),
-    "no buffer position shows an override's record" );
+  assert! ( relation_from_client_string ("forks") . is_ok () );
+  assert! ( relation_from_client_string ("subscribesTo") . is_err (),
+    "a retired relation name" );
   assert! ( relation_from_client_string (
     "hidesFromSubs") . is_err (),
     "hides have no explicit-repo path" );

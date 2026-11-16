@@ -36,7 +36,7 @@ pub enum StaleGraphnodeReport {
 
 /// One aspect of a stale graphnode that differs between a buffer's
 /// baseline and the graph: title, body, content, aliases, extra IDs,
-/// flags, subscriptions, hides, overrides or home skgrepo. These are
+/// flags, forks, hides or home skgrepo. These are
 /// the stale error's own grain, not the diff aspects of change-forest
 /// leaves ('NodeAspect') nor the diff view's 'ChangedAspects': this
 /// says "body" where those say "text", and names a relationship list

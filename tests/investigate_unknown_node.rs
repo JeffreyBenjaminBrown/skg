@@ -173,3 +173,29 @@ fn the_request_is_refused_under_a_skgrepo_restriction (
   assert! ( ! content . contains ("Vanishing"),
             "a refusal must reveal nothing:\n{}", content );
   Ok (( )) }
+
+/// History before the November 2026 migration holds the keys it
+/// retired ('server/dbs/filesystem/retired_keys.rs'), and the search
+/// still reads such a blob, as having no forks: a node 'old', which
+/// contained w and subscribed to and overrode it, deleted in a later
+/// commit, is reported with its title and its contains.
+#[test]
+fn a_deleted_node_whose_blob_holds_retired_keys_is_reported (
+) -> Result<(), Box<dyn Error>> {
+  let f : Fixture = fixture () ?;
+  let skgrepo : &Path = &f . config . skgrepos [&SkgrepoName::from ("main")] . path;
+  let gitrepo : Repository = Repository::open (skgrepo) ?;
+  fs::write ( skgrepo . join ("old.skg"),
+              "title: Old\npid: old\ncontains:\n- w\nsubscribesTo:\n- w\noverrides:\n- w\n" ) ?;
+  commit_everything (&gitrepo, "add old, in the old format") ?;
+  fs::remove_file ( skgrepo . join ("old.skg") ) ?;
+  commit_everything (&gitrepo, "delete old") ?;
+  let (content, errors) : (String, bool) = investigate (&f, "old", "other") ?;
+  assert! ( ! errors, "no error expected:\n{}", content );
+  assert! ( content . contains ("*** title when last present: Old")
+            && content . contains ("delete old")
+            && content . contains ("**** contains\n***** w"),
+            "old must be reported from history:\n{}", content );
+  assert! ( ! content . contains ("forks"),
+            "a retired key is read as no forks:\n{}", content );
+  Ok (( )) }

@@ -66,15 +66,15 @@ fn contains_multi_not_birth () {
 
 #[test]
 fn subscribee_as_such () {
-  // bS: grandparent (gen 2) subscribes to it, born of subscribesTo.
-  let c = RelationCounts { subscribers : 1, .. counts () };
+  // bK: grandparent (gen 2) forks it, born of forks.
+  let c = RelationCounts { forkers : 1, .. counts () };
   let mut f = AncestorFlags::default ();
-  f . record (NodeRelation::SubscribesTo, true, 2);
+  f . record (NodeRelation::Forks, true, 2);
   assert_eq! (
     emit (&c, 0, 0, &f,
-          &[BirthFact::new (NodeRelation::SubscribesTo, Side::In, Some (2))])
+          &[BirthFact::new (NodeRelation::Forks, Side::In, Some (2))])
       . as_deref (),
-    Some ("(rels (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2))") );
+    Some ("(rels (forks (in 1 (ancestors 2)))) (birth (forks in 2))") );
 }
 
 #[test]
@@ -95,16 +95,16 @@ fn contextual_content_distinguishes_applicable_zero_from_absent () {
 }
 
 #[test]
-fn overrider_as_such_out_side () {
-  // Ob: it overrides its grandparent (out, gen 2), born of overrides.
-  let c = RelationCounts { overrides_out : 1, .. counts () };
+fn forker_of_its_grandparent_out_side () {
+  // Kb: it forks its grandparent (out, gen 2), born of forks.
+  let c = RelationCounts { forkees : 1, .. counts () };
   let mut f = AncestorFlags::default ();
-  f . record (NodeRelation::Overrides, false, 2);
+  f . record (NodeRelation::Forks, false, 2);
   assert_eq! (
     emit (&c, 0, 0, &f,
-          &[BirthFact::new (NodeRelation::Overrides, Side::Out, Some (2))])
+          &[BirthFact::new (NodeRelation::Forks, Side::Out, Some (2))])
       . as_deref (),
-    Some ("(rels (overrides (out 1 (ancestors 2)))) (birth (overrides out 2))") );
+    Some ("(rels (forks (out 1 (ancestors 2)))) (birth (forks out 2))") );
 }
 
 #[test]

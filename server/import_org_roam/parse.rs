@@ -321,9 +321,8 @@ fn graphnode_from_section_tree (
     extra_ids: vec![],
     body,
     contains,
-    subscribesTo                 : MSV::Unspecified,
+    forks                        : MSV::Unspecified,
     hidesFromSubs                : MSV::Unspecified,
-    overrides                    : MSV::Unspecified,
     flags                        :
       if tree . section . had_id {
         vec![Flag::Had_ID_Before_Import] }

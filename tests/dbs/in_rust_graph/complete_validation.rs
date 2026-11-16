@@ -108,22 +108,22 @@ fn unknown_home_is_hard_but_relationship_provenance_is_a_warning () {
 #[test]
 fn configured_dangling_members_are_tolerated_without_warning () {
   let mut recorder = node ("recorder", "public");
-  recorder . subscribesTo = MSV::Specified (vec![RelPartner::at_relRepo (
+  recorder . forks = MSV::Specified (vec![RelPartner::at_relRepo (
     SkgrepoName::from ("public"), ID::from ("absent"))]);
   let report = validate_complete_graph (&config (), &[recorder]);
   assert! (report . is_valid ());
   assert! (report . warnings . is_empty ());
-  assert! (report . graph . subscribers_of . contains_key (&ID::from ("absent")));
+  assert! (report . graph . forkers_of . contains_key (&ID::from ("absent")));
 }
 
 #[test]
 fn canonical_entry_includes_the_fork_rules_and_telescope_orientation () {
-  // a and b both override target (legal); a also contains it (not).
+  // a and b both fork target (legal); a also contains it (not).
   let target = node ("target", "private");
   let mut a = node ("a", "public");
   let mut b = node ("b", "public");
-  for overrider in [&mut a, &mut b] {
-    overrider . overrides = MSV::Specified (vec![
+  for forker in [&mut a, &mut b] {
+    forker . forks = MSV::Specified (vec![
       RelPartner::at_relRepo (
         SkgrepoName::from ("public"), ID::from ("target")),
     ]); }
@@ -136,10 +136,10 @@ fn canonical_entry_includes_the_fork_rules_and_telescope_orientation () {
         forker : ID::from ("a"), forkee : ID::from ("target") }) ]);
   assert_eq! (report . warnings . iter () . filter (|(_, warning)| matches! (
     warning, TelescopeViolation::LeakShapedMembership {
-      relation : "overrides", .. })) . count (), 2);
+      relation : "forks", .. })) . count (), 2);
 }
 
-/// Owned e contains foreign f, which subscribes to (forks) e: a
+/// Owned e contains foreign f, which forks e: a
 /// foreign record takes part, so it is a warning naming both notes and
 /// which is foreign, not an error.
 #[test]
@@ -148,7 +148,7 @@ fn an_owned_note_containing_its_foreign_forker_is_a_warning () {
   e . contains = vec![ RelPartner::at_relRepo (
     SkgrepoName::from ("public"), ID::from ("f")) ];
   let mut f = node ("f", "foreign");
-  f . subscribesTo = MSV::Specified (vec![ RelPartner::at_relRepo (
+  f . forks = MSV::Specified (vec![ RelPartner::at_relRepo (
     SkgrepoName::from ("foreign"), ID::from ("e")) ]);
   let report = validate_complete_graph (&config (), &[e, f]);
   assert! (report . is_valid (), "{:?}", report . errors);
@@ -160,12 +160,12 @@ fn an_owned_note_containing_its_foreign_forker_is_a_warning () {
            "{}", warning);
 }
 
-/// Owned r subscribes to (forks) foreign e, which contains r: a
+/// Owned r forks foreign e, which contains r: a
 /// warning naming e as foreign.
 #[test]
 fn an_owned_note_forking_its_foreign_container_is_a_warning () {
   let mut r = node ("r", "public");
-  r . subscribesTo = MSV::Specified (vec![ RelPartner::at_relRepo (
+  r . forks = MSV::Specified (vec![ RelPartner::at_relRepo (
     SkgrepoName::from ("public"), ID::from ("e")) ]);
   let mut e = node ("e", "foreign");
   e . contains = vec![ RelPartner::at_relRepo (
@@ -178,7 +178,7 @@ fn an_owned_note_forking_its_foreign_container_is_a_warning () {
            "{}", report . fork_rule_warnings [0]);
 }
 
-/// Owned e contains owned r, which subscribes to (forks) e: owned
+/// Owned e contains owned r, which forks e: owned
 /// records alone make the violation, so it is an error.
 #[test]
 fn an_owned_note_containing_its_owned_forker_is_an_error () {
@@ -186,7 +186,7 @@ fn an_owned_note_containing_its_owned_forker_is_an_error () {
   e . contains = vec![ RelPartner::at_relRepo (
     SkgrepoName::from ("public"), ID::from ("r")) ];
   let mut r = node ("r", "public");
-  r . subscribesTo = MSV::Specified (vec![ RelPartner::at_relRepo (
+  r . forks = MSV::Specified (vec![ RelPartner::at_relRepo (
     SkgrepoName::from ("public"), ID::from ("e")) ]);
   let report = validate_complete_graph (&config (), &[e, r]);
   assert_eq! (report . errors, vec![

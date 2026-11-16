@@ -237,11 +237,11 @@ node p
 #[test]
 fn the_diff_view_adds_no_default_folders () {
   let graph_nodes : Vec<Graphnode> = vec! [
-    Graphnode { subscribesTo  : msv_ids (&["e"]),
+    Graphnode { forks : msv_ids (&["e"]),
                 hidesFromSubs : msv_ids (&["h"]), .. node ("s") },
     Graphnode { contains : ids (&["h"]), .. node ("e") },
     node ("h"),
-    Graphnode { subscribesTo : msv_ids (&["e"]), .. node ("u") }, ];
+    Graphnode { forks : msv_ids (&["e"]), .. node ("u") }, ];
   let straddle : GraphStraddle = straddle (&graph_nodes, &graph_nodes);
   let input : String = formatdoc! ("
     * {} s
@@ -272,7 +272,7 @@ fn the_diff_view_substitutes_nothing () {
   let graph_nodes : Vec<Graphnode> = vec! [
     Graphnode { contains : ids (&["n"]), .. node ("p") },
     node ("n"),
-    Graphnode { overrides : msv_ids (&["n"]), .. node ("o") }, ];
+    Graphnode { forks : msv_ids (&["n"]), .. node ("o") }, ];
   let straddle : GraphStraddle = straddle (&graph_nodes, &graph_nodes);
   let run : Run = diff_run_asserting_fixpoint (
     &format! ("* {} p\n", occurrence_metadata ("p", "")), &straddle );

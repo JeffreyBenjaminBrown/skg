@@ -129,14 +129,10 @@ fn fetch_all_graphnodestats_in_rust (
       inbound_shown (NodeRelation::HidesFromSubs) . len ();
     let hides : usize =
       outbound_shown (NodeRelation::HidesFromSubs) . len ();
-    let subscribers : usize =
-      inbound_shown (NodeRelation::SubscribesTo) . len ();
-    let subscribees : usize =
-      outbound_shown (NodeRelation::SubscribesTo) . len ();
-    let overriders : usize =
-      inbound_shown (NodeRelation::Overrides) . len ();
-    let overrides_out : usize =
-      outbound_shown (NodeRelation::Overrides) . len ();
+    let forkers : usize =
+      inbound_shown (NodeRelation::Forks) . len ();
+    let forkees : usize =
+      outbound_shown (NodeRelation::Forks) . len ();
     let mentioners : HashSet<ID> = inbound_shown (NodeRelation::LinksTo);
     let link_total : usize = mentioners . len ();
     let link_substantive : usize = mentioners . iter ()
@@ -154,7 +150,7 @@ fn fetch_all_graphnodestats_in_rust (
       containers : shown_containers . len (),
       contents   : shown_contents . len (),
       hiders, hides,
-      subscribers, subscribees, overriders, overrides_out,
+      forkers, forkees,
       link_total, link_substantive, link_targets } );
     // container_to_contents[pid] = (pid's shown contents) ∩ pid_set.
     { let intersected : HashSet<ID> =

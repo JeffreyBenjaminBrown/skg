@@ -27,7 +27,7 @@ use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::{run_with_skgrepo_set_test_db, save_added_overrides};
+use skg::test_utils::{run_with_skgrepo_set_test_db, save_added_forks};
 use skg::types::misc::SkgrepoName;
 use skg::test_utils::graph_handle_from_config;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
@@ -571,10 +571,10 @@ async fn editable_subscribeeFolder (
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&reordered, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
     match saved_node_by_gnid (&nodes, "wSub-owner") {
-      Some (n) => if members_msv (&n . subscribesTo) != MSV::Specified (vec![
+      Some (n) => if members_msv (&n . forks) != MSV::Specified (vec![
           ID::from ("wSub-c"), ID::from ("wSub-b"), ID::from ("wSub-a")]) {
         fails . record (s, format! (
-          "reordered subscribesTo wrong: {:?}", n . subscribesTo)); },
+          "reordered subscribesTo wrong: {:?}", n . forks)); },
       None => fails . record (s, "no SaveNode for wSub-owner" . into ()), } }
   { // delete one: remove b -> [a,c]
     let s : &str = "subscribeeFolder/delete";
@@ -584,10 +584,10 @@ async fn editable_subscribeeFolder (
     let nodes  : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
     match saved_node_by_gnid (&nodes, "wSub-owner") {
-      Some (n) => if members_msv (&n . subscribesTo) != MSV::Specified (vec![
+      Some (n) => if members_msv (&n . forks) != MSV::Specified (vec![
           ID::from ("wSub-a"), ID::from ("wSub-c")]) {
         fails . record (s, format! (
-          "after delete, subscribesTo wrong: {:?}", n . subscribesTo)); },
+          "after delete, subscribesTo wrong: {:?}", n . forks)); },
       None => fails . record (s, "no SaveNode for wSub-owner" . into ()), } }
   { // insert a member: add d -> [a,b,c,d]
     let s : &str = "subscribeeFolder/insert";
@@ -598,11 +598,11 @@ async fn editable_subscribeeFolder (
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
     match saved_node_by_gnid (&nodes, "wSub-owner") {
-      Some (n) => if members_msv (&n . subscribesTo) != MSV::Specified (vec![
+      Some (n) => if members_msv (&n . forks) != MSV::Specified (vec![
           ID::from ("wSub-a"), ID::from ("wSub-b"),
           ID::from ("wSub-c"), ID::from ("wSub-d")]) {
         fails . record (s, format! (
-          "after insert, subscribesTo wrong: {:?}", n . subscribesTo)); },
+          "after insert, subscribesTo wrong: {:?}", n . forks)); },
       None => fails . record (s, "no SaveNode for wSub-owner" . into ()), } }
   Ok (( )) }
 
@@ -682,7 +682,7 @@ async fn omission_scenarios (
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, &restriction) . await ?;
     match saved_node_by_gnid (&nodes, "omWsub-owner") {
-      Some (n) => { let subs : Vec<ID> = match &n . subscribesTo {
+      Some (n) => { let subs : Vec<ID> = match &n . forks {
           MSV::Specified (gnids) => members_of (gnids),
           MSV::Unspecified => Vec::new (), };
         if ! subs . contains (&ID::from ("omWsub-inactive")) {
@@ -702,11 +702,9 @@ async fn omission_scenarios (
 
 //////////////////////////////////////////////////////////////
 // Function 2 (each its own database, since each must observe the
-// disk after a save): a save adding a second owned overrider of a note
-// saves (through the save's graph update: no buffer position edits
-// overrides); a buffer save making a note subscribe to itself, which
-// the fork rules read as forking itself, is refused, and disk is
-// unchanged. The buffer is hand-written rather than rendered.
+// disk after a save): a save adding a second owned fork of a note
+// saves (through the save's graph update); a buffer save making a
+// note fork itself is refused, and disk is unchanged. The buffer is hand-written rather than rendered.
 //////////////////////////////////////////////////////////////
 
 #[test]
@@ -717,18 +715,18 @@ fn a_save_admits_a_second_owned_overrider
     "tests/partner_folder_matrix/fixtures-monogamy/skgconfig.toml",
     "/tmp/tantivy-test-partner-folder-matrix-second-overrider",
     |config, tantivy| Box::pin ( async move {
-      // mono-r1 already overrides mono-target on disk; this save
-      // makes mono-r2 override it too.
-      save_added_overrides (
+      // mono-r1 already forks mono-target on disk; this save
+      // makes mono-r2 fork it too.
+      save_added_forks (
         &ID::from ("mono-r2"), &[ ID::from ("mono-target") ],
         config, tantivy ) . await ?;
       let r2 : Graphnode =
         graphnode_by_gnid (
           &graph_handle_from_config (config) ? . load_full (),
           config, &ID::from ("mono-r2") ) ?;
-      assert_eq! ( members_msv (&r2 . overrides) . or_default (),
+      assert_eq! ( members_msv (&r2 . forks) . or_default (),
                    &[ ID::from ("mono-target") ],
-                   "the save must write mono-r2's override" );
+                   "the save must write mono-r2's fork" );
       Ok (( )) } )) }
 
 #[test]
@@ -769,12 +767,12 @@ fn buffer_save_refuses_a_self_subscription
         graphnode_by_gnid (
           &skg::test_utils::graph_handle_from_config (config)? . load_full (),
           config, &ID::from ("mono-r2") ) ?;
-      let subscriptions_empty : bool = match &r2 . subscribesTo {
+      let subscriptions_empty : bool = match &r2 . forks {
         MSV::Unspecified       => true,
         MSV::Specified (gnids)   => gnids . is_empty (), };
       assert! ( subscriptions_empty,
         "a refused save must not write mono-r2's subscription: {:?}",
-        r2 . subscribesTo );
+        r2 . forks );
       Ok (( )) } )) }
 
 /// Owned E contains foreign R, which subscribes to (forks) E: the

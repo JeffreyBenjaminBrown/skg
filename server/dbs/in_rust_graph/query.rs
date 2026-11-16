@@ -27,17 +27,13 @@ pub fn find_related_nodes (
       ("contains",                     "container",   "content")  =>
         if let Some (n) = graph . nodes . get (&pid) {
           out . extend ( members_of (& n . contains) . iter () . map (&pid_or_self) ); },
-      ("subscribesTo",                 "subscriber",  "subscribee") =>
+      ("forks",                        "forker",      "forkee")     =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( members_of ( n . subscribesTo . or_default () )
+          out . extend ( members_of ( n . forks . or_default () )
                          . iter () . map (&pid_or_self) ); },
       ("hidesFromSubs", "hider",                      "hidden")     =>
         if let Some (n) = graph . nodes . get (&pid) {
           out . extend ( members_of ( n . hidesFromSubs . or_default () )
-                         . iter () . map (&pid_or_self) ); },
-      ("overrides",                    "overrider",   "overridden") =>
-        if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( members_of ( n . overrides . or_default () )
                          . iter () . map (&pid_or_self) ); },
       ("linksTo",                      "mentioner",   "mentioned")  =>
         if let Some (n) = graph . nodes . get (&pid) {
@@ -47,21 +43,20 @@ pub fn find_related_nodes (
       ("contains",                     "content",   "container")   =>
         if let Some (s) = graph . contained_by . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
-      ("subscribesTo",                 "subscribee",  "subscriber")  =>
-        if let Some (s) = graph . subscribers_of . get (&pid) {
+      ("forks",                        "forkee",      "forker")      =>
+        if let Some (s) = graph . forkers_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
       ("hidesFromSubs",                "hidden",      "hider")       =>
         if let Some (s) = graph . hiders_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
-      ("overrides",                    "overridden",  "overrider")   =>
-        if let Some (s) = graph . overriders_of . get (&pid) {
-          out . extend ( s . iter () . cloned () ); },
       ("linksTo",                      "mentioned",   "mentioner")  =>
         if let Some (s) = graph . mentioners_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
-      // Unknown (relation, input, output) combination: shouldn't
-      // happen — the five outbound types have exactly two roles
-      // each. Return empty (caller will get no matches).
-      _ => {},
+      // Unknown (relation, input, output) combination: a caller's
+      // bug, since the four outbound types have exactly two roles
+      // each. Answering nothing would hide a stale relation name.
+      (relation, input_role, output_role) =>
+        panic! ("find_related_nodes: unknown triple ({}, {}, {})",
+                relation, input_role, output_role),
     } }
   out }

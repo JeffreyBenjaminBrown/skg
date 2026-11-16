@@ -89,17 +89,17 @@ pub fn relRepo_info (
 
 /// The two relations an explicit '(editRequest (relRepo ...))'
 /// request can name
-/// (matching 'RequestedRelRepos'). Hides, overrides and links have no
+/// (matching 'RequestedRelRepos'). Hides and links have no
 /// explicit-relRepo path, so asking about them is an error.
 fn relation_from_client_string (
   s : &str,
 ) -> Result<NodeRelation, String> {
   match s {
     "contains"          => Ok (NodeRelation::Contains),
-    "subscribesTo"      => Ok (NodeRelation::SubscribesTo),
+    "forks"             => Ok (NodeRelation::Forks),
     other => Err ( format! (
       "unsupported relation '{}': the explicit-relRepo path covers \
-       contains and subscribesTo", other )), }}
+       contains and forks", other )), }}
 
 #[cfg(test)]
 #[path = "../../../tests/unit/relRepo_info.rs"]

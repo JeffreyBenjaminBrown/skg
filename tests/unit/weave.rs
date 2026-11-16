@@ -14,15 +14,6 @@ fn w (disk : &[&str], buffer : &[&str]) -> Vec<&'static str> {
       Box::leak ( s . to_string () . into_boxed_str () ) } ) . collect ();
   weave ( &disk, vis, &buffer ) }
 
-fn sdm (disk : &[&str], buffer : &[&str]) -> Vec<&'static str> {
-  let disk : Vec<&'static str> =
-    disk . iter () . map ( |s| -> &'static str {
-      Box::leak ( s . to_string () . into_boxed_str () ) } ) . collect ();
-  let buffer : Vec<&'static str> =
-    buffer . iter () . map ( |s| -> &'static str {
-      Box::leak ( s . to_string () . into_boxed_str () ) } ) . collect ();
-  set_difference_merge ( &disk, vis, &buffer ) }
-
 #[test]
 fn weave_identity_when_all_visible () {
   assert_eq! ( w (&["a","b","c"], &["a","b","c"]),
@@ -78,23 +69,3 @@ fn weave_new_members_carry_no_runs () {
 fn weave_dedups_buffer_duplicates () {
   assert_eq! ( w (&["a","X"], &["a","a"]),
                vec! ["a","X"] ); }
-
-#[test]
-fn sdm_disk_order_kept_and_reorder_is_noop () {
-  assert_eq! ( sdm (&["a","X","b"], &["b","a"]),
-               vec! ["a","X","b"] ); }
-
-#[test]
-fn sdm_visible_delete_lands_invisible_survives () {
-  assert_eq! ( sdm (&["a","X","b"], &["b"]),
-               vec! ["X","b"] ); }
-
-#[test]
-fn sdm_appends_new_members_deduped () {
-  assert_eq! ( sdm (&["a"], &["a","n","n"]),
-               vec! ["a","n"] ); }
-
-#[test]
-fn sdm_identity_when_all_visible_and_unchanged () {
-  assert_eq! ( sdm (&["a","b"], &["a","b"]),
-               vec! ["a","b"] ); }

@@ -1,0 +1,15 @@
+{
+  "marks": [
+    {
+      "leaf": {
+        "Relationship": {
+          "relation": "Contains",
+          "recorder": "a",
+          "member": "b",
+          "aspect": "RelRepo"
+        }
+      },
+      "fingerprint": 42
+    }
+  ]
+}

@@ -58,7 +58,7 @@ pub struct DefiningFolderRecorder {
 /// They are the self-emissions, and lowering a map entry to a
 /// NodeInstruction needs to know which skgrepo's file it concerns.
 /// .
-/// 'SetContains' / 'SetSubscribesTo' pair each
+/// 'SetContains' / 'SetForks' pair each
 /// member with an Option<RepoName>: Some when the position's
 /// headline carried an explicit '(editRequest (relRepo NAME))'
 /// request (the 'skg-set-relRepo' gesture), None meaning
@@ -75,7 +75,7 @@ pub enum FieldIntent {
                     body   : Option<String>, },
   SetContains     (Vec<(ID, Option<SkgrepoName>)>),
   SetAliases      (Vec<(String, Option<SkgrepoName>)>),
-  SetSubscribesTo (Vec<(ID, Option<SkgrepoName>)>),
+  SetForks        (Vec<(ID, Option<SkgrepoName>)>),
   Delete          { skgrepo : SkgrepoName },
   NodeMerge       { acquiree : ID },
   SetFlag     { flag : Flag, value : bool },
@@ -127,7 +127,7 @@ pub struct FieldIntentsForOneId {
   pub title_and_body : Option<(String, Option<String>)>,
   pub contains       : Option<Vec<(ID, Option<SkgrepoName>)>>,
   pub aliases        : Option<Vec<(String, Option<SkgrepoName>)>>,
-  pub subscribesTo   : Option<Vec<(ID, Option<SkgrepoName>)>>,
+  pub forks          : Option<Vec<(ID, Option<SkgrepoName>)>>,
   pub delete         : bool,
   pub node_merge     : Option<ID>, // This holds the acquiree.
   pub flag       : Option<(Flag, bool)>,
@@ -154,7 +154,7 @@ impl FieldIntentsForOneId {
     self . title_and_body . is_some()
       || self . contains      . is_some()
       || self . aliases       . is_some()
-      || self . subscribesTo . is_some()
+      || self . forks . is_some()
       || self . node_merge    . is_some()
       || self . flag      . is_some() }}
 
@@ -252,10 +252,10 @@ impl CollectedFieldIntents {
           FieldIntent::SetAliases (texts) =>
             fill_exclusive_slot (
               &mut entry . aliases, texts, "aliases", &target, emitters),
-          FieldIntent::SetSubscribesTo (members) =>
+          FieldIntent::SetForks (members) =>
             fill_exclusive_slot (
-              &mut entry . subscribesTo, members,
-              "subscribesTo", &target, emitters),
+              &mut entry . forks, members,
+              "forks", &target, emitters),
           FieldIntent::NodeMerge { acquiree } => {
             if entry . flag . is_some() {
               return Err ( with_org_subheadlines (

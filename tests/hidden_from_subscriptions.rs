@@ -684,7 +684,7 @@ async fn test_a_save_says_why_a_removal_hides_nothing (
     assert_eq! (
       save_and_return_hides (
         removed, config, tantivy, &graph, &mut views_state ) . await ?,
-      vec! [ "Hides nothing: 'y' left 'f', but it is no content of 'j', nor overrides any." . to_string () ] );
+      vec! [ "Hides nothing: 'y' left 'f', but it is no content of 'j', nor a mirror of any." . to_string () ] );
     let replaced : &str = indoc! {"
       * (skg node (gnid g) (skgRepos (nodeRepo owned))) g
       ** (skg node (gnid m) (skgRepos (nodeRepo owned))) m
@@ -1023,10 +1023,10 @@ async fn test_subscribee_and_compound_partner_folders (
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 3))))) R
+      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hidesFromSubs (out 3))))) R
        ** (skg subscribeeFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (unintegrated 1))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-1
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (unintegrated 1))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-2
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
+       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeFolder)
        **** (skg folded node (gnid hidden-for-no-reason) (skgRepos (nodeRepo main)) writeProtected (view (rels (hidesFromSubs (in 1 (ancestors 3)))) (birth (hidesFromSubs in 3)))) hidden-for-no-reason
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
@@ -1056,17 +1056,17 @@ async fn test_subscribee_and_compound_partner_folders (
     println!("View from R after save with editable view requests:\n{}", extended);
 
     let expected_extended = indoc! {
-      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 3))))) R
+      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hidesFromSubs (out 3))))) R
        ** (skg subscribeeFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 1))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-1
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded node (gnid hidden-in-E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4)))) (birth (contains in 2) (hidesFromSubs in 4)))) hidden-in-E1
-       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (subscribesTo (in 1))) cycle)) subscribee-1
+       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (forks (in 1))) cycle)) subscribee-1
        **** (skg node (gnid E11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E11
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 1))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-2
+       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-2
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded node (gnid hidden-in-E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4)))) (birth (contains in 2) (hidesFromSubs in 4)))) hidden-in-E2
-       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (subscribesTo (in 1))) cycle)) subscribee-2
+       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (forks (in 1))) cycle)) subscribee-2
        **** (skg node (gnid E21) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E21
        *** (skg hiddenOutsideOfSubscribeeFolder)
        **** (skg folded node (gnid hidden-for-no-reason) (skgRepos (nodeRepo main)) writeProtected (view (rels (hidesFromSubs (in 1 (ancestors 3)))) (birth (hidesFromSubs in 3)))) hidden-for-no-reason
@@ -1100,9 +1100,9 @@ async fn test_hidden_within_but_none_without (
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (subscribesTo (out 1)) (hidesFromSubs (out 1))))) R
+      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 1)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 3 (unintegrated 2))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-1
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 3 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
     assert_metadata_eq!(initial_view, expected_initial,
@@ -1132,12 +1132,12 @@ async fn test_hidden_within_but_none_without (
     // HiddenInSubscribeeFolder precedes content regardless of .skg order.
     // E1.skg has [E11, H, E12] but view shows HiddenInSubscribeeFolder (with H) before E11 and E12.
     let expected_extended = indoc! {
-      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (subscribesTo (out 1)) (hidesFromSubs (out 1))))) R
+      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 1)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 3 (unintegrated 2))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-1
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 3 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4)))) (birth (contains in 2) (hidesFromSubs in 4)))) H
-       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 3 (ancestors 1))) (subscribesTo (in 1))) cycle)) subscribee-1
+       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 3 (ancestors 1))) (forks (in 1))) cycle)) subscribee-1
        **** (skg node (gnid E11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E11
        **** (skg node (gnid E12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E12
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
@@ -1328,10 +1328,10 @@ async fn test_hidden_without_but_none_within (
                           &ID("R" . to_string()) )?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
+      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (unintegrated 2))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-1
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-2
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
+       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeFolder)
        **** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (hidesFromSubs (in 1 (ancestors 3)))) (birth (hidesFromSubs in 3)))) H
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
@@ -1359,13 +1359,13 @@ async fn test_hidden_without_but_none_within (
     println!("View from R after save with editable view requests:\n{}",
              with_subscribees_extended);
     let expected_extended = indoc! {
-      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
+      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 2))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-1
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
        **** (skg node (gnid E11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E11
        **** (skg node (gnid E12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) E12
        ***** (skg node (gnid E121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E121
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-2
+       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeFolder)
        **** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (hidesFromSubs (in 1 (ancestors 3)))) (birth (hidesFromSubs in 3)))) H
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
@@ -1466,10 +1466,10 @@ async fn test_overlapping_hidden_within (
                           &ID("R" . to_string()) )?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
+      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-1
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-2
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
+       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-2
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
     assert_metadata_eq!(initial_view, expected_initial,
@@ -1495,18 +1495,18 @@ async fn test_overlapping_hidden_within (
       response . saved_view };
     println!("View from R after save with editable view requests:\n{}", extended);
     let expected_extended = indoc! {
-      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
+      "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 1 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-1
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-1
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4)))) (birth (contains in 2) (hidesFromSubs in 4)))) H
-       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))) cycle)) subscribee-1
-       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))))) subscribee-2
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 1 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-2
+       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))) cycle)) subscribee-1
+       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))))) subscribee-2
+       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) subscribee-2
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4)))) (birth (contains in 2) (hidesFromSubs in 4)))) H
-       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))))) subscribee-1
-       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))) cycle)) subscribee-2
+       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))))) subscribee-1
+       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))) cycle)) subscribee-2
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
     assert_metadata_eq!(extended, expected_extended,

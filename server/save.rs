@@ -432,8 +432,7 @@ pub enum DeleteFrom {
 /// origin (which could be the recorder-collection pass or the save
 /// itself),
 /// remove every id in 'deleted_id_set' from the four
-/// outbound list fields (contains, subscribesTo,
-/// hidesFromSubs, overrides).
+/// outbound list fields (contains, forks, hidesFromSubs).
 ///
 /// 'deleted_id_set' includes both the primary pid of each delete
 /// and the extra_ids of that node from the in-Rust graph.
@@ -492,9 +491,8 @@ pub(crate) fn apply_delete_propagation_cleanup (
     for deleted in &deleted_primary_pids { // Recorderward relmaps are keyed by primary pid (id_to_pid_if_found resolves extra_ids during index construction), so iterating the primary pids of deletes is sufficient to find every referencer.
       for inverse in [
         &graph_snap . contained_by,
-        &graph_snap . subscribers_of,
-        &graph_snap . hiders_of,
-        &graph_snap . overriders_of, ] {
+        &graph_snap . forkers_of,
+        &graph_snap . hiders_of, ] {
         if let Some (set) = inverse . get (deleted) {
           for pid in set {
             referencer_pids . insert ( pid . clone () ); }} } }
@@ -523,16 +521,15 @@ pub(crate) fn apply_delete_propagation_cleanup (
         if ! config . skgrepo_is_owned (&nc . home_skgrepo) { continue; }
         nc . contains . retain ( |record|
           ! stripped (record, &deleted_id_set) );
-        for list in [ &mut nc . subscribesTo,
-                      &mut nc . hidesFromSubs,
-                      &mut nc . overrides ] {
+        for list in [ &mut nc . forks,
+                      &mut nc . hidesFromSubs ] {
           if let MSV::Specified (records) = list {
             records . retain ( |record|
               ! stripped (record, &deleted_id_set) ); }} }} } }
 
 /// How many records in sections the skgrepo restriction keeps out name
 /// a graphnode 'node_defs' deletes: the records of owned referencers,
-/// in any of the four outbound list fields, that the delete's
+/// in any of the three outbound list fields, that the delete's
 /// propagation would strip and the user could not see. Zero when the
 /// connection is unrestricted.
 pub(crate) fn restricted_records_naming_deleted_graphnodes (
@@ -555,9 +552,8 @@ pub(crate) fn restricted_records_naming_deleted_graphnodes (
     . collect ();
   let referencer_pids : HashSet<&ID> = deleted_primary_pids . iter ()
     . flat_map ( |deleted| [ &graph_snap . contained_by,
-                             &graph_snap . subscribers_of,
-                             &graph_snap . hiders_of,
-                             &graph_snap . overriders_of, ]
+                             &graph_snap . forkers_of,
+                             &graph_snap . hiders_of, ]
                  . into_iter ()
                  . filter_map ( move |inverse| inverse . get (deleted) )
                  . flatten () )
@@ -573,14 +569,13 @@ pub(crate) fn restricted_records_naming_deleted_graphnodes (
             . count () )
     . sum () }
 
-/// Every record of the four outbound list fields of 'node'.
+/// Every record of the three outbound list fields of 'node'.
 fn records_of_graphnodeInRust (
   node : &GraphnodeInRust,
 ) -> Vec<&RelPartner<ID>> {
   node . contains . iter ()
-    . chain ( node . subscribesTo . or_default () . iter () )
+    . chain ( node . forks . or_default () . iter () )
     . chain ( node . hidesFromSubs . or_default () . iter () )
-    . chain ( node . overrides . or_default () . iter () )
     . collect () }
 
 
@@ -600,9 +595,8 @@ pub(crate) fn graphnode_from_graphnodeInRust (
     aliases                      : rust . aliases . clone (),
     body                         : rust . body . clone (),
     contains                     : rust . contains . clone (),
-    subscribesTo                 : rust . subscribesTo . clone (),
+    forks                        : rust . forks . clone (),
     hidesFromSubs                : rust . hidesFromSubs . clone (),
-    overrides                    : rust . overrides . clone (),
     flags                        : rust . flags . clone (),
   }}
 

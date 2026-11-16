@@ -376,16 +376,16 @@ fn local_index_check_work_does_not_grow_with_unrelated_nodes () {
 }
 
 #[test]
-fn a_nodeMerge_leaving_two_owned_overriders_of_one_note_is_prepared () {
-  // R1 overrides N1 and R2 overrides N2; N2 merges into N1, so both
-  // come to override N1. Several forks of one note are legal.
+fn a_nodeMerge_leaving_two_owned_forks_of_one_note_is_prepared () {
+  // R1 forks N1 and R2 forks N2; N2 merges into N1, so both come to
+  // fork N1. Several forks of one note are legal.
   let skgrepo : SkgrepoName = SkgrepoName::from ("main");
   let mut n1 : Graphnode = node ("N1");
   let mut r1 : Graphnode = node ("R1");
-  r1 . overrides = MSV::Specified (rel_partners_at_relRepo (
+  r1 . forks = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("N1")]));
   let mut r2 : Graphnode = node ("R2");
-  r2 . overrides = MSV::Specified (rel_partners_at_relRepo (
+  r2 . forks = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("N2")]));
   let base : Arc<InRustGraph> = Arc::new (
     InRustGraph::from_graphnodes (&[n1 . clone (), node ("N2"), r1, r2]));
@@ -397,20 +397,20 @@ fn a_nodeMerge_leaving_two_owned_overriders_of_one_note_is_prepared () {
         gnid : ID::from ("N2"), home_skgrepo: skgrepo,
       }),
     ]) . expect ("two owned forks of one note are legal");
-  let mut overriders : Vec<ID> = prepared . candidate () . overriders_of
-    . get (&ID::from ("N1")) . expect ("N1 is overridden")
+  let mut forkers : Vec<ID> = prepared . candidate () . forkers_of
+    . get (&ID::from ("N1")) . expect ("N1 is forked")
     . iter () . cloned () . collect ();
-  overriders . sort ();
-  assert_eq! (overriders, vec![ID::from ("R1"), ID::from ("R2")]);
+  forkers . sort ();
+  assert_eq! (forkers, vec![ID::from ("R1"), ID::from ("R2")]);
 }
 
 #[test]
-fn an_acquirer_left_overriding_its_acquiree_is_refused_as_a_self_fork () {
+fn an_acquirer_left_forking_its_acquiree_is_refused_as_a_self_fork () {
   // The nodeMerge drops such a relationship ('three_nodeMerged_graphnodes');
   // a save that keeps one is refused here.
   let skgrepo : SkgrepoName = SkgrepoName::from ("main");
   let mut a : Graphnode = node ("A");
-  a . overrides = MSV::Specified (rel_partners_at_relRepo (
+  a . forks = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("B")]));
   let base : Arc<InRustGraph> = Arc::new (
     InRustGraph::from_graphnodes (&[a . clone (), node ("B")]));
@@ -482,9 +482,8 @@ proptest! {
       prop_assert_eq! (&actual . nodes, &full . graph . nodes);
       prop_assert_eq! (&actual . extra_id_to_pid, &full . graph . extra_id_to_pid);
       prop_assert_eq! (&actual . contained_by, &full . graph . contained_by);
-      prop_assert_eq! (&actual . subscribers_of, &full . graph . subscribers_of);
+      prop_assert_eq! (&actual . forkers_of, &full . graph . forkers_of);
       prop_assert_eq! (&actual . hiders_of, &full . graph . hiders_of);
-      prop_assert_eq! (&actual . overriders_of, &full . graph . overriders_of);
       prop_assert_eq! (&actual . mentioners_of, &full . graph . mentioners_of);
     }
   }

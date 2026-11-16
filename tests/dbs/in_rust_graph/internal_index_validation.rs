@@ -19,11 +19,9 @@ fn full_fixture () -> InRustGraph {
   let mut recorder = node ("recorder");
   recorder . contains = rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("target-alias"), ID::from ("dangling")]);
-  recorder . subscribesTo = MSV::Specified (rel_partners_at_relRepo (
+  recorder . forks = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("target-alias")]));
   recorder . hidesFromSubs = MSV::Specified (rel_partners_at_relRepo (
-    &skgrepo, vec![ID::from ("target-alias")]));
-  recorder . overrides = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("target-alias")]));
   recorder . body = Some (
     "[[id:target-alias][target]] and [[id:text-dangling][missing]]" . to_string ());
@@ -38,9 +36,8 @@ fn assert_same_graph (
 ) {
   assert_eq! (actual . nodes, expected . nodes);
   assert_eq! (actual . contained_by, expected . contained_by);
-  assert_eq! (actual . subscribers_of, expected . subscribers_of);
+  assert_eq! (actual . forkers_of, expected . forkers_of);
   assert_eq! (actual . hiders_of, expected . hiders_of);
-  assert_eq! (actual . overriders_of, expected . overriders_of);
   assert_eq! (actual . mentioners_of, expected . mentioners_of);
   assert_eq! (actual . extra_id_to_pid, expected . extra_id_to_pid);
 }
@@ -56,19 +53,18 @@ fn construction_recomputes_every_role_alias_and_dangling_key () {
 }
 
 #[test]
-fn exact_diagnostics_cover_all_six_corrupt_indexes_in_stable_order () {
+fn exact_diagnostics_cover_all_five_corrupt_indexes_in_stable_order () {
   let mut graph = full_fixture ();
   graph . contained_by . remove (&ID::from ("target"));
-  graph . subscribers_of . remove (&ID::from ("target"));
+  graph . forkers_of . remove (&ID::from ("target"));
   graph . hiders_of . remove (&ID::from ("target"));
-  graph . overriders_of . remove (&ID::from ("target"));
   graph . mentioners_of . remove (&ID::from ("target"));
   graph . extra_id_to_pid . insert (
     ID::from ("target-alias"), ID::from ("wrong"));
   let mismatches = validate_internal_indexes (&graph);
   assert_eq! (
     mismatches . iter () . map (|m| m . index) . collect::<Vec<_>> (),
-    vec!["contained_by", "subscribers_of", "hiders_of", "overriders_of",
+    vec!["contained_by", "forkers_of", "hiders_of",
          "mentioners_of", "extra_id_to_pid"]);
   let formatted = format_internal_index_mismatches (&mismatches);
   assert! (formatted . contains (
@@ -86,7 +82,7 @@ fn incremental_update_delete_and_extra_id_acquisition_remain_coherent () {
   let mut graph = InRustGraph::from_graphnodes (&[recorder . clone (), disposable]);
   assert_eq! (validate_internal_indexes (&graph), vec![]);
 
-  recorder . subscribesTo = MSV::Specified (rel_partners_at_relRepo (
+  recorder . forks = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("future-alias")]));
   apply_nodeInstructions_to_inRustGraph (
     &mut graph, &[NodeInstruction::Save (SaveNode (recorder))]);
@@ -108,15 +104,13 @@ fn incremental_update_delete_and_extra_id_acquisition_remain_coherent () {
 }
 
 #[test]
-fn alias_acquisition_rekeys_all_five_inverse_indexes () {
+fn alias_acquisition_rekeys_all_four_inverse_indexes () {
   let skgrepo         : SkgrepoName = SkgrepoName::from ("main");
   let mut recorder : Graphnode = node ("recorder");
   recorder . contains = rel_partners_at_relRepo (&skgrepo, vec![ID::from ("future")]);
-  recorder . subscribesTo = MSV::Specified (rel_partners_at_relRepo (
+  recorder . forks = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("future")]));
   recorder . hidesFromSubs = MSV::Specified (rel_partners_at_relRepo (
-    &skgrepo, vec![ID::from ("future")]));
-  recorder . overrides = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, vec![ID::from ("future")]));
   recorder . body = Some ("[[id:future][future]]" . to_string ());
   let mut graph : InRustGraph =
@@ -128,9 +122,8 @@ fn alias_acquisition_rekeys_all_five_inverse_indexes () {
 
   for index in [
     &graph . contained_by,
-    &graph . subscribers_of,
+    &graph . forkers_of,
     &graph . hiders_of,
-    &graph . overriders_of,
     &graph . mentioners_of,
   ] {
     assert_eq! (
@@ -179,11 +172,9 @@ fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
   let mut recorder : Graphnode = node ("foreign-recorder");
   let raw_gnids : Vec<ID> = vec![ID::from ("target"), ID::from ("extra")];
   recorder . contains = rel_partners_at_relRepo (&skgrepo, raw_gnids . clone ());
-  recorder . subscribesTo = MSV::Specified (rel_partners_at_relRepo (
+  recorder . forks = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, raw_gnids . clone ()));
   recorder . hidesFromSubs = MSV::Specified (rel_partners_at_relRepo (
-    &skgrepo, raw_gnids . clone ()));
-  recorder . overrides = MSV::Specified (rel_partners_at_relRepo (
     &skgrepo, raw_gnids . clone ()));
   recorder . body = Some (
     "[[id:target][primary]] [[id:extra][extra]]" . to_string ());
@@ -201,9 +192,8 @@ fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
 
   for index in [
     &graph . contained_by,
-    &graph . subscribers_of,
+    &graph . forkers_of,
     &graph . hiders_of,
-    &graph . overriders_of,
     &graph . mentioners_of,
   ] {
     for raw in &raw_gnids {
@@ -214,20 +204,18 @@ fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
 }
 
 #[test]
-fn changed_recorder_removes_and_adds_all_five_inverse_contributions () {
+fn changed_recorder_removes_and_adds_all_four_inverse_contributions () {
   let skgrepo    : SkgrepoName = SkgrepoName::from ("main");
   let mut old : Graphnode = node ("recorder");
   old . contains = rel_partners_at_relRepo (&skgrepo, vec![ID::from ("old")]);
-  old . subscribesTo = MSV::Specified (old . contains . clone ());
+  old . forks = MSV::Specified (old . contains . clone ());
   old . hidesFromSubs = MSV::Specified (old . contains . clone ());
-  old . overrides = MSV::Specified (old . contains . clone ());
   old . body = Some ("[[id:old][old]]" . to_string ());
   let mut final_node : Graphnode = node ("recorder");
   final_node . contains = rel_partners_at_relRepo (&skgrepo, vec![ID::from ("new")]);
-  final_node . subscribesTo = MSV::Specified (final_node . contains . clone ());
+  final_node . forks = MSV::Specified (final_node . contains . clone ());
   final_node . hidesFromSubs =
     MSV::Specified (final_node . contains . clone ());
-  final_node . overrides = MSV::Specified (final_node . contains . clone ());
   final_node . body = Some ("[[id:new][new]]" . to_string ());
   let mut graph : InRustGraph = InRustGraph::from_graphnodes (&[old]);
   apply_nodeInstructions_to_inRustGraph (
@@ -235,9 +223,8 @@ fn changed_recorder_removes_and_adds_all_five_inverse_contributions () {
 
   for index in [
     &graph . contained_by,
-    &graph . subscribers_of,
+    &graph . forkers_of,
     &graph . hiders_of,
-    &graph . overriders_of,
     &graph . mentioners_of,
   ] {
     assert! (! index . contains_key (&ID::from ("old")));
@@ -262,9 +249,8 @@ proptest! {
       . collect ();
     let mut recorder : Graphnode = node ("recorder");
     recorder . contains = rel_partners_at_relRepo (&skgrepo, raw_gnids . clone ());
-    recorder . subscribesTo = MSV::Specified (recorder . contains . clone ());
+    recorder . forks = MSV::Specified (recorder . contains . clone ());
     recorder . hidesFromSubs = MSV::Specified (recorder . contains . clone ());
-    recorder . overrides = MSV::Specified (recorder . contains . clone ());
     recorder . body = Some (raw_indexes . iter ()
       . map (|index| format! ("[[id:{}][x]]", universe [*index]))
       . collect::<Vec<String>> () . join (" "));

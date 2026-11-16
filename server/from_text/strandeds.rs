@@ -31,11 +31,10 @@ use crate::types::save::{NodeInstruction, SaveNode, SkgrepoMove};
 use std::collections::{HashMap, HashSet};
 
 /// The relations whose relationships carry a relRepo.
-const RELATIONS_WITH_RELREPOS : [NodeRelation; 4] = [
+const RELATIONS_WITH_RELREPOS : [NodeRelation; 3] = [
   NodeRelation::Contains,
-  NodeRelation::SubscribesTo,
-  NodeRelation::HidesFromSubs,
-  NodeRelation::Overrides, ];
+  NodeRelation::Forks,
+  NodeRelation::HidesFromSubs, ];
 
 /// See the module comment.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -115,10 +114,10 @@ pub fn stranded_relationships (
       let recorder_home_after : SkgrepoName = recorder . home_skgrepo . clone ();
       let subscribes_before : Vec<RelPartner<ID>> =
         graph . nodes . get (&recorder_pid)
-        . map ( |node| node . subscribesTo . or_default () . to_vec () )
+        . map ( |node| node . forks . or_default () . to_vec () )
         . unwrap_or_default ();
       let subscribes_after : Vec<RelPartner<ID>> =
-        recorder . subscribesTo . or_default () . to_vec ();
+        recorder . forks . or_default () . to_vec ();
       for partner in relation_list (&recorder, relation) {
         let member : ID = resolve (&partner . member);
         if recorder_pid != *moved && member != *moved { continue; }
@@ -200,9 +199,8 @@ fn relation_list (
 ) -> Vec<RelPartner<ID>> {
   match relation {
     NodeRelation::Contains      => node . contains . clone (),
-    NodeRelation::SubscribesTo  => node . subscribesTo . or_default () . to_vec (),
+    NodeRelation::Forks         => node . forks . or_default () . to_vec (),
     NodeRelation::HidesFromSubs => node . hidesFromSubs . or_default () . to_vec (),
-    NodeRelation::Overrides     => node . overrides . or_default () . to_vec (),
     NodeRelation::LinksTo       => Vec::new (), } }
 
 fn relation_list_mut (
@@ -217,9 +215,8 @@ fn relation_list_mut (
       MSV::Unspecified => &mut [], } }
   match relation {
     NodeRelation::Contains      => node . contains . as_mut_slice (),
-    NodeRelation::SubscribesTo  => msv_list (&mut node . subscribesTo),
+    NodeRelation::Forks         => msv_list (&mut node . forks),
     NodeRelation::HidesFromSubs => msv_list (&mut node . hidesFromSubs),
-    NodeRelation::Overrides     => msv_list (&mut node . overrides),
     NodeRelation::LinksTo       => &mut [], } }
 
 /// A relationship's default relRepo, given its recorder's home, its

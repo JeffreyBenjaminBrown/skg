@@ -19,9 +19,8 @@ pub struct GraphnodeInRust {
   pub aliases                      : MSV<RelPartner<String>>,
   pub body                         : Option<String>,
   pub contains                     : Vec<RelPartner<ID>>,
-  pub subscribesTo                 : MSV<RelPartner<ID>>,
+  pub forks                        : MSV<RelPartner<ID>>,
   pub hidesFromSubs                : MSV<RelPartner<ID>>,
-  pub overrides                    : MSV<RelPartner<ID>>,
   pub flags                        : Vec<Flag>,
   // PITFALL: derived from the text.
   // Parsed from title+body via 'links_from_node' during
@@ -46,9 +45,8 @@ impl From<&Graphnode> for GraphnodeInRust {
       aliases                      : c . aliases . clone (),
       body                         : c . body . clone (),
       contains                     : c . contains . clone (),
-      subscribesTo                 : c . subscribesTo . clone (),
+      forks                        : c . forks . clone (),
       hidesFromSubs                : c . hidesFromSubs . clone (),
-      overrides                    : c . overrides . clone (),
       flags                        : c . flags . clone (),
       linksTo,
     }

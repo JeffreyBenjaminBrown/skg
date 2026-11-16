@@ -102,8 +102,7 @@ pub enum PostSkgsaveCommitNoticeCandidate {
 /// they do not own) editable and edited it; that edit is read as a
 /// request to clone N. 'clone' is the new owned node C, built from the
 /// edited buffer node -- a fresh pid, an owned skgrepo, the edited
-/// title/body/contains, 'subscribesTo = [N]' and
-/// 'overrides = [N]', no hides. N itself is left untouched on
+/// title/body/contains, 'forks = [N]', no hides. N itself is left untouched on
 /// disk (its foreign SaveNode is dropped). The 'original_*' fields name
 /// N, for the already-forked check and the confirmation buffer's display.
 #[derive(Debug, Clone)]

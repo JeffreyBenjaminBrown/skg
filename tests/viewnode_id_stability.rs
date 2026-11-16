@@ -86,7 +86,7 @@ fn write_fixture (
     ("a",  "pid: a\ntitle: a\ncontains:\n- a1\n"),
     ("a1", "pid: a1\ntitle: a1\n"),
     ("b",  "pid: b\ntitle: b\n"),
-    ("c",  "pid: c\ntitle: c\nsubscribesTo:\n- d\n"),
+    ("c",  "pid: c\ntitle: c\nforks:\n- d\n"),
     ("d",  "pid: d\ntitle: d\n"),
     ("x",  "pid: x\ntitle: x\ncontains:\n- r\n"),
     ("s1", "pid: s1\ntitle: s1\n"), ];

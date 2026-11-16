@@ -327,7 +327,7 @@ fn visit_subscribee_folder (
         collected . instructionMerge_fieldIntent (
           &recorder . headline,
           recorder . gnid . clone(),
-          FieldIntent::SetSubscribesTo (
+          FieldIntent::SetForks (
             partnerFolder_members (node_ref) )) ?; }
       for child in node_ref . children() {
         let child_context : LocalContext =
@@ -412,7 +412,7 @@ fn dedup_members_by_gnid (
 /// '(editRequest (relRepo NAME))' request, if any (see 'FieldIntent').
 /// Tombstones contribute nothing. A member whose record the
 /// skgrepo restriction keeps out has no headline: the folder omits it from
-/// display, and the save preserves it ('subscribesTo' is
+/// display, and the save preserves it ('forks' is
 /// order-meaningful: disk supplementation's weave restores it at its
 /// disk position; see the API doc's "Restricted-skgrepo nodes").
 fn partnerFolder_members (

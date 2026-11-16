@@ -71,7 +71,7 @@ pub struct Partner {
 /// The two halves of C, the set of changed graphnodes.
 /// 'out_changed': nodes whose own files record a change, and every new
 /// or deleted node. 'in_changed': nodes whose set of containers,
-/// mentioners, subscribers, overriders or hiders changed.
+/// mentioners, forkers or hiders changed.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ChangedPids {
   pub out_changed : BTreeSet<ID>,

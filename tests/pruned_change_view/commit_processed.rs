@@ -486,7 +486,7 @@ fn a_merge_wholly_processed_goes_in () -> TestResult {
     assert! ( marked_keys (env) . is_empty () );
     Ok (( )) }) }
 
-/// At HEAD r overrides n. In the worktree r no longer does, and n
+/// At HEAD r forks n. In the worktree r no longer does, and n
 /// contains r. Only n is processed: committing it alone would leave n
 /// containing a note that forks it, so validation refuses, and nothing
 /// goes in.
@@ -494,7 +494,7 @@ fn a_merge_wholly_processed_goes_in () -> TestResult {
 fn a_commit_leaving_a_note_containing_its_forker_is_refused () -> TestResult {
   with_scratch ( MAIN, &[
     ("main", "n", Some (&yaml ("n", "n", &[])), Some (&yaml ("n", "n", &["r"]))),
-    ("main", "r", Some ("pid: r\ntitle: r\noverrides:\n- n\n"), Some (&yaml ("r", "r", &[]))), ],
+    ("main", "r", Some ("pid: r\ntitle: r\nforks:\n- n\n"), Some (&yaml ("r", "r", &[]))), ],
     |f, env| {
       mark_nodes (f, env, &["n"]) ?;
       let marks : HashSet<LeafKey> = marked_keys (env);

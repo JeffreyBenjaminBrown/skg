@@ -174,7 +174,7 @@ fn processed_aggregates_over_the_leaves_that_exist () {
 /// n6; the new n4 stands alone.
 fn straddle_with_new_nodes () -> GraphStraddle {
   let mut n1 : Graphnode = node ("n1", "n1", &["n2", "a"]);
-  n1 . subscribesTo = MSV::Specified ( vec! [ RelPartner::at_relRepo (
+  n1 . forks = MSV::Specified ( vec! [ RelPartner::at_relRepo (
     SkgrepoName::from ("main"), ID::from ("n5") ) ] );
   straddle (
     vec! [ node ("r", "r", &["a"]), node ("a", "a", &[]) ],
@@ -187,10 +187,10 @@ fn straddle_with_new_nodes () -> GraphStraddle {
            node ("n5", "n5", &["n6"]),
            node ("n6", "n6", &[]) ] ) }
 
-fn n1_subscribes_to_n5 () -> LeafKey {
+fn n1_forks_n5 () -> LeafKey {
   LeafKey::Relationship {
     relationship : RelationshipKey {
-      relation : NodeRelation::SubscribesTo,
+      relation : NodeRelation::Forks,
       recorder : ID::from ("n1"),
       member   : ID::from ("n5") },
     aspect : RelationshipAspect::Existence } }
@@ -252,7 +252,7 @@ fn a_request_on_new_nodes_marks_what_its_walk_follows () {
     marked_by ( forest, NamedLeafSet::NewNodesFrom (
       ID::from ("n1"), NewNodeWalk::Outward, BOTH_KINDS )),
     contentward . into_iter ()
-      . chain ([ n1_subscribes_to_n5 (),
+      . chain ([ n1_forks_n5 (),
                  node_key ("n5", NodeAspect::Existence),
                  contains_key ("n5", "n6", RelationshipAspect::Existence),
                  node_key ("n6", NodeAspect::Existence) ])
@@ -286,7 +286,7 @@ fn the_letters_beside_a_walk_filter_what_it_marks () {
     [ contains_key ("n1", "n2", RelationshipAspect::Existence),
       contains_key ("n1", "a",  RelationshipAspect::Existence),
       contains_key ("n2", "n1", RelationshipAspect::Existence),
-      n1_subscribes_to_n5 (),
+      n1_forks_n5 (),
       contains_key ("n5", "n6", RelationshipAspect::Existence) ]
       . into_iter () . collect () ); }
 

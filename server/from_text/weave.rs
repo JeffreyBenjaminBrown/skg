@@ -1,8 +1,8 @@
-//! Pure merge functions letting a save under a skgrepo restriction
+//! A pure merge function letting a save under a skgrepo restriction
 //! preserve relationship-list members the user could not
 //! see (the API doc's "Restricted-skgrepo nodes").
 //!
-//! VOCABULARY (shared by both functions):
+//! VOCABULARY:
 //! - A disk member is visible iff its record is: the skgrepo restriction
 //!   holds its relRepo ('SkgrepoRestriction::record_is_visible'). A
 //!   visible member has a headline the user could delete: an
@@ -24,7 +24,7 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 /// The anchored weave, for order-meaningful lists ('contains',
-/// 'subscribesTo').  Invisible disk members cling to the visible
+/// 'forks').  Invisible disk members cling to the visible
 /// sibling they followed: each maximal run of invisible,
 /// non-positioned disk members attaches to the nearest preceding
 /// positioned disk member (or to START), and is emitted right after
@@ -67,35 +67,6 @@ where T : Eq + Hash + Clone,
       result . push (member . clone ());
       if let Some (run) = runs . get (&Some (member . clone ())) {
         result . extend (run . iter () . cloned ()); }}}
-  result }
-
-/// The set-difference merge, for order-meaningless lists
-/// ('overrides').  The disk list keeps its order; visible
-/// members the user deleted are subtracted; new buffer members are
-/// appended; nothing else changes -- so reordering is a no-op, the
-/// diff stays quiet, and invisible members survive.
-pub fn set_difference_merge<T, V> (
-  disk_list   : &[T],
-  is_visible  : V,
-  buffer_list : &[T],
-) -> Vec<T>
-where T : Eq + Hash + Clone,
-      V : Fn (&T) -> bool {
-  let in_buffer : HashSet<&T> =
-    buffer_list . iter () . collect ();
-  let kept : Vec<T> =
-    disk_list . iter ()
-    . filter ( |m| in_buffer . contains (m) || ! is_visible (m) )
-    . cloned ()
-    . collect ();
-  let mut result : Vec<T> = kept;
-  { let on_disk : HashSet<&T> =
-      disk_list . iter () . collect ();
-    let mut seen : HashSet<T> = HashSet::new ();
-    for member in buffer_list {
-      if on_disk . contains (member) { continue; }
-      if seen . insert (member . clone ()) {
-        result . push (member . clone ()); }}}
   result }
 
 #[cfg(test)]

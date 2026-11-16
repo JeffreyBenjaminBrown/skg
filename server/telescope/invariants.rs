@@ -173,12 +173,10 @@ pub fn telescope_violations_of (
   check ("contains", &node . contains);
   let msv = |m : &MSV<RelPartner<ID>>| -> Vec<RelPartner<ID>> {
     m . or_default () . to_vec () };
-  check ("subscribesTo",
-         & msv ( &node . subscribesTo ));
+  check ("forks",
+         & msv ( &node . forks ));
   check ("hidesFromSubs",
          & msv ( &node . hidesFromSubs ));
-  check ("overrides",
-         & msv ( &node . overrides ));
   violations }
 
 /// Recorders whose telescope-warning truth may differ between two valid
@@ -209,9 +207,8 @@ pub fn derive_affected_telescope_recorders (
     ] {
       for index in [
         &graph . contained_by,
-        &graph . subscribers_of,
+        &graph . forkers_of,
         &graph . hiders_of,
-        &graph . overriders_of,
       ] {
         if let Some (inbound) = index . get (key) {
           recorders . extend (inbound . iter () . cloned ()); }}} }

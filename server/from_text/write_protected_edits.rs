@@ -319,7 +319,7 @@ mod tests {
         aliases  : MSV::Specified (rel_partners_at_relRepo (
           &main, vec! ["another name" . to_string ()])),
         flags    : vec! [Flag::NoSearchMatching],
-        subscribesTo : MSV::Specified (rel_partners_at_relRepo (
+        forks : MSV::Specified (rel_partners_at_relRepo (
           &main, vec! [ID::from ("sub"), ID::from ("private_sub")])),
         .. node ("recorder") },
       node ("c1"),

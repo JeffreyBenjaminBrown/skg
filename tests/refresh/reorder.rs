@@ -79,7 +79,7 @@ fn the_editable_ordered_folders_take_the_goals_order () {
     Graphnode { aliases      : MSV::Specified ( rel_partners_at_relRepo (
                   &SkgrepoName::from ("main"),
                   vec! [ "x" . to_string (), "y" . to_string () ] )),
-                subscribesTo : msv_ids (&["a", "b"]),
+                forks : msv_ids (&["a", "b"]),
                 .. node ("p") },
     node ("a"), node ("b"), ]);
   let input : String = formatdoc! ("

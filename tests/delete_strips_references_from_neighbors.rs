@@ -9,7 +9,7 @@
 //
 // Fixture:
 //   container.skg     contains: [victim, sibling]
-//   subscriber.skg    subscribesTo: [victim, sibling]
+//   subscriber.skg    forks: [victim, sibling]
 //   victim.skg        (the one being deleted)
 //   sibling.skg       (left alone)
 //
@@ -17,7 +17,7 @@
 // pipeline should:
 //   - delete victim.skg
 //   - rewrite container.skg to contains: [sibling]
-//   - rewrite subscriber.skg to subscribesTo: [sibling]
+//   - rewrite subscriber.skg to forks: [sibling]
 //   - leave sibling.skg unchanged.
 
 use indoc::indoc;
@@ -199,9 +199,8 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
   let recorder : Graphnode = graphnode_from_pid_and_skgrepo (
     config, ID::from ("owner"), &SkgrepoName::from ("main")) ?;
   assert_eq! (members_of (&recorder . contains), vec! [ID::from ("kept")]);
-  assert! (recorder . subscribesTo . or_default () . is_empty ());
+  assert! (recorder . forks . or_default () . is_empty ());
   assert! (recorder . hidesFromSubs . or_default () . is_empty ());
-  assert! (recorder . overrides . or_default () . is_empty ());
   assert! (recorder . title . contains ("[[id:gone][text link left alone]]"),
             "cleanup reports text links but does not rewrite them" );
   Ok (( ))
@@ -233,7 +232,7 @@ async fn delete_preserves_foreign_referencer (
   let saved_root : &str = response . saved_view . lines () . next ()
     . ok_or ("the saved view must not be empty") ?;
   assert! ( ! saved_root . contains ("(gnid cheese)")
-            && saved_root . contains ("(overrides (out 1))"),
+            && saved_root . contains ("(forks (out 1))"),
     "the buffer whose foreign root was forked must immediately be rooted at the fork: {}",
     response . saved_view );
   assert_eq! ( fs::read (&foreign_path) ?, foreign_before,
@@ -369,19 +368,19 @@ async fn delete_strips_references_impl (
       "container.contains lost sibling: {:?}",
       container . contains )); }
 
-  // 3. subscriber.skg's subscribesTo has only sibling.
+  // 3. subscriber.skg's forks has only sibling.
   let subscriber : Graphnode =
     graphnode_from_pid_and_skgrepo (
       config, ID::from ("subscriber"), &main ) ?;
   let sub_vec : Vec<ID> =
-    members_msv ( &subscriber . subscribesTo ) . into_vec ();
+    members_msv ( &subscriber . forks ) . into_vec ();
   if sub_vec . contains (&ID::from ("victim")) {
     failures . push ( format! (
-      "subscriber.subscribesTo still has victim: {:?}",
+      "subscriber.forks still has victim: {:?}",
       sub_vec )); }
   if ! sub_vec . contains (&ID::from ("sibling")) {
     failures . push ( format! (
-      "subscriber.subscribesTo lost sibling: {:?}",
+      "subscriber.forks lost sibling: {:?}",
       sub_vec )); }
 
   // 4. sibling.skg unchanged.

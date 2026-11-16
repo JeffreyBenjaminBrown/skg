@@ -7,6 +7,9 @@ use crate::dbs::filesystem::one_node::{
   PreparedTelescopeWrite, prepare_graphnode_telescope,
   read_graphnode, validate_pid_matches_filename,
 };
+use crate::dbs::filesystem::retired_keys::{
+  RetiredKeysInFiles, quoted_keys, what_to_do_about_retired_keys,
+};
 use crate::repo_watch::own_writes::record_own_removal;
 use crate::types::misc::{SkgConfig, Skgrepo, ID, SkgrepoName};
 use crate::types::nodes::fs::GraphnodeOnDisk;
@@ -89,12 +92,22 @@ fn read_all_skg_files_from_skgrepos_impl (
           sections_by_pid . entry (pid)
             . or_insert_with (Vec::new)
             . push ((skgrepo, node_fs)); }}
-      Err (e) => {
-        load_errors . push ((
-          skgrepo_name . to_string(),
-          skgrepo . path . display() . to_string(),
-          e . to_string()
-        )); }} }
+      Err (e) => match RetiredKeysInFiles::carried_by (&e) {
+        Some (retired) =>
+          for (path, keys) in &retired . files {
+            load_errors . push ((
+              skgrepo_name . to_string(),
+              path . display() . to_string(),
+              format! ( "holds {}; {}",
+                        quoted_keys (keys),
+                        what_to_do_about_retired_keys (
+                          Some (skgrepo . owned) )) )); },
+        None =>
+          load_errors . push ((
+            skgrepo_name . to_string(),
+            skgrepo . path . display() . to_string(),
+            e . to_string()
+          )), }} }
   if report_errors {
     report_load_errors (&load_errors, &config . data_root) ?; }
   if ! load_errors . is_empty() {
@@ -235,6 +248,9 @@ pub fn error_unless_each_gnid_names_one_node (
   Err (io::Error::new (
     io::ErrorKind::InvalidData, msg )) }
 
+/// Every section in the skgrepo's folder. The first unreadable file
+/// ends the read, but for files holding retired keys: the error then
+/// names every such file of the folder ('RetiredKeysInFiles').
 pub fn read_skg_sections_from_folder (
   skgrepo_name : &SkgrepoName,
   config       : &SkgConfig,
@@ -245,6 +261,8 @@ pub fn read_skg_sections_from_folder (
       io::ErrorKind::NotFound,
       format!("Repo '{}' not found in config", skgrepo_name)))?;
   let mut sections : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
+  let mut retired : RetiredKeysInFiles =
+    RetiredKeysInFiles { files : Vec::new () };
   let entries : ReadDir = // an iterator
     fs::read_dir (&skgrepo . path) ?;
   for entry in entries {
@@ -255,9 +273,17 @@ pub fn read_skg_sections_from_folder (
            false,                  // None => no extension found
            |ext| ext == "skg") ) { // Some
       let node_fs : GraphnodeOnDisk =
-        read_graphnode (&path) ?;
+        match read_graphnode (&path) {
+          Ok (node_fs) => node_fs,
+          Err (e) => match RetiredKeysInFiles::carried_by (&e) {
+            Some (found) => {
+              retired . files . extend ( found . files . iter () . cloned () );
+              continue; },
+            None => return Err (e), }, };
       validate_pid_matches_filename (&node_fs, &path) ?;
       sections . push (( skgrepo_name . clone (), node_fs )); }}
+  if ! retired . files . is_empty () {
+    return Err ( retired . into_io_error () ); }
   Ok (sections) }
 
 /// Like `read_all_skg_files_from_repos` but only for telescopes

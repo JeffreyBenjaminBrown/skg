@@ -93,13 +93,13 @@ fn a_relRepo_request_into_a_restricted_skgrepo_is_refused (
 fn a_hide_only_a_restricted_subscription_explains_is_refused (
 ) -> Result<(), Box<dyn Error>> {
   under_public (
-    &[ ("r",  "pid: r\ntitle: r\nsubscribesTo:\n- e1\nhidesFromSubs:\n- o\n"),
+    &[ ("r",  "pid: r\ntitle: r\nforks:\n- e1\nhides:\n- o\n"),
        ("e1", "pid: e1\ntitle: e1\ncontains:\n- c\n"),
        ("e",  "pid: e\ntitle: e\ncontains:\n- h\n"),
        ("c",  "pid: c\ntitle: c\n"),
        ("h",  "pid: h\ntitle: h\n"),
        ("o",  "pid: o\ntitle: o\n") ],
-    &[ ("r", "pid: r\nsubscribesTo:\n- e\n") ],
+    &[ ("r", "pid: r\nforks:\n- e\n") ],
     |f, public| {
       let opened : String = open_content_view (f, "r", VIEW, public) ?;
       let requested : String = edit_line ( &opened, "* (skg node (gnid r)", |line|
@@ -115,7 +115,7 @@ fn a_hide_only_a_restricted_subscription_explains_is_refused (
         f, VIEW, &with_hide, public, true, DeleteFrom::NotChosen ),
         "hidesFromSubs", "h" );
       assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
-      assert_eq! ( list_in (f, "public/r.skg", "hidesFromSubs"), vec! ["o"] );
+      assert_eq! ( list_in (f, "public/r.skg", "hides"), vec! ["o"] );
       Ok (( )) } ) }
 
 /// r (public) contains m (public) by a record in r's private section,

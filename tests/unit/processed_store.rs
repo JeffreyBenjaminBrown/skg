@@ -98,6 +98,26 @@ fn a_relationship_mark_is_one_flat_object_in_the_file () {
     fs::read_to_string ( marks_file (&dir) ) . unwrap ();
   assert_eq! ( saved . trim_end (), fixture . trim_end () ); }
 
+/// A mark of a retired relation ('SubscribesTo', 'Overrides') makes
+/// the whole file unreadable, so it loads as an empty store; the file
+/// as 'tools/migrate-forks-2026-11/migrate.py' leaves it (that mark
+/// dropped, the fixture being the tool's output) loads with every
+/// other mark.
+#[test]
+fn a_marks_file_loads_whole_once_the_forks_migration_has_run () {
+  let dir : TempDir = TempDir::new () . unwrap ();
+  fs::write ( marks_file (&dir),
+              include_str! ("processed_store/marks_before_the_forks_migration.json") )
+    . unwrap ();
+  assert_eq! ( ProcessedStore::load ( &marks_file (&dir) ),
+               ProcessedStore::default () );
+  fs::write ( marks_file (&dir),
+              include_str! ("processed_store/marks_after_the_forks_migration.json") )
+    . unwrap ();
+  let store : ProcessedStore = ProcessedStore::load ( &marks_file (&dir) );
+  assert_eq! ( store . marks . len (), 1 );
+  assert! ( store . is_processed ( &some_keys () . remove (3), 42 )); }
+
 /// Two configs in one data root keep their marks apart, each in a file
 /// named after its config; a symlink to a config shares its file; and
 /// 'processed_marks_file' states another, relative to the data root.

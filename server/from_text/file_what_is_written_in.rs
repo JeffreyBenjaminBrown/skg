@@ -9,7 +9,7 @@
 //! of its content, at any depth) is touching it, so the save files that
 //! member in F: it appends the member to F's contains, by the ID S's
 //! list names (the original, as every contains list records it; a fork
-//! of it is drawn in its place wherever F's owner's overrides are
+//! of it is drawn in its place wherever F's owner's perspective is
 //! followed). Then the member is no longer counted unintegrated. The
 //! save moves its headline, with what was typed under it, to the end
 //! of F's content in the saved view, as the user would have, so that

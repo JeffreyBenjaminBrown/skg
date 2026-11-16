@@ -56,6 +56,7 @@ fn test_node_io() {
   // Create temporary directory for test output
   let test_dir : PathBuf =
     PathBuf::from ("/tmp/file_io_test");
+  let _ = fs::remove_dir_all (&test_dir); // a file left by an earlier run would be read
   fs::create_dir_all (&test_dir)
     . unwrap ();
 
@@ -155,7 +156,7 @@ fn verify_body_not_needed() {
 
 pub fn reverse_some_of_node(node: &Graphnode) -> Graphnode {
   // Create a new Graphnode reversing two of its lists,
-  // `contains` and `subscribesTo`.
+  // `contains` and `forks`.
   // This is only for testing purposes,
   // to show reading from and writing to disk work;
   // there's no other reason anyone would want to do this.
@@ -163,14 +164,14 @@ pub fn reverse_some_of_node(node: &Graphnode) -> Graphnode {
     let mut v : Vec<RelPartner<ID>> = node . contains . clone();
     v . reverse();
     v };
-  let reversed_subscribesTo = match node . subscribesTo . clone() {
+  let reversed_forks = match node . forks . clone() {
     MSV::Unspecified => MSV::Unspecified,
     MSV::Specified (mut v) => {
       v . reverse();
       MSV::Specified (v) } };
   Graphnode {
     contains          : reversed_contains,
-    subscribesTo      : reversed_subscribesTo,
+    forks             : reversed_forks,
 
     title             : node . title             . clone(),
     overPrivateText_telescope    : node . overPrivateText_telescope,
@@ -181,7 +182,6 @@ pub fn reverse_some_of_node(node: &Graphnode) -> Graphnode {
     body              : node . body              . clone(),
     hidesFromSubs     :
       node . hidesFromSubs        . clone(),
-    overrides         : node . overrides . clone(),
     flags             : node . flags              . clone(),
   }}
 

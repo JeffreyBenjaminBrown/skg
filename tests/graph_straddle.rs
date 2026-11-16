@@ -134,6 +134,20 @@ fn a_duplicate_id_at_head_refuses () {
   assert! ( refusal . contains ("duplicate extra id 'dup'"),
             "unexpected refusal: {}", refusal ); }
 
+/// A HEAD holding keys retired in November 2026 (the worktree
+/// migrated, the migration not yet committed) refuses, naming the file
+/// and the commit that ends the refusal.
+#[test]
+fn a_head_holding_retired_keys_refuses_until_the_migration_is_committed () {
+  let f : Fixture =
+    case_fixture ("retired_keys_at_head", OwnedSkgrepos::OnlyMain, &[]);
+  let refusal : String = graph_straddle (&f) . err ()
+    . expect ("a HEAD holding retired keys should refuse") . to_string ();
+  assert! ( refusal . contains ("The HEAD of skgrepo 'main' holds keys retired in November 2026, in 1 file(s): ")
+            && refusal . contains ("N.skg (holds 'subscribesTo', 'overrides')")
+            && refusal . contains ("commit -am 'Migrate to forks'"),
+            "unexpected refusal: {}", refusal ); }
+
 #[test]
 fn a_foreign_skgrepo_needs_no_gitrepo_and_contributes_no_change () {
   // Owned M contains foreign F; the foreign skgrepo is a plain folder.

@@ -115,8 +115,8 @@ fn add_editable_view_requests_to_folder_members (
 
 /// A subscribing root of a fresh view is drawn with its subscribee
 /// folder and, beside its subscribees, the folder of what it hides
-/// outside them, whose members are drawn folded: N subscribes to
-/// Subscribee and hides Hidden, which no subscribee contains.
+/// outside them, whose members are drawn folded: N forks Subscribee
+/// and Overridden, and hides Hidden, which no forkee contains.
 #[test]
 fn a_subscribing_root_is_drawn_with_its_subscription_folders
   () -> Result<(), Box<dyn Error>> {
@@ -133,10 +133,11 @@ fn a_subscribing_root_is_drawn_with_its_subscription_folders
         . filter ( |line| line . starts_with ('*') )
         . map ( |line| line . split (" (skgRepos") . next () . unwrap () . to_string () )
         . collect ();
-      assert_eq! ( outline [.. 5], [
+      assert_eq! ( outline [.. 6], [
         "* (skg node (gnid N)",
         "** (skg subscribeeFolder)",
         "*** (skg node (gnid Subscribee)",
+        "*** (skg node (gnid Overridden)",
         "*** (skg hiddenOutsideOfSubscribeeFolder)",
         "**** (skg folded node (gnid Hidden)" ],
         "{}", n_view );

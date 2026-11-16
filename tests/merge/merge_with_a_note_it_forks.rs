@@ -2,12 +2,12 @@
 //
 // A nodeMerge of a note with a note it forks saves, and the merged
 // note neither forks nor hides itself: 'three_nodeMerged_graphnodes'
-// drops the merged note's own IDs from its subscriptions, overrides
-// and hides, as from its contents.
+// drops the merged note's own IDs from its forks and hides, as from
+// its contents.
 //
 // Fixture graph (all owned, at 'main'):
-//   a subscribes to b, overrides b and hides b;
-//   b contains x and overrides a (a mutual pair of overrides).
+//   a forks b and hides b;
+//   b contains x and forks a (a mutual pair of forks).
 // The buffer merges b into a.
 
 use indoc::indoc;
@@ -62,8 +62,7 @@ async fn merge_with_a_note_it_forks_impl (
             "a acquired b's ID: {:?}", a . extra_ids );
   let own_ids : [ID; 2] = [ ID::from ("a"), ID::from ("b") ];
   for (relation, members) in [
-    ("subscribesTo",  members_of ( a . subscribesTo . or_default () )),
-    ("overrides",     members_of ( a . overrides . or_default () )),
+    ("forks",         members_of ( a . forks . or_default () )),
     ("hidesFromSubs", members_of ( a . hidesFromSubs . or_default () )),
     ("contains",      members_of ( &a . contains )),
   ] {

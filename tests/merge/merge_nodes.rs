@@ -6,7 +6,7 @@ use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_viewforest;
 use skg::nodeMerge::merge_nodes;
 use skg::test_utils::{run_with_shared_test_stores, tantivy_contains_gnid, graph_handle_from_config, audit_inrustgraph_or_panic};
-use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SkgrepoName};
+use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SkgrepoName, members_of};
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{NodeEditRequest, Viewnode, ViewnodeKind, Vognode, Occurrence, Editability, viewforest_root_viewnode, viewnode_of, default_occurrence};
 use skg::types::nodes::complete::Graphnode;
@@ -154,10 +154,9 @@ fn verify_filesystem_after_merge_2_into_1(
 
   // Verify that node 1 keeps its original relationships
   // (node 2 had no relationships to transfer)
-  assert_eq!(node_1 . subscribesTo . or_default() . len(), 1,
-             "Node 1 should keep its subscribesTo");
-  assert_eq!(&node_1 . subscribesTo . or_default()[0] . member,
-             &ID::from ("1-subscribes-to"));
+  assert_eq!(members_of (node_1 . forks . or_default()),
+             vec![ ID::from ("1-subscribes-to"), ID::from ("overridden-by-1") ],
+             "Node 1 should keep its forks");
 
   // Note: node 1 originally hid both "hidden-from-1s-subscriptions"
   // and "hidden-from-subscriptions-of-1-but-in-content-of-2".
@@ -167,11 +166,6 @@ fn verify_filesystem_after_merge_2_into_1(
              "Node 1 should have 1 hides relationship");
   assert_eq!(&node_1 . hidesFromSubs . or_default()[0] . member,
              &ID::from ("hidden-from-1s-subscriptions"));
-
-  assert_eq!(node_1 . overrides . or_default() . len(), 1,
-             "Node 1 should keep its overrides");
-  assert_eq!(&node_1 . overrides . or_default()[0] . member,
-             &ID::from ("overridden-by-1"));
 
   let acquiree_text_preserver_path: String =
     path_from_pid_and_skgrepo ( config,
@@ -192,12 +186,10 @@ fn verify_filesystem_after_merge_2_into_1(
 
   // acquiree_text_preserver should have Unspecified for relationship fields
   // (when read from disk, missing fields are Unspecified)
-  assert_eq!(acquiree_text_preserver . subscribesTo, MSV::Unspecified,
-             "acquiree_text_preserver should have Unspecified for subscribesTo");
+  assert_eq!(acquiree_text_preserver . forks, MSV::Unspecified,
+             "acquiree_text_preserver should have Unspecified for forks");
   assert_eq!(acquiree_text_preserver . hidesFromSubs, MSV::Unspecified,
              "acquiree_text_preserver should have Unspecified for hidesFromSubs");
-  assert_eq!(acquiree_text_preserver . overrides, MSV::Unspecified,
-             "acquiree_text_preserver should have Unspecified for overrides");
 
   Ok(( )) }
 
@@ -326,12 +318,10 @@ fn verify_filesystem_after_merge_1_into_2(
   assert_eq!(overlap_count, 1,
              "overlap should appear exactly once (deduplicated), not twice");
 
-  // Verify subscribesTo: should have node 1's subscribesTo transferred
-  assert_eq!(node_2 . subscribesTo . or_default() . len(), 1,
-             "Node 2 should have 1 subscribesTo relationship");
-  assert_eq!(&node_2 . subscribesTo . or_default()[0] . member,
-             &ID::from ("1-subscribes-to"),
-             "Node 2 should subscribe to 1-subscribes-to");
+  // Verify forks: should have node 1's forks transferred
+  assert_eq!(members_of (node_2 . forks . or_default()),
+             vec![ ID::from ("1-subscribes-to"), ID::from ("overridden-by-1") ],
+             "Node 2 should fork what node 1 forked");
 
   // Verify hidesFromSubs: should have node 1's hides,
   // but not "hidden-from-subscriptions-of-1-but-in-content-of-2"
@@ -342,13 +332,6 @@ fn verify_filesystem_after_merge_1_into_2(
   assert_eq!(&node_2 . hidesFromSubs . or_default()[0] . member,
              &ID::from ("hidden-from-1s-subscriptions"),
              "Node 2 should hide hidden-from-1s-subscriptions");
-
-  // Verify overrides: should have node 1's overrides transferred
-  assert_eq!(node_2 . overrides . or_default() . len(), 1,
-             "Node 2 should have 1 overrides relationship");
-  assert_eq!(&node_2 . overrides . or_default()[0] . member,
-             &ID::from ("overridden-by-1"),
-             "Node 2 should override view of overridden-by-1");
 
   let acquiree_text_preserver_path: String =
     path_from_pid_and_skgrepo( config,
@@ -372,12 +355,10 @@ fn verify_filesystem_after_merge_1_into_2(
   // acquiree_text_preserver should have Unspecified for relationship fields
   // (when read from disk, missing fields are Unspecified)
   // (these relationships stay with the acquirer, not the acquiree_text_preserver)
-  assert_eq!(acquiree_text_preserver . subscribesTo, MSV::Unspecified,
-             "acquiree_text_preserver should have Unspecified for subscribesTo");
+  assert_eq!(acquiree_text_preserver . forks, MSV::Unspecified,
+             "acquiree_text_preserver should have Unspecified for forks");
   assert_eq!(acquiree_text_preserver . hidesFromSubs, MSV::Unspecified,
              "acquiree_text_preserver should have Unspecified for hidesFromSubs");
-  assert_eq!(acquiree_text_preserver . overrides, MSV::Unspecified,
-             "acquiree_text_preserver should have Unspecified for overrides");
 
   Ok(( )) }
 
@@ -468,13 +449,14 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
 
   // === Inverse queries: "who points at pid 2?" ===
 
-  let subscribers : HashSet<ID> =
+  let forkers : HashSet<ID> =
     find_related_nodes (
       &graph_snap, &input_acquirer,
-      "subscribesTo", "subscribee", "subscriber" );
-  assert!( subscribers . contains (&ID::from ("subscribes-to-1")),
-           "inverse subscribes under pid 2 should include \
-            subscribes-to-1 (its subscribesTo = [1], which aliases 2)" );
+      "forks", "forkee", "forker" );
+  assert!( forkers . contains (&ID::from ("subscribes-to-1"))
+           && forkers . contains (&ID::from ("overrider-of-1")),
+           "inverse forks under pid 2 should include subscribes-to-1 \
+            and overrider-of-1 (each forks [1], which aliases 2)" );
 
   let containers : HashSet<ID> =
     find_related_nodes (
@@ -490,14 +472,6 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
            "inverse hides under pid 2 should include \
             hides-1-from-subscriptions" );
 
-  let overriders : HashSet<ID> =
-    find_related_nodes (
-      &graph_snap, &input_acquirer,
-      "overrides", "overridden", "overrider" );
-  assert!( overriders . contains (&ID::from ("overrider-of-1")),
-           "inverse overrides under pid 2 should include \
-            overrider-of-1" );
-
   let link_skgrepos : HashSet<ID> =
     find_related_nodes (
       &graph_snap, &input_acquirer,
@@ -511,9 +485,9 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   let subscribee_of_s2_1 : HashSet<ID> =
     find_related_nodes (
       &graph_snap, &vec![ID::from ("subscribes-to-1")],
-      "subscribesTo", "subscriber", "subscribee" );
+      "forks", "forker", "forkee" );
   assert!( subscribee_of_s2_1 . contains (&ID::from ("2")),
-           "subscribes-to-1's forward subscribes should resolve to \
+           "subscribes-to-1's forward forks should resolve to \
             canonical pid 2 (was raw 1 on disk)" );
   assert!( ! subscribee_of_s2_1 . contains (&ID::from ("1")),
            "forward query should NOT return raw acquiree pid 1" );
@@ -528,12 +502,12 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   assert!( hidden_by_h1 . contains (&ID::from ("11")),
            "hides-1-from-subscriptions also hides 11 (unchanged)" );
 
-  let overridden_by_ov1 : HashSet<ID> =
+  let forked_by_ov1 : HashSet<ID> =
     find_related_nodes (
       &graph_snap, &vec![ID::from ("overrider-of-1")],
-      "overrides", "overrider", "overridden" );
-  assert!( overridden_by_ov1 . contains (&ID::from ("2")),
-           "overrider-of-1's forward overrides should resolve \
+      "forks", "forker", "forkee" );
+  assert!( forked_by_ov1 . contains (&ID::from ("2")),
+           "overrider-of-1's forward forks should resolve \
             to canonical pid 2" );
 
   let destinations_of_l1 : HashSet<ID> =
@@ -548,9 +522,8 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
     read_all_skg_files_from_skgrepos (config) ?;
   let rebuilt : InRustGraph = InRustGraph::from_graphnodes (&disk_nodes);
   assert_eq! (graph_snap . contained_by, rebuilt . contained_by);
-  assert_eq! (graph_snap . subscribers_of, rebuilt . subscribers_of);
+  assert_eq! (graph_snap . forkers_of, rebuilt . forkers_of);
   assert_eq! (graph_snap . hiders_of, rebuilt . hiders_of);
-  assert_eq! (graph_snap . overriders_of, rebuilt . overriders_of);
   assert_eq! (graph_snap . mentioners_of, rebuilt . mentioners_of);
   assert_eq! (graph_snap . extra_id_to_pid, rebuilt . extra_id_to_pid);
 

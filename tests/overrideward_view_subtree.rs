@@ -5,11 +5,10 @@
 // results").
 //
 // Fixture (tests/overrideward_view_subtree/fixtures): owned skgrepo
-// "main" holds U, which subscribes to and overrides foreign F, which
-// overrides foreign G; foreign M1 and M2 mutually override; foreign B
-// subscribes to and overrides foreign E; foreign D subscribes to and
-// overrides "gone", which no file defines; owned O1 and O2 mutually
-// override. The config marks "foreign" with 'foreign = true'; "main"
+// "main" holds U, which forks foreign F, which forks foreign G;
+// foreign M1 and M2 mutually fork; foreign B forks foreign E; foreign
+// D forks "gone", which no file defines; owned O1 and O2 mutually
+// fork. The config marks "foreign" with 'foreign = true'; "main"
 // is owned.
 
 use std::collections::HashSet;
@@ -64,8 +63,8 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
 /// stub, then the refresh of the stub, which draws the enrichment) and
 /// check the rendered buffer. The suppressed F is
 /// absent from the top level and reappears in U's subscribee folder,
-/// since U subscribes to it, carrying its heralds -- U, two levels up,
-/// subscribes to and overrides it. G, which F overrides, is not shown:
+/// since U forks it, carrying its heralds -- U, two levels up, forks
+/// it. G, which F forks, is not shown:
 /// the search buffer's partner folders hold direct relatives only, and
 /// only its containers folder's members carry anything.
 fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
@@ -104,14 +103,14 @@ fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
   assert_eq! ( level_of ("cooking, forked once"), 3,
     "F (suppressed) reappears in U's subscribee folder.\n{}", buffer );
   assert_eq! ( level_of ("cooking, the original"), 0,
-    "G, which F overrides, is not shown.\n{}", buffer );
+    "G, which F forks, is not shown.\n{}", buffer );
   let line : String = buffer . lines ()
     . find ( |l| l . contains ("cooking, forked once") )
     . unwrap_or ("") . to_string ();
-  assert! ( line . contains ("(overrides (in 1 (ancestors 2))")
-            && line . contains ("(birth (subscribesTo in 2))"),
-    "F must render its heralds -- U, two levels up, subscribes to and \
-     overrides it -- proving graphStats were fetched for it: {}", line );
+  assert! ( line . contains ("(forks (in 1 (ancestors 2)) (out 1))")
+            && line . contains ("(birth (forks in 2))"),
+    "F must render its heralds -- U, two levels up, forks it, and it \
+     forks G -- proving graphStats were fetched for it: {}", line );
   Ok (( )) }
 
 /// Among hits that are mirrors of one another, every one but the hit

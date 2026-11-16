@@ -33,7 +33,7 @@
 // subscribes to and overrides L, contains L1 and hides L2; V, in
 // "main", contains J, and Y, in "main", links to it.
 
-use skg::test_utils::{save_added_overrides, save_and_rerender};
+use skg::test_utils::{save_added_forks, save_and_rerender};
 use indoc::indoc;
 use std::error::Error;
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
@@ -283,8 +283,8 @@ async fn save_roundtrips_to_original_and_is_a_fixpoint (
          collected-ID orderkey)" );
       Ok (( )) }
 
-/// M, in N's skgrepo, comes to override N beside R (saved through the
-/// save's graph update, since no buffer position edits overrides). N's
+/// M, in N's skgrepo, comes to fork N beside R (saved through the
+/// save's graph update). N's
 /// three mirrors tie in that skgrepo, R and M both forked by none of
 /// the others, so N stands as itself (Q3, rule 3), where R stood before
 /// the save; and M, whose mirrors are the same three, stands as itself.
@@ -297,10 +297,10 @@ async fn a_second_owned_overrider_saves_and_q3s_mirror_stands (
   assert! ( marked_lines (&before, "N") . iter ()
             . any ( |l| l . contains ("(gnid R)") ),
             "before the save, R stands in N's place:\n{}", before );
-  save_added_overrides (
+  save_added_forks (
     &ID::from ("M"), &[ ID::from ("N") ], config, tantivy ) . await ?;
   assert! ( read_fixture_file (config, "M") . contains ("- N"),
-            "M overrides N on disk:\n{}", read_fixture_file (config, "M") );
+            "M forks N on disk:\n{}", read_fixture_file (config, "M") );
   let (after, _pids, _tree) =
     multi_root_view ( config, Some (tantivy), &[ ID::from ("P") ] ) ?;
   assert! ( marked_lines (&after, "N") . is_empty ()
@@ -312,23 +312,27 @@ async fn a_second_owned_overrider_saves_and_q3s_mirror_stands (
             "N and M are shown as themselves, R not at all:\n{}", after );
   Ok (( )) }
 
-/// N comes to override R, which overrides N: an owned mutual pair, in
+/// N comes to fork R, which forks N: an owned mutual pair, in
 /// one skgrepo (saved as above). Each is forked by the other, so N
-/// stands as itself (Q3, rule 3), where R stood before the save.
+/// stands as itself (Q3, rule 3), where R stood before the save; R
+/// is drawn, as what N forks, in N's subscribee folder.
 async fn an_owned_mutual_pair_saves_and_q3s_mirror_stands (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  save_added_overrides (
+  save_added_forks (
     &ID::from ("N"), &[ ID::from ("R") ], config, tantivy ) . await ?;
   assert! ( read_fixture_file (config, "N") . contains ("- R"),
-            "N overrides R on disk:\n{}", read_fixture_file (config, "N") );
+            "N forks R on disk:\n{}", read_fixture_file (config, "N") );
   let (after, _pids, _tree) =
     multi_root_view ( config, Some (tantivy), &[ ID::from ("P") ] ) ?;
   assert! ( marked_lines (&after, "N") . is_empty ()
-            && line_of_gnid (&after, "N") . is_some ()
-            && line_of_gnid (&after, "R") . is_none (),
-            "N is shown as itself, R not at all:\n{}", after );
+            && line_of_gnid (&after, "N") . is_some (),
+            "N is shown as itself:\n{}", after );
+  assert! ( line_of_gnid (&after, "R")
+            . is_some_and ( |l| l . contains ("(birth (forks in 2))") ),
+            "R is shown only as what N forks, in its subscribee \
+             folder:\n{}", after );
   Ok (( )) }
 
 async fn extraction_honors_overridesHere (
@@ -632,23 +636,23 @@ fn read_skgrepo_file (
   std::fs::read_to_string (&path)
     . unwrap_or_else ( |e| panic! ("reading {:?}: {}", path, e) ) }
 
-/// The one node on disk that overrides 'original'.
-fn overrider_on_disk (
+/// The one owned node on disk that forks 'original'.
+fn owned_fork_on_disk (
   config   : &SkgConfig,
   original : &str,
 ) -> Result<Graphnode, Box<dyn Error>> {
-  let overriders : Vec<Graphnode> =
+  let forks : Vec<Graphnode> =
     read_all_skg_files_from_skgrepos (config) ?
     . into_iter ()
     . filter ( |node| config . skgrepo_is_owned (&node . home_skgrepo)
-               && node . overrides . or_default () . iter ()
+               && node . forks . or_default () . iter ()
                . any ( |m| m . member == ID::from (original) ) )
     . collect ();
-  match overriders . as_slice () {
+  match forks . as_slice () {
     [one] => Ok (one . clone ()),
-    _ => Err ( format! ( "expected one overrider of {} on disk; found {:?}",
+    _ => Err ( format! ( "expected one owned fork of {} on disk; found {:?}",
                          original,
-                         overriders . iter () . map ( |n| &n . pid )
+                         forks . iter () . map ( |n| &n . pid )
                          . collect::<Vec<&ID>> () ) . into () ), }}
 
 /// The view's line for the occurrence whose gnid is 'gnid'.
@@ -700,7 +704,7 @@ async fn under_a_foreign_root_a_save_roundtrips_its_authors_overrider (
   let saved : String = save_and_rerender (&view, config, tantivy) . await ?;
   assert_eq! ( read_skgrepo_file (config, "foreign", "R"), r_before,
     "R, still containing M, is untouched by the save" );
-  assert! ( overrider_on_disk (config, "K") . is_err (),
+  assert! ( owned_fork_on_disk (config, "K") . is_err (),
     "an unchanged save forks nothing" );
   assert_metadata_eq! ( view, saved,
     "the save of an unchanged view of R is a fixpoint" );
@@ -754,7 +758,7 @@ async fn under_a_foreign_root_a_forked_child_is_shown_as_the_original (
   let edited : String = view . replace (
     k_line, &k_line . replace (") K", ") K-edited") );
   let saved : String = save_and_rerender (&edited, config, tantivy) . await ?;
-  let clone : Graphnode = overrider_on_disk (config, "K") ?;
+  let clone : Graphnode = owned_fork_on_disk (config, "K") ?;
   assert_eq! ( clone . title, "K-edited", "the edit forked K" );
   assert_eq! ( clone . home_skgrepo, SkgrepoName::from ("main") );
   assert! ( line_of_gnid (&saved, "K")
@@ -799,7 +803,7 @@ async fn a_forked_foreign_root_follows_the_users_overrides (
   let edited : String = view . replacen (
     r_line, &r_line . replace (") R", ") R-edited"), 1 );
   let saved : String = save_and_rerender (&edited, config, tantivy) . await ?;
-  let clone : Graphnode = overrider_on_disk (config, "R") ?;
+  let clone : Graphnode = owned_fork_on_disk (config, "R") ?;
   let root_line : &str = saved . lines () . next () . unwrap ();
   assert! ( root_line . contains (&format! ("(gnid {})", clone . pid . 0))
             && ! root_line . contains ("overridesHere"),
@@ -956,10 +960,10 @@ fn a_switch_of_perspective_re_points_a_substituted_content_child (
 /// mirror by declaration order stands, whoever wrote it: P, the
 /// user's, contains N, alice's, which bob's F forks; the config
 /// declares bob's skgrepo before alice's, so a view of P shows F in
-/// N's place, born of its forking N ('(birth (overrides out))'). From
+/// N's place, born of its forking N ('(birth (forks out))'). From
 /// alice's perspective N shows raw there; and under Q, which contains
 /// F, N stands in F's place, born of being forked by it
-/// ('(birth (overrides in))').
+/// ('(birth (forks in))').
 fn a_third_authors_mirror_stands_where_the_user_has_none (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -968,7 +972,7 @@ fn a_third_authors_mirror_stands_where_the_user_has_none (
     connection_holding_a_view_of (config, tantivy, "P", &[ ID::from ("P") ]) ?;
   let marked : Vec<&str> = marked_lines (&view, "N");
   assert! ( marked . len () == 1 && marked [0] . contains ("(gnid F)")
-            && marked [0] . contains ("(birth (overrides out))"),
+            && marked [0] . contains ("(birth (forks out))"),
     "the user has no mirror of N, so bob's F, declared first, stands:\n{}", view );
   let alices : String = rerendered_text ( &messages_answering (
     &switch_request ("P", owner_of ("alice")),
@@ -985,7 +989,7 @@ fn a_third_authors_mirror_stands_where_the_user_has_none (
     . ok_or ("the switch to alice's perspective rerenders the view of Q") ?;
   let in_fs_place : Vec<&str> = marked_lines (&alices_q, "F");
   assert! ( in_fs_place . len () == 1 && in_fs_place [0] . contains ("(gnid N)")
-            && in_fs_place [0] . contains ("(birth (overrides in))"),
+            && in_fs_place [0] . contains ("(birth (forks in))"),
     "from alice's perspective N, which F forks, stands in F's place:\n{}", alices_q );
   Ok (( )) }
 
@@ -1266,11 +1270,16 @@ fn a_replaced_root_shows_its_own_containers (
     assert! ( refusal_of (&messages) . is_none (), "{:?}", messages );
     Ok ( rerendered_text (&messages) . ok_or ("the switch rerenders") ? ) };
   let users : String = switch ("user") ?;
-  assert! ( line_of_gnid (&users, "W") . is_some ()
-            && line_of_gnid (&users, "P") . is_none ()
-            && line_of_gnid (&users, "R") . is_none ()
+  let users_container_folder : Vec<&str> = users . lines ()
+    . skip_while ( |l| ! l . contains ("containerFolder") ) . skip (1)
+    . take_while ( |l| l . starts_with ("***") )
+    . collect ();
+  assert! ( users_container_folder . len () == 1
+            && users_container_folder [0] . contains ("(gnid W)")
             && ! users . contains ("noWarrant"),
-    "from the user's, U's folder lists W, which contains U, and nothing of M's:\n{}", users );
+    "from the user's, U's folder lists W, which contains U, and nothing of M's \
+     (M's containers show only under M, in U's subscribee folder, since U \
+     forks M):\n{}", users );
   assert_eq! ( without_vnids ( users . lines () . skip (1) ),
                without_vnids ( fresh_view_of_u . lines () . skip (1) ),
     "U's folder is drawn as a fresh view of U draws it" );
@@ -1458,7 +1467,7 @@ async fn a_save_following_the_users_overrides_shows_a_new_fork_in_place (
       &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
       OverridesFollowed::user () ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
-  let clone : Graphnode = overrider_on_disk (config, "K") ?;
+  let clone : Graphnode = owned_fork_on_disk (config, "K") ?;
   let saved : &str = &response . saved_view;
   assert! ( line_of_gnid (saved, &clone . pid . 0)
             . is_some_and ( |l| l . contains ("(overridesHere K)") && l . ends_with (") K-edited") ),
@@ -1590,7 +1599,7 @@ async fn deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows
     "U is deleted" );
   assert_eq! ( read_skgrepo_file (config, "foreign", "R"), r_before,
     "R is as its author wrote it" );
-  assert! ( overrider_on_disk (config, "R") . is_err (), "R was not forked" );
+  assert! ( owned_fork_on_disk (config, "R") . is_err (), "R was not forked" );
   let saved : &str = &response . saved_view;
   assert! ( line_of_gnid (saved, "A")
             . is_some_and ( |l| l . starts_with ("** ")

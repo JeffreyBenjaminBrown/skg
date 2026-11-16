@@ -27,7 +27,7 @@ fn write_fixture (
   write_unchanged_skgrepos (dir, &[ ( "main", &[
     ("p", "pid: p\ntitle: p\ncontains:\n- a\n"),
     ("a", "pid: a\ntitle: a\n"),
-    ("s", "pid: s\ntitle: s\nsubscribesTo:\n- e\n"),
+    ("s", "pid: s\ntitle: s\nforks:\n- e\n"),
     ("e", "pid: e\ntitle: e\n"), ] ) ]) }
 
 /// Two views of p. A save of the first adds s to p's contents; the

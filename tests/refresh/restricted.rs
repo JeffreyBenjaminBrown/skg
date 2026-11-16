@@ -345,7 +345,7 @@ fn an_editable_folder_a_narrowing_empties_stays_and_fills_again_on_widening () {
   // e. One forest, kept between refreshes as a view is: narrowed, then
   // widened.
   let graph : InRustGraph = graph (&[
-    Graphnode { subscribesTo : MSV::Specified ( rel_partners_at_relRepo (
+    Graphnode { forks : MSV::Specified ( rel_partners_at_relRepo (
                   &SkgrepoName::from ("private"), vec! [ ID::from ("e") ] )),
                 .. node ("s") },
     Graphnode { home_skgrepo : SkgrepoName::from ("private"), .. node ("e") } ]);

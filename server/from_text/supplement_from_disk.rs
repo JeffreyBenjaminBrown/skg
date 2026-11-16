@@ -10,7 +10,7 @@
 
 use crate::from_text::local_fieldintent_collection::lower::{
   RequestedRelRepos, NodeIntent, NodeSaveIntent };
-use crate::from_text::weave::{set_difference_merge, weave};
+use crate::from_text::weave::weave;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -186,10 +186,9 @@ fn supplement_nodeSaveIntent_from_disk (
 /// node's relationship-list members, so its lists describe only the
 /// visible subset.  This merges each list with its disk counterpart
 /// (the API doc's "Restricted-skgrepo nodes"): the anchored
-/// 'weave' for the order-meaningful 'contains', 'subscribesTo' and
+/// 'weave' for the order-meaningful 'contains', 'forks' and
 /// 'aliases' (the alias folder omits an alias whose record is
-/// restricted), the 'set_difference_merge' for the order-meaningless
-/// 'overrides'.  A field is replaced only when the merge
+/// restricted).  A field is replaced only when the merge
 /// changed it, so an untouched field keeps its MSV shape (and the
 /// noop filter can still recognize an unchanged node).
 fn preserve_invisible_members (
@@ -203,12 +202,9 @@ fn preserve_invisible_members (
   let contains_visible : &dyn Fn (&ID) -> bool = &|gnid : &ID| -> bool {
     SkgrepoRestriction::member_record_is_visible (
       restriction, &disk_node . contains, gnid ) };
-  let subscribes_visible : &dyn Fn (&ID) -> bool = &|gnid : &ID| -> bool {
+  let forks_visible : &dyn Fn (&ID) -> bool = &|gnid : &ID| -> bool {
     SkgrepoRestriction::member_record_is_visible (
-      restriction, disk_node . subscribesTo . or_default (), gnid ) };
-  let overrides_visible : &dyn Fn (&ID) -> bool = &|gnid : &ID| -> bool {
-    SkgrepoRestriction::member_record_is_visible (
-      restriction, disk_node . overrides . or_default (), gnid ) };
+      restriction, disk_node . forks . or_default (), gnid ) };
   // Rendering may canonicalize a resolvable extra ID to its primary PID.  The
   // comparison key says that is the same relationship, but the disk spelling
   // is load-bearing: restore it before the weave so an untouched round trip
@@ -230,31 +226,18 @@ fn preserve_invisible_members (
       &buffer_contains );
     supplemented . contains =
       rel_partners_at_relRepo (&recorder_skgrepo, merged); }
-  { let disk_subscribes : Vec<ID> =
-      members_of (disk_node . subscribesTo . or_default ());
-    let submitted_subscribes : Vec<ID> =
-      members_of (supplemented . subscribesTo . or_default ());
-    let buffer_subscribes : Vec<ID> = normalize_to_disk_raw (
-      &submitted_subscribes,
-      disk_node . subscribesTo . or_default ());
+  { let disk_forks : Vec<ID> =
+      members_of (disk_node . forks . or_default ());
+    let submitted_forks : Vec<ID> =
+      members_of (supplemented . forks . or_default ());
+    let buffer_forks : Vec<ID> = normalize_to_disk_raw (
+      &submitted_forks,
+      disk_node . forks . or_default ());
     let merged : Vec<ID> = weave (
-      &disk_subscribes, &subscribes_visible,
-      &buffer_subscribes );
-    if merged != submitted_subscribes {
-      supplemented . subscribesTo =
-        MSV::Specified (rel_partners_at_relRepo (&recorder_skgrepo, merged)); }}
-  { let disk_overrides : Vec<ID> =
-      members_of (disk_node . overrides . or_default ());
-    let submitted_overrides : Vec<ID> =
-      members_of (supplemented . overrides . or_default ());
-    let buffer_overrides : Vec<ID> = normalize_to_disk_raw (
-      &submitted_overrides,
-      disk_node . overrides . or_default ());
-    let merged : Vec<ID> = set_difference_merge (
-      &disk_overrides, &overrides_visible,
-      &buffer_overrides );
-    if merged != submitted_overrides {
-      supplemented . overrides =
+      &disk_forks, &forks_visible,
+      &buffer_forks );
+    if merged != submitted_forks {
+      supplemented . forks =
         MSV::Specified (rel_partners_at_relRepo (&recorder_skgrepo, merged)); }}
   { // The sticky pass after this gives each alias its relRepo again,
     // by its text.
@@ -472,28 +455,18 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
         disk, &submitted, &explicit . contains, "contains") ?;
       m . member = raw_disk_member (disk, &submitted); }}
   { let disk : &[RelPartner<ID>] =
-      disk_node . subscribesTo . or_default ();
-    if let MSV::Specified (v) = &mut supplemented . subscribesTo {
+      disk_node . forks . or_default ();
+    if let MSV::Specified (v) = &mut supplemented . forks {
       for m in v . iter_mut () {
         let submitted : ID = m . member . clone ();
         m . relRepo = resolve_skgrepo (
-          disk, &submitted, &explicit . subscribesTo,
-          "subscribesTo") ?;
-        m . member = raw_disk_member (disk, &submitted); }} }
-  { let disk : &[RelPartner<ID>] =
-      disk_node . overrides . or_default ();
-    if let MSV::Specified (v) = &mut supplemented . overrides {
-      for m in v . iter_mut () {
-        let submitted : ID = m . member . clone ();
-        m . relRepo = resolve_skgrepo (
-          // No buffer position requests an override's relRepo.
-          disk, &submitted, &HashMap::new (),
-          "overrides") ?;
+          disk, &submitted, &explicit . forks,
+          "forks") ?;
         m . member = raw_disk_member (disk, &submitted); }} }
   { let disk : &[RelPartner<ID>] =
       disk_node . hidesFromSubs . or_default ();
     let subscribes : Vec<RelPartner<ID>> =
-      supplemented . subscribesTo . or_default () . to_vec ();
+      supplemented . forks . or_default () . to_vec ();
     if let MSV::Specified (v) =
       &mut supplemented . hidesFromSubs {
       for m in v . iter_mut () {
@@ -645,15 +618,12 @@ pub fn supplement_unspecified_fields_from_disk (
 ) -> Graphnode {
   if from_buffer . aliases . is_unspecified() {
     from_buffer . aliases = disk_node . aliases . clone(); }
-  if from_buffer . subscribesTo . is_unspecified() {
-    from_buffer . subscribesTo =
-      disk_node . subscribesTo . clone(); }
+  if from_buffer . forks . is_unspecified() {
+    from_buffer . forks =
+      disk_node . forks . clone(); }
   if from_buffer . hidesFromSubs . is_unspecified() {
     from_buffer . hidesFromSubs =
       disk_node . hidesFromSubs . clone(); }
-  if from_buffer . overrides . is_unspecified() {
-    from_buffer . overrides =
-      disk_node . overrides . clone(); }
   if from_buffer . flags . is_empty() {
     from_buffer . flags = disk_node . flags . clone(); }
   from_buffer }

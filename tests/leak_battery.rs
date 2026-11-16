@@ -3,7 +3,7 @@
 // THE LEAK BATTERY ('docs/telescopes.org', "What lives where"): a
 // membership's relRepo, not just the member node's own skgrepo, gates
 // whether it renders. Fixtures pin the shape the sweep exists to close: a
-// public node (N) whose private section privately contains/subscribesTo
+// public node (N) whose private section privately contains/forks
 // another public node (C) -- a private reading-list entry between two nodes
 // that are each individually visible at every skgrepo. Without relRepo
 // gating this leaks by omission (a public session would still show the
@@ -15,7 +15,7 @@
 // - N: public home ("leak-battery-N"), no contains there; a private
 //   section (owned/private/N.skg, no title) holds `contains: - C`.
 // - S: public home ("leak-battery-S"); a private section
-//   (owned/private/S.skg, no title) holds `subscribesTo: - C`.
+//   (owned/private/S.skg, no title) holds `forks: - C`.
 
 use crate::parse_helpers::{first_root, occurrence_children_gnids, viewnode_tree_as_written};
 use ego_tree::{NodeId, Tree};
@@ -180,7 +180,7 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
       // fully public node.
       let subscribers_public : Vec<ID> =
         graph . other_member_pids_gated (
-          &ID::from ("C"), RelationRole::SUBSCRIBEE, &public );
+          &ID::from ("C"), RelationRole::FORKEE, &public );
       assert! (
         ! subscribers_public . contains (&ID::from ("S")),
         "S's privately-recorded subscription to C must not surface \
@@ -188,7 +188,7 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
         subscribers_public );
       let subscribers_all : Vec<ID> =
         graph . other_member_pids_gated (
-          &ID::from ("C"), RelationRole::SUBSCRIBEE, &all );
+          &ID::from ("C"), RelationRole::FORKEE, &all );
       assert! (
         subscribers_all . contains (&ID::from ("S")),
         "unrestricted S's subscription to C is visible: {:?}",
@@ -283,18 +283,18 @@ fn ancestor_heralds_gate_privately_recorded_relations (
           & s_ref . value () . kind
         else { return Err ("S is not an occurrence" . into ()); };
         Ok ( t . viewStats . rel_heralds . rels . clone () ) };
-      // In the semantic wire the subscription shows as a `subscribes`
+      // In the semantic wire the subscription shows as a `forks`
       // relation; gated out at public, present under `all`. (S's only
       // subscription here is to its buffer-parent C.)
       let at_public : Option<String> = herald_of_S (&public) ?;
       assert! (
         ! at_public . as_deref () . unwrap_or ("")
-          . contains ("subscribesTo"),
+          . contains ("forks"),
         "S's privately-recorded subscription to its buffer-parent C \
          must not tint an ancestor herald at public: {:?}", at_public );
       let at_all : Option<String> = herald_of_S (&all) ?;
       assert! (
-        at_all . as_deref () . unwrap_or ("") . contains ("subscribesTo"),
+        at_all . as_deref () . unwrap_or ("") . contains ("forks"),
         "unrestricted the subscription flags S's herald: {:?}", at_all );
       Ok (( )) } )) }
 

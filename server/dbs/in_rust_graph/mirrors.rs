@@ -45,7 +45,7 @@ use std::iter::once;
 
 /// The relation whose relationships join a note to its mirrors: a
 /// note that records one of it to N forks N.
-pub const MIRROR_RELATION : NodeRelation = NodeRelation::Overrides;
+pub const MIRROR_RELATION : NodeRelation = NodeRelation::Forks;
 
 /// One mirror of a note N.
 #[derive(Clone, Debug, PartialEq, Eq)]

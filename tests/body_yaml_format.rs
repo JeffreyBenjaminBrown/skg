@@ -20,9 +20,8 @@ fn node_with_body (
     extra_ids                    : vec! [],
     body                         : Some (body . to_string ()),
     contains                     : vec! [],
-    subscribesTo                 : vec! [],
+    forks                        : vec! [],
     hidesFromSubs                : vec! [],
-    overrides                    : vec! [],
     flags                        : vec! [],
   } }
 
@@ -95,9 +94,8 @@ fn field_order_places_body_between_extra_ids_and_contains () {
       "multi\nline\n\tbody" . to_string ()),
     contains                     : vec! [
       ListItem::Member ( ID::new ("c1") ) ],
-    subscribesTo                 : vec! [],
+    forks                        : vec! [],
     hidesFromSubs                : vec! [],
-    overrides                    : vec! [],
     flags                        : vec! [],
   };
   let yaml : String = node . to_yaml () . unwrap ();

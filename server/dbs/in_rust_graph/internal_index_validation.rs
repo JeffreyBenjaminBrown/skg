@@ -55,8 +55,7 @@ pub(crate) fn validate_local_internal_indexes (
       . map (|node| relationship_keys (candidate, node))
       . unwrap_or_default ();
     for index_name in [
-      "contained_by", "subscribers_of", "hiders_of", "overriders_of",
-      "mentioners_of",
+      "contained_by", "forkers_of", "hiders_of", "mentioners_of",
     ] {
       let keys : BTreeSet<ID> = old_keys . get (index_name) . into_iter ()
         . flatten () . chain (
@@ -160,11 +159,9 @@ fn relationship_keys (
   BTreeMap::from ([
     ("contained_by", members_of (&node . contains) . into_iter ()
       . map (|raw| canonical (&raw)) . collect ()),
-    ("subscribers_of", members_of (node . subscribesTo . or_default ())
+    ("forkers_of", members_of (node . forks . or_default ())
       . into_iter () . map (|raw| canonical (&raw)) . collect ()),
     ("hiders_of", members_of (node . hidesFromSubs . or_default ())
-      . into_iter () . map (|raw| canonical (&raw)) . collect ()),
-    ("overriders_of", members_of (node . overrides . or_default ())
       . into_iter () . map (|raw| canonical (&raw)) . collect ()),
     ("mentioners_of", node . linksTo . iter ()
       . map (canonical) . collect ()),
@@ -177,9 +174,8 @@ fn relationship_index<'a> (
 ) -> &'a im::HashMap<ID, im::HashSet<ID>> {
   match name {
     "contained_by"   => &graph . contained_by,
-    "subscribers_of" => &graph . subscribers_of,
+    "forkers_of"     => &graph . forkers_of,
     "hiders_of"      => &graph . hiders_of,
-    "overriders_of"  => &graph . overriders_of,
     "mentioners_of"   => &graph . mentioners_of,
     _ => unreachable! ("known relationship index"),
   }
@@ -217,9 +213,8 @@ pub fn validate_internal_indexes (
         carriers . first () . unwrap () . clone (),
       _ => raw . clone (), } };
   let mut contained_by : ExpectedIndex = BTreeMap::new ();
-  let mut subscribers_of : ExpectedIndex = BTreeMap::new ();
+  let mut forkers_of : ExpectedIndex = BTreeMap::new ();
   let mut hiders_of : ExpectedIndex = BTreeMap::new ();
-  let mut overriders_of : ExpectedIndex = BTreeMap::new ();
   let mut mentioners_of : ExpectedIndex = BTreeMap::new ();
   let record = |index : &mut ExpectedIndex, member : &ID, recorder : &ID| {
     index . entry (canonical (member)) . or_default ()
@@ -227,12 +222,10 @@ pub fn validate_internal_indexes (
   for node in graph . nodes . values () {
     for member in members_of (&node . contains) {
       record (&mut contained_by, &member, &node . pid); }
-    for member in members_of (node . subscribesTo . or_default ()) {
-      record (&mut subscribers_of, &member, &node . pid); }
+    for member in members_of (node . forks . or_default ()) {
+      record (&mut forkers_of, &member, &node . pid); }
     for member in members_of (node . hidesFromSubs . or_default ()) {
       record (&mut hiders_of, &member, &node . pid); }
-    for member in members_of (node . overrides . or_default ()) {
-      record (&mut overriders_of, &member, &node . pid); }
     for member in &node . linksTo {
       record (&mut mentioners_of, member, &node . pid); }}
 
@@ -240,11 +233,9 @@ pub fn validate_internal_indexes (
   compare_set_index (
     "contained_by", &contained_by, &graph . contained_by, &mut result);
   compare_set_index (
-    "subscribers_of", &subscribers_of, &graph . subscribers_of, &mut result);
+    "forkers_of", &forkers_of, &graph . forkers_of, &mut result);
   compare_set_index (
     "hiders_of", &hiders_of, &graph . hiders_of, &mut result);
-  compare_set_index (
-    "overriders_of", &overriders_of, &graph . overriders_of, &mut result);
   compare_set_index (
     "mentioners_of", &mentioners_of, &graph . mentioners_of, &mut result);
 

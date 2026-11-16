@@ -5,6 +5,8 @@
 
 use crate::dbs::filesystem::multiple_nodes::{
   read_skg_sections_from_folder};
+use crate::dbs::filesystem::retired_keys::{
+  FORKS_MIGRATION_TOOL, quoted_keys, retired_keys_held};
 use crate::telescope::compose::compose_telescope;
 use crate::telescope::types::{
   Telescope, separate_illegal_sections,
@@ -336,7 +338,10 @@ fn fold_telescope_tolerating_homelessness (
 }
 
 /// The skgrepo's sections as the tree 'tree' of its gitrepo holds
-/// them, or as HEAD's tree does when 'tree' is None.
+/// them, or as HEAD's tree does when 'tree' is None. A tree holding a
+/// retired key ('retired_keys.rs') is refused, naming its files: the
+/// owner has migrated the worktree (else the server would not have
+/// started) but not yet committed the migration.
 fn read_skgrepo_from_tree (
   config       : &SkgConfig,
   skgrepo_name : &SkgrepoName,
@@ -352,6 +357,8 @@ fn read_skgrepo_from_tree (
       "Could not open Git repo for Skg repo '{}'", skgrepo_name )) ?;
   let prefix : PathBuf =
     repo_prefix_in_gitrepo (&gitrepo, skgrepo_path) ?;
+  let tree_label : &str =
+    if tree . is_some () { "tree to commit" } else { "HEAD" };
   let tree : git2::Tree = match tree {
     Some (tree) => gitrepo . find_tree (tree) . map_err ( |e| format! (
       "Reading tree {} for repo '{}': {}", tree, skgrepo_name, e )) ?,
@@ -361,6 +368,7 @@ fn read_skgrepo_from_tree (
         "Reading HEAD tree for repo '{}': {}", skgrepo_name, e )) ?, };
   let mut sections : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
   let mut parse_error : Option<String> = None;
+  let mut retired : Vec<(PathBuf, Vec<&'static str>)> = Vec::new ();
   let walk_result : Result<(), git2::Error> =
     tree . walk (TreeWalkMode::PreOrder, |root, entry| {
     if parse_error . is_some () {
@@ -372,10 +380,18 @@ fn read_skgrepo_from_tree (
     if ! path_is_skgrepo_skg (&rel_path, &prefix) {
       return TreeWalkResult::Ok; }
     let oid : git2::Oid = entry . id ();
-    match gitrepo . find_blob (oid)
-      . map_err ( |e| e . to_string () )
-      . and_then ( |blob| parse_blob_section (
-        blob . content (), &rel_path ) ) {
+    let blob : git2::Blob = match gitrepo . find_blob (oid) {
+      Ok (blob) => blob,
+      Err (e) => {
+        parse_error = Some (e . to_string ());
+        return TreeWalkResult::Abort; } };
+    let retired_here : Vec<&'static str> =
+      from_utf8 ( blob . content () )
+      . map ( retired_keys_held ) . unwrap_or_default ();
+    if ! retired_here . is_empty () {
+      retired . push (( rel_path, retired_here ));
+      return TreeWalkResult::Ok; }
+    match parse_blob_section ( blob . content (), &rel_path ) {
       Ok (node_fs) =>
         sections . push (( skgrepo_name . clone (), node_fs )),
       Err (e) => {
@@ -387,8 +403,33 @@ fn read_skgrepo_from_tree (
     return Err (error); }
   walk_result . map_err ( |e| format! (
     "Walking HEAD tree for repo '{}': {}", skgrepo_name, e )) ?;
+  if ! retired . is_empty () {
+    return Err ( tree_holds_retired_keys (
+      skgrepo_name, skgrepo_path, tree_label, &retired )); }
   Ok (sections)
 }
+
+/// The refusal of a git tree holding retired keys: the files (the
+/// first few, and how many), and the commit that ends it.
+fn tree_holds_retired_keys (
+  skgrepo_name : &SkgrepoName,
+  skgrepo_path : &Path,
+  tree_label   : &str,
+  retired      : &[(PathBuf, Vec<&'static str>)],
+) -> String {
+  const FILES_NAMED : usize = 5;
+  let named : Vec<String> = retired . iter () . take (FILES_NAMED)
+    . map ( |(path, keys)| format! (
+      "{} (holds {})", path . display (), quoted_keys (keys) ))
+    . collect ();
+  let more : String =
+    if retired . len () > FILES_NAMED {
+      format! ("; and {} more", retired . len () - FILES_NAMED) }
+    else { String::new () };
+  format! (
+    "The {} of skgrepo '{}' holds keys retired in November 2026, in {} file(s): {}{}. If you have run {} over the worktree, commit the migration first: git -C {} commit -am 'Migrate to forks'",
+    tree_label, skgrepo_name, retired . len (), named . join ("; "), more,
+    FORKS_MIGRATION_TOOL, skgrepo_path . display () ) }
 
 pub(crate) fn repo_prefix_in_gitrepo (
   gitrepo        : &Repository,

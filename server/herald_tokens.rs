@@ -11,8 +11,7 @@
 //!   (rels
 //!     (contains          (in  COUNT (ancestors GEN...))
 //!                        (out COUNT (ancestors GEN...)))
-//!     (subscribesTo     (in ...) (out ...))
-//!     (overrides (in ...) (out ...))
+//!     (forks            (in ...) (out ...))
 //!     (hidesFromSubs (in ...) (out ...))
 //!     (linksTo          (in COUNT (ancestors GEN...)
 //!                            (substantive COUNT (ancestors GEN...)))
@@ -24,7 +23,7 @@
 //! Each birth fact names a relation explaining why this occurrence is
 //! here, the side of this node it is on, and the ancestor generation
 //! it accounts for -- omitted when no ancestor does, as for a
-//! node shown in place of a node it overrides.
+//! mirror shown in another note's place.
 //! See 'docs/heralds.org'.
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
@@ -77,8 +76,7 @@ pub struct AncestorFlags {
   pub links_in       : Vec<usize>, pub links_substantive_in : Vec<usize>,
   pub links_out      : Vec<usize>,
   pub hides_in       : Vec<usize>, pub hides_out       : Vec<usize>,
-  pub subscribes_in  : Vec<usize>, pub subscribes_out  : Vec<usize>,
-  pub overrides_in   : Vec<usize>, pub overrides_out   : Vec<usize>,
+  pub forks_in       : Vec<usize>, pub forks_out       : Vec<usize>,
 }
 
 impl AncestorFlags {
@@ -98,10 +96,8 @@ impl AncestorFlags {
       (NodeRelation::LinksTo,               false) => Some (&mut self . links_out),
       (NodeRelation::HidesFromSubs, true )             => Some (&mut self . hides_in),
       (NodeRelation::HidesFromSubs, false)             => Some (&mut self . hides_out),
-      (NodeRelation::SubscribesTo,                true ) => Some (&mut self . subscribes_in),
-      (NodeRelation::SubscribesTo,                false) => Some (&mut self . subscribes_out),
-      (NodeRelation::Overrides,           true )       => Some (&mut self . overrides_in),
-      (NodeRelation::Overrides,           false)       => Some (&mut self . overrides_out), };
+      (NodeRelation::Forks,                     true ) => Some (&mut self . forks_in),
+      (NodeRelation::Forks,                     false) => Some (&mut self . forks_out), };
     if let Some (v) = slot {
       if ! v . contains (&ancestor_generation) { v . push (ancestor_generation); } } }
 }
@@ -243,11 +239,8 @@ pub fn relationship_heralds_sexp (
     &flags . links_in, &flags . links_substantive_in,
     counts . link_targets, &flags . links_out) { parts . push (s); }
   if let Some (s) = relation_sexp (
-    NodeRelation::SubscribesTo . relation_name (), counts . subscribers, &flags . subscribes_in,
-    counts . subscribees, &flags . subscribes_out) { parts . push (s); }
-  if let Some (s) = relation_sexp (
-    NodeRelation::Overrides . relation_name (), counts . overriders, &flags . overrides_in,
-    counts . overrides_out, &flags . overrides_out) { parts . push (s); }
+    NodeRelation::Forks . relation_name (), counts . forkers, &flags . forks_in,
+    counts . forkees, &flags . forks_out) { parts . push (s); }
   if let Some (s) = relation_sexp (
     NodeRelation::HidesFromSubs . relation_name (), counts . hiders, &flags . hides_in,
     counts . hides, &flags . hides_out) { parts . push (s); }

@@ -1,4 +1,5 @@
 use skg::dbs::in_rust_graph::InRustGraph;
+use skg::dbs::in_rust_graph::query::find_related_nodes;
 use skg::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition,
   GnidPresence,
@@ -29,9 +30,8 @@ fn unrestricted () -> SkgrepoRestriction {
 fn node (
   pid       : &str,
   extra_ids : &[&str],
-  subscribes: &[&str],
+  forks     : &[&str],
   hides     : &[&str],
-  overrides : &[&str],
 ) -> Graphnode {
   let mut node : Graphnode =
     empty_graphnode ();
@@ -40,33 +40,27 @@ fn node (
   node . home_skgrepo = SkgrepoName::from ("main");
   node . extra_ids =
     extra_ids . iter () . map ( |gnid| ID::from (*gnid) ) . collect ();
-  node . subscribesTo =
-    if subscribes . is_empty () { MSV::Unspecified }
+  node . forks =
+    if forks . is_empty () { MSV::Unspecified }
     else { MSV::Specified ( rel_partners_at_relRepo (
       &node . home_skgrepo,
-      subscribes . iter () . map ( |gnid| ID::from (*gnid) ) . collect ())) };
+      forks . iter () . map ( |gnid| ID::from (*gnid) ) . collect ())) };
   node . hidesFromSubs =
     if hides . is_empty () { MSV::Unspecified }
     else { MSV::Specified ( rel_partners_at_relRepo (
       &node . home_skgrepo,
       hides . iter () . map ( |gnid| ID::from (*gnid) ) . collect ())) };
-  node . overrides =
-    if overrides . is_empty () { MSV::Unspecified }
-    else { MSV::Specified ( rel_partners_at_relRepo (
-      &node . home_skgrepo,
-      overrides . iter () . map ( |gnid| ID::from (*gnid) ) . collect ())) };
   node }
 
 fn node_with_all_relations (
   pid       : &str,
   contains  : &[&str],
-  subscribes: &[&str],
+  forks     : &[&str],
   hides     : &[&str],
-  overrides : &[&str],
   links : &[&str],
 ) -> Graphnode {
   let mut result : Graphnode =
-    node (pid, &[], subscribes, hides, overrides);
+    node (pid, &[], forks, hides);
   result . contains = rel_partners_at_relRepo (
     &result . home_skgrepo,
     contains . iter () . map (|gnid| ID::from (*gnid)) . collect ());
@@ -87,25 +81,23 @@ fn gnid_set (
 fn relation_accessors_return_both_membership_directions () {
   let graph : InRustGraph =
     InRustGraph::from_graphnodes (&[
-      node ("recorder", &[], &["subscribee-alias"], &["hidden"], &["overridden"]),
-      node ("subscribee", &["subscribee-alias"], &[], &[], &[]),
-      node ("subscriber", &[], &["recorder"], &[], &[]),
-      node ("hidden", &[], &[], &[], &[]),
-      node ("hider", &[], &[], &["recorder"], &[]),
-      node ("overridden", &[], &[], &[], &[]),
-      node ("overrider", &[], &[], &[], &["recorder"]),
+      node ("recorder", &[], &["forkee-alias"], &["hidden"]),
+      node ("forkee", &["forkee-alias"], &[], &[]),
+      node ("forker", &[], &["recorder"], &[]),
+      node ("hidden", &[], &[], &[]),
+      node ("hider", &[], &[], &["recorder"]),
     ]);
 
   assert_eq!(
     graph . other_member_pids (
       &ID::from ("recorder"),
-      RelationRole::new (NodeRelation::SubscribesTo, BinaryRolePosition::First)),
-    vec![ID::from ("subscribee")] );
+      RelationRole::new (NodeRelation::Forks, BinaryRolePosition::First)),
+    vec![ID::from ("forkee")] );
   assert_eq!(
     graph . other_member_pids (
       &ID::from ("recorder"),
-      RelationRole::new (NodeRelation::SubscribesTo, BinaryRolePosition::Second)),
-    vec![ID::from ("subscriber")] );
+      RelationRole::new (NodeRelation::Forks, BinaryRolePosition::Second)),
+    vec![ID::from ("forker")] );
   assert_eq!(
     graph . other_member_pids (
       &ID::from ("recorder"),
@@ -117,22 +109,12 @@ fn relation_accessors_return_both_membership_directions () {
       &ID::from ("recorder"),
       RelationRole::new (
         NodeRelation::HidesFromSubs, BinaryRolePosition::Second)),
-    vec![ID::from ("hider")] );
-  assert_eq!(
-    graph . other_member_pids (
-      &ID::from ("recorder"),
-      RelationRole::new (NodeRelation::Overrides, BinaryRolePosition::First)),
-    vec![ID::from ("overridden")] );
-  assert_eq!(
-    graph . other_member_pids (
-      &ID::from ("recorder"),
-      RelationRole::new (NodeRelation::Overrides, BinaryRolePosition::Second)),
-    vec![ID::from ("overrider")] ); }
+    vec![ID::from ("hider")] ); }
 
 #[test]
 fn stored_outbound_accessor_retains_unresolved_raw_members () {
   let mut recorder : Graphnode = node (
-    "recorder", &[], &[], &[], &[]);
+    "recorder", &[], &[], &[]);
   recorder . contains = vec! [
     RelPartner {
       member : ID::from ("known-extra"),
@@ -143,7 +125,7 @@ fn stored_outbound_accessor_retains_unresolved_raw_members () {
   ];
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     recorder,
-    node ("known", &["known-extra"], &[], &[], &[]),
+    node ("known", &["known-extra"], &[], &[]),
   ]);
   assert_eq! (
     graph . outbound_rel_partners_for_relation_gated (
@@ -179,7 +161,7 @@ fn stored_outbound_accessor_retains_unresolved_raw_members () {
 #[test]
 fn relationship_member_key_canonicalizes_only_resolved_gnids () {
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
-    node ("known", &["known-extra"], &[], &[], &[]),
+    node ("known", &["known-extra"], &[], &[]),
   ]);
   assert_eq! (
     graph . relationship_member_key (&ID::from ("known-extra")),
@@ -192,37 +174,37 @@ fn relationship_member_key_canonicalizes_only_resolved_gnids () {
 fn update_relevant_neighborhood_includes_each_ordinary_relation_both_ways () {
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     node_with_all_relations (
-      "seed", &["contained"], &["subscribee"], &["hidden"], &[],
+      "seed", &["contained"], &["forkee"], &["hidden"],
       &["link-dest", "dangling-link"]),
-    node_with_all_relations ("contained", &[], &[], &[], &[], &[]),
-    node_with_all_relations ("container", &["seed"], &[], &[], &[], &[]),
-    node_with_all_relations ("subscribee", &[], &[], &[], &[], &[]),
-    node_with_all_relations ("subscriber", &[], &["seed"], &[], &[], &[]),
-    node_with_all_relations ("hidden", &[], &[], &[], &[], &[]),
-    node_with_all_relations ("hider", &[], &[], &["seed"], &[], &[]),
-    node_with_all_relations ("link-dest", &[], &[], &[], &[], &[]),
-    node_with_all_relations ("link-source", &[], &[], &[], &[], &["seed"]),
+    node_with_all_relations ("contained", &[], &[], &[], &[]),
+    node_with_all_relations ("container", &["seed"], &[], &[], &[]),
+    node_with_all_relations ("forkee", &[], &[], &[], &[]),
+    node_with_all_relations ("forker", &[], &["seed"], &[], &[]),
+    node_with_all_relations ("hidden", &[], &[], &[], &[]),
+    node_with_all_relations ("hider", &[], &[], &["seed"], &[]),
+    node_with_all_relations ("link-dest", &[], &[], &[], &[]),
+    node_with_all_relations ("link-source", &[], &[], &[], &["seed"]),
   ]);
   assert_eq! (
     graph . update_relevant_neighborhood ([ID::from ("seed")]),
     gnid_set (&[
-      "seed", "contained", "container", "subscribee", "subscriber",
+      "seed", "contained", "container", "forkee", "forker",
       "hidden", "hider", "link-dest", "link-source", "dangling-link",
     ]));
 }
 
 /// The neighborhood over the ordinary relations but links, as the
 /// dirty-view check reads it: no link partner in either direction, but
-/// every other ordinary partner and the override walks.
+/// every other ordinary partner and the mirrors.
 #[test]
 fn update_relevant_neighborhood_over_relations_without_links_omits_link_partners () {
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     node_with_all_relations (
-      "seed", &["contained"], &[], &[], &["overridden"], &["link-dest"]),
-    node_with_all_relations ("contained", &[], &[], &[], &[], &[]),
-    node_with_all_relations ("overridden", &[], &[], &[], &[], &[]),
-    node_with_all_relations ("link-dest", &[], &[], &[], &[], &[]),
-    node_with_all_relations ("link-source", &[], &[], &[], &[], &["seed"]),
+      "seed", &["contained"], &["forkee"], &[], &["link-dest"]),
+    node_with_all_relations ("contained", &[], &[], &[], &[]),
+    node_with_all_relations ("forkee", &[], &[], &[], &[]),
+    node_with_all_relations ("link-dest", &[], &[], &[], &[]),
+    node_with_all_relations ("link-source", &[], &[], &[], &["seed"]),
   ]);
   let ordinary_relations_without_links : Vec<NodeRelation> =
     UPDATE_RELEVANT_ORDINARY_RELATIONS . iter () . copied ()
@@ -231,11 +213,11 @@ fn update_relevant_neighborhood_over_relations_without_links_omits_link_partners
   assert_eq! (
     graph . update_relevant_neighborhood_over (
       [ID::from ("seed")], &ordinary_relations_without_links),
-    gnid_set (&["seed", "contained", "overridden"]));
+    gnid_set (&["seed", "contained", "forkee"]));
   assert_eq! (
     graph . update_relevant_neighborhood ([ID::from ("seed")]),
     gnid_set (&[
-      "seed", "contained", "overridden", "link-dest", "link-source"]));
+      "seed", "contained", "forkee", "link-dest", "link-source"]));
 }
 
 /// Every mirror of the seed: its forkees and forkers, transitively, a
@@ -243,12 +225,12 @@ fn update_relevant_neighborhood_over_relations_without_links_omits_link_partners
 #[test]
 fn update_relevant_neighborhood_holds_every_mirror_of_the_seed () {
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
-    node_with_all_relations ("above-3", &[], &[], &[], &["above-2"], &[]),
-    node_with_all_relations ("above-2", &[], &[], &[], &["seed"], &[]),
-    node_with_all_relations ("above-branch", &[], &[], &[], &["seed"], &[]),
-    node_with_all_relations ("seed", &[], &[], &[], &["below-1"], &[]),
-    node_with_all_relations ("below-1", &[], &[], &[], &["below-2"], &[]),
-    node_with_all_relations ("below-2", &[], &[], &[], &["below-1"], &[]),
+    node_with_all_relations ("above-3", &[], &["above-2"], &[], &[]),
+    node_with_all_relations ("above-2", &[], &["seed"], &[], &[]),
+    node_with_all_relations ("above-branch", &[], &["seed"], &[], &[]),
+    node_with_all_relations ("seed", &[], &["below-1"], &[], &[]),
+    node_with_all_relations ("below-1", &[], &["below-2"], &[], &[]),
+    node_with_all_relations ("below-2", &[], &["below-1"], &[], &[]),
   ]);
   assert_eq! (
     graph . update_relevant_neighborhood ([ID::from ("seed")]),
@@ -264,14 +246,14 @@ fn update_relevant_neighborhood_holds_every_mirror_of_the_seed () {
 #[test]
 fn update_relevant_neighborhood_mixes_no_paths () {
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
-    node_with_all_relations ("above", &[], &[], &[], &["seed"], &[]),
-    node_with_all_relations ("side-of-above", &["above"], &[], &[], &[], &[]),
-    node_with_all_relations ("seed", &["ordinary"], &[], &[], &["below"], &[]),
-    node_with_all_relations ("ordinary", &[], &[], &[], &["mixed"], &[]),
-    node_with_all_relations ("below", &[], &[], &[], &[], &[]),
-    node_with_all_relations ("sibling", &[], &[], &[], &["below"], &[]),
-    node_with_all_relations ("two-hop", &["ordinary"], &[], &[], &[], &[]),
-    node_with_all_relations ("mixed", &[], &[], &[], &[], &[]),
+    node_with_all_relations ("above", &[], &["seed"], &[], &[]),
+    node_with_all_relations ("side-of-above", &["above"], &[], &[], &[]),
+    node_with_all_relations ("seed", &["ordinary"], &["below"], &[], &[]),
+    node_with_all_relations ("ordinary", &[], &["mixed"], &[], &[]),
+    node_with_all_relations ("below", &[], &[], &[], &[]),
+    node_with_all_relations ("sibling", &[], &["below"], &[], &[]),
+    node_with_all_relations ("two-hop", &["ordinary"], &[], &[], &[]),
+    node_with_all_relations ("mixed", &[], &[], &[], &[]),
   ]);
   assert_eq! (
     graph . update_relevant_neighborhood ([ID::from ("seed")]),
@@ -284,9 +266,9 @@ fn update_relevant_neighborhood_mixes_no_paths () {
 #[test]
 fn update_relevant_neighborhood_of_a_fork_holds_its_sibling () {
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
-    node_with_all_relations ("original", &[], &[], &[], &[], &[]),
-    node_with_all_relations ("changed-fork", &[], &[], &[], &["original"], &[]),
-    node_with_all_relations ("shown-fork", &[], &[], &[], &["original"], &[]),
+    node_with_all_relations ("original", &[], &[], &[], &[]),
+    node_with_all_relations ("changed-fork", &[], &["original"], &[], &[]),
+    node_with_all_relations ("shown-fork", &[], &["original"], &[], &[]),
   ]);
   assert! (
     graph . update_relevant_neighborhood ([ID::from ("changed-fork")])
@@ -296,9 +278,9 @@ fn update_relevant_neighborhood_of_a_fork_holds_its_sibling () {
 #[test]
 fn update_relevant_neighborhood_canonicalizes_aliases_and_retains_unknowns () {
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
-    node ("known", &["alias"], &[], &[], &[]),
+    node ("known", &["alias"], &[], &[]),
     node_with_all_relations (
-      "points-at-unknown", &["unknown"], &[], &[], &[], &[]),
+      "points-at-unknown", &["unknown"], &[], &[], &[]),
   ]);
   assert_eq! (
     graph . update_relevant_neighborhood (
@@ -312,10 +294,10 @@ fn update_relevant_neighborhood_canonicalizes_aliases_and_retains_unknowns () {
 // skgrepo restriction.
 #[test]
 fn gnid_presence_gated_tells_hidden_from_absent () {
-  let mut private : Graphnode = node ("private", &["private-extra"], &[], &[], &[]);
+  let mut private : Graphnode = node ("private", &["private-extra"], &[], &[]);
   private . home_skgrepo = SkgrepoName::from ("private");
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
-    node ("public", &[], &[], &[], &[]), private ]);
+    node ("public", &[], &[], &[]), private ]);
   let only_main : SkgrepoRestriction = only_main ();
   let all : SkgrepoRestriction = unrestricted_over_main_and_private ();
   let presence = |gnid : &str, restriction : &SkgrepoRestriction|
@@ -353,11 +335,11 @@ fn a_record_is_visible_when_the_restriction_holds_its_relRepo () {
 // weave ('SkgrepoRestriction::record_is_visible') answer alike.
 #[test]
 fn a_record_in_a_skgrepo_the_config_does_not_name_is_visible_under_every_restriction () {
-  let mut recorder : Graphnode = node ("recorder", &[], &[], &[], &[]);
+  let mut recorder : Graphnode = node ("recorder", &[], &[], &[]);
   recorder . contains = vec! [ RelPartner::at_relRepo (
     SkgrepoName::from ("unnamed"), ID::from ("member") ) ];
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
-    recorder, node ("member", &[], &[], &[], &[]) ]);
+    recorder, node ("member", &[], &[], &[]) ]);
   for restriction in [ only_main (), unrestricted_over_main_and_private () ] {
     let shown_by_the_render : bool =
       graph . outbound_rel_partners_for_relation_gated (
@@ -373,7 +355,7 @@ fn a_record_in_a_skgrepo_the_config_does_not_name_is_visible_under_every_restric
 // restricted under no skgrepo restriction: the gated graph shows it.
 #[test]
 fn a_graphnode_homed_in_a_skgrepo_the_config_does_not_name_is_never_restricted () {
-  let mut member : Graphnode = node ("member", &[], &[], &[], &[]);
+  let mut member : Graphnode = node ("member", &[], &[], &[]);
   member . home_skgrepo = SkgrepoName::from ("unnamed");
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[ member ]);
   for restriction in [ only_main (), unrestricted_over_main_and_private () ] {
@@ -383,3 +365,14 @@ fn a_graphnode_homed_in_a_skgrepo_the_config_does_not_name_is_never_restricted (
     assert_eq! ( graph . gnid_presence_gated (&ID::from ("member"), &restriction),
                  GnidPresence::Present,
                  "under {}", restriction . most_private_shown ); }}
+
+/// A relation or role name no relation has is a caller's bug, and
+/// 'find_related_nodes' says so rather than answering nothing.
+#[test]
+#[should_panic (expected = "unknown triple (subscribesTo, subscriber, subscribee)")]
+fn find_related_nodes_panics_on_a_name_no_relation_has () {
+  let graph : InRustGraph = InRustGraph::from_graphnodes (&[
+    node ("recorder", &[], &[], &[]) ]);
+  find_related_nodes (
+    &graph, &[ID::from ("recorder")],
+    "subscribesTo", "subscriber", "subscribee" ); }

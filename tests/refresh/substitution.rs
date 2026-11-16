@@ -3,7 +3,9 @@
 // folder, and as the content of an overridden node shown raw. When
 // the override is gone, the shown headline loses 'overridesHere',
 // becomes unwarranted (so, under an editable parent, 'noClaim'), and
-// the overridden node is reinstated beside it.
+// the overridden node is reinstated beside it. A shown mirror that
+// forks the original draws the original in its subscribee folder, as
+// any editable fork does.
 
 use super::*;
 use indoc::formatdoc;
@@ -13,14 +15,17 @@ fn overridden () -> InRustGraph {
   graph (&[
     Graphnode { contains : ids (&["n"]), .. node ("p") },
     node ("n"),
-    Graphnode { overrides : msv_ids (&["n"]), .. node ("o") }, ]) }
+    Graphnode { forks : msv_ids (&["n"]), .. node ("o") }, ]) }
 
 #[test]
 fn a_drawn_member_is_shown_as_its_overrider () {
   assert_eq! ( run_asserting_fixpoint (
     &format! ("* {} p\n", occurrence_metadata ("p", "")), &overridden () ) . outline (), "\
 node p
-  node o (overridesHere n)" ); }
+  node o (overridesHere n)
+    subscribeeFolder
+      node n wp
+        node p wp noClaim" ); }
 
 #[test]
 fn a_member_shown_raw_is_shown_as_its_overrider_in_place () {
@@ -58,8 +63,8 @@ fn a_root_and_a_folder_member_are_shown_raw () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["n"]), .. node ("q") },
     node ("n"),
-    Graphnode { overrides : msv_ids (&["n"]), .. node ("o") },
-    Graphnode { overrides : msv_ids (&["q"]), .. node ("v") }, ]);
+    Graphnode { forks : msv_ids (&["n"]), .. node ("o") },
+    Graphnode { forks : msv_ids (&["q"]), .. node ("v") }, ]);
   let input : String = formatdoc! ("
     * {} n
     ** (skg containerFolder)
@@ -74,9 +79,9 @@ node n
 fn the_content_of_an_overridden_node_shown_raw_is_shown_raw () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["n"]), .. node ("r") },
-    Graphnode { overrides : msv_ids (&["r"]), .. node ("s") },
+    Graphnode { forks : msv_ids (&["r"]), .. node ("s") },
     node ("n"),
-    Graphnode { overrides : msv_ids (&["n"]), .. node ("o") }, ]);
+    Graphnode { forks : msv_ids (&["n"]), .. node ("o") }, ]);
   assert_eq! ( run_asserting_fixpoint (
     &format! ("* {} r\n", occurrence_metadata ("r", "")), &graph ) . outline (), "\
 node r
@@ -92,7 +97,7 @@ fn an_overrider_editable_elsewhere_is_shown_write_protected () {
     Graphnode { contains : ids (&["n", "q"]), .. node ("p") },
     node ("n"),
     Graphnode { contains : ids (&["o"]), .. node ("q") },
-    Graphnode { overrides : msv_ids (&["n"]), .. node ("o") }, ]);
+    Graphnode { forks : msv_ids (&["n"]), .. node ("o") }, ]);
   let input : String = formatdoc! ("
     * {} p
     ** {} n
@@ -128,8 +133,8 @@ fn m_overridden_by_its_author_and_the_user () -> InRustGraph {
     Graphnode { contains : ids (&["m"]), .. node_in ("theirs", "r") },
     Graphnode { contains : ids (&["m"]), .. node ("p") },
     node_in ("theirs", "m"),
-    Graphnode { overrides : msv_ids (&["m"]), .. node_in ("theirs", "a") },
-    Graphnode { overrides : msv_ids (&["m"]), .. node ("u") }, ]) }
+    Graphnode { forks : msv_ids (&["m"]), .. node_in ("theirs", "a") },
+    Graphnode { forks : msv_ids (&["m"]), .. node ("u") }, ]) }
 
 #[test]
 fn under_a_foreign_root_its_authors_overrider_is_shown_and_not_the_users () {
@@ -137,7 +142,11 @@ fn under_a_foreign_root_its_authors_overrider_is_shown_and_not_the_users () {
     &format! ("* {} r\n", occurrence_metadata_in ("theirs", "r")),
     &m_overridden_by_its_author_and_the_user () ) . outline (), "\
 node r
-  node a (overridesHere m)" ); }
+  node a (overridesHere m)
+    subscribeeFolder
+      node m wp
+        node p wp noClaim
+        node r wp noClaim" ); }
 
 #[test]
 fn under_an_owned_root_the_users_overrider_is_shown () {
@@ -145,7 +154,11 @@ fn under_an_owned_root_the_users_overrider_is_shown () {
     &format! ("* {} p\n", occurrence_metadata ("p", "")),
     &m_overridden_by_its_author_and_the_user () ) . outline (), "\
 node p
-  node u (overridesHere m)" ); }
+  node u (overridesHere m)
+    subscribeeFolder
+      node m wp
+        node p wp noClaim
+        node r wp noClaim" ); }
 
 /// r, in 'theirs', contains e, in 'third', which contains c, in
 /// 'third'. c is overridden by j, in 'theirs' (r's author), by d, in
@@ -157,15 +170,19 @@ fn under_a_foreign_root_its_authors_overrides_are_followed_beneath_a_third_autho
     Graphnode { contains : ids (&["e"]), .. node_in ("theirs", "r") },
     Graphnode { contains : ids (&["c"]), .. node_in ("third", "e") },
     node_in ("third", "c"),
-    Graphnode { overrides : msv_ids (&["c"]), .. node_in ("theirs", "j") },
-    Graphnode { overrides : msv_ids (&["c"]), .. node_in ("third", "d") },
-    Graphnode { overrides : msv_ids (&["c"]), .. node ("u") }, ]);
+    Graphnode { forks : msv_ids (&["c"]), .. node_in ("theirs", "j") },
+    Graphnode { forks : msv_ids (&["c"]), .. node_in ("third", "d") },
+    Graphnode { forks : msv_ids (&["c"]), .. node ("u") }, ]);
   assert_eq! ( run_asserting_fixpoint (
     &format! ("* {} r\n", occurrence_metadata_in ("theirs", "r")),
     &graph ) . outline (), "\
 node r
   node e
-    node j (overridesHere c)" ); }
+    node j (overridesHere c)
+      subscribeeFolder
+        node c wp
+          node e wp noClaim
+            node r wp noClaim" ); }
 
 /// A chain of overriders stops where the next is not the follower's:
 /// m is overridden by a, in 'theirs', which u, in 'main', overrides.
@@ -175,13 +192,16 @@ fn under_a_foreign_root_a_chain_stops_before_the_users_overrider () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["m"]), .. node_in ("theirs", "r") },
     node_in ("theirs", "m"),
-    Graphnode { overrides : msv_ids (&["m"]), .. node_in ("theirs", "a") },
-    Graphnode { overrides : msv_ids (&["a"]), .. node ("u") }, ]);
+    Graphnode { forks : msv_ids (&["m"]), .. node_in ("theirs", "a") },
+    Graphnode { forks : msv_ids (&["a"]), .. node ("u") }, ]);
   assert_eq! ( run_asserting_fixpoint (
     &format! ("* {} r\n", occurrence_metadata_in ("theirs", "r")),
     &graph ) . outline (), "\
 node r
-  node a (overridesHere m)" ); }
+  node a (overridesHere m)
+    subscribeeFolder
+      node m wp
+        node r wp noClaim" ); }
 
 /// Whether a foreign root is overridden and so shows its content raw
 /// asks of its author's overrides, not the user's: the user's k
@@ -193,9 +213,9 @@ fn a_foreign_root_is_shown_raw_only_when_its_author_overrides_it () {
     Graphnode { contains : ids (&["m"]), .. node_in ("theirs", "r") },
     Graphnode { contains : ids (&["m"]), .. node_in ("theirs", "q") },
     node_in ("theirs", "m"),
-    Graphnode { overrides : msv_ids (&["m"]), .. node_in ("theirs", "a") },
-    Graphnode { overrides : msv_ids (&["r"]), .. node ("k") },
-    Graphnode { overrides : msv_ids (&["q"]), .. node_in ("theirs", "s") }, ]);
+    Graphnode { forks : msv_ids (&["m"]), .. node_in ("theirs", "a") },
+    Graphnode { forks : msv_ids (&["r"]), .. node ("k") },
+    Graphnode { forks : msv_ids (&["q"]), .. node_in ("theirs", "s") }, ]);
   assert_eq! ( run_asserting_fixpoint (
     &format! ("* {} r\n* {} q\n",
               occurrence_metadata_in ("theirs", "r"),
@@ -203,5 +223,9 @@ fn a_foreign_root_is_shown_raw_only_when_its_author_overrides_it () {
     &graph ) . outline (), "\
 node r
   node a (overridesHere m)
+    subscribeeFolder
+      node m wp
+        node q wp noClaim
+        node r wp noClaim
 node q
   node m" ); }

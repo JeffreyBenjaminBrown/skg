@@ -41,7 +41,7 @@ pub struct NodeSaveIntent {
   pub home_skgrepo      : SkgrepoName,
   pub title             : String,
   pub body              : Option<String>,
-  // contains / subscribesTo pair each member
+  // contains / forks pair each member
   // with an Option<RepoName>: Some when the buffer's headline
   // carried an '(editRequest (relRepo NAME))' request (see
   // 'RelationshipEditRequest::RelRepo', 'FieldIntent'); None means
@@ -52,9 +52,8 @@ pub struct NodeSaveIntent {
   pub contains          : MSV<(ID, Option<SkgrepoName>)>,
   pub extra_ids         : Vec<ID>,
   pub aliases           : MSV<(String, Option<SkgrepoName>)>,
-  pub subscribesTo      : MSV<(ID, Option<SkgrepoName>)>,
+  pub forks             : MSV<(ID, Option<SkgrepoName>)>,
   pub hidesFromSubs     : MSV<ID>,
-  pub overrides         : MSV<(ID, Option<SkgrepoName>)>,
   pub flags              : Vec<Flag>,
   pub flag_request  : Option<(Flag, bool)>,
 }
@@ -76,7 +75,7 @@ pub struct NodeSaveIntent {
 pub struct RequestedRelRepos {
   pub contains          : HashMap<ID, SkgrepoName>,
   pub aliases           : HashMap<String, SkgrepoName>,
-  pub subscribesTo      : HashMap<ID, SkgrepoName>,
+  pub forks             : HashMap<ID, SkgrepoName>,
 }
 
 /// Strip the per-member explicit-repo payload down to plain IDs, by
@@ -155,10 +154,9 @@ impl NodeIntent {
           aliases . into_iter ()
           . map ( |alias| (alias . member, None) )
           . collect () ), },
-      subscribesTo                 : no_explicit_msv (&node . subscribesTo),
+      forks                        : no_explicit_msv (&node . forks),
       hidesFromSubs                :
         members_msv (&node . hidesFromSubs),
-      overrides                    : no_explicit_msv (&node . overrides),
       flags                         : node . flags,
       flag_request             : None,
     }) }
@@ -215,7 +213,7 @@ impl NodeSaveIntent {
         . filter_map ( |(text, skgrepo)| skgrepo . clone ()
           . map ( |skgrepo| (text . clone (), skgrepo) ) )
         . collect (),
-      subscribesTo      : collect (self . subscribesTo . or_default ()),
+      forks             : collect (self . forks . or_default ()),
     }}
 
   pub fn into_graphnode (
@@ -241,12 +239,10 @@ impl NodeSaveIntent {
       contains                     :
         rel_partners_at_relRepo (
           &skgrepo, gnids_only (self . contains . or_default ()) ),
-      subscribesTo                 :
-        rel_partners_at_relRepo_msv (&skgrepo, gnids_only_msv (self . subscribesTo)),
+      forks                        :
+        rel_partners_at_relRepo_msv (&skgrepo, gnids_only_msv (self . forks)),
       hidesFromSubs                :
         rel_partners_at_relRepo_msv (&skgrepo, self . hidesFromSubs),
-      overrides                    :
-        rel_partners_at_relRepo_msv (&skgrepo, gnids_only_msv (self . overrides)),
       flags                         : self . flags,
     };
     node . normalize_gnids ();
@@ -345,7 +341,7 @@ pub fn lower_collected_fieldIntents (
     // 'lowerable_order'; so anything else here is a collection bug.
     if leftover . contains . is_some()
       || leftover . aliases       . is_some()
-      || leftover . subscribesTo . is_some()
+      || leftover . forks . is_some()
       || leftover . node_merge    . is_some()
       || leftover . flag      . is_some()
     { return Err ( format!(
@@ -383,12 +379,9 @@ fn lower_one_entry (
         extra_ids                    : vec![],
         aliases                      :
           msv_from_slot (entry . aliases),
-        subscribesTo                 :
-          msv_from_slot (entry . subscribesTo),
+        forks                        :
+          msv_from_slot (entry . forks),
         hidesFromSubs                : MSV::Unspecified,
-        // No buffer position edits 'overrides': disk supplementation
-        // keeps the node's own.
-        overrides                    : MSV::Unspecified,
         flags                    : Vec::new(),
         flag_request             : entry . flag,
       })) }} }
@@ -409,7 +402,7 @@ impl LoweredNodeIntents {
       . filter_map ( |pid| by_pid . remove (&pid) )
       . collect() }
 
-  /// One (pid, skgrepo, contains, subscribesTo) tuple per Save
+  /// One (pid, skgrepo, contains, forks) tuple per Save
   /// nodeIntent whose contains is Specified -- the candidates for
   /// inferring hides from contains removals (see
   /// 'infer_hides_from_contains_removals'). Cloned out so the caller
@@ -426,7 +419,7 @@ impl LoweredNodeIntents {
                 pid . clone (),
                 intent . home_skgrepo . clone (),
                 gnids_only (contains),
-                gnids_only_msv_ref (&intent . subscribesTo) )),
+                gnids_only_msv_ref (&intent . forks) )),
               _ => None },
           _ => None })
       . collect () }
@@ -457,11 +450,11 @@ impl LoweredNodeIntents {
   ) -> Vec<ID> {
     match self . by_pid . get (&subscriber_from_disk . pid) {
       Some (NodeIntent::Save (intent))
-        if ! intent . subscribesTo . is_unspecified () =>
-          gnids_only (intent . subscribesTo . or_default ()),
+        if ! intent . forks . is_unspecified () =>
+          gnids_only (intent . forks . or_default ()),
       _ =>
         members_of (
-          subscriber_from_disk . subscribesTo . or_default () ),
+          subscriber_from_disk . forks . or_default () ),
     }}
 
   /// The hide IDs after the preceding inference stages.  Edits of the

@@ -17,14 +17,13 @@ use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 use std::iter::once;
 
-/// The four graph relations whose flags the H/S/O/L checks consult via
-/// the in-Rust graph (contains, the fifth, is checked via the
+/// The three graph relations whose flags the H/K/L checks consult via
+/// the in-Rust graph (contains, the fourth, is checked via the
 /// containment maps).
-const GRAPH_RELATIONS : [NodeRelation; 4] = [
+const GRAPH_RELATIONS : [NodeRelation; 3] = [
   NodeRelation::LinksTo,
   NodeRelation::HidesFromSubs,
-  NodeRelation::SubscribesTo,
-  NodeRelation::Overrides, ];
+  NodeRelation::Forks, ];
 
 /// The stats of each occurrence (its rels, props, birth, 'cycle',
 /// 'repoBoundary', 'omittedBody', relRepo). The warrants and the

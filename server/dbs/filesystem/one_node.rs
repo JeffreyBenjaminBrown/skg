@@ -10,6 +10,7 @@ use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::complete::Graphnode;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
+use crate::dbs::filesystem::retired_keys::{RetiredKeysInFiles, retired_keys_held};
 use crate::repo_watch::own_writes::{remove_skg_file, write_skg_file};
 use crate::util::path_from_pid_and_skgrepo;
 use std::error::Error;
@@ -91,8 +92,10 @@ pub(crate) fn sections_of_pid_on_disk (
     if ! Path::new (&path) . is_file () { continue; }
     let node_fs : GraphnodeOnDisk =
       read_graphnode (&path)
-      . map_err ( |e| io::Error::new (
-        e . kind (), format! ("{}: {}", path, e) )) ?;
+      . map_err ( |e|
+        if RetiredKeysInFiles::carried_by (&e) . is_some () { e } // it names the file
+        else { io::Error::new (
+          e . kind (), format! ("{}: {}", path, e) ) } ) ?;
     validate_pid_matches_filename (&node_fs, Path::new (&path)) ?;
     sections . push (( skgrepo_name, node_fs )); }
   Ok (sections) }
@@ -243,12 +246,10 @@ pub(crate) fn prepare_graphnode_telescope (
         home     : & graphnode . home_skgrepo,
         aliases  : graphnode . aliases . or_default (),
         contains : & graphnode . contains,
-        subscribesTo :
-          graphnode . subscribesTo . or_default (),
+        forks :
+          graphnode . forks . or_default (),
         hidesFromSubs :
-          graphnode . hidesFromSubs . or_default (),
-        overrides :
-          graphnode . overrides . or_default (), },
+          graphnode . hidesFromSubs . or_default (), },
       config )
     . map_err ( |e| io::Error::new (
       io::ErrorKind::InvalidData, e ) ) ?;
@@ -379,6 +380,8 @@ pub(super) fn validate_pid_matches_filename (
 ///
 /// Returns a GraphnodeOnDisk (on-disk shape, no skgrepo). Callers attach
 /// skgrepo via 'GraphnodeOnDisk::into_complete' based on file location.
+/// A file holding a retired key ('retired_keys.rs') is unreadable: its
+/// error carries a 'RetiredKeysInFiles'.
 pub(super) fn read_graphnode
   <P : AsRef <Path>> // any type that can be converted to an &Path
   (file_path : P
@@ -387,6 +390,11 @@ pub(super) fn read_graphnode
   let file_path : &Path = file_path . as_ref ();
   let node_fs   : GraphnodeOnDisk = {
     let contents : String = fs::read_to_string (file_path)?;
+    let retired : Vec<&'static str> = retired_keys_held (&contents);
+    if ! retired . is_empty () {
+      return Err ( RetiredKeysInFiles {
+        files : vec! [ ( file_path . to_path_buf (), retired ) ] }
+        . into_io_error () ); }
     yaml_serde::from_str (&contents)
     . map_err (
       |e| io::Error::new (

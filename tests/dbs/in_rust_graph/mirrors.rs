@@ -54,7 +54,7 @@ fn note (
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
   node . home_skgrepo = SkgrepoName::from (skgrepo);
-  node . overrides =
+  node . forks =
     if forks . is_empty () { MSV::Unspecified }
     else { MSV::Specified ( rel_partners_at_relRepo (
       &node . home_skgrepo,
@@ -191,7 +191,7 @@ fn a_restricted_middle_note_cuts_the_path () {
 #[test]
 fn a_restricted_relationship_joins_no_mirrors () {
   let mut fork : Graphnode = note ("f", "my-y", &[]);
-  fork . overrides = MSV::Specified (vec! [
+  fork . forks = MSV::Specified (vec! [
     RelPartner::at_relRepo ( SkgrepoName::from ("my-x"), ID::from ("n") ) ]);
   let notes : Vec<Graphnode> = vec! [ note ("n", "your-x", &[]), fork ];
   let restricted : SkgrepoRestriction =

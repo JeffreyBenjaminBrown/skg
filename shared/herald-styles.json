@@ -127,8 +127,7 @@
                                         "out_unintegrated": "medium" },
       "linksTo":                     { "in": "medium", "out": "normal",
                                         "in_substantive": "high" },
-      "subscribesTo":                { "in": "high",   "out": "medium" },
-      "overrides":                   { "in": "low",    "out": "medium" },
+      "forks":                       { "in": "high",   "out": "medium" },
       "hidesFromSubs":               { "in": "medium", "out": "normal" }
     },
     "floors": {

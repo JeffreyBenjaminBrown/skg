@@ -67,13 +67,12 @@ fn lowering_produces_ordered_nodeInstructions_and_signals () {
     assert_eq!( members_of (&root . contains), vec![ID::from ("child")] );
     assert_eq!( members_msv (&root . aliases),
                 MSV::Specified (vec!["nickname" . to_string()]) );
-    assert_eq!( members_msv (&root . subscribesTo),
+    assert_eq!( members_msv (&root . forks),
                 MSV::Specified (vec![ID::from ("e")]) );
     // Unmentioned fields lower to Unspecified; hides is never
     // emitted by collection (resolution sets it later).
     assert_eq!( root . hidesFromSubs,
-                MSV::Unspecified );
-    assert_eq!( root . overrides, MSV::Unspecified ); }
+                MSV::Unspecified ); }
   assert!( matches!( &nodeInstructions [1],
     NodeInstruction::Save (SaveNode (node))
       if node . pid == ID::from ("child") ));

@@ -149,7 +149,7 @@ fn restoring_a_removed_subscription_from_a_subscriber_folder (
     let (response, files) : (SaveResponse, BTreeMap<String, String>) = saved ( f,
       &requesting (&buffer, S_REMOVED_AS_S2S_SUBSCRIBER, "restoreRel") ) ?;
     assert_eq! ( file_of (&files, "s"),
-                 "title: s\npid: s\nsubscribesTo:\n- s1\n- s2\n- s3\n" );
+                 "title: s\npid: s\nforks:\n- s1\n- s2\n- s3\n" );
     assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
     saved_and_rerendered (f, &response . saved_view) ?;
     Ok (( )) }) }
@@ -169,7 +169,7 @@ fn restoring_a_deleted_node () -> Result<(), Box<dyn Error>> {
                  G_AT_HEAD );
     assert_eq! ( file_of (&files, "q"),
                  "title: q\npid: q\ncontains:\n- q1\n- g\n- q2\n" );
-    assert_eq! ( file_of (&files, "t"), "title: t\npid: t\nsubscribesTo:\n- g\n" );
+    assert_eq! ( file_of (&files, "t"), "title: t\npid: t\nforks:\n- g\n" );
     assert! ( ! files . contains_key ("main/gd.skg") );
     assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
     let rerendered : &str = &response . saved_view;

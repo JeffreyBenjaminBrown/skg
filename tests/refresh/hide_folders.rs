@@ -44,7 +44,7 @@ fn s_e_h (
     None => at (Record::Main, &["c"]),
     Some (record) => [ at (Record::Main, &["c"]), at (record, &["h"]) ] . concat (), };
   graph (&[
-    Graphnode { subscribesTo  : MSV::Specified ( at (Record::Main, &["e"]) ),
+    Graphnode { forks : MSV::Specified ( at (Record::Main, &["e"]) ),
                 hidesFromSubs : MSV::Specified ( at (hide, &["h"]) ),
                 .. node ("s") },
     Graphnode { contains : e_contains, .. node ("e") },
@@ -132,7 +132,7 @@ fn a_restricted_hide_of_what_e_contains_restrictedly_stands_nowhere_under_a_narr
 #[test]
 fn a_visible_hide_of_what_a_restricted_subscribee_contains_stands_outside_under_a_narrowing () {
   let graph : InRustGraph = graph (&[
-    Graphnode { subscribesTo  : MSV::Specified ( at (Record::Main, &["e"]) ),
+    Graphnode { forks : MSV::Specified ( at (Record::Main, &["e"]) ),
                 hidesFromSubs : MSV::Specified ( at (Record::Main, &["h"]) ),
                 .. node ("s") },
     Graphnode { home_skgrepo : SkgrepoName::from ("private"),

@@ -451,7 +451,7 @@ pub(crate) fn hidden_outside_of_subscribees (
     &graph . outbound_gnids_for_relation_gated (
       subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ),
     &graph . outbound_gnids_for_relation_gated (
-      subscriber, NodeRelation::SubscribesTo, walk . truth . restriction ),
+      subscriber, NodeRelation::Forks, walk . truth . restriction ),
     walk . truth . restriction );
   resolve_all (&goal, graph) }
 

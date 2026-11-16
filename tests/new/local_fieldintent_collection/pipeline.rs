@@ -135,14 +135,14 @@ async fn pipeline_basic_mixed_tree (
                     MSV::Specified (vec![
                       "first alias" . to_string(),
                       "second alias" . to_string()]) );
-        assert_eq!( members_msv (&root . subscribesTo),
+        assert_eq!( members_msv (&root . forks),
                     MSV::Specified (vec![ID::from ("s1")]) ); }
       { let explicit : &Graphnode =
           saved_node_by_gnid (&plan . node_instructions, "explicit");
         // Present-but-empty folders are explicit emptiness.
         assert_eq!( explicit . aliases,
                     MSV::Specified (vec![]) );
-        assert_eq!( explicit . subscribesTo,
+        assert_eq!( explicit . forks,
                     MSV::Specified (vec![]) ); }
       assert!( plan . skgrepo_moves . is_empty() );
       assert!( nodeMerge_acquisitions . is_empty() );

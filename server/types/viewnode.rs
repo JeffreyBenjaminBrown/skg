@@ -420,7 +420,7 @@ pub enum Editability {
     edit_request : Option < NodeEditRequest >, },
   WriteProtected, }
 
-/// Directional member counts for the five graph relations, plus the
+/// Directional member counts for the four graph relations, plus the
 /// substantive mentioners and distinct outbound targets, feeding the uniform-herald token grammar
 /// (server/herald_tokens.rs). All are graph-level (position-independent)
 /// counts of a node's members on each side of each relation.
@@ -430,10 +430,8 @@ pub struct RelationCounts {
   pub contents      : usize, // C outbound: nodes it contains
   pub hiders        : usize, // H inbound: nodes that hide it
   pub hides         : usize, // H outbound: nodes it hides
-  pub subscribers   : usize, // S inbound: nodes that subscribe to it
-  pub subscribees   : usize, // S outbound: its subscribees
-  pub overriders    : usize, // O inbound: nodes that override it
-  pub overrides_out : usize, // O outbound: nodes it overrides
+  pub forkers       : usize, // K inbound: nodes that fork it
+  pub forkees       : usize, // K outbound: nodes it forks
   pub link_total       : usize, // L inbound: distinct visible skgrepos
   pub link_substantive : usize, // inbound skgrepos with body, content, or multiple targets
   pub link_targets     : usize, // L outbound: distinct visible resolved targets
@@ -892,10 +890,10 @@ impl Folder {
     match self {
       Folder::Subscribee =>
         Some (RelationRole::new (
-          NodeRelation::SubscribesTo, BinaryRolePosition::Second)),
+          NodeRelation::Forks, BinaryRolePosition::Second)),
       Folder::Subscriber =>
         Some (RelationRole::new (
-          NodeRelation::SubscribesTo, BinaryRolePosition::First)),
+          NodeRelation::Forks, BinaryRolePosition::First)),
       Folder::Hider =>
         Some (RelationRole::new (
           NodeRelation::HidesFromSubs, BinaryRolePosition::First)),

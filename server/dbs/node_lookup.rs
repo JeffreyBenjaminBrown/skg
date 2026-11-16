@@ -48,7 +48,6 @@ pub fn graphnode_from_graph (
     aliases                      : rust . aliases . clone (),
     body                         : rust . body . clone (),
     contains                     : rust . contains . clone (),
-    subscribesTo                 : rust . subscribesTo . clone (),
+    forks                        : rust . forks . clone (),
     hidesFromSubs                : rust . hidesFromSubs . clone (),
-    overrides                    : rust . overrides . clone (),
     flags                        : rust . flags . clone (), } ) }

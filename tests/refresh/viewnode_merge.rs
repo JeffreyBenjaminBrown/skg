@@ -229,7 +229,7 @@ fn overridden () -> InRustGraph {
   graph (&[
     Graphnode { contains : ids (&["n"]), .. node ("p") },
     node ("n"),
-    Graphnode { overrides : msv_ids (&["n"]), .. node ("o") }, ]) }
+    Graphnode { forks : msv_ids (&["n"]), .. node ("o") }, ]) }
 
 #[test]
 fn the_result_takes_the_merged_siblings_editability () {

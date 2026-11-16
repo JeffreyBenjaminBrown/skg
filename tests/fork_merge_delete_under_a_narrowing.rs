@@ -48,7 +48,7 @@ fn a_fork_under_a_narrowing_copies_only_the_visible_records (
       let clone : String = the_clone (f, &files_before) ?;
       assert_eq! ( list_in (f, &format! ("public/{}.skg", clone), "contains"), vec! ["a"],
                    "the clone contains a alone" );
-      assert_eq! ( list_in (f, &format! ("public/{}.skg", clone), "subscribesTo"), vec! ["n"] );
+      assert_eq! ( list_in (f, &format! ("public/{}.skg", clone), "forks"), vec! ["n"] );
       assert! ( ! skg_files (f) ? . contains_key (&format! ("private/{}.skg", clone)),
                 "the clone has no private section" );
       assert_eq! ( skg_files (f) ? . get ("private/n.skg"), files_before . get ("private/n.skg"),
@@ -178,7 +178,7 @@ fn a_nodeMerge_of_graphnodes_with_restricted_sections_is_refused (
        ("b", "pid: b\ntitle: b\ncontains:\n- h\n"),
        ("h", "pid: h\ntitle: h\n"),
        ("q", "pid: q\ntitle: q\n") ],
-    &[ ("a", "pid: a\nhidesFromSubs:\n- h\n"),
+    &[ ("a", "pid: a\nhides:\n- h\n"),
        ("b", "pid: b\ncontains:\n- q\n") ],
     |f, public| {
       let files_before : BTreeMap<String, String> = skg_files (f) ?;

@@ -128,11 +128,13 @@ fn a_foreign_recorder_never_leaks_but_an_owned_one_still_can (
     let mut members : Vec<RelPartner<ID>> = at_fred ("secret");
     members . extend ( at_fred ("absent") );
     members };
-  foreign . subscribesTo  = MSV::Specified ( at_fred ("secret") );
+  foreign . forks = MSV::Specified ( {
+    let mut members : Vec<RelPartner<ID>> = at_fred ("secret");
+    members . extend ( at_fred ("open") );
+    members } );
   foreign . hidesFromSubs = MSV::Specified ( at_fred ("open") );
-  foreign . overrides     = MSV::Specified ( at_fred ("open") );
   let mut citing_foreign : Graphnode = node_at ("citing-foreign", "public");
-  citing_foreign . overrides = MSV::Specified ( vec! [ // owned names foreign
+  citing_foreign . forks = MSV::Specified ( vec! [ // owned names foreign
     RelPartner::at_relRepo ( SkgrepoName::from ("public"),
                              ID::new ("foreign") ) ] );
   let mut leaking : Graphnode = node_at ("leaking", "public");
@@ -180,7 +182,7 @@ fn unconfigured_skgrepo_and_msv_relations_are_covered (
   let config : SkgConfig = two_skgrepo_config ();
   let mut node : Graphnode = node_at ("n", "public");
   let target : Graphnode = node_at ("t", "private");
-  node . subscribesTo = MSV::Specified ( vec! [
+  node . forks = MSV::Specified ( vec! [
     // leak via a non-contains relation
     RelPartner::at_relRepo ( SkgrepoName::from ("public"),
                           ID::new ("t") ) ] );
@@ -195,29 +197,27 @@ fn unconfigured_skgrepo_and_msv_relations_are_covered (
   assert_eq! ( violations . len (), 2, "{:?}", violations );
   assert! ( violations . iter () . any ( |v| matches! (
     v, TelescopeViolation::LeakShapedMembership {
-      relation : "subscribesTo", .. } )));
+      relation : "forks", .. } )));
   assert! ( violations . iter () . any ( |v| matches! (
     v, TelescopeViolation::UnconfiguredRelRepo { .. } )));
 }
 
 #[test]
-fn absent_targets_use_recorder_home_for_all_four_relationships () {
+fn absent_targets_use_recorder_home_for_all_three_relationships () {
   let config : SkgConfig = two_skgrepo_config ();
   let member : RelPartner<ID> = RelPartner::at_relRepo (
     SkgrepoName::from ("public"), ID::from ("absent"));
   let mut recorder : Graphnode = node_at ("recorder", "private");
   recorder . contains = vec![member . clone ()];
-  recorder . subscribesTo = MSV::Specified (vec![member . clone ()]);
+  recorder . forks = MSV::Specified (vec![member . clone ()]);
   recorder . hidesFromSubs =
-    MSV::Specified (vec![member . clone ()]);
-  recorder . overrides = MSV::Specified (vec![member]);
+    MSV::Specified (vec![member]);
   let graph      : InRustGraph = InRustGraph::from_graphnodes (&[recorder]);
   let violations : Vec<TelescopeViolation> = telescope_violations_of (
     &config, &graph, &ID::from ("recorder"));
-  assert_eq! (violations . len (), 4, "{violations:?}");
+  assert_eq! (violations . len (), 3, "{violations:?}");
   for relation in [
-    "contains", "subscribesTo", "hidesFromSubs",
-    "overrides",
+    "contains", "forks", "hidesFromSubs",
   ] {
     assert! (violations . iter () . any (|violation| matches! (
       violation,
@@ -254,9 +254,8 @@ fn recorder_with_relation (
     SkgrepoName::from (relRepo), ID::from (target))];
   match relation {
     0 => recorder . contains = members,
-    1 => recorder . subscribesTo = MSV::Specified (members),
+    1 => recorder . forks = MSV::Specified (members),
     2 => recorder . hidesFromSubs = MSV::Specified (members),
-    3 => recorder . overrides = MSV::Specified (members),
     _ => unreachable! (),
   }
   recorder
@@ -275,7 +274,7 @@ fn warnings_by_recorder (
 #[test]
 fn affected_recorder_derivation_covers_warning_changes_exhaustively () {
   let config : SkgConfig = two_skgrepo_config ();
-  for relation in 0..4 {
+  for relation in 0..3 {
     for action in 0..5 {
       for (recorder_home, relRepo) in [
         ("private", "public"), ("private", "private"),

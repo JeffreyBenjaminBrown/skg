@@ -59,7 +59,7 @@ fn a_root_claims () {
 #[test]
 fn in_an_editable_folder_an_unwarranted_member_vanishes () {
   let graph : InRustGraph = graph (&[
-    Graphnode { subscribesTo : msv_ids (&["e"]), .. node ("s") },
+    Graphnode { forks : msv_ids (&["e"]), .. node ("s") },
     node ("e"), node ("z"), ]);
   let input : String = formatdoc! ("
     * {} s
@@ -77,7 +77,7 @@ node s
 #[test]
 fn in_an_editable_folder_of_a_write_protected_node_no_member_claims () {
   let graph : InRustGraph = graph (&[
-    Graphnode { subscribesTo : msv_ids (&["e"]), .. node ("s") },
+    Graphnode { forks : msv_ids (&["e"]), .. node ("s") },
     node ("e"), ]);
   let input : String = formatdoc! ("
     * {} s

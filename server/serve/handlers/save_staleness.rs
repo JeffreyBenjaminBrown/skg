@@ -269,7 +269,7 @@ fn as_a_view_reads_it_back (
     .. node } ) }
 
 /// 'node' with each member of its relationship lists ('contains',
-/// 'subscribesTo', 'hidesFromSubs', 'overrides') replaced by its pid,
+/// 'forks', 'hidesFromSubs') replaced by its pid,
 /// and every later member with the same pid dropped, keeping order. A
 /// nodeMerge of two members of one list leaves both IDs in the file,
 /// naming one graphnode, which a view draws once.
@@ -293,9 +293,8 @@ fn with_relationships_by_distinct_pid (
       MSV::Unspecified => MSV::Unspecified, }};
   Graphnode {
     contains      : by_distinct_pid     (node . contains),
-    subscribesTo  : msv_by_distinct_pid (node . subscribesTo),
+    forks         : msv_by_distinct_pid (node . forks),
     hidesFromSubs : msv_by_distinct_pid (node . hidesFromSubs),
-    overrides     : msv_by_distinct_pid (node . overrides),
     .. node } }
 
 /// The pids of the graphnodes the buffer writes or deletes: its
@@ -349,12 +348,10 @@ fn change_since_rendered (
       || ! changes . extra_ids_lost . is_empty () ),
     ( "flags", // the noop filter compares them in order
       then . flags != now . flags ),
-    ( "subscriptions",
-      relationships_changed (&then . subscribesTo, &now . subscribesTo) ),
+    ( "forks",
+      relationships_changed (&then . forks, &now . forks) ),
     ( "hides",
-      relationships_changed (&then . hidesFromSubs, &now . hidesFromSubs) ),
-    ( "overrides",
-      relationships_changed (&then . overrides, &now . overrides) ), ] {
+      relationships_changed (&then . hidesFromSubs, &now . hidesFromSubs) ), ] {
     if changed { aspects . push ( StaleAspect { name, detail : None } ); }}
   if let Some (home) = &changes . home {
     aspects . push ( StaleAspect {

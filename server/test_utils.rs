@@ -504,24 +504,23 @@ pub async fn save_and_rerender (
   Ok ( response . saved_view ) }
 
 /// Save, through the save's graph update (which checks the fork
-/// rules), the node 'pid' as disk has it but with 'overrides' added to
-/// its overrides, each recorded at its home. No buffer position edits
-/// overrides; only the fork operation writes them, so a test that
-/// needs an owned note to come to override another saves it here.
-pub async fn save_added_overrides (
-  pid       : &ID,
-  overrides : &[ID],
-  config    : &SkgConfig,
-  tantivy   : &TantivyIndex,
+/// rules), the node 'pid' as disk has it but with 'forkees' appended
+/// to its forks, each recorded at its home: how a test makes an owned
+/// note fork another without drawing a buffer.
+pub async fn save_added_forks (
+  pid     : &ID,
+  forkees : &[ID],
+  config  : &SkgConfig,
+  tantivy : &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   let mut node : Graphnode = graphnode_from_gnid (config, pid) ?;
   let mut members : Vec<RelPartner<ID>> =
-    node . overrides . or_default () . to_vec ();
+    node . forks . or_default () . to_vec ();
   members . extend ( rel_partners_at_relRepo (
-    &node . home_skgrepo, overrides . to_vec () ));
-  node . overrides = MSV::Specified (members);
+    &node . home_skgrepo, forkees . to_vec () ));
+  node . forks = MSV::Specified (members);
   update_graph_minus_nodeMerges (
     vec! [ NodeInstruction::Save (SaveNode (node)) ], &[],
     config . clone (), tantivy, &graph, &new_mutation_gate () ) . await ?;
@@ -635,9 +634,8 @@ pub fn set_skgrepo_retagging_relRepos (
     if let MSV::Specified (v) = msv {
       for m in v . iter_mut () {
         m . relRepo = skgrepo . clone (); }} };
-  retag_msv ( &mut node . subscribesTo );
+  retag_msv ( &mut node . forks );
   retag_msv ( &mut node . hidesFromSubs );
-  retag_msv ( &mut node . overrides );
   if let MSV::Specified (v) = &mut node . aliases {
     for m in v . iter_mut () {
       m . relRepo = skgrepo . clone (); }} }
@@ -888,12 +886,11 @@ It better be okay with newlines."# . to_string() ),
                     vec![ ID::new ("1"),
                           ID::new ("2"),
                           ID::new ("3")] ),
-    subscribesTo: rel_partners_at_relRepo_msv ( &skgrepo,
+    forks: rel_partners_at_relRepo_msv ( &skgrepo,
                     MSV::Specified(vec![ID::new ("11"),
                              ID::new ("12"),
                              ID::new ("13")])),
     hidesFromSubs: MSV::Unspecified,
-    overrides: MSV::Unspecified,
     flags: Vec::new (), }}
 
 /// Extract Graphnode from Save variant; panics on Delete.

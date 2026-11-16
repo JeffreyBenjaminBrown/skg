@@ -51,12 +51,10 @@ pub struct InRustGraph {
   pub nodes            : im::HashMap<ID, GraphnodeInRust>,
   /// 'X → {pids of nodes whose contains includes X}'
   pub contained_by     : RecorderwardRelmap,
-  /// 'X → {pids of nodes whose subscribesTo includes X}'
-  pub subscribers_of   : RecorderwardRelmap,
+  /// 'X → {pids of nodes whose forks includes X}'
+  pub forkers_of       : RecorderwardRelmap,
   /// 'X → {pids of nodes whose hidesFromSubs includes X}'
   pub hiders_of        : RecorderwardRelmap,
-  /// 'X → {pids of nodes whose overrides includes X}'
-  pub overriders_of    : RecorderwardRelmap,
   /// 'X → {pids of nodes whose linksTo includes X}'
   pub mentioners_of    : RecorderwardRelmap,
   /// Maps any of a node's extra_ids to that node's pid. Invariant:
@@ -75,9 +73,8 @@ impl InRustGraph {
     InRustGraph {
       nodes            : im::HashMap::new (),
       contained_by     : im::HashMap::new (),
-      subscribers_of   : im::HashMap::new (),
+      forkers_of       : im::HashMap::new (),
       hiders_of        : im::HashMap::new (),
-      overriders_of    : im::HashMap::new (),
       mentioners_of     : im::HashMap::new (),
       extra_id_to_pid  : im::HashMap::new (),
       illegal_edits    : im::HashMap::new (), } }
@@ -159,7 +156,7 @@ fn canonical_key (
   identity . pid_else_raw_id (raw)
 }
 
-/// Add one recorder's five relationship contributions. Identity claims are
+/// Add one recorder's four relationship contributions. Identity claims are
 /// installed separately, before relationship indexing begins.
 fn add_relationship_contributions (
   graph    : &mut InRustGraph,
@@ -170,15 +167,12 @@ fn add_relationship_contributions (
   for second_member in members_of ( &node . contains ) {
     let key : ID = canonical_key (identity, &second_member);
     add_to_inverse_map (&mut graph . contained_by, &key, pid); }
-  for second_member in members_of ( node . subscribesTo . or_default () ) {
+  for second_member in members_of ( node . forks . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
-    add_to_inverse_map (&mut graph . subscribers_of, &key, pid); }
+    add_to_inverse_map (&mut graph . forkers_of, &key, pid); }
   for second_member in members_of ( node . hidesFromSubs . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
     add_to_inverse_map (&mut graph . hiders_of, &key, pid); }
-  for second_member in members_of ( node . overrides . or_default () ) {
-    let key : ID = canonical_key (identity, &second_member);
-    add_to_inverse_map (&mut graph . overriders_of, &key, pid); }
   for second_member in &node . linksTo {
     let key : ID = canonical_key (identity, second_member);
     add_to_inverse_map (&mut graph . mentioners_of, &key, pid); } }
@@ -198,15 +192,12 @@ fn remove_relationship_contributions (
   for second_member in members_of ( &node . contains ) {
     let key : ID = canonical_key (identity, &second_member);
     remove_from_inverse_map (&mut graph . contained_by, &key, pid); }
-  for second_member in members_of ( node . subscribesTo . or_default () ) {
+  for second_member in members_of ( node . forks . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
-    remove_from_inverse_map (&mut graph . subscribers_of, &key, pid); }
+    remove_from_inverse_map (&mut graph . forkers_of, &key, pid); }
   for second_member in members_of ( node . hidesFromSubs . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
     remove_from_inverse_map (&mut graph . hiders_of, &key, pid); }
-  for second_member in members_of ( node . overrides . or_default () ) {
-    let key : ID = canonical_key (identity, &second_member);
-    remove_from_inverse_map (&mut graph . overriders_of, &key, pid); }
   for second_member in &node . linksTo {
     let key : ID = canonical_key (identity, second_member);
     remove_from_inverse_map (&mut graph . mentioners_of, &key, pid); } }
@@ -218,9 +209,8 @@ pub(crate) fn inbound_recorders_at (
   let mut recorders : HashSet<ID> = HashSet::new ();
   for index in [
     &graph . contained_by,
-    &graph . subscribers_of,
+    &graph . forkers_of,
     &graph . hiders_of,
-    &graph . overriders_of,
     &graph . mentioners_of,
   ] {
     if let Some (indexed) = index . get (key) {

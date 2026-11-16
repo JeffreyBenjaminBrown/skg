@@ -291,7 +291,7 @@ fn infer_hides_from_contains_removals (
             MSV::Specified (subs) => subs . clone (),
             MSV::Unspecified =>
               members_with_visible_records (
-                subscriber_from_disk . subscribesTo . or_default (),
+                subscriber_from_disk . forks . or_default (),
                 skgrepo_restriction ), };
           let mut content : HashSet<ID> = HashSet::new ();
           for subscribee in &subscribes {

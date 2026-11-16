@@ -37,7 +37,7 @@ const VIEW : &str = "view of r";
 fn an_unchanged_save_hides_nothing_that_only_a_restricted_record_explains (
 ) -> Result<(), Box<dyn Error>> {
   under_public (
-    &[ ("r", "pid: r\ntitle: r\ncontains:\n- y\nsubscribesTo:\n- e\n"),
+    &[ ("r", "pid: r\ntitle: r\ncontains:\n- y\nforks:\n- e\n"),
        ("e", "pid: e\ntitle: e\ncontains:\n- c\n"),
        ("c", "pid: c\ntitle: c\n"),
        ("x", "pid: x\ntitle: x\n"),
@@ -52,7 +52,7 @@ fn an_unchanged_save_hides_nothing_that_only_a_restricted_record_explains (
       assert! ( ! editable . contains ("(gnid x)"),
                 "e shows nothing of its private record:\n{}", editable );
       save (f, &editable, public) ?;
-      assert_eq! ( list_in (f, "public/r.skg", "hidesFromSubs"), Vec::<String>::new (),
+      assert_eq! ( list_in (f, "public/r.skg", "hides"), Vec::<String>::new (),
                    "r's public file hides nothing" );
       assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
       Ok (( )) } ) }
@@ -65,11 +65,11 @@ fn an_unchanged_save_hides_nothing_that_only_a_restricted_record_explains (
 fn an_unchanged_save_keeps_a_restricted_hide_of_what_the_subscribee_shows (
 ) -> Result<(), Box<dyn Error>> {
   under_public (
-    &[ ("r", "pid: r\ntitle: r\nsubscribesTo:\n- e\n"),
+    &[ ("r", "pid: r\ntitle: r\nforks:\n- e\n"),
        ("e", "pid: e\ntitle: e\ncontains:\n- c\n- h\n"),
        ("c", "pid: c\ntitle: c\n"),
        ("h", "pid: h\ntitle: h\n") ],
-    &[ ("r", "pid: r\nhidesFromSubs:\n- h\n") ],
+    &[ ("r", "pid: r\nhides:\n- h\n") ],
     |f, public| {
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
       let editable : String = e_editable_under_its_subscriber (f, public) ?;
@@ -80,7 +80,7 @@ fn an_unchanged_save_keeps_a_restricted_hide_of_what_the_subscribee_shows (
       let saved : String = save (f, &editable, public) ?;
       assert_eq! ( without_viewnode_ids (&saved), without_viewnode_ids (&editable),
                    "saved unchanged, the view comes back as it went" );
-      assert_eq! ( list_in (f, "private/r.skg", "hidesFromSubs"), vec! ["h"],
+      assert_eq! ( list_in (f, "private/r.skg", "hides"), vec! ["h"],
                    "r's private section still hides h" );
       assert_eq! ( skg_files (f) ?, files_before, "no file changed" );
       Ok (( )) } ) }
@@ -92,11 +92,11 @@ fn an_unchanged_save_keeps_a_restricted_hide_of_what_the_subscribee_shows (
 fn a_restricted_hide_of_restricted_subscribee_content_stands_nowhere_and_saves_keep_it (
 ) -> Result<(), Box<dyn Error>> {
   under_public (
-    &[ ("r", "pid: r\ntitle: r\nsubscribesTo:\n- e\n"),
+    &[ ("r", "pid: r\ntitle: r\nforks:\n- e\n"),
        ("e", "pid: e\ntitle: e\ncontains:\n- c\n"),
        ("c", "pid: c\ntitle: c\n"),
        ("h", "pid: h\ntitle: h\n") ],
-    &[ ("r", "pid: r\nhidesFromSubs:\n- h\n"),
+    &[ ("r", "pid: r\nhides:\n- h\n"),
        ("e", "pid: e\ncontains:\n- h\n") ],
     |f, public| {
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
@@ -116,13 +116,13 @@ fn a_restricted_hide_of_restricted_subscribee_content_stands_nowhere_and_saves_k
 fn edits_of_the_hidden_outside_folder_leave_a_restricted_hide_alone (
 ) -> Result<(), Box<dyn Error>> {
   under_public (
-    &[ ("r",     "pid: r\ntitle: r\nsubscribesTo:\n- e\nhidesFromSubs:\n- hpub\n"),
+    &[ ("r",     "pid: r\ntitle: r\nforks:\n- e\nhides:\n- hpub\n"),
        ("e",     "pid: e\ntitle: e\ncontains:\n- c\n"),
        ("c",     "pid: c\ntitle: c\n"),
        ("hpub",  "pid: hpub\ntitle: hpub\n"),
        ("hpriv", "pid: hpriv\ntitle: hpriv\n"),
        ("n",     "pid: n\ntitle: n\n") ],
-    &[ ("r", "pid: r\nhidesFromSubs:\n- hpriv\n") ],
+    &[ ("r", "pid: r\nhides:\n- hpriv\n") ],
     |f, public| {
       let files_before : BTreeMap<String, String> = skg_files (f) ?;
       let requested : String = subscribee_folder_requested (f, public) ?;
@@ -131,14 +131,14 @@ fn edits_of_the_hidden_outside_folder_leave_a_restricted_hide_alone (
       assert_eq! ( skg_files (f) ?, files_before, "saved unchanged, no file changed" );
       let without_hpub : String = save (
         f, &without_member_line (&unchanged, "hpub"), public) ?;
-      assert_eq! ( list_in (f, "public/r.skg", "hidesFromSubs"), Vec::<String>::new (),
+      assert_eq! ( list_in (f, "public/r.skg", "hides"), Vec::<String>::new (),
                    "hpub's hide goes from r's public file" );
-      assert_eq! ( list_in (f, "private/r.skg", "hidesFromSubs"), vec! ["hpriv"],
+      assert_eq! ( list_in (f, "private/r.skg", "hides"), vec! ["hpriv"],
                    "the private section keeps its hide of hpriv" );
       save (f, &with_member_n (&without_hpub), public) ?;
-      assert_eq! ( list_in (f, "public/r.skg", "hidesFromSubs"), vec! ["n"],
+      assert_eq! ( list_in (f, "public/r.skg", "hides"), vec! ["n"],
                    "n's hide is recorded in r's public file" );
-      assert_eq! ( list_in (f, "private/r.skg", "hidesFromSubs"), vec! ["hpriv"],
+      assert_eq! ( list_in (f, "private/r.skg", "hides"), vec! ["hpriv"],
                    "the private section keeps its hide of hpriv" );
       Ok (( )) } ) }
 
@@ -151,7 +151,7 @@ fn edits_of_the_hidden_outside_folder_leave_a_restricted_hide_alone (
 fn a_hide_of_what_the_subscribee_contains_restrictedly_stands_outside_and_its_edits_save (
 ) -> Result<(), Box<dyn Error>> {
   under_public (
-    &[ ("r", "pid: r\ntitle: r\nsubscribesTo:\n- e\nhidesFromSubs:\n- h\n- o\n"),
+    &[ ("r", "pid: r\ntitle: r\nforks:\n- e\nhides:\n- h\n- o\n"),
        ("e", "pid: e\ntitle: e\ncontains:\n- c\n"),
        ("c", "pid: c\ntitle: c\n"),
        ("h", "pid: h\ntitle: h\n"),
@@ -164,7 +164,7 @@ fn a_hide_of_what_the_subscribee_contains_restrictedly_stands_outside_and_its_ed
       let unchanged : String = save (f, &requested, public) ?;
       assert_eq! ( skg_files (f) ?, files_before, "saved unchanged, no file changed" );
       save (f, &without_member_line (&unchanged, "h"), public) ?;
-      assert_eq! ( list_in (f, "public/r.skg", "hidesFromSubs"), vec! ["o"],
+      assert_eq! ( list_in (f, "public/r.skg", "hides"), vec! ["o"],
                    "h's hide goes from r's public file" );
       assert_eq! ( list_in (f, "private/e.skg", "contains"), vec! ["h"],
                    "e's private section still contains h" );

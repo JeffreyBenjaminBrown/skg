@@ -33,7 +33,7 @@ const VIEW : &str = "view";
 fn a_member_only_a_restricted_record_explains_is_not_hidden (
 ) -> Result<(), Box<dyn Error>> {
   under_public (
-    &[ ("r", "pid: r\ntitle: r\ncontains:\n- y\nsubscribesTo:\n- e\n"),
+    &[ ("r", "pid: r\ntitle: r\ncontains:\n- y\nforks:\n- e\n"),
        ("e", "pid: e\ntitle: e\ncontains:\n- c\n"),
        ("c", "pid: c\ntitle: c\n"),
        ("y", "pid: y\ntitle: y\n") ],
@@ -43,7 +43,7 @@ fn a_member_only_a_restricted_record_explains_is_not_hidden (
       save_cleanly (f, &without_line (&opened, "** (skg node (gnid y)"), public) ?;
       assert_eq! ( list_in (f, "public/r.skg", "contains"), Vec::<String>::new (),
                    "y's line is gone from r" );
-      assert_eq! ( list_in (f, "public/r.skg", "hidesFromSubs"), Vec::<String>::new (),
+      assert_eq! ( list_in (f, "public/r.skg", "hides"), Vec::<String>::new (),
                    "r's public file hides nothing" );
       assert! ( ! skg_files (f) ? . contains_key ("private/r.skg"),
                 "no private section of r appears" );
@@ -56,7 +56,7 @@ fn a_member_only_a_restricted_record_explains_is_not_hidden (
 fn a_hide_lands_no_more_publicly_than_the_contains_record_that_explains_it (
 ) -> Result<(), Box<dyn Error>> {
   under_public (
-    &[ ("r", "pid: r\ntitle: r\ncontains:\n- y\nsubscribesTo:\n- e\n"),
+    &[ ("r", "pid: r\ntitle: r\ncontains:\n- y\nforks:\n- e\n"),
        ("e", "pid: e\ntitle: e\ncontains:\n- c\n"),
        ("c", "pid: c\ntitle: c\n"),
        ("y", "pid: y\ntitle: y\n") ],
@@ -66,9 +66,9 @@ fn a_hide_lands_no_more_publicly_than_the_contains_record_that_explains_it (
         SkgrepoRestriction::unrestricted (&f . config);
       let opened : String = open_content_view (f, "r", VIEW, &unrestricted) ?;
       save_cleanly (f, &without_line (&opened, "** (skg node (gnid y)"), &unrestricted) ?;
-      assert_eq! ( list_in (f, "public/r.skg", "hidesFromSubs"), Vec::<String>::new (),
+      assert_eq! ( list_in (f, "public/r.skg", "hides"), Vec::<String>::new (),
                    "r's public file names no hide of y" );
-      assert_eq! ( list_in (f, "private/r.skg", "hidesFromSubs"), vec! ["y"],
+      assert_eq! ( list_in (f, "private/r.skg", "hides"), vec! ["y"],
                    "r's private section hides y" );
       Ok (( )) } ) }
 
@@ -84,7 +84,7 @@ fn a_restricted_subscription_explains_no_hide (
     &[ ("r2", "pid: r2\ntitle: r2\ncontains:\n- z\n"),
        ("e2", "pid: e2\ntitle: e2\ncontains:\n- z\n"),
        ("z",  "pid: z\ntitle: z\n") ],
-    &[ ("r2", "pid: r2\nsubscribesTo:\n- e2\n") ],
+    &[ ("r2", "pid: r2\nforks:\n- e2\n") ],
     |f, public| {
       let private_before : String =
         skg_files (f) ? . get ("private/r2.skg") . cloned () . unwrap ();
@@ -104,11 +104,11 @@ fn a_restricted_subscription_explains_no_hide (
 fn re_adding_a_member_drops_no_restricted_hide (
 ) -> Result<(), Box<dyn Error>> {
   under_public (
-    &[ ("r", "pid: r\ntitle: r\ncontains:\n- c\nsubscribesTo:\n- e\n"),
+    &[ ("r", "pid: r\ntitle: r\ncontains:\n- c\nforks:\n- e\n"),
        ("e", "pid: e\ntitle: e\ncontains:\n- h\n"),
        ("c", "pid: c\ntitle: c\n"),
        ("h", "pid: h\ntitle: h\n") ],
-    &[ ("r", "pid: r\nhidesFromSubs:\n- h\n") ],
+    &[ ("r", "pid: r\nhides:\n- h\n") ],
     |f, public| {
       let opened : String = open_content_view (f, "r", VIEW, public) ?;
       let with_h : String = edit_line ( &opened, "** (skg node (gnid c)", |line|
@@ -116,7 +116,7 @@ fn re_adding_a_member_drops_no_restricted_hide (
       save_cleanly (f, &with_h, public) ?;
       assert_eq! ( list_in (f, "public/r.skg", "contains"), vec! ["c", "h"],
                    "r's public file contains h" );
-      assert_eq! ( list_in (f, "private/r.skg", "hidesFromSubs"), vec! ["h"],
+      assert_eq! ( list_in (f, "private/r.skg", "hides"), vec! ["h"],
                    "r's private section still hides h" );
       Ok (( )) } ) }
 

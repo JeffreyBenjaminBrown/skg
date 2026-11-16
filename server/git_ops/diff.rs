@@ -1,3 +1,4 @@
+use crate::dbs::filesystem::retired_keys::{quoted_keys, retired_keys_held};
 use crate::types::git::{ GitDiffStatus, PathDiffStatus, SkgrepoDiff, GraphnodeDiff };
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::fs::GraphnodeOnDisk;
@@ -98,12 +99,21 @@ fn compute_graphnode_diff_for_stage (
 /// context) and returned as None — distinct from "file absent",
 /// which also returns None but without logging. Callers can't
 /// currently distinguish the two cases, but a corrupt file will at
-/// least show up in the server logs.
+/// least show up in the server logs. A file holding a retired key
+/// ('retired_keys.rs') is treated likewise: read, it would seem a node
+/// with no forks.
 fn graphnode_on_disk_as_graphnode_with_default_skgrepo (
   yaml    : &str,
   origin  : &str,
   context : &Path,
 ) -> Option<Graphnode> {
+  let retired : Vec<&'static str> = retired_keys_held (yaml);
+  if ! retired . is_empty () {
+    tracing::warn! (
+      origin, path = %context . display (), keys = %quoted_keys (&retired),
+      "compute_graphnode_diff: the file holds keys retired in November 2026; \
+       treating as if file were absent");
+    return None; }
   match yaml_serde::from_str::<GraphnodeOnDisk> (yaml) {
     Ok (node_fs) =>
       Some ( node_fs . into_complete_as_single_section ( SkgrepoName::default ())),

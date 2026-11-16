@@ -1,7 +1,7 @@
 //! The rules an owned note's forks, contents and hides must keep.
 //!
-//! A note *forks* another when it subscribes to it or overrides it
-//! ('FORK_RELATIONS'). An owned note may not
+//! A note *forks* another when it records a 'forks' relationship to
+//! it. An owned note may not
 //! - fork itself ('SelfFork'), contain itself ('SelfContains') or hide
 //!   itself ('SelfHides'); a link to itself is fine;
 //! - both fork and contain one note ('ForkeeContained'): a note it
@@ -28,16 +28,11 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 
 use std::collections::HashSet;
 
-/// The relations by which a note forks another.
-const FORK_RELATIONS : [NodeRelation; 2] =
-  [ NodeRelation::SubscribesTo, NodeRelation::Overrides ];
-
 /// The relations whose records the rules read, besides hides, which
 /// only 'SelfHides' reads.
-const RELATIONS_THE_RULES_PAIR : [NodeRelation; 3] =
+const RELATIONS_THE_RULES_PAIR : [NodeRelation; 2] =
   [ NodeRelation::Contains,
-    NodeRelation::SubscribesTo,
-    NodeRelation::Overrides ];
+    NodeRelation::Forks ];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OverrideInvariantViolation {
@@ -139,17 +134,14 @@ fn violations_of_owned_note (
   pid   : &ID,
 ) -> Vec<OverrideInvariantViolation> {
   let forkees : HashSet<ID> =
-    FORK_RELATIONS . iter ()
-    . flat_map ( |relation| outbound_keys (graph, pid, *relation) )
-    . collect ();
+    outbound_keys (graph, pid, NodeRelation::Forks);
   let contents : HashSet<ID> =
     outbound_keys (graph, pid, NodeRelation::Contains);
   let hidden : HashSet<ID> =
     outbound_keys (graph, pid, NodeRelation::HidesFromSubs);
   let forkers : HashSet<ID> =
-    FORK_RELATIONS . iter ()
-    . flat_map ( |relation| graph . inbound_pids_for_relation (pid, *relation) )
-    . collect ();
+    graph . inbound_pids_for_relation (pid, NodeRelation::Forks)
+    . into_iter () . collect ();
   let containers : HashSet<ID> =
     graph . inbound_pids_for_relation (pid, NodeRelation::Contains)
     . into_iter () . collect ();
@@ -239,15 +231,15 @@ pub fn describe_override_invariant_violation (
     OverrideInvariantViolation::UnknownSkgrepo { node, skgrepo } =>
       format! ("node {} has unknown repo {}", node, skgrepo),
     OverrideInvariantViolation::SelfFork { node } =>
-      format! ("node {} forks itself (subscribes to or overrides itself); a note may not fork itself", node),
+      format! ("node {} forks itself; a note may not fork itself", node),
     OverrideInvariantViolation::SelfContains { node } =>
       format! ("node {} contains itself; a note may not contain itself", node),
     OverrideInvariantViolation::SelfHides { node } =>
       format! ("node {} hides itself; a note may not hide itself", node),
     OverrideInvariantViolation::ForkeeContained { forker, forkee } =>
-      format! ("node {} both forks (subscribes to or overrides) and contains node {}; a note may not contain a note it forks", forker, forkee),
+      format! ("node {} both forks and contains node {}; a note may not contain a note it forks", forker, forkee),
     OverrideInvariantViolation::ForkerContained { forker, forkee } =>
-      format! ("node {} contains node {}, which forks it (subscribes to or overrides it); a note may not contain a note that forks it, nor fork a note that contains it", forkee, forker),
+      format! ("node {} contains node {}, which forks it; a note may not contain a note that forks it, nor fork a note that contains it", forkee, forker),
   }}
 
 /// A violation that 'foreign' takes part in, as a startup warning.

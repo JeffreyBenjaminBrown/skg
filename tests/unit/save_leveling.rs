@@ -184,10 +184,10 @@ fn hide_floor_is_the_most_public_explaining_subscription (
     // buffer would come through the (relRepo ...) atom (see the
     // explicit_repo_* tests below), landed with render-and-gating.
     let mut disk : Graphnode = recorder . clone ();
-    disk . subscribesTo = MSV::Specified ( vec! [
+    disk . forks = MSV::Specified ( vec! [
       pm ("private", "expl-a") ] );
     let mut buffer : Graphnode = recorder . clone ();
-    buffer . subscribesTo = MSV::Specified ( vec! [
+    buffer . forks = MSV::Specified ( vec! [
       pm ("public", "expl-a") ] ); // degenerate tag; sticky restores
     buffer . hidesFromSubs = MSV::Specified ( vec! [
       pm ("public", "victim") ] ); // degenerate tag
@@ -195,7 +195,7 @@ fn hide_floor_is_the_most_public_explaining_subscription (
       apply_sticky_relRepos_in_graph (
         buffer, &disk, &RequestedRelRepos::default (), &graph, &config) . unwrap ();
     assert_eq! (
-      resolved . subscribesTo . or_default (),
+      resolved . forks . or_default (),
       & [ pm ("private", "expl-a") ] );
     assert_eq! (
       resolved . hidesFromSubs . or_default (),
@@ -203,11 +203,11 @@ fn hide_floor_is_the_most_public_explaining_subscription (
   { // A public explanation exists too: the inference is innocent,
     // so the hide may stay public.
     let mut disk : Graphnode = recorder . clone ();
-    disk . subscribesTo = MSV::Specified ( vec! [
+    disk . forks = MSV::Specified ( vec! [
       pm ("private", "expl-a"),
       pm ("public",  "expl-b") ] );
     let mut buffer : Graphnode = recorder;
-    buffer . subscribesTo = MSV::Specified ( vec! [
+    buffer . forks = MSV::Specified ( vec! [
       pm ("public", "expl-a"),
       pm ("public", "expl-b") ] );
     buffer . hidesFromSubs = MSV::Specified ( vec! [
@@ -551,7 +551,7 @@ fn new_private_child_in_the_same_save_gets_a_private_relationship (
 #[test]
 fn owned_to_foreign_new_relationships_default_to_the_recorder_home (
 ) {
-  for relation in ["contains", "subscribesTo", "overrides"] {
+  for relation in ["contains", "forks"] {
     for (recorder_home, member_home) in
         [("public", "private"), ("private", "public")] {
       let mut config : SkgConfig =
@@ -567,19 +567,15 @@ fn owned_to_foreign_new_relationships_default_to_the_recorder_home (
       let mut buffer : Graphnode = node_at ("recorder", recorder_home);
       match relation {
         "contains" => buffer . contains = vec! [pm (recorder_home, "member")],
-        "subscribesTo" => buffer . subscribesTo =
-          MSV::Specified (vec! [pm (recorder_home, "member")]),
-        "overrides" => buffer . overrides =
+        "forks" => buffer . forks =
           MSV::Specified (vec! [pm (recorder_home, "member")]),
         _ => unreachable! (), }
       let resolved : Graphnode = apply_sticky_relRepos_in_graph (
         buffer, &disk, &RequestedRelRepos::default (), &graph, &config ) . unwrap ();
       let skgrepo : &SkgrepoName = match relation {
         "contains" => &resolved . contains [0] . relRepo,
-        "subscribesTo" =>
-          &resolved . subscribesTo . or_default () [0] . relRepo,
-        "overrides" =>
-          &resolved . overrides . or_default () [0] . relRepo,
+        "forks" =>
+          &resolved . forks . or_default () [0] . relRepo,
         _ => unreachable! (), };
       assert_eq! (skgrepo, &SkgrepoName::from (recorder_home),
                   "relation {}", relation); }}

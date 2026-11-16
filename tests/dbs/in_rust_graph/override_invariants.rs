@@ -39,18 +39,18 @@ fn config () -> SkgConfig {
       }),
   ])) }
 
-/// A note in 'skgrepo' that overrides 'overrides'.
+/// A note in 'skgrepo' that forks 'forks'.
 fn node (
-  pid       : &str,
-  skgrepo   : &str,
-  overrides : &[&str],
+  pid     : &str,
+  skgrepo : &str,
+  forks   : &[&str],
 ) -> Graphnode {
   let mut node : Graphnode =
     empty_graphnode ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
   node . home_skgrepo = SkgrepoName::from (skgrepo);
-  node . overrides = msv_of (&node . home_skgrepo, overrides);
+  node . forks = msv_of (&node . home_skgrepo, forks);
   node }
 
 fn msv_of (
@@ -73,13 +73,6 @@ fn with_contains (
   contains : &[&str],
 ) -> Graphnode {
   node . contains = partners_of (&node . home_skgrepo, contains);
-  node }
-
-fn with_subscribesTo (
-  mut node     : Graphnode,
-  subscribesTo : &[&str],
-) -> Graphnode {
-  node . subscribesTo = msv_of (&node . home_skgrepo, subscribesTo);
   node }
 
 fn with_hides (
@@ -122,7 +115,7 @@ fn affected_and_full (
 }
 
 #[test]
-fn one_owned_overrider_is_valid () {
+fn one_owned_fork_is_valid () {
   assert_eq! (
     violations_for (vec![
       node ("target", "owned", &[]),
@@ -139,12 +132,11 @@ fn several_owned_forks_of_one_note_are_valid () {
       target,
       node ("one", "owned", &["target"]),
       node ("two", "owned", &["target-extra"]),
-      with_subscribesTo (node ("three", "owned", &[]), &["target"]),
     ]),
     vec![] ); }
 
 #[test]
-fn owned_override_chain_is_valid () {
+fn owned_fork_chain_is_valid () {
   assert_eq! (
     violations_for (vec![
       node ("z", "owned", &[]),
@@ -154,7 +146,7 @@ fn owned_override_chain_is_valid () {
     vec![] ); }
 
 #[test]
-fn owned_override_cycles_are_valid () {
+fn owned_fork_cycles_are_valid () {
   assert_eq! (
     violations_for (vec![
       node ("a", "owned", &["b"]),
@@ -170,13 +162,9 @@ fn owned_override_cycles_are_valid () {
     vec![] ); }
 
 #[test]
-fn an_owned_self_override_or_self_subscription_is_a_self_fork () {
+fn an_owned_self_fork_is_a_self_fork () {
   assert_eq! (
     violations_for (vec![ node ("a", "owned", &["a"]) ]),
-    vec![ OverrideInvariantViolation::SelfFork { node : ID::from ("a") } ] );
-  assert_eq! (
-    violations_for (vec![
-      with_subscribesTo (node ("a", "owned", &[]), &["a"]) ]),
     vec![ OverrideInvariantViolation::SelfFork { node : ID::from ("a") } ] ); }
 
 #[test]
@@ -216,14 +204,6 @@ fn a_note_may_not_contain_a_note_it_forks () {
     violations_for (vec![
       node ("e", "foreign", &[]),
       with_contains (node ("r", "owned", &["e"]), &["e"]),
-    ]),
-    expected );
-  assert_eq! (
-    violations_for (vec![
-      node ("e", "foreign", &[]),
-      with_contains (
-        with_subscribesTo (node ("r", "owned", &[]), &["e"]),
-        &["e"]),
     ]),
     expected ); }
 
@@ -303,7 +283,7 @@ fn a_dangling_id_forked_and_contained_breaks_no_rule_until_it_names_a_note () {
 
 #[test]
 fn an_extra_id_that_closes_a_self_fork_is_affected () {
-  // A overrides 'future'; A acquires 'future' as an extra ID.
+  // A forks 'future'; A acquires 'future' as an extra ID.
   let mut acquirer : Graphnode = node ("A", "owned", &["future"]);
   acquirer . extra_ids = vec![ID::from ("future")];
   let (affected, full) = affected_and_full (
@@ -354,14 +334,14 @@ fn relationship_and_target_deletions_do_not_create_violations () {
 proptest! {
   #![proptest_config (ProptestConfig::with_cases (256))]
 
-  /// One note's overrides, subscriptions, contents and ownership
+  /// One note's forks, contents and ownership
   /// changed in a small graph: the save's check agrees with the whole
   /// graph's.
   #[test]
   fn affected_check_matches_full_for_one_node_edits (
     changed_index  in 0usize..4,
-    override_index in 0usize..5,
-    subscribe_index in 0usize..5,
+    fork_index     in 0usize..5,
+    other_fork_index in 0usize..5,
     contain_index  in 0usize..5,
     owned in any::<bool> (),
   ) {
@@ -374,14 +354,18 @@ proptest! {
     ];
     let pick = |index : usize| -> Vec<&str> {
       if index == 4 { Vec::new () } else { vec![gnids [index]] } };
-    let changed : Graphnode = with_subscribesTo (
+    let forks : Vec<&str> = {
+      let mut forks : Vec<&str> = pick (fork_index);
+      for gnid in pick (other_fork_index) {
+        if ! forks . contains (&gnid) { forks . push (gnid); }}
+      forks };
+    let changed : Graphnode =
       with_contains (
         node (
           gnids [changed_index],
           if owned { "owned" } else { "foreign" },
-          &pick (override_index)),
-        &pick (contain_index)),
-      &pick (subscribe_index));
+          &forks),
+        &pick (contain_index));
     let base_graph : InRustGraph = InRustGraph::from_graphnodes (&base);
     let mut candidate : InRustGraph = base_graph . clone ();
     apply_nodeInstructions_to_inRustGraph (

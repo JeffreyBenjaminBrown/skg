@@ -141,14 +141,12 @@ fn sighting_at_commit (
       if ! members . is_empty () {
         outbound . push ( (name, members . to_vec ()) ); }};
     let contains_gnids   : Vec<ID> = members_of (& own . contains);
-    let subscribes_gnids : MSV<ID> = members_msv (& own . subscribesTo);
+    let forks_gnids      : MSV<ID> = members_msv (& own . forks);
     let hides_gnids       : MSV<ID> = members_msv (
       & own . hidesFromSubs);
-    let overrides_gnids   : MSV<ID> = members_msv (& own . overrides);
     keep ("contains",                     & contains_gnids);
-    keep ("subscribesTo",                subscribes_gnids . or_default ());
+    keep ("forks",                       forks_gnids . or_default ());
     keep ("hidesFromSubs", hides_gnids . or_default ());
-    keep ("overrides",            overrides_gnids . or_default ());
     outbound };
   let inbound : Vec<(ID, &'static str)> =
     inbound_references_in_tree (gitrepo, prefix, skgrepo_name, gnid, &tree);
@@ -190,14 +188,11 @@ fn inbound_references_in_tree (
       if hit { inbound . push ( (node . pid . clone (), name) ); }};
     note ("contains",
           node . contains . iter () . any ( |m| &m . member == gnid ));
-    note ("subscribesTo",
-          node . subscribesTo . or_default () . iter ()
+    note ("forks",
+          node . forks . or_default () . iter ()
             . any ( |m| &m . member == gnid ));
     note ("hidesFromSubs",
           node . hidesFromSubs . or_default () . iter ()
-            . any ( |m| &m . member == gnid ));
-    note ("overrides",
-          node . overrides . or_default () . iter ()
             . any ( |m| &m . member == gnid ));
     note ("link",
           links_from_node (&node) . iter ()

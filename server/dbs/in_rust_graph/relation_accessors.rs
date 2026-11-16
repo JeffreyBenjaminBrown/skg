@@ -18,23 +18,21 @@ thread_local! {
   pub(crate) static STORED_LIST_READS : Cell<usize> = const { Cell::new (0) };
 }
 
-/// The five stored outbound relationship types and their endpoint roles.
+/// The four stored outbound relationship types and their endpoint roles.
 /// This is domain vocabulary; storage adapters consume it rather than own it.
 pub const OUTBOUND_RELATIONSHIP_TYPES : &[(&str, &str, &str)] = &[
   ("contains",                      "container",  "content"),
   ("linksTo",                       "mentioner",  "mentioned"),
-  ("subscribesTo",                  "subscriber", "subscribee"),
+  ("forks",                         "forker",     "forkee"),
   ("hidesFromSubs",                 "hider",      "hidden"),
-  ("overrides",                     "overrider",  "overridden"),
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum NodeRelation {
   Contains,
   LinksTo,
-  SubscribesTo,
-  HidesFromSubs, // "hides from its subscriptions": the hider keeps the hidden node out of what it shows from its subscribees.
-  Overrides,
+  Forks, // "forker forks forkee": the forker shows the forkee's content it neither contains nor hides, and the two are mirrors ('server/dbs/in_rust_graph/mirrors.rs').
+  HidesFromSubs, // "hides from its forks": the hider keeps the hidden node out of what it shows from its forkees.
 }
 
 /// The ordinary relations of the update-relevant neighborhood
@@ -43,7 +41,7 @@ pub enum NodeRelation {
 pub const UPDATE_RELEVANT_ORDINARY_RELATIONS : &[NodeRelation] = &[
   NodeRelation::Contains,
   NodeRelation::LinksTo,
-  NodeRelation::SubscribesTo,
+  NodeRelation::Forks,
   NodeRelation::HidesFromSubs,
 ];
 
@@ -77,10 +75,9 @@ pub struct RelationshipKey {
 }
 
 impl NodeRelation {
-  pub const ALL : [NodeRelation; 5] = [
+  pub const ALL : [NodeRelation; 4] = [
     NodeRelation::Contains, NodeRelation::LinksTo,
-    NodeRelation::SubscribesTo, NodeRelation::HidesFromSubs,
-    NodeRelation::Overrides ];
+    NodeRelation::Forks, NodeRelation::HidesFromSubs ];
 
   /// The inverse of 'relation_name'.
   pub fn from_relation_name (
@@ -95,12 +92,10 @@ impl NodeRelation {
         "contains",
       Self::LinksTo =>
         "linksTo",
-      Self::SubscribesTo =>
-        "subscribesTo",
+      Self::Forks =>
+        "forks",
       Self::HidesFromSubs =>
         "hidesFromSubs",
-      Self::Overrides =>
-        "overrides",
     } }
 
 
@@ -152,7 +147,7 @@ impl RelationRole {
 //
 
 impl RelationRole {
-  // The nine partner roles, named for the role the partner plays
+  // The seven partner roles, named for the role the partner plays
   // toward the origin (as a member of a partner folder plays toward
   // the folder's viewparent), and CONTENT, which the recursive content
   // view serves and the diff view compares content lists by.
@@ -168,23 +163,17 @@ impl RelationRole {
   pub const MENTIONED : RelationRole =
     RelationRole { relation : NodeRelation::LinksTo,
                    position : BinaryRolePosition::Second };
-  pub const OVERRIDER : RelationRole =
-    RelationRole { relation : NodeRelation::Overrides,
-                   position : BinaryRolePosition::First };
-  pub const OVERRIDDEN : RelationRole =
-    RelationRole { relation : NodeRelation::Overrides,
-                   position : BinaryRolePosition::Second };
   pub const HIDER : RelationRole =
     RelationRole { relation : NodeRelation::HidesFromSubs,
                    position : BinaryRolePosition::First };
   pub const HIDDEN : RelationRole =
     RelationRole { relation : NodeRelation::HidesFromSubs,
                    position : BinaryRolePosition::Second };
-  pub const SUBSCRIBER : RelationRole =
-    RelationRole { relation : NodeRelation::SubscribesTo,
+  pub const FORKER : RelationRole =
+    RelationRole { relation : NodeRelation::Forks,
                    position : BinaryRolePosition::First };
-  pub const SUBSCRIBEE : RelationRole =
-    RelationRole { relation : NodeRelation::SubscribesTo,
+  pub const FORKEE : RelationRole =
+    RelationRole { relation : NodeRelation::Forks,
                    position : BinaryRolePosition::Second };
 }
 
@@ -344,12 +333,10 @@ impl InRustGraph {
     match relation {
       NodeRelation::Contains =>
         node . contains . clone (),
-      NodeRelation::SubscribesTo =>
-        node . subscribesTo . or_default () . to_vec (),
+      NodeRelation::Forks =>
+        node . forks . or_default () . to_vec (),
       NodeRelation::HidesFromSubs =>
         node . hidesFromSubs . or_default () . to_vec (),
-      NodeRelation::Overrides =>
-        node . overrides . or_default () . to_vec (),
       NodeRelation::LinksTo =>
         Vec::new (), }}
 
@@ -471,12 +458,10 @@ impl InRustGraph {
     Some ( match relation {
       NodeRelation::Contains =>
         StoredRelPartners::Listed (&node . contains),
-      NodeRelation::SubscribesTo =>
-        StoredRelPartners::Listed (node . subscribesTo . or_default ()),
+      NodeRelation::Forks =>
+        StoredRelPartners::Listed (node . forks . or_default ()),
       NodeRelation::HidesFromSubs =>
         StoredRelPartners::Listed (node . hidesFromSubs . or_default ()),
-      NodeRelation::Overrides =>
-        StoredRelPartners::Listed (node . overrides . or_default ()),
       NodeRelation::LinksTo =>
         StoredRelPartners::AllAtHome (node . home_skgrepo . clone ()), } ) }
 
@@ -627,12 +612,10 @@ fn outbound_gnids_from_node (
       members_of ( &node . contains ),
     NodeRelation::LinksTo =>
       node . linksTo . clone (),
-    NodeRelation::SubscribesTo =>
-      members_of ( node . subscribesTo . or_default () ),
+    NodeRelation::Forks =>
+      members_of ( node . forks . or_default () ),
     NodeRelation::HidesFromSubs =>
       members_of ( node . hidesFromSubs . or_default () ),
-    NodeRelation::Overrides =>
-      members_of ( node . overrides . or_default () ),
   } }
 
 fn inbound_pid_set (
@@ -649,16 +632,12 @@ fn inbound_pid_set (
       graph . mentioners_of . get (pid)
       . map ( |s| s . iter () . cloned () . collect () )
       . unwrap_or_default (),
-    NodeRelation::SubscribesTo =>
-      graph . subscribers_of . get (pid)
+    NodeRelation::Forks =>
+      graph . forkers_of . get (pid)
       . map ( |s| s . iter () . cloned () . collect () )
       . unwrap_or_default (),
     NodeRelation::HidesFromSubs =>
       graph . hiders_of . get (pid)
-      . map ( |s| s . iter () . cloned () . collect () )
-      . unwrap_or_default (),
-    NodeRelation::Overrides =>
-      graph . overriders_of . get (pid)
       . map ( |s| s . iter () . cloned () . collect () )
       . unwrap_or_default (),
   };
@@ -674,14 +653,12 @@ mod tests {
   fn every_node_relation () -> Vec<NodeRelation> {
     let every : Vec<NodeRelation> = vec! [
       NodeRelation::Contains, NodeRelation::LinksTo,
-      NodeRelation::SubscribesTo, NodeRelation::HidesFromSubs,
-      NodeRelation::Overrides ];
+      NodeRelation::Forks, NodeRelation::HidesFromSubs ];
     for relation in &every {
       match relation {
         NodeRelation::Contains | NodeRelation::LinksTo
-          | NodeRelation::SubscribesTo
-          | NodeRelation::HidesFromSubs
-          | NodeRelation::Overrides => (), } }
+          | NodeRelation::Forks
+          | NodeRelation::HidesFromSubs => (), } }
     every }
 
   /// shared/relations.json, which both clients read, names the same

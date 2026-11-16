@@ -1,7 +1,7 @@
 //! Fork support. Editing a foreign node N (one in a skgrepo the user
 //! does not own) is read as a request to clone it: the clone C lives in
-//! an owned skgrepo, copies N's edited title/body/contains, subscribes
-//! to N and overrides N. N itself is left untouched.
+//! an owned skgrepo, copies N's edited title/body/contains, and forks
+//! N. N itself is left untouched.
 //!
 //! Detection happens in 'apply_foreign_policy' (validate.rs): a foreign
 //! SaveNode whose buffer content differs from disk is a fork candidate
@@ -241,7 +241,7 @@ pub const FORK_SKGREPO_PLACEHOLDER : &str = "PICK-A-REPO";
 ///                           the PICK-A-REPO placeholder, preceded by a
 ///                           one-line suggestion comment the client
 ///                           offers as the prompt's default.
-///   ** <original title>  -- the original N that C overrides: its real gnid,
+///   ** <original title>  -- the original N that C forks: its real gnid,
 ///                           real skgrepo, write-protected,
 ///                           noClaim.
 ///
@@ -257,10 +257,9 @@ pub fn build_fork_confirmation_buffer (
   out . push_str (
     "* Fork confirmation -- what this buffer is\n\
      Forking turns a node into an editable clone, in a repo you\n\
-     own, that subscribes to and overrides the original. Each\n\
-     top-level headline below is a clone-to-be; its child is the\n\
-     original it forks (real id; the clone above it overrides\n\
-     it).\n\
+     own, that forks the original. Each top-level headline below\n\
+     is a clone-to-be; its child is the original it forks (real\n\
+     id).\n\
      APPROVE with C-c C-c: the source buffer is re-saved, skgsave-committing\n\
      each fork into the repo its clone-to-be shows. A clone still\n\
      showing PICK-A-REPO needs a real repo first: the client prompts\n\
@@ -395,11 +394,11 @@ pub fn validate_fork_specs (
 /// resolved owned skgrepo. C copies N's title/body/contains (the
 /// edited buffer values -- N is already disk-supplemented, so no disk
 /// fetch is needed, unlike nodeMerge whose acquiree is only an ID
-/// reference), subscribesTo = [N] and overrides = [N], a
+/// reference), forks = [N], a
 /// fresh pid, and the owned skgrepo. C's hides are the children the
 /// forking edit deleted (disk_contains minus the edited contains):
 /// the user dismissed them, so they must not reappear as
-/// unintegrated subscribed content. (Children the clone keeps need no
+/// unintegrated forked content. (Children the clone keeps need no
 /// hide -- the display rule already excludes C's own contains from
 /// its subscribee-as-such view.)
 /// contains is stored raw (the child IDs as the buffer collected them);
@@ -407,7 +406,7 @@ pub fn validate_fork_specs (
 /// .
 /// The clone copies only the contains records the skgrepo restriction
 /// shows: what the user could not see, the user did not fork. The rest
-/// is N's still, and since C subscribes to N it shows under C as
+/// is N's still, and since C forks N it shows under C as
 /// unintegrated content after a skgrepo widening. Each copied record,
 /// and each hide, stands at the more private of the clone's home and
 /// the relRepo of the record it comes from, when that relRepo is owned
@@ -444,7 +443,7 @@ pub fn build_fork_clone (
     extra_ids     : Vec::new (),
     body          : buffer_node . body . clone (),
     contains      : buffer_contains,
-    subscribesTo  : MSV::Specified ( rel_partners_at_relRepo (
+    forks         : MSV::Specified ( rel_partners_at_relRepo (
       &clone_skgrepo, vec! [ buffer_node . pid . clone () ] )),
     hidesFromSubs : MSV::Specified (
       // The children the forking edit deleted.
@@ -452,8 +451,6 @@ pub fn build_fork_clone (
         . filter (visible)
         . filter ( |record| ! buffer_contains_gnids . contains (&record . member) )
         . map (floored) . collect () ),
-    overrides : MSV::Specified ( rel_partners_at_relRepo (
-      &clone_skgrepo, vec! [ buffer_node . pid . clone () ] )),
     // The clone preserves the original node's search-matching choice, but
     // importer provenance flags do not describe the newly-created clone.
     flags          : if flag_is_true (

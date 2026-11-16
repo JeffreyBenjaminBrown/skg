@@ -62,7 +62,7 @@ async fn exercise_second_phase_preflight (
   Ok (( ))
 }
 
-/// R contains N1 and overrides N2. Merging N2 into N1 would make R
+/// R contains N1 and forks N2. Merging N2 into N1 would make R
 /// both fork and contain N1, so the merge is refused, and no store
 /// changes.
 async fn exercise_rejected_merge (
@@ -82,7 +82,7 @@ async fn exercise_rejected_merge (
     graphnode_from_gnid (config, &ID::from ("N2")) ?;
   preserver . pid = ID::from ("preserver");
   preserver . extra_ids . clear ();
-  preserver . overrides = skg::types::misc::MSV::Unspecified;
+  preserver . forks = skg::types::misc::MSV::Unspecified;
   let merge : NodeMerge = NodeMerge {
     acquiree_text_preserver : SaveNode (preserver),
     updated_acquirer        : SaveNode (n1),
@@ -97,7 +97,7 @@ async fn exercise_rejected_merge (
     Ok (_) => panic! ("a merge making R fork and contain N1 must be rejected"),
   };
   let message : String = error . to_string ();
-  assert! (message . contains ("node R both forks (subscribes to or overrides) and contains node N1"),
+  assert! (message . contains ("node R both forks and contains node N1"),
            "{message}");
 
   wait_for_tantivy_writes_idle ();
