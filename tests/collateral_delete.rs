@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(collateral_delete::)'
+// cargo nextest run --test grouped_forks -E 'test(collateral_delete::)'
 //
 // Deleting a node whose viewnode is still present in another
 // open view must not make the save response complain about that

@@ -48,7 +48,7 @@ fn lowering_produces_ordered_nodeInstructions_and_signals () {
     assert_eq!( visibility . len(), 1 );
     let (subscriber, signal) = &visibility [0];
     assert_eq!( subscriber, &ID::from ("root") );
-    assert_eq!( signal . subscribee, ID::from ("e") );
+    assert_eq!( signal . forkee, ID::from ("e") );
     assert_eq!( signal . visible, vec![ID::from ("visible")] ); }
   let nodeInstructions : Vec<NodeInstruction> =
     intents . into_ordered_intents()

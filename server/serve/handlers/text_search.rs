@@ -295,13 +295,13 @@ fn filter_match_groups_to_unrestricted_skgrepos (
 /// made of the hits ('build_search_viewforest'), the same code every
 /// view is drawn with. Each hit (a root standing for one of
 /// 'search_results') is a write-protected occurrence asking for its
-/// containers folder, and holds the folder of the nodes it subscribes
-/// to and the folder of the nodes that subscribe to it, each only when
-/// it would have members ('stub_root_of_hit'), and, when it was found
-/// through an alias, its alias folder; the refresh fills the folders,
-/// each member of the containers folder with its containerward chain,
-/// and titles each hit from the graph. What the refresh drew under
-/// each hit is then folded ('fold_what_was_drawn_under_hit'), and,
+/// containers folder, and holds its forks folder (the nodes it forks
+/// and the nodes that fork it) when that folder would have members
+/// ('stub_root_of_hit'), and, when it was found through an alias,
+/// its alias folder; the refresh fills the folders, each member of the
+/// containers folder with its containerward chain, and titles each hit
+/// from the graph. What the refresh drew under each hit is then folded
+/// ('fold_what_was_drawn_under_hit'), and,
 /// unless the search included them, the occurrences of
 /// overPrivateText nodes are entombstoned, after the refresh, so that
 /// the members it drew are covered too, and the childless tombstones

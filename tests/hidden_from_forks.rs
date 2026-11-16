@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_views -E 'test(hidden_from_subscriptions::)'
+// cargo nextest run --test grouped_views -E 'test(hidden_from_forks::)'
 //
 // Tests for hiddenOutsideOfForkPartnersFolder, hiddenInForkPartnerFolder, and HiddenFromSubscribees.
 // These test that:
@@ -293,95 +293,95 @@ fn all_tests
     "skg-test-hidden-from-subscriptions",
     |s| Box::pin ( async move {
       s . reset ("test_deleting_foreign_subscribee_content_preserves_branch_edit",
-        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
+        "tests/hidden_from_forks/fixtures-subscribee-edit") ?;
       test_deleting_foreign_subscribee_content_preserves_branch_edit (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_deleting_foreign_subscribee_content_infers_hide",
-        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
+        "tests/hidden_from_forks/fixtures-subscribee-edit") ?;
       test_deleting_foreign_subscribee_content_infers_hide (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_removing_subscribee_content_from_subscriber_contains_infers_hide",
-        "tests/hidden_from_subscriptions/fixtures-clone-edit") ?;
+        "tests/hidden_from_forks/fixtures-clone-edit") ?;
       test_removing_subscribee_content_from_subscriber_contains_infers_hide (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_readding_subscribee_content_to_subscriber_contains_unhides",
-        "tests/hidden_from_subscriptions/fixtures-clone-edit") ?;
+        "tests/hidden_from_forks/fixtures-clone-edit") ?;
       test_readding_subscribee_content_to_subscriber_contains_unhides (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_placing_and_removing_an_overrider_of_subscribee_content_hides_what_it_overrides",
-        "tests/hidden_from_subscriptions/fixtures-overrider-of-subscribee-content") ?;
+        "tests/hidden_from_forks/fixtures-overrider-of-subscribee-content") ?;
       test_placing_and_removing_an_overrider_of_subscribee_content_hides_what_it_overrides (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_removing_an_overrider_of_subscribee_content_hides_what_it_overrides",
-        "tests/hidden_from_subscriptions/fixtures-overrider-of-subscribee-content") ?;
+        "tests/hidden_from_forks/fixtures-overrider-of-subscribee-content") ?;
       test_removing_an_overrider_of_subscribee_content_hides_what_it_overrides (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_a_preview_and_a_save_say_what_they_hide",
-        "tests/hidden_from_subscriptions/fixtures-overrider-of-subscribee-content") ?;
+        "tests/hidden_from_forks/fixtures-overrider-of-subscribee-content") ?;
       test_a_preview_and_a_save_say_what_they_hide (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_a_save_says_why_a_removal_hides_nothing",
-        "tests/hidden_from_subscriptions/fixtures-overrider-of-subscribee-content") ?;
+        "tests/hidden_from_forks/fixtures-overrider-of-subscribee-content") ?;
       test_a_save_says_why_a_removal_hides_nothing (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_placing_an_overrider_of_a_hidden_node_keeps_its_hide",
-        "tests/hidden_from_subscriptions/fixtures-overrider-of-subscribee-content") ?;
+        "tests/hidden_from_forks/fixtures-overrider-of-subscribee-content") ?;
       test_placing_an_overrider_of_a_hidden_node_keeps_its_hide (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_replacing_an_overrider_with_its_original_hides_nothing",
-        "tests/hidden_from_subscriptions/fixtures-overrider-of-subscribee-content") ?;
+        "tests/hidden_from_forks/fixtures-overrider-of-subscribee-content") ?;
       test_replacing_an_overrider_with_its_original_hides_nothing (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_collateral_view_reflects_newly_hidden_subscribee_content",
-        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
+        "tests/hidden_from_forks/fixtures-subscribee-edit") ?;
       test_collateral_view_reflects_newly_hidden_subscribee_content (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_moving_foreign_subscribee_content_to_subscriber_does_not_hide",
-        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
+        "tests/hidden_from_forks/fixtures-subscribee-edit") ?;
       test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_moving_foreign_subscribee_content_elsewhere_still_hides",
-        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
+        "tests/hidden_from_forks/fixtures-subscribee-edit") ?;
       test_moving_foreign_subscribee_content_elsewhere_still_hides (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_extra_view_child_under_foreign_subscribee_vanishes",
-        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
+        "tests/hidden_from_forks/fixtures-subscribee-edit") ?;
       test_extra_view_child_under_foreign_subscribee_vanishes (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_extra_view_child_under_owned_subscribee_vanishes",
-        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
+        "tests/hidden_from_forks/fixtures-subscribee-edit") ?;
       test_extra_view_child_under_owned_subscribee_vanishes (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_subscribee_and_compound_partner_folders",
-        "tests/hidden_from_subscriptions/fixtures-every-kind-of-folder/skgconfig.toml") ?;
+        "tests/hidden_from_forks/fixtures-every-kind-of-folder/skgconfig.toml") ?;
       test_subscribee_and_compound_partner_folders (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_hidden_within_but_none_without",
-        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml") ?;
+        "tests/hidden_from_forks/fixtures-hidden-within-but-none-without/skgconfig.toml") ?;
       test_hidden_within_but_none_without (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide",
-        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without") ?;
+        "tests/hidden_from_forks/fixtures-hidden-within-but-none-without") ?;
       test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_collateral_view_reflects_newly_unhidden_subscribee_content",
-        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without") ?;
+        "tests/hidden_from_forks/fixtures-hidden-within-but-none-without") ?;
       test_collateral_view_reflects_newly_unhidden_subscribee_content (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_deleting_from_hiddenin_folder_does_not_unhide",
-        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without") ?;
+        "tests/hidden_from_forks/fixtures-hidden-within-but-none-without") ?;
       test_deleting_from_hiddenin_folder_does_not_unhide (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_hidden_without_but_none_within",
-        "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within/skgconfig.toml") ?;
+        "tests/hidden_from_forks/fixtures-hidden-without-but-none-within/skgconfig.toml") ?;
       test_hidden_without_but_none_within (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_adding_to_hiddenoutside_folder_hides_and_moves_inside",
-        "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within") ?;
+        "tests/hidden_from_forks/fixtures-hidden-without-but-none-within") ?;
       test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_overlapping_hidden_within",
-        "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within/skgconfig.toml") ?;
+        "tests/hidden_from_forks/fixtures-overlapping-hidden-within/skgconfig.toml") ?;
       test_overlapping_hidden_within (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }

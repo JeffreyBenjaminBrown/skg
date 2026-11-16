@@ -360,7 +360,7 @@ fn writeProtected_relRepo_request_errors (
     { let headline : HeadlineName = node_ref . value () . headline_name ();
       errors . push ( BufferValidationError::Other ( with_org_subheadlines (
         &format! (
-          "relRepo request on write-protected node {} that no editable node collects:\n- Its view-parent is write-protected (or marked for deletion, or a subscribee shown as such), or it is not a member of that view-parent.\n- Make the relRepo request from a view where the view-parent is editable.\n",
+          "relRepo request on write-protected node {} that no editable node collects:\n- Its view-parent is write-protected (or marked for deletion, or a forkee shown as such), or it is not a member of that view-parent.\n- Make the relRepo request from a view where the view-parent is editable.\n",
           t . gnid . 0 ),
         &[ headline ] ))); }} }
 
@@ -408,7 +408,7 @@ fn is_saveEligible_occurrence (
 ) -> bool {
   let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
     &node_ref . value () . kind else { return false; };
-  let is_subscribee_as_such : bool =
+  let is_forkee_as_such : bool =
     t . claimsMembership
     && node_ref . parent ()
        . map ( |p| matches! ( &p . value () . kind,
@@ -416,4 +416,4 @@ fn is_saveEligible_occurrence (
        . unwrap_or (false);
   ! t . is_writeProtected ()
   && ! matches! ( t . edit_request (), Some (&NodeEditRequest::Delete) )
-  && ! is_subscribee_as_such }
+  && ! is_forkee_as_such }

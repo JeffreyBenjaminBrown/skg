@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(partner_folder_order::)'
+// cargo nextest run --test grouped_forks -E 'test(partner_folder_order::)'
 //
 // A folder whose goal is not ordered (here a forks folder) respects the
 // user's view-local member order across save and rerender

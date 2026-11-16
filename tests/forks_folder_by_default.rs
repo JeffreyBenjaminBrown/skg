@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_unit -E 'test(subscribee_folder::)'
+// cargo nextest run --test grouped_unit -E 'test(forks_folder_by_default::)'
 
 use indoc::indoc;
 use skg::assert_metadata_eq;
@@ -10,7 +10,7 @@ use skg::types::misc::{SkgConfig, ID};
 use futures::executor::block_on;
 use std::error::Error;
 
-const CONFIG_PATH: &str = "tests/subscribee_folder/fixtures/skgconfig.toml";
+const CONFIG_PATH: &str = "tests/forks_folder_by_default/fixtures/skgconfig.toml";
 
 /// Helper to set up multi-repo test environment
 async fn setup_multi_skgrepo_test(

@@ -1,4 +1,4 @@
-// Binary grouping: override / partner folder
+// Binary grouping: forks / partner folder
 // tests. See tests/grouped_unit.rs for why test files are grouped
 // into a few [[test]] targets.
 // Store-using tests across this binary are serialized by the fixture mutex in
@@ -17,8 +17,8 @@ mod git_fixture;
 #[path = "collateral_partner_folder.rs"]
 mod collateral_partner_folder;
 
-#[path = "collateral_subscribee_staleness.rs"]
-mod collateral_subscribee_staleness;
+#[path = "collateral_forkee_staleness.rs"]
+mod collateral_forkee_staleness;
 
 #[path = "collateral_delete.rs"]
 mod collateral_delete;
@@ -50,8 +50,8 @@ mod idempotence;
 #[path = "restricted_suppression.rs"]
 mod restricted_suppression;
 
-#[path = "overrideward_view_subtree.rs"]
-mod overrideward_view_subtree;
+#[path = "forks_under_search_hits.rs"]
+mod forks_under_search_hits;
 
 #[path = "override_substitution.rs"]
 mod override_substitution;
@@ -59,8 +59,8 @@ mod override_substitution;
 #[path = "partner_folder_matrix.rs"]
 mod partner_folder_matrix;
 
-#[path = "subscribee_as_such_extension.rs"]
-mod subscribee_as_such_extension;
+#[path = "forkee_as_such_extension.rs"]
+mod forkee_as_such_extension;
 
 #[path = "partner_folder_order.rs"]
 mod partner_folder_order;

@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(collateral_new_link::)'
+// cargo nextest run --test grouped_forks -E 'test(collateral_new_link::)'
 //
 // The collateral redraw of clean views matches through links
 // ('SaveAffectedIds::matching_identity' reads the full update-relevant

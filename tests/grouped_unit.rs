@@ -70,8 +70,8 @@ mod skgrepo_path_validation;
 #[path = "server_warnings.rs"]
 mod server_warnings;
 
-#[path = "subscribee_folder.rs"]
-mod subscribee_folder;
+#[path = "forks_folder_by_default.rs"]
+mod forks_folder_by_default;
 
 #[path = "tantivy.rs"]
 mod tantivy;

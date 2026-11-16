@@ -50,8 +50,8 @@ use crate::refresh::editability::{
 use crate::refresh::extent::{Extent, extent_of_parent};
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, goal_of_parent, has_a_fork_partner,
-  hidden_in_subscribee, hidden_outside_of_subscribees, member_of_child,
-  subscriber_of_subscribee_as_such, visible_illegal_edits};
+  hidden_in_forkee, hidden_outside_of_forkees, member_of_child,
+  forker_of_forkee_as_such, visible_illegal_edits};
 use crate::refresh::goal::partnerFolder_members_in_graph;
 use crate::telescope::types::IllegalEdit;
 use crate::refresh::id_rule::{
@@ -143,9 +143,9 @@ fn add_default_folders (
       if let Some (folder) = last_leading_folder {
         move_after (tree, folder, forks_folder)
           . expect ("add_default_folders: both are children"); }}}
-  if let Some (subscriber) = subscriber_of_subscribee_as_such (tree, parent) {
+  if let Some (forker) = forker_of_forkee_as_such (tree, parent) {
     if child_folder (tree, parent, &Folder::HiddenInForkPartner) . is_none ()
-       && ! hidden_in_subscribee (&pid, &subscriber, walk) . is_empty ()
+       && ! hidden_in_forkee (&pid, &forker, walk) . is_empty ()
     { let folder : NodeId = tree . get_mut (parent) . unwrap ()
         . append ( viewnode_of ( ViewnodeKind::Folder (Folder::HiddenInForkPartner) ))
         . id ();
@@ -1073,7 +1073,7 @@ fn reinstate_original_after (
 /// Whether the occurrence at 'treeid' is shown raw where, from the
 /// perspective of 'owner', another of its mirrors would stand in its
 /// place: at a root, or as a member of a folder that is no forkee as
-/// such ('subscriber_of_subscribee_as_such'): a forker-only member of a
+/// such ('forker_of_forkee_as_such'): a forker-only member of a
 /// forks folder is raw, as a member of every other folder is.
 fn is_raw_where_another_mirror_would_stand (
   tree   : &Tree<Viewnode>,
@@ -1087,7 +1087,7 @@ fn is_raw_where_another_mirror_would_stand (
       ViewnodeKind::BufferRoot => true,
       ViewnodeKind::Folder (folder) =>
         ! folder . members_are_properties ()
-        && subscriber_of_subscribee_as_such (tree, treeid) . is_none (),
+        && forker_of_forkee_as_such (tree, treeid) . is_none (),
       _ => false, } );
   let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) : &ViewnodeKind =
     &node . value () . kind else { return false; };
@@ -1199,27 +1199,27 @@ fn add_folders (
         added . push (new);
         new }, };
     if matches! ( folder, Folder::Forks ) {
-      let subscriber : Option<ID> =
+      let forker : Option<ID> =
         tree . get (treeid) . unwrap () . value () . occurrence_gnid () . cloned ();
-      if let Some (subscriber) = subscriber {
-        add_hidden_outside_folder (tree, folder_treeid, &subscriber, walk); }}}
+      if let Some (forker) = forker {
+        add_hidden_outside_folder (tree, folder_treeid, &forker, walk); }}}
   for folder_treeid in added . into_iter () . rev () {
     move_to_first_child (tree, treeid, folder_treeid)
       . expect ("add_folders: the folder was just added"); }}
 
-/// In the forks folder at 'subscribee_folder', of 'subscriber', the
+/// In the forks folder at 'forks_folder', of 'forker', the
 /// compound folder of what it hides outside its fork partners, when it
 /// hides something there and the folder lacks one; new, its members
 /// are drawn folded ('Walk::added_compound_folders').
 fn add_hidden_outside_folder (
   tree              : &mut Tree<Viewnode>,
-  subscribee_folder : NodeId,
-  subscriber        : &ID,
+  forks_folder      : NodeId,
+  forker            : &ID,
   walk              : &mut Walk,
 ) {
-  if child_folder (tree, subscribee_folder, &Folder::HiddenOutsideOfForkPartners) . is_none ()
-     && ! hidden_outside_of_subscribees (subscriber, walk) . is_empty ()
-  { let hidden_outside : NodeId = tree . get_mut (subscribee_folder) . unwrap ()
+  if child_folder (tree, forks_folder, &Folder::HiddenOutsideOfForkPartners) . is_none ()
+     && ! hidden_outside_of_forkees (forker, walk) . is_empty ()
+  { let hidden_outside : NodeId = tree . get_mut (forks_folder) . unwrap ()
       . append ( viewnode_of (
         ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners) )) . id ();
     walk . added_compound_folders . insert (hidden_outside); }}

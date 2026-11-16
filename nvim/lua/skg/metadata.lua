@@ -1738,9 +1738,9 @@ M.relationship_role_menu_prose = {
   forkee = { kind = 'forkee', description =
     "A member of the view-parent's forksFolder that claims: the view-parent forks it. Sets the repo of each forks relationship from the view-parent." },
   hider = { kind = false, description =
-    'Hide repos are derived at save, floored at the most public explaining subscription; the hiderFolder is write-protected.' },
+    'Hide repos are derived at save, floored at the most public forks relationship explaining them; the hiderFolder is write-protected.' },
   hidden = { kind = false, description =
-    'Hide repos are derived at save, floored at the most public explaining subscription; the hiddenFolder is write-protected.' } }
+    'Hide repos are derived at save, floored at the most public forks relationship explaining them; the hiddenFolder is write-protected.' } }
 
 ---The relationship-kind menu: one entry { relation, roles } per
 ---relation in 'shared/relations.json', each role { role, kind,
@@ -1881,7 +1881,7 @@ end
 ---The lines of the relationships of KIND in the subtree at
 ---LINE_NUMBER, that headline included. Recurses only where edits still
 ---affect the graph: below an occurrence that claims membership and is
----neither write-protected nor a subscribee as such, and below a
+---neither write-protected nor a forkee as such, and below a
 ---writable folder; a noClaim occurrence, a write-protected folder and
 ---every other non-vognode are pruned with their subtrees. Mirrors
 ---skg--relRepo-recursive-targets.
@@ -1928,7 +1928,7 @@ end
 ---an unknown viewnode or a restricted viewnode, whose
 ---relationship to its view-parent is of KIND and is collected at save from this position?
 ---For 'content', the view-parent is an editable occurrence not in
----subscribee-as-such position; for 'forkee', it is the writable
+---forkee-as-such position; for 'forkee', it is the writable
 ---forksFolder with an editable viewparent, and the headline claims (a
 ---member claiming nothing forks the viewparent; its record is its
 ---own). Mirrors
@@ -1947,7 +1947,7 @@ function M.relationship_kind_matches_p (line_number, kind)
   if M.occurrence_sexp_p(parent_sexp) then
     return kind == 'content'
            and not M.node_write_protected_p(parent_sexp)
-           and not M.subscribee_as_such_at_line_p(parent) end
+           and not M.forkee_as_such_at_line_p(parent) end
   if M.non_vognode_atom_present_p(parent_sexp, 'forksFolder') then
     return kind == 'forkee' and M.folder_viewparent_editable_p(parent) end
   return false
@@ -1955,7 +1955,7 @@ end
 
 ---Should the walk not descend below the occurrence at LINE_NUMBER,
 ---whose metadata is METADATA_SEXP? A write-protected node's contains
----is not collected at save, and a subscribee-as-such member's
+---is not collected at save, and a forkee-as-such member's
 ---viewchildren are hide and unhide signals, not writable relationships.
 ---Mirrors skg--relRepo-prune-below-p.
 ---@param line_number integer
@@ -1963,15 +1963,15 @@ end
 ---@return boolean
 function M.relRepo_prune_below_p (line_number, metadata_sexp)
   return M.node_write_protected_p(metadata_sexp)
-         or M.subscribee_as_such_at_line_p(line_number)
+         or M.forkee_as_such_at_line_p(line_number)
 end
 
 ---@param line_number integer
 ---@return boolean is the headline an occurrence claiming membership
 ---under a forksFolder, a forkee as such (one claiming nothing forks the
 ---folder's viewparent, or was detached)? Mirrors
----skg--subscribee-as-such-at-point-p.
-function M.subscribee_as_such_at_line_p (line_number)
+---skg--forkee-as-such-at-point-p.
+function M.forkee_as_such_at_line_p (line_number)
   local meta = M.metadata_sexp_at_line_or_nil(line_number)
   if not (M.occurrence_sexp_p(meta) and M.claims_membership_p(meta)) then
     return false end

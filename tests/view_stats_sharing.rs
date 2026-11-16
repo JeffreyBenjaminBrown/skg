@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(view_stats_sharing::)'
+// cargo nextest run --test grouped_forks -E 'test(view_stats_sharing::)'
 //
 // The position-relative sharing view-stats
 // ('docs/api-and-formats.org', "Stats metadata: graphStats and

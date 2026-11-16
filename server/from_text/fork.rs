@@ -400,7 +400,7 @@ pub fn validate_fork_specs (
 /// the user dismissed them, so they must not reappear as
 /// unintegrated forked content. (Children the clone keeps need no
 /// hide -- the display rule already excludes C's own contains from
-/// its subscribee-as-such view.)
+/// its forkee-as-such view.)
 /// contains is stored raw (the child IDs as the buffer collected them);
 /// override substitution applies at render time.
 /// .

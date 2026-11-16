@@ -37,7 +37,7 @@ fn restriction (gnid : &str, skgrepo : &str) -> Viewnode {
   mk_editable_viewnode (
     ID::from (gnid), SkgrepoName::from (skgrepo), gnid . to_string (), None ) }
 
-fn subscribee_folder () -> Viewnode {
+fn forks_folder () -> Viewnode {
   viewnode_of (ViewnodeKind::Folder (Folder::Forks)) }
 
 /// Build a forest exercising the three shapes:
@@ -56,7 +56,7 @@ fn build_forest () -> ViewForest {
     f . get_mut (q) . unwrap () . append ( restriction ("M", "foreign") ) . id ();
   let r : ego_tree::NodeId = f . append_root ( restriction ("R", "owned1") );
   let rc : ego_tree::NodeId =
-    f . get_mut (r) . unwrap () . append ( subscribee_folder () ) . id ();
+    f . get_mut (r) . unwrap () . append ( forks_folder () ) . id ();
   let _s : ego_tree::NodeId =
     f . get_mut (rc) . unwrap () . append ( restriction ("S", "foreign") ) . id ();
   f }

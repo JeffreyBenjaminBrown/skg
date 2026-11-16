@@ -250,10 +250,10 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
  } . map_err ( |errors| SaveError::BufferValidationErrors {
         errors, warnings : parsing_warnings . clone () } ) ?;
   // A reply typed in the unread list files the message it answers in
-  // the subscriber, now that the forks are known; before the checks
+  // the forker, now that the forks are known; before the checks
   // below, which judge that write too. The saved view moves the
   // message there too, so the rerender draws it where it now lives.
-  file_what_is_written_in::file_subscribee_members_written_in (
+  file_what_is_written_in::file_forkee_members_written_in (
     &mut viewforest, graph, config, skgrepo_restriction, &fork_specs,
     & unedited_stale_graphnodes . iter ()
       . map ( |node| node . pid . clone () ) . collect (),

@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_views -E 'test(subscribee_folder_empty_persists::)'
+// cargo nextest run --test grouped_views -E 'test(forks_folder_empty_persists::)'
 //
 // An exception to the prune: an *empty* forks folder is preserved, not
 // self-deleted. It is the editable interface onto the origin's forks; if
@@ -28,7 +28,7 @@ use skg::types::misc::{SkgConfig, TantivyIndex};
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  let fixtures : &str = "tests/subscribee_folder_empty_persists/fixtures";
+  let fixtures : &str = "tests/forks_folder_empty_persists/fixtures";
   run_with_shared_test_stores (
     "skg-test-subscribee-folder-empty-persists",
     |s| Box::pin ( async move {

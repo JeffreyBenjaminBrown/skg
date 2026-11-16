@@ -7,7 +7,7 @@ use std::error::Error;
 fn one_subscribee_has_contextual_counts_under_two_subscribers (
 ) -> Result<(), Box<dyn Error>> {
   let config : SkgConfig = load_config_with_overrides (
-    "tests/subscribee_heralds/fixtures/skgconfig.toml",
+    "tests/forkee_heralds/fixtures/skgconfig.toml",
     Some ("skg-test-subscribee-heralds"), &[] ) ?;
   for (subscriber, numerator) in [("A1", 1), ("A2", 2)] {
     let (view, _, _) : (String, Vec<ID>, _) = single_root_view (

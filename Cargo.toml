@@ -59,8 +59,8 @@ name = "grouped_views"
 path = "tests/grouped_views.rs"
 
 [[test]]
-name = "grouped_overrides"
-path = "tests/grouped_overrides.rs"
+name = "grouped_forks"
+path = "tests/grouped_forks.rs"
 
 [[test]]
 name = "grouped_saves"

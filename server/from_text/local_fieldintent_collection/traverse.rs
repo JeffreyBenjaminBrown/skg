@@ -30,11 +30,11 @@
 //! .
 //! DEFINITION: a vognode is *save-eligible* iff it is an occurrence,
 //! editable, lacks a Delete edit request, and is not in
-//! subscribee-as-such position. (Its position may be anywhere else --
+//! forkee-as-such position. (Its position may be anywhere else --
 //! including as a member of a write-protected folder, where it is
 //! save-eligible for itself but invisible to the folder's recorder.)
 //! .
-//! DEFINITION: a vognode is *in subscribee-as-such position* (a forkee
+//! DEFINITION: a vognode is *in forkee-as-such position* (a forkee
 //! as such) iff it is a claiming occurrence direct child of a
 //! forksFolder. A child of a forksFolder claiming nothing (a
 //! forker-only member, or a detached forkee) is no member of the
@@ -49,7 +49,7 @@ use crate::from_text::local_fieldintent_collection::predicates::{
   member_counts_for_partnerFolder };
 use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, DefiningFolderRecorder, LocalContext, FieldIntent,
-  ForksFolderMembers, HiddenOutsideEdit, SubscribeeTextClaim, SubscribeeVisibility };
+  ForksFolderMembers, HiddenOutsideEdit, ForkeeTextClaim, ForkeeVisibility };
 use crate::types::errors::HeadlineName;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
@@ -92,7 +92,7 @@ fn visit (
           // Carrying the identity of the ghost or gnid-only vognode
           // (write-protected, not save-eligible) keeps a
           // forksFolder found under a ghost meaningful: its
-          // children stay in subscribee-as-such position, so their
+          // children stay in forkee-as-such position, so their
           // title edits bounce via text claims instead of silently
           // becoming real edits.
           gnid               : vognode . gnid() . clone(),
@@ -119,7 +119,7 @@ fn visit (
     // ones whose membership the save reads. The catch-all folder arm
     // after them covers the write-protected ones.
     ViewnodeKind::Folder (Folder::Forks) =>
-      visit_subscribee_folder (node_ref, context, collected, owned),
+      visit_forks_folder (node_ref, context, collected, owned),
     ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners) =>
       visit_hiddenOutside_folder (node_ref, context, collected, owned),
     ViewnodeKind::Folder (Folder::ID)
@@ -140,12 +140,12 @@ fn visit_occurrence (
   collected : &mut CollectedFieldIntents,
   owned     : IsOwned,
 ) -> Result<(), String> {
-  let subscribee_as_such_context : Option<(&ID, bool)> =
+  let forkee_as_such_context : Option<(&ID, bool)> =
     match context {
-      LocalContext::SubscribeeAsSuchPosition {
-        subscriber, subscriber_is_editable }
+      LocalContext::ForkeeAsSuchPosition {
+        forker, forker_is_editable }
         if t . claimsMembership =>
-        Some (( subscriber, *subscriber_is_editable )),
+        Some (( forker, *forker_is_editable )),
       _ => None };
   let is_editable : bool =
     ! t . is_writeProtected();
@@ -155,37 +155,37 @@ fn visit_occurrence (
   let is_saveEligible : bool =
     is_editable
     && ! has_delete_request
-    && subscribee_as_such_context . is_none();
+    && forkee_as_such_context . is_none();
   let headline : HeadlineName = node_ref . value () . headline_name ();
   if is_editable {
     // Emission happens only inside this block, because an
     // write-protected vognode emits nothing.
-    match subscribee_as_such_context {
-      Some (( subscriber, subscriber_is_editable )) => {
+    match forkee_as_such_context {
+      Some (( forker, forker_is_editable )) => {
         collected . instructionMerge_fieldIntent (
           &headline,
           t . gnid . clone(),
-          FieldIntent::SubscribeeTextClaim (
-            SubscribeeTextClaim {
+          FieldIntent::ForkeeTextClaim (
+            ForkeeTextClaim {
               title    : t . title . clone(),
               body     : t . body() . cloned(),
               headline : headline . clone () } )) ?;
-        if subscriber_is_editable {
+        if forker_is_editable {
           // The at-most-one-writer-per-ID guard: only the
           // forksFolder under the editable instance of a
-          // subscriber may write its hide edits. The same subscriber
+          // forker may write its hide edits. The same forker
           // can recur write-protected elsewhere with its own
           // forksFolder; without this guard those could emit
           // contradictory hide edits for one ID.
           collected . instructionMerge_fieldIntent (
             &headline,
-            subscriber . clone(),
-            FieldIntent::SubscribeeVisibility (
-              SubscribeeVisibility {
-                subscribee : t . gnid . clone(),
+            forker . clone(),
+            FieldIntent::ForkeeVisibility (
+              ForkeeVisibility {
+                forkee     : t . gnid . clone(),
                 visible    : visible_content_members (node_ref) } )) ?; }
         // Delete and NodeMerge edit requests here are ignored: a
-        // subscribee-as-such can affect only what its subscriber
+        // forkee-as-such can affect only what its forker
         // hides.
       },
       None => {
@@ -322,7 +322,7 @@ fn visit_aliasFolder (
 /// which deleting a forker hides it ('ForksFolderMembers'). A claiming
 /// member stands as a forkee as such; one claiming nothing, as a
 /// member of a write-protected folder.
-fn visit_subscribee_folder (
+fn visit_forks_folder (
   node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
   collected : &mut CollectedFieldIntents,
@@ -346,18 +346,18 @@ fn visit_subscribee_folder (
           match &child . value() . kind {
             ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners) =>
               LocalContext::HiddenOutsidePosition {
-                subscriber      : recorder . gnid . clone(),
+                forker          : recorder . gnid . clone(),
                 is_saveEligible : recorder . is_saveEligible },
             ViewnodeKind::Vognode (Vognode::Occurrence (t))
               if ! t . claimsMembership =>
               LocalContext::UnderWriteProtectedFolder,
             _ =>
-              // The subscriber's identity is passed even when the recorder is
+              // The forker's identity is passed even when the recorder is
               // not save-eligible, because text claims outlive the
               // visibility guard.
-              LocalContext::SubscribeeAsSuchPosition {
-                subscriber               : recorder . gnid . clone(),
-                subscriber_is_editable : recorder . is_editable }, };
+              LocalContext::ForkeeAsSuchPosition {
+                forker                   : recorder . gnid . clone(),
+                forker_is_editable : recorder . is_editable }, };
         visit (child, &child_context, collected, owned) ?; }
       Ok (( )) },
     _ =>
@@ -370,7 +370,7 @@ fn visit_subscribee_folder (
 
 /// Collect the explicitly submitted visible-outside subset.  This folder is a
 /// compound partner folder rather than a direct relationship set, so its meaning is
-/// resolved only after ordinary subscribee visibility inference has run.
+/// resolved only after ordinary forkee visibility inference has run.
 fn visit_hiddenOutside_folder (
   node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
@@ -378,7 +378,7 @@ fn visit_hiddenOutside_folder (
   owned     : IsOwned,
 ) -> Result<(), String> {
   if let LocalContext::HiddenOutsidePosition {
-    subscriber, is_saveEligible } = context
+    forker, is_saveEligible } = context
   {
     if *is_saveEligible {
       let mut members : Vec<ID> = Vec::new ();
@@ -396,7 +396,7 @@ fn visit_hiddenOutside_folder (
           members . push (gnid); }}
       collected . instructionMerge_fieldIntent (
         &node_ref . value () . headline_name (),
-        subscriber . clone(),
+        forker . clone(),
         FieldIntent::HiddenOutsideEdit (HiddenOutsideEdit { members }) ) ?; }}
   recurse_with_uniform_context (
     node_ref, &LocalContext::UnderWriteProtectedFolder, collected, owned)
@@ -520,9 +520,9 @@ fn content_members (
   contents }
 
 /// This returns the children that the buffer presents as visible
-/// content of one subscribee-as-such. The list is not saved as the
-/// subscribee's contains; it is the signal from which the
-/// subscriber's hides/unhides are inferred, downstream. It is not
+/// content of one forkee-as-such. The list is not saved as the
+/// forkee's contains; it is the signal from which the
+/// forker's hides/unhides are inferred, downstream. It is not
 /// deduplicated.
 fn visible_content_members (
   node_ref : NodeRef<Viewnode>,

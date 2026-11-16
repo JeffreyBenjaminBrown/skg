@@ -59,7 +59,7 @@ use std::mem::{Discriminant, discriminant};
 //
 
 /// An occurrence's content over the straddle. Of what the worktree
-/// holds, a subscribee as such keeps what 'unintegrated' keeps. A
+/// holds, a forkee as such keeps what 'unintegrated' keeps. A
 /// removed member that neither graph has is left out: its change is
 /// under the content changeset marker.
 pub(crate) fn content_goal (

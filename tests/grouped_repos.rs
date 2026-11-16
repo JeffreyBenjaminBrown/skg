@@ -60,8 +60,8 @@ mod foreign_hidden;
 #[path = "illegal_edits.rs"]
 mod illegal_edits;
 
-#[path = "subscriber_hides_under_a_narrowing.rs"]
-mod subscriber_hides_under_a_narrowing;
+#[path = "forker_hides_under_a_narrowing.rs"]
+mod forker_hides_under_a_narrowing;
 
 #[path = "hide_inference_under_a_narrowing.rs"]
 mod hide_inference_under_a_narrowing;

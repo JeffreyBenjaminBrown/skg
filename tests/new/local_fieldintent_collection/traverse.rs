@@ -8,8 +8,8 @@ use indoc::indoc;
 use skg::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
 use skg::types::errors::HeadlineName;
 use skg::from_text::local_fieldintent_collection::types::{
-  CollectedFieldIntents, FieldIntentsForOneId, SubscribeeTextClaim,
-  SubscribeeVisibility };
+  CollectedFieldIntents, FieldIntentsForOneId, ForkeeTextClaim,
+  ForkeeVisibility };
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::tree::forest::ViewForest;
@@ -107,15 +107,15 @@ fn subscribee_as_such_emits_claim_and_visibility () {
     assert_eq!( e . contains, None );
     assert_eq!(
       e . text_claims,
-      vec![ SubscribeeTextClaim {
+      vec![ ForkeeTextClaim {
         title    : "e" . to_string(),
         body     : Some ("Subscribee body" . to_string()),
         headline : HeadlineName::of ( None, Some (&ID::from ("e")), "e" ) } ]); }
   { let subscriber : &FieldIntentsForOneId = entry (&collected, "subscriber");
     assert_eq!(
       subscriber . visibility,
-      vec![ SubscribeeVisibility {
-        subscribee : ID::from ("e"),
+      vec![ ForkeeVisibility {
+        forkee     : ID::from ("e"),
         visible    : vec![ID::from ("visible")] } ]);
     assert_eq!( subscriber . forks,
                 Some (vec![(ID::from ("e"), None)]) ); }
@@ -261,7 +261,7 @@ fn editable_subscribee_under_writeProtected_subscriber_claims_without_visibility
       "} );
   assert_eq!(
     entry (&collected, "e") . text_claims,
-    vec![ SubscribeeTextClaim {
+    vec![ ForkeeTextClaim {
       title    : "e" . to_string(),
       body     : None,
       headline : HeadlineName::of ( None, Some (&ID::from ("e")), "e" ) } ]);

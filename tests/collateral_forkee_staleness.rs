@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(collateral_subscribee_staleness::)'
+// cargo nextest run --test grouped_forks -E 'test(collateral_forkee_staleness::)'
 //
 // Regression for a collateral-rerender staleness. A editable subscriber
 // open in two views: changing its subscriptions in one view and saving must
@@ -6,7 +6,7 @@
 // not leave it claiming the old subscription.
 //
 // Installs the explicit graph handle (the subscribee lookups read
-// the captured graph), so it lives among the grouped_overrides installers.
+// the captured graph), so it lives among the grouped_forks installers.
 
 use std::error::Error;
 
@@ -28,7 +28,7 @@ fn collateral_editable_subscriber_forksFolder_refreshes
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
     "skg-test-collateral-subscribee-staleness",
-    "tests/collateral_subscribee_staleness/fixtures",
+    "tests/collateral_forkee_staleness/fixtures",
     "/tmp/tantivy-test-collateral-subscribee-staleness",
     |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =

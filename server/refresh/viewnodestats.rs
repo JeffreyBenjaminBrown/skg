@@ -12,7 +12,7 @@ use crate::types::viewnode::{
   GraphnodeStats, Folder, Viewnode, ViewnodeKind, Vognode, Warrant };
 use crate::refresh::ancestry::{
   CompoundFolderParties, compound_folder_parties, required_ancestors};
-use crate::refresh::goal::{content_goal_gnids, subscriber_of_subscribee_as_such};
+use crate::refresh::goal::{content_goal_gnids, forker_of_forkee_as_such};
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 use std::iter::once;
@@ -216,28 +216,28 @@ fn set_herald_strings_in_viewnode (
       container_to_contents, content_to_containers,
       node_pid, anc_pid, *generation ); }
   if ! stands_as_member_here {
-    // A child standing as no member under a subscribee-as-such: the
-    // content the subscriber hides, retained there claiming nothing,
+    // A child standing as no member under a forkee-as-such: the
+    // content the forker hides, retained there claiming nothing,
     // with its subtree, says so, as the hiddenInForkPartnerFolder's
     // members do.
-    if let Some (subscriber_pid) =
+    if let Some (forker_pid) =
       tree . get (treeid) . unwrap () . parent ()
-      . and_then ( |parent| subscriber_of_subscribee_as_such (tree, parent . id ()) )
+      . and_then ( |parent| forker_of_forkee_as_such (tree, parent . id ()) )
     { if relationship_is_visible (
-        graph, restriction, relRepos, node_pid, &subscriber_pid,
+        graph, restriction, relRepos, node_pid, &forker_pid,
         RelationRole::new (NodeRelation::Hides, BinaryRolePosition::First) )
       { flags . record (NodeRelation::Hides, true, 3); }}}
   let unintegrated : Option<usize> =
-    // A subscribee as such counts the nodes its content goal draws as
+    // A forkee as such counts the nodes its content goal draws as
     // occurrences: nodes the skgrepo restriction shows, as the count of its
     // contents is ('RelationCounts').
     if stands_as_member_here {
-      subscriber_of_subscribee_as_such (tree, treeid) . map ( |subscriber| {
+      forker_of_forkee_as_such (tree, treeid) . map ( |forker| {
         let members : HashSet<ID> = content_goal_gnids (
           graph, restriction,
           &graph . outbound_member_keys_for_relation_gated (
             node_pid, NodeRelation::Contains, restriction ),
-          Some (&subscriber) )
+          Some (&forker) )
           . into_iter ()
           . filter ( |gnid| graph . node_is_shown (gnid, restriction) )
           . collect ();
@@ -432,7 +432,7 @@ fn side_of_role (
 
 /// A partner-folder member's birth facts. The folder's recorder is the
 /// member's grandparent; the compound partner folders sit one or two
-/// levels deeper under the subscriber. (The table of birth facts is in
+/// levels deeper under the forker. (The table of birth facts is in
 /// docs/api-and-formats.org.)
 fn birth_facts_for_folder (
   tree          : &Tree<Viewnode>,
@@ -464,10 +464,10 @@ fn birth_facts_for_folder (
         else { return Vec::new (); }; // unsayable, so entombstoned
       once ( BirthFact::new (
           NodeRelation::Hides, Side::In,
-          generation_above_a_member (tree, folder_treeid, parties . subscriber) ))
-        . chain ( parties . subscribee . map ( |subscribee| BirthFact::new (
+          generation_above_a_member (tree, folder_treeid, parties . forker) ))
+        . chain ( parties . forkee . map ( |forkee| BirthFact::new (
             NodeRelation::Contains, Side::In,
-            generation_above_a_member (tree, folder_treeid, subscribee) )) )
+            generation_above_a_member (tree, folder_treeid, forkee) )) )
         . collect () },
     // 'ParentKind::Folder' holds partner folders only.
     Folder::Alias | Folder::ID | Folder::Flags { .. } => Vec::new (),

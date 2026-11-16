@@ -14,17 +14,17 @@ mod content_view;
 #[path = "editable_view_cascade_and_budget.rs"]
 mod editable_view_cascade_and_budget;
 
-#[path = "hidden_from_subscriptions.rs"]
-mod hidden_from_subscriptions;
+#[path = "hidden_from_forks.rs"]
+mod hidden_from_forks;
 
 #[path = "initial_view_bfs.rs"]
 mod initial_view_bfs;
 
-#[path = "subscribee_folder_empty_persists.rs"]
-mod subscribee_folder_empty_persists;
+#[path = "forks_folder_empty_persists.rs"]
+mod forks_folder_empty_persists;
 
-#[path = "subscribee_heralds.rs"]
-mod subscribee_heralds;
+#[path = "forkee_heralds.rs"]
+mod forkee_heralds;
 
 #[path = "viewnode_ids.rs"]
 mod viewnode_ids;

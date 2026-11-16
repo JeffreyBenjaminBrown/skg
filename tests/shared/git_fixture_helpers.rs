@@ -4,7 +4,7 @@
 // carrying change facts.
 // Declared once per test target that uses it, in
 // 'tests/grouped_repos.rs', 'tests/grouped_unit.rs',
-// 'tests/grouped_views.rs', 'tests/grouped_overrides.rs' and
+// 'tests/grouped_views.rs', 'tests/grouped_forks.rs' and
 // 'tests/grouped_saves.rs'.
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;

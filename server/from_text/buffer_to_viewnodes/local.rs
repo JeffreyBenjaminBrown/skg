@@ -557,7 +557,7 @@ fn validate_vognode_identity_and_structure (
   let mut errors : Vec<String> = Vec::new();
   if !id_present {
     errors . push( format!("{} must have an ID.", label) ); }
-  let is_subscribee_as_such : bool =
+  let is_forkee_as_such : bool =
     // A member of a forks folder is the one vognode position that
     // legitimately carries a hiddenInForkPartnerFolder (the refresh
     // puts one under a forkee as such); rendering puts the folder
@@ -569,7 +569,7 @@ fn validate_vognode_identity_and_structure (
     . unwrap_or (false);
   if !generation_includes_only(
     tree, treeid, 1, true,
-    |node| !cannot_be_child_of_vognode (node, is_subscribee_as_such))
+    |node| !cannot_be_child_of_vognode (node, is_forkee_as_such))
     { errors . push( format!("{} has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInForkPartnerFolder (outside a forks folder's member), or HiddenOutsideOfForkPartnersFolder.", label) ); }
   if !claiming_children_have_distinct_gnids(tree, treeid) {
     errors . push( format!("Two claiming children of this {} stand for one node; only one may claim.", label . to_lowercase ()) ); }
@@ -619,16 +619,16 @@ fn restoreRel_stands_where_it_may (
 
 fn cannot_be_child_of_vognode (
   node : &Viewnode,
-  parent_is_subscribee_as_such : bool,
+  parent_is_forkee_as_such : bool,
 ) -> bool {
   matches!(&node . kind,
     ViewnodeKind::BufferRoot |
     ViewnodeKind::PropertyMember (
       PropertyMember::Alias { .. } | PropertyMember::ID { .. } | PropertyMember::Flag { .. }) |
     ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners))
-  || ( ! parent_is_subscribee_as_such
+  || ( ! parent_is_forkee_as_such
        // validate_hiddenin requires a vognode parent; a
-       // subscribee-as-such is the position that warrants one.
+       // forkee-as-such is the position that warrants one.
        && matches!(&node . kind,
             ViewnodeKind::Folder (Folder::HiddenInForkPartner)) ) }
 

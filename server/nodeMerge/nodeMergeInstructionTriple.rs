@@ -70,15 +70,15 @@ fn nodeMerge_from_acquirer_and_acquiree (
   let acquiree_text_preserver : Graphnode =
     create_acquiree_text_preserver (&acquiree_from_disk);
   let shown_pre_merge : HashSet<ID> = {
-    // Whatever either member showed as unintegrated subscribed
+    // Whatever either member showed as unintegrated forkee
     // content before the merge, the merged node must keep showing,
     // so these ids are dropped from the combined
     // hides below.
     let mut shown : HashSet<ID> =
-      gnids_shown_through_subscriptions (
+      gnids_shown_through_forks (
         &acquirer_from_disk, graph, config ) ?;
     shown . extend (
-      gnids_shown_through_subscriptions (
+      gnids_shown_through_forks (
         &acquiree_from_disk, graph, config ) ? );
     shown };
   let updated_acquirer : Graphnode =
@@ -204,12 +204,12 @@ fn three_nodeMerged_graphnodes(
       MSV::Specified (combined); }
   { // Combine hides, filtering to hide
     // nothing that the acquirer contains, and nothing either member
-    // showed through its subscriptions pre-merge: if it was
-    // contained in one member's subscribee and unhidden by (and not
+    // showed through its forks pre-merge: if it was
+    // contained in one member's forkee and unhidden by (and not
     // contained in) that member, the merge keeps showing it -- one
     // member's hide never silences the other's view. ("Something
     // like the intersection": exactly the intersection when both
-    // members could see the id through some subscribee.)
+    // members could see the id through some forkee.)
     let mut combined : Vec<RelPartner<ID>> = combine_rel_partners (
       & [ acquirer_from_disk . hides
             . or_default (),
@@ -224,12 +224,12 @@ fn three_nodeMerged_graphnodes(
       MSV::Specified (combined); }
   Ok (updated_acquirer) }
 
-/// The ids 'node' shows as unintegrated subscribed content: contained
-/// by some node it subscribes to, and neither hidden by it nor among
-/// its own contents (the subscribee-as-such display rule,
-/// docs/sharing-model.org). A subscribee with no disk entry
+/// The ids 'node' shows as unintegrated forkee content: contained
+/// by some node it forks, and neither hidden by it nor among
+/// its own contents (the forkee-as-such display rule,
+/// docs/sharing-model.org). A forkee with no disk entry
 /// contributes nothing.
-fn gnids_shown_through_subscriptions (
+fn gnids_shown_through_forks (
   node   : &Graphnode,
   graph  : &InRustGraph,
   config : &SkgConfig,
@@ -239,11 +239,11 @@ fn gnids_shown_through_subscriptions (
     members_of ( node . hides . or_default () );
   let contains : Vec<ID> =
     members_of ( & node . contains );
-  for subscribee_gnid in members_of ( node . forks . or_default () ) {
-    let Some (subscribee) = opt_graphnode_by_gnid (
-      graph, config, &subscribee_gnid ) ?
+  for forkee_gnid in members_of ( node . forks . or_default () ) {
+    let Some (forkee) = opt_graphnode_by_gnid (
+      graph, config, &forkee_gnid ) ?
     else { continue; };
-    for gnid in members_of ( & subscribee . contains ) {
+    for gnid in members_of ( & forkee . contains ) {
       if ! hides . contains (&gnid)
         && ! contains . contains (&gnid)
       { shown . insert ( gnid ); }} }

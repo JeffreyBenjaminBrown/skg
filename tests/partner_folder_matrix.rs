@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(partner_folder_matrix::)'
+// cargo nextest run --test grouped_forks -E 'test(partner_folder_matrix::)'
 //
 // The batched relationship-matrix target
 // ('docs/sharing-model.org', "The write-protected folders"). One test

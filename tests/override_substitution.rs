@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(override_substitution::)'
+// cargo nextest run --test grouped_forks -E 'test(override_substitution::)'
 //
 // Override substitution ('docs/override.org', "Automatic override
 // substitution"):

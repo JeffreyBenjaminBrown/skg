@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(collateral_repo_move::)'
+// cargo nextest run --test grouped_forks -E 'test(collateral_repo_move::)'
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use futures::executor::block_on;

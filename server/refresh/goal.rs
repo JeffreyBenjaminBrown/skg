@@ -1,6 +1,6 @@
 //! The goal of a parent: what the truth says its children should
 //! contain. For an occurrence's content, its 'contains' list in file
-//! order (for a subscribee as such, less what the subscriber hides or
+//! order (for a forkee as such, less what the forker hides or
 //! contains); for a node of the containerward chain under a folder's
 //! member, its containers; for a folder, its partners in the folder's
 //! relation (for the containers folder, those the view does not
@@ -267,10 +267,10 @@ fn content_goal (
 ) -> Goal {
   let graph : &InRustGraph = walk . truth . graph;
   let restriction : &SkgrepoRestriction = walk . truth . restriction;
-  let subscriber : Option<ID> = subscriber_of_subscribee_as_such (tree, parent);
+  let forker : Option<ID> = forker_of_forkee_as_such (tree, parent);
   let unintegrated : &dyn Fn (Vec<ID>) -> Vec<ID> = &|contents : Vec<ID>| -> Vec<ID> {
-    less_what_the_subscriber_integrates (
-      graph, restriction, subscriber . as_ref (), &contents ) };
+    less_what_the_forker_integrates (
+      graph, restriction, forker . as_ref (), &contents ) };
   if let Some (goal) = diff_view::content_goal (pid, unintegrated, walk) {
     return goal; }
   let members : Vec<RelPartner<RelationshipMemberKey>> =
@@ -279,58 +279,58 @@ fn content_goal (
   let relRepos : HashMap<ID, SkgrepoName> =
     unknown_or_restricted_members_relRepos (graph, restriction, pid, &members);
   Goal::ordered ( gnid_items (
-    content_goal_gnids ( graph, restriction, &members, subscriber . as_ref () ),
+    content_goal_gnids ( graph, restriction, &members, forker . as_ref () ),
     &relRepos )) }
 
 /// The content an occurrence shows outside the diff view: the members
 /// of its 'contains' list whose records the skgrepo restriction shows
 /// ('members', gated, a raw ID where nothing answers), less what
-/// 'subscriber' hides or contains when the occurrence is a subscribee
+/// 'forker' hides or contains when the occurrence is a forkee
 /// as such. The restricted members among them are drawn as Restricted
-/// vognodes. The stats pass counts a subscribee's unintegrated content
+/// vognodes. The stats pass counts a forkee's unintegrated content
 /// from it, so that the count is what is drawn.
 pub(crate) fn content_goal_gnids (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
   members     : &[RelPartner<RelationshipMemberKey>],
-  subscriber  : Option<&ID>,
+  forker      : Option<&ID>,
 ) -> Vec<ID> {
   let contents : Vec<ID> = members . iter ()
     . map ( |member| member . member . id () . clone () )
     . collect ();
-  less_what_the_subscriber_integrates (graph, restriction, subscriber, &contents) }
+  less_what_the_forker_integrates (graph, restriction, forker, &contents) }
 
-/// 'contents' less what 'subscriber' hides or contains, as the truth
-/// has it ('unintegrated_content_gnids'): what a subscribee as such
+/// 'contents' less what 'forker' hides or contains, as the truth
+/// has it ('unintegrated_content_gnids'): what a forkee as such
 /// shows of its content. All of 'contents' when there is no
-/// subscriber.
-fn less_what_the_subscriber_integrates (
+/// forker.
+fn less_what_the_forker_integrates (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
-  subscriber  : Option<&ID>,
+  forker      : Option<&ID>,
   contents    : &[ID],
 ) -> Vec<ID> {
-  let Some (subscriber) : Option<&ID> = subscriber
+  let Some (forker) : Option<&ID> = forker
     else { return contents . to_vec (); };
   unintegrated_content_gnids (
     graph, contents,
     &graph . outbound_gnids_for_relation_gated (
-      subscriber, NodeRelation::Hides, restriction ),
+      forker, NodeRelation::Hides, restriction ),
     &graph . outbound_gnids_for_relation_gated (
-      subscriber, NodeRelation::Contains, restriction )) }
+      forker, NodeRelation::Contains, restriction )) }
 
-/// What a subscribee as such shows of its content: its content less
-/// what its subscriber hides or contains. Inputs preserve raw IDs; extra IDs are
+/// What a forkee as such shows of its content: its content less
+/// what its forker hides or contains. Inputs preserve raw IDs; extra IDs are
 /// resolved before comparing membership, without replacing overridden nodes.
 fn unintegrated_content_gnids (
   graph               : &InRustGraph,
   content_gnids      : &[ID],
-  subscriber_hidden   : &[ID],
-  subscriber_contains : &[ID],
+  forker_hidden       : &[ID],
+  forker_contains     : &[ID],
 ) -> Vec<ID> {
   let contents : Vec<ID> = resolve_all (content_gnids, graph);
-  let hidden : Vec<ID> = resolve_all (subscriber_hidden, graph);
-  let contained : Vec<ID> = resolve_all (subscriber_contains, graph);
+  let hidden : Vec<ID> = resolve_all (forker_hidden, graph);
+  let contained : Vec<ID> = resolve_all (forker_contains, graph);
   setlike_vector_subtraction (
     setlike_vector_subtraction (contents, &hidden), &contained) }
 
@@ -340,7 +340,7 @@ fn unintegrated_content_gnids (
 /// folder reads its members' claims ('parent_reads_claims'), a member
 /// claiming nothing is none: a forker-only member, or a forkee the user
 /// detached.
-pub(crate) fn subscriber_of_subscribee_as_such (
+pub(crate) fn forker_of_forkee_as_such (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Option<ID> {
@@ -386,15 +386,15 @@ fn folder_goal (
     Folder::HiddenInForkPartner => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       Some ( Goal::unordered ( gnid_items (
-        hidden_in_subscribee (
-          &occurrence_pid_of (parties . subscribee ?) ?,
-          &occurrence_pid_of (parties . subscriber) ?, walk ),
+        hidden_in_forkee (
+          &occurrence_pid_of (parties . forkee ?) ?,
+          &occurrence_pid_of (parties . forker) ?, walk ),
         &HashMap::new ()))) },
     Folder::HiddenOutsideOfForkPartners => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       Some ( Goal::ordered ( gnid_items (
-        hidden_outside_of_subscribees (
-          &occurrence_pid_of (parties . subscriber) ?, walk ),
+        hidden_outside_of_forkees (
+          &occurrence_pid_of (parties . forker) ?, walk ),
         &HashMap::new ()))) },
     Folder::Forks =>
       Some ( forks_folder_goal (&described_pid () ?, walk) ),
@@ -540,76 +540,76 @@ pub(crate) fn partnerFolder_members_in_graph (
       viewparent_pid, recorder_role, skgrepo_restriction ) };
   Some (members) }
 
-/// What 'subscriber' hides in the content of 'subscribee', by the
+/// What 'forker' hides in the content of 'forkee', by the
 /// records the skgrepo restriction shows: the goal of the compound
 /// folder 'HiddenInForkPartner' under the forkee as such.
-pub(crate) fn hidden_in_subscribee (
-  subscribee : &ID,
-  subscriber : &ID,
+pub(crate) fn hidden_in_forkee (
+  forkee     : &ID,
+  forker     : &ID,
   walk       : &Walk,
 ) -> Vec<ID> {
   let graph : &InRustGraph = walk . truth . graph;
-  let goal : Vec<ID> = goal_list_for_hiddenInSubscribee_folder (
+  let goal : Vec<ID> = goal_list_for_hiddenInForkPartner_folder (
     graph,
     &graph . outbound_gnids_for_relation_gated (
-      subscribee, NodeRelation::Contains, walk . truth . restriction ),
+      forkee, NodeRelation::Contains, walk . truth . restriction ),
     &graph . outbound_gnids_for_relation_gated (
-      subscriber, NodeRelation::Hides, walk . truth . restriction ));
+      forker, NodeRelation::Hides, walk . truth . restriction ));
   resolve_all (&goal, graph) }
 
 /// Goal list for a hiddenInForkPartnerFolder: the intersection of the
-/// subscriber's hides-list and the subscribee's contains-list, in the
+/// forker's hides-list and the forkee's contains-list, in the
 /// order of the hides list.
-fn goal_list_for_hiddenInSubscribee_folder (
+fn goal_list_for_hiddenInForkPartner_folder (
   graph                : &InRustGraph,
-  subscribee_contains : &[ID],
-  subscriber_hides    : &[ID],
+  forkee_contains     : &[ID],
+  forker_hides        : &[ID],
 ) -> Vec<ID> {
   let contains_set : HashSet<ID> =
-    resolve_all (subscribee_contains, graph) . into_iter () . collect ();
-  subscriber_hides . iter ()
+    resolve_all (forkee_contains, graph) . into_iter () . collect ();
+  forker_hides . iter ()
     . filter ( |gnid| contains_set . contains (&graph . pid_else_raw_id (gnid)) )
     . cloned () . collect () }
 
-/// What 'subscriber' hides outside the content of its subscribees, by
+/// What 'forker' hides outside the content of its forkees, by
 /// the records the skgrepo restriction shows: the goal of its compound
 /// folder 'HiddenOutsideOfForkPartners', in the order of its hides list.
-/// A subscribee's content is read by the same records, so a hide of
-/// something a subscribee contains only by a restricted record stands
+/// A forkee's content is read by the same records, so a hide of
+/// something a forkee contains only by a restricted record stands
 /// here, outside, as it does in the view.
-pub(crate) fn hidden_outside_of_subscribees (
-  subscriber : &ID,
+pub(crate) fn hidden_outside_of_forkees (
+  forker     : &ID,
   walk       : &Walk,
 ) -> Vec<ID> {
   let graph : &InRustGraph = walk . truth . graph;
-  let goal : Vec<ID> = goal_list_for_hiddenOutsideOfSubscribee_folder (
+  let goal : Vec<ID> = goal_list_for_hiddenOutsideOfForkPartners_folder (
     graph,
     &graph . outbound_gnids_for_relation_gated (
-      subscriber, NodeRelation::Hides, walk . truth . restriction ),
+      forker, NodeRelation::Hides, walk . truth . restriction ),
     &graph . outbound_gnids_for_relation_gated (
-      subscriber, NodeRelation::Forks, walk . truth . restriction ),
+      forker, NodeRelation::Forks, walk . truth . restriction ),
     walk . truth . restriction );
   resolve_all (&goal, graph) }
 
-/// Goal list for a hiddenOutsideOfForkPartnersFolder: the subscriber's
-/// hides-list minus everything any subscribee contains by a record
+/// Goal list for a hiddenOutsideOfForkPartnersFolder: the forker's
+/// hides-list minus everything any forkee contains by a record
 /// the skgrepo restriction shows.
-fn goal_list_for_hiddenOutsideOfSubscribee_folder (
+fn goal_list_for_hiddenOutsideOfForkPartners_folder (
   graph             : &InRustGraph,
-  subscriber_hides  : &[ID],
-  subscribees       : &[ID],
+  forker_hides      : &[ID],
+  forkees           : &[ID],
   restriction       : &SkgrepoRestriction,
 ) -> Vec<ID> {
-  let subscribee_content_of : &dyn Fn (&ID) -> Vec<ID> = &|subscribee : &ID| -> Vec<ID> {
+  let forkee_content_of : &dyn Fn (&ID) -> Vec<ID> = &|forkee : &ID| -> Vec<ID> {
     graph . outbound_gnids_for_relation_gated (
-      &graph . pid_else_raw_id (subscribee), NodeRelation::Contains, restriction ) };
-  let all_subscribee_content : HashSet<ID> =
-    subscribees . iter ()
-      . flat_map ( |pid| subscribee_content_of (pid) )
+      &graph . pid_else_raw_id (forkee), NodeRelation::Contains, restriction ) };
+  let all_forkee_content : HashSet<ID> =
+    forkees . iter ()
+      . flat_map ( |pid| forkee_content_of (pid) )
       . map ( |gnid| graph . pid_else_raw_id (&gnid) )
       . collect ();
-  subscriber_hides . iter ()
-    . filter ( |gnid| ! all_subscribee_content
+  forker_hides . iter ()
+    . filter ( |gnid| ! all_forkee_content
               . contains (&graph . pid_else_raw_id (gnid)) )
     . cloned () . collect () }
 

@@ -1,16 +1,16 @@
 //! What a save hides and stops hiding, in words a user can read
 //! ('docs/api-and-formats.org', "Save buffer": the '(hides ...)'
 //! entry). A hide is never typed: the server infers it from what left
-//! a subscriber's content ('resolve_visibility.rs'), or from an edit
+//! a forker's content ('resolve_visibility.rs'), or from an edit
 //! of a hidden folder. So a gesture that hides nothing looks, in the
 //! buffer, just like one that works; these lines tell them apart.
 //! .
 //! The lines compare the plan with the graph, not the inference's own
-//! steps: for each subscriber the plan writes (a fork's clone
+//! steps: for each forker the plan writes (a fork's clone
 //! included), its hides as the plan leaves them against its hides on
 //! disk. That catches every source of a hide, and reports what the
 //! save will in fact write. Then each child that left an owned
-//! subscriber that subscribes to something, and whose departure hid
+//! forker that forks something, and whose departure hid
 //! nothing, earns a "Hides nothing:" line naming the rule that held.
 //! .
 //! Only what the skgrepo restriction shows counts, as in the
@@ -29,7 +29,7 @@ use crate::types::save::{ForkSpec, NodeInstruction, SaveNode};
 use std::collections::{HashMap, HashSet};
 
 /// One line per hide and per unhide the plan writes, then one per
-/// removal from a subscriber that hides nothing, saying why.
+/// removal from a forker that hides nothing, saying why.
 pub fn hide_report_lines (
   graph             : &InRustGraph,
   config            : &SkgConfig,
@@ -64,7 +64,7 @@ pub fn hide_report_lines (
     format! ("'{}'", title) };
   let clones : HashSet<ID> =
     fork_specs . iter () . map ( |spec| spec . clone . 0 . pid . clone () ) . collect ();
-  let subscriber_label = |pid : &ID| -> String { // a clone keeps its original's title, so it is named as the fork
+  let forker_label = |pid : &ID| -> String { // a clone keeps its original's title, so it is named as the fork
     if clones . contains (pid) { format! ("the fork {}", label (pid)) }
     else { label (pid) } };
   let key = |gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
@@ -85,23 +85,23 @@ pub fn hide_report_lines (
     let hides_after : Vec<ID> = match &node . hides {
       MSV::Specified (hides) => visible_members (hides),
       MSV::Unspecified => disk_hides . clone (), };
-    let subscribees : Vec<ID> = match &node . forks {
-      MSV::Specified (subscribes) => visible_members (subscribes),
+    let forkees : Vec<ID> = match &node . forks {
+      MSV::Specified (forkees) => visible_members (forkees),
       MSV::Unspecified => on_disk . as_ref ()
         . map ( |disk| visible_members (disk . forks . or_default ()) )
         . unwrap_or_default (), };
-    let subscribee_contents : Vec<(ID, Vec<ID>)> =
-      subscribees . iter ()
-      . map ( |subscribee| (
-        subscribee . clone (),
-        graphnode_from_graph (graph, subscribee)
-          . map ( |subscribee| visible_members (&subscribee . contains) )
+    let forkee_contents : Vec<(ID, Vec<ID>)> =
+      forkees . iter ()
+      . map ( |forkee| (
+        forkee . clone (),
+        graphnode_from_graph (graph, forkee)
+          . map ( |forkee| visible_members (&forkee . contains) )
           . unwrap_or_default () ))
       . collect ();
-    let containers_of = |member : &ID| -> String { // the subscribees whose content holds 'member', named
-      subscribee_contents . iter ()
+    let containers_of = |member : &ID| -> String { // the forkees whose content holds 'member', named
+      forkee_contents . iter ()
         . filter ( |(_, content)| content . contains (member) )
-        . map ( |(subscribee, _)| label (subscribee) )
+        . map ( |(forkee, _)| label (forkee) )
         . collect::<Vec<String>> () . join (" and ") };
     let as_content_of = |member : &ID| -> String {
       let containers : String = containers_of (member);
@@ -117,18 +117,18 @@ pub fn hide_report_lines (
       . collect ();
     for member in &hidden {
       changes . push ( format! ( "Hides {} from {}{}.",
-        label (member), subscriber_label (&node . pid), as_content_of (member) )); }
+        label (member), forker_label (&node . pid), as_content_of (member) )); }
     for member in &unhidden {
       changes . push ( format! ( "Stops hiding {} from {}{}.",
-        label (member), subscriber_label (&node . pid), as_content_of (member) )); }
+        label (member), forker_label (&node . pid), as_content_of (member) )); }
     let Some (disk) = &on_disk else { continue; };
-    if subscribees . is_empty () { continue; }
+    if forkees . is_empty () { continue; }
     let contains_after : Vec<ID> = visible_members (&node . contains);
     let removed : Vec<ID> = visible_members (&disk . contains) . into_iter ()
       . filter ( |child| ! contains_after . contains (child) )
       . filter ( |child| ! deleted . contains (child) )
       . collect ();
-    let all_content : HashSet<ID> = subscribee_contents . iter ()
+    let all_content : HashSet<ID> = forkee_contents . iter ()
       . flat_map ( |(_, content)| content . iter () . cloned () )
       . collect ();
     for child in &removed {
@@ -139,8 +139,8 @@ pub fn hide_report_lines (
       let why : String = match stands_for {
         None => format! (
           "it is no content of {}, nor a mirror of any",
-          subscribee_contents . iter ()
-            . map ( |(subscribee, _)| label (subscribee) )
+          forkee_contents . iter ()
+            . map ( |(forkee, _)| label (forkee) )
             . collect::<Vec<String>> () . join (" or ") ),
         Some (member) if hidden . contains (&&member)
                          || deleted . contains (&member) => continue,

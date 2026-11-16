@@ -1,8 +1,8 @@
 //! A reply typed in the unread list files the message it answers.
 //!
-//! An owned subscriber F draws, in its forks folder, each
-//! subscribee S as such: S's members that F neither contains nor
-//! hides ('less_what_the_subscriber_integrates' in
+//! An owned forker F draws, in its forks folder, each
+//! forkee S as such: S's members that F neither contains nor
+//! hides ('less_what_the_forker_integrates' in
 //! 'server/refresh/goal.rs'). Read as mail, those are the messages F's
 //! owner has not touched. Writing in one of them (a reply typed under
 //! it, which forks it when it is foreign, or any other edit of it or
@@ -42,25 +42,25 @@ use crate::types::viewnode::{
 use ego_tree::{NodeId, NodeRef};
 use std::collections::HashSet;
 
-/// One member to file: the subscriber's occurrence and ID, and the
-/// member's occurrence and the ID its subscribee's list names.
+/// One member to file: the forker's occurrence and ID, and the
+/// member's occurrence and the ID its forkee's list names.
 struct Filing {
-  subscriber_at : NodeId,
-  subscriber    : ID,
+  forker_at     : NodeId,
+  forker        : ID,
   member_at     : NodeId,
   member        : ID,
 }
 
-/// File each subscribee member the save writes in: append it to the
-/// contains of its subscriber's Save in 'node_instructions' (the
+/// File each forkee member the save writes in: append it to the
+/// contains of its forker's Save in 'node_instructions' (the
 /// planned one if there is one, else one from the graph), and move its
-/// headline to the end of the subscriber's content in 'viewforest'.
+/// headline to the end of the forker's content in 'viewforest'.
 /// What the save writes: the nodes 'node_instructions' saves or
 /// deletes, and the originals 'fork_specs' clone. 'left_stale' are
 /// the pids the save leaves as the graph has them, because they
 /// changed since the buffer was drawn and the buffer did not edit them
 /// ('without_unedited_stale_saves'): writing one would refuse the save.
-pub fn file_subscribee_members_written_in (
+pub fn file_forkee_members_written_in (
   viewforest        : &mut ViewForest,
   graph             : &InRustGraph,
   config            : &SkgConfig,
@@ -79,23 +79,23 @@ pub fn file_subscribee_members_written_in (
     . collect ();
   if written . is_empty () { return Ok (( )); }
   for filing in
-    subscribee_members_written_in (viewforest, graph, config, restriction, &written)
-  { if left_stale . contains (&graph . pid_else_raw_id (&filing . subscriber))
+    forkee_members_written_in (viewforest, graph, config, restriction, &written)
+  { if left_stale . contains (&graph . pid_else_raw_id (&filing . forker))
     { continue; }
-    if file_in_subscriber (
+    if file_in_forker (
          graph, config, restriction, node_instructions,
-         &filing . subscriber, &filing . member )
+         &filing . forker, &filing . member )
     { move_to_last_child (
-        viewforest, filing . subscriber_at, filing . member_at ) ?; }}
+        viewforest, filing . forker_at, filing . member_at ) ?; }}
   Ok (( )) }
 
-/// Each member A of the content of a subscribee S as such, in the
+/// Each member A of the content of a forkee S as such, in the
 /// forks folder of an occurrence F whose contains the save writes
 /// ('saves_its_contains'), such that S's contains names A and an
 /// editable occurrence at A or in its content, at any depth, is of a
 /// node in 'written'. A child of S that S's list does not name is no
 /// member of S, only a node the user placed there ('docs/sharing-model.org').
-fn subscribee_members_written_in (
+fn forkee_members_written_in (
   viewforest  : &ViewForest,
   graph       : &InRustGraph,
   config      : &SkgConfig,
@@ -106,32 +106,32 @@ fn subscribee_members_written_in (
   for folder in viewforest . nodes () {
     if ! matches! ( folder . value () . kind, ViewnodeKind::Folder (Folder::Forks) )
     { continue; }
-    let Some (subscriber) : Option<NodeRef<Viewnode>> = folder . parent ()
+    let Some (forker) : Option<NodeRef<Viewnode>> = folder . parent ()
       else { continue; };
-    let Some (subscriber_occurrence) : Option<&Occurrence> =
-      occurrence_of (subscriber) else { continue; };
-    if ! saves_its_contains (subscriber, subscriber_occurrence, config) { continue; }
-    for subscribee in folder . children () {
-      let Some (subscribee_occurrence) : Option<&Occurrence> = occurrence_of (subscribee)
+    let Some (forker_occurrence) : Option<&Occurrence> =
+      occurrence_of (forker) else { continue; };
+    if ! saves_its_contains (forker, forker_occurrence, config) { continue; }
+    for forkee in folder . children () {
+      let Some (forkee_occurrence) : Option<&Occurrence> = occurrence_of (forkee)
         else { continue; };
-      if ! subscribee_occurrence . claimsMembership { continue; }
+      if ! forkee_occurrence . claimsMembership { continue; }
       let its_list : HashSet<ID> =
         graph . outbound_gnids_for_relation_gated (
-          &graph . pid_else_raw_id (&subscribee_occurrence . gnid),
+          &graph . pid_else_raw_id (&forkee_occurrence . gnid),
           NodeRelation::Contains, restriction )
         . iter () . map ( |gnid| graph . pid_else_raw_id (gnid) ) . collect ();
-      for member in subscribee . children () {
+      for member in forkee . children () {
         let Some (occurrence) : Option<&Occurrence> = occurrence_of (member)
           else { continue; };
         // A shown overrider stands for the original it is shown in
-        // place of, which is what the subscribee's list names.
+        // place of, which is what the forkee's list names.
         let named : ID = occurrence . collected_gnid ();
         if occurrence_child_counts_as_content (occurrence)
            && its_list . contains (&graph . pid_else_raw_id (&named))
            && is_written_in (member, graph, written)
         { filings . push ( Filing {
-            subscriber_at : subscriber . id (),
-            subscriber    : subscriber_occurrence . gnid . clone (),
+            forker_at     : forker . id (),
+            forker        : forker_occurrence . gnid . clone (),
             member_at     : member . id (),
             member        : named, } ); }}}}
   filings }
@@ -153,20 +153,20 @@ fn is_written_in (
 
 /// Whether the save writes the contains of the occurrence at 'node':
 /// it is editable, of a node in a skgrepo the user owns, not marked
-/// for deletion, and not itself a subscribee as such.
+/// for deletion, and not itself a forkee as such.
 fn saves_its_contains (
   node       : NodeRef<Viewnode>,
   occurrence : &Occurrence,
   config     : &SkgConfig,
 ) -> bool {
-  let subscribee_as_such : bool =
+  let forkee_as_such : bool =
     occurrence . claimsMembership
     && node . parent () . is_some_and ( |parent| matches! (
       parent . value () . kind, ViewnodeKind::Folder (Folder::Forks) ));
   ! occurrence . is_writeProtected ()
   && config . skgrepo_is_owned (&occurrence . home_skgrepo)
   && ! matches! ( occurrence . edit_request (), Some (NodeEditRequest::Delete) )
-  && ! subscribee_as_such }
+  && ! forkee_as_such }
 
 fn occurrence_of<'a> (
   node : NodeRef<'a, Viewnode>,
@@ -175,33 +175,33 @@ fn occurrence_of<'a> (
     ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) => Some (occurrence),
     _ => None, } }
 
-/// Append 'member' to the contains of the Save of 'subscriber' in
+/// Append 'member' to the contains of the Save of 'forker' in
 /// 'node_instructions', adding one from the graph if there is none,
-/// unless that Save deletes the subscriber or already contains or
+/// unless that Save deletes the forker or already contains or
 /// hides the member, or contains a mirror of it, under the skgrepo
 /// restriction (filing the member too could draw that mirror twice
 /// there). The record is
 /// at the relRepo a new record between the two would take
 /// ('SkgConfig::default_relRepo'). Whether it appended.
-fn file_in_subscriber (
+fn file_in_forker (
   graph             : &InRustGraph,
   config            : &SkgConfig,
   restriction       : &SkgrepoRestriction,
   node_instructions : &mut Vec<NodeInstruction>,
-  subscriber        : &ID,
+  forker            : &ID,
   member            : &ID,
 ) -> bool {
-  let subscriber : ID = graph . pid_else_raw_id (subscriber);
+  let forker : ID = graph . pid_else_raw_id (forker);
   let planned : Option<usize> =
     node_instructions . iter () . position ( |instruction| match instruction {
-      NodeInstruction::Save (SaveNode (node)) => node . pid == subscriber,
+      NodeInstruction::Save (SaveNode (node)) => node . pid == forker,
       NodeInstruction::Delete (delete) =>
-        graph . pid_else_raw_id (&delete . gnid) == subscriber, } );
+        graph . pid_else_raw_id (&delete . gnid) == forker, } );
   let mut node : Graphnode = match planned {
     Some (i) => match &node_instructions [i] {
       NodeInstruction::Save (SaveNode (node)) => node . clone (),
       NodeInstruction::Delete (_) => return false, },
-    None => match graphnode_from_graph (graph, &subscriber) {
+    None => match graphnode_from_graph (graph, &forker) {
       Some (node) => node,
       None => return false, }, };
   let member : ID = graph . pid_else_raw_id (member);

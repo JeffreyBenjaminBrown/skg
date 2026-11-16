@@ -162,7 +162,7 @@ fn orphan_warnings (
 /// Whether the save creates a node from 'node', an editable occurrence
 /// without a delete request whose gnid the graph lacks, and its parent
 /// reads no claims. (A claiming child of a forks folder is a
-/// subscribee as such, which the save does not create.)
+/// forkee as such, which the save does not create.)
 fn is_created_as_an_orphan (
   viewforest : &ViewForest,
   node       : NodeRef<Viewnode>,

@@ -25,7 +25,7 @@ use std::error::Error;
 use crate::parse_helpers::viewforest_as_written;
 
 const SUBSCRIBEE_EDIT_CONFIG : &str =
-  "tests/hidden_from_subscriptions/fixtures-subscribee-edit/skgconfig.toml";
+  "tests/hidden_from_forks/fixtures-subscribee-edit/skgconfig.toml";
 
 /// This parses the way production does, supplying ids and repos
 /// from the graph on disk. Orgs that mention on-disk nodes need it.

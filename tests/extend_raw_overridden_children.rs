@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(extend_raw_overridden_children::)'
+// cargo nextest run --test grouped_forks -E 'test(extend_raw_overridden_children::)'
 //
 // Substitution does not apply to the immediate children of an
 // overridden node shown raw ('docs/override.org', "Automatic override

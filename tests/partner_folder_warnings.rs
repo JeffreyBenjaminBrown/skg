@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(partner_folder_warnings::)'
+// cargo nextest run --test grouped_forks -E 'test(partner_folder_warnings::)'
 //
 // When the refresh corrects a write-protected partner folder in the
 // view the user just saved, the save succeeds, and the only warning is

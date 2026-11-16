@@ -112,11 +112,11 @@ pub fn stranded_relationships (
       let Some (recorder_home_before) = home_before (&recorder_pid)
         else { continue; };
       let recorder_home_after : SkgrepoName = recorder . home_skgrepo . clone ();
-      let subscribes_before : Vec<RelPartner<ID>> =
+      let forks_before : Vec<RelPartner<ID>> =
         graph . nodes . get (&recorder_pid)
         . map ( |node| node . forks . or_default () . to_vec () )
         . unwrap_or_default ();
-      let subscribes_after : Vec<RelPartner<ID>> =
+      let forks_after : Vec<RelPartner<ID>> =
         recorder . forks . or_default () . to_vec ();
       for partner in relation_list (&recorder, relation) {
         let member : ID = resolve (&partner . member);
@@ -130,10 +130,10 @@ pub fn stranded_relationships (
         if ! seen . insert (relationship . clone ()) { continue; }
         let default_before : SkgrepoName = default_relRepo (
           graph, config, relation, &recorder_home_before, &partner . member,
-          &subscribes_before, &resolve, &home_before );
+          &forks_before, &resolve, &home_before );
         let default_after : SkgrepoName = default_relRepo (
           graph, config, relation, &recorder_home_after, &partner . member,
-          &subscribes_after, &resolve, &home_after );
+          &forks_after, &resolve, &home_after );
         if partner . relRepo != default_before
           || partner . relRepo == default_after { continue; }
         strandeds . push ( StrandedRelationship {
@@ -221,7 +221,7 @@ fn relation_list_mut (
 
 /// A relationship's default relRepo, given its recorder's home, its
 /// member's home ('home_of'), and, for a hide, the recorder's
-/// subscriptions: the rule a new relationship follows
+/// forks: the rule a new relationship follows
 /// ('apply_sticky_relRepos_in_graph_with_prospective_homes').
 fn default_relRepo (
   graph         : &InRustGraph,
@@ -229,13 +229,13 @@ fn default_relRepo (
   relation      : NodeRelation,
   recorder_home : &SkgrepoName,
   member        : &ID,
-  subscribes    : &[RelPartner<ID>],
+  forkees       : &[RelPartner<ID>],
   resolve       : &dyn Fn (&ID) -> ID,
   home_of       : &dyn Fn (&ID) -> Option<SkgrepoName>,
 ) -> SkgrepoName {
   if relation == NodeRelation::Hides {
     return hide_skgrepo (
-      graph, config, recorder_home, member, subscribes, resolve, home_of ); }
+      graph, config, recorder_home, member, forkees, resolve, home_of ); }
   match home_of (member) {
     Some (member_home) => config . default_relRepo (recorder_home, &member_home),
     None => recorder_home . clone (), } }

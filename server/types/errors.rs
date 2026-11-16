@@ -89,7 +89,7 @@ pub enum BufferValidationError {
   }, // The buffer deletes the acquirer or the acquiree of one of its own merge requests.
   SkgrepoNotInConfig              (ID, SkgrepoName),
   // Fork errors. Editing a foreign node N is read as a request to
-  // clone it (the clone C lives in an owned skgrepo, subscribes to and
+  // clone it (the clone C lives in an owned skgrepo, forks and
   // overrides N). These are the ways that request can be refused.
   ForkSkgrepoUnresolved           (ID), // N's pid: no owned vognode ancestor in the view to inherit C's skgrepo from, and the user set none in the confirmation buffer.
   ForkAlreadyExists              (ID,   // N's pid

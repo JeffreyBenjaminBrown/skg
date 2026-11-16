@@ -24,11 +24,11 @@ pub enum LocalContext {
     parent_if_editable : Option<ID>, }, // This is Some iff the parent is save-eligible.
   UnderDefiningFolder ( // The node is inside an aliasFolder or a forksFolder.
     DefiningFolderRecorder ),
-  SubscribeeAsSuchPosition { // The node is a claiming direct child of a forksFolder: a forkee as such.
-    subscriber               : ID,
-    subscriber_is_editable   : bool, },
+  ForkeeAsSuchPosition { // The node is a claiming direct child of a forksFolder: a forkee as such.
+    forker                   : ID,
+    forker_is_editable       : bool, },
   HiddenOutsidePosition { // The one derived-but-editable compound partner folder under a forksFolder.
-    subscriber       : ID,
+    forker           : ID,
     is_saveEligible  : bool, },
   UnderWriteProtectedFolder, // The node is inside a write-protected partner folder, an idFolder, or a property member.
 }
@@ -43,7 +43,7 @@ pub struct DefiningFolderRecorder {
   pub gnid              : ID,
   pub headline        : HeadlineName, // the recorder's occurrence, which emits the folder's fieldIntents
   pub is_editable     : bool, // True iff the recorder is an editable occurrence.
-  pub is_saveEligible : bool, // True iff the recorder is an editable occurrence, carries no Delete request, and is not in subscribee-as-such position.
+  pub is_saveEligible : bool, // True iff the recorder is an editable occurrence, carries no Delete request, and is not in forkee-as-such position.
 }
 
 /// A FieldIntent is what one visit can emit. Each emission
@@ -80,9 +80,9 @@ pub enum FieldIntent {
   NodeMerge       { acquiree : ID },
   SetFlag     { flag : Flag, value : bool },
   // The remaining kinds are combineable.
-  SubscribeeVisibility (SubscribeeVisibility),
+  ForkeeVisibility (ForkeeVisibility),
   HiddenOutsideEdit  (HiddenOutsideEdit),
-  SubscribeeTextClaim  (SubscribeeTextClaim),
+  ForkeeTextClaim  (ForkeeTextClaim),
   ForksFolderMembers (ForksFolderMembers),
 }
 
@@ -99,30 +99,30 @@ pub struct ForksFolderMembers {
 }
 
 /// This is an unresolved signal: the buffer presents 'visible' as
-/// the visible content of 'subscribee', under some subscriber.
-/// Resolution into hides/unhides edits on the subscriber needs disk
-/// and the subscriber's own post-save contains, so it happens
+/// the visible content of 'forkee', under some forker.
+/// Resolution into hides/unhides edits on the forker needs disk
+/// and the forker's own post-save contains, so it happens
 /// downstream of collection.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SubscribeeVisibility {
-  pub subscribee : ID,
+pub struct ForkeeVisibility {
+  pub forkee     : ID,
   pub visible    : Vec<ID>, // These are the nodes *not* to hide.
 }
 
-/// The explicitly submitted visible-outside subset for one subscriber.
+/// The explicitly submitted visible-outside subset for one forker.
 /// Unlike direct relationship sets it carries no skgrepo request: hide
-/// skgrepos are derived after subscriptions and visibility are resolved.
+/// skgrepos are derived after forks and visibility are resolved.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HiddenOutsideEdit {
   pub members : Vec<ID>,
 }
 
 /// This is a validation-only signal: the buffer claims this title
-/// and body for a node shown in subscribee-as-such position.
+/// and body for a node shown in forkee-as-such position.
 /// Downstream validation errors unless they match disk, because
 /// title/body edits in that position are forbidden.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SubscribeeTextClaim {
+pub struct ForkeeTextClaim {
   pub title    : String,
   pub body     : Option<String>,
   pub headline : HeadlineName, // the occurrence claiming them
@@ -144,10 +144,10 @@ pub struct FieldIntentsForOneId {
   pub delete         : bool,
   pub node_merge     : Option<ID>, // This holds the acquiree.
   pub flag       : Option<(Flag, bool)>,
-  pub visibility     : Vec<SubscribeeVisibility>,  // This slot is combineable.
+  pub visibility     : Vec<ForkeeVisibility>,  // This slot is combineable.
   pub hidden_outside : Vec<HiddenOutsideEdit>,     // This slot is combineable.
   pub forks_folder_members : Vec<ForksFolderMembers>, // This slot is combineable.
-  pub text_claims    : Vec<SubscribeeTextClaim>,   // This slot is combineable, and is consumed only by validation.
+  pub text_claims    : Vec<ForkeeTextClaim>,   // This slot is combineable, and is consumed only by validation.
 }
 
 /// This is the traversal's output.
@@ -155,7 +155,7 @@ pub struct FieldIntentsForOneId {
 pub struct CollectedFieldIntents {
   pub order           : Vec<ID>, // This holds the IDs in first-emission order.
   pub exclusive_emitters : HashMap<ID, Vec<HeadlineName>>, // For each ID, the occurrences that emitted an exclusive fieldIntent for it, in emission order, for the conflict messages.
-  pub lowerable_order : Vec<ID>, // This holds the IDs in first save-or-delete-emission order. It is a subset of 'order': an ID whose entry holds only signals appears in 'order' alone. Lowering uses this, so that an ID first seen as (say) a subscribee-as-such is saved at the position of its editable instance.
+  pub lowerable_order : Vec<ID>, // This holds the IDs in first save-or-delete-emission order. It is a subset of 'order': an ID whose entry holds only signals appears in 'order' alone. Lowering uses this, so that an ID first seen as (say) a forkee-as-such is saved at the position of its editable instance.
   pub by_pid          : HashMap<ID, FieldIntentsForOneId>,
 }
 
@@ -193,7 +193,7 @@ impl CollectedFieldIntents {
   /// - 'nodeMerge' and 'flag' are mutually exclusive, including
   ///   when duplicate occurrences of an ID emit them separately;
   /// - 'visibility' and 'text_claims' coexist with anything,
-  ///   including 'delete' (resolution ignores deleted subscribers).
+  ///   including 'delete' (resolution ignores deleted forkers).
   /// An error lists the viewnode IDs of the occurrences that emitted
   /// exclusive fieldIntents for the ID, 'emitter' (the occurrence
   /// emitting this one) among them.
@@ -205,9 +205,9 @@ impl CollectedFieldIntents {
     intent  : FieldIntent,
   ) -> Result<(), String> {
     if ! matches! ( intent,
-                    FieldIntent::SubscribeeVisibility (_)
+                    FieldIntent::ForkeeVisibility (_)
                     | FieldIntent::HiddenOutsideEdit (_)
-                    | FieldIntent::SubscribeeTextClaim (_)
+                    | FieldIntent::ForkeeTextClaim (_)
                     | FieldIntent::ForksFolderMembers (_) )
     { let emitters : &mut Vec<HeadlineName> =
         self . exclusive_emitters . entry (target . clone ())
@@ -224,13 +224,13 @@ impl CollectedFieldIntents {
       self . by_pid . entry (target . clone())
         . or_default() };
     match intent {
-      FieldIntent::SubscribeeVisibility (v) => {
+      FieldIntent::ForkeeVisibility (v) => {
         entry . visibility . push (v);
         Ok (( )) },
       FieldIntent::HiddenOutsideEdit (edit) => {
         entry . hidden_outside . push (edit);
         Ok (( )) },
-      FieldIntent::SubscribeeTextClaim (c) => {
+      FieldIntent::ForkeeTextClaim (c) => {
         entry . text_claims . push (c);
         Ok (( )) },
       FieldIntent::ForksFolderMembers (members) => {
@@ -291,9 +291,9 @@ impl CollectedFieldIntents {
               &mut entry . flag, (flag, value),
               "flag", &target, emitters) },
           FieldIntent::Delete { .. }
-            | FieldIntent::SubscribeeVisibility (_)
+            | FieldIntent::ForkeeVisibility (_)
             | FieldIntent::HiddenOutsideEdit (_)
-            | FieldIntent::SubscribeeTextClaim (_)
+            | FieldIntent::ForkeeTextClaim (_)
             | FieldIntent::ForksFolderMembers (_) =>
             unreachable! ("handled by the outer match"), }}}}
 }

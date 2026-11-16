@@ -2,7 +2,7 @@
 // and worktree differ, with the config, search index, live graph and
 // views a test of the graph straddle or the diff view runs against.
 // Declared in 'tests/grouped_repos.rs', and in
-// 'tests/grouped_overrides.rs' for the fixpoint in 'tests/idempotence.rs'.
+// 'tests/grouped_forks.rs' for the fixpoint in 'tests/idempotence.rs'.
 
 use crate::git_fixture_helpers::setup_gitrepo_with_fixtures;
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;

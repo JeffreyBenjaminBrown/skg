@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_repos -E 'test(subscriber_hides_under_a_narrowing::)'
+// cargo nextest run --test grouped_repos -E 'test(forker_hides_under_a_narrowing::)'
 //
 // A save under a skgrepo narrowing leaves alone what the narrowing
 // keeps out of a subscriber's hides ('docs/api-and-formats.org',

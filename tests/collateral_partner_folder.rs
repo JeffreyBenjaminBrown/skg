@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(collateral_partner_folder::)'
+// cargo nextest run --test grouped_forks -E 'test(collateral_partner_folder::)'
 //
 // Two cells of the relationship matrix ('docs/sharing-model.org', "The
 // write-protected folders: who subscribes to or hides this node") that

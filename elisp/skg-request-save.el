@@ -1338,7 +1338,7 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
 (defun skg--save-hides-message (hides &optional shown)
   "The echo-area text after a save whose answer's '(hides ...)' is
 HIDES: what the save hid and stopped hiding, and each removal from a
-subscriber that hid nothing, one line each, as the server words them
+forker that hid nothing, one line each, as the server words them
 \('docs/api-and-formats.org', \"Save buffer\"). SHOWN, the message the
 save already showed, if any, stays above them."
   (mapconcat #'identity

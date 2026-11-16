@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(extend_partner_folder_member::)'
+// cargo nextest run --test grouped_forks -E 'test(extend_partner_folder_member::)'
 //
 // Default folders on ordinary editable nodes and on editable
 // partner folder members.  The initial presentation contains only a

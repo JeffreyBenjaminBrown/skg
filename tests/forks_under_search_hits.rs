@@ -1,10 +1,10 @@
-// cargo nextest run --test grouped_overrides -E 'test(overrideward_view_subtree::)'
+// cargo nextest run --test grouped_forks -E 'test(forks_under_search_hits::)'
 //
 // The forks folder under search hits, and suppression in
 // search results ('docs/override.org', "Partner folders in search
 // results").
 //
-// Fixture (tests/overrideward_view_subtree/fixtures): owned skgrepo
+// Fixture (tests/forks_under_search_hits/fixtures): owned skgrepo
 // "main" holds U, which forks foreign F, which forks foreign G;
 // foreign M1 and M2 mutually fork; foreign B forks foreign E; foreign
 // D forks "gone", which no file defines; owned O1 and O2 mutually
@@ -41,8 +41,8 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
     "skg-test-overrideward-view-subtree",
     |s| Box::pin ( async move {
       s . reset_from_config (
-        "overrideward_view_subtree",
-        "tests/overrideward_view_subtree/fixtures/skgconfig.toml"
+        "forks_under_search_hits",
+        "tests/forks_under_search_hits/fixtures/skgconfig.toml"
         ) ?;
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::unrestricted (&s . config);

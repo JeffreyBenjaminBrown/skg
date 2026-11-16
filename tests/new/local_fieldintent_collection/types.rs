@@ -3,7 +3,7 @@
 
 use skg::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, FieldIntentsForOneId, FieldIntent,
-  SubscribeeTextClaim, SubscribeeVisibility };
+  ForkeeTextClaim, ForkeeVisibility };
 use skg::types::errors::HeadlineName;
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::viewnode::ViewnodeId;
@@ -119,14 +119,14 @@ fn combineable_intents_always_combine () {
   for subscribee in ["e1", "e2", "e1"] {
     acc . instructionMerge_fieldIntent (
       &emitter (), ID::from ("subscriber"),
-      FieldIntent::SubscribeeVisibility (
-        SubscribeeVisibility {
-          subscribee : ID::from (subscribee),
+      FieldIntent::ForkeeVisibility (
+        ForkeeVisibility {
+          forkee     : ID::from (subscribee),
           visible    : vec![] } )) . unwrap(); }
   acc . instructionMerge_fieldIntent (
     &emitter (), ID::from ("subscriber"),
-    FieldIntent::SubscribeeTextClaim (
-      SubscribeeTextClaim {
+    FieldIntent::ForkeeTextClaim (
+      ForkeeTextClaim {
         title    : "t" . to_string(),
         body     : None,
         headline : emitter () } )) . unwrap();

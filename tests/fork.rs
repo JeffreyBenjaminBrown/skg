@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(fork::)'
+// cargo nextest run --test grouped_forks -E 'test(fork::)'
 //
 // The fork/clone feature: editing a foreign node N (write-protected, in a
 // skgrepo the user does not own) is read as a request to clone it. The
@@ -7,7 +7,7 @@
 //
 // Installs the explicit graph handle (override substitution and
 // forksFolder content read it), so it belongs among the
-// grouped_overrides installers.
+// grouped_forks installers.
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::error::Error;
@@ -1100,7 +1100,7 @@ async fn fork_fixture_files (
 /// fact round-trips and a save never silently re-points containers at
 /// the clone. (That the clone's subscribee-as-such view of N starts
 /// empty and fills as N gains children is the prerequisite rule,
-/// exercised in hidden_from_subscriptions; here C.contains ==
+/// exercised in hidden_from_forks; here C.contains ==
 /// N.contains == [N1,N2] gives it nothing to show.)
 async fn fork_round_trip (
   config : &SkgConfig,

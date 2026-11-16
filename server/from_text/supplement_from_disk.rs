@@ -331,9 +331,9 @@ fn has_restricted_sections (
 ///   the relationship instead stays at the recorder's home: the relationship
 ///   and foreign ID are intentionally shared with that skgrepo.
 /// - hides additionally floor at the most public explaining
-///   subscription (see 'hide_repo'): a hide is only as public as
-///   some subscription that makes it meaningful, else it leaks the
-///   inference that a private subscription exists. Hides carry no
+///   fork (see 'hide_repo'): a hide is only as public as
+///   some fork that makes it meaningful, else it leaks the
+///   inference that a private fork exists. Hides carry no
 ///   explicit-repo path: the folder that displays them is write-protected
 ///   (the set-relRepo gesture refuses there).
 #[cfg(test)]
@@ -465,7 +465,7 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
         m . member = raw_disk_member (disk, &submitted); }} }
   { let disk : &[RelPartner<ID>] =
       disk_node . hides . or_default ();
-    let subscribes : Vec<RelPartner<ID>> =
+    let forkees : Vec<RelPartner<ID>> =
       supplemented . forks . or_default () . to_vec ();
     if let MSV::Specified (v) =
       &mut supplemented . hides {
@@ -479,7 +479,7 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
         let unclamped : SkgrepoName = match sticky {
           Some (skgrepo) => skgrepo,
           None => hide_skgrepo (
-            graph, config, &recorder_home, &m . member, &subscribes,
+            graph, config, &recorder_home, &m . member, &forkees,
             &resolve, &home_of ), };
         m . relRepo = config . more_private_of (
           unclamped, recorder_home . clone () );
@@ -518,12 +518,12 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
 
 /// A new hide's relRepo: at least the more private of the endpoints'
 /// homes, and at least as private as some explanation of it. An
-/// explanation is a subscription of the hider whose subscribee
+/// explanation is a fork of the hider whose forkee
 /// contains the hidden node, and stands at the more private of the
-/// subscription's relRepo and the relRepo of the contains record: a
+/// fork's relRepo and the relRepo of the contains record: a
 /// hide more public than either would name what only that record
 /// tells. The most public explanation is the floor, because the
-/// inference "the hider subscribes to something containing X" is
+/// inference "the hider forks something containing X" is
 /// innocent whenever any explanation is visible; with no explanation
 /// found, the endpoint rule alone applies (junk-tolerant; the
 /// validators report residue).
@@ -532,7 +532,7 @@ pub(crate) fn hide_skgrepo (
   config        : &SkgConfig,
   recorder_home : &SkgrepoName,
   hidden        : &ID,
-  subscribes    : &[RelPartner<ID>],
+  forkees       : &[RelPartner<ID>],
   resolve       : &dyn Fn (&ID) -> ID,
   home_of       : &dyn Fn (&ID) -> Option<SkgrepoName>,
 ) -> SkgrepoName {
@@ -545,16 +545,16 @@ pub(crate) fn hide_skgrepo (
       _ => recorder_home . clone (), }};
   let hidden_key : ID = resolve (hidden);
   let explaining_skgrepos : Vec<SkgrepoName> =
-    subscribes . iter ()
+    forkees . iter ()
     . flat_map ( |sub| {
       let explaining_records : Vec<SkgrepoName> =
         graph . pid_of ( & sub . member )
         . and_then ( |p| graph . nodes . get (&p) )
-        . map ( |subscribee| subscribee . contains . iter ()
+        . map ( |forkee| forkee . contains . iter ()
                 . filter ( |c| resolve ( &c . member ) == hidden_key )
                 . map ( |c|
-                  // A foreign subscribee's contains record has no
-                  // rung, so the subscription alone explains the hide.
+                  // A foreign forkee's contains record has no
+                  // rung, so the fork alone explains the hide.
                   if config . skgrepo_is_owned (&c . relRepo) {
                     config . more_private_of (
                       sub . relRepo . clone (), c . relRepo . clone () )
@@ -563,12 +563,12 @@ pub(crate) fn hide_skgrepo (
         . unwrap_or_default ();
       explaining_records } )
     . collect ();
-  let subscription_floor : Option<SkgrepoName> =
+  let fork_floor : Option<SkgrepoName> =
     explaining_skgrepos . into_iter ()
     . reduce ( |a, b| // keep the more public of the two
                if config . is_strictly_more_public (&a, &b) { a }
                else { b } );
-  match subscription_floor {
+  match fork_floor {
     Some (floor) =>
       config . more_private_of (endpoint_floor, floor),
     None => endpoint_floor, }}

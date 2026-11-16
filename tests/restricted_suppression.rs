@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(restricted_suppression::)'
+// cargo nextest run --test grouped_forks -E 'test(restricted_suppression::)'
 //
 // Restricted-node rewrite suppression ('docs/api-and-formats.org',
 // "Restricted-skgrepo nodes: omission, retention, and save preservation"):

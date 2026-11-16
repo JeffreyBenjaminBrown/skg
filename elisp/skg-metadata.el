@@ -442,9 +442,9 @@ next save will do with the relationship."
     ("forkee" forkee
      "A member of the view-parent's forksFolder that claims: the view-parent forks it. Sets the repo of each forks relationship from the view-parent.")
     ("hider" nil
-     "Hide repos are derived at save, floored at the most public explaining subscription; the hiderFolder is write-protected.")
+     "Hide repos are derived at save, floored at the most public forks relationship explaining them; the hiderFolder is write-protected.")
     ("hidden" nil
-     "Hide repos are derived at save, floored at the most public explaining subscription; the hiddenFolder is write-protected."))
+     "Hide repos are derived at save, floored at the most public forks relationship explaining them; the hiddenFolder is write-protected."))
   "For each relation role in 'shared/relations.json',
 (ROLE-NAME KIND-OR-NIL DESCRIPTION), as the relationship-kind menu of
 `skg-set-relRepo-recursive' shows it. ROLE-NAME is the role the
@@ -493,7 +493,7 @@ The walk starts at the node at point (inclusive: its own relationship to
 its view-parent counts when it matches) and recurses only on
 viewchildren that affect their viewparents: member
 occurrences and writable folders. It prunes below write-protected nodes
-and subscribee-as-such members (their viewchildren's relationships are not
+and forkee-as-such members (their viewchildren's relationships are not
 collected at save), and prunes write-protected folders and other non-vognodes
 entirely.
 
@@ -595,7 +595,7 @@ subtree at point, the headline at point included, whose relationship
 to its view-parent is of KIND (`content' or `forkee'; see
 `skg--relationship-kind-matches-p'). Recurses only
 where edits still affect the graph: it prunes below write-protected
-nodes and subscribee-as-such members, prunes noClaim
+nodes and forkee-as-such members, prunes noClaim
 nodes -- except the walk's root, which the
 user chose deliberately -- and prunes non-vognodes other than the
 writable forksFolder. Returns how many headlines it applied CHOICE to."
@@ -657,8 +657,8 @@ command, but does not edit anything."
 unknown viewnode or a restricted viewnode whose
 relationship to its view-parent is of KIND, writable-and-collected
 from this position: for `content', the view-parent must be a
-editable occurrence not in subscribee-as-such position (an
-write-protected or subscribee-as-such parent's contains is not
+editable occurrence not in forkee-as-such position (an
+write-protected or forkee-as-such parent's contains is not
 collected at save, so a relRepo request under one would be
 inert); for `forkee', the viewparent must be the writable
 forksFolder with an editable viewparent, and the headline must claim
@@ -674,7 +674,7 @@ forksFolder with an editable viewparent, and the headline must claim
                    ((skg--occurrence-sexp-p parent-sexp)
                     (and (eq kind 'content)
                          (not (skg--node-write-protected-p parent-sexp))
-                         (not (skg--subscribee-as-such-at-point-p))))
+                         (not (skg--forkee-as-such-at-point-p))))
                    ((skg--non-vognode-atom-present-p parent-sexp
                                                   'forksFolder)
                     (and (eq kind 'forkee)
@@ -685,13 +685,13 @@ forksFolder with an editable viewparent, and the headline must claim
   "Non-nil iff the walk should not descend below the occurrence
 headline at point (with METADATA-SEXP its parsed metadata): an
 write-protected node's contains is not collected at save, and a
-subscribee-as-such member's viewchildren are hide/unhide signals,
+forkee-as-such member's viewchildren are hide/unhide signals,
 not writable relationships."
   (or (skg--node-write-protected-p metadata-sexp)
-      (skg--subscribee-as-such-at-point-p)))
+      (skg--forkee-as-such-at-point-p)))
 
-(defun skg--subscribee-as-such-at-point-p ()
-  "Non-nil iff the headline at point sits in subscribee-as-such
+(defun skg--forkee-as-such-at-point-p ()
+  "Non-nil iff the headline at point sits in forkee-as-such
 position, a forkee as such: an occurrence member of a forksFolder that
 claims (one claiming nothing forks the folder's viewparent, or was
 detached)."

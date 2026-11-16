@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(forks_folder::)'
+// cargo nextest run --test grouped_forks -E 'test(forks_folder::)'
 //
 // The one forks folder ('docs/glossary.org', "partner folder"): N's
 // fork partners, each once. N forks E and M; M and F fork N; N hides

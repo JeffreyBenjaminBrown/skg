@@ -3761,7 +3761,7 @@ def expand_relRepo_subtree (edited, root, word, headline_of_handle, check):
     return
   def metadata_of (index):
     return outline_metadata (edited, index, headline_of_handle)
-  def subscribee_as_such (index):
+  def forkee_as_such (index):
     metadata = metadata_of (index)
     return ( metadata is not None and headline_kind (metadata) == "node"
              and not metadata_has_atom (metadata, "noClaim")
@@ -3769,7 +3769,7 @@ def expand_relRepo_subtree (edited, root, word, headline_of_handle, check):
                                [ Symbol ("skg") ] ) == "forksFolder" )
   def prune_below (index):
     return ( metadata_has_atom ( metadata_of (index), "writeProtected" )
-             or subscribee_as_such (index) )
+             or forkee_as_such (index) )
   def relationship_matches (index):
     metadata = metadata_of (index)
     member_kind = headline_kind (metadata)
@@ -3782,7 +3782,7 @@ def expand_relRepo_subtree (edited, root, word, headline_of_handle, check):
       return False
     if headline_kind (parent_metadata) == "node":
       return ( kind == "content" and is_editable_node (parent_metadata)
-               and not subscribee_as_such (parent) )
+               and not forkee_as_such (parent) )
     return ( WRITABLE_FOLDER_RELATIONSHIP_KINDS . get ( folder_atom (parent_metadata) )
              == kind
              and is_editable_node ( metadata_of ( edited [parent] . parent )) )
@@ -4383,7 +4383,7 @@ def predicted_forks (edited, original, headline_of_handle, ownership,
   nothing; making it editable first ('editable', then a save) is the
   gesture, as 'docs/forks.org' says. Only an occurrence in content
   position (a root, or a node's child) forks: a member of a folder
-  does not, and a subscribee as such, whose removed children become
+  does not, and a forkee as such, whose removed children become
   hides, takes no edit of its title or body."""
   forks = PredictedForks ()
   owned = [ name for name, is_owned in ownership . items () if is_owned ]

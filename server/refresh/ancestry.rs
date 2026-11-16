@@ -112,7 +112,7 @@ pub fn described_node (
   match kind {
     Folder::HiddenInForkPartner | Folder::HiddenOutsideOfForkPartners => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
-      Some ( parties . subscribee . unwrap_or (parties . subscriber) ) },
+      Some ( parties . forkee . unwrap_or (parties . forker) ) },
     _ => required_ancestors (tree, folder) . first () . copied (), } }
 
 /// The gnids the view shows above the headline at 'treeid': of each
@@ -135,9 +135,9 @@ pub fn view_ancestor_gnids (
     . collect () }
 
 /// A compound folder's two parties, where they stand: the note whose
-/// hides it shows (the 'subscriber', its forker), and, for the folder
+/// hides it shows (the 'forker', its forker), and, for the folder
 /// of what that note hides in one forkee, that forkee as such (the
-/// 'subscribee'). In
+/// 'forkee'). In
 ///   forker > forksFolder > forkee > hiddenInForkPartnerFolder
 /// the forkee is the folder's viewparent and the forker three
 /// generations up; in
@@ -145,8 +145,8 @@ pub fn view_ancestor_gnids (
 /// the note is two up.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CompoundFolderParties {
-  pub subscriber : NodeId,
-  pub subscribee : Option<NodeId>,
+  pub forker     : NodeId,
+  pub forkee     : Option<NodeId>,
 }
 
 /// The parties of the compound folder at 'folder', as
@@ -161,11 +161,11 @@ pub fn compound_folder_parties (
   let required : Vec<NodeId> = required_ancestors (tree, folder);
   match kind { // the places are those of the rows ANC_HIDDEN_IN and ANC_HIDDEN_OUTSIDE
     Folder::HiddenInForkPartner => Some ( CompoundFolderParties {
-      subscriber : *required . get (2) ?,
-      subscribee : Some ( *required . first () ? ) } ),
+      forker     : *required . get (2) ?,
+      forkee     : Some ( *required . first () ? ) } ),
     Folder::HiddenOutsideOfForkPartners => Some ( CompoundFolderParties {
-      subscriber : *required . get (1) ?,
-      subscribee : None } ),
+      forker     : *required . get (1) ?,
+      forkee     : None } ),
     _ => None, } }
 
 /// The ancestors the row of the descriptor at 'treeid' requires, as

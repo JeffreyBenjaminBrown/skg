@@ -1,14 +1,14 @@
 //! This file defines visibility resolution, which consumes the
-//! 'SubscribeeVisibility' signals that collection put in the map.
+//! 'ForkeeVisibility' signals that collection put in the map.
 //! It is async because it consults disk.
 //! .
-//! The policy of the subscribee-visibility step, for subscriber R
-//! viewing subscribee E, is:
+//! The policy of the forkee-visibility step, for forker R
+//! viewing forkee E, is:
 //! .
-//! - If N is graph-content of subscribee E,
+//! - If N is graph-content of forkee E,
 //!   and E has a viewchild with ID N and claimsMembership,
-//!   then N is intended to be visible through this subscription,
-//!   so it is removed from the hides of subscriber R.
+//!   then N is intended to be visible through this fork,
+//!   so it is removed from the hides of forker R.
 //! - If N is graph-content of E, E has no viewchild with ID N and
 //!   claimsMembership, and N is not graph-content of R after the
 //!   save, then N is hidden from R.
@@ -26,13 +26,13 @@
 //! explains.
 //! .
 //! A forks folder adds one more signal ('ForksFolderMembers'): a note
-//! that forks the subscriber, that the subscriber does not fork after
+//! that forks the forker, that the forker does not fork after
 //! the save, and that its forks folder no longer shows, was deleted
 //! there, and is hidden from it ('resolve_forks_folder_removals').
 //! .
 //! Resolution cannot run during collection, even in principle: it
-//! needs disk (the subscribee's contains, the subscriber's hides)
-//! and the subscriber's own post-save contains -- a finished entry
+//! needs disk (the forkee's contains, the forker's hides)
+//! and the forker's own post-save contains -- a finished entry
 //! elsewhere in the same map.
 
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -41,7 +41,7 @@ use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::from_text::local_fieldintent_collection::lower::LoweredNodeIntents;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::from_text::local_fieldintent_collection::types::{
-  ForksFolderMembers, HiddenOutsideEdit, SubscribeeVisibility };
+  ForksFolderMembers, HiddenOutsideEdit, ForkeeVisibility };
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, members_of};
@@ -51,62 +51,62 @@ use crate::types::save::PostSkgsaveCommitNoticeCandidate;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
-/// The 'visibility' pairs are (subscriber, signal), as
+/// The 'visibility' pairs are (forker, signal), as
 /// 'lower_collected_fieldIntents' extracted them from the map.
 pub fn resolve_visibility (
   mut lowered : LoweredNodeIntents,
-  visibility  : &[(ID, SubscribeeVisibility)],
+  visibility  : &[(ID, ForkeeVisibility)],
   hidden_outside : &[(ID, HiddenOutsideEdit)],
   forks_folder_members : &[(ID, ForksFolderMembers)],
   graph       : &InRustGraph,
   config      : &SkgConfig,
   skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result<(LoweredNodeIntents, Vec<PostSkgsaveCommitNoticeCandidate>), Box<dyn Error>> {
-  validate_no_overlapping_subscribee_hiderel_conflicts (
+  validate_no_overlapping_forkee_hiderel_conflicts (
     visibility, graph, config, skgrepo_restriction ) ?;
   infer_hides_from_contains_removals (
     // Before the signal loop below, so that an explicit
-    // subscribee-as-such gesture about the same child wins.
+    // forkee-as-such gesture about the same child wins.
     &mut lowered, visibility, graph, config,
     skgrepo_restriction ) ?;
-  for (subscriber, signal) in visibility {
-    let Some (subscribee_from_disk) =
+  for (forker, signal) in visibility {
+    let Some (forkee_from_disk) =
       opt_graphnode_by_gnid (
-        graph, config, &signal . subscribee ) ?
+        graph, config, &signal . forkee ) ?
     else { continue; };
-    let Some (subscriber_from_disk) =
+    let Some (forker_from_disk) =
       opt_graphnode_by_gnid (
-        graph, config, subscriber ) ?
+        graph, config, forker ) ?
     else { continue; };
-    if ! config . skgrepo_is_owned (&subscriber_from_disk . home_skgrepo) {
+    if ! config . skgrepo_is_owned (&forker_from_disk . home_skgrepo) {
       continue; }
-    let subscriber_contains : HashSet<ID> =
-      lowered . subscriber_contains_after_save (
-        &subscriber_from_disk );
+    let forker_contains : HashSet<ID> =
+      lowered . forker_contains_after_save (
+        &forker_from_disk );
     let visible_content : HashSet<ID> =
       signal . visible . iter() . cloned() . collect();
-    let subscribee_contains : Vec<ID> = // what the buffer could show of the subscribee's content
+    let forkee_contains : Vec<ID> = // what the buffer could show of the forkee's content
       members_with_visible_records (
-        &subscribee_from_disk . contains, skgrepo_restriction );
-    let subscriber_hides : Vec<ID> = // a restricted hide the buffer could not show, so no save removes it
+        &forkee_from_disk . contains, skgrepo_restriction );
+    let forker_hides : Vec<ID> = // a restricted hide the buffer could not show, so no save removes it
       members_with_visible_records (
-        subscriber_from_disk . hides . or_default (),
+        forker_from_disk . hides . or_default (),
         skgrepo_restriction );
     let inferred_hides : Vec<ID> =
-      subscribee_contains . iter()
+      forkee_contains . iter()
       . filter ( |gnid| ! visible_content . contains (*gnid) )
-      . filter ( |gnid| ! subscriber_contains . contains (*gnid) )
+      . filter ( |gnid| ! forker_contains . contains (*gnid) )
       . cloned()
       . collect();
     let inferred_unhides : Vec<ID> =
-      subscribee_contains . iter()
+      forkee_contains . iter()
       . filter ( |gnid| visible_content . contains (*gnid) )
-      . filter ( |gnid| subscriber_hides . contains (*gnid) )
+      . filter ( |gnid| forker_hides . contains (*gnid) )
       . cloned() . collect();
     if inferred_hides . is_empty() && inferred_unhides . is_empty()
       { continue; }
-    lowered . apply_hiderel_delta_to_subscriber (
-      subscriber_from_disk,
+    lowered . apply_hiderel_delta_to_forker (
+      forker_from_disk,
       &inferred_hides,
       &inferred_unhides ); }
   resolve_forks_folder_removals (
@@ -146,10 +146,10 @@ fn resolve_forks_folder_removals (
       &|gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
     let shown : HashSet<ID> = signal . members . iter () . map (key) . collect ();
     let forked_after_save : HashSet<ID> =
-      lowered . subscriber_subscribes_after_save (&note_from_disk) . iter ()
+      lowered . forker_forks_after_save (&note_from_disk) . iter ()
       . map (key) . collect ();
     let hidden : HashSet<ID> =
-      lowered . subscriber_hides_after_resolution (&note_from_disk) . iter ()
+      lowered . forker_hides_after_resolution (&note_from_disk) . iter ()
       . map (key) . collect ();
     let deleted_forkers : Vec<ID> =
       graph . inbound_pids_for_relation_gated (
@@ -160,7 +160,7 @@ fn resolve_forks_folder_removals (
                           && ! hidden . contains (forker) )
       . collect ();
     if ! deleted_forkers . is_empty () {
-      lowered . apply_hiderel_delta_to_subscriber (
+      lowered . apply_hiderel_delta_to_forker (
         note_from_disk, &deleted_forkers, &[] ); }}
   Ok (( )) }
 
@@ -178,16 +178,16 @@ fn members_with_visible_records (
 
 /// Applies the submitted visible-outside subset after all ordinary hide
 /// inference.  Only the old *visible outside* hides are replaceable: hides
-/// whose records are restricted, and members inside a subscribee, remain owned
+/// whose records are restricted, and members inside a forkee, remain owned
 /// by the graph and survive an edit of this compound partner folder. A hide is
 /// visible, and so replaceable, when the skgrepo restriction holds its relRepo
 /// ('SkgrepoRestriction::record_is_visible'): the folder as drawn showed its
 /// member, as an occurrence or a gnid-only vognode, so the submitted
 /// folder is the whole set of hides with a visible record outside the
-/// subscribees, and a folder saved under a skgrepo restriction never unhides a
+/// forkees, and a folder saved under a skgrepo restriction never unhides a
 /// member it could not show. What counts as inside is what the folder's goal
-/// subtracts ('goal_list_for_hiddenOutsideOfSubscribee_folder'): the content
-/// of each subscribee by the records the skgrepo restriction shows.
+/// subtracts ('goal_list_for_hiddenOutsideOfForkPartners_folder'): the content
+/// of each forkee by the records the skgrepo restriction shows.
 fn apply_hiddenoutside_edits (
   lowered                : &mut LoweredNodeIntents,
   edits                  : &[(ID, HiddenOutsideEdit)],
@@ -197,14 +197,14 @@ fn apply_hiddenoutside_edits (
 ) -> Result<Vec<PostSkgsaveCommitNoticeCandidate>, Box<dyn Error>> {
   let mut seen : HashSet<ID> = HashSet::new ();
   let mut candidates : Vec<PostSkgsaveCommitNoticeCandidate> = Vec::new ();
-  for (subscriber, edit) in edits {
-    if ! seen . insert (subscriber . clone ()) {
+  for (forker, edit) in edits {
+    if ! seen . insert (forker . clone ()) {
       return Err (Box::new (BufferValidationError::Other (
-        format! ("More than one HiddenOutsideOfForkPartners edit was submitted for subscriber {}", subscriber) ))); }
-    let Some (subscriber_from_disk) =
-      opt_graphnode_by_gnid (graph, config, subscriber) ?
+        format! ("More than one HiddenOutsideOfForkPartners edit was submitted for forker {}", forker) ))); }
+    let Some (forker_from_disk) =
+      opt_graphnode_by_gnid (graph, config, forker) ?
     else { continue; };
-    if ! config . skgrepo_is_owned (&subscriber_from_disk . home_skgrepo) {
+    if ! config . skgrepo_is_owned (&forker_from_disk . home_skgrepo) {
       continue; }
 
     let key : &dyn Fn (&ID) -> ID =
@@ -213,14 +213,14 @@ fn apply_hiddenoutside_edits (
       &|member : &RelPartner<ID>| -> bool {
       SkgrepoRestriction::record_is_visible (
         skgrepo_restriction, &member . relRepo ) };
-    let subscribee_gnids : Vec<ID> =
-      lowered . subscriber_subscribes_after_save (&subscriber_from_disk);
+    let forkee_gnids : Vec<ID> =
+      lowered . forker_forks_after_save (&forker_from_disk);
     let mut inside : HashSet<ID> = HashSet::new ();
-    for subscribee_gnid in subscribee_gnids {
-      let Some (subscribee) =
-        opt_graphnode_by_gnid (graph, config, &subscribee_gnid) ?
+    for forkee_gnid in forkee_gnids {
+      let Some (forkee) =
+        opt_graphnode_by_gnid (graph, config, &forkee_gnid) ?
       else { continue; };
-      for member in subscribee . contains . iter ()
+      for member in forkee . contains . iter ()
         . filter (|member| is_visible (member)) {
         inside . insert (key (&member . member)); }}
 
@@ -228,7 +228,7 @@ fn apply_hiddenoutside_edits (
     // from newly inferred hides: preceding user actions in this save retain
     // their ordinary inference semantics.
     let replaceable_outside : HashSet<ID> =
-      subscriber_from_disk . hides . or_default ()
+      forker_from_disk . hides . or_default ()
       . iter ()
       . filter (|member| is_visible (member))
       .map (|member| key (&member . member))
@@ -237,15 +237,15 @@ fn apply_hiddenoutside_edits (
     let submitted : HashSet<ID> =
       edit . members . iter () . map (|gnid| key (gnid)) . collect ();
     let disk_hide_keys : HashSet<ID> =
-      subscriber_from_disk . hides . or_default ()
+      forker_from_disk . hides . or_default ()
       . iter () . map (|member| key (&member . member)) . collect ();
     for member in &edit . members {
       if ! disk_hide_keys . contains (&key (member)) {
         candidates . push (
           PostSkgsaveCommitNoticeCandidate::HiddenOutsideAdded {
-            subscriber : subscriber . clone (), member : member . clone () }); }}
+            forker : forker . clone (), member : member . clone () }); }}
     let current_hides : Vec<ID> =
-      lowered . subscriber_hides_after_resolution (&subscriber_from_disk);
+      lowered . forker_hides_after_resolution (&forker_from_disk);
     let inferred_unhides : Vec<ID> = current_hides . iter ()
       . filter (|gnid| {
         let member_key : ID = key (gnid);
@@ -258,19 +258,19 @@ fn apply_hiddenoutside_edits (
       . filter (|gnid| ! current_keys . contains (&key (gnid)))
       . cloned () . collect ();
     if ! inferred_hides . is_empty () || ! inferred_unhides . is_empty () {
-      lowered . apply_hiderel_delta_to_subscriber (
-        subscriber_from_disk, &inferred_hides, &inferred_unhides); }}
+      lowered . apply_hiderel_delta_to_forker (
+        forker_from_disk, &inferred_hides, &inferred_unhides); }}
   Ok (candidates) }
 
-/// Deleting (or moving away) a child of an owned subscriber F, where
-/// that child is disk-content of a node F subscribes to, hides the
-/// child from F's subscriptions -- otherwise the child would
-/// reappear under F as unintegrated subscribed content the user just
+/// Deleting (or moving away) a child of an owned forker F, where
+/// that child is disk-content of a node F forks, hides the
+/// child from F's forks -- otherwise the child would
+/// reappear under F as unintegrated forkee content the user just
 /// dismissed (docs/sharing-model.org: branches deleted from a clone
 /// become hides). Symmetrically, re-adding such a child to F's
 /// contains drops a stale hide of it by F. A removed child counts as
 /// the member it stands for ('member_it_stands_for'): removing a
-/// mirror of a subscribee's member hides that member, unless the
+/// mirror of a forkee's member hides that member, unless the
 /// same save leaves F containing the member. Placing a mirror
 /// drops no hide, as containing it does not integrate the member
 /// ('unintegrated_content_gnids' in 'server/refresh/goal.rs' compares
@@ -282,34 +282,34 @@ fn apply_hiddenoutside_edits (
 ///   where the skgrepo restriction keeps out its node), so its absence
 ///   is a removal.
 /// - A child the same save explicitly shows through one of F's
-///   subscriptions (a subscribee-as-such signal) is not hidden here:
-///   the explicit subscription-view gesture wins. This runs before
+///   forkees (a forkee-as-such signal) is not hidden here:
+///   the explicit forkee-view gesture wins. This runs before
 ///   the signal loop, so signal deltas also land last.
 /// - A node with no disk entry removes nothing (a fork clone's
 ///   creation-time hides are computed in 'build_fork_clone').
 /// - Only what the skgrepo restriction shows explains or blocks a
-///   hide: the subscriber's subscriptions, each subscribee's content
-///   and the subscriber's hides are read by their visible records. A
+///   hide: the forker's forks, each forkee's content
+///   and the forker's hides are read by their visible records. A
 ///   member only a restricted record explains is not hidden, and
 ///   re-adding a member drops no restricted hide of it.
 fn infer_hides_from_contains_removals (
   lowered                : &mut LoweredNodeIntents,
-  visibility             : &[(ID, SubscribeeVisibility)],
+  visibility             : &[(ID, ForkeeVisibility)],
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
   skgrepo_restriction    : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
-  for (subscriber_pid, skgrepo, new_contains, subscribes_msv)
+  for (forker_pid, skgrepo, new_contains, forks_msv)
     in lowered . nodeSaveIntents_with_specified_contains () {
     if ! config . skgrepo_is_owned (&skgrepo) { continue; }
-    let Some (subscriber_from_disk) =
+    let Some (forker_from_disk) =
       opt_graphnode_by_gnid (
-        graph, config, &subscriber_pid ) ?
+        graph, config, &forker_pid ) ?
     else { continue; };
-    let subscriber_contains : Vec<ID> =
-      members_of (&subscriber_from_disk . contains);
+    let forker_contains : Vec<ID> =
+      members_of (&forker_from_disk . contains);
     let visible_contains : HashSet<&ID> =
-      subscriber_from_disk . contains . iter ()
+      forker_from_disk . contains . iter ()
       . filter ( |member| SkgrepoRestriction::record_is_visible (
           skgrepo_restriction, &member . relRepo ))
       . map ( |member| &member . member )
@@ -317,22 +317,22 @@ fn infer_hides_from_contains_removals (
     let removed : Vec<ID> = {
       let new_contains_set : HashSet<&ID> =
         new_contains . iter () . collect ();
-      let signal_visible : HashSet<&ID> = // children the same save explicitly shows through a subscription of this subscriber
+      let signal_visible : HashSet<&ID> = // children the same save explicitly shows through a fork of this forker
         visibility . iter ()
-        . filter ( |(pid, _)| *pid == subscriber_pid )
+        . filter ( |(pid, _)| *pid == forker_pid )
         . flat_map ( |(_, signal)| signal . visible . iter () )
         . collect ();
-      subscriber_contains . iter ()
+      forker_contains . iter ()
         . filter ( |gnid| ! new_contains_set . contains (gnid) )
         . filter ( |gnid| ! signal_visible . contains (gnid) )
         . filter ( |gnid| visible_contains . contains (gnid) )
         . cloned () . collect () };
     let inferred_unhides : Vec<ID> = {
       let disk_contains : HashSet<&ID> =
-        subscriber_contains . iter () . collect ();
+        forker_contains . iter () . collect ();
       let disk_hides : Vec<ID> = // a restricted hide stays, as the buffer could not show it
         members_with_visible_records (
-          subscriber_from_disk . hides . or_default (),
+          forker_from_disk . hides . or_default (),
           skgrepo_restriction );
       new_contains . iter ()
         . filter ( |gnid| ! disk_contains . contains (gnid) )
@@ -341,48 +341,48 @@ fn infer_hides_from_contains_removals (
     let inferred_hides : Vec<ID> =
       if removed . is_empty () { Vec::new () }
       else {
-        let subscribee_content : HashSet<ID> = {
-          let subscribes : Vec<ID> = match &subscribes_msv {
-            // The post-save subscriptions: unsubscribing a node in
+        let forkee_content : HashSet<ID> = {
+          let forkees : Vec<ID> = match &forks_msv {
+            // The post-save forks: unforking a node in
             // the same save also stops hides being inferred from it.
             MSV::Specified (subs) => subs . clone (),
             MSV::Unspecified =>
               members_with_visible_records (
-                subscriber_from_disk . forks . or_default (),
+                forker_from_disk . forks . or_default (),
                 skgrepo_restriction ), };
           let mut content : HashSet<ID> = HashSet::new ();
-          for subscribee in &subscribes {
-            if let Some (subscribee_from_disk) =
+          for forkee in &forkees {
+            if let Some (forkee_from_disk) =
               opt_graphnode_by_gnid (
-                graph, config, subscribee ) ?
+                graph, config, forkee ) ?
             { content . extend (
                 members_with_visible_records (
-                  & subscribee_from_disk . contains,
+                  & forkee_from_disk . contains,
                   skgrepo_restriction )); }}
           content };
         let new_contains_set : HashSet<&ID> = new_contains . iter () . collect ();
         removed . iter ()
           . filter_map ( |gnid| member_it_stands_for (
-            graph, skgrepo_restriction, gnid, &subscribee_content ))
+            graph, skgrepo_restriction, gnid, &forkee_content ))
           . filter ( |member| ! new_contains_set . contains (member) )
           . collect () };
     if inferred_hides . is_empty () && inferred_unhides . is_empty ()
       { continue; }
-    lowered . apply_hiderel_delta_to_subscriber (
-      subscriber_from_disk, &inferred_hides, &inferred_unhides ); }
+    lowered . apply_hiderel_delta_to_forker (
+      forker_from_disk, &inferred_hides, &inferred_unhides ); }
   Ok (( )) }
 
 /// The member of 'members' that 'gnid', a child removed from a
-/// subscriber, stands for: 'gnid' itself when it is one; otherwise
+/// forker, stands for: 'gnid' itself when it is one; otherwise
 /// the member that is a mirror of it under the skgrepo restriction
 /// ('server/dbs/in_rust_graph/mirrors.rs'), the nearest along forks
 /// first, and among equals the least. Every contains list, a
-/// subscribee's included, records the original; a mirror is shown in
+/// forkee's included, records the original; a mirror is shown in
 /// its place only where a perspective ranks it first. So when the
-/// subscribee's author forks a member of its content (to answer under
-/// a note of the subscriber's, say), the content still names the
-/// original, which the subscriber's own view draws raw and the
-/// author's view draws as the fork. Either way the subscriber met the
+/// forkee's author forks a member of its content (to answer under
+/// a note of the forker's, say), the content still names the
+/// original, which the forker's own view draws raw and the
+/// author's view draws as the fork. Either way the forker met the
 /// same member, so dismissing the fork dismisses it. Any mirror
 /// counts, not one perspective's: which member a child stands for is
 /// a fact about the child, whichever view the user found it in.
@@ -401,42 +401,42 @@ pub(crate) fn member_it_stands_for (
     . min ()
     . map ( |(_distance, member)| member . clone () ) }
 
-/// Checks one subscriber + content node
-/// against all subscribee branches under the subscriber.
-/// Rejects the save if one subscribee says "hide it"
-/// and another says "show it". A subscribee's content is read by the
+/// Checks one forker + content node
+/// against all forkee branches under the forker.
+/// Rejects the save if one forkee says "hide it"
+/// and another says "show it". A forkee's content is read by the
 /// records the skgrepo restriction shows, as the view drew it.
-fn validate_no_overlapping_subscribee_hiderel_conflicts (
-  visibility          : &[(ID, SubscribeeVisibility)],
+fn validate_no_overlapping_forkee_hiderel_conflicts (
+  visibility          : &[(ID, ForkeeVisibility)],
   graph               : &InRustGraph,
   config              : &SkgConfig,
   skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
   // This needs the visibility signals plus disk contains lists,
-  // because the conflict is per subscriber/subscribee-content pair,
+  // because the conflict is per forker/forkee-content pair,
   // not just per viewchild shown in the buffer.
   let mut seen : HashMap<(ID, ID), bool> = HashMap::new();
-  for (subscriber, signal) in visibility {
-    let subscribee_from_disk : Graphnode =
+  for (forker, signal) in visibility {
+    let forkee_from_disk : Graphnode =
       match opt_graphnode_by_gnid (
-        graph, config, &signal . subscribee ) ?
-      { Some (subscribee_from_disk) => subscribee_from_disk,
+        graph, config, &signal . forkee ) ?
+      { Some (forkee_from_disk) => forkee_from_disk,
         None                        => continue, };
     let visible_content : HashSet<ID> =
       signal . visible . iter() . cloned() . collect();
     for content_gnid in members_with_visible_records (
-      &subscribee_from_disk . contains, skgrepo_restriction ) {
+      &forkee_from_disk . contains, skgrepo_restriction ) {
       let content_gnid : ID = content_gnid;
       let key : (ID, ID) =
-        (subscriber . clone(), content_gnid . clone());
+        (forker . clone(), content_gnid . clone());
       let visible : bool = visible_content . contains (&content_gnid);
       match seen . get (&key) {
         Some (previous_visible) => {
           let previous_visible : &bool = previous_visible;
           if *previous_visible != visible {
             return Err (Box::new (BufferValidationError::Other (
-              format!( "Conflicting subscribee visibility edits for subscriber {} and content {}",
-                        subscriber, content_gnid )) )); }},
+              format!( "Conflicting forkee visibility edits for forker {} and content {}",
+                        forker, content_gnid )) )); }},
         None => {}, }
       seen . insert (key, visible); }}
   Ok (( )) }

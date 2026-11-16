@@ -117,7 +117,7 @@ pub struct SaveResponse {
   /// only in headline lines, None otherwise.
   pub changed_headlines   : Option<Vec<ViewnodeId>>,
   /// What the save hid and stopped hiding, and each removal from a
-  /// subscriber that hid nothing ('hide_report_lines' in
+  /// forker that hid nothing ('hide_report_lines' in
   /// 'server/from_text/hide_report.rs'). Sent as '(hides ...)' when
   /// not empty.
   pub hides               : Vec<String>,
@@ -1359,7 +1359,7 @@ fn skgrepos_in_config_order (
     . collect () }
 
 /// Turn a successfully skgsave-committed HiddenOutside addition into a message only
-/// when the final graph classifies it as hidden *inside* a subscribee.  This is
+/// when the final graph classifies it as hidden *inside* a forkee.  This is
 /// intentionally downstream of graph/filesystem mutation: failure and every
 /// confirmation return leave the candidate silent.
 fn post_skgsave_commit_hiddenoutside_warnings (
@@ -1375,22 +1375,22 @@ fn post_skgsave_commit_hiddenoutside_warnings (
   let mut warnings : Vec<String> = Vec::new ();
   for candidate in candidates {
     let PostSkgsaveCommitNoticeCandidate::HiddenOutsideAdded {
-      subscriber, member } = candidate;
-    let Some (subscriber_node) =
-      graphnode_from_graph (graph, subscriber)
+      forker, member } = candidate;
+    let Some (forker_node) =
+      graphnode_from_graph (graph, forker)
     else { continue; };
-    let mut containing_subscribees : Vec<String> = Vec::new ();
-    for subscribee in subscriber_node . forks . or_default () {
-      let Some (subscribee_node) =
-        graphnode_from_graph (graph, &subscribee . member)
+    let mut containing_forkees : Vec<String> = Vec::new ();
+    for forkee in forker_node . forks . or_default () {
+      let Some (forkee_node) =
+        graphnode_from_graph (graph, &forkee . member)
       else { continue; };
-      if subscribee_node . contains . iter ()
+      if forkee_node . contains . iter ()
         . any (|content| key (&content . member) == key (member))
-      { containing_subscribees . push (label (&subscribee_node . pid)); }}
-    if ! containing_subscribees . is_empty () {
+      { containing_forkees . push (label (&forkee_node . pid)); }}
+    if ! containing_forkees . is_empty () {
       warnings . push (format! (
         "Saved hide for {}; its display moved to HiddenInForkPartnerFolder under {}.",
-        label (member), containing_subscribees . join (", ") )); }}
+        label (member), containing_forkees . join (", ") )); }}
   warnings
 }
 

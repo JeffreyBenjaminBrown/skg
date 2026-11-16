@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(idempotence::)'
+// cargo nextest run --test grouped_forks -E 'test(idempotence::)'
 //
 // The refresh is a fixpoint. Re-rendering an already-rendered buffer,
 // with no edits and an unchanged graph, must yield byte-identical output. This is

@@ -1,6 +1,6 @@
 //! This file defines text-claim validation, which is async because
-//! it consults disk. A 'SubscribeeTextClaim' is the title/body that
-//! an editable subscribee-as-such displayed in the buffer; since
+//! it consults disk. A 'ForkeeTextClaim' is the title/body that
+//! an editable forkee-as-such displayed in the buffer; since
 //! title/body edits in that position are forbidden, each claim must
 //! match the node's disk state. Claims for nodes absent from disk
 //! are ignored.
@@ -30,6 +30,6 @@ pub fn validate_text_claims (
       if claim . title != from_disk . title
         || claim . body != from_disk . body
       { return Err (Box::new (BufferValidationError::Other (
-          format!( "Cannot edit title/body for node {} ({}) in subscribee-as-such position. View the node as itself to edit title/body.",
+          format!( "Cannot edit title/body for node {} ({}) in forkee-as-such position. View the node as itself to edit title/body.",
                     pid, claim . headline )) )); }}}
   Ok (( )) }

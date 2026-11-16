@@ -42,7 +42,7 @@ pub fn occurrence_child_counts_as_content (
 /// leaves that original's parent as its author wrote it, unforked, and
 /// N is drawn again there. Under a parent the user owns, the deletion
 /// still takes N out of the list too, as it did before 2026-11-15
-/// (and so, in a subscriber, hides N). Removing the headline removes N
+/// (and so, in a forker, hides N). Removing the headline removes N
 /// from any list, as removing any child does ('docs/forks.org',
 /// "Taking back a fork").
 pub fn deleted_overrider_keeps_its_original (
@@ -54,9 +54,9 @@ pub fn deleted_overrider_keeps_its_original (
                  Some (&NodeEditRequest::Delete)) }
 
 /// This returns true iff the given occurrence, a child of a
-/// editable subscribee-as-such, counts as visible content of the
-/// subscribee. That visible content is the signal from which the
-/// subscriber's hides/unhides are inferred.
+/// editable forkee-as-such, counts as visible content of the
+/// forkee. That visible content is the signal from which the
+/// forker's hides/unhides are inferred.
 pub fn occurrence_child_counts_as_visible_content (
   t : &Occurrence,
 ) -> bool {

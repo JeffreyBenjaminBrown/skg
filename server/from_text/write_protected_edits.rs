@@ -300,7 +300,7 @@ mod tests {
   }
 
   /// root contains recorder, which contains c1 then c2, has the alias
-  /// "another name" and the flag noSearchMatching, and subscribes to
+  /// "another name" and the flag noSearchMatching, and forks
   /// sub and to private_sub, whose home is the skgrepo private.
   fn graph () -> InRustGraph {
     let main : SkgrepoName = SkgrepoName::from ("main");

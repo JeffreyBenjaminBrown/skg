@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_overrides -E 'test(subscribee_as_such_extension::)'
+// cargo nextest run --test grouped_forks -E 'test(forkee_as_such_extension::)'
 //
 // Extending a subscribee as such, on the R/E/G/H example: R
 // subscribes to and overrides E, R hides H, E contains G and H.
@@ -20,7 +20,7 @@ use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  let fixtures : &str = "tests/subscribee_as_such_extension/fixtures";
+  let fixtures : &str = "tests/forkee_as_such_extension/fixtures";
   run_with_shared_test_stores (
     "skg-test-subscribee-as-such-extension",
     |s| Box::pin ( async move {

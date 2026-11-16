@@ -16,7 +16,7 @@ use skg::from_text::local_fieldintent_collection::extract_nonmergeSavePlan_local
 use skg::from_text::local_fieldintent_collection::lower::{
   lower_collected_fieldIntents, LoweringOutput, NodeIntent };
 use skg::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
-use skg::from_text::local_fieldintent_collection::types::SubscribeeVisibility;
+use skg::from_text::local_fieldintent_collection::types::ForkeeVisibility;
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
 use skg::test_utils::extract_graphnode_if_save_else_error;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config, graph_from_config};
@@ -31,7 +31,7 @@ use skg::types::viewnode::viewforest_root_viewnode;
 use std::error::Error;
 
 const SUBSCRIBEE_EDIT_CONFIG: &str =
-  "tests/hidden_from_subscriptions/fixtures-subscribee-edit/skgconfig.toml";
+  "tests/hidden_from_forks/fixtures-subscribee-edit/skgconfig.toml";
 
 fn save_gnids (
   instructions : &[NodeInstruction],
@@ -70,7 +70,7 @@ fn nodeInstructions_from_tree (
 /// collection emits.
 fn visibility_pairs_from_tree (
   viewforest : Tree<Viewnode>,
-) -> Vec<(ID, SubscribeeVisibility)> {
+) -> Vec<(ID, ForkeeVisibility)> {
   let forest : ViewForest =
     ViewForest::from_internal_tree (viewforest);
   let LoweringOutput { visibility, .. } =
@@ -80,7 +80,7 @@ fn visibility_pairs_from_tree (
 
 fn visibility_pairs_from_org (
   input : &str,
-) -> Vec<(ID, SubscribeeVisibility)> {
+) -> Vec<(ID, ForkeeVisibility)> {
   visibility_pairs_from_tree (
     viewnode_tree_as_written (input) ) }
 
@@ -467,8 +467,8 @@ fn subscribee_hiderel_intent_collects_visible_content (
   assert_eq!(
     visibility_pairs_from_org (input),
     vec![(ID::from ("subscriber"),
-       SubscribeeVisibility {
-         subscribee : ID::from ("subscribee"),
+       ForkeeVisibility {
+         forkee     : ID::from ("subscribee"),
          visible    : vec![ID::from ("a"), ID::from ("b")],
        })]); }
 
@@ -489,13 +489,13 @@ fn subscribee_hiderel_intents_preserve_subscribee_tree_order (
     visibility_pairs_from_org (input),
     vec![
       (ID::from ("subscriber"),
-         SubscribeeVisibility {
-           subscribee : ID::from ("first"),
+         ForkeeVisibility {
+           forkee     : ID::from ("first"),
            visible    : vec![ID::from ("first-child")],
          }),
       (ID::from ("subscriber"),
-         SubscribeeVisibility {
-           subscribee : ID::from ("second"),
+         ForkeeVisibility {
+           forkee     : ID::from ("second"),
            visible    : vec![ID::from ("second-child")],
          })]); }
 
@@ -514,8 +514,8 @@ fn subscribee_hiderel_intent_uses_only_children (
   assert_eq!(
     visibility_pairs_from_org (input),
     vec![(ID::from ("subscriber"),
-       SubscribeeVisibility {
-         subscribee : ID::from ("subscribee"),
+       ForkeeVisibility {
+         forkee     : ID::from ("subscribee"),
          visible    : vec![ID::from ("child")],
        })]); }
 
@@ -531,7 +531,7 @@ fn subscribee_hiderel_intent_ignores_writeProtected_subscribee (
 
   assert_eq!(
     visibility_pairs_from_org (input),
-    Vec::<(ID, SubscribeeVisibility)>::new()); }
+    Vec::<(ID, ForkeeVisibility)>::new()); }
 
 #[test]
 fn subscribee_hiderel_intent_ignores_writeProtected_subscriber (
@@ -551,7 +551,7 @@ fn subscribee_hiderel_intent_ignores_writeProtected_subscriber (
 
   assert_eq!(
     visibility_pairs_from_org (input),
-    Vec::<(ID, SubscribeeVisibility)>::new()); }
+    Vec::<(ID, ForkeeVisibility)>::new()); }
 
 #[test]
 fn subscribee_hiderel_intent_excludes_non_content_delete_and_ghost_children (
@@ -568,14 +568,14 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_ghost_children (
             "};
   let viewforest : Tree<Viewnode> =
     viewnode_tree_as_written (input);
-  let intents : Vec<(ID, SubscribeeVisibility)> =
+  let intents : Vec<(ID, ForkeeVisibility)> =
     visibility_pairs_from_tree (viewforest);
 
   assert_eq!(
     intents,
     vec![(ID::from ("subscriber"),
-       SubscribeeVisibility {
-         subscribee : ID::from ("subscribee"),
+       ForkeeVisibility {
+         forkee     : ID::from ("subscribee"),
          visible    : vec![ID::from ("keep")],
        })]); }
 
@@ -597,8 +597,8 @@ fn subscribee_hiderel_intent_ignores_hidden_folder_contents (
   assert_eq!(
     visibility_pairs_from_org (input),
     vec![(ID::from ("subscriber"),
-       SubscribeeVisibility {
-         subscribee : ID::from ("subscribee"),
+       ForkeeVisibility {
+         forkee     : ID::from ("subscribee"),
          visible    : vec![ID::from ("visible")],
        })]); }
 
@@ -718,17 +718,17 @@ fn all_tests
         &s . config ) . await ?;
       s . reset_from_config (
         "subscribee_as_such_visible_child_removes_subscriber_hide",
-        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml") ?;
+        "tests/hidden_from_forks/fixtures-hidden-within-but-none-without/skgconfig.toml") ?;
       subscribee_as_such_visible_child_removes_subscriber_hide (
         &s . config ) . await ?;
       s . reset_from_config (
         "subscribee_as_such_unhide_preserves_unrelated_hides",
-        "tests/hidden_from_subscriptions/fixtures-every-kind-of-folder/skgconfig.toml") ?;
+        "tests/hidden_from_forks/fixtures-every-kind-of-folder/skgconfig.toml") ?;
       subscribee_as_such_unhide_preserves_unrelated_hides (
         &s . config ) . await ?;
       s . reset_from_config (
         "overlapping_subscribee_hiderel_conflict_rejects_save",
-        "tests/hidden_from_subscriptions/fixtures-overlapping-subscribees/skgconfig.toml") ?;
+        "tests/hidden_from_forks/fixtures-overlapping-subscribees/skgconfig.toml") ?;
       overlapping_subscribee_hiderel_conflict_rejects_save (
         &s . config ) . await ?;
       s . reset_from_config (
@@ -943,7 +943,7 @@ async fn overlapping_subscribee_hiderel_conflict_rejects_save (
         matches!(
           buffer_error,
           BufferValidationError::Other (msg)
-            if msg . contains ("Conflicting subscribee visibility edits")),
+            if msg . contains ("Conflicting forkee visibility edits")),
         "expected overlapping visibility conflict, got {:?}",
         buffer_error);
       Ok (()) }
@@ -1060,7 +1060,7 @@ async fn foreign_subscribee_as_such_title_edit_is_rejected (
           buffer_error,
           BufferValidationError::Other (msg)
             if msg . contains ("Cannot edit title/body")
-               && msg . contains ("subscribee-as-such")
+               && msg . contains ("forkee-as-such")
                && msg . contains ("e")),
         "expected foreign subscribee-as-such title edit rejection, got {:?}",
         buffer_error);
@@ -1089,7 +1089,7 @@ async fn owned_as_subscribee_title_edit_is_rejected (
           buffer_error,
           BufferValidationError::Other (msg)
             if msg . contains ("Cannot edit title/body")
-               && msg . contains ("subscribee-as-such")
+               && msg . contains ("forkee-as-such")
                && msg . contains ("r")),
         "expected owned subscribee-as-such title edit rejection, got {:?}",
         buffer_error);
@@ -1119,7 +1119,7 @@ async fn owned_as_subscribee_body_edit_is_rejected (
           buffer_error,
           BufferValidationError::Other (msg)
             if msg . contains ("Cannot edit title/body")
-               && msg . contains ("subscribee-as-such")
+               && msg . contains ("forkee-as-such")
                && msg . contains ("r")),
         "expected owned subscribee-as-such body edit rejection, got {:?}",
         buffer_error);
