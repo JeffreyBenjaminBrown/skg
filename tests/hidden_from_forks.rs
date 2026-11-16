@@ -311,9 +311,9 @@ fn all_tests
         "tests/hidden_from_forks/fixtures-forkee-edit") ?;
       test_moving_foreign_forkee_content_to_forker_does_not_hide (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_moving_foreign_forkee_content_elsewhere_still_hides",
+      s . reset ("test_moving_foreign_forkee_content_into_another_owned_note_does_not_hide",
         "tests/hidden_from_forks/fixtures-forkee-edit") ?;
-      test_moving_foreign_forkee_content_elsewhere_still_hides (
+      test_moving_foreign_forkee_content_into_another_owned_note_does_not_hide (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_a_node_placed_under_a_foreign_forkee_is_refused",
         "tests/hidden_from_forks/fixtures-forkee-edit") ?;
@@ -844,7 +844,12 @@ async fn test_moving_foreign_forkee_content_to_forker_does_not_hide (
     assert_e1_removed_from_visible_forkee_branch (&rerendered);
     Ok (( )) }
 
-async fn test_moving_foreign_forkee_content_elsewhere_still_hides (
+/// e1 moved from under e, r's foreign forkee as such, to under a, a
+/// new owned note: the user keeps e1 in a, so r hides nothing
+/// ('docs/forks.org', "What you keep elsewhere"). e1 stands in e's
+/// folder of what the user keeps elsewhere, its containers folder
+/// naming a, and remains a's content.
+async fn test_moving_foreign_forkee_content_into_another_owned_note_does_not_hide (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -872,9 +877,16 @@ async fn test_moving_foreign_forkee_content_elsewhere_still_hides (
         &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
-    assert_hides_e1_under_the_forkee (&rerendered);
+    assert_does_not_hide_e1 (&rerendered);
+    let without_ids : String = without_viewnode_ids (&rerendered);
     assert! (
-      without_viewnode_ids (&rerendered) . contains (
+      without_ids . contains (
+        "**** (skg integratedElsewhereFolder)\n***** (skg folded node (gnid e1) (skgRepos (nodeRepo foreign)) writeProtected" )
+      && without_ids . contains ( "****** (skg containerFolder)\n******* (skg folded node (gnid a)" ),
+      "Expected e1 under e's folder of what the user keeps elsewhere, naming a:\n{}",
+      rerendered );
+    assert! (
+      without_ids . contains (
         "** (skg node (gnid e1) (skgRepos (nodeRepo foreign)) writeProtected" ),
       "Expected e1 to remain content of a:\n{}",
       rerendered );

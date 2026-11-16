@@ -121,13 +121,16 @@ fn a_forkee_as_such_shows_what_its_forker_neither_hides_nor_contains () {
 node s
   forksFolder
     node e
+      integratedElsewhereFolder
+        node i wp noClaim folded
       hiddenInForkPartnerFolder
         node h wp noClaim folded
           node e wp noClaim
       node k
   node i",
-    "an editable forkee as such also shows the folder of what its \
-     forker hides in it" ); }
+    "an editable forkee as such also shows, first, the folder of what \
+     the user keeps elsewhere (i, which s contains), then the folder \
+     of what its forker hides in it" ); }
 
 #[test]
 fn a_folder_omits_the_members_whose_records_are_restricted () {

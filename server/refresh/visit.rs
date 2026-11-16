@@ -53,8 +53,8 @@ use crate::refresh::extent::{Extent, extent_of_parent};
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, goal_of_parent, has_a_fork_partner,
   hidden_by_forker, hidden_in_fork_partner, hidden_outside_of_fork_partners,
-  member_of_child, note_forked_by_forker_as_such, note_of_member_as_such,
-  visible_illegal_edits};
+  integrated_elsewhere, member_of_child, note_forked_by_forker_as_such,
+  note_of_member_as_such, visible_illegal_edits};
 use crate::refresh::goal::partnerFolder_members_in_graph;
 use crate::telescope::types::IllegalEdit;
 use crate::refresh::id_rule::{
@@ -123,10 +123,12 @@ pub(crate) fn visit_parent (
 /// fork partners, when that holds anything); a member as such shows
 /// one only when asked ('(folder forks)'), since the folder it stands
 /// in lists every mirror already. An editable member as such of a
-/// forks folder (a forkee or forker as such) shows the folder of what
-/// the note whose folder holds it hides in it, when that holds
-/// anything; and an editable forker as such that forks that note
-/// ('note_forked_by_forker_as_such') shows, after that, the folder of
+/// forks folder (a forkee or forker as such) shows, first, the folder
+/// of what it contains that the user keeps elsewhere
+/// ('integrated_elsewhere'), then the folder of what the note whose
+/// folder holds it hides in it, each when it holds anything; and an
+/// editable forker as such that forks that note
+/// ('note_forked_by_forker_as_such') shows, after them, the folder of
 /// what it hides of the note's content, when that holds anything. Not
 /// in the diff view.
 fn add_default_folders (
@@ -156,31 +158,32 @@ fn add_default_folders (
         move_after (tree, folder, forks_folder)
           . expect ("add_default_folders: both are children"); }}}
   if let Some (note) = note_of_member_as_such (tree, parent) {
-    // The folder of what the note hides in the member goes first; the
-    // folder of what a forker as such hides of the note's content
-    // goes right after it.
-    let hidden_in : Option<NodeId> =
-      if child_folder (tree, parent, &Folder::HiddenInForkPartner) . is_none ()
-         && ! hidden_in_fork_partner (&pid, &note, walk) . is_empty ()
-      { let folder : NodeId = tree . get_mut (parent) . unwrap ()
-          . append ( viewnode_of ( ViewnodeKind::Folder (Folder::HiddenInForkPartner) ))
-          . id ();
-        move_to_first_child (tree, parent, folder)
-          . expect ("add_default_folders: the folder was just added");
-        walk . folders_whose_drawn_members_are_folded . insert (folder);
-        Some (folder)
-      } else { child_folder (tree, parent, &Folder::HiddenInForkPartner) };
-    if note_forked_by_forker_as_such (tree, parent, walk) . is_some ()
-       && child_folder (tree, parent, &Folder::HiddenByForker) . is_none ()
-       && ! hidden_by_forker (&pid, &note, walk) . is_empty ()
-    { let folder : NodeId = tree . get_mut (parent) . unwrap ()
-        . append ( viewnode_of ( ViewnodeKind::Folder (Folder::HiddenByForker) ))
-        . id ();
-      match hidden_in {
-        Some (hidden_in) => move_after (tree, hidden_in, folder),
-        None => move_to_first_child (tree, parent, folder), }
-        . expect ("add_default_folders: the folder was just added");
-      walk . folders_whose_drawn_members_are_folded . insert (folder); }}}
+    // The folder of what the user keeps elsewhere goes first; the
+    // folder of what the note hides in the member right after it;
+    // the folder of what a forker as such hides of the note's content
+    // right after them. Each new one follows the last of those
+    // before it that stands.
+    let mut last_placed : Option<NodeId> = None;
+    for (kind, holds_something) in [
+      ( Folder::IntegratedElsewhere,
+        ! integrated_elsewhere (&pid, &note, walk) . is_empty () ),
+      ( Folder::HiddenInForkPartner,
+        ! hidden_in_fork_partner (&pid, &note, walk) . is_empty () ),
+      ( Folder::HiddenByForker,
+        note_forked_by_forker_as_such (tree, parent, walk) . is_some ()
+        && ! hidden_by_forker (&pid, &note, walk) . is_empty () ), ]
+    { last_placed = match child_folder (tree, parent, &kind) {
+        Some (present) => Some (present),
+        None if holds_something => {
+          let folder : NodeId = tree . get_mut (parent) . unwrap ()
+            . append ( viewnode_of ( ViewnodeKind::Folder (kind) )) . id ();
+          match last_placed {
+            Some (before) => move_after (tree, before, folder),
+            None => move_to_first_child (tree, parent, folder), }
+            . expect ("add_default_folders: the folder was just added");
+          walk . folders_whose_drawn_members_are_folded . insert (folder);
+          Some (folder) },
+        None => last_placed, }; }}}
 
 /// In a forks folder of a content view, the compound folder of what
 /// its viewparent hides outside its fork partners, when it hides
@@ -586,14 +589,21 @@ fn mark_claims (
 /// no longer stands for it by any record, visible or not
 /// ('unhidden_in_the_hides_folder'), or by design
 /// ('view_ancestor_in_its_folder',
-/// 'is_hiddenByForkerFolder_under_no_forker_as_such').
+/// 'is_hiddenByForkerFolder_under_no_forker_as_such'), or the folder
+/// is the folder of what a member as such contains that the user keeps
+/// elsewhere, whose members are derived each time from where the user
+/// keeps them: one the user keeps there no longer, or that a skgrepo
+/// narrowing keeps out of the user's graph, the member shows again
+/// among its content instead.
 fn leaves_its_write_protected_folder (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
   child  : NodeId,
   walk   : &Walk,
 ) -> bool {
-  unhidden_in_the_hides_folder (tree, parent, child, walk)
+  matches! ( tree . get (parent) . unwrap () . value () . kind,
+             ViewnodeKind::Folder (Folder::IntegratedElsewhere) )
+  || unhidden_in_the_hides_folder (tree, parent, child, walk)
   || view_ancestor_in_its_folder (tree, parent, child)
   || is_hidden_by_the_forks_folders_viewparent (tree, parent, child, walk)
   || is_hiddenByForkerFolder_under_no_forker_as_such (tree, parent, walk) }
@@ -772,7 +782,8 @@ fn reinstate (
 /// Book what a drawn child is: an editable occurrence holds its
 /// node's editability ('Walk::hold_editability'); a folder member
 /// carries its chain, but for a member of a forks folder in a content
-/// view, which carries it in a containers folder
+/// view, or of a folder of what a member as such contains that the
+/// user keeps elsewhere, which carries it in a containers folder
 /// ('add_containers_folder_under_forks_folder_member'); under a folder
 /// the refresh added to be drawn folded, it is drawn folded, and so it
 /// is under one of those kinds that already stood drawn folded
@@ -785,16 +796,17 @@ fn after_drawing (
 ) -> Result<(), Box<dyn Error>> {
   if let Some (gnid) = tree . get (treeid) . unwrap () . value () . editable_gnid () . cloned () {
     walk . hold_editability (&gnid, treeid); }
-  let (carries_chain, in_a_content_views_forks_folder) : (bool, bool) =
+  let (carries_chain, carries_containers_folder) : (bool, bool) =
     if ! tree . get (treeid) . unwrap () . value () . is_occurrence () { (false, false) }
     else { match &tree . get (parent) . unwrap () . value () . kind {
       ViewnodeKind::Folder (folder) =>
         ( folder . members_carry_containerward_chain (walk . is_diff_view ()),
-          matches! ( folder, Folder::Forks ) && ! walk . is_diff_view () ),
+          ( matches! ( folder, Folder::Forks ) && ! walk . is_diff_view () )
+          || matches! ( folder, Folder::IntegratedElsewhere ) ),
       _ => (false, false), }};
   if carries_chain {
     draw_containerward_chain (tree, treeid, walk) ?; }
-  if in_a_content_views_forks_folder {
+  if carries_containers_folder {
     add_containers_folder_under_forks_folder_member (tree, treeid, walk); }
   if walk . folders_whose_drawn_members_are_folded . contains (&parent)
      || stands_drawn_folded (tree, parent, treeid) {
@@ -815,7 +827,8 @@ fn stands_drawn_folded (
 ) -> bool {
   let folder : NodeRef<Viewnode> = tree . get (parent) . unwrap ();
   if ! matches! ( folder . value () . kind,
-                  ViewnodeKind::Folder ( Folder::HiddenInForkPartner
+                  ViewnodeKind::Folder ( Folder::IntegratedElsewhere
+                                         | Folder::HiddenInForkPartner
                                          | Folder::HiddenByForker
                                          | Folder::HiddenOutsideOfForkPartners
                                          | Folder::Container )) { return false; }
@@ -825,7 +838,9 @@ fn stands_drawn_folded (
   && others . iter () . all ( |child| child . value () . foldAndFocus . folded ) }
 
 /// Under the occurrence at 'member', just drawn into a forks folder of
-/// a content view, a containers folder, drawn folded
+/// a content view (or into a folder of what a member as such contains
+/// that the user keeps elsewhere, where it shows where the user keeps
+/// it), a containers folder, drawn folded
 /// ('Walk::folders_whose_drawn_members_are_folded'), whose members
 /// carry their chains: the member's containers but its view-ancestors
 /// ('Folder::omits_view_ancestors'). Where it would hold nothing its
@@ -1183,7 +1198,8 @@ fn kinds_redrawing (
     Folder::Mentioner              => folders_of_relation (FolderRelation::Mentioners),
     Folder::Alias                  => folders_of_relation (FolderRelation::Aliases),
     Folder::Flags { .. }           => vec! [ Folder::flags () ],
-    Folder::HiddenInForkPartner | Folder::HiddenByForker
+    Folder::IntegratedElsewhere
+      | Folder::HiddenInForkPartner | Folder::HiddenByForker
       | Folder::HiddenOutsideOfForkPartners
       | Folder::AcquiredBy | Folder::Acquired
       | Folder::ID | Folder::IllegalEdit { .. } => Vec::new (), } }

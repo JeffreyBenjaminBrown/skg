@@ -2,9 +2,9 @@
 //!
 //! An owned forker F draws, in its forks folder, each
 //! forkee S as such: S's members that F neither contains nor
-//! hides ('less_what_the_note_integrates' in
-//! 'server/refresh/goal.rs'). Read as mail, those are the messages F's
-//! owner has not touched. Writing in one of them (a reply typed under
+//! hides, and that no other owned note keeps
+//! ('less_what_the_note_integrates' in 'server/refresh/goal.rs').
+//! Read as mail, those are the messages F's owner has not touched. Writing in one of them (a reply typed under
 //! it, which forks it when it is foreign, or any other edit of it or
 //! of its content, at any depth) is touching it, so the save files that
 //! member in F: it appends the member to F's contains, by the ID S's

@@ -12,7 +12,9 @@
 //! save will in fact write. Then each child that left an owned
 //! note with a fork partner its forks folder shows (a note it forks,
 //! or a forker it does not hide), and whose departure hid
-//! nothing, earns a "Hides nothing:" line naming the rule that held.
+//! nothing, earns a "Hides nothing:" line naming the rule that held:
+//! among them, that an owned note keeps it after the save
+//! ('owned_notes_containing'), so that no partner shows it.
 //! .
 //! Only what the skgrepo restriction shows counts, as in the
 //! inference: a hide or a member whose record is kept out of sight is
@@ -22,7 +24,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text::local_fieldintent_collection::resolve_visibility::member_it_stands_for;
-use crate::refresh::goal::fork_partners_shown;
+use crate::refresh::goal::{ContainsAfterSave, fork_partners_shown, owned_notes_containing};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig};
 use crate::types::nodes::complete::Graphnode;
@@ -80,6 +82,12 @@ pub fn hide_report_lines (
     saved . iter ()
     . map ( |node| ( node . pid . clone (), visible_members (&node . contains) ))
     . collect ();
+  let after_save : ContainsAfterSave = ContainsAfterSave {
+    saved : saved . iter ()
+      . map ( |node| ( node . pid . clone (), node . home_skgrepo . clone (),
+                       visible_members (&node . contains) . into_iter () . collect () ))
+      . collect (),
+    deleted : deleted . clone () };
   let mut changes : Vec<String> = Vec::new ();
   let mut nothings : Vec<String> = Vec::new ();
   for node in &saved {
@@ -142,6 +150,13 @@ pub fn hide_report_lines (
         graph, restriction, child, &all_content ) . map ( |member| key (&member) );
       let it_or = |member : &ID| -> String {
         if member == child { "it" . to_string () } else { label (member) } };
+      let keepers : Vec<String> = // the owned notes keeping what it stands for after the save
+        stands_for . as_ref ()
+        . map ( |member| owned_notes_containing (
+                  graph, config, restriction, member,
+                  &[ node . pid . clone () ], Some (&after_save) ))
+        . unwrap_or_default ()
+        . iter () . map ( |keeper| label (keeper) ) . collect ();
       let placed_under : Vec<String> = // the fork partners this save places the child under
         partner_contents . iter ()
         . filter ( |(partner, content_before)|
@@ -167,6 +182,12 @@ pub fn hide_report_lines (
         Some (member) if contains_after . contains (&member) => format! (
           "{} still contains {}, which it stands for",
           label (&node . pid), label (&member) ),
+        Some (member) if ! keepers . is_empty () => format! (
+          "{} {} {}{}",
+          keepers . join (" and "),
+          if keepers . len () == 1 { "keeps" } else { "keep" },
+          it_or (&member),
+          if member == *child { "" } else { ", which it stands for" } ),
         Some (member) => format! (
           "this save shows {} under {}",
           it_or (&member), containers_of (&member) ), };

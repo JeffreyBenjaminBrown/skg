@@ -17,7 +17,7 @@ const CLAIMS_MEMBERSHIP : bool = true;
 #[test]
 fn folder_kind_rules () {
   let ordered : Vec<Folder> = vec! [
-    Folder::Forks, Folder::Hidden,
+    Folder::Forks, Folder::Hidden, Folder::IntegratedElsewhere,
     Folder::HiddenOutsideOfForkPartners, Folder::Alias ];
   let unordered : Vec<Folder> = vec! [
     Folder::Hider,

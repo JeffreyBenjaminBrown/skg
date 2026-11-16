@@ -155,8 +155,10 @@ async fn a_fresh_view_draws_forkers_after_forkees_editable (
                 "{} shows {}, editable:\n{}", member, gnid, view ); }}
   Ok (( )) }
 
-/// Under T, the folder of what N hides in it (Z) comes first, then the
-/// folder of what T hides of N's content (X2), then its content (Y),
+/// Under T, the folder of what the user keeps elsewhere (X1 and X3,
+/// which N contains) comes first, then the folder of what N hides in
+/// it (Z), then the folder of what T hides of N's content (X2), then
+/// its content (Y),
 /// and no forks folder (a member as such shows one only when asked);
 /// each folder's members are folded. K, a
 /// forkee, has neither folder. The second folder's label names T as
@@ -168,13 +170,14 @@ async fn a_forkers_folders_stand_in_order (
   let view : String = view_of (config, tantivy, "N") ?;
   let children : Vec<&str> = children_of (&view, "T");
   let kinds : Vec<&str> = children . iter ()
-    . map ( |line| if line . contains ("hiddenInForkPartnerFolder") { "hiddenIn" }
+    . map ( |line| if line . contains ("integratedElsewhereFolder") { "integrated" }
+                   else if line . contains ("hiddenInForkPartnerFolder") { "hiddenIn" }
                    else if line . contains ("hiddenByForkerFolder") { "hiddenBy" }
                    else if line . contains ("forksFolder") { "forks" }
                    else if line . contains ("(gnid Y)") { "Y" }
                    else { "other" } )
     . collect ();
-  assert_eq! ( kinds, vec! ["hiddenIn", "hiddenBy", "Y"], "{}", view );
+  assert_eq! ( kinds, vec! ["integrated", "hiddenIn", "hiddenBy", "Y"], "{}", view );
   let hidden_by_at : usize = view . lines ()
     . position ( |line| line . contains ("hiddenByForkerFolder") ) . unwrap ();
   let first_member : &str = view . lines () . nth (hidden_by_at + 1) . unwrap ();

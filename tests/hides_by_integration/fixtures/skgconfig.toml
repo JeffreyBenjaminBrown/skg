@@ -1,0 +1,15 @@
+tantivy_folder = "/tmp/placeholder"
+beep_when_server_becomes_available = false
+
+[[repos]]
+name = "public"
+path = "public"
+
+[[repos]]
+name = "private"
+path = "private"
+
+[[repos]]
+name = "theirs"
+path = "theirs"
+foreign = true

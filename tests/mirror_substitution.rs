@@ -464,11 +464,12 @@ async fn extraction_honors_inPlaceOf (
             ! s_node . hides . or_default ()
               . iter () . any ( |m| &m . member == &ID::from ("N") ),
             "S must not hide N: the shown R stands for N" ); }}
-      { // Deleting R where it stands for N there deletes R and hides
-        // N from S, as removing R does: a deleted mirror keeps its
-        // original only in the content of a parent the user does not
-        // own ('content_members'), and a forkee as such has no
-        // content the save writes, only S's hides. Nor is N filed in S.
+      { // Deleting R where it stands for N there deletes R. It hides
+        // nothing from S: P, an owned note, keeps N, so a forkee as
+        // such never shows N ('docs/forks.org', "What you keep
+        // elsewhere"), and a buffer drawn before that rule, as this
+        // one is, which shows it, cuts nothing the view drew. Nor is N
+        // filed in S.
         let buffer = indoc! {"
           * (skg node (gnid S) (skgRepos (nodeRepo main))) S
           ** (skg forksFolder)
@@ -480,15 +481,15 @@ async fn extraction_honors_inPlaceOf (
         assert! ( instructions . iter () . any ( |i| matches! (
                     i, NodeInstruction::Delete (d) if d . gnid == ID::from ("R") )),
           "R is deleted" );
-        let s_node : &Graphnode = saved_node_by_gnid (&instructions, "S");
-        assert! (
-          s_node . hides . or_default ()
-            . iter () . any ( |m| &m . member == &ID::from ("N") ),
-          "S hides N" );
-        assert! (
-          ! s_node . contains
-            . iter () . any ( |m| &m . member == &ID::from ("N") ),
-          "S does not file N" ); }
+        if let Some (s_node) = opt_saved_node_by_gnid (&instructions, "S") {
+          assert! (
+            ! s_node . hides . or_default ()
+              . iter () . any ( |m| &m . member == &ID::from ("N") ),
+            "S does not hide N, which P keeps" );
+          assert! (
+            ! s_node . contains
+              . iter () . any ( |m| &m . member == &ID::from ("N") ),
+            "S does not file N" ); }}
       Ok (( )) }
 
 /// Which mirror stands is the perspective's skgrepo's choice, and

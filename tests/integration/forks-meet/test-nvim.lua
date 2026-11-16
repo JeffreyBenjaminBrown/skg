@@ -3,17 +3,21 @@
 -- data). The Lua mirror of test-emacs.el in this directory, through
 -- the user's own gestures ('dd', 'p', ':s', ':w'):
 -- 1. R's view. R's forks folder is flat. N stands editable in it, its
---    herald bK (a forkee); T, which forks N, stands there too, an
+--    herald bK (a forkee), its first child its folder of what the user
+--    keeps elsewhere (X1 to X3, which R contains); T, which forks N,
+--    stands there too, an
 --    indirect member, editable, its herald with neither bK nor Kb,
 --    showing Y and Z, what R neither contains nor hides; no member
 --    shows a forks folder; each containers folder's member (Shelf) is
 --    folded.
 -- 2. X4, which N shows there, is deleted ('dd') and the view saved
---    (':w'): X4 stands in N's folder of what R hides in it.
+--    (':w'): X4 stands in N's folder of what R hides in it, right after
+--    N's folder of what the user keeps elsewhere.
 -- 3. N's view. Y is deleted from under T, put after N's last child
 --    ('p') and raised to N's content (':s'), and the view saved: T
 --    stands first in N's forks folder, claiming, its herald bKb (a
---    mutual); R follows; Y stands in N's content.
+--    mutual); R follows; Y stands in N's content, and so in T's folder
+--    of what the user keeps elsewhere.
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(60)
@@ -183,10 +187,18 @@ write_view()
 print("R's view after the save:\n" .. T.buffer_text(r_buf))
 do
   local n_line = line_showing(r_buf, 'N')
-  T.check(line_at(r_buf, n_line + 1):find('hiddenInForkPartnerFolder', 1, true)
-          and depth_at(r_buf, n_line + 1) == depth_at(r_buf, n_line) + 1,
-          "N's first child is now its folder of what R hides in it")
-  T.check(line_at(r_buf, n_line + 2):find('(gnid X4)', 1, true),
+  local n_depth = depth_at(r_buf, n_line)
+  T.check(line_at(r_buf, n_line + 1):find('integratedElsewhereFolder', 1, true)
+          and depth_at(r_buf, n_line + 1) == n_depth + 1,
+          "N's first child is its folder of what the user keeps elsewhere")
+  local hidden_in_line = n_line + 2
+  while depth_at(r_buf, hidden_in_line) > n_depth + 1 do
+    hidden_in_line = hidden_in_line + 1
+  end
+  T.check(line_at(r_buf, hidden_in_line):find('hiddenInForkPartnerFolder', 1, true)
+          and depth_at(r_buf, hidden_in_line) == n_depth + 1,
+          "N's second child is now its folder of what R hides in it")
+  T.check(line_at(r_buf, hidden_in_line + 1):find('(gnid X4)', 1, true),
           'that folder holds X4')
 end
 print("PASS [phase 2]: X4 stands in N's folder of what R hides in it")
@@ -224,7 +236,9 @@ do
   T.check(depth_at(n_buf, next_member) == member_depth
           and line_at(n_buf, next_member):find('(gnid R)', 1, true),
           "R follows T in N's forks folder")
-  T.check(depth_at(n_buf, line_showing(n_buf, 'Y')) == 2,
+  T.check(depth_at(n_buf, line_showing(n_buf, 'Y')) == member_depth + 2,
+          "Y stands first in T's folder of what the user keeps elsewhere")
+  T.check(depth_at(n_buf, line_showing(n_buf, 'Y', 1)) == 2,
           "Y stands in N's own content")
 end
 print("PASS [phase 3]: T is a mutual, first, and Y is N's")

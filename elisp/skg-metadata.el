@@ -253,6 +253,7 @@ write-protected -- the save would refuse that edit. Returns
   '(hiderFolder hiddenFolder
     containerFolder mentionerFolder acquiredByFolder acquiredFolder
     illegalEditFolder
+    integratedElsewhereFolder
     hiddenInForkPartnerFolder hiddenByForkerFolder
     hiddenOutsideOfForkPartnersFolder)
   "The partner folder atoms where an explicit relRepo

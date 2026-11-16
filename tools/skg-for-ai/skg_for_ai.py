@@ -3270,8 +3270,9 @@ WRITABLE_FOLDER_RELATIONSHIP_KINDS = { "forksFolder" : "forkee" }
 RELREPO_UNSUPPORTED_FOLDERS = (
   "hiderFolder", "hiddenFolder",
   "containerFolder", "mentionerFolder", "acquiredByFolder",
-  "acquiredFolder", "illegalEditFolder", "hiddenInForkPartnerFolder",
-  "hiddenByForkerFolder", "hiddenOutsideOfForkPartnersFolder" )
+  "acquiredFolder", "illegalEditFolder", "integratedElsewhereFolder",
+  "hiddenInForkPartnerFolder", "hiddenByForkerFolder",
+  "hiddenOutsideOfForkPartnersFolder" )
 
 class OutlineWordCheck:
   """What reading the handles' words against the outline found:

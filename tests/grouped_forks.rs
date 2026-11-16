@@ -48,6 +48,9 @@ mod forks_folder;
 #[path = "flat_forks_folders.rs"]
 mod flat_forks_folders;
 
+#[path = "hides_by_integration.rs"]
+mod hides_by_integration;
+
 #[path = "forkees_drawn_editable.rs"]
 mod forkees_drawn_editable;
 #[path = "forkers_drawn_editable.rs"]

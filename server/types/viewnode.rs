@@ -505,8 +505,8 @@ pub struct ViewnodeStats {
   /// graph handle; for a relationship recorded in a foreign skgrepo,
   /// which has no privacy rank, and which only that skgrepo's own node
   /// records; for a node that is not genuinely a member here
-  /// (one claiming nothing); and for the two
-  /// compound partner folders (HiddenInForkPartner,
+  /// (one claiming nothing); and for the four
+  /// compound partner folders (IntegratedElsewhere, HiddenInForkPartner,
   /// HiddenByForker, HiddenOutsideOfForkPartners), which have no single
   /// 'relation_member_role' to read a skgrepo from.
   /// This is a derived fact, unlike a requested replacement stored in
@@ -584,8 +584,8 @@ pub enum ChangesetMarkerKind {
 }
 
 /// A viewnode grouping the children of one kind of relationship of
-/// its viewparent: the ten partner folders, whose members are
-/// nodes (five of one relation each, the three compound partner folders, and
+/// its viewparent: the eleven partner folders, whose members are
+/// nodes (five of one relation each, the four compound partner folders, and
 /// the diff view's two acquisition folders), and the three property
 /// folders, whose members are the viewparent's aliases, IDs and true
 /// flags.
@@ -604,6 +604,14 @@ pub enum Folder {
   // by the node represented by its parent. The relationships are write-protected
   // here, but editable within the parent's forks folder.
   Hidden,
+  /// Child of a member as such of a forks folder (a forkee or forker
+  /// as such). Collects the member's content that the user keeps
+  /// elsewhere: what an owned note but the member, or the note whose
+  /// forks folder holds it, contains, less what that note hides
+  /// ('docs/glossary.org', "integrated"). Write-protected (the user
+  /// keeps these in the notes that contain them). Stands first among
+  /// the member's folders.
+  IntegratedElsewhere,
   HiddenInForkPartner, // Child of a member as such of a forks folder (a forkee or forker as such). Collects children of the member that the note whose forks folder holds it hides. Write-protected (but these relationships are editable by modifying the listed contents of the member as such).
   HiddenByForker, // Child of a forker as such. Collects what the forker hides of the content of the note whose forks folder holds it. Write-protected (the forker's hides are its owner's, edited in its own view).
   HiddenOutsideOfForkPartners, // Child of a forks folder. Collects things hidden by the forks folder's parent but absent from the content of every fork partner the folder shows (its forkees and the forkers it does not hide), a forker it hides among them. This compound partner folder is editable as an exclusive visible-outside subset; its hide skgrepos remain derived. Shown after every member, under the same forks folder.
@@ -783,7 +791,9 @@ impl Folder {
 
   /// Whether the folder's goal has an order the view follows: the
   /// viewparent's own file records the members in order (the
-  /// hidden and alias folders, and the forkees that lead the forks
+  /// hidden and alias folders, the folder of what a member as such
+  /// contains that the user keeps elsewhere, in the member's list's
+  /// order, and the forkees that lead the forks
   /// folder, whose other members follow them in the order the graph
   /// and the config give: 'forks_folder_goal'), or the folder
   /// is the compound partner folder of what a note hides outside its
@@ -794,6 +804,7 @@ impl Folder {
   pub fn goal_is_ordered (&self) -> bool {
     match self {
       Folder::Forks | Folder::Hidden
+        | Folder::IntegratedElsewhere
         | Folder::HiddenOutsideOfForkPartners | Folder::Alias
         | Folder::IllegalEdit { .. } => true,
       Folder::Hider
@@ -816,8 +827,8 @@ impl Folder {
       Folder::Forks
         | Folder::HiddenOutsideOfForkPartners | Folder::Alias => true,
       Folder::Hider
-        | Folder::Hidden | Folder::HiddenInForkPartner
-        | Folder::HiddenByForker
+        | Folder::Hidden | Folder::IntegratedElsewhere
+        | Folder::HiddenInForkPartner | Folder::HiddenByForker
         | Folder::Container | Folder::Mentioner
         | Folder::AcquiredBy | Folder::Acquired
         | Folder::ID | Folder::Flags { .. }
@@ -838,14 +849,17 @@ impl Folder {
   /// record a nodeMerge, do not, nor do the property folders; nor,
   /// outside the diff view ('in_the_diff_view'), does the forks
   /// folder, whose members carry the chain in a containers folder
-  /// instead ('after_drawing' in 'server/refresh/visit.rs').
+  /// instead ('after_drawing' in 'server/refresh/visit.rs'), nor, in
+  /// any view, does the folder of what a member as such contains that
+  /// the user keeps elsewhere, whose members do the same.
   pub fn members_carry_containerward_chain (
     &self,
     in_the_diff_view : bool,
   ) -> bool {
     ! ( self . members_are_properties ()
         || matches! ( self, Folder::AcquiredBy | Folder::Acquired
-                            | Folder::IllegalEdit { .. } )
+                            | Folder::IllegalEdit { .. }
+                            | Folder::IntegratedElsewhere )
         || ( matches! ( self, Folder::Forks ) && ! in_the_diff_view )) }
 
   pub fn repr_in_client (&self) -> &'static str {
@@ -853,6 +867,7 @@ impl Folder {
       Folder::Forks                       => "forksFolder",
       Folder::Hider                       => "hiderFolder",
       Folder::Hidden                      => "hiddenFolder",
+      Folder::IntegratedElsewhere         => "integratedElsewhereFolder",
       Folder::HiddenInForkPartner         => "hiddenInForkPartnerFolder",
       Folder::HiddenByForker              => "hiddenByForkerFolder",
       Folder::HiddenOutsideOfForkPartners => "hiddenOutsideOfForkPartnersFolder",
@@ -872,14 +887,15 @@ impl Folder {
     Folder::all () . into_iter ()
       . find ( |folder| folder . repr_in_client () == s ) }
 
-  /// Every kind of folder: the ten partner folders, the three
+  /// Every kind of folder: the eleven partner folders, the three
   /// property folders, a flags folder with no text, and an
   /// illegal-edit folder with none.
-  pub fn all () -> [Folder; 14] {
+  pub fn all () -> [Folder; 15] {
     fn guard ( folder : &Folder ) { // compile error here = update the list below
       match folder {
         Folder::Forks
         | Folder::Hider | Folder::Hidden
+        | Folder::IntegratedElsewhere
         | Folder::HiddenInForkPartner | Folder::HiddenByForker
         | Folder::HiddenOutsideOfForkPartners
         | Folder::Container | Folder::Mentioner
@@ -889,6 +905,7 @@ impl Folder {
     let _ = guard;
     [ Folder::Forks,
       Folder::Hider, Folder::Hidden,
+      Folder::IntegratedElsewhere,
       Folder::HiddenInForkPartner, Folder::HiddenByForker,
       Folder::HiddenOutsideOfForkPartners,
       Folder::Container, Folder::Mentioner,
@@ -931,6 +948,7 @@ impl Folder {
       Folder::Mentioner =>
         Some (RelationRole::new (
           NodeRelation::LinksTo, BinaryRolePosition::First)),
+      Folder::IntegratedElsewhere |
       Folder::HiddenInForkPartner |
       Folder::HiddenByForker |
       Folder::HiddenOutsideOfForkPartners =>

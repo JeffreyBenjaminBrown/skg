@@ -92,6 +92,24 @@ fn retitled (
   let metadata_end : usize = line . rfind (") ") . unwrap () + 2;
   buf . replacen ( line, &format! ("{}{}", &line [.. metadata_end], title), 1 ) }
 
+/// The first line showing 'gnid' as a member of a forks folder of
+/// the view's root (at depth 3), and the lines under it: a member may
+/// stand deeper first, in a containers folder under what another
+/// member keeps.
+fn forks_folder_member<'a> (
+  buf  : &'a str,
+  gnid : &str,
+) -> (&'a str, Vec<&'a str>) {
+  let lines : Vec<&str> = buf . lines () . collect ();
+  let at : usize = lines . iter ()
+    . position ( |line| line . starts_with ("*** ")
+                        && line . contains (&format! ("(gnid {})", gnid)) )
+    . unwrap_or_else ( || panic! ( "no member {} in:\n{}", gnid, buf ));
+  ( lines [at],
+    lines [at + 1 ..] . iter ()
+      . take_while ( |line| line . starts_with ("****") )
+      . copied () . collect () ) }
+
 /// Save 'view' unchanged as 'view_id', 'view' its baseline: it saves
 /// with no warning of a stale node and writes nothing; the view it
 /// draws.
@@ -117,14 +135,19 @@ fn saves_unchanged_writing_nothing (
 fn a_view_with_an_indirect_member_saves_unchanged
   () -> Result<(), Box<dyn Error>> {
   // V's view shows W, V's forkee as such, editable; then U, which W
-  // forks, an indirect member, editable, claiming nothing, showing u1
-  // and u2 (V contains and hides nothing); W shows no forks folder.
+  // forks, an indirect member, editable, claiming nothing, showing u2
+  // (V contains and hides nothing), and u1, which W, owned, contains
+  // too, in its folder of what the user keeps elsewhere (as W shows
+  // u1, which U keeps); W shows no forks folder.
   let mut f : Fixture = fixture () ?;
   let mut connection : ViewsState = new_connection ();
   let v : String = open_view (&mut f, &mut connection, "V", "V");
-  assert! ( ! line_of (&v, "U") . contains ("writeProtected")
-            && line_of (&v, "U") . contains ("noClaim")
-            && under (&v, "U") . iter () . any ( |line| line . contains ("(gnid u2)") ),
+  let (u_line, under_u) : (&str, Vec<&str>) = forks_folder_member (&v, "U");
+  assert! ( ! u_line . contains ("writeProtected")
+            && u_line . contains ("noClaim")
+            && under_u . iter () . any ( |line| line . starts_with ("**** ")
+                                                && line . contains ("(gnid u2)") )
+            && under_u . iter () . any ( |line| line . contains ("integratedElsewhereFolder") ),
             "U stands editable in V's forks folder, claiming nothing, showing u2:\n{}", v );
   assert_eq! ( v . matches ("forksFolder") . count (), 1, "{}", v );
   saves_unchanged_writing_nothing (&mut f, &mut connection, "V", &v);
@@ -165,8 +188,9 @@ fn a_cut_from_an_indirect_member_makes_the_note_fork_it_and_hide_the_cut
   assert_eq! ( file_text (&f, "main", "W"), w_before, "W is untouched" );
   assert_eq! ( file_text (&f, "main", "U"), u_before, "U is untouched" );
   let redrawn : String = saved_view (&result);
-  assert! ( ! line_of (&redrawn, "U") . contains ("noClaim")
-            && under (&redrawn, "U") . iter () . any ( |line|
+  let (u_line, under_u) : (&str, Vec<&str>) = forks_folder_member (&redrawn, "U");
+  assert! ( ! u_line . contains ("noClaim")
+            && under_u . iter () . any ( |line|
                  line . contains ("hiddenInForkPartnerFolder") ),
             "U claims now, u2 in its folder of what V hides in it:\n{}", redrawn );
   Ok (()) }

@@ -77,6 +77,7 @@
       "atoms": [ "aliasFolder", "idFolder", "flagsFolder",
                  "forksFolder",
                  "hiderFolder", "hiddenFolder",
+                 "integratedElsewhereFolder",
                  "hiddenInForkPartnerFolder",
                  "hiddenByForkerFolder",
                  "hiddenOutsideOfForkPartnersFolder",

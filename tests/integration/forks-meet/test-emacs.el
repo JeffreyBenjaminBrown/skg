@@ -2,17 +2,21 @@
 ;;; ('docs/forks.org', "Forks of one note meet"; run-test.sh gives the
 ;;; data). The user's own gestures, and what the user then sees:
 ;;; 1. R's view. R's forks folder is flat. N stands editable in it,
-;;;    its herald bK (a forkee); T, which forks N, stands there too,
+;;;    its herald bK (a forkee), its first child its folder of what
+;;;    the user keeps elsewhere (X1 to X3, which R contains); T, which
+;;;    forks N, stands there too,
 ;;;    an indirect member, editable, its herald with neither bK nor Kb,
 ;;;    showing Y and Z, what R neither contains nor hides; no member
 ;;;    shows a forks folder; each containers folder's member (Shelf)
 ;;;    is folded.
 ;;; 2. X4, which N shows there, is cut (org-cut-subtree) and the view
-;;;    saved: X4 stands in N's folder of what R hides in it.
+;;;    saved: X4 stands in N's folder of what R hides in it, right
+;;;    after N's folder of what the user keeps elsewhere.
 ;;; 3. N's view. Y is cut from T and pasted into N's own content
 ;;;    (org-paste-subtree), and the view saved: T stands first in N's
 ;;;    forks folder, claiming, its herald bKb (a mutual); R follows;
-;;;    Y stands in N's content.
+;;;    Y stands in N's content, and so in T's folder of what the user
+;;;    keeps elsewhere.
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../test-wait.el")
@@ -149,9 +153,14 @@ and acts on the atoms only when a save redraws the buffer."
     (forks-meet-goto-line-showing "N")
     (let ((n-depth (forks-meet-depth)))
       (forks-meet-next-line)
+      (unless (and (string-match-p "integratedElsewhereFolder" (forks-meet-line))
+                   (= (forks-meet-depth) (1+ n-depth)))
+        (test-fail "N's first child should be its folder of what the user keeps elsewhere"))
+      (forks-meet-next-line)
+      (while (> (forks-meet-depth) (1+ n-depth)) (forks-meet-next-line))
       (unless (and (string-match-p "hiddenInForkPartnerFolder" (forks-meet-line))
                    (= (forks-meet-depth) (1+ n-depth)))
-        (test-fail "N's first child should now be its folder of what R hides in it"))
+        (test-fail "N's second child should now be its folder of what R hides in it"))
       (forks-meet-next-line)
       (unless (and (string-match-p "(gnid X4)" (forks-meet-line))
                    (invisible-p (point)))
@@ -198,6 +207,9 @@ and acts on the atoms only when a save redraws the buffer."
                    (string-match-p "(gnid R)" (forks-meet-line)))
         (test-fail "R should follow T in N's forks folder")))
     (forks-meet-goto-line-showing "Y")
+    (unless (= (forks-meet-depth) 5)
+      (test-fail "Y should stand first in T's folder of what the user keeps elsewhere"))
+    (forks-meet-goto-line-showing "Y" 1)
     (unless (= (forks-meet-depth) 2)
       (test-fail "Y should stand in N's own content"))
     (message "✓ PASS [phase 3]: T is a mutual, first, and Y is N's")))

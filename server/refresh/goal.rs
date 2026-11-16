@@ -2,13 +2,16 @@
 //! contain. For an occurrence's content, its 'contains' list in file
 //! order (for a member as such of a forks folder, a forkee or a
 //! forker as such, less what the note whose folder holds it hides or
-//! contains); for a node of the containerward chain under a folder's
+//! contains, and less what an owned note but the member contains:
+//! 'docs/glossary.org', "what a member shows"); for a node of the
+//! containerward chain under a folder's
 //! member, its containers; for a folder, its partners in the folder's
 //! relation (for the containers folder, those the view does not
 //! already show above the node; for the forks folder, every mirror
 //! of it: the notes it forks, then those forking it that it neither
 //! forks nor hides, then its other mirrors that it does not hide), or
-//! the compound folders' derived lists; for a property
+//! the compound folders' derived lists (among them the member's
+//! content the user keeps elsewhere, 'integrated_elsewhere'); for a property
 //! folder, the node's aliases, IDs or true flags. In the diff view the
 //! goal also holds what HEAD alone warrants ('diff_view.rs'). Each
 //! item names a gnid or a property value. A parent whose position
@@ -49,6 +52,7 @@ use crate::util::setlike_vector_subtraction;
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 use std::iter::once;
+use std::slice::from_ref;
 
 /// What one goal item names.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -272,11 +276,15 @@ fn content_goal (
   walk   : &Walk,
 ) -> Goal {
   let graph : &InRustGraph = walk . truth . graph;
+  let config : &SkgConfig = walk . truth . config;
   let restriction : &SkgrepoRestriction = walk . truth . restriction;
   let note : Option<ID> = note_of_member_as_such (tree, parent);
   let unintegrated : &dyn Fn (Vec<ID>) -> Vec<ID> = &|contents : Vec<ID>| -> Vec<ID> {
+    // The diff view draws no folder of what the user keeps
+    // elsewhere, so there a member keeps it among its content.
     less_what_the_note_integrates (
-      graph, restriction, note . as_ref (), &contents ) };
+      graph, config, restriction, pid, note . as_ref (), &contents,
+      ! walk . is_diff_view () ) };
   if let Some (goal) = diff_view::content_goal (pid, unintegrated, walk) {
     return goal; }
   let members : Vec<RelPartner<RelationshipMemberKey>> =
@@ -285,38 +293,46 @@ fn content_goal (
   let relRepos : HashMap<ID, SkgrepoName> =
     unknown_or_restricted_members_relRepos (graph, restriction, pid, &members);
   Goal::ordered ( gnid_items (
-    content_goal_gnids ( graph, restriction, &members, note . as_ref () ),
+    content_goal_gnids ( graph, config, restriction, pid, &members, note . as_ref () ),
     &relRepos )) }
 
-/// The content an occurrence shows outside the diff view: the members
-/// of its 'contains' list whose records the skgrepo restriction shows
-/// ('members', gated, a raw ID where nothing answers), less what
-/// 'note' hides or contains when the occurrence is a member as such
-/// of the note's forks folder (a forkee or forker as such). The
-/// restricted members among them are drawn as Restricted vognodes.
-/// The stats pass counts a member's unintegrated content from it, so
-/// that the count is what is drawn.
+/// The content the occurrence of 'member' shows outside the diff
+/// view: the members of its 'contains' list whose records the skgrepo
+/// restriction shows ('members', gated, a raw ID where nothing
+/// answers), less what 'note' hides or contains and what the user
+/// keeps elsewhere, when the occurrence is a member as such of the
+/// note's forks folder (a forkee or forker as such). The restricted
+/// members among them are drawn as Restricted vognodes. The stats pass
+/// counts a member's unintegrated content from it, so that the count
+/// is what is drawn.
 pub(crate) fn content_goal_gnids (
   graph       : &InRustGraph,
+  config      : &SkgConfig,
   restriction : &SkgrepoRestriction,
+  member      : &ID,
   members     : &[RelPartner<RelationshipMemberKey>],
   note        : Option<&ID>,
 ) -> Vec<ID> {
   let contents : Vec<ID> = members . iter ()
     . map ( |member| member . member . id () . clone () )
     . collect ();
-  less_what_the_note_integrates (graph, restriction, note, &contents) }
+  less_what_the_note_integrates (graph, config, restriction, member, note, &contents, true) }
 
-/// 'contents' less what 'note' hides or contains, as the truth
-/// has it ('unintegrated_content_gnids'): what a member as such of
-/// the note's forks folder shows of its content ('docs/glossary.org',
-/// "what a member shows"), whichever role the member plays there.
-/// All of 'contents' when there is no note.
+/// 'contents', the content of 'member', less what 'note' hides or
+/// contains and, where 'kept_elsewhere_counts', less what an owned
+/// note but 'member' contains ('owned_notes_containing'), as the truth
+/// has it ('unintegrated_content_gnids'): what a member as such of the
+/// note's forks folder shows of its content ('docs/glossary.org',
+/// "what a member shows"), whichever role the member plays there. All
+/// of 'contents' when there is no note.
 fn less_what_the_note_integrates (
-  graph       : &InRustGraph,
-  restriction : &SkgrepoRestriction,
-  note        : Option<&ID>,
-  contents    : &[ID],
+  graph                 : &InRustGraph,
+  config                : &SkgConfig,
+  restriction           : &SkgrepoRestriction,
+  member                : &ID,
+  note                  : Option<&ID>,
+  contents              : &[ID],
+  kept_elsewhere_counts : bool,
 ) -> Vec<ID> {
   let Some (note) : Option<&ID> = note
     else { return contents . to_vec (); };
@@ -325,22 +341,135 @@ fn less_what_the_note_integrates (
     &graph . outbound_gnids_for_relation_gated (
       note, NodeRelation::Hides, restriction ),
     &graph . outbound_gnids_for_relation_gated (
-      note, NodeRelation::Contains, restriction )) }
+      note, NodeRelation::Contains, restriction ),
+    &|gnid : &ID| -> bool {
+      kept_elsewhere_counts
+      && ! owned_notes_containing (
+             graph, config, restriction, gnid,
+             from_ref (member), None ) . is_empty () } ) }
 
 /// What a member as such shows of its content: its content less
-/// what the note whose forks folder holds it hides or contains. Inputs preserve raw IDs; extra IDs are
-/// resolved before comparing membership, without substituting mirrors.
+/// what the note whose forks folder holds it hides or contains, and
+/// less what 'kept_elsewhere' says the user keeps in another owned
+/// note. Inputs preserve raw IDs; extra IDs are resolved before
+/// comparing membership, without substituting mirrors.
 fn unintegrated_content_gnids (
   graph               : &InRustGraph,
   content_gnids      : &[ID],
   note_hides          : &[ID],
   note_contains       : &[ID],
+  kept_elsewhere      : &dyn Fn (&ID) -> bool,
 ) -> Vec<ID> {
   let contents : Vec<ID> = resolve_all (content_gnids, graph);
   let hidden : Vec<ID> = resolve_all (note_hides, graph);
   let contained : Vec<ID> = resolve_all (note_contains, graph);
   setlike_vector_subtraction (
-    setlike_vector_subtraction (contents, &hidden), &contained) }
+    setlike_vector_subtraction (contents, &hidden), &contained)
+    . into_iter ()
+    . filter ( |gnid| ! kept_elsewhere (gnid) )
+    . collect () }
+
+/// The notes a save writes, as the question which owned notes
+/// contain a node after it reads them ('owned_notes_containing'): each
+/// note it saves with its contains specified, by its pid, with its
+/// home and those contents, each resolved
+/// ('InRustGraph::pid_else_raw_id'); and the notes it deletes. A note
+/// it names in neither stands as the graph has it.
+#[derive(Default)]
+pub(crate) struct ContainsAfterSave {
+  pub saved   : Vec<(ID, SkgrepoName, HashSet<ID>)>,
+  pub deleted : HashSet<ID>,
+}
+
+impl ContainsAfterSave {
+  /// The contents the save leaves to 'pid', if it saves that note's
+  /// contains.
+  fn contents_saved_for (
+    &self,
+    pid : &ID,
+  ) -> Option<&HashSet<ID>> {
+    self . saved . iter ()
+      . find ( |(saved, _, _)| saved == pid )
+      . map ( |(_, _, contents)| contents ) }
+}
+
+/// The notes of the user's graph ('docs/glossary.org', "integrated")
+/// that contain 'gnid', but those 'excepted' names: notes homed in an
+/// owned skgrepo, each shown by the skgrepo restriction, whose record
+/// of 'gnid' it shows. As the graph has them, or, given 'after_save',
+/// as that save leaves them: a note it saves by its contains then, a
+/// note it deletes not at all, any other as the graph has it. The
+/// graph's containers first, in its order, then those the save adds.
+/// IDs are compared resolved, without substituting mirrors: a note
+/// containing a mirror of 'gnid' does not contain 'gnid'.
+pub(crate) fn owned_notes_containing (
+  graph       : &InRustGraph,
+  config      : &SkgConfig,
+  restriction : &SkgrepoRestriction,
+  gnid        : &ID,
+  excepted    : &[ID],
+  after_save  : Option<&ContainsAfterSave>,
+) -> Vec<ID> {
+  let target : ID = graph . pid_else_raw_id (gnid);
+  let excepted : HashSet<ID> = resolve_all (excepted, graph) . into_iter () . collect ();
+  let unwritten : ContainsAfterSave = ContainsAfterSave::default ();
+  let save : &ContainsAfterSave = after_save . unwrap_or (&unwritten);
+  let in_the_graph : Vec<ID> =
+    graph . inbound_pids_for_relation_gated (&target, NodeRelation::Contains, restriction)
+    . into_iter ()
+    . filter ( |container| ! excepted . contains (container)
+                           && ! save . deleted . contains (container)
+                           && graph . node_is_shown (container, restriction)
+                           && graph . get (container) . is_some_and (
+                                |node| config . skgrepo_is_owned (&node . home_skgrepo) )
+                           && save . contents_saved_for (container)
+                              . is_none_or ( |contents| contents . contains (&target) ) )
+    . collect ();
+  let added_by_the_save : Vec<ID> =
+    save . saved . iter ()
+    . filter ( |(pid, home, contents)|
+               contents . contains (&target)
+               && ! excepted . contains (pid)
+               && ! in_the_graph . contains (pid)
+               && config . skgrepo_is_owned (home)
+               && ! SkgrepoRestriction::node_is_restricted (restriction, home) )
+    . map ( |(pid, _, _)| pid . clone () )
+    . collect ();
+  in_the_graph . into_iter () . chain (added_by_the_save) . collect () }
+
+/// What 'member', a member as such of the forks folder of 'note',
+/// contains that the user keeps elsewhere: the goal of its folder
+/// 'Folder::IntegratedElsewhere'. Its content by the records the
+/// skgrepo restriction shows that 'note' contains, or that an owned
+/// note but 'member' contains ('owned_notes_containing'), less what
+/// 'note' hides (which stands in the member's folder of what the note
+/// hides in it instead), in the member's list's order.
+pub(crate) fn integrated_elsewhere (
+  member : &ID,
+  note   : &ID,
+  walk   : &Walk,
+) -> Vec<ID> {
+  let graph : &InRustGraph = walk . truth . graph;
+  let restriction : &SkgrepoRestriction = walk . truth . restriction;
+  let contents : Vec<ID> = resolve_all (
+    &graph . outbound_gnids_for_relation_gated (
+      member, NodeRelation::Contains, restriction ),
+    graph );
+  let hidden : HashSet<ID> = resolve_all (
+    &graph . outbound_gnids_for_relation_gated (
+      note, NodeRelation::Hides, restriction ),
+    graph ) . into_iter () . collect ();
+  let contained_by_the_note : HashSet<ID> = resolve_all (
+    &graph . outbound_gnids_for_relation_gated (
+      note, NodeRelation::Contains, restriction ),
+    graph ) . into_iter () . collect ();
+  contents . into_iter ()
+    . filter ( |gnid| ! hidden . contains (gnid) )
+    . filter ( |gnid| contained_by_the_note . contains (gnid)
+                      || ! owned_notes_containing (
+                             graph, walk . truth . config, restriction, gnid,
+                             from_ref (member), None ) . is_empty () )
+    . collect () }
 
 /// When the occurrence at 'treeid' is a member as such of a forks
 /// folder (a member the folder's goal warrants: a forkee as such,
@@ -422,6 +551,13 @@ fn folder_goal (
           . map ( |gnid| graph . pid_else_raw_id (gnid) )
           . collect (),
         &HashMap::new () ))),
+    Folder::IntegratedElsewhere => {
+      let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
+      Some ( Goal::ordered ( gnid_items (
+        integrated_elsewhere (
+          &occurrence_pid_of (parties . container ?) ?,
+          &occurrence_pid_of (parties . hider) ?, walk ),
+        &HashMap::new ()))) },
     Folder::HiddenInForkPartner => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       Some ( Goal::unordered ( gnid_items (

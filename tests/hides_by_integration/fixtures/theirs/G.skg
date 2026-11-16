@@ -1,0 +1,7 @@
+pid: G
+title: G
+contains:
+- g1
+- g2
+forks:
+- x

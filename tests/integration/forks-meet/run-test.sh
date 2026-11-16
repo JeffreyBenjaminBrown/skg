@@ -5,10 +5,11 @@
 # - Starts an independent skg server over one owned skgrepo: N
 #   contains X1 to X4 and hides Z; R and T fork N; R contains X1 to
 #   X3; T contains X1, X3, Y, Z and hides X2; Shelf contains N and T.
-# - R's view: R's flat forks folder holds N, editable (herald bK), and
-#   T, an indirect member showing Y and Z (no 'b' in its herald); the
-#   containers folders' members folded. X4 is cut from N and the view
-#   saved: X4 stands in N's hidden-in folder.
+# - R's view: R's flat forks folder holds N, editable (herald bK),
+#   keeping X1 to X3, which R contains, in its folder of what the user
+#   keeps elsewhere, and T, an indirect member showing Y and Z (no 'b'
+#   in its herald); the containers folders' members folded. X4 is cut
+#   from N and the view saved: X4 stands in N's hidden-in folder.
 # - N's view: Y is cut from T and pasted into N's content, and the
 #   view saved: T stands first in N's forks folder, a mutual (bKb),
 #   claiming, and Y in N's content.

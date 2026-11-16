@@ -224,6 +224,10 @@
 (skg forksFolder)
 ---- text: It forks these, or these fork it.
 ---- styles: message*33
+==== folders: what a forkee or forker as such contains that the user keeps elsewhere
+(skg integratedElsewhereFolder)
+---- text: ☮ It contains these, and you keep them elsewhere.
+---- styles: crucial*1 -*1 message*47
 ==== folders: hidden in a forkee or forker as such, by the note the great-grandparent
 (skg hiddenInForkPartnerFolder)
 ---- text: ☮ It contains these, but c hides them.

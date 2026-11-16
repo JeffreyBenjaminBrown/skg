@@ -1541,14 +1541,14 @@ def check_write_protected_foreign_edit_refused (context):
   content, forks nothing, so it is refused before any save, saying how
   to fork it."""
   folder = fresh_root_view (context, "fork-write-protected")
-  detail = compact_line_starting (folder, "*** A detail of Fred's ⟨0s ")
+  detail = compact_line_starting (folder, "*** A detail of Fred's ⟨0u ")
   edit_compact ( folder, [ ( detail, detail . replace (
     "A detail of Fred's ⟨", "A detail of Fred's, mine ⟨" )) ])
   graph_before = skg_files (context)
   require_output (
     run_save (folder, "--yes"),
     REPORT_HEAD +
-    "Error: ⟨0s⟩ 'A detail of Fred's', of the foreign skgrepo 'fred', is "
+    "Error: ⟨0u⟩ 'A detail of Fred's', of the foreign skgrepo 'fred', is "
     "write-protected, and its title changed. A write-protected occurrence "
     "saves nothing of its own, so this would fork nothing. To fork it, undo "
     "the edit, write 'editable' in its handle and save; then edit it and "
@@ -1563,19 +1563,19 @@ def check_making_a_foreign_node_editable (context):
   writes nothing, and the re-rendered view shows it editable, and the
   occurrence that was editable write-protected."""
   folder = fresh_root_view (context, "editable")
-  detail = compact_line_starting (folder, "*** A detail of Fred's ⟨0s ")
+  detail = compact_line_starting (folder, "*** A detail of Fred's ⟨0u ")
   edit_compact ( folder, [ ( detail, detail [ : -1 ] + " editable⟩" ) ])
   graph_before = skg_files (context)
   fred_before = fred_files (context)
   require_output (
     run_save (folder, "--yes"),
     REPORT_HEAD +
-    "Editable: ⟨0s⟩ 'A detail of Fred's', as '(viewRequests editableView)': "
+    "Editable: ⟨0u⟩ 'A detail of Fred's', as '(viewRequests editableView)': "
     "the save makes it this view's editable occurrence of its node.\n"
     + saved_line (0) + written_paths (folder) )
   require_equal ( "the owned files after 'editable'", skg_files (context), graph_before )
   require_equal ( "the foreign files after 'editable'", fred_files (context), fred_before )
-  if "☮" in compact_line_starting (folder, "*** A detail of Fred's ⟨0s "):
+  if "☮" in compact_line_starting (folder, "*** A detail of Fred's ⟨0u "):
     raise CaseFailure ( f"the occurrence is still write-protected:\n{read_compact (folder)}" )
   if "☮" not in compact_line_starting (folder, "*** A detail of Fred's ⟨0e "):
     raise CaseFailure ( f"the other occurrence is still editable:\n{read_compact (folder)}" )
@@ -1651,7 +1651,7 @@ def check_implicit_fork_approved (context):
                   skg_list (context, "child-a-id", "contains"),
                   [ "fred-detail-id", "elsewhere-id", "fred-aside-id", "shared-id" ] )
   require_in_compact ( folder, "*** An aside of Fred's ⟨0h C1 Kĥ1⟩\n"
-                               "**** My note on it ⟨0t⟩\n" )
+                               "**** My note on it ⟨0v⟩\n" )
 
 def check_explicit_fork (context):
   """'fork' on an owned node, as the clients' 'skg-fork-node' marks
@@ -1707,15 +1707,26 @@ def check_explicit_fork (context):
                   "Contained twice" )
 
 def check_forking_and_hiding_by_placing (context):
-  """In the editable forks folder 'forest forks' draws, a
-  placed foreign node is forked; its unintegrated child, then removed
-  from under it and from under the second child, which forks the
-  same note and so stands in the folder too, an indirect member, is
-  hidden from the fork, which the report says before the save and the
-  save says after. The cut from the indirect member makes the node
-  fork it as well ('Fork:' reports none: no clone is made). Then the
-  report says that removing a child the second child, a forkee now,
-  contains hides it, as that child's content."""
+  """First Fred's detail is taken out of the first child, so that of
+  the owned notes only the second child keeps it. In the editable
+  forks folder 'forest forks' draws, a placed foreign node is forked;
+  it shows the detail in its folder of what the user keeps elsewhere,
+  and the second child, which forks the same note and so stands in
+  the folder too, an indirect member, shows it as its content, no
+  other owned note keeping it. Cut from under the second child, the
+  detail is hidden from the fork, which the report says before the
+  save and the save says after. The cut from the indirect member makes
+  the node fork it as well ('Fork:' reports none: no clone is made).
+  Then the report says that removing a child the first child keeps
+  hides nothing, naming the notes that keep it."""
+  root = fresh_root_view (context, "free-the-detail")
+  edit_compact ( root, [ (
+    compact_line_starting (root, "*** A detail of Fred's ⟨0e ") + "\n", "" ) ])
+  if "Server: saved," not in run_save (root, "--yes") . stdout:
+    raise CaseFailure ( "the save taking the detail out of the first child failed" )
+  require_equal ( "the first child's content without the detail",
+                  skg_list (context, "child-a-id", "contains"),
+                  [ "elsewhere-id", "fred-aside-id", "shared-id" ] )
   folder = os . path . join ( context [ "scratch" ], "write", "fork-by-placing" )
   require_tool_run ([ "forest", "forks", "elsewhere-id", "--out-dir",
                       folder, "--no-summary" ])
@@ -1731,8 +1742,13 @@ def check_forking_and_hiding_by_placing (context):
   require_equal ( "what the node forks",
                   skg_list (context, "elsewhere-id", "forks"),
                   [ "fred-note-id" ] )
-  details = [ line for line in read_file (compact_path) . split ("\n")
+  forked = read_file (compact_path)
+  if "It contains these, and you keep them elsewhere." not in forked:
+    raise CaseFailure ( f"the forked note shows no folder of what is kept elsewhere:\n{forked}" )
+  details = [ line for line in forked . split ("\n")
               if line . startswith ("**** A detail of Fred's ⟨") ]
+  if len (details) != 1:
+    raise CaseFailure ( f"the second child alone shows the detail as content:\n{forked}" )
   edit_compact ( folder, [ ( detail + "\n", "" ) for detail in details ], base_name )
   hide_line = ( "Hides 'A detail of Fred's' from 'A second container, "
                 "outside the view', as content of 'Fred's note' and "
@@ -1761,8 +1777,9 @@ def check_forking_and_hiding_by_placing (context):
   edit_compact ( folder, [ ( "\n" . join ( lines [start : end] ) + "\n", "" ) ],
                  base_name )
   reported = run_save (folder) . stdout
-  if ( "Hides 'Contained twice' from 'A second container, outside the "
-       "view', as content of 'Second child, a forker'.\n" ) not in reported:
+  if ( "Hides nothing: 'Contained twice' left 'A second container, outside "
+       "the view', but 'First child' and 'Second child, a forker' keep "
+       "it.\n" ) not in reported:
     raise CaseFailure ( f"the report of a removal printed {reported!r}" )
 
 # ============================================================

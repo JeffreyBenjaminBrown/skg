@@ -481,6 +481,11 @@ pub fn herald_rule_table () -> HeraldRule {
             "hides these, but no fork partner shown contains them."),
       leaf (Folder::Forks . repr_in_client (),
             "It forks these, or these fork it.") ],
+      // Under a member as such, what it contains that the user keeps
+      // elsewhere (in an owned note, or in the note whose forks folder
+      // holds the member): names no ancestor.
+      write_protected_leaves (Folder::IntegratedElsewhere . repr_in_client (),
+            "It contains these, and you keep them elsewhere."),
       write_protected_leaves (Folder::Hidden . repr_in_client (),
             "It hides these from its forks."),
       write_protected_leaves (Folder::Hider . repr_in_client (),

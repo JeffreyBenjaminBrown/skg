@@ -80,7 +80,7 @@ fn set_viewnodestats_recursive (
         None => stands_as_member (tree, treeid), };
       set_herald_strings_in_viewnode (
         tree, treeid, &node_pid, stands_as_member_here, fork_roles . as_ref (),
-        graph, restriction, relRepos, container_to_contents, content_to_containers );
+        graph, config, restriction, relRepos, container_to_contents, content_to_containers );
       set_omitted_body (tree, treeid, &node_pid, graph);
       set_relRepo (tree, treeid, stands_as_member_here, fork_roles . as_ref (),
                    graph, relRepos, config);
@@ -194,6 +194,7 @@ fn set_herald_strings_in_viewnode (
   stands_as_member_here : bool, // see 'stands_as_member'
   fork_roles            : Option<&ForksFolderMemberRoles>,
   graph                 : &InRustGraph,
+  config                : &SkgConfig,
   restriction           : &SkgrepoRestriction,
   relRepos              : &mut RelRepoLookup,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
@@ -238,7 +239,7 @@ fn set_herald_strings_in_viewnode (
     if stands_as_member_here || fork_roles . is_some () {
       note_of_member_as_such (tree, treeid) . map ( |note| {
         let members : HashSet<ID> = content_goal_gnids (
-          graph, restriction,
+          graph, config, restriction, node_pid,
           &graph . outbound_member_keys_for_relation_gated (
             node_pid, NodeRelation::Contains, restriction ),
           Some (&note) )
@@ -454,7 +455,14 @@ fn birth_facts_for_folder (
         Some (role) => vec![ BirthFact::new (
           role . relation, side_of_role (role), Some (2) ) ],
         None => Vec::new (), },
-    // Compound partner folders. In
+    // In
+    //   note > forksFolder > member
+    //     > integratedElsewhereFolder > member of it
+    // the member as such (generation 2) contains it; whatever else
+    // contains it is no ancestor.
+    Folder::IntegratedElsewhere => vec! [ BirthFact::new (
+      NodeRelation::Contains, Side::In, Some (2) ) ],
+    // The other compound partner folders. In
     //   note > forksFolder > member
     //     > hiddenInForkPartnerFolder > member of it
     // the note (generation 4) hides it, and the member as such
@@ -514,7 +522,8 @@ fn set_omitted_body (
 /// actual skgrepo ('InRustGraph::relRepo') against its applicable
 /// relationship default. None on any of: the viewnode does not
 /// stand as a member here ('stands_as_member'); a compound partner folder
-/// (HiddenInForkPartner, HiddenByForker, HiddenOutsideOfForkPartners: no single
+/// (IntegratedElsewhere, HiddenInForkPartner, HiddenByForker,
+/// HiddenOutsideOfForkPartners: no single
 /// 'relation_member_role'); no recorded relationship; a relationship
 /// recorded in a foreign skgrepo; unresolvable homes;
 /// or the skgrepo equalling the default.

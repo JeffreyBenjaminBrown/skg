@@ -17,6 +17,8 @@
 //!   here: nodeMerge extraction reads them via 'nodeMerge_pairs'
 //!   before lowering consumes the map.)
 
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::refresh::goal::ContainsAfterSave;
 use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, ForksFolderMembers, HiddenOutsideEdit, FieldIntentsForOneId,
   ForkeeVisibility, ForkerVisibility };
@@ -461,6 +463,31 @@ impl LoweredNodeIntents {
         members_of (&note_from_disk . contains)
         . into_iter() . collect(),
     }}
+
+  /// The notes this save writes, as the question which owned notes
+  /// contain a node after it reads them ('owned_notes_containing' in
+  /// 'server/refresh/goal.rs'): each Save nodeIntent whose contains
+  /// is specified, its contents resolved by 'graph', and each Delete
+  /// nodeIntent. A Save that leaves its contains unspecified leaves
+  /// them as the graph has them.
+  pub(crate) fn contains_after_save (
+    &self,
+    graph : &InRustGraph,
+  ) -> ContainsAfterSave {
+    let mut after : ContainsAfterSave = ContainsAfterSave::default ();
+    for pid in &self . order {
+      match self . by_pid . get (pid) {
+        Some (NodeIntent::Save (intent))
+          if ! intent . contains . is_unspecified () =>
+          after . saved . push ((
+            pid . clone (), intent . home_skgrepo . clone (),
+            intent . contains . or_default () . iter ()
+              . map ( |(gnid, _)| graph . pid_else_raw_id (gnid) )
+              . collect () )),
+        Some (NodeIntent::Delete (_)) => {
+          after . deleted . insert ( graph . pid_else_raw_id (pid) ); },
+        _ => {}, }}
+    after }
 
   /// As 'note_contains_after_save', but for the post-save list of
   /// forkees.  Edits of the hidden-outside compound partner folder

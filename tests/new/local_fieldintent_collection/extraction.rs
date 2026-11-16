@@ -924,6 +924,9 @@ async fn forkee_as_such_unhide_preserves_unrelated_hides (
                ID::from ("hidden-for-no-reason")]));
       Ok (()) }
 
+/// E1 and E2, foreign, both contain 'shared', which no owned note
+/// keeps, so each shows it: the buffer shows it under E1 and not
+/// under E2, which would both unhide and hide it in R.
 async fn overlapping_forkee_hiderel_conflict_rejects_save (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
@@ -931,9 +934,9 @@ async fn overlapping_forkee_hiderel_conflict_rejects_save (
         indoc! {"
                 * (skg node (gnid R) (skgRepos (nodeRepo main))) R
                 ** (skg forksFolder)
-                *** (skg node (gnid E1) (skgRepos (nodeRepo main))) E1
-                **** (skg node (gnid shared) (skgRepos (nodeRepo main))) shared
-                *** (skg node (gnid E2) (skgRepos (nodeRepo main))) E2
+                *** (skg node (gnid E1) (skgRepos (nodeRepo theirs))) E1
+                **** (skg node (gnid shared) (skgRepos (nodeRepo theirs))) shared
+                *** (skg node (gnid E2) (skgRepos (nodeRepo theirs))) E2
                 "};
       let result : Result<Vec<NodeInstruction>, Box<dyn Error>> =
         nodeInstructions_from_org_with_disk (

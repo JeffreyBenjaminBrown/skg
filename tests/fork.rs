@@ -382,10 +382,14 @@ async fn a_reply_under_an_unread_message_integrates_it (
               . any ( |line| line . ends_with (" my reply") ),
     "the redrawn view must show the reply under the clone:\n{}", redrawn );
   let unread : Vec<&str> = subtree_of (redrawn, "t");
+  let kept_elsewhere : Vec<&str> = subtree_of (redrawn, "m1");
   assert! ( first_says (&unread, "(unintegrated 1)")
             && unread . iter () . any ( |line| line . contains ("(inPlaceOf m2)") )
-            && ! unread . iter () . any ( |line| line . contains ("m1") ),
-    "the redrawn view must count one message unread, m2, and draw no m1 there:\n{}",
+            && unread . iter () . filter ( |line| line . contains ("m1") ) . count () == 1
+            && unread . iter () . any ( |line| line . contains ("integratedElsewhereFolder") )
+            && first_says (&kept_elsewhere, "folded"),
+    "the redrawn view must count one message unread, m2, and draw m1 there \
+     only in the folder of what the reader keeps elsewhere:\n{}",
     redrawn );
   // A fresh view draws t editable too, its count saying one message
   // is unread.
@@ -492,7 +496,12 @@ async fn a_reply_deeper_in_an_unread_message_integrates_the_message (
   assert_eq! ( members_of (& node_from_disk (config, "f") ? . contains),
                vec! [ ID::from ("d"), ID::from ("m1") ],
     "the answer must file m1, the message it is in, in f" );
-  let shown : Vec<&str> = subtree_of (&response . saved_view, "m1");
+  let from_fs_content : String = // from m1 as f's content on, past t's folder of what f keeps elsewhere
+    response . saved_view . lines ()
+    . skip_while ( |line| ! ( line . starts_with ("** ") && line . contains ("(gnid m1)") ))
+    . map ( |line| format! ("{}\n", line) )
+    . collect ();
+  let shown : Vec<&str> = subtree_of (&from_fs_content, "m1");
   assert! ( shown . iter () . any ( |line| line . contains (& format! ("(gnid {})", clone . pid . 0)) )
             && shown . iter () . any ( |line| line . ends_with (" my answer") ),
     "the redrawn view must show m1, filed, with the clone of q1 and the answer in it:\n{}",

@@ -78,6 +78,7 @@ fn every_kind_atom (
     Folder::Alias, Folder::ID, Folder::flags (),
     Folder::Forks,
     Folder::Hider, Folder::Hidden,
+    Folder::IntegratedElsewhere,
     Folder::HiddenInForkPartner, Folder::HiddenByForker,
     Folder::HiddenOutsideOfForkPartners,
     Folder::Container, Folder::Mentioner,
@@ -87,6 +88,7 @@ fn every_kind_atom (
       Folder::Alias | Folder::ID | Folder::Flags { .. }
         | Folder::Forks
         | Folder::Hider | Folder::Hidden
+        | Folder::IntegratedElsewhere
         | Folder::HiddenInForkPartner | Folder::HiddenByForker
         | Folder::HiddenOutsideOfForkPartners
         | Folder::Container | Folder::Mentioner
