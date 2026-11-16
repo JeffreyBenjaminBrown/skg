@@ -675,7 +675,8 @@ are saved when the user owns it, and refused when it is foreign; a
 headline typed under it joins its content when the user owns it, and
 is refused otherwise; its delete, nodeMerge and flag requests are
 ignored. What the buffer shows under it is the forker-visibility
-signal (see "the forker-visibility step").
+signal (see "the forker-visibility step"): cutting a child from it
+makes N fork it, so that it stands as a mutual.
 
 *** the forker-visibility step
 
@@ -686,14 +687,35 @@ reads what the buffer shows of F's content
 'server/from_text/local_fieldintent_collection/resolve_visibility.rs'):
 a child typed there joins F's content (refused under a foreign F); a
 child of F that N hides, shown claiming under F, is unhidden in N, as
-under a forkee (refused under a foreign N); and a child F showed that
-the buffer no longer shows claiming under F was cut from it. A cut
-from a forker is to make N fork F ('TODO/every-mirror/2_plan.org',
-slice 5); until that is built the save refuses it, so that no cut is
-lost silently. It reads F's content and N's hides and content by the
-records the skgrepo restriction shows, as the view drew them. A
-forker the graph lacks (typed there) has no list to lose: what it
-shows is its contains.
+under a forkee; and a child F showed that the buffer no longer shows
+claiming under F was cut from it (see "cut"). A cut from a forker
+makes N fork F, so that F, which forks N, becomes a mutual, and N
+hides each child cut that it does not contain after the save (one
+pasted into N's content is not hidden). The saved view gives F's
+headline its claim, so that the rerender draws F among the forkees,
+not as a pending detachment ('claim_forkers_the_save_makes_forkees' in
+'server/from_text/forkers_made_forkees.rs'). Where the same save
+removes the claim of a mutual (a detachment), a cut from it only
+hides: the detachment stands. A foreign N can record neither a fork
+nor a hide, so a save that cuts from F or unhides under it is refused,
+naming N ('cut_under_a_foreign_note'), in the words the
+forkee-visibility step uses. The fork rules still bind: a save that
+would make N fork F while N contains F is refused. The step reads F's
+content and N's hides and content by the records the skgrepo
+restriction shows, as the view drew them. A forker the graph lacks
+(typed there) has no list to lose: what it shows is its contains.
+
+*** cut
+
+To *cut* a child from a member as such (a forkee or forker as such) is
+to delete its headline from under the member and save, whether or not
+it is pasted elsewhere. A cut child is one the member's list names,
+and the view showed there, that the buffer no longer shows claiming
+under it. The member's own list never changes: a cut edits the note
+whose forks folder holds the member. A cut from a forkee hides the
+child in the note unless the note contains it after the save (see "the
+forkee-visibility step"); a cut from a forker does that too, and makes
+the note fork the forker (see "the forker-visibility step").
 
 *** the forkee-visibility step
 
@@ -710,7 +732,7 @@ hide recorded in a restricted section is neither removed nor moved,
 and no hide is written of a member that only a restricted record
 explains. Only a forker the user owns records hides: a save whose
 step would hide or unhide anything in a foreign forker is refused,
-naming the forker ('cut_under_a_foreign_forker').
+naming the forker ('cut_under_a_foreign_note').
 
 *** role tree, and the -ward adjectives
 

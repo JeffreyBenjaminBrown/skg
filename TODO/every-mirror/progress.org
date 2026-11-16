@@ -2795,3 +2795,114 @@ The slice's headline in '2_plan.org' is DONE.
 - Glossary: "hides" now means "hides from its forks"; a fork partner
   that contains the hidden node *explains* the hide (under "relation,
   relationship, member, membership, partner").
+** Slice 5: a cut from a forker as such makes my node fork it
+*** Commits
+- e63028ef every-mirror plan 2 slice 5: a cut from a forker as such makes my node fork it
+- (the commit carrying this record) every-mirror plan 2 slice 5: docs, record, DONE
+*** Suites
+- The slice's own tests ('grouped_forks', 'cuts_from_forkers::',
+  'forkers_drawn_editable::', 'forkees_drawn_editable::'): 4 of 4,
+  first run. Two pins were checked against broken code: with the
+  saved view's claim switched off, Jeff's example fails ("F, now a
+  forkee, leads"); with the detachment guard removed, the detachment
+  test fails ("N no longer forks F").
+- 'bash/nextest.sh': 1260 of 1260, first run. The one expected
+  adaptation was made beforehand: slice 3's
+  'a_cut_from_an_editable_forker_is_refused'
+  ('tests/forkers_drawn_editable.rs') pinned the interim refusal this
+  slice replaces, so it went; its case is now Jeff's example.
+- The AI tool's tests (after 'cargo build --bin skg'): PASS, first run.
+- 'bash/integration-tests.sh': 76 of 76 (both clients), first run.
+- 'bash/all-tests.sh', first run: all pass: build, Emacs 503 of 503,
+  Neovim (no failure), nextest 1260 of 1260, doctests, team tools, AI
+  reader, integration 76 of 76 (both clients). The docs were written
+  before it; no code changed after it.
+- End to end, per '/verify': an isolated 'target/debug/skg' on port
+  24865, scratch data with my x ('nx', owned, empty) and your x ('yx',
+  foreign, forking nx, containing y and z), x2 and f2 likewise, and G
+  and H foreign (H forks G and contains h). Jeff's example: y cut from
+  your x and pasted under my x, saved: nx.skg contains [y] and forks
+  [yx], hides nothing; yx.skg untouched; the redrawn view drew your x
+  claiming (no 'noClaim'), editable, its heralds' facts =forks (in 1)
+  (out 1)= (=bKb=), showing z, and y as my x's content. That redrawn
+  view saved unchanged: no file changed (md5 of every file), the view
+  drawn again identical, no changed headlines. A plain cut of y2 from
+  f2: n2.skg forks [f2] and hides [y2], "Hides 'y2' from 'x2', as
+  content of 'f2'.", y2 drawn in f2's hidden-in folder. h cut from H in
+  G's view: "NOTHING WAS SAVED ... Cannot change what G ('G') shows of
+  H ('H'), its forker: G is foreign, and only a note of your own can
+  fork another and hide what that one contains.", no file changed.
+  The server was stopped by its PID, the port checked free, the
+  scratch data deleted; transcripts outside 'tests/results/', in
+  '/tmp/claude-1000/every-mirror-p2s5/transcript/'.
+Logs: 'tests/results/every-mirror/slice5-plan2/' (first-own.log,
+nextest-first.log, ai-tool.log, integration.out, all-tests.out,
+all-tests-ALL.org, all-tests-nextest.log, emacs.log, nvim.log,
+ai-reader.log). 'tests/results/every-mirror/' was copied out before
+'bash/all-tests.sh' and put back after it.
+*** Deviations from the plan's "how"
+**** The saved view's claim is given by a rule over the save's result
+'claim_forkers_the_save_makes_forkees'
+('server/from_text/forkers_made_forkees.rs'), called in
+'buffer_to_validated_saveplan_with_fork_skgrepos_in_graph' after the
+filing of members written in, gives its claim to each member claiming
+nothing of an editable occurrence's forks folder whose note's Save
+forks it and whose fork the graph does not record. That is exactly
+the forker the cut made a forkee, without threading pairs out of the
+extraction (which reads an immutable viewforest); a fork the graph
+already holds (a restricted record, say) is never claimed by it.
+**** A detachment in the same save wins over the fork
+Not foreseen by the plan: a mutual whose claim the user removes (a
+detachment) is, in that buffer, a forker as such, and a cut from it
+would have forked it again, undoing the detachment silently. The step
+forks F only where N records no fork of F (by any record); otherwise
+the cut only hides. Pinned by
+'a_cut_from_a_mutual_detached_in_the_same_save_only_hides'.
+**** One refusal for a foreign note, forkee or forker, cut or unhide
+'cut_under_a_foreign_forker' is 'cut_under_a_foreign_note', taking
+the member's side: "Cannot change what N ('..') shows of M ('..'), its
+forkee|forker: N is foreign, and only a note of your own can fork
+another and hide what that one contains." It also replaces slice 3's
+'unhide_under_a_foreign_note' (its own wording, "hides of"), so both
+paths and both gestures say the same.
+**** The fork rules' case is tested within one save
+Plan 1's 'ForkerContained' already forbids N containing a forker F,
+so "N contains F" cannot stand before the cut. The test
+('a_cut_that_would_make_n_fork_what_it_contains_is_refused') places
+F in N's content in the same save as the cut: refused, "node N both
+forks and contains node F", nothing written.
+**** The new record's relRepo
+None is given, so the save derives it as for any new 'forks' record
+(sticky-else-default); in Jeff's example it lands at N's home, in
+N's file, as plan 1's rules give.
+**** The test file is 'tests/cuts_from_forkers.rs'
+In 'grouped_forks', fixture 'tests/cuts_from_forkers/fixtures/' (N,
+E, e1, M owned; F, y, z, G, H, h foreign). M forks F already, so
+Jeff's example also covers "monogamy is gone". Its line helpers
+copy those of 'tests/forkers_drawn_editable.rs' and
+'tests/forkees_drawn_editable.rs', as those copy each other: a
+quasi-duplication across the three files, left as the earlier slices
+left it.
+**** Docs
+The plan's list (glossary, 'docs/sharing-model.org', 'docs/forks.org',
+both COMMANDS docs), plus 'docs/data-model_technical.org' (the forks
+folder's save rules). 'docs/forks.org' has a new section, "Cutting
+from a forker", with Jeff's example.
+*** Fixtures changed
+- New: 'tests/cuts_from_forkers/fixtures/'.
+- No other fixture's data changed.
+*** Unfinished
+Nothing of this slice.
+*** DONE
+The slice's headline in '2_plan.org' is DONE.
+*** Names coined or changed
+- New: 'LoweredNodeIntents::add_forkee_to_note' ('lower.rs');
+  'server/from_text/forkers_made_forkees.rs' with
+  'claim_forkers_the_save_makes_forkees' and 'saves_a_new_fork'.
+- Renamed: 'cut_under_a_foreign_forker' is 'cut_under_a_foreign_note'
+  (it takes 'MemberAsSuch').
+- Removed: 'cut_from_a_forker_is_not_yet_read',
+  'unhide_under_a_foreign_note'.
+- Tests: 'tests/cuts_from_forkers.rs' (its five sub-tests);
+  'a_cut_from_an_editable_forker_is_refused' removed.
+- Glossary: new entry "cut".

@@ -896,7 +896,7 @@ Questions: Q11, Q12. Decision 8.
   'NodeRelation::Hides''s comment widen with them.
 - Run the suites as slice 1 does.
 
-** TODO Slice 5: a cut from a forker as such makes my node fork it
+** DONE Slice 5: a cut from a forker as such makes my node fork it
 Questions: Q3.
 - The save: a forker-visibility step beside 'resolve_visibility': for
   a forker as such F under an editable, owned N, each child F's list

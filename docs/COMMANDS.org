@@ -485,9 +485,12 @@ content ("☮ a hides these, which c contains."), each folded and
 write-protected. Its title and body save when you own it, and are
 refused when it is foreign; a headline typed under it joins its
 content when you own it. A save never reads its partial content as
-its whole list. Cutting one of its children (which will make the node
-fork it) is not supported yet: the save is refused, and nothing is
-written.
+its whole list. Deleting one of its children (a cut) makes the
+node fork it, so it becomes a mutual (=bKb=), redrawn claiming, among
+the forkees; the node hides the child unless the node contains it
+after the save, so a child cut there and pasted into the node's own
+content is taken in, hiding nothing. Under a foreign node such a save
+is refused.
 *** C-c l a : skg-show-folderOf-aliases
 The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:
