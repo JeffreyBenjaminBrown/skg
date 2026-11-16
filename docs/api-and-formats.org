@@ -2398,11 +2398,14 @@ by the next save:
   what to do: for an owned skgrepo, run
   =tools/migrate-forks-2026-11/migrate.py= over your skgrepos (its
   =README.org= says how) and commit each; for a foreign one, its owner
-  should, and until then you may remove it from =skgconfig.toml=.
+  should, and until then you may remove it from =skgconfig.toml=. A
+  file holding an October 2026 key names
+  =tools/migrate-skg-keys-2026-10/migrate.py= first, since the
+  November tool refuses such a file.
 - A git tree holding one -- HEAD, or the tree stage-and-commit would
-  commit -- refuses the diff view and stage-and-commit, naming the
-  files and saying to commit the migration (=git -C PATH commit -am
-  'Migrate to forks'=).
+  commit -- refuses the diff view and stage-and-commit, naming, for
+  every skgrepo whose tree holds one, the files and the commit of the
+  migration (=git -C PATH commit -am 'Migrate to forks'=).
 - The diff's per-file blob reader treats such a blob as absent, with a
   warning in the server log.
 - The vanished-node search ("Investigate unknown node") still reads

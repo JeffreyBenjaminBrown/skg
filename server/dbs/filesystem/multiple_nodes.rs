@@ -101,7 +101,7 @@ fn read_all_skg_files_from_skgrepos_impl (
               format! ( "holds {}; {}",
                         quoted_keys (keys),
                         what_to_do_about_retired_keys (
-                          Some (skgrepo . owned) )) )); },
+                          Some (skgrepo . owned), keys )) )); },
         None =>
           load_errors . push ((
             skgrepo_name . to_string(),

@@ -74,8 +74,9 @@ fn init_warns_and_starts_when_a_foreign_note_takes_part
 /// A file holding a key retired in November 2026 is unreadable, in an
 /// owned skgrepo or a foreign one ('server/dbs/filesystem/retired_keys.rs'):
 /// init refuses, and its report names every such file of each folder,
-/// the keys each holds, and what to do, by the skgrepo's owner. A file
-/// in today's format beside them is not named.
+/// the keys each holds, and what to do, by the skgrepo's owner: for an
+/// October 2026 key, the October tool first. A file in today's format
+/// beside them is not named.
 #[test]
 fn init_refuses_retired_keys_naming_every_such_file
   () -> Result<(), Box<dyn Error>> {
@@ -102,13 +103,14 @@ foreign = true
               "pid: a\ntitle: a\nsubscribesTo:\n- c\noverrides:\n- c\n" ) ?;
   fs::write ( mine . join ("b.skg"), "pid: b\ntitle: b\nhidesFromSubs:\n- c\n" ) ?;
   fs::write ( mine . join ("c.skg"), "pid: c\ntitle: c\nforks:\n- t\nhides:\n- a\n" ) ?;
+  fs::write ( mine . join ("d.skg"), "pid: d\ntitle: d\noverrides_view_of:\n- c\n" ) ?;
   fs::write ( theirs . join ("t.skg"), "pid: t\ntitle: t\noverrides:\n- a\n" ) ?;
   let (config, _warnings) : (SkgConfig, Vec<String>) =
     load_config ( &dir . path () . join ("skgconfig.toml") . to_string_lossy () ) ?;
   let error : String = match read_all_skg_files_from_skgrepos (&config) {
     Ok (_) => panic! ("init must refuse files holding retired keys"),
     Err (e) => e . to_string (), };
-  assert_eq! ( error, "3 unreadable file(s)" );
+  assert_eq! ( error, "4 unreadable file(s)" );
   let report : String = fs::read_to_string (
     dir . path () . join ("initialization-error_unreadable-skg-files.org") ) ?;
   for expected in [
@@ -116,6 +118,8 @@ foreign = true
     "holds 'subscribesTo', 'overrides'; these keys were retired in November 2026: run tools/migrate-forks-2026-11/migrate.py over your skgrepos",
     &format! ("* {}", mine . join ("b.skg") . display ()),
     "holds 'hidesFromSubs';",
+    &format! ("* {}", mine . join ("d.skg") . display ()),
+    "holds 'overrides_view_of'; these keys were retired in November 2026: run tools/migrate-skg-keys-2026-10/migrate.py, then tools/migrate-forks-2026-11/migrate.py over your skgrepos",
     &format! ("* {}", theirs . join ("t.skg") . display ()),
     "holds 'overrides'; these keys were retired in November 2026: this skgrepo's owner should run tools/migrate-forks-2026-11/migrate.py over their skgrepos; until they have, you may remove it from skgconfig.toml",
   ] {

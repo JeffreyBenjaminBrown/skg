@@ -6,7 +6,7 @@
 use crate::dbs::filesystem::multiple_nodes::{
   read_skg_sections_from_folder};
 use crate::dbs::filesystem::retired_keys::{
-  FORKS_MIGRATION_TOOL, quoted_keys, retired_keys_held};
+  migration_tools_for, quoted_keys, retired_keys_held};
 use crate::telescope::compose::compose_telescope;
 use crate::telescope::types::{
   Telescope, separate_illegal_sections,
@@ -150,18 +150,21 @@ pub fn read_candidate_graph_snapshot (
       None        => GitSnapshotKind::Head, }} ) }
 
 /// Sections arrive in fold order ('ordered_skgrepos') so each
-/// telescope composes with its home section first.
+/// telescope composes with its home section first. Every skgrepo
+/// whose tree holds retired keys is named in one refusal, one line
+/// each, so that the user commits each migration before trying again.
 fn read_graph_snapshot_per_skgrepo (
   config            : &SkgConfig,
   kind_for_skgrepo  : impl Fn (&SkgrepoName) -> GitSnapshotKind,
 ) -> Result<GraphSnapshot, String> {
   let mut sections : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
+  let mut retired_keys_refusals : Vec<String> = Vec::new ();
   for skgrepo_name in config . ordered_skgrepos () {
     let kind : GitSnapshotKind =
       kind_for_skgrepo (&skgrepo_name);
     let label : String =
       format! ("read repo '{}' from {:?}", skgrepo_name, kind);
-    let mut skgrepo_sections : Vec<(SkgrepoName, GraphnodeOnDisk)> =
+    let read : Result<Vec<(SkgrepoName, GraphnodeOnDisk)>, TreeReadError> =
       profile_step_result (&label, || match kind {
         GitSnapshotKind::Head =>
           read_skgrepo_from_tree (config, &skgrepo_name, None),
@@ -169,9 +172,15 @@ fn read_graph_snapshot_per_skgrepo (
           read_skgrepo_from_tree (config, &skgrepo_name, Some (tree)),
         GitSnapshotKind::Worktree =>
           read_skg_sections_from_folder (&skgrepo_name, config)
-            . map_err ( |e| format! (
-              "Reading worktree repo '{}': {}", skgrepo_name, e )), }) ?;
-    sections . append (&mut skgrepo_sections); }
+            . map_err ( |e| TreeReadError::Other ( format! (
+              "Reading worktree repo '{}': {}", skgrepo_name, e ))), });
+    match read {
+      Ok (mut skgrepo_sections) => sections . append (&mut skgrepo_sections),
+      Err (TreeReadError::HoldsRetiredKeys (refusal)) =>
+        retired_keys_refusals . push (refusal),
+      Err (TreeReadError::Other (error)) => return Err (error), }}
+  if ! retired_keys_refusals . is_empty () {
+    return Err ( retired_keys_refusals . join ("\n") ); }
   profile_step ("snapshot_from_sections", || {
     git_snapshot_from_sections (config, sections) })
 }
@@ -337,6 +346,21 @@ fn fold_telescope_tolerating_homelessness (
         . map_err ( |e| e . to_string () ) }}
 }
 
+/// Why a skgrepo's tree was not read.
+enum TreeReadError {
+  /// It holds retired keys; the refusal names its files
+  /// ('tree_holds_retired_keys').
+  HoldsRetiredKeys (String),
+  Other (String),
+}
+
+impl From<String> for TreeReadError {
+  fn from (
+    error : String,
+  ) -> TreeReadError {
+    TreeReadError::Other (error) }
+}
+
 /// The skgrepo's sections as the tree 'tree' of its gitrepo holds
 /// them, or as HEAD's tree does when 'tree' is None. A tree holding a
 /// retired key ('retired_keys.rs') is refused, naming its files: the
@@ -346,7 +370,7 @@ fn read_skgrepo_from_tree (
   config       : &SkgConfig,
   skgrepo_name : &SkgrepoName,
   tree         : Option<Oid>,
-) -> Result<Vec<(SkgrepoName, GraphnodeOnDisk)>, String> {
+) -> Result<Vec<(SkgrepoName, GraphnodeOnDisk)>, TreeReadError> {
   let skgrepo : &Skgrepo =
     config . skgrepos . get (skgrepo_name) . ok_or_else ( || format! (
       "Repo '{}' not found in config", skgrepo_name )) ?;
@@ -400,12 +424,12 @@ fn read_skgrepo_from_tree (
     TreeWalkResult::Ok
   });
   if let Some (error) = parse_error {
-    return Err (error); }
+    return Err ( TreeReadError::Other (error) ); }
   walk_result . map_err ( |e| format! (
     "Walking HEAD tree for repo '{}': {}", skgrepo_name, e )) ?;
   if ! retired . is_empty () {
-    return Err ( tree_holds_retired_keys (
-      skgrepo_name, skgrepo_path, tree_label, &retired )); }
+    return Err ( TreeReadError::HoldsRetiredKeys ( tree_holds_retired_keys (
+      skgrepo_name, skgrepo_path, tree_label, &retired ))); }
   Ok (sections)
 }
 
@@ -426,10 +450,13 @@ fn tree_holds_retired_keys (
     if retired . len () > FILES_NAMED {
       format! ("; and {} more", retired . len () - FILES_NAMED) }
     else { String::new () };
+  let keys : Vec<&str> = retired . iter ()
+    . flat_map ( |(_, keys)| keys . iter () . copied () )
+    . collect ();
   format! (
     "The {} of skgrepo '{}' holds keys retired in November 2026, in {} file(s): {}{}. If you have run {} over the worktree, commit the migration first: git -C {} commit -am 'Migrate to forks'",
     tree_label, skgrepo_name, retired . len (), named . join ("; "), more,
-    FORKS_MIGRATION_TOOL, skgrepo_path . display () ) }
+    migration_tools_for (&keys), skgrepo_path . display () ) }
 
 pub(crate) fn repo_prefix_in_gitrepo (
   gitrepo        : &Repository,

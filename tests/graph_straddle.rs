@@ -148,6 +148,21 @@ fn a_head_holding_retired_keys_refuses_until_the_migration_is_committed () {
             && refusal . contains ("commit -am 'Migrate to forks'"),
             "unexpected refusal: {}", refusal ); }
 
+/// Where two skgrepos' HEADs hold retired keys, the refusal names
+/// both, each with the commit that ends its part.
+#[test]
+fn a_refusal_of_retired_keys_at_head_names_every_such_skgrepo () {
+  let f : Fixture = case_fixture (
+    "retired_keys_at_two_heads", OwnedSkgrepos::Named (&["pub", "priv"]), &[] );
+  let refusal : String = graph_straddle (&f) . err ()
+    . expect ("HEADs holding retired keys should refuse") . to_string ();
+  for skgrepo in ["pub", "priv"] {
+    assert! ( refusal . contains ( &format! (
+                "The HEAD of skgrepo '{}' holds keys retired in November 2026", skgrepo ))
+              && refusal . contains ( &format! (
+                "{} commit -am 'Migrate to forks'", f . root . path () . join (skgrepo) . display () )),
+              "the refusal names {}: {}", skgrepo, refusal ); }}
+
 #[test]
 fn a_foreign_skgrepo_needs_no_gitrepo_and_contributes_no_change () {
   // Owned M contains foreign F; the foreign skgrepo is a plain folder.

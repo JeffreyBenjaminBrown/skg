@@ -1,0 +1,6 @@
+pid: A
+title: A
+subscribesTo:
+- B
+overrides:
+- B
