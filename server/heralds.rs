@@ -480,7 +480,7 @@ pub fn herald_rule_table () -> HeraldRule {
       leaf (Folder::HiddenOutsideOfForkPartners . repr_in_client (),
             "hides these, but no fork partner shown contains them."),
       leaf (Folder::Forks . repr_in_client (),
-            "It forks these, or these fork it.") ],
+            "It forks these, or these fork it, or these fork or are forked by others here.") ],
       // Under a member as such, what it contains that the user keeps
       // elsewhere (in an owned note but the member, the note whose
       // forks folder holds the member among them when owned): names

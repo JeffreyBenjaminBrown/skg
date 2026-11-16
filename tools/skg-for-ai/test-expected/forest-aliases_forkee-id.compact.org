@@ -1,5 +1,5 @@
 * A forkee, outside the view ⟨0a 1K A1 ⌂:main⟩
 ** ⟨0d aliases⟩
 *** Another name for it ⟨0e alias⟩
-** ⟨0b It forks these, or these fork it.⟩
+** ⟨0b It forks these, or these fork it, or these fork or are forked by others here.⟩
 *** A forker, outside the view ⟨0c Kb F1⟩

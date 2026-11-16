@@ -523,7 +523,8 @@ chain, chain node").
 *** the forks folder, fork partner, forker-only member, mutual, direct member, indirect member
 
 The *forks folder* ('Folder::Forks', atom =forksFolder=, label "It
-forks these, or these fork it.") is the one partner folder of the
+forks these, or these fork it, or these fork or are forked by others
+here.") is the one partner folder of the
 relation 'forks'. Under an occurrence of a note N it holds every
 mirror of N (see "mirror") but N, each once, by records the skgrepo
 restriction shows: it is *flat*. Its *direct members* are N's *fork

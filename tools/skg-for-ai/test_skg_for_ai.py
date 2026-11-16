@@ -247,8 +247,8 @@ def failures_of_forks_folder_claims ():
     failures . append ( f"'relRepo:main' on a claiming forkee gave {allowed!r}" )
   # The folder's label holds 'fork', which its handle's words leave out.
   for text, words in [
-      ( "** ⟨0b It forks these, or these fork it.⟩", [] ),
-      ( "** ⟨0b It forks these, or these fork it. relRepo:main subtree⟩",
+      ( "** ⟨0b It forks these, or these fork it, or these fork or are forked by others here.⟩", [] ),
+      ( "** ⟨0b It forks these, or these fork it, or these fork or are forked by others here. relRepo:main subtree⟩",
         [ "relRepo:main", "subtree" ] ) ]:
     folder = skg_for_ai . parse_edited_compact_view (text) [0]
     if folder . words () != words:
@@ -1734,7 +1734,7 @@ def check_forking_and_hiding_by_placing (context):
   compact_path = os . path . join ( folder, base_name + ".compact.org" )
   compact = read_file (compact_path)
   folder_line = next ( line for line in compact . split ("\n")
-                       if "It forks these, or these fork it." in line )
+                       if "It forks these, or these fork it, or these fork or are forked by others here." in line )
   edit_compact ( folder, [ ( folder_line + "\n", folder_line +
                              "\n*** Fred's ⟨node:fred-note-id⟩\n" ) ], base_name )
   if "Server: saved," not in run_save (folder, "--yes") . stdout:
@@ -3215,9 +3215,9 @@ FOLLOWS_MAINS_SUMMARY = (
   "# Showing the perspective of main (each root's home skgrepo is the default).\n" )
 FOLLOWS_THIRDS_SUMMARY = (
   "# Showing the perspective of third (each root's home skgrepo is the default).\n" )
-R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK ⌂:origin⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n**** U ⟨K1 ⌂:main⟩\n**** B ⟨K1 ⌂:third⟩\n** K ⟨0i⟩\n"
-R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK ⌂:origin⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n**** A ⟨K1 ⌂:foreign⟩\n**** B ⟨K1 ⌂:third⟩\n** K ⟨0i⟩\n"
-R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨It forks these, or these fork it.⟩\n**** M ⟨2C 3bK ⌂:origin⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n**** A ⟨K1 ⌂:foreign⟩\n**** U ⟨K1 ⌂:main⟩\n** K ⟨0i⟩\n"
+R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨It forks these, or these fork it, or these fork or are forked by others here.⟩\n**** M ⟨2C 3bK ⌂:origin⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n**** U ⟨K1 ⌂:main⟩\n**** B ⟨K1 ⌂:third⟩\n** K ⟨0i⟩\n"
+R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨It forks these, or these fork it, or these fork or are forked by others here.⟩\n**** M ⟨2C 3bK ⌂:origin⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n**** A ⟨K1 ⌂:foreign⟩\n**** B ⟨K1 ⌂:third⟩\n** K ⟨0i⟩\n"
+R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨It forks these, or these fork it, or these fork or are forked by others here.⟩\n**** M ⟨2C 3bK ⌂:origin⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n**** A ⟨K1 ⌂:foreign⟩\n**** U ⟨K1 ⌂:main⟩\n** K ⟨0i⟩\n"
 
 def copy_perspective_fixture (data_root):
   """The perspective data, with a config naming its three foreign

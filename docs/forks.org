@@ -158,7 +158,8 @@ already-forked node.
 ** Unintegrated content: the forks folder
 
 Because =C= forks =N=, a generated *forksFolder* ("It forks these, or
-these fork it.") appears under =C= listing =N=, claiming, as a
+these fork it, or these fork or are forked by others here.") appears
+under =C= listing =N=, claiming, as a
 /forkee as such/. The same folder lists, after
 the forkees, the notes that fork =C=, and then =C='s other mirrors,
 each claiming nothing (deleting one hides it, attaching it makes =C=

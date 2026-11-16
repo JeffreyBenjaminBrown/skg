@@ -16,7 +16,7 @@
 ** ⟨0b ☮ These also contain it.⟩
 *** The fixture root ⟨0c ☮B 1C2b L2b⟩
 **** Above the root ⟨0d ☮ Ca⟩
-** ⟨0e It forks these, or these fork it.⟩
+** ⟨0e It forks these, or these fork it, or these fork or are forked by others here.⟩
 *** Fred's note ⟨0f C1 1/L bK ⌂:fred⟩
 **** ⟨0g ☮ It contains these, but c hides them.⟩
 ***** A detail of Fred's ⟨0h ☮ bC dH folded⟩
