@@ -235,11 +235,14 @@ As in TypeDB, a *relation* is a kind of relationship: =contains=,
 container contains content, mentioner linksTo mentioned, forker forks
 forkee, hider hides hidden. A forks B says two things: A shows
 B's content that A neither contains nor hides (see "forkee as
-such"), and A and B are mirrors (see "mirror"). =hides= means, for
-now, "hides from what it forks": the hider keeps the hidden node out
-of what the hider shows of its forkees (plan 2,
-'TODO/every-mirror/2_plan.org', decision 8, widens it to what it shows
-of every fork partner). A *relationship* is one instance of a relation: this
+such"), and A and B are mirrors (see "mirror"). =hides= means
+"hides from its forks": the hider keeps the hidden node out of what
+it shows of every fork partner its forks folder shows, a note it
+forks or one forking it that it does not hide ('fork_partners_shown'
+in 'server/refresh/goal.rs'). A fork partner that contains the hidden
+node *explains* the hide: the view draws it there, under that
+partner, and a hide no partner explains stands in the hidden-outside
+folder (see "compound partner folder"). A *relationship* is one instance of a relation: this
 node contains that one. (Graph theory would call it an edge; we don't,
 because the word is opaque to newcomers.)
 
@@ -446,8 +449,8 @@ each join three relationships -- forking, hiding and containment:
 - a *hiddenByForkPartnerFolder*, under a forker as such, lists what
   that forker hides of the note's content;
 - a *hiddenOutsideOfForkPartnersFolder*, last in a forks folder, lists
-  the nodes its parent hides that no forkee contains, a forker it
-  hides among them.
+  the nodes its parent hides that no fork partner the folder shows
+  contains, a forker it hides among them.
 
 The diff view adds two more, for nodeMerges since HEAD:
 - an *acquiredByFolder* ("it was acquired by"), under an acquiree's
@@ -536,14 +539,16 @@ editing, done in S's own view. Under a forkee as such it is not
 drawn, and one standing under a member that became a forkee holds
 nothing and goes. The *hidden-outside
 compound partner folder* (=hiddenOutsideOfForkPartnersFolder=, label
-"b hides these, but nothing it forks contains them.") stands last in
-N's forks folder and holds N's hides that no forkee contains, in the
-order of N's hides list; a forker N hides stands there, since the
-forks folder does not draw it, and removing it there unhides it. Its
-membership reads N's forkees' content only: plan 2
-('TODO/every-mirror/2_plan.org', decision 8) makes N's hides apply to
-its forkers' content too, and this folder's membership and label
-with them. The note whose hides a compound folder shows is its
+"b hides these, but nothing it forks or that forks it contains
+them.") stands last in N's forks folder and holds N's hides that no
+fork partner of N contains, in the order of N's hides list. Its fork
+partners are the members its forks folder shows, forkees and
+forkers alike ('fork_partners_shown'), so a hide is there exactly
+when no member of the same folder explains it: a hide of something
+only a forker contains stands in that forker's hidden-in folder
+instead. A forker N hides stands there, since the forks folder does
+not draw it (nor, so, count it as a partner), and removing it there
+unhides it. The note whose hides a compound folder shows is its
 *hider* ('CompoundFolderParties::hider'), and, for the two folders
 under a member as such, the note whose content holds what is hidden
 is its *container* ('CompoundFolderParties::container'): the member
@@ -551,7 +556,10 @@ for the hidden-in folder, N for the hidden-by folder. Both read each relationshi
 restriction shows: under a skgrepo narrowing, a hide of H that S
 contains only by a restricted record stands in the hidden-outside
 folder, and a hide recorded in a restricted section stands in
-neither.
+neither. The save reads the hidden-outside folder's edits against
+the same partners ('apply_hiddenoutside_edits'), so a buffer that
+keeps that folder never hides again what a gesture under a forker
+as such unhid.
 
 *** the folder's viewparent
 
@@ -1409,8 +1417,10 @@ to C as unintegrated forked content, and mirror substitution shows C
 wherever N would appear, from your perspective). Children of N
 that the forking edit deleted become C's
 =hides=, and thereafter any child removed from
-an owned forker's contains that some forkee still contains is
-hidden likewise on save (re-adding it unhides). The fork operation
+an owned note's contains that some fork partner its forks folder
+shows still contains (a forkee, or a forker it does not hide) is
+hidden likewise on save, so that it does not come back under that
+partner (re-adding it unhides). The fork operation
 refuses to fork a node you already fork, naming your fork of it:
 silently making a second clone would more often be an accident. A
 deliberate second fork is made by having another note of yours fork
@@ -2461,7 +2471,9 @@ into a more public telescope section. Hoist /moves/ text to home.
 *** hiderel = "hides" relationship
 
 A relationship of the relation =hides=, which a '.skg' file
-records under the key 'hides'. See [[file:./data-model_technical.org][the technical data model]] for the hiding
+records under the key 'hides': the hider keeps the hidden node out of
+what it shows of its fork partners (see "relation, relationship,
+member, membership, partner"). See [[file:./data-model_technical.org][the technical data model]] for the hiding
 relationship.
 
 *** kv-pair = key-value pair

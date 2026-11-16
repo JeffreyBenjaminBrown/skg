@@ -858,7 +858,7 @@ Questions: Q2, Q4, Q5, Q8, Q9.
   'docs/sharing-model.org'.
 - Run the suites as slice 1 does.
 
-** TODO Slice 4: hides apply to every fork partner
+** DONE Slice 4: hides apply to every fork partner
 Questions: Q11, Q12. Decision 8.
 - The hidden-outside folder's goal reads N's fork partners, forkees and
   forkers (Q11), and 'apply_hiddenoutside_edits' reads its edits

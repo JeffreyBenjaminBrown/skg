@@ -82,7 +82,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 *** Letters and sides
 The relations, in display order, are =C= contains, =L= links to, =K=
 forks (the K of forK; =F= is the flags count), and =H= hides (from
-what it forks). A relation's token has an in-side before its letter and
+its forks). A relation's token has an in-side before its letter and
 an out-side after it. The in-side counts nodes that relate to this node
 ("N nodes contain it"); the out-side counts nodes this node relates to
 ("it contains N nodes"). =2C3= thus means two containers and three
@@ -205,11 +205,10 @@ viewparent contains and the note hides: =☮ It contains these, but c
 hides them.= Under a forker as such, the folder of what the forker,
 the viewparent, hides of the note's content reads =☮ a hides these,
 which c contains.= In the forks folder itself, the note is the
-grandparent: =b hides these, but nothing it forks contains them.= (Its membership counts only what b's
-forkees contain; plan 2 widens it, and the label, to its forkers,
-'TODO/every-mirror/2_plan.org', decision 8.) The hider and hidden
-folders read =☮ These hide it from what they fork.= and =☮ It hides
-these from what it forks.=
+grandparent: =b hides these, but nothing it forks or that forks it
+contains them.= (b's hides that no member of the forks folder, forkee
+or forker, contains.) The hider and hidden folders read =☮ These hide
+it from their forks.= and =☮ It hides these from its forks.=
 
 The bare atom =noClaim= (a child that does not affect its parent's
 membership on save) has no glyph of its own. Under an editable parent

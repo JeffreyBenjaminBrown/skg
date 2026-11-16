@@ -395,8 +395,11 @@ forkee's visible record shows the hidden node as its content, and
 no hide is written of a member that only a restricted record
 explains. The inference of hides from a removal
 (=infer_hides_from_contains_removals=) reads the same way: the
-forker's visible forks, their content by visible records,
-and its visible hides. So does the hiding of a forker deleted from a
+note's visible forks and forkers (the fork partners its forks folder
+shows, =fork_partners_shown=), their content by visible records, and
+its visible hides. A child removed from the note that such a partner
+still contains is hidden, a forker's content as a forkee's, so that
+it does not come back under that partner. So does the hiding of a forker deleted from a
 forks folder (=resolve_forks_folder_removals=): only a forker whose
 record the skgrepo restriction shows was drawn, so only such a one
 is hidden for its absence.
@@ -406,10 +409,11 @@ a section the skgrepo restriction keeps out unless the graph already
 holds it there (=refuse_records_landing_restricted= in
 =server/from_text/validate.rs=, after the suppression of writes to
 restricted nodes, which keys on the graph's home as well as the
-buffer's). A new hide's relRepo is at least as private as each record
-that explains it, the forks relationship and the contains record
-(=hide_skgrepo=), so that a public hide never names a private
-membership. The writes built from the graph rather than the buffer
+buffer's). A new hide's relRepo is at least as private as the
+records of some fork partner that explains it, the forks relationship
+(in the hider's file for a forkee, in the forker's for a forker) and
+the partner's contains record (=hide_skgrepo=), so that a public hide
+never names a private membership. The writes built from the graph rather than the buffer
 obey the rule apart: a fork's clone copies only the visible records
 (=build_fork_clone=); a nodeMerge, like a delete, is refused when
 either graphnode has a restricted section; and a delete's propagation
@@ -624,10 +628,12 @@ the edits of the hidden-outside folder, which run last. So:
   save leaves the forks and hides involving it as they are, and the
   rerender draws it again ('preserve_invisible_members' in
   'supplement_from_disk.rs', and the two steps above).
-The hidden-outside folder's membership reads N's forkees' content
-only; plan 2 ('TODO/every-mirror/2_plan.org', decision 8) makes N's
-hides apply to what it shows of its forkers too, and that folder's
-membership with them.
+The hidden-outside folder holds N's hides that no fork partner the
+forks folder shows contains, forkee or forker
+('hidden_outside_of_fork_partners'); its edits are read against the
+same partners ('apply_hiddenoutside_edits'), so a hide of what only a
+forker contains, unhidden under that forker as such, is not hidden
+again by a buffer that keeps the hidden-outside folder.
 
 *** The extent and the node budget
 The *extent* is how much of P's goal the refresh draws

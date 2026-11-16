@@ -147,7 +147,7 @@ folder of its own, folded (but the view-ancestors). The kinds:
 | containers    | C-c l c | the containers folder: what contains the node                                    |
 | mentioners    | C-c l m | the mentioners folder: what links to it                                          |
 | forks         | C-c l f | the forks folder: what it forks, and what forks it                               |
-| hides         | C-c l h | the hidden folder (what it hides from what it forks) and the hiders folder       |
+| hides         | C-c l h | the hidden folder (what it hides from its forks) and the hiders folder           |
 | aliases       | C-c l a | the aliases folder                                                               |
 | flags         | C-c l p | the flags folder: its true flags                                                 |
 A write-protected folder (☮) is one whose membership cannot be
@@ -406,7 +406,7 @@ client shows them, the heralds are:
 The relationship heralds are rendered as the clients render them;
 'docs/heralds.org', "Relationship heralds", explains them. In display
 order: 'C' contains, 'L' links to, 'K' forks (the K of forK; 'F' is
-the flags count), 'H' hides (from what it forks). A count before a letter counts the
+the flags count), 'H' hides (from its forks). A count before a letter counts the
 nodes on the relation's in-side ("two nodes contain this"), a count
 after it the out-side ("this contains three"). A lowercase letter is
 an ancestor in this view: 'a' the viewparent, 'b' the grandparent, and
@@ -1022,7 +1022,7 @@ The fixture has two skgrepos, a foreign 'fred' listed first and an
 owned 'main'. Its root contains two children and is contained by a
 node above it; one child contains a node that a node outside the view
 also contains; the other forks a foreign node and hides two
-foreign nodes from what it forks, one of which the view shows
+foreign nodes from its forks, one of which the view shows
 folded in a hidden-outside-of-fork-partners folder. The root's body links
 to a node in the view, to a foreign node, and to an ID nobody wrote.
 Outside the view, an owned node with a true flag forks another,
@@ -1453,7 +1453,7 @@ tool says which.
 
 The clone copies the original's title, body and content list (the
 IDs, not the subtree) with the edit applied, and forks it; a child
-the edit removed becomes one the clone hides from what it forks. The original is not written. A node may have
+the edit removed becomes one the clone hides from its forks. The original is not written. A node may have
 one clone you own; forking it again is refused, naming the clone.
 *** Forking a node you own
 'fork' in the handle of a node you own forks it, as the clients'

@@ -2636,3 +2636,162 @@ The slice's headline in '2_plan.org' is DONE.
 - The text claim's message: "a foreign node shown as a member of a
   forks folder"; a typed child under a foreign forker: "... a foreign
   node shown as a forker ...".
+** Slice 4: hides apply to every fork partner
+*** Commits
+- 7925194a every-mirror plan 2 slice 4: hides apply to every fork partner
+- (the commit carrying this record) every-mirror plan 2 slice 4: docs, record, DONE
+*** Suites
+- 'bash/nextest.sh', first run with the code changed: 1253 of 1254;
+  the one failure an expected fixture adaptation:
+  'forkers_drawn_editable::all_tests', whose
+  'a_hide_moved_out_under_a_forker_is_unhidden' cut the hidden-outside
+  folder out of its buffer (slice 3's caveat) and found none to cut: Z,
+  which T contains, now has a reason. Then, with the new tests,
+  1259 of 1259; again on the final tree, 1259 of 1259.
+- The AI tool's tests (after 'cargo build --bin skg'): PASS, first run
+  (the five expected views were edited for the labels beforehand; no
+  membership of theirs changed).
+- 'bash/emacs-tests.sh' 503 of 503 and 'bash/nvim-tests.sh' no
+  failure, first runs (both read the rendering cases' new labels and
+  style runs).
+- 'bash/integration-tests.sh' (the Emacs pass): 38 of 38, first run.
+- 'bash/all-tests.sh', first run: all pass: build, Emacs 503 of 503,
+  Neovim (no failure), nextest 1259 of 1259, doctests, team tools, AI
+  reader, integration 76 of 76 (both clients). One closure variable in
+  'hide_report.rs' was renamed while it ran ('forkee' to 'partner');
+  the debug build and 'bash/nextest.sh' were run again after it:
+  1259 of 1259.
+- End to end, per '/verify': an isolated 'target/debug/skg' on port
+  24864 with scratch data (x contains a, b, forks e and hides w, h2;
+  e contains e1; f forks x and contains a, w, f1). A fresh view of x
+  drew w in f's hidden-in folder and the hidden-outside folder holding
+  h2 alone. w moved from that folder to stand under f, the buffer
+  keeping the hidden-outside folder, saved: "Stops hiding 'w' from
+  'x', as content of 'f'.", x.skg hides [h2], and the rerender drew w
+  under f. a then deleted from x's content: "Hides 'a' from 'x', as
+  content of 'f'.", x.skg contains [b] and hides [h2, a], and the
+  rerender drew a in f's hidden-in folder. The server was stopped by
+  its PID, the port checked free, the scratch data deleted;
+  transcripts outside 'tests/results/', in
+  '/tmp/claude-1000/every-mirror-p2s4/verify/transcript/'.
+Logs: 'tests/results/every-mirror/slice4-plan2/' (nextest-first.log,
+nextest.log, nextest-final.log, ai-tool-first.log, emacs.log,
+nvim.log, integration.out, all-tests.out, all-tests-ALL.org,
+all-tests-nextest.log, ai-reader.log). 'tests/results/every-mirror/'
+was copied out before 'bash/all-tests.sh' and put back after it.
+*** Every reader of the hides' partner set
+The pitfall "Readers of the hides' partner set" asks for this list,
+under plan 1's names. Each now reads the note's fork partners as its
+forks folder shows them, through one function, 'fork_partners_shown'
+('goal.rs'): the notes it forks, then its forker-only members (the
+forkers it neither forks nor hides, 'forker_only_members', now
+'pub(crate)').
+- 'hidden_outside_of_forkees' ('goal.rs') is
+  'hidden_outside_of_fork_partners', its argument 'note';
+  'goal_list_for_hiddenOutsideOfForkPartners_folder' subtracts every
+  partner's visible content. 'add_hidden_outside_folder' ('visit.rs')
+  asks it, so a forks folder whose note's hides all have a reason
+  draws no hidden-outside folder.
+- 'apply_hiddenoutside_edits' ('resolve_visibility.rs'): what is
+  "inside", and so not replaceable, is the visible content of the
+  partners (forkees as the save leaves them). This ends slice 3's
+  caveat: the folder no longer lists a hide only a forker explains,
+  so a buffer that keeps it hides nothing again.
+- 'infer_hides_from_contains_removals': the content that explains a
+  hide is the partners' (forkees as the save leaves them, as before).
+- 'fork_floor' in 'hide_skgrepo' ('supplement_from_disk.rs'), and so
+  'default_relRepo' ('strandeds.rs'): each forker of the hider in the
+  graph explains too, at the more private of its 'forks' record (in
+  its own file, 'InRustGraph::relRepo') and its contains record.
+  'hide_skgrepo' takes the recorder's pid.
+- 'gnids_shown_through_forkees' (nodeMerge) is
+  'gnids_shown_through_fork_partners': what a member showed through a
+  forker it does not hide is kept unhidden by the merge too.
+- 'hide_report.rs': the "as content of" names and the "Hides nothing:"
+  lines read the partners; a note with forkers but no forkee now gets
+  "Hides nothing:" lines too.
+Unchanged, each already right: 'forker_only_members' (the forks
+folder's goal), the forkee- and forker-visibility steps,
+'resolve_forks_folder_removals', and
+'validate_no_overlapping_forkee_hiderel_conflicts'.
+*** Deviations from the plan's "how"
+**** One function says which partners explain a hide
+'fork_partners_shown' lives in 'server/refresh/goal.rs', beside
+'forker_only_members', and the save imports it (as it imports
+'parent_reads_claims' from the refresh). The save reads the forkers
+and the note's hides from the graph, which is the disk before the
+save: what the view drew. Forkees come from wherever the reader took
+them before (the save's own forks after the save, or the graph).
+**** A hidden forker explains nothing, but for the floor
+Q11's "the members the forks folder shows" leaves out a forker the
+note hides (plan 1's slice 6), so its content explains no hide, in
+the hidden-outside folder, the inference, nodeMerge and the report.
+The floor ('hide_skgrepo') counts every forker the graph has, hidden
+or not and unrestricted, as it already counted every forkee
+unrestricted: it answers "would a public hide leak a private
+membership", and a forker's public records make the inference
+innocent whether or not the note hides it (Q12: "any fork partner's
+relationship").
+**** The floor reads forkers before the save
+'hide_skgrepo' reads the forkees as the save leaves the hider, but the
+forkers from the graph: another note made a forker in the same save
+does not explain a hide until a later save. The supplement step sees
+one node at a time.
+**** nodeMerge reads every record, as before
+'gnids_shown_through_fork_partners' reads the graph without a skgrepo
+restriction, as 'gnids_shown_through_forkees' did. Its unit test
+stands in the file's existing 'flag_tests' module, which has the
+config it needs.
+**** The test file is 'tests/hides_apply_to_every_fork_partner.rs'
+In 'grouped_forks', fixture
+'tests/hides_apply_to_every_fork_partner/fixtures/' (Jeff's picture:
+N hides W, which only its forker F contains, and H2, which nothing
+contains; its forkee E does not contain W). The floor and the
+narrowing are in 'tests/hide_inference_under_a_narrowing.rs', beside
+the forkee tests they mirror; a unit test of the floor in
+'tests/unit/save_leveling.rs'. Each new pin was checked against the
+code before this slice: the view, the unhide that keeps the
+hidden-outside folder, and the removal each failed there.
+**** Labels
+As the slice says: "b hides these, but nothing it forks or that forks
+it contains them.", "It hides these from its forks.", "These hide it
+from their forks." The rendering cases' style runs follow the lengths
+(message*65, message*31). The handle-word list in the AI tool keeps
+the two phrases it had.
+**** Docs beyond the plan's list
+'docs/api-and-formats.org' (the hidden-outside folder's edits, the
+floor, the restricted-record refusal), both COMMANDS docs (C-c l f
+and C-c l h), the AI tool's README ("from its forks"), and the
+comments of four test files naming the hidden-outside folder.
+*** Fixtures changed
+- New: 'tests/hides_apply_to_every_fork_partner/fixtures/' (N, E, F,
+  X1, X2, W, H2, G, e1, f1, all owned); the narrowing tests and the
+  unit tests build their own.
+- 'tools/skg-for-ai/test-expected/': five compact views, the labels
+  only.
+- 'tests/forkers_drawn_editable.rs':
+  'a_hide_moved_out_under_a_forker_is_unhidden' no longer cuts the
+  hidden-outside folder out of its buffer: there is none now (Z, which
+  T contains, has a reason), and it asserts so.
+*** Unfinished
+Nothing of this slice.
+*** DONE
+The slice's headline in '2_plan.org' is DONE.
+*** Names coined or changed
+- New: 'fork_partners_shown' ('goal.rs'); 'forker_only_members' is
+  'pub(crate)'.
+- Renamed: 'hidden_outside_of_forkees' is
+  'hidden_outside_of_fork_partners'; 'gnids_shown_through_forkees' is
+  'gnids_shown_through_fork_partners'. 'hide_skgrepo' and
+  'default_relRepo' ('strandeds.rs') take the recorder's pid.
+- Labels as above.
+- Tests: 'tests/hides_apply_to_every_fork_partner.rs';
+  'a_hide_a_forker_explains_lands_no_more_publicly_than_its_record',
+  'a_member_only_a_forkers_restricted_record_explains_is_not_hidden'
+  ('tests/hide_inference_under_a_narrowing.rs');
+  'hide_floor_counts_a_forker_as_explaining' (unit);
+  'what_a_forker_adds_is_shown_through_it_unless_hidden' (nodeMerge's
+  unit tests).
+- Glossary: "hides" now means "hides from its forks"; a fork partner
+  that contains the hidden node *explains* the hide (under "relation,
+  relationship, member, membership, partner").
