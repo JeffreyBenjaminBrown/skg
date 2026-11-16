@@ -1,5 +1,5 @@
--- Integration test: cycling a view's perspective, whose overrides it
--- follows ('override_perspective.override_perspective'). The Lua mirror of
+-- Integration test: cycling a view's perspective
+-- ('perspective.cycle_perspective'). The Lua mirror of
 -- test-emacs.el in this directory; see run-test.sh for the data.
 
 local T = dofile('../test-nvim-lib.lua')
@@ -7,7 +7,7 @@ T.arm_timeout(60)
 
 local buffer = require('skg.buffer')
 local lock = require('skg.lock')
-local override_perspective = require('skg.override_perspective')
+local perspective = require('skg.perspective')
 local save = require('skg.save')
 
 ---The view of R, once it opens.
@@ -29,7 +29,7 @@ local function check_eventually (predicate, timeout_secs, message)
   print('ok: ' .. message)
 end
 
-print('=== SKG Override Perspective Integration Test ===')
+print('=== SKG Perspective Integration Test ===')
 
 require('skg.single_root_content_view')
   .request_single_root_content_view_from_id('R')
@@ -44,24 +44,24 @@ buf = T.wait_for(function ()
 end, 10)
 T.check(buf, 'the view of R opened, showing A in M\'s place')
 vim.api.nvim_set_current_buf(buf)
-T.check(vim.b[buf].skg_overrides_followed == nil,
-        "a fresh view follows its root authors' overrides")
+T.check(vim.b[buf].skg_perspective == nil,
+        "a fresh view is drawn from its root authors' perspective")
 
 -- The cursor on A's headline; the switch must leave it on U's, which
 -- stands in the same place.
 vim.api.nvim_win_set_cursor(0, { line_of_gnid(buf, 'A'), 0 })
-override_perspective.override_perspective()
+perspective.cycle_perspective()
 check_eventually(function ()
-    return vim.b[buf].skg_overrides_followed == 'user'
+    return vim.b[buf].skg_perspective == 'user'
            and line_of_gnid(buf, 'U')
            and lock.stream_in_progress == nil
   end, 10, 'switched, the view shows U')
 T.check(not line_of_gnid(buf, 'A'),
         'switched, the view no longer shows A')
 T.check(vim.api.nvim_win_get_cursor(0)[1] == line_of_gnid(buf, 'U'),
-        "the cursor stayed on the headline M's overrider stands on")
-T.check(buffer.override_perspective_mode_line(buf) == ':your overrides',
-        'the statusline mark says the view follows your overrides')
+        "the cursor stayed on the headline M's mirror stands on")
+T.check(buffer.perspective_mode_line(buf) == ':your perspective',
+        'the statusline mark says the view shows your perspective')
 
 -- Unsaved edits refuse the switch. The body line goes directly under
 -- U's headline: the end of the buffer is under foreign K, and an edit
@@ -70,7 +70,7 @@ local u_line = line_of_gnid(buf, 'U')
 vim.api.nvim_buf_set_lines(buf, u_line, u_line, false,
                            { 'a body line for U' })
 vim.api.nvim_win_set_cursor(0, { u_line, 0 })
-local switched, refusal = pcall(override_perspective.override_perspective)
+local switched, refusal = pcall(perspective.cycle_perspective)
 T.check(not switched and tostring(refusal):find('unsaved edits', 1, true)
         and lock.stream_in_progress == nil,
         'a buffer with unsaved edits is not switched')
@@ -85,32 +85,32 @@ check_eventually(function ()
   end, 20, 'the save finished')
 check_eventually(function ()
     return line_of_gnid(buf, 'U') and not line_of_gnid(buf, 'A')
-           and vim.b[buf].skg_overrides_followed == 'user'
-  end, 1, 'after the save the view still follows your overrides')
+           and vim.b[buf].skg_perspective == 'user'
+  end, 1, 'after the save the view still shows your perspective')
 
 -- The next perspective is third's, which shows B.
-override_perspective.override_perspective()
+perspective.cycle_perspective()
 check_eventually(function ()
-    return vim.b[buf].skg_overrides_followed == 'owner of third'
+    return vim.b[buf].skg_perspective == 'owner of third'
            and line_of_gnid(buf, 'B')
            and lock.stream_in_progress == nil
   end, 10, "the next perspective, third's, shows B")
-T.check(buffer.override_perspective_mode_line(buf) == ":third's overrides",
-        "the statusline mark names third's overrides")
+T.check(buffer.perspective_mode_line(buf) == ":third's perspective",
+        "the statusline mark names third's perspective")
 
 -- After the last, the root authors' again, showing A.
-override_perspective.override_perspective()
+perspective.cycle_perspective()
 check_eventually(function ()
-    return vim.b[buf].skg_overrides_followed == nil
+    return vim.b[buf].skg_perspective == nil
            and line_of_gnid(buf, 'A')
            and lock.stream_in_progress == nil
   end, 10, 'switched back, the view shows A again')
-T.check(buffer.override_perspective_mode_line(buf) == '',
+T.check(buffer.perspective_mode_line(buf) == '',
         'the statusline mark is gone')
 
 -- The root too: a view of M, which A (M's own author's), U (yours)
--- and B (third's) each override, shows M as its root from the root
--- authors' perspective and each override from its author's, re-pointed
+-- and B (third's) each fork, shows M as its root from the root
+-- authors' perspective and each fork from its author's, re-pointed
 -- where the root stands, so the cursor stays on it; the buffer keeps
 -- its name.
 require('skg.single_root_content_view')
@@ -127,24 +127,24 @@ end, 10)
 T.check(buf, 'the view of M opened')
 vim.api.nvim_set_current_buf(buf)
 local name = vim.api.nvim_buf_get_name(buf)
-for _, step in ipairs({ { 'user', 'U', ':your overrides' },
-                        { 'owner of foreign', 'A', ":foreign's overrides" },
-                        { 'owner of third', 'B', ":third's overrides" },
+for _, step in ipairs({ { 'user', 'U', ':your perspective' },
+                        { 'owner of foreign', 'A', ":foreign's perspective" },
+                        { 'owner of third', 'B', ":third's perspective" },
                         { nil, 'M', '' } }) do
   local followed, shown, mark = step[1], step[2], step[3]
   vim.api.nvim_win_set_cursor(0, { 1, 0 })
-  override_perspective.override_perspective()
+  perspective.cycle_perspective()
   check_eventually(function ()
-      return vim.b[buf].skg_overrides_followed == followed
+      return vim.b[buf].skg_perspective == followed
              and line_of_gnid(buf, shown) == 1
              and lock.stream_in_progress == nil
     end, 10, 'the root is ' .. shown)
   local root = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1]
-  T.check((shown == 'M') == (not root:find('(overridesHere M)', 1, true)),
+  T.check((shown == 'M') == (not root:find('(inPlaceOf M)', 1, true)),
           'the root ' .. shown .. ' stands for M as it should')
   T.check(vim.api.nvim_win_get_cursor(0)[1] == 1,
           'the cursor stayed on the root, now ' .. shown)
-  T.check(buffer.override_perspective_mode_line(buf) == mark,
+  T.check(buffer.perspective_mode_line(buf) == mark,
           'the statusline mark for ' .. shown)
   T.check(vim.api.nvim_buf_get_name(buf) == name, 'the buffer keeps its name')
 end

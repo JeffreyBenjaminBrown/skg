@@ -24,7 +24,7 @@ use crate::types::nodes::complete::{
 use crate::types::save::{ForkSpec, SaveNode};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
-use crate::types::views_state::OverridesFollowed;
+use crate::types::views_state::Perspective;
 
 use ego_tree::NodeRef;
 use std::collections::{HashMap, HashSet};
@@ -402,7 +402,7 @@ pub fn validate_fork_specs (
 /// hide -- the display rule already excludes C's own contains from
 /// its forkee-as-such view.)
 /// contains is stored raw (the child IDs as the buffer collected them);
-/// override substitution applies at render time.
+/// mirror substitution applies at render time.
 /// .
 /// The clone copies only the contains records the skgrepo restriction
 /// shows: what the user could not see, the user did not fork. The rest
@@ -483,7 +483,7 @@ pub fn forks_the_view_will_not_show (
   graph              : &InRustGraph,
   config             : &SkgConfig,
   restriction        : &SkgrepoRestriction,
-  overrides_followed : &OverridesFollowed,
+  perspective        : &Perspective,
   fork_specs         : &[ForkSpec],
 ) -> Vec<String> {
   let mut warnings : Vec<String> = Vec::new ();
@@ -497,10 +497,10 @@ pub fn forks_the_view_will_not_show (
       matches! ( parent . value () . kind, ViewnodeKind::BufferRoot ));
     if is_root { continue; }
     let owner : SkgrepoOwner = perspective_owner_of_tree_containing (
-      config, graph, overrides_followed, edited );
+      config, graph, perspective, edited );
     let shown : ID = mirror_shown_once_cloned (config, graph, restriction, &owner, spec);
     if shown == spec . clone . 0 . pid { continue; }
-    let perspective : String = match &owner {
+    let perspective_named : String = match &owner {
       SkgrepoOwner::User => "your perspective" . to_string (),
       SkgrepoOwner::Foreign (name) =>
         format! ("the perspective of the owner of '{}'", name . 0), };
@@ -514,7 +514,7 @@ pub fn forks_the_view_will_not_show (
       "Your edit of '{}' forked it into your skgrepo '{}', but this view \
        is drawn there from {}, so it goes on showing {} there, without \
        your edit. To see your fork, switch the view's perspective (C-c v o).",
-      spec . original_title, spec . clone . 0 . home_skgrepo, perspective,
+      spec . original_title, spec . clone . 0 . home_skgrepo, perspective_named,
       what_it_shows )); }
   warnings }
 

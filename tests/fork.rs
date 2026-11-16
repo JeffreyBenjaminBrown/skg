@@ -5,7 +5,7 @@
 // clone C lives in an owned skgrepo, copies N's edited title/body/
 // contains, subscribes to N and overrides N; N itself is untouched.
 //
-// Installs the explicit graph handle (override substitution and
+// Installs the explicit graph handle (mirror substitution and
 // forksFolder content read it), so it belongs among the
 // grouped_forks installers.
 
@@ -300,7 +300,7 @@ async fn reader_view_with_unread_list (
   let unread : Vec<&str> = subtree_of (&response . saved_view, "t");
   assert! ( unread . iter () . any ( |line| line . contains ("(gnid m1)") )
             && unread . iter () . any ( |line|
-                 line . contains ("(gnid m2r)") && line . contains ("(overridesHere m2)") )
+                 line . contains ("(gnid m2r)") && line . contains ("(inPlaceOf m2)") )
             && first_says (&unread, "(unintegrated 2)"),
     "t, made editable, must list both messages as unintegrated, m2 as \
      the reader's earlier fork of it:\n{}",
@@ -373,7 +373,7 @@ async fn a_reply_under_an_unread_message_integrates_it (
   let redrawn : &str = &response . saved_view;
   assert! ( second_level (redrawn) . last () . is_some_and ( |line|
               line . contains (& format! ("(gnid {})", clone . pid . 0))
-              && line . contains ("(overridesHere m1)")
+              && line . contains ("(inPlaceOf m1)")
               && ! line . contains ("writeProtected") ),
     "the redrawn view must end f's content with the clone, editable, \
      in m1's place:\n{}", redrawn );
@@ -382,7 +382,7 @@ async fn a_reply_under_an_unread_message_integrates_it (
     "the redrawn view must show the reply under the clone:\n{}", redrawn );
   let unread : Vec<&str> = subtree_of (redrawn, "t");
   assert! ( first_says (&unread, "(unintegrated 1)")
-            && unread . iter () . any ( |line| line . contains ("(overridesHere m2)") )
+            && unread . iter () . any ( |line| line . contains ("(inPlaceOf m2)") )
             && ! unread . iter () . any ( |line| line . contains ("m1") ),
     "the redrawn view must count one message unread, m2, and draw no m1 there:\n{}",
     redrawn );
@@ -423,7 +423,7 @@ async fn a_reply_under_ones_own_unfiled_fork_files_the_original (
                vec! [ ID::from ("d"), ID::from ("m2") ],
     "the reply must file m2, the original m2r stands for" );
   assert! ( second_level (&response . saved_view) . last () . is_some_and ( |line|
-              line . contains ("(gnid m2r)") && line . contains ("(overridesHere m2)") )
+              line . contains ("(gnid m2r)") && line . contains ("(inPlaceOf m2)") )
             && subtree_of (&response . saved_view, "m2r") . iter ()
                  . any ( |line| line . ends_with (" a later reply") )
             && first_says (&subtree_of (&response . saved_view, "t"), "(unintegrated 1)"),
@@ -690,7 +690,7 @@ async fn fork_no_owned_ancestor_defaults (
   let root_line : &str = response . saved_view . lines () . next ()
     . ok_or ("the saved root view must not be empty") ?;
   assert! ( root_line . contains (&format! ("(gnid {})", c . pid . 0))
-            && ! root_line . contains ("overridesHere"),
+            && ! root_line . contains ("inPlaceOf"),
     "the buffer that forked root N must immediately be rooted at its clone, \
      which stands for nothing:\n{}",
     response . saved_view );
@@ -1093,7 +1093,7 @@ async fn fork_fixture_files (
   Ok (( )) }
 
 /// Round-trip: after the fork, reopening P shows the clone in N's
-/// place, carrying (overridesHere N), with the default forksFolder
+/// place, carrying (inPlaceOf N), with the default forksFolder
 /// listing N. The load-bearing property:
 /// P's stored
 /// 'contains' is not rewritten to the clone -- it still lists N, so the
@@ -1119,13 +1119,13 @@ async fn fork_round_trip (
 
   let clone_gnid : ID = clone_on_disk (config) ? . pid;
 
-  // Reopen P de-novo. N is P's content; override substitution shows the
-  // clone in its place with (overridesHere N).
+  // Reopen P de-novo. N is P's content; mirror substitution shows the
+  // clone in its place with (inPlaceOf N).
   let (p_view, _pids, _) =
     single_root_view (
       config, Some (tantivy), &ID::from ("P") ) ?;
-  assert! ( p_view . contains ("(overridesHere N)"),
-    "the clone must be shown in N's place with (overridesHere N):\n{}",
+  assert! ( p_view . contains ("(inPlaceOf N)"),
+    "the clone must be shown in N's place with (inPlaceOf N):\n{}",
     p_view );
   assert! ( p_view . contains (& format! ("(gnid {})", clone_gnid . 0)),
     "the shown substitute must be the clone {}:\n{}", clone_gnid . 0, p_view );
@@ -1170,14 +1170,14 @@ async fn fork_collateral_rerender_substitutes_too (
   let response = update_from_and_rerender_buffer (
     &mut stream, &buffer, config, tantivy, &graph,
     &Ok (saved_viewforest_id), &mut views_state ) . await ?;
-  assert! ( response . saved_view . contains ("(overridesHere N)"),
+  assert! ( response . saved_view . contains ("(inPlaceOf N)"),
     "the saved view must substitute the clone:\n{}", response . saved_view );
 
   let collateral = views_state . open_views
     . viewforest_id_to_view (&collateral_viewforest_id)
     .ok_or ("the collateral view must remain open") ?;
   let collateral_text : String = viewforest_to_string (collateral) ?;
-  assert! ( collateral_text . contains ("(overridesHere N)")
+  assert! ( collateral_text . contains ("(inPlaceOf N)")
             && ! collateral_text . contains ("(gnid N)"),
     "the collateral view must substitute the clone:\n{}", collateral_text );
   Ok (( )) }

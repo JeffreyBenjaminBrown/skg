@@ -656,7 +656,7 @@ gap too. Details, options and questions:
    (Tantivy is a rebuildable cache) and dropping the forced per-commit
    'reader.reload()' in production.
 * Problems found during full-schema metaplan 2 research (2026-06-10)
-** Architecture note: "drawn in place of another node" is override-specific data
+** FIX PLANNED: Architecture note: "drawn in place of another node" is override-specific data
    Override substitution (TODO/DONE/full-schema/
    11_override-rendering-and-navigation.org, executed 2026-06-11)
    lets a viewnode stand in for a different graphnode than the one

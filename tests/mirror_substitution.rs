@@ -1,14 +1,13 @@
-// cargo nextest run --test grouped_forks -E 'test(override_substitution::)'
+// cargo nextest run --test grouped_forks -E 'test(mirror_substitution::)'
 //
-// Override substitution ('docs/override.org', "Automatic override
-// substitution"):
+// Mirror substitution ('docs/mirrors.org', "Mirror substitution"):
 // when the refresh would draw a viewnode for node N as recursive
-// content, and an owned, visible R overrides N, it shows R
-// instead, marked '(overridesHere N)' -- and saving such a view
+// content, and the perspective's skgrepo list ranks a mirror R of N
+// first, it shows R instead, marked '(inPlaceOf N)' -- and saving such a view
 // round-trips to the original IDs, so a container's contains list is
 // never silently rewritten from N to R.
 //
-// Fixture (tests/override_substitution/fixtures, single skgrepo
+// Fixture (tests/mirror_substitution/fixtures, single skgrepo
 // "main", owned): Q contains P and P2; P contains N and M;
 // R overrides N and contains W; S subscribes to E; E contains N.
 //
@@ -17,8 +16,8 @@
 // N1; R2 (skgrepo "other", owned) overrides N2; N3 lives in
 // "other" while P3 and its overrider R3 live in "main".
 //
-// The foreign-root fixture (fixtures-foreign-root) gives a view the
-// overrides of its root's author to follow: R (skgrepo "foreign", not
+// The foreign-root fixture (fixtures-foreign-root) gives a view its
+// root's author's perspective: R (skgrepo "foreign", not
 // owned) contains M and K; A, also foreign, and U, in "main", each
 // override M; P, in "main", contains M, and W, in "main", contains U.
 // A second foreign owner,
@@ -52,8 +51,8 @@ use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, SkgrepoOwner, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
-use skg::types::views_state::{OpenViews, OverridesFollowed, ViewforestId};
-use skg::serve::handlers::overrides_followed::handle_set_overrides_followed_request;
+use skg::types::views_state::{OpenViews, Perspective, ViewforestId};
+use skg::serve::handlers::perspective::handle_set_perspective_request;
 use skg::serve::handlers::rerender_views::handle_rerender_views_request;
 use skg::serve::handlers::text_search::handle_text_search_request;
 use skg::serve::handlers::save_buffer::{
@@ -78,7 +77,7 @@ use ego_tree::Tree;
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  let fixtures : &str = "tests/override_substitution/fixtures";
+  let fixtures : &str = "tests/mirror_substitution/fixtures";
   run_with_shared_test_stores (
     "skg-test-override-substitution",
     |s| Box::pin ( async move {
@@ -98,15 +97,15 @@ fn all_tests
       an_owned_mutual_pair_saves_and_q3s_mirror_stands (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("ownership_and_visibility_gate_substitution",
-                             "tests/override_substitution/fixtures-multi/skgconfig.toml") ?;
+                             "tests/mirror_substitution/fixtures-multi/skgconfig.toml") ?;
       ownership_and_visibility_gate_substitution (
         &s . config ) . await ?;
       s . reset_from_config ("chain_half_visible_keeps_the_original",
-                             "tests/override_substitution/fixtures-chain/skgconfig.toml") ?;
+                             "tests/mirror_substitution/fixtures-chain/skgconfig.toml") ?;
       chain_half_visible_keeps_the_original (
         &s . config, &mut s . tantivy ) . await ?;
       let foreign_root : &str =
-        "tests/override_substitution/fixtures-foreign-root";
+        "tests/mirror_substitution/fixtures-foreign-root";
       s . reset ("a_view_follows_the_overrides_of_its_roots_author", foreign_root) ?;
       a_view_follows_the_overrides_of_its_roots_author (
         &s . config, &mut s . tantivy ) . await ?;
@@ -119,17 +118,17 @@ fn all_tests
       s . reset ("under_a_foreign_root_a_forked_child_is_shown_as_the_original", foreign_root) ?;
       under_a_foreign_root_a_forked_child_is_shown_as_the_original (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_forked_foreign_root_follows_the_users_overrides", foreign_root) ?;
-      a_forked_foreign_root_follows_the_users_overrides (
+      s . reset ("a_forked_foreign_root_follows_the_users_perspective", foreign_root) ?;
+      a_forked_foreign_root_follows_the_users_perspective (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_switched_view_follows_the_users_overrides_until_switched_back", foreign_root) ?;
-      a_switched_view_follows_the_users_overrides_until_switched_back (
+      s . reset ("a_switched_view_follows_the_users_perspective_until_switched_back", foreign_root) ?;
+      a_switched_view_follows_the_users_perspective_until_switched_back (
         &s . config, &mut s . tantivy ) ?;
       s . reset ("a_switch_of_perspective_re_points_a_substituted_content_child", foreign_root) ?;
       a_switch_of_perspective_re_points_a_substituted_content_child (
         &s . config, &mut s . tantivy ) ?;
       s . reset ("a_third_authors_mirror_stands_where_the_user_has_none",
-                 "tests/override_substitution/fixtures-third-author") ?;
+                 "tests/mirror_substitution/fixtures-third-author") ?;
       a_third_authors_mirror_stands_where_the_user_has_none (
         &s . config, &mut s . tantivy ) ?;
       s . reset ("a_switch_to_the_users_overrides_is_refused_where_it_would_change_nothing", foreign_root) ?;
@@ -154,7 +153,7 @@ fn all_tests
       a_replaced_root_shows_its_own_containers (
         &s . config, &mut s . tantivy ) ?;
       let replaced_root_folders : &str =
-        "tests/override_substitution/fixtures-replaced-root-folders";
+        "tests/mirror_substitution/fixtures-replaced-root-folders";
       s . reset ("a_replaced_root_shows_its_own_default_folders", replaced_root_folders) ?;
       a_replaced_root_shows_its_own_default_folders (
         &s . config, &mut s . tantivy ) ?;
@@ -176,8 +175,8 @@ fn all_tests
       s . reset ("deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_the_original", foreign_root) ?;
       deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_the_original (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_deleted_overrider_keeps_its_original_but_a_removed_one_does_not", foreign_root) ?;
-      a_deleted_overrider_keeps_its_original_but_a_removed_one_does_not (
+      s . reset ("a_deleted_mirror_keeps_its_original_but_a_removed_one_does_not", foreign_root) ?;
+      a_deleted_mirror_keeps_its_original_but_a_removed_one_does_not (
         &s . config ) ?;
       Ok (( )) } )) }
 
@@ -186,7 +185,7 @@ fn marked_lines<'a> (
   original : &str,
 ) -> Vec<&'a str> {
   let fact : String =
-    format! ("(overridesHere {})", original);
+    format! ("(inPlaceOf {})", original);
   buf . lines ()
     . filter ( |l| l . contains (&fact) )
     . collect () }
@@ -246,7 +245,7 @@ async fn de_novo_rendering_shows_the_overrider_marked (
         "R's own content W is shown beneath it:\n{}", view );
       assert! ( view . lines () . any (
                   |l| l . contains ("(gnid M)")
-                      && ! l . contains ("overridesHere") ),
+                      && ! l . contains ("inPlaceOf") ),
         "M, not overridden, is shown raw:\n{}", view );
       Ok (( )) }
 
@@ -350,7 +349,7 @@ async fn extraction_honors_overridesHere (
         // strongest form.
         let buffer = indoc! {"
           * (skg node (gnid P) (skgRepos (nodeRepo main))) P
-          ** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected (overridesHere N)) R
+          ** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected (inPlaceOf N)) R
           ** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected) M
         "};
         assert! (
@@ -373,7 +372,7 @@ async fn extraction_honors_overridesHere (
         let buffer = indoc! {"
           * (skg node (gnid P) (skgRepos (nodeRepo main))) P
           ** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected) M
-          ** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected (overridesHere N)) R
+          ** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected (inPlaceOf N)) R
         "};
         assert_eq! (
           members_of ( & saved_node_by_gnid (
@@ -386,7 +385,7 @@ async fn extraction_honors_overridesHere (
           ** (skg node (gnid P) (skgRepos (nodeRepo main))) P
           *** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected) M
           ** (skg node (gnid P2) (skgRepos (nodeRepo main))) P2
-          *** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected (overridesHere N)) R
+          *** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected (inPlaceOf N)) R
         "};
         let instructions : Vec<NodeInstruction> =
           node_instructions_from (buffer, config) . await ?;
@@ -399,7 +398,7 @@ async fn extraction_honors_overridesHere (
       { // Edits to the shown R save to R; N is untouched.
         let buffer = indoc! {"
           * (skg node (gnid P) (skgRepos (nodeRepo main))) P
-          ** (skg node (gnid R) (skgRepos (nodeRepo main)) (overridesHere N)) R-edited
+          ** (skg node (gnid R) (skgRepos (nodeRepo main)) (inPlaceOf N)) R-edited
           *** (skg node (gnid W) (skgRepos (nodeRepo main)) writeProtected) W
           ** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected) M
         "};
@@ -428,13 +427,13 @@ async fn extraction_honors_overridesHere (
       { // Tamper: a fact the server would not have rendered aborts.
         let buffer = indoc! {"
           * (skg node (gnid P) (skgRepos (nodeRepo main))) P
-          ** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected (overridesHere W)) M
+          ** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected (inPlaceOf W)) M
         "};
         match node_instructions_from (buffer, config) . await {
           Err (SaveError::BufferValidationErrors { errors, .. }) => {
             assert! ( errors . iter () . any ( |e| matches! (
-              e, BufferValidationError::OverridesHere_Mismatch (..) )),
-              "expected OverridesHere_Mismatch, got: {:?}", errors ); },
+              e, BufferValidationError::InPlaceOf_Mismatch (..) )),
+              "expected InPlaceOf_Mismatch, got: {:?}", errors ); },
           other => panic! (
             "tampered fact must abort the save; got: {:?}",
             other . map ( |v| v . len () ) ), }}
@@ -444,7 +443,7 @@ async fn extraction_honors_overridesHere (
           * (skg node (gnid S) (skgRepos (nodeRepo main))) S
           ** (skg forksFolder)
           *** (skg node (gnid E) (skgRepos (nodeRepo main))) E
-          **** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected (overridesHere N)) R
+          **** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected (inPlaceOf N)) R
         "};
         let instructions : Vec<NodeInstruction> =
           node_instructions_from (buffer, config) . await ?;
@@ -462,7 +461,7 @@ async fn extraction_honors_overridesHere (
           * (skg node (gnid S) (skgRepos (nodeRepo main))) S
           ** (skg forksFolder)
           *** (skg node (gnid E) (skgRepos (nodeRepo main))) E
-          **** (skg node (gnid R) (skgRepos (nodeRepo main)) (overridesHere N) (editRequest delete)) R
+          **** (skg node (gnid R) (skgRepos (nodeRepo main)) (inPlaceOf N) (editRequest delete)) R
         "};
         let instructions : Vec<NodeInstruction> =
           node_instructions_from (buffer, config) . await ?;
@@ -615,12 +614,12 @@ async fn chain_half_visible_keeps_the_original (
       { // A fact on a node not on N's chain is rejected.
         let buffer = indoc! {"
           * (skg node (gnid P) (skgRepos (nodeRepo main))) P
-          ** (skg node (gnid D) (skgRepos (nodeRepo other)) writeProtected (overridesHere P)) D
+          ** (skg node (gnid D) (skgRepos (nodeRepo other)) writeProtected (inPlaceOf P)) D
         "};
         match node_instructions_from (buffer, config) . await {
           Err (SaveError::BufferValidationErrors { errors, .. }) =>
             assert! ( errors . iter () . any ( |e| matches! (
-              e, BufferValidationError::OverridesHere_Mismatch (..) )),
+              e, BufferValidationError::InPlaceOf_Mismatch (..) )),
               "off-chain fact must abort; got: {:?}", errors ),
           other => panic! (
             "off-chain fact must abort the save; got: {:?}",
@@ -691,7 +690,7 @@ async fn a_view_follows_the_overrides_of_its_roots_author (
   Ok (( )) }
 
 /// Saving a view of foreign R, unchanged, where A stands for M, writes
-/// nothing to R, passes the overridesHere tamper check, and is a
+/// nothing to R, passes the inPlaceOf tamper check, and is a
 /// fixpoint.
 async fn under_a_foreign_root_a_save_roundtrips_its_authors_overrider (
   config  : &SkgConfig,
@@ -702,7 +701,7 @@ async fn under_a_foreign_root_a_save_roundtrips_its_authors_overrider (
   let (view, _pids, _tree) =
     multi_root_view ( config, Some (tantivy), &[ ID::from ("R") ] ) ?;
   assert! ( line_of_gnid (&view, "A")
-            . is_some_and ( |l| l . contains ("(overridesHere M)") ),
+            . is_some_and ( |l| l . contains ("(inPlaceOf M)") ),
     "{}", view );
   let saved : String = save_and_rerender (&view, config, tantivy) . await ?;
   assert_eq! ( read_skgrepo_file (config, "foreign", "R"), r_before,
@@ -717,7 +716,7 @@ async fn under_a_foreign_root_a_save_roundtrips_its_authors_overrider (
 /// carrier, whichever the tree's perspective would show: under owned
 /// P, whose tree is drawn from the user's perspective (which shows U
 /// in M's place), A, a fork of M by M's own author, carrying
-/// '(overridesHere M)', saves. K, no mirror of M, carrying it, aborts
+/// '(inPlaceOf M)', saves. K, no mirror of M, carrying it, aborts
 /// the save, the refusal naming U, the mirror shown.
 async fn the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror (
   config : &SkgConfig,
@@ -725,13 +724,13 @@ async fn the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror (
   graph_handle_from_config (config) ?;
   let carried_by = |carrier : &str| -> String { format! (
     "* (skg node (gnid P) (skgRepos (nodeRepo main))) P\n\
-     ** (skg node (gnid {carrier}) (skgRepos (nodeRepo foreign)) (overridesHere M)) {carrier}\n" ) };
+     ** (skg node (gnid {carrier}) (skgRepos (nodeRepo foreign)) (inPlaceOf M)) {carrier}\n" ) };
   assert! ( node_instructions_from (&carried_by ("A"), config) . await . is_ok (),
     "a mirror the tree's perspective would not show is still an honest carrier" );
   match node_instructions_from (&carried_by ("K"), config) . await {
     Err (SaveError::BufferValidationErrors { errors, .. }) =>
       assert! ( errors . iter () . any ( |e| matches! (
-        e, BufferValidationError::OverridesHere_Mismatch (
+        e, BufferValidationError::InPlaceOf_Mismatch (
              Some (carrier), original, Some (shown), _ )
            if carrier == &ID::from ("K") && original == &ID::from ("M")
               && shown == &ID::from ("U") )),
@@ -746,8 +745,8 @@ async fn the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror (
 /// author would see, so a child of R the user edits there, which
 /// forks it into the user's clone, is shown afterward as the
 /// original, unedited, and not as the clone. The clone is shown where
-/// the user's own overrides are followed (under an owned root, or
-/// under a fork of R: 'a_forked_foreign_root_follows_the_users_overrides').
+/// the view is drawn from the user's perspective (under an owned root, or
+/// under a fork of R: 'a_forked_foreign_root_follows_the_users_perspective').
 async fn under_a_foreign_root_a_forked_child_is_shown_as_the_original (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -773,7 +772,7 @@ async fn under_a_foreign_root_a_forked_child_is_shown_as_the_original (
   assert! ( clone_lines . iter () . all ( |line| line . contains ("(birth (forks out 2))") ),
     "under R, the user's clone of K is shown only in K's forks folder, as its forker:\n{}", saved );
   assert! ( line_of_gnid (&saved, "A")
-            . is_some_and ( |l| l . contains ("(overridesHere M)") ),
+            . is_some_and ( |l| l . contains ("(inPlaceOf M)") ),
     "under R, A still stands for M:\n{}", saved );
   { // Editing K there again would fork it again; the save refuses,
     // naming the clone to edit instead.
@@ -791,11 +790,11 @@ async fn under_a_foreign_root_a_forked_child_is_shown_as_the_original (
   Ok (( )) }
 
 /// Editing foreign root R forks it; the saved view is re-rooted at the
-/// user's clone of R, which stands for nothing (no '(overridesHere
+/// user's clone of R, which stands for nothing (no '(inPlaceOf
 /// R)': the root authors' would show R raw in its place), and beneath
-/// it the user's overrides are followed: U, not A, is shown in M's
+/// it the user's perspective is followed: U, not A, is shown in M's
 /// place.
-async fn a_forked_foreign_root_follows_the_users_overrides (
+async fn a_forked_foreign_root_follows_the_users_perspective (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -811,7 +810,7 @@ async fn a_forked_foreign_root_follows_the_users_overrides (
   let clone : Graphnode = owned_fork_on_disk (config, "R") ?;
   let root_line : &str = saved . lines () . next () . unwrap ();
   assert! ( root_line . contains (&format! ("(gnid {})", clone . pid . 0))
-            && ! root_line . contains ("overridesHere"),
+            && ! root_line . contains ("inPlaceOf"),
     "the root is R's clone:\n{}", saved );
   let marked : Vec<&str> = marked_lines (&saved, "M");
   assert! ( marked . len () == 1 && marked [0] . contains ("(gnid U)"),
@@ -821,8 +820,8 @@ async fn a_forked_foreign_root_follows_the_users_overrides (
   Ok (( )) }
 
 //
-// Switching whose overrides a view follows
-// ('docs/api-and-formats.org', "Set overrides followed").
+// Switching a view's perspective
+// ('docs/api-and-formats.org', "Set perspective").
 //
 
 /// A connection holding one view, of 'root_gnids', as a content-view
@@ -866,7 +865,7 @@ fn messages_answering (
 
 fn switch_request (
   view_id   : &str,
-  followed  : OverridesFollowed,
+  followed  : Perspective,
 ) -> String {
   switch_request_naming (view_id, &followed . wire_name ()) }
 
@@ -875,13 +874,13 @@ fn switch_request_naming (
   named     : &str,
 ) -> String {
   format! (
-    "((request . \"set overrides followed\") (view-id . \"{}\") (overrides-followed . \"{}\"))",
+    "((request . \"set perspective\") (view-id . \"{}\") (perspective . \"{}\"))",
     view_id, named ) }
 
 fn owner_of (
   skgrepo : &str,
-) -> OverridesFollowed {
-  OverridesFollowed::Owner ( SkgrepoOwner::Foreign ( SkgrepoName::from (skgrepo) )) }
+) -> Perspective {
+  Perspective::Owner ( SkgrepoOwner::Foreign ( SkgrepoName::from (skgrepo) )) }
 
 /// The one rerendered view's text among 'messages', if one was sent.
 fn rerendered_text (
@@ -892,35 +891,35 @@ fn rerendered_text (
     . and_then ( |message| extract_string_field_from_sexp (message, "content") ) }
 
 /// A view of foreign R shows A, R's author's, in M's place. Switched
-/// to the user's overrides, it is rerendered with U, the user's, there
+/// to the user's perspective, it is rerendered with U, the user's, there
 /// instead; the answer names the view and the choice; a foreign redraw
 /// (the "rerender views" a reload asks for) keeps it. Switched back,
 /// it shows A again.
-fn a_switched_view_follows_the_users_overrides_until_switched_back (
+fn a_switched_view_follows_the_users_perspective_until_switched_back (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let (mut views_state, env, view) : (ViewsState, SkgEnv, String) =
     connection_holding_a_view_of (config, tantivy, "R", &[ ID::from ("R") ]) ?;
-  assert! ( line_of_gnid (&view, "A") . is_some_and ( |l| l . contains ("(overridesHere M)") ),
+  assert! ( line_of_gnid (&view, "A") . is_some_and ( |l| l . contains ("(inPlaceOf M)") ),
     "a fresh view of R follows R's author:\n{}", view );
   let messages : Vec<String> = messages_answering (
-    &switch_request ("R", OverridesFollowed::user ()),
-    &mut views_state, &env, config, handle_set_overrides_followed_request );
+    &switch_request ("R", Perspective::user ()),
+    &mut views_state, &env, config, handle_set_perspective_request );
   let answer : &String = messages . first () . unwrap ();
-  assert! ( answer . contains ("(response-type overrides-followed)")
+  assert! ( answer . contains ("(response-type perspective)")
             && extract_string_field_from_sexp (answer, "view-id") . as_deref () == Some ("R")
-            && extract_string_field_from_sexp (answer, "overrides-followed") . as_deref () == Some ("user")
+            && extract_string_field_from_sexp (answer, "perspective") . as_deref () == Some ("user")
             && extract_string_field_from_sexp (answer, "content") . is_none (),
     "the answer names the view and the new choice: {:?}", messages );
   let switched : String = rerendered_text (&messages)
     . ok_or_else ( || format! ("the view is rerendered: {:?}", messages) ) ?;
-  assert! ( line_of_gnid (&switched, "U") . is_some_and ( |l| l . contains ("(overridesHere M)") )
+  assert! ( line_of_gnid (&switched, "U") . is_some_and ( |l| l . contains ("(inPlaceOf M)") )
             && line_of_gnid (&switched, "A") . is_none (),
     "switched, the user's U stands in M's place:\n{}", switched );
-  assert_eq! ( views_state . open_views . overrides_followed_by_view (
+  assert_eq! ( views_state . open_views . perspective_of_view (
                  &ViewforestId::from_client_string ("R" . to_string ()) ),
-               OverridesFollowed::user () );
+               Perspective::user () );
   let redrawn : String = rerendered_text ( &messages_answering (
     "((request . \"rerender views\") (view-ids \"R\"))",
     &mut views_state, &env, config, handle_rerender_views_request ))
@@ -928,10 +927,10 @@ fn a_switched_view_follows_the_users_overrides_until_switched_back (
   assert! ( line_of_gnid (&redrawn, "U") . is_some (),
     "a redraw the user did not ask for keeps the choice:\n{}", redrawn );
   let back : String = rerendered_text ( &messages_answering (
-    &switch_request ("R", OverridesFollowed::RootAuthors),
-    &mut views_state, &env, config, handle_set_overrides_followed_request ))
+    &switch_request ("R", Perspective::RootAuthors),
+    &mut views_state, &env, config, handle_set_perspective_request ))
     . ok_or ("switching back rerenders the view") ?;
-  assert! ( line_of_gnid (&back, "A") . is_some_and ( |l| l . contains ("(overridesHere M)") )
+  assert! ( line_of_gnid (&back, "A") . is_some_and ( |l| l . contains ("(inPlaceOf M)") )
             && line_of_gnid (&back, "U") . is_none (),
     "switched back, R's author's A stands in M's place again:\n{}", back );
   Ok (( )) }
@@ -947,14 +946,14 @@ fn a_switch_of_perspective_re_points_a_substituted_content_child (
 ) -> Result<(), Box<dyn Error>> {
   let (mut views_state, env, view) : (ViewsState, SkgEnv, String) =
     connection_holding_a_view_of (config, tantivy, "P", &[ ID::from ("P") ]) ?;
-  assert! ( line_of_gnid (&view, "U") . is_some_and ( |l| l . contains ("(overridesHere M)") ),
+  assert! ( line_of_gnid (&view, "U") . is_some_and ( |l| l . contains ("(inPlaceOf M)") ),
     "a fresh view of P shows the user's U in M's place:\n{}", view );
   for (perspective, shown) in [ ( owner_of ("third"), "B" ),
                                 ( owner_of ("foreign"), "A" ),
-                                ( OverridesFollowed::RootAuthors, "U" ) ] {
+                                ( Perspective::RootAuthors, "U" ) ] {
     let switched : String = rerendered_text ( &messages_answering (
       &switch_request ("P", perspective . clone ()),
-      &mut views_state, &env, config, handle_set_overrides_followed_request ))
+      &mut views_state, &env, config, handle_set_perspective_request ))
       . ok_or_else ( || format! ("the switch to {:?} rerenders the view", perspective) ) ?;
     let marked : Vec<&str> = marked_lines (&switched, "M");
     assert! ( marked . len () == 1 && marked [0] . contains ( &format! ("(gnid {})", shown) ),
@@ -981,7 +980,7 @@ fn a_third_authors_mirror_stands_where_the_user_has_none (
     "the user has no mirror of N, so bob's F, declared first, stands:\n{}", view );
   let alices : String = rerendered_text ( &messages_answering (
     &switch_request ("P", owner_of ("alice")),
-    &mut views_state, &env, config, handle_set_overrides_followed_request ))
+    &mut views_state, &env, config, handle_set_perspective_request ))
     . ok_or ("the switch to alice's perspective rerenders the view") ?;
   assert! ( marked_lines (&alices, "N") . is_empty ()
             && line_of_gnid (&alices, "N") . is_some (),
@@ -990,7 +989,7 @@ fn a_third_authors_mirror_stands_where_the_user_has_none (
     connection_holding_a_view_of (config, tantivy, "Q", &[ ID::from ("Q") ]) ?;
   let alices_q : String = rerendered_text ( &messages_answering (
     &switch_request ("Q", owner_of ("alice")),
-    &mut views_state, &env, config, handle_set_overrides_followed_request ))
+    &mut views_state, &env, config, handle_set_perspective_request ))
     . ok_or ("the switch to alice's perspective rerenders the view of Q") ?;
   let in_fs_place : Vec<&str> = marked_lines (&alices_q, "F");
   assert! ( in_fs_place . len () == 1 && in_fs_place [0] . contains ("(gnid N)")
@@ -998,7 +997,7 @@ fn a_third_authors_mirror_stands_where_the_user_has_none (
     "from alice's perspective N, which F forks, stands in F's place:\n{}", alices_q );
   Ok (( )) }
 
-/// A view whose every root the user owns shows the user's overrides
+/// A view whose every root the user owns shows the user's perspective
 /// already, so a switch to them is refused, with the reason, the
 /// unchanged perspective and an empty rerender stream; "next" skips
 /// them, to the owners who would show it differently, foreign then
@@ -1013,43 +1012,43 @@ fn a_switch_to_the_users_overrides_is_refused_where_it_would_change_nothing (
   let (mut views_state, env, _view) : (ViewsState, SkgEnv, String) =
     connection_holding_a_view_of (config, tantivy, "P", &[ ID::from ("P") ]) ?;
   let owned : Vec<String> = messages_answering (
-    &switch_request ("P", OverridesFollowed::user ()),
-    &mut views_state, &env, config, handle_set_overrides_followed_request );
-  assert! ( refusal_of (&owned) . is_some_and ( |reason| reason . contains ("Your overrides would show this buffer as its root authors' do") ),
+    &switch_request ("P", Perspective::user ()),
+    &mut views_state, &env, config, handle_set_perspective_request );
+  assert! ( refusal_of (&owned) . is_some_and ( |reason| reason . contains ("Your perspective would show this buffer as its root authors' do") ),
     "{:?}", owned );
-  assert! ( extract_string_field_from_sexp (&owned [0], "overrides-followed")
+  assert! ( extract_string_field_from_sexp (&owned [0], "perspective")
             . as_deref () == Some ("root authors")
             && extract_string_field_from_sexp (&owned [0], "perspective-name")
-            . as_deref () == Some ("each root author's overrides (yours)"),
+            . as_deref () == Some ("each root author's perspective (yours)"),
     "the refusal carries the unchanged perspective: {:?}", owned );
   for (expected_wire, expected_overrider) in [ ("owner of foreign", "A"),
                                                ("owner of third",   "B") ] {
     let next : Vec<String> = messages_answering (
       &switch_request_naming ("P", "next"),
-      &mut views_state, &env, config, handle_set_overrides_followed_request );
-    assert! ( extract_string_field_from_sexp (&next [0], "overrides-followed")
+      &mut views_state, &env, config, handle_set_perspective_request );
+    assert! ( extract_string_field_from_sexp (&next [0], "perspective")
               . as_deref () == Some (expected_wire)
               && rerendered_text (&next) . is_some_and ( |text| line_of_gnid (&text, expected_overrider)
-                   . is_some_and ( |l| l . contains ("(overridesHere M)") )),
+                   . is_some_and ( |l| l . contains ("(inPlaceOf M)") )),
       "next skips the user's, which would change nothing, for each foreign owner's in turn: {:?}", next ); }
   let back : Vec<String> = messages_answering (
-    &switch_request ("P", OverridesFollowed::RootAuthors),
-    &mut views_state, &env, config, handle_set_overrides_followed_request );
+    &switch_request ("P", Perspective::RootAuthors),
+    &mut views_state, &env, config, handle_set_perspective_request );
   assert! ( extract_string_field_from_sexp (&back [0], "content") . is_none ()
             && rerendered_text (&back) . is_some (),
     "a switch to the root authors' is not refused: {:?}", back );
   let unheld : Vec<String> = messages_answering (
-    &switch_request ("R", OverridesFollowed::user ()),
-    &mut views_state, &env, config, handle_set_overrides_followed_request );
+    &switch_request ("R", Perspective::user ()),
+    &mut views_state, &env, config, handle_set_perspective_request );
   assert! ( refusal_of (&unheld) . is_some_and ( |reason| reason . contains ("does not hold") ),
     "{:?}", unheld );
   let unnamed : Vec<String> = messages_answering (
-    "((request . \"set overrides followed\") (view-id . \"P\"))",
-    &mut views_state, &env, config, handle_set_overrides_followed_request );
+    "((request . \"set perspective\") (view-id . \"P\"))",
+    &mut views_state, &env, config, handle_set_perspective_request );
   assert! ( refusal_of (&unnamed) . is_some (), "{:?}", unnamed );
   let unknown_owner : Vec<String> = messages_answering (
     &switch_request_naming ("P", "owner of nobody"),
-    &mut views_state, &env, config, handle_set_overrides_followed_request );
+    &mut views_state, &env, config, handle_set_perspective_request );
   assert! ( refusal_of (&unknown_owner) . is_some (), "{:?}", unknown_owner );
   Ok (( )) }
 
@@ -1060,7 +1059,7 @@ fn refusal_of (
   messages : &[String],
 ) -> Option<String> {
   let answer : &String = messages . first () ?;
-  assert! ( answer . contains ("(response-type overrides-followed)"), "{:?}", messages );
+  assert! ( answer . contains ("(response-type perspective)"), "{:?}", messages );
   let refusal : Option<String> = extract_string_field_from_sexp (answer, "content");
   if refusal . is_some () {
     assert! ( rerendered_text (messages) . is_none ()
@@ -1083,23 +1082,23 @@ fn next_cycles_through_every_perspective_that_shows_the_view_differently (
     -> Result<String, Box<dyn Error>> {
     let messages : Vec<String> = messages_answering (
       &switch_request_naming ("R", "next"),
-      &mut views_state, &env, config, handle_set_overrides_followed_request );
+      &mut views_state, &env, config, handle_set_perspective_request );
     assert! ( refusal_of (&messages) . is_none (), "{:?}", messages );
-    assert_eq! ( extract_string_field_from_sexp (&messages [0], "overrides-followed")
+    assert_eq! ( extract_string_field_from_sexp (&messages [0], "perspective")
                    . as_deref (), Some (expected_wire), "{:?}", messages );
     assert_eq! ( extract_string_field_from_sexp (&messages [0], "perspective-name")
                    . as_deref (), Some (expected_name), "{:?}", messages );
     let text : String = rerendered_text (&messages) . ok_or ("the switch rerenders") ?;
     assert! ( line_of_gnid (&text, shown_for_m)
-              . is_some_and ( |l| l . contains ("(overridesHere M)") ),
+              . is_some_and ( |l| l . contains ("(inPlaceOf M)") ),
       "{} stands in M's place:\n{}", shown_for_m, text );
     Ok (text) };
-  next ("user", "your overrides", "U") ?;
-  let third : String = next ("owner of third", "third's overrides", "B") ?;
-  assert! ( line_of_gnid (&third, "T") . is_some_and ( |l| l . contains ("(overridesHere K)") ),
+  next ("user", "your perspective", "U") ?;
+  let third : String = next ("owner of third", "third's perspective", "B") ?;
+  assert! ( line_of_gnid (&third, "T") . is_some_and ( |l| l . contains ("(inPlaceOf K)") ),
     "third's T stands in K's place:\n{}", third );
-  next ("root authors", "each root author's overrides (foreign's)", "A") ?;
-  next ("user", "your overrides", "U") ?;
+  next ("root authors", "each root author's perspective (foreign's)", "A") ?;
+  next ("user", "your perspective", "U") ?;
   Ok (( )) }
 
 /// The cycle does not depend on the path taken. In a view of F2, the
@@ -1115,9 +1114,9 @@ fn a_perspective_stays_in_the_cycle_where_another_hides_what_it_overrides (
     connection_holding_a_view_of (config, tantivy, "F2", &[ ID::from ("F2") ]) ?;
   let mut switch = |named : &str| -> Vec<String> { messages_answering (
     &switch_request_naming ("F2", named),
-    &mut views_state, &env, config, handle_set_overrides_followed_request ) };
+    &mut views_state, &env, config, handle_set_perspective_request ) };
   let to_user : Vec<String> = switch ("next");
-  assert! ( extract_string_field_from_sexp (&to_user [0], "overrides-followed")
+  assert! ( extract_string_field_from_sexp (&to_user [0], "perspective")
               . as_deref () == Some ("user")
             && rerendered_text (&to_user) . is_some_and ( |text|
                  line_of_gnid (&text, "U2") . is_some () && line_of_gnid (&text, "N2") . is_none () ),
@@ -1127,10 +1126,10 @@ fn a_perspective_stays_in_the_cycle_where_another_hides_what_it_overrides (
   let back_to_user : Vec<String> = switch ("user");
   assert! ( refusal_of (&back_to_user) . is_none (), "{:?}", back_to_user );
   let to_third : Vec<String> = switch ("next");
-  assert! ( extract_string_field_from_sexp (&to_third [0], "overrides-followed")
+  assert! ( extract_string_field_from_sexp (&to_third [0], "perspective")
               . as_deref () == Some ("owner of third")
             && rerendered_text (&to_third) . is_some_and ( |text|
-                 line_of_gnid (&text, "T2") . is_some_and ( |l| l . contains ("(overridesHere N2)") )),
+                 line_of_gnid (&text, "T2") . is_some_and ( |l| l . contains ("(inPlaceOf N2)") )),
     "from the user's, the next is third's, which shows T2 in N2's place: {:?}", to_third );
   Ok (( )) }
 
@@ -1145,13 +1144,13 @@ fn the_root_authors_are_named_in_the_order_of_their_first_roots (
     connection_holding_a_view_of (
       config, tantivy, "RPK", &[ ID::from ("R"), ID::from ("P"), ID::from ("K") ] ) ?;
   messages_answering (
-    &switch_request ("RPK", OverridesFollowed::user ()),
-    &mut views_state, &env, config, handle_set_overrides_followed_request );
+    &switch_request ("RPK", Perspective::user ()),
+    &mut views_state, &env, config, handle_set_perspective_request );
   let back : Vec<String> = messages_answering (
-    &switch_request ("RPK", OverridesFollowed::RootAuthors),
-    &mut views_state, &env, config, handle_set_overrides_followed_request );
+    &switch_request ("RPK", Perspective::RootAuthors),
+    &mut views_state, &env, config, handle_set_perspective_request );
   assert_eq! ( extract_string_field_from_sexp (&back [0], "perspective-name") . as_deref (),
-               Some ("each root author's overrides (foreign's, yours)"), "{:?}", back );
+               Some ("each root author's perspective (foreign's, yours)"), "{:?}", back );
   Ok (( )) }
 
 /// A view in which no one's perspective would show anything
@@ -1168,8 +1167,8 @@ async fn next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_autho
     connection_holding_a_view_of (config, tantivy, "L", &[ ID::from ("L") ]) ?;
   let lonely : Vec<String> = messages_answering (
     &switch_request_naming ("L", "next"),
-    &mut views_state, &env, config, handle_set_overrides_followed_request );
-  assert! ( refusal_of (&lonely) . is_some_and ( |reason| reason . contains ("No one's overrides") ),
+    &mut views_state, &env, config, handle_set_perspective_request );
+  assert! ( refusal_of (&lonely) . is_some_and ( |reason| reason . contains ("No other perspective") ),
     "{:?}", lonely );
   let view_id : ViewforestId = ViewforestId::from_client_string ("L" . to_string ());
   let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
@@ -1181,13 +1180,13 @@ async fn next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_autho
       &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
       owner_of ("third") ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
-  assert_eq! ( views_state . open_views . overrides_followed_by_view (&view_id),
+  assert_eq! ( views_state . open_views . perspective_of_view (&view_id),
                owner_of ("third") );
   let back : Vec<String> = messages_answering (
     &switch_request_naming ("L", "next"),
-    &mut views_state, &env, config, handle_set_overrides_followed_request );
+    &mut views_state, &env, config, handle_set_perspective_request );
   assert! ( refusal_of (&back) . is_none ()
-            && extract_string_field_from_sexp (&back [0], "overrides-followed")
+            && extract_string_field_from_sexp (&back [0], "perspective")
                . as_deref () == Some ("root authors"),
     "{:?}", back );
   Ok (( )) }
@@ -1195,7 +1194,7 @@ async fn next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_autho
 /// The root too: a view of M, which A (M's own author's), U (the
 /// user's) and B (third's) each override, shows M raw from the root
 /// authors' perspective, as a fresh view does, and each owner's
-/// override of it from that owner's, marked '(overridesHere M)'. The
+/// override of it from that owner's, marked '(inPlaceOf M)'. The
 /// root is re-pointed where it stands, so it keeps its viewnode ID
 /// both ways, and the root authors' perspective shows M raw again. A
 /// save through the replaced root edits the overrider, not M.
@@ -1207,26 +1206,26 @@ async fn a_perspective_replaces_the_root_and_the_root_authors_restore_it (
     connection_holding_a_view_of (config, tantivy, "M", &[ ID::from ("M") ]) ?;
   let root_line = |text : &str| -> String { text . lines () . next () . unwrap () . to_string () };
   assert! ( root_line (&view) . contains ("(vnid 0a) node (gnid M)")
-            && ! view . contains ("overridesHere"),
+            && ! view . contains ("inPlaceOf"),
     "a fresh view shows its root raw:\n{}", view );
   let mut next = |expected_wire : &str| -> Result<String, Box<dyn Error>> {
     let messages : Vec<String> = messages_answering (
       &switch_request_naming ("M", "next"),
-      &mut views_state, &env, config, handle_set_overrides_followed_request );
-    assert_eq! ( extract_string_field_from_sexp (&messages [0], "overrides-followed")
+      &mut views_state, &env, config, handle_set_perspective_request );
+    assert_eq! ( extract_string_field_from_sexp (&messages [0], "perspective")
                    . as_deref (), Some (expected_wire), "{:?}", messages );
     Ok ( root_line ( &rerendered_text (&messages) . ok_or ("the switch rerenders") ? )) };
   for (wire, shown) in [ ("user", "U"), ("owner of foreign", "A"), ("owner of third", "B") ] {
     let root : String = next (wire) ?;
     assert! ( root . contains ( &format! ("(vnid 0a) node (gnid {})", shown) )
-              && root . contains ("(overridesHere M)"),
+              && root . contains ("(inPlaceOf M)"),
       "from {}, the root is {}, standing for M: {}", wire, shown, root ); }
   let back : String = next ("root authors") ?;
-  assert! ( back . contains ("(vnid 0a) node (gnid M)") && ! back . contains ("overridesHere"),
+  assert! ( back . contains ("(vnid 0a) node (gnid M)") && ! back . contains ("inPlaceOf"),
     "the root authors' show M raw again: {}", back );
   let switched : String = { let messages : Vec<String> = messages_answering (
-      &switch_request ("M", OverridesFollowed::user ()),
-      &mut views_state, &env, config, handle_set_overrides_followed_request );
+      &switch_request ("M", Perspective::user ()),
+      &mut views_state, &env, config, handle_set_perspective_request );
     rerendered_text (&messages) . ok_or ("the switch rerenders") ? };
   let edited : String = switched . replacen (") U\n", ") U, retitled\n", 1);
   assert_ne! ( edited, switched, "{}", switched );
@@ -1238,14 +1237,14 @@ async fn a_perspective_replaces_the_root_and_the_root_authors_restore_it (
       &mut views_state, &SkgrepoRestriction::unrestricted (config),
       true, &HashMap::new (), &HashSet::new (),
       &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
-      OverridesFollowed::user () ) . await ?;
+      Perspective::user () ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   assert! ( read_skgrepo_file (config, "main", "U") . contains ("title: U, retitled"),
     "the save edits U" );
   assert! ( read_skgrepo_file (config, "foreign", "M") . contains ("title: M"),
     "and leaves M" );
   assert! ( root_line (&response . saved_view) . contains ("(gnid U)")
-            && root_line (&response . saved_view) . contains ("(overridesHere M)")
+            && root_line (&response . saved_view) . contains ("(inPlaceOf M)")
             && response . saved_view . contains ("U, retitled"),
     "the saved view is still shown from the user's perspective:\n{}", response . saved_view );
   Ok (( )) }
@@ -1271,7 +1270,7 @@ fn a_replaced_root_shows_its_own_containers (
   let mut switch = |named : &str| -> Result<String, Box<dyn Error>> {
     let messages : Vec<String> = messages_answering (
       &switch_request_naming ("M", named),
-      &mut views_state, &env, config, handle_set_overrides_followed_request );
+      &mut views_state, &env, config, handle_set_perspective_request );
     assert! ( refusal_of (&messages) . is_none (), "{:?}", messages );
     Ok ( rerendered_text (&messages) . ok_or ("the switch rerenders") ? ) };
   let users : String = switch ("user") ?;
@@ -1318,7 +1317,7 @@ fn a_replaced_root_shows_its_own_default_folders (
   let mut switch = |named : &str| -> Result<String, Box<dyn Error>> {
     let messages : Vec<String> = messages_answering (
       &switch_request_naming ("L", named),
-      &mut views_state, &env, config, handle_set_overrides_followed_request );
+      &mut views_state, &env, config, handle_set_perspective_request );
     assert! ( refusal_of (&messages) . is_none (), "{:?}", messages );
     Ok ( rerendered_text (&messages) . ok_or ("the switch rerenders") ? ) };
   let users : String = switch ("user") ?;
@@ -1359,7 +1358,7 @@ async fn a_replaced_root_redraws_the_folders_it_was_asked_for (
       &mut views_state, &SkgrepoRestriction::unrestricted (config),
       true, &HashMap::new (), &HashSet::new (),
       &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
-      OverridesFollowed::RootAuthors ) . await ?;
+      Perspective::RootAuthors ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   let asked : String = response . saved_view;
   let shows_ls = |text : &str| -> bool {
@@ -1372,7 +1371,7 @@ async fn a_replaced_root_redraws_the_folders_it_was_asked_for (
   let mut switch = |named : &str| -> Result<String, Box<dyn Error>> {
     let messages : Vec<String> = messages_answering (
       &switch_request_naming ("L", named),
-      &mut views_state, &env, config, handle_set_overrides_followed_request );
+      &mut views_state, &env, config, handle_set_perspective_request );
     assert! ( refusal_of (&messages) . is_none (), "{:?}", messages );
     Ok ( rerendered_text (&messages) . ok_or ("the switch rerenders") ? ) };
   let users : String = switch ("user") ?;
@@ -1418,7 +1417,7 @@ fn a_replaced_search_hit_stays_a_hit (
   let mut switch = |named : &str| -> Result<String, Box<dyn Error>> {
     let messages : Vec<String> = messages_answering (
       &switch_request_naming ("search:missive", named),
-      &mut views_state, &env, config, handle_set_overrides_followed_request );
+      &mut views_state, &env, config, handle_set_perspective_request );
     assert! ( refusal_of (&messages) . is_none (), "{:?}", messages );
     Ok ( rerendered_text (&messages) . ok_or ("the switch rerenders") ? ) };
   let users : String = switch ("user") ?;
@@ -1445,9 +1444,9 @@ fn without_vnids<'a> (
       None => line . to_string (), } )
     . collect () }
 
-/// In a view of foreign R that follows the user's overrides, editing
+/// In a view of foreign R drawn from the user's perspective, editing
 /// R's child K forks it, and the save's rerender shows the clone, with
-/// the edit, in K's place, as '(overridesHere K)', K standing only in
+/// the edit, in K's place, as '(inPlaceOf K)', K standing only in
 /// the clone's forks folder (the folder K's occurrence carried, now
 /// the clone's); U still stands in M's place. The connection keeps the
 /// choice the save named.
@@ -1458,8 +1457,8 @@ async fn a_save_following_the_users_overrides_shows_a_new_fork_in_place (
   let (mut views_state, mut env, _view) : (ViewsState, SkgEnv, String) =
     connection_holding_a_view_of (config, tantivy, "R", &[ ID::from ("R") ]) ?;
   let switched : String = rerendered_text ( &messages_answering (
-    &switch_request ("R", OverridesFollowed::user ()),
-    &mut views_state, &env, config, handle_set_overrides_followed_request ))
+    &switch_request ("R", Perspective::user ()),
+    &mut views_state, &env, config, handle_set_perspective_request ))
     . ok_or ("the switch rerenders the view") ?;
   let k_line : &str = line_of_gnid (&switched, "K")
     . ok_or_else ( || format! ("K is shown under R:\n{}", switched) ) ?;
@@ -1473,25 +1472,25 @@ async fn a_save_following_the_users_overrides_shows_a_new_fork_in_place (
       &mut views_state, &SkgrepoRestriction::unrestricted (config),
       true, &HashMap::new (), &HashSet::new (),
       &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
-      OverridesFollowed::user () ) . await ?;
+      Perspective::user () ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   let clone : Graphnode = owned_fork_on_disk (config, "K") ?;
   let saved : &str = &response . saved_view;
   assert! ( line_of_gnid (saved, &clone . pid . 0)
-            . is_some_and ( |l| l . contains ("(overridesHere K)") && l . ends_with (") K-edited") ),
+            . is_some_and ( |l| l . contains ("(inPlaceOf K)") && l . ends_with (") K-edited") ),
     "the clone, edited, stands in K's place:\n{}", saved );
   assert! ( saved . lines () . filter ( |line| line . contains ("(gnid K)") )
             . all ( |line| line . contains ("(birth (forks in 2))") ),
             "K stands only in the clone's forks folder:\n{}", saved );
-  assert! ( line_of_gnid (saved, "U") . is_some_and ( |l| l . contains ("(overridesHere M)") ),
+  assert! ( line_of_gnid (saved, "U") . is_some_and ( |l| l . contains ("(inPlaceOf M)") ),
     "U still stands in M's place:\n{}", saved );
-  assert_eq! ( views_state . open_views . overrides_followed_by_view (
+  assert_eq! ( views_state . open_views . perspective_of_view (
                  &ViewforestId::from_client_string ("R" . to_string ()) ),
-               OverridesFollowed::user () );
+               Perspective::user () );
   Ok (( )) }
 
 /// Under foreign R, U, the user's, and A, R's author's, each carrying
-/// '(overridesHere M)', are honest whichever perspective the save
+/// '(inPlaceOf M)', are honest whichever perspective the save
 /// names: each is a mirror of M. K, no mirror of M, is refused under
 /// either, the refusal naming the mirror the named perspective shows.
 /// A root standing for another node has that node's author: K standing
@@ -1503,36 +1502,36 @@ fn the_tamper_check_accepts_a_mirror_whatever_perspective_the_save_names (
   let graph : InRustGraph = InRustGraph::from_graphnodes (
     &read_all_skg_files_from_skgrepos (config) ? );
   let buffer_showing = |carrier : &str, repo : &str| -> String { format! (
-    "* (skg node (gnid R) (skgRepos (nodeRepo foreign))) R\n** (skg node (gnid {}) (skgRepos (nodeRepo {})) (overridesHere M)) {}\n",
+    "* (skg node (gnid R) (skgRepos (nodeRepo foreign))) R\n** (skg node (gnid {}) (skgRepos (nodeRepo {})) (inPlaceOf M)) {}\n",
     carrier, repo, carrier ) };
-  let mismatch_naming = |buffer : &str, followed : OverridesFollowed| -> Option<ID> {
+  let mismatch_naming = |buffer : &str, followed : Perspective| -> Option<ID> {
     match buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       buffer, &graph, config, &SkgrepoRestriction::unrestricted (config),
       &HashMap::new (), &WhatTheBaselineShows::default (), followed ) {
       Err (SaveError::BufferValidationErrors { errors, .. }) =>
         errors . iter () . find_map ( |e| match e {
-          BufferValidationError::OverridesHere_Mismatch (_, _, shown, _) =>
+          BufferValidationError::InPlaceOf_Mismatch (_, _, shown, _) =>
             Some ( shown . clone () . unwrap_or ( ID::from ("none") )),
           _ => None, } ),
       _ => None, } };
-  for followed in [ OverridesFollowed::user (), OverridesFollowed::RootAuthors ] {
+  for followed in [ Perspective::user (), Perspective::RootAuthors ] {
     assert_eq! ( mismatch_naming (&buffer_showing ("U", "main"), followed . clone ()), None );
     assert_eq! ( mismatch_naming (&buffer_showing ("A", "foreign"), followed . clone ()), None ); }
-  assert_eq! ( mismatch_naming (&buffer_showing ("K", "foreign"), OverridesFollowed::user ()),
+  assert_eq! ( mismatch_naming (&buffer_showing ("K", "foreign"), Perspective::user ()),
                Some ( ID::from ("U") ));
-  assert_eq! ( mismatch_naming (&buffer_showing ("K", "foreign"), OverridesFollowed::RootAuthors),
+  assert_eq! ( mismatch_naming (&buffer_showing ("K", "foreign"), Perspective::RootAuthors),
                Some ( ID::from ("A") ));
   { // At the root, K standing for M has M's author, foreign, as its
     // root author.
     let root_k_standing_for_m : &str =
-      "* (skg node (gnid K) (skgRepos (nodeRepo foreign)) (overridesHere M)) K\n";
-    assert_eq! ( mismatch_naming (root_k_standing_for_m, OverridesFollowed::user ()),
+      "* (skg node (gnid K) (skgRepos (nodeRepo foreign)) (inPlaceOf M)) K\n";
+    assert_eq! ( mismatch_naming (root_k_standing_for_m, Perspective::user ()),
                  Some ( ID::from ("U") ));
-    assert_eq! ( mismatch_naming (root_k_standing_for_m, OverridesFollowed::RootAuthors),
+    assert_eq! ( mismatch_naming (root_k_standing_for_m, Perspective::RootAuthors),
                  Some ( ID::from ("A") )); }
   Ok (( )) }
 
-/// The client is the authority on whose overrides its buffer follows:
+/// The client is the authority on its buffer's perspective:
 /// a view the connection holds as following the user's, saved by a
 /// client whose buffer still follows the root authors' (drawn before
 /// the switch, as after a lost answer, or by a client that never
@@ -1545,11 +1544,11 @@ async fn a_held_view_follows_whatever_its_save_names (
   let (mut views_state, mut env, view) : (ViewsState, SkgEnv, String) =
     connection_holding_a_view_of (config, tantivy, "R", &[ ID::from ("R") ]) ?;
   messages_answering (
-    &switch_request ("R", OverridesFollowed::user ()),
-    &mut views_state, &env, config, handle_set_overrides_followed_request );
+    &switch_request ("R", Perspective::user ()),
+    &mut views_state, &env, config, handle_set_perspective_request );
   let view_id : ViewforestId = ViewforestId::from_client_string ("R" . to_string ());
-  assert_eq! ( views_state . open_views . overrides_followed_by_view (&view_id),
-               OverridesFollowed::user () );
+  assert_eq! ( views_state . open_views . perspective_of_view (&view_id),
+               Perspective::user () );
   let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   let response : SaveResponse =
     update_from_and_rerender_buffer_with_approvals (
@@ -1557,17 +1556,17 @@ async fn a_held_view_follows_whatever_its_save_names (
       &mut views_state, &SkgrepoRestriction::unrestricted (config),
       true, &HashMap::new (), &HashSet::new (),
       &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
-      OverridesFollowed::RootAuthors ) . await ?;
+      Perspective::RootAuthors ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   assert! ( line_of_gnid (&response . saved_view, "A")
-            . is_some_and ( |l| l . contains ("(overridesHere M)") ),
+            . is_some_and ( |l| l . contains ("(inPlaceOf M)") ),
     "the save is redrawn following R's author:\n{}", response . saved_view );
-  assert_eq! ( views_state . open_views . overrides_followed_by_view (&view_id),
-               OverridesFollowed::RootAuthors );
+  assert_eq! ( views_state . open_views . perspective_of_view (&view_id),
+               Perspective::RootAuthors );
   Ok (( )) }
 
 /// The user takes back a fork where it stands in place of another's
-/// original: a view of foreign R, switched to the user's overrides,
+/// original: a view of foreign R, switched to the user's perspective,
 /// shows U in M's place, and 'delete' is written on U. The save
 /// deletes U and nothing else: it asks to fork nothing, R keeps M, and
 /// the redrawn view shows in U's place the mirror of M that the user's
@@ -1582,15 +1581,15 @@ async fn deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows
   let (mut views_state, mut env, _view) : (ViewsState, SkgEnv, String) =
     connection_holding_a_view_of (config, tantivy, "R", &[ ID::from ("R") ]) ?;
   let switched : String = rerendered_text ( &messages_answering (
-    &switch_request ("R", OverridesFollowed::user ()),
-    &mut views_state, &env, config, handle_set_overrides_followed_request ))
+    &switch_request ("R", Perspective::user ()),
+    &mut views_state, &env, config, handle_set_perspective_request ))
     . ok_or ("the switch rerenders the view") ?;
   let u_line : &str = line_of_gnid (&switched, "U")
-    . filter ( |l| l . contains ("(overridesHere M)") )
+    . filter ( |l| l . contains ("(inPlaceOf M)") )
     . ok_or_else ( || format! ("U stands in M's place under R:\n{}", switched) ) ?;
   let edited : String = switched . replace (
-    u_line, &u_line . replace ("(overridesHere M)",
-                               "(overridesHere M) (editRequest delete)") );
+    u_line, &u_line . replace ("(inPlaceOf M)",
+                               "(inPlaceOf M) (editRequest delete)") );
   let r_before : String = read_skgrepo_file (config, "foreign", "R");
   let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   let response : SaveResponse =
@@ -1600,7 +1599,7 @@ async fn deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows
       &mut views_state, &SkgrepoRestriction::unrestricted (config),
       false, &HashMap::new (), &HashSet::new (),
       &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
-      OverridesFollowed::user () ) . await ?;
+      Perspective::user () ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   assert! ( response . fork_confirmation . is_none (),
     "deleting one's own fork asks to fork nothing:\n{}", response . saved_view );
@@ -1613,7 +1612,7 @@ async fn deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows
   let saved : &str = &response . saved_view;
   assert! ( line_of_gnid (saved, "A")
             . is_some_and ( |l| l . starts_with ("** ")
-                                && l . contains ("(overridesHere M)") ),
+                                && l . contains ("(inPlaceOf M)") ),
     "A, M's author's fork, is shown in U's place:\n{}", saved );
   assert! ( line_of_gnid (saved, "U") . is_none (), "{}", saved );
   Ok (( )) }
@@ -1623,7 +1622,7 @@ async fn deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows
 /// removing the overrider's headline instead removes M, which forks
 /// R. Under an owned parent, the deletion takes M out of the list too,
 /// as it did before.
-fn a_deleted_overrider_keeps_its_original_but_a_removed_one_does_not (
+fn a_deleted_mirror_keeps_its_original_but_a_removed_one_does_not (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraph = InRustGraph::from_graphnodes (
@@ -1632,14 +1631,14 @@ fn a_deleted_overrider_keeps_its_original_but_a_removed_one_does_not (
     buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       buffer, &graph, config, &SkgrepoRestriction::unrestricted (config),
       &HashMap::new (), &WhatTheBaselineShows::default (),
-      OverridesFollowed::user () ) . map ( |(_, plan, _)| plan ) };
+      Perspective::user () ) . map ( |(_, plan, _)| plan ) };
   let deletes_u = |instructions : &[NodeInstruction]| -> bool {
     instructions . iter () . any ( |i| matches! (
       i, NodeInstruction::Delete (d) if d . gnid == ID::from ("U") )) };
   { // Under foreign R.
     let deleted : skg::types::save::SavePlan = plan ( indoc! {"
       * (skg node (gnid R) (skgRepos (nodeRepo foreign))) R
-      ** (skg node (gnid U) (skgRepos (nodeRepo main)) (overridesHere M) (editRequest delete)) U
+      ** (skg node (gnid U) (skgRepos (nodeRepo main)) (inPlaceOf M) (editRequest delete)) U
       ** (skg node (gnid K) (skgRepos (nodeRepo foreign))) K
       "} ) ?;
     assert! ( deletes_u (&deleted . node_instructions) );
@@ -1656,7 +1655,7 @@ fn a_deleted_overrider_keeps_its_original_but_a_removed_one_does_not (
   { // Under owned P, which contains M.
     let deleted : skg::types::save::SavePlan = plan ( indoc! {"
       * (skg node (gnid P) (skgRepos (nodeRepo main))) P
-      ** (skg node (gnid U) (skgRepos (nodeRepo main)) (overridesHere M) (editRequest delete)) U
+      ** (skg node (gnid U) (skgRepos (nodeRepo main)) (inPlaceOf M) (editRequest delete)) U
       "} ) ?;
     assert! ( deletes_u (&deleted . node_instructions) );
     assert! ( opt_saved_node_by_gnid (&deleted . node_instructions, "P")

@@ -133,7 +133,7 @@ rather than via `unload-feature'."
             skg-repo-files-reloaded
             skg-request-single-root-content-view
             skg-request-repo-sets
-            skg-request-override-perspective
+            skg-request-perspective
             skg-request-extend-diff-view
             skg-request-stage-and-commit
             skg-request-strip-body-whitespace

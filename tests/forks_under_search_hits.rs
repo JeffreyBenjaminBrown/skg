@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_forks -E 'test(forks_under_search_hits::)'
 //
 // The forks folder under search hits, and suppression in
-// search results ('docs/override.org', "Partner folders in search
+// search results ('docs/mirrors.org', "Partner folders in search
 // results").
 //
 // Fixture (tests/forks_under_search_hits/fixtures): owned skgrepo

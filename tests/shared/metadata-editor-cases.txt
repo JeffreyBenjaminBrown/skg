@@ -61,7 +61,7 @@
 ---- with the processed request: (skg (vnid 0a) node (gnid x) (skgRepos (nodeRepo main)) (editRequest (processed node)))
 
 ==== occurrence: every part the printer writes
----- metadata: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (overridesHere o) (editRequest (relRepo pub)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
+---- metadata: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (inPlaceOf o) (editRequest (relRepo pub)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
 ---- fill-in:
 * skg
 ** vnid
@@ -80,7 +80,7 @@
 *** true
 ** writeProtected
 *** true
-** overridesHere
+** inPlaceOf
 *** o
 ** editRequest
 *** relRepo
@@ -95,11 +95,11 @@
 *** leaves
 **** 1
 **** rel
----- strip: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (overridesHere o) (editRequest (relRepo pub)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
+---- strip: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (inPlaceOf o) (editRequest (relRepo pub)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
 ---- edit request: (merge m)
----- with the edit request: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (overridesHere o) (editRequest (merge m)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
+---- with the edit request: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (inPlaceOf o) (editRequest (merge m)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
 ---- processed request: (processed rel)
----- with the processed request: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (overridesHere o) (editRequest (relRepo pub) (processed rel)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
+---- with the processed request: (skg (vnid 0b) focused folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected (inPlaceOf o) (editRequest (relRepo pub) (processed rel)) (viewRequests editableView) (view cycle) (diff (rel added) (leaves 1 rel)))
 
 ==== occurrence: a processed request alone
 ---- metadata: (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (processed node rel)) (diff (node added) (leaves 2 node rel)))

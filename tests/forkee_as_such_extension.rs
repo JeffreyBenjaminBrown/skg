@@ -99,7 +99,7 @@ async fn subscribee_as_such_extension_hides_and_substitutes (
         lines_by_enclosing_folder (&view);
       assert! ( tagged . iter () . any ( |(c, l)|
                   *c == "forksFolder"
-                  && l . contains ("(overridesHere G)")
+                  && l . contains ("(inPlaceOf G)")
                   && l . contains ("(gnid X)") ),
         "the general rule applies below a subscribee-as-such: \
          G is shown as X, marked:\n{}", view );
@@ -134,6 +134,6 @@ async fn folder_members_never_substitute (
       assert_eq! ( e_lines . len (), 1,
         "E appears under the forks folder:\n{}", view );
       assert! ( e_lines . iter () . all (
-                  |l| ! l . contains ("overridesHere") ),
+                  |l| ! l . contains ("inPlaceOf") ),
         "it is not substituted:\n{}", view );
       Ok (( )) }

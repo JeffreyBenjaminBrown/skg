@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_forks -E 'test(extend_raw_overridden_children::)'
 //
 // Substitution does not apply to the immediate children of an
-// overridden node shown raw ('docs/override.org', "Automatic override
+// overridden node shown raw ('docs/mirrors.org', "Mirror
 // substitution").
 //
 // Fixture (the docs/forks.org shape): clone R overrides original X, and
@@ -43,7 +43,7 @@ fn raw_shown_overridden_root_children_are_raw
         "X1 should appear raw as X's immediate child:\n{}", x_view );
       // Nothing is substituted in this view: no overrider stands in for
       // X1 (the bug this change removes).
-      assert! ( ! x_view . contains ("overridesHere"),
+      assert! ( ! x_view . contains ("inPlaceOf"),
         "no immediate child of a raw-shown overridden node may be \
          substituted:\n{}", x_view );
       assert! ( ! x_view . lines () . any (

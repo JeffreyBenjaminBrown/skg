@@ -10,7 +10,7 @@
 //! a kind is one the kind does not take, and a value it does not list
 //! for a field is one the field does not take there. The table lists
 //! only what a user sets; the parts the server writes (the gnid, the
-//! skgrepos, 'overridesHere', the derived facts) and the processed
+//! skgrepos, 'inPlaceOf', the derived facts) and the processed
 //! request are the parser's to place ('parse_metadata_sexp.rs').
 
 use serde::Deserialize;

@@ -483,7 +483,7 @@ fn the_printer_writes_the_parts_in_the_tables_order () {
   let metadata : ViewnodeMetadata = parse_cleanly (
     "(skg (vnid 1a) focused folded bodyFolded node (gnid n) \
      (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected \
-     (overridesHere o) (editRequest (relRepo pub) (processed node)) \
+     (inPlaceOf o) (editRequest (relRepo pub) (processed node)) \
      (viewRequests editableView))" ) . unwrap ();
   let (mut viewnode, _, _) : (Viewnode, _, _) =
     viewnode_from_metadata (&metadata, "n" . to_string (), None);

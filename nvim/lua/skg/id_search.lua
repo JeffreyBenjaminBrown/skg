@@ -299,7 +299,7 @@ end
 
 ---Open a content view for the nearest ID on the current line. The
 ---requested node itself is the raw root; recursive content may still
----use override substitution.
+---use mirror substitution.
 function M.goto_id_near_point ()
   local result = M.nearest_id()
   if result then

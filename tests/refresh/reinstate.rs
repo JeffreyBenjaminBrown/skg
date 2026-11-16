@@ -224,7 +224,7 @@ node p
     alias alias
   node c wp
     node q wp noClaim ⊥
-  node o (overridesHere n)
+  node o (inPlaceOf n)
     forksFolder
       node n wp
         node p wp noClaim

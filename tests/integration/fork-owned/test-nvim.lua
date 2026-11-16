@@ -116,8 +116,8 @@ local clone_line = goto_line_starting_with('* (skg node (skgRepos (nodeRepo ',
 metadata.change_repo_at_line(clone_line, 'owned')
 save.approve_fork()
 
--- 5. Reopen Q fresh: override substitution now shows the clone in M's
---    place, carrying (overridesHere M).
+-- 5. Reopen Q fresh: mirror substitution now shows the clone in M's
+--    place, carrying (inPlaceOf M).
 do
   local live_q_buf = buffer_showing('Q')
   if live_q_buf then
@@ -126,10 +126,10 @@ end
 content_view.request_single_root_content_view_from_id('Q')
 local substituted = T.wait_for(function ()
   local buf = buffer_showing('Q')
-  return buf and T.buffer_text(buf):find('(overridesHere M)', 1, true)
+  return buf and T.buffer_text(buf):find('(inPlaceOf M)', 1, true)
 end, 10)
 T.check(substituted, "the clone was not shown in M's place on reopen")
-print("approve: the clone is shown in M's place with (overridesHere M)")
+print("approve: the clone is shown in M's place with (inPlaceOf M)")
 
 -- 6. DECLINE on a second node M2 (in Q2): the lingering fork atom is
 --    stripped and nothing is committed.
@@ -159,7 +159,7 @@ q2_buf = T.wait_for(function () return buffer_showing('Q2') end, 10)
 T.check(q2_buf, "Q2's view never reappeared")
 -- Give the view a beat, then assert no substitution happened.
 T.wait_for(function () return false end, 1)
-T.check(not T.buffer_text(q2_buf):find('(overridesHere M2)', 1, true),
+T.check(not T.buffer_text(q2_buf):find('(inPlaceOf M2)', 1, true),
         'decline must not commit a clone overriding M2')
 print('decline committed nothing (no clone overrides M2)')
 

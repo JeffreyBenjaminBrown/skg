@@ -1,7 +1,7 @@
 // Rung 7: substitution. In a content view an overridden node is shown
-// as its overrider, with '(overridesHere ID)', except at a root, in a
+// as its overrider, with '(inPlaceOf ID)', except at a root, in a
 // folder, and as the content of an overridden node shown raw. When
-// the override is gone, the shown headline loses 'overridesHere',
+// the override is gone, the shown headline loses 'inPlaceOf',
 // becomes unwarranted (so, under an editable parent, 'noClaim'), and
 // the overridden node is reinstated beside it. A shown mirror that
 // forks the original draws the original in its forks folder, as any
@@ -23,7 +23,7 @@ fn a_drawn_member_is_shown_as_its_overrider () {
   assert_eq! ( run_asserting_fixpoint (
     &format! ("* {} p\n", occurrence_metadata ("p", "")), &overridden () ) . outline (), "\
 node p
-  node o (overridesHere n)
+  node o (inPlaceOf n)
     forksFolder
       node n wp
         node p wp noClaim" ); }
@@ -37,7 +37,7 @@ fn a_member_shown_raw_is_shown_as_its_overrider_in_place () {
   let run : Run = run_asserting_fixpoint (&input, &overridden ());
   assert_eq! ( run . outline (), "\
 node p
-  node o (overridesHere n) folded" );
+  node o (inPlaceOf n) folded" );
   let shown : NodeRef<Viewnode> =
     run . forest . roots () . next () . unwrap () . first_child () . unwrap ();
   assert_eq! ( shown . value () . viewnode_id, Some ( ViewnodeId ("n1" . into ()) )); }
@@ -51,7 +51,7 @@ fn when_the_override_is_gone_the_overrider_vanishes_and_the_original_returns () 
     * {} p
     ** {} o
     ", occurrence_metadata ("p", ""),
-       occurrence_metadata ("o", "(overridesHere n)") );
+       occurrence_metadata ("o", "(inPlaceOf n)") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
@@ -110,7 +110,7 @@ fn an_overrider_editable_elsewhere_is_shown_write_protected () {
        occurrence_metadata ("q", ""), occurrence_metadata ("o", "") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
-  node o wp (overridesHere n)
+  node o wp (inPlaceOf n)
   node q
     node o wp
 node o" ); }
@@ -145,7 +145,7 @@ fn under_a_foreign_root_its_authors_overrider_is_shown_and_not_the_users () {
     &format! ("* {} r\n", occurrence_metadata_in ("theirs", "r")),
     &m_overridden_by_its_author_and_the_user () ) . outline (), "\
 node r
-  node a (overridesHere m)
+  node a (inPlaceOf m)
     forksFolder
       node m wp
         node p wp noClaim
@@ -157,7 +157,7 @@ fn under_an_owned_root_the_users_overrider_is_shown () {
     &format! ("* {} p\n", occurrence_metadata ("p", "")),
     &m_overridden_by_its_author_and_the_user () ) . outline (), "\
 node p
-  node u (overridesHere m)
+  node u (inPlaceOf m)
     forksFolder
       node m wp
         node p wp noClaim
@@ -166,7 +166,7 @@ node p
 /// r, in 'theirs', contains e, in 'third', which contains c, in
 /// 'third'. c is overridden by j, in 'theirs' (r's author), by d, in
 /// 'third' (e's author), and by u, in 'main' (the user). Under r,
-/// only r's author's overrides are followed, even beneath e.
+/// only r's author's perspective is followed, even beneath e.
 #[test]
 fn under_a_foreign_root_its_authors_overrides_are_followed_beneath_a_third_authors_node () {
   let graph : InRustGraph = graph (&[
@@ -181,7 +181,7 @@ fn under_a_foreign_root_its_authors_overrides_are_followed_beneath_a_third_autho
     &graph ) . outline (), "\
 node r
   node e
-    node j (overridesHere c)
+    node j (inPlaceOf c)
       forksFolder
         node c wp
           node e wp noClaim
@@ -201,14 +201,14 @@ fn under_a_foreign_root_a_chain_stops_before_the_users_overrider () {
     &format! ("* {} r\n", occurrence_metadata_in ("theirs", "r")),
     &graph ) . outline (), "\
 node r
-  node a (overridesHere m)
+  node a (inPlaceOf m)
     forksFolder
       node m wp
         node r wp noClaim
       node u wp noClaim" ); }
 
 /// Whether a foreign root is overridden and so shows its content raw
-/// asks of its author's overrides, not the user's: the user's k
+/// asks of its author's perspective, not the user's: the user's k
 /// overrides r, yet r's author's overrider of m is shown; r's
 /// author's s overrides q, so q's content is raw.
 #[test]
@@ -226,7 +226,7 @@ fn a_foreign_root_is_shown_raw_only_when_its_author_overrides_it () {
               occurrence_metadata_in ("theirs", "q")),
     &graph ) . outline (), "\
 node r
-  node a (overridesHere m)
+  node a (inPlaceOf m)
     forksFolder
       node m wp
         node q wp noClaim

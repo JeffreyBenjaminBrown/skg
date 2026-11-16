@@ -21,7 +21,7 @@ use crate::serve::handlers::repos::handle_repos_request;
 use crate::serve::handlers::rebuild_session_lifetime_stores::handle_rebuild_session_lifetime_stores_request;
 use crate::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use crate::serve::handlers::rerender_views::handle_rerender_views_request;
-use crate::serve::handlers::overrides_followed::handle_set_overrides_followed_request;
+use crate::serve::handlers::perspective::handle_set_perspective_request;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::server_warnings::handle_server_warnings_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
@@ -247,8 +247,8 @@ fn handle_emacs (
               &env,
               &mut views_state,
               &skgrepo_restriction ),
-          Ok (RequestType::SetOverridesFollowed) =>
-            handle_set_overrides_followed_request (
+          Ok (RequestType::SetPerspective) =>
+            handle_set_perspective_request (
               &mut stream,
               &request_header,
               &env,

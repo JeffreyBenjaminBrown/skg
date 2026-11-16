@@ -15,7 +15,7 @@
 //!   node [(gnid ID)] [(skgRepos [(nodeRepo REPO)] [(relRepo REPO)])]
 //!        [noClaim]          ; the occurrence claims no membership
 //!        [writeProtected]   ; marks the occurrence write-protected
-//!        [(overridesHere ID)]
+//!        [(inPlaceOf ID)]
 //!        [(editRequest [<delete | (merge ID) | (relRepo REPO)
 //!                       | (flag FLAG true|false) | restoreRel>]
 //!                      [(processed OBJECT...) | (unprocessed OBJECT...)])]
@@ -131,7 +131,7 @@ pub struct OccurrenceMetadata {
   pub writeProtected   : bool,
   /// Load-bearing: save extraction round-trips the original ID
   /// through it.
-  pub overridesHere    : Option<ID>,
+  pub in_place_of      : Option<ID>,
   pub edit_request     : Option<OccurrenceEditRequest>,
   pub view_requests    : HashSet<ViewRequest>,
 }
@@ -144,7 +144,7 @@ impl Default for OccurrenceMetadata {
       home_skgrepo     : None,
       claimsMembership : true,
       writeProtected   : false,
-      overridesHere    : None,
+      in_place_of      : None,
       edit_request     : None,
       view_requests    : HashSet::new (), } }
 }
@@ -401,7 +401,7 @@ fn occurrence_from_metadata (
       home_skgrepo     : occurrence . home_skgrepo . clone ()
                          . unwrap_or_else (SkgrepoName::not_found),
       claimsMembership : occurrence . claimsMembership,
-      overridesHere    : occurrence . overridesHere . clone (),
+      in_place_of      : occurrence . in_place_of . clone (),
       graphStats       : metadata . graphStats . clone (),
       viewStats        : metadata . viewStats . clone (),
       relationshipEditRequest,
@@ -496,7 +496,7 @@ impl NamedKind {
   fn parts_the_table_leaves_out (&self) -> &'static [&'static str] {
     match self {
       NamedKind::Occurrence =>
-        &[ "gnid", "skgRepos", "overridesHere", "view", "diff" ],
+        &[ "gnid", "skgRepos", "inPlaceOf", "view", "diff" ],
       NamedKind::Ghost =>
         &[ "gnid", "skgRepos", "view", "diff" ],
       NamedKind::GnidOnly (_) =>
@@ -555,7 +555,7 @@ struct WrittenParts {
                             Option<SkgrepoName> )>, // its relRepo
   noClaim        : bool,
   writeProtected : bool,
-  overridesHere  : Option<ID>,
+  in_place_of    : Option<ID>,
   edit_request   : Option<WrittenEditRequest>,
   view_requests  : HashSet<ViewRequest>,
 }
@@ -656,7 +656,7 @@ fn classify_metadata_element (
           metadata . viewnode_id = Some ( ViewnodeId::parse (
             & single_argument (&head, args) ? ) ? );
           Ok (( String::new (), None )) },
-        "gnid" | "skgRepos" | "overridesHere"
+        "gnid" | "skgRepos" | "inPlaceOf"
           | "editRequest" | "viewRequests" | "view" | "diff" => part (&head),
         "oldText" => {
           let aspect : String = single_argument (&head, args) ?;
@@ -727,8 +727,8 @@ fn read_metadata_part (
       written . gnid = Some ( ID::from ( single_argument (name, args) ? )),
     "skgRepos" =>
       written . skgRepos = Some ( parse_skgRepos (args) ? ),
-    "overridesHere" =>
-      written . overridesHere = Some ( ID::from (
+    "inPlaceOf" =>
+      written . in_place_of = Some ( ID::from (
         single_argument (name, args) ? )),
     "editRequest" => {
       let (request, processed_request)
@@ -794,7 +794,7 @@ fn kind_with_its_parts (
         home_skgrepo   : nodeRepo,
         claimsMembership,
         writeProtected : written . writeProtected,
-        overridesHere  : written . overridesHere,
+        in_place_of    : written . in_place_of,
         edit_request   : match written . edit_request {
           None => None,
           Some (WrittenEditRequest::ForAnOccurrence (request)) => Some (request),

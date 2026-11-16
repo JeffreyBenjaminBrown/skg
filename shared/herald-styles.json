@@ -118,7 +118,7 @@
     "letter": "normal",
     "birth_letter": "low",
     "property_counts": "boring",
-    "overrides_here": "crucial",
+    "in_place_of": "crucial",
     "side_tiers": {
       "contains":                     { "in": "medium", "out": "normal",
                                         "out_write_protected": "low",

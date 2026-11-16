@@ -386,10 +386,10 @@ pub struct Occurrence {
   /// wherever this fact appears, so a substituted child
   /// round-trips to the original ID instead of rewriting the
   /// parent's contains. Serialized as the keyed form
-  /// '(overridesHere N)' at the top level; tamper-checked at
+  /// '(inPlaceOf N)' at the top level; tamper-checked at
   /// buffer validation (the carrier must be a mirror of N, under
-  /// the unrestricted skgrepo restriction: 'overridesHere_part_errors').
-  pub overridesHere    : Option<ID>,
+  /// the unrestricted skgrepo restriction: 'inPlaceOf_part_errors').
+  pub in_place_of      : Option<ID>,
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
   pub graphStats    : GraphnodeStats,
@@ -745,14 +745,14 @@ impl Occurrence {
       Editability::WriteProtected => None, }}
 
   /// The collected ID: what this viewnode contributes to its
-  /// parent's collected lists -- the 'overridesHere' original when
+  /// parent's collected lists -- the 'inPlaceOf' original when
   /// the node is shown in place of one, else its own ID. Save
   /// extraction, the distinctness validators and the refresh's goal
   /// member ('member_of_child') all read this, never the raw 'id', so a
-  /// shown overrider round-trips to the original member instead of
+  /// shown mirror round-trips to the original member instead of
   /// rewriting its parent's contains.
   pub fn collected_gnid (&self) -> ID {
-    self . overridesHere . clone ()
+    self . in_place_of . clone ()
     . unwrap_or_else ( || self . gnid . clone () ) }
 }
 
@@ -1464,7 +1464,7 @@ pub fn default_occurrence (
     gnid,
     home_skgrepo: skgrepo,
     claimsMembership : true,
-    overridesHere    : None,
+    in_place_of      : None,
     graphStats     : GraphnodeStats::default(),
     viewStats      : ViewnodeStats::default(),
     relationshipEditRequest : None,

@@ -87,7 +87,7 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
                           strandeds_review,
                           delete_from,
                           vim.b[save_buf].skg_diffView_buffer_kind,
-                          vim.b[save_buf].skg_overrides_followed)
+                          vim.b[save_buf].skg_perspective)
   state.register_response_handler('save-lock',
     function (_payload_text, response)
       M.broad_save_lock_handler(response)
@@ -268,9 +268,9 @@ end
 ---  the saved buffer is ('vim.b.skg_diffView_buffer_kind', "all
 ---  changes" say), sent as (diff-view-buffer . NAME); nil for any
 ---  other view
----@param overrides_followed string|nil the saved view's perspective,
----  whose overrides it follows ('vim.b.skg_overrides_followed'):
----  "user" or "owner of NAME", sent as (overrides-followed . NAME);
+---@param perspective string|nil the saved view's perspective
+---  ('vim.b.skg_perspective'):
+---  "user" or "owner of NAME", sent as (perspective . NAME);
 ---  nil, the root authors', sends nothing
 ---@return string
 function M.save_request_sexp (view_id, position, approved_forks,
@@ -278,16 +278,16 @@ function M.save_request_sexp (view_id, position, approved_forks,
                                 strandeds_review,
                                 delete_from,
                                 diffView_buffer_kind,
-                                overrides_followed)
+                                perspective)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'save buffer'),
     sexpr.pair(sexpr.symbol('view-id'), view_id) }
   if diffView_buffer_kind then
     table.insert(request,
       sexpr.pair(sexpr.symbol('diff-view-buffer'), diffView_buffer_kind)) end
-  if overrides_followed then
+  if perspective then
     table.insert(request,
-      sexpr.pair(sexpr.symbol('overrides-followed'), overrides_followed)) end
+      sexpr.pair(sexpr.symbol('perspective'), perspective)) end
   table.insert(request,
     sexpr.pair(sexpr.symbol('point-lines-below-focused-headline'),
                tostring(position.lines_below_focused_headline)))

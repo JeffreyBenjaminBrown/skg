@@ -544,11 +544,11 @@ of birth facts (RELATION SIDE [GEN]), already accounts for."
                                          'out_unintegrated 'in_substantive)))
           (heralds--side-text count gens tier))))))
 
-(defun heralds--rel-token (rel form birth write-protected overrides-here)
+(defun heralds--rel-token (rel form birth write-protected in-place-of)
   "Render relation REL's token from FORM, or nil if it has nothing to show."
   (let ((in-s (heralds--rel-side-text rel 'in form birth write-protected))
         (out-s (heralds--rel-side-text rel 'out form birth write-protected))
-        (here (and (eq rel 'forks) overrides-here)))
+        (here (and (eq rel 'forks) in-place-of)))
     (unless (and (string-empty-p in-s) (string-empty-p out-s) (not here))
       (concat in-s
               (heralds--styled (heralds--rel-letter rel)
@@ -556,7 +556,7 @@ of birth facts (RELATION SIDE [GEN]), already accounts for."
                                    (heralds--relationship-style 'birth_letter)
                                  (heralds--relationship-style 'letter)))
               (if here (heralds--styled "ĥ" (heralds--relationship-style
-                                             'overrides_here))
+                                             'in_place_of))
                 "")
               out-s))))
 
@@ -573,14 +573,14 @@ F, space-separated."
       (let* ((parts (cdr sexp)) ;; a node's parts stand beside its kind atom
              (birth (cdr (assq 'birth view))) ;; facts (RELATION SIDE [GEN])
              (write-protected (memq 'writeProtected parts))
-             (overrides-here (assq 'overridesHere parts))
+             (in-place-of (assq 'inPlaceOf parts))
              (property-style (heralds--relationship-style 'property_counts))
              (tokens '()))
         (dolist (rel heralds--rel-order)
           (let ((form (assq rel (cdr rels))))
-            (when (or form (and (eq rel 'forks) overrides-here))
+            (when (or form (and (eq rel 'forks) in-place-of))
               (let ((tok (heralds--rel-token rel form birth write-protected
-                                             overrides-here)))
+                                             in-place-of)))
                 (when tok (push tok tokens))))))
         (dolist (count '((aliases . "A") (extraIds . "I") (flags . "F")))
           (let ((k (cadr (assq (car count) (cdr props)))))

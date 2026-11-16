@@ -31,7 +31,7 @@ fn node_with_its_declared_parts (
   if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
     = &mut viewnode . kind {
     occurrence . viewStats . relRepo = Some ( SkgrepoName::from ("pub") );
-    occurrence . overridesHere = Some ( ID::from ("o") ); }
+    occurrence . in_place_of = Some ( ID::from ("o") ); }
   viewnode }
 
 #[test]
@@ -42,7 +42,7 @@ fn each_kind_prints_its_parts_beside_its_atom (
   assert_eq! (
     rendered ( Viewnode { viewnode_id : Some ( ViewnodeId::from_counter (10) ),
                           .. node_with_its_declared_parts () } ),
-    format! ( "(vnid {}) node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) (overridesHere o)",
+    format! ( "(vnid {}) node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) (inPlaceOf o)",
               ViewnodeId::from_counter (10) ));
   assert_eq! (
     rendered ( mk_writeProtected_viewnode (
@@ -69,9 +69,9 @@ fn the_declared_parts_parse_back_in_any_order (
 ) {
   let in_print_order : ViewnodeMetadata = parse_metadata_to_viewnodemd (
     "(skg (vnid 1a) folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) \
-     noClaim writeProtected (overridesHere o) (viewRequests editableView))" ) . unwrap ();
+     noClaim writeProtected (inPlaceOf o) (viewRequests editableView))" ) . unwrap ();
   let shuffled : ViewnodeMetadata = parse_metadata_to_viewnodemd (
-    "(skg (viewRequests editableView) (overridesHere o) writeProtected \
+    "(skg (viewRequests editableView) (inPlaceOf o) writeProtected \
      (skgRepos (relRepo pub) (nodeRepo main)) noClaim (gnid n) node folded (vnid 1a))" )
     . unwrap ();
   assert_eq! ( in_print_order, shuffled );
@@ -80,7 +80,7 @@ fn the_declared_parts_parse_back_in_any_order (
   assert_eq! ( occurrence . gnid, Some ( ID::from ("n") ));
   assert_eq! ( occurrence . home_skgrepo, Some ( SkgrepoName::from ("main") ));
   assert_eq! ( in_print_order . viewStats . relRepo, Some ( SkgrepoName::from ("pub") ));
-  assert_eq! ( occurrence . overridesHere, Some ( ID::from ("o") ));
+  assert_eq! ( occurrence . in_place_of, Some ( ID::from ("o") ));
   assert! ( occurrence . writeProtected
             && ! occurrence . claimsMembership
             && in_print_order . foldAndFocus . folded ); }
@@ -98,7 +98,7 @@ fn the_retired_spellings_are_refused_naming_the_grammar (
     "(skg node (gnid n) (repo main))",
     "(skg alias (relRepo pub))",
     "(skg node (gnid n) (viewStats (relRepo pub)))",
-    "(skg node (gnid n) (viewStats (overridesHere o)))",
+    "(skg node (gnid n) (viewStats (inPlaceOf o)))",
     "(skg node (gnid n) nonMember)",
     "(skg restrictedNode)", ] {
     let refusal : String = parse_metadata_to_viewnodemd (retired) . unwrap_err ();

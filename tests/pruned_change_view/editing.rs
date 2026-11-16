@@ -213,19 +213,19 @@ fn register_content_view_of (
 /// The diff view shows the graph as stored: a member that an
 /// overrider would replace in an ordinary view is shown as itself.
 #[test]
-fn override_substitution_is_off (
+fn mirror_substitution_is_off (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("overrides", &["main"], |f| {
     let (ordinary_view, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from ("p") ] ) ?;
-    assert! ( ordinary_view . contains ("(overridesHere n)"),
+    assert! ( ordinary_view . contains ("(inPlaceOf n)"),
               "precondition: an ordinary view of p shows r for n:\n{}",
               ordinary_view );
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( buffer . lines () . any ( |line|
                 without_viewnode_ids (line) . starts_with ("** (skg node (gnid n)") ),
               "n must be shown as itself under p:\n{}", buffer );
-    assert! ( ! buffer . contains ("overridesHere"),
+    assert! ( ! buffer . contains ("inPlaceOf"),
               "no member is shown in place of another:\n{}", buffer );
     Ok (( )) }) }
 

@@ -131,7 +131,7 @@
                      (with-current-buffer error-buf (buffer-string))))))
 
     ;; 5. The exact buffer used for the gesture is immediately re-rooted at
-    ;; K, which stands for nothing (no overridesHere).  K contains N, and N
+    ;; K, which stands for nothing (no inPlaceOf).  K contains N, and N
     ;; contains O.
     (unless
         (skg-test-wait-for
@@ -157,7 +157,7 @@
                      (line-beginning-position) (line-end-position))))
           (unless (and k-line
                        (string-match "(gnid \\([^ )]+\\))" k-line)
-                       (not (string-match-p "overridesHere" k-line))
+                       (not (string-match-p "inPlaceOf" k-line))
                        (string-match-p "(forks (out 1))" k-line))
             (test-fail "K lacks its expected F relationships:\n%s"
                        (buffer-string)))

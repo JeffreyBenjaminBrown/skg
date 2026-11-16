@@ -10,7 +10,7 @@ use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Folder, P
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
 use crate::types::viewnode::{Vognode, Occurrence};
 use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::OverridesFollowed;
+use crate::types::views_state::Perspective;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};
 use crate::nodeMerge::validate_nodeMerge::validate_nodeMerge_requests;
@@ -44,12 +44,12 @@ pub fn find_buffer_errors_for_saving_in_graph (
   viewforest: &ViewForest,
   graph: &InRustGraph,
   config: &SkgConfig,
-  overrides_followed: OverridesFollowed, // whose overrides the buffer was drawn following
+  perspective: Perspective, // the perspective the buffer was drawn from
 ) -> Result<Vec<BufferValidationError>,
             Box<dyn std::error::Error>>
 { // Two kinds of check, in order: the global checks
   // (instructions, nodeMerges, view requests, idFolder membership,
-  // overridesHere parts, view roots, write-protected relRepo requests),
+  // inPlaceOf parts, view roots, write-protected relRepo requests),
   // which judge viewnodes against each other across the viewforest,
   // or one viewnode against the graph;
   // then the local-structure validation,
@@ -84,8 +84,8 @@ pub fn find_buffer_errors_for_saving_in_graph (
     viewforest, graph, config, &mut errors);
   idFolder_membership_errors (
     viewforest, graph, config, &mut errors ) ?;
-  overridesHere_part_errors (
-    viewforest, graph, config, overrides_followed, &mut errors );
+  inPlaceOf_part_errors (
+    viewforest, graph, config, perspective, &mut errors );
   validate_view_roots (
       viewforest, &mut errors);
   writeProtected_relRepo_request_errors (
@@ -114,7 +114,7 @@ pub fn find_buffer_errors_for_saving (
     ::read_all_skg_files_from_skgrepos (config)?;
   let graph = InRustGraph::from_graphnodes (&nodes);
   find_buffer_errors_for_saving_in_graph (
-    viewforest, &graph, config, OverridesFollowed::RootAuthors ) }
+    viewforest, &graph, config, Perspective::RootAuthors ) }
 
 /// Removing an ID from an idFolder aborts the save (see the
 /// glossary's "write-protected set"): for each present idFolder whose
@@ -171,8 +171,8 @@ fn idFolder_membership_errors (
             recorder, buffer_gnids, real, recorder_headline )); }}, }}
   Ok (( )) }
 
-/// Tamper validation for the '(overridesHere N)' part
-/// ('docs/override.org', "The overridesHere part").
+/// Tamper validation for the '(inPlaceOf N)' part
+/// ('docs/mirrors.org', "The inPlaceOf part").
 /// The part is load-bearing text: wherever it appears, save
 /// extraction collects N instead of the carrier's own ID. So a
 /// part the server would not have rendered must abort the save --
@@ -188,11 +188,11 @@ fn idFolder_membership_errors (
 /// The explicit graph is required, so every present fact is checked against
 /// the same graph snapshot used by the rest of save planning.
 #[allow(non_snake_case)]
-fn overridesHere_part_errors (
+fn inPlaceOf_part_errors (
   viewforest         : &ViewForest,
   graph              : &InRustGraph,
   config             : &SkgConfig,
-  overrides_followed : OverridesFollowed,
+  perspective        : Perspective,
   errors             : &mut Vec<BufferValidationError>,
 ) {
   let unrestricted : SkgrepoRestriction = SkgrepoRestriction::unrestricted (config);
@@ -201,19 +201,19 @@ fn overridesHere_part_errors (
     let (carrier, original) : (ID, ID) =
       match &node_ref . value () . kind {
         ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
-          match &t . overridesHere {
+          match &t . in_place_of {
             Some (original) =>
               ( t . gnid . clone (), original . clone () ),
             None => continue },
         _ => continue };
     if ! is_mirror_of (graph, &unrestricted, &original, &carrier) {
       let owner : SkgrepoOwner = perspective_owner_of_tree_containing (
-        config, graph, &overrides_followed, node_ref);
+        config, graph, &perspective, node_ref);
       let effective : Option<ID> = // the mirror shown, for the message
         Some ( mirror_shown (
           config, graph, &unrestricted, &owner, &original ));
       errors . push (
-        BufferValidationError::OverridesHere_Mismatch (
+        BufferValidationError::InPlaceOf_Mismatch (
           Some (carrier), original, effective,
           node_ref . value () . headline_name () )); }}}
 

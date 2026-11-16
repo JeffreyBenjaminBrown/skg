@@ -385,10 +385,10 @@ local function rel_side_chunks (rel, side, form, birth, write_protected)
 end
 
 ---Chunks for relation REL's token from FORM, or nil if it shows nothing.
-local function rel_chunks (rel, form, birth, write_protected, overrides_here)
+local function rel_chunks (rel, form, birth, write_protected, in_place_of)
   local in_c = rel_side_chunks(rel, 'in', form, birth, write_protected)
   local out_c = rel_side_chunks(rel, 'out', form, birth, write_protected)
-  local here = rel == 'forks' and overrides_here
+  local here = rel == 'forks' and in_place_of
   if #in_c == 0 and #out_c == 0 and not here then return nil end
   local born = false
   for _, fact in ipairs(birth) do
@@ -398,7 +398,7 @@ local function rel_chunks (rel, form, birth, write_protected, overrides_here)
   table.insert(chunks, styled(rel_letter(rel),
     born and relationship_styles.birth_letter or relationship_styles.letter))
   if here then
-    table.insert(chunks, styled('ĥ', relationship_styles.overrides_here)) end
+    table.insert(chunks, styled('ĥ', relationship_styles.in_place_of)) end
   for _, c in ipairs(out_c) do table.insert(chunks, c) end
   return chunks
 end
@@ -409,7 +409,7 @@ end
 ---'(props ...)'. Nil if it has none or they produce nothing. Tokens
 ---are the relations in display order (C L K H), then the property
 ---counts A I F, space-separated. 'writeProtected' and
----'(overridesHere O)' stand at the top level of SEXP.
+---'(inPlaceOf O)' stand at the top level of SEXP.
 ---@param sexp any
 ---@return table[]|nil
 function M.render_rel_facts (sexp)
@@ -418,7 +418,7 @@ function M.render_rel_facts (sexp)
   local rels = assq(view, 'rels')
   local props = assq(view, 'props')
   if not (rels or props) then return nil end
-  local overrides_here = assq(sexp, 'overridesHere') ~= nil
+  local in_place_of = assq(sexp, 'inPlaceOf') ~= nil
   local write_protected = has_atom(sexp, 'writeProtected')
   local birth = {}
   local birth_form = assq(view, 'birth')
@@ -439,8 +439,8 @@ function M.render_rel_facts (sexp)
   end
   for _, rel in ipairs(REL_ORDER) do
     local form = rels and assq(rels, rel)
-    if form or (rel == 'forks' and overrides_here) then
-      add_token(rel_chunks(rel, form, birth, write_protected, overrides_here))
+    if form or (rel == 'forks' and in_place_of) then
+      add_token(rel_chunks(rel, form, birth, write_protected, in_place_of))
     end
   end
   for _, count in ipairs({ { 'aliases', 'A' }, { 'extraIds', 'I' },

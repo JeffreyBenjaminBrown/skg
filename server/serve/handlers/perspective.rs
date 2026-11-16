@@ -1,9 +1,9 @@
-//! The "set overrides followed" request: switch the perspective of
-//! one open view, whose overrides it follows ('OverridesFollowed'),
+//! The "set perspective" request: switch the perspective of
+//! one open view ('Perspective'),
 //! and rerender it. The request names a perspective, or asks for the
 //! next one in the view's cycle ('perspective_to_show').
 //!
-//! The answer is an 'overrides-followed' message naming the view, the
+//! The answer is a 'perspective' message naming the view, the
 //! perspective it now shows, and that perspective as a message to the
 //! user names it, followed by a rerender stream of that one view. A
 //! refusal answers in the same shape, carrying the view's unchanged
@@ -40,7 +40,7 @@ use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::{ID, SkgConfig, SkgrepoOwner};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode, Warrant};
 use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::{OverridesFollowed, ViewState, ViewforestId, ViewnodeIdRecord};
+use crate::types::views_state::{Perspective, ViewState, ViewforestId, ViewnodeIdRecord};
 
 use ego_tree::NodeRef;
 use std::net::TcpStream;
@@ -49,19 +49,19 @@ use std::sync::Arc;
 
 /// How a message names the root authors' perspective where its
 /// authors go unnamed ('perspective_name').
-const ROOT_AUTHORS_UNNAMED : &str = "each root author's overrides";
+const ROOT_AUTHORS_UNNAMED : &str = "each root author's perspective";
 
-/// What a "set overrides followed" request asks for.
+/// What a "set perspective" request asks for.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RequestedPerspective {
   /// The perspective after the view's own in its cycle, as the cycle
   /// is computed now ('first_ranked_after').
   Next,
   /// This one, which must be in the view's cycle.
-  Named (OverridesFollowed),
+  Named (Perspective),
 }
 
-pub fn handle_set_overrides_followed_request (
+pub fn handle_set_perspective_request (
   stream              : &mut TcpStream,
   request             : &str,
   env                 : &SkgEnv,
@@ -74,13 +74,13 @@ pub fn handle_set_overrides_followed_request (
       Ok (viewforest_id) => viewforest_id,
       Err (_) => {
         refuse_unwinding (
-          stream, "", &OverridesFollowed::default (),
+          stream, "", &Perspective::default (),
           ROOT_AUTHORS_UNNAMED,
           "The request names no view ('view-id')." );
         return; }};
-  let current : OverridesFollowed =
-    views_state . open_views . overrides_followed_by_view (&viewforest_id);
-  let (requested, drawn) : (OverridesFollowed, RerenderedView) =
+  let current : Perspective =
+    views_state . open_views . perspective_of_view (&viewforest_id);
+  let (requested, drawn) : (Perspective, RerenderedView) =
     match requested_perspective (request, &runtime . config)
       . and_then ( |requested| perspective_to_show (
         views_state, env, &runtime, skgrepo_restriction,
@@ -106,35 +106,35 @@ pub fn handle_set_overrides_followed_request (
     runtime . clone (), skgrepo_restriction, drawn );
   if ! authorize_prepared_rerenders (
     stream, &mut prepared, skgrepo_restriction,
-    "overrides-followed-switch", &approved_pids_from_request (request) ) {
+    "perspective-switch", &approved_pids_from_request (request) ) {
     return; }
-  views_state . open_views . set_overrides_followed (
+  views_state . open_views . set_perspective (
     &viewforest_id, requested . clone ());
-  send_overrides_followed_response (
+  send_perspective_response (
     stream, &viewforest_id . repr_in_client (), &requested,
     &requested_name, None );
   stream_prepared_rerenders (stream, views_state, prepared); }
 
-/// The request's '(overrides-followed . "NAME")', which it requires:
-/// "next", or a perspective's wire name ('OverridesFollowed::wire_name').
+/// The request's '(perspective . "NAME")', which it requires:
+/// "next", or a perspective's wire name ('Perspective::wire_name').
 pub fn requested_perspective (
   request : &str,
   config  : &SkgConfig,
 ) -> Result<RequestedPerspective, String> {
   let name : String =
-    value_from_request_sexp ("overrides-followed", request)
-    . map_err ( |_| "The request says nothing of whose overrides to follow ('overrides-followed')." . to_string () ) ?;
+    value_from_request_sexp ("perspective", request)
+    . map_err ( |_| "The request names no perspective ('perspective')." . to_string () ) ?;
   if name == "next" { return Ok (RequestedPerspective::Next); }
-  OverridesFollowed::from_wire_name (&name, config)
+  Perspective::from_wire_name (&name, config)
     . map (RequestedPerspective::Named)
     . ok_or_else ( || format! (
-      "'overrides-followed' must be \"next\", \"root authors\", \"user\" or \"owner of SKGREPO\" (a foreign skgrepo), not {:?}.",
+      "'perspective' must be \"next\", \"root authors\", \"user\" or \"owner of SKGREPO\" (a foreign skgrepo), not {:?}.",
       name )) }
 
 /// The perspective the view 'viewforest_id', now showing 'current',
 /// is to show, and the view drawn from it, which is its rerender; or
 /// why it cannot be switched: the connection does not hold it; it is a
-/// buffer of the diff view (which substitutes no overriders); "next"
+/// buffer of the diff view (which substitutes no mirrors); "next"
 /// finds no perspective but the one shown; or a named perspective is
 /// not in the view's cycle. The root authors' is always in the cycle,
 /// so the way back is never refused.
@@ -158,26 +158,26 @@ fn perspective_to_show (
   runtime       : &Arc<RuntimeGeneration>,
   restriction   : &SkgrepoRestriction,
   viewforest_id : &ViewforestId,
-  current       : &OverridesFollowed,
+  current       : &Perspective,
   requested     : RequestedPerspective,
-) -> Result<(OverridesFollowed, RerenderedView), String> {
+) -> Result<(Perspective, RerenderedView), String> {
   let Some (state) : Option<&ViewState> =
     views_state . open_views . views . get (viewforest_id)
   else { return Err ( format! (
     "The server does not hold the view {} (it was restarted, or the client reconnected, since the view was drawn). Save the buffer, then switch again.",
     viewforest_id . repr_in_client () )); };
   if state . diffView_buffer_kind . is_some () {
-    return Err ( "The diff view shows no overriders in place of what they override, so it follows no one's overrides." . to_string () ); }
-  let draw = |perspective : &OverridesFollowed| -> Result<RerenderedView, String> {
+    return Err ( "The diff view shows no mirror in place of another, so it has no perspective." . to_string () ); }
+  let draw = |perspective : &Perspective| -> Result<RerenderedView, String> {
     view_drawn_from (perspective, viewforest_id, state, env, runtime, restriction) };
-  let root_authors : RerenderedView = draw (&OverridesFollowed::RootAuthors) ?;
+  let root_authors : RerenderedView = draw (&Perspective::RootAuthors) ?;
   let mut candidates : Vec<SkgrepoOwner> =
     candidate_owners (&root_authors . viewforest, &runtime . config, &runtime . graph, restriction);
   for owner in candidate_owners (&state . viewforest, &runtime . config, &runtime . graph, restriction) {
     if ! candidates . contains (&owner) { candidates . push (owner); }}
-  let candidates : Vec<OverridesFollowed> =
-    candidates . into_iter () . map (OverridesFollowed::Owner) . collect ();
-  let in_the_cycle = |perspective : &OverridesFollowed|
+  let candidates : Vec<Perspective> =
+    candidates . into_iter () . map (Perspective::Owner) . collect ();
+  let in_the_cycle = |perspective : &Perspective|
     -> Result<Option<RerenderedView>, String> {
     let drawn : RerenderedView = draw (perspective) ?;
     Ok ( ( drawn . text != root_authors . text ) . then_some (drawn) ) };
@@ -185,11 +185,11 @@ fn perspective_to_show (
     RequestedPerspective::Next =>
       match first_ranked_after (current, candidates, &runtime . config, in_the_cycle) ? {
         Some (next) => Ok (next),
-        None if *current == OverridesFollowed::RootAuthors =>
-          Err ( "No one's overrides would show this buffer differently from its root authors'." . to_string () ),
-        None => Ok (( OverridesFollowed::RootAuthors, root_authors )), },
-    RequestedPerspective::Named (OverridesFollowed::RootAuthors) =>
-      Ok (( OverridesFollowed::RootAuthors, root_authors )),
+        None if *current == Perspective::RootAuthors =>
+          Err ( "No other perspective would show this buffer differently from its root authors'." . to_string () ),
+        None => Ok (( Perspective::RootAuthors, root_authors )), },
+    RequestedPerspective::Named (Perspective::RootAuthors) =>
+      Ok (( Perspective::RootAuthors, root_authors )),
     RequestedPerspective::Named (named) => {
       let drawn : Option<RerenderedView> =
         if candidates . contains (&named) { in_the_cycle (&named) ? } else { None };
@@ -204,7 +204,7 @@ fn perspective_to_show (
 /// rerender would draw it ('rerender_open_view'). Nothing the
 /// connection holds changes.
 fn view_drawn_from (
-  perspective   : &OverridesFollowed,
+  perspective   : &Perspective,
   viewforest_id : &ViewforestId,
   state         : &ViewState,
   env           : &SkgEnv,
@@ -217,7 +217,7 @@ fn view_drawn_from (
     env, runtime . clone (), restriction, None, DiffViewBufferRerender::RefreshOnly );
   refresh_view (
     &mut viewforest, &mut viewnode_id_record, &mut context,
-    RerenderMode::ContentView { overrides_followed : perspective . clone () } )
+    RerenderMode::ContentView { perspective : perspective . clone () } )
     . map_err ( |error| error . to_string () ) ?;
   let text : String = viewforest_to_string (&viewforest)
     . map_err ( |error| error . to_string () ) ?;
@@ -253,7 +253,7 @@ fn candidate_owners (
 /// The original a substitution at 'node' would stand for, if 'node'
 /// is a position where substitution acts: an occurrence that is a
 /// root of the view, or that stands as content of an editable
-/// occurrence, which stands for its '(overridesHere N)', or, a root
+/// occurrence, which stands for its '(inPlaceOf N)', or, a root
 /// or the graph relating it so, for itself.
 fn original_at_substitution_position (
   graph : &InRustGraph,
@@ -264,7 +264,7 @@ fn original_at_substitution_position (
   if ! at_a_root { parent . value () . editable_gnid () ?; }
   let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) : &ViewnodeKind =
     &node . value () . kind else { return None; };
-  match &occurrence . overridesHere {
+  match &occurrence . in_place_of {
     Some (original) => Some ( original . clone () ),
     None => ( at_a_root || occurrence . viewStats . warrant == Warrant::ByGraph )
       . then ( || graph . pid_else_raw_id (&occurrence . gnid) ), }}
@@ -275,13 +275,13 @@ fn original_at_substitution_position (
 /// perspective after one is well defined even when the cycle changes
 /// between requests.
 fn perspective_rank (
-  perspective : &OverridesFollowed,
+  perspective : &Perspective,
   config      : &SkgConfig,
 ) -> usize {
   match perspective {
-    OverridesFollowed::RootAuthors => 0,
-    OverridesFollowed::Owner (SkgrepoOwner::User) => 1,
-    OverridesFollowed::Owner (SkgrepoOwner::Foreign (name)) =>
+    Perspective::RootAuthors => 0,
+    Perspective::Owner (SkgrepoOwner::User) => 1,
+    Perspective::Owner (SkgrepoOwner::Foreign (name)) =>
       2 + config . skgrepos_in_declaration_order () . iter ()
         . position ( |declared| declared == name )
         . unwrap_or (usize::MAX - 2), }}
@@ -296,13 +296,13 @@ fn perspective_rank (
 /// each request, 'current' may have left it; the next is then still
 /// the first member ranked after it.
 pub fn first_ranked_after<T> (
-  current      : &OverridesFollowed,
-  candidates   : Vec<OverridesFollowed>,
+  current      : &Perspective,
+  candidates   : Vec<Perspective>,
   config       : &SkgConfig,
-  mut in_the_cycle : impl FnMut (&OverridesFollowed) -> Result<Option<T>, String>,
-) -> Result<Option<(OverridesFollowed, T)>, String> {
+  mut in_the_cycle : impl FnMut (&Perspective) -> Result<Option<T>, String>,
+) -> Result<Option<(Perspective, T)>, String> {
   let current_rank : usize = perspective_rank (current, config);
-  let mut after : Vec<OverridesFollowed> = candidates . into_iter ()
+  let mut after : Vec<Perspective> = candidates . into_iter ()
     . filter ( |candidate| perspective_rank (candidate, config) > current_rank )
     . collect ();
   after . sort_by_key ( |candidate| perspective_rank (candidate, config) );
@@ -312,23 +312,23 @@ pub fn first_ranked_after<T> (
   Ok (None) }
 
 /// How a message to the user names 'perspective' in the view 'state':
-/// "your overrides", "NAME's overrides", or "each root author's
-/// overrides" with the root authors named, in the order of their
-/// first roots ("each root author's overrides (NAME's, yours)").
+/// "your perspective", "NAME's perspective", or "each root author's
+/// perspective" with the root authors named, in the order of their
+/// first roots ("each root author's perspective (NAME's, yours)").
 pub fn perspective_name (
-  perspective : &OverridesFollowed,
+  perspective : &Perspective,
   state       : &ViewState,
   runtime     : &RuntimeGeneration,
 ) -> String {
   match perspective {
-    OverridesFollowed::Owner (owner) =>
-      OverridesFollowed::name_of_owners_overrides (owner),
-    OverridesFollowed::RootAuthors => {
+    Perspective::Owner (owner) =>
+      Perspective::name_of_owners_perspective (owner),
+    Perspective::RootAuthors => {
       let mut authors : Vec<SkgrepoOwner> = Vec::new ();
       for root in state . viewforest . roots () {
         let author : SkgrepoOwner = perspective_owner_of_tree_containing (
           &runtime . config, &runtime . graph,
-          &OverridesFollowed::RootAuthors, root );
+          &Perspective::RootAuthors, root );
         if ! authors . contains (&author) { authors . push (author); }}
       let names : Vec<String> = authors . iter ()
         . map ( |author| match author {
@@ -352,21 +352,21 @@ fn capitalized (
 fn refuse_unwinding (
   stream             : &mut TcpStream,
   view_id            : &str,
-  overrides_followed : &OverridesFollowed,
+  perspective        : &Perspective,
   perspective_name   : &str,
   reason             : &str,
 ) {
-  send_overrides_followed_response (
-    stream, view_id, overrides_followed, perspective_name, Some (reason) );
+  send_perspective_response (
+    stream, view_id, perspective, perspective_name, Some (reason) );
   stream_empty_rerender (stream); }
 
-/// The 'overrides-followed' message: the view, the perspective it
+/// The 'perspective' message: the view, the perspective it
 /// shows, that perspective's name for the user, and, for a refusal,
 /// why.
-fn send_overrides_followed_response (
+fn send_perspective_response (
   stream             : &mut TcpStream,
   view_id            : &str,
-  overrides_followed : &OverridesFollowed,
+  perspective        : &Perspective,
   perspective_name   : &str,
   refusal            : Option<&str>,
 ) {
@@ -374,10 +374,10 @@ fn send_overrides_followed_response (
     . map ( |reason| format! (" (content {})", quote_sexp_string (reason)) )
     . unwrap_or_default ();
   send_response_with_length_prefix ( stream, & format! (
-    "((response-type {}) (view-id {}) (overrides-followed {}) (perspective-name {}){})",
-    TcpToClient::OverridesFollowed . repr_in_client (),
+    "((response-type {}) (view-id {}) (perspective {}) (perspective-name {}){})",
+    TcpToClient::Perspective . repr_in_client (),
     quote_sexp_string (view_id),
-    quote_sexp_string ( &overrides_followed . wire_name () ),
+    quote_sexp_string ( &perspective . wire_name () ),
     quote_sexp_string (perspective_name),
     content )); }
 
@@ -389,8 +389,8 @@ mod tests {
 
   fn foreign (
     name : &str,
-  ) -> OverridesFollowed {
-    OverridesFollowed::Owner ( SkgrepoOwner::Foreign ( SkgrepoName::from (name) )) }
+  ) -> Perspective {
+    Perspective::Owner ( SkgrepoOwner::Foreign ( SkgrepoName::from (name) )) }
 
   /// The next perspective is the first in the cycle ranked after the
   /// current one, wrapping to the root authors'. A current perspective
@@ -404,27 +404,27 @@ mod tests {
     let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
     config . skgrepo_order = [ "main", "alice", "bob", "carol" ] . iter ()
       . map ( |name| SkgrepoName::from (*name) ) . collect ();
-    let candidates : Vec<OverridesFollowed> = vec! [
-      foreign ("carol"), foreign ("bob"), OverridesFollowed::user (), foreign ("alice") ];
-    let next = |current : &OverridesFollowed, cycle : &[OverridesFollowed]|
-      -> (OverridesFollowed, Vec<OverridesFollowed>) {
-      let mut tried : Vec<OverridesFollowed> = Vec::new ();
-      let found : Option<(OverridesFollowed, ())> = first_ranked_after (
+    let candidates : Vec<Perspective> = vec! [
+      foreign ("carol"), foreign ("bob"), Perspective::user (), foreign ("alice") ];
+    let next = |current : &Perspective, cycle : &[Perspective]|
+      -> (Perspective, Vec<Perspective>) {
+      let mut tried : Vec<Perspective> = Vec::new ();
+      let found : Option<(Perspective, ())> = first_ranked_after (
         current, candidates . clone (), &config,
         |candidate| { tried . push ( candidate . clone () );
                       Ok ( cycle . contains (candidate) . then_some (()) ) } )
         . unwrap ();
-      ( found . map ( |(next, ())| next ) . unwrap_or (OverridesFollowed::RootAuthors),
+      ( found . map ( |(next, ())| next ) . unwrap_or (Perspective::RootAuthors),
         tried ) };
-    let cycle : Vec<OverridesFollowed> = vec! [
-      OverridesFollowed::RootAuthors, OverridesFollowed::user (),
+    let cycle : Vec<Perspective> = vec! [
+      Perspective::RootAuthors, Perspective::user (),
       foreign ("alice"), foreign ("carol") ];
-    assert_eq! ( next (&OverridesFollowed::RootAuthors, &cycle),
-                 ( OverridesFollowed::user (), vec! [ OverridesFollowed::user () ] ),
+    assert_eq! ( next (&Perspective::RootAuthors, &cycle),
+                 ( Perspective::user (), vec! [ Perspective::user () ] ),
                  "only the next is drawn" );
-    assert_eq! ( next (&OverridesFollowed::user (), &cycle) . 0, foreign ("alice") );
+    assert_eq! ( next (&Perspective::user (), &cycle) . 0, foreign ("alice") );
     assert_eq! ( next (&foreign ("carol"), &cycle),
-                 ( OverridesFollowed::RootAuthors, vec! [] ),
+                 ( Perspective::RootAuthors, vec! [] ),
                  "nothing is ranked after the last; nothing is drawn" );
     assert_eq! ( next (&foreign ("alice"), &cycle),
                  ( foreign ("carol"), vec! [ foreign ("bob"), foreign ("carol") ] ),
@@ -432,8 +432,8 @@ mod tests {
     assert_eq! ( next (&foreign ("bob"), &cycle) . 0,
                  foreign ("carol"), "bob left the cycle; carol is ranked after him" );
     assert_eq! ( next (&foreign ("bob"), &cycle [..2]) . 0,
-                 OverridesFollowed::RootAuthors );
-    assert_eq! ( next (&OverridesFollowed::RootAuthors, &[ OverridesFollowed::RootAuthors ]) . 0,
-                 OverridesFollowed::RootAuthors,
+                 Perspective::RootAuthors );
+    assert_eq! ( next (&Perspective::RootAuthors, &[ Perspective::RootAuthors ]) . 0,
+                 Perspective::RootAuthors,
                  "a cycle of one leads nowhere; the request is refused" ); }
 }

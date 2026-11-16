@@ -197,12 +197,12 @@ fn set_herald_strings_in_viewnode (
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
-  let (gstats, overridesHere)
+  let (gstats, in_place_of)
     : (GraphnodeStats, Option<ID>) = {
     let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
-    ( t . graphStats . clone (), t . overridesHere . clone () ) };
+    ( t . graphStats . clone (), t . in_place_of . clone () ) };
   let counts = match & gstats . rels {
     Some (c) => c . clone (),
     None => return, }; // no stats -> no heralds
@@ -248,7 +248,7 @@ fn set_herald_strings_in_viewnode (
         members . len () })
     } else { None };
   let side_of_mirror : Option<Side> = // shown in another's place: which side of it
-    overridesHere . as_ref () . and_then ( |original|
+    in_place_of . as_ref () . and_then ( |original|
       side_of_mirror_shown (graph, restriction, node_pid, original) );
   let birth_facts : Vec<BirthFact> =
     birth_facts (tree, &parent_kind, stands_as_member_here, fork_sides, &flags, side_of_mirror);

@@ -5,7 +5,7 @@
   "parts_comment": "The parts of '(skg ...)' in the order the server writes them ('viewnode_to_string', server/org_to_text.rs), 'KIND' standing for a kind's atom; a kind's fields are listed in that order too. The editors show a headline's parts in this order, a field it lacks where the server would write it, and a command that writes a request puts a new '(editRequest ...)' where it stands here. The server's parser reads the parts in any order. A conformance test (tests/metadata_fields_table.rs) checks the order against the printer.",
   "parts": [ "vnid", "focused", "folded", "bodyFolded", "KIND",
              "gnid", "skgRepos", "noClaim", "writeProtected",
-             "overridesHere", "editRequest", "viewRequests",
+             "inPlaceOf", "editRequest", "viewRequests",
              "view", "diff" ],
   "kinds": [
     { "kind": "occurrence", "atoms": [ "node" ],

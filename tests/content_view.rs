@@ -138,7 +138,7 @@ async fn test_multi_root_view_with_shared_nodes (
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg node (gnid 2) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)) (birth (contains in 1)))) title 2
-         ** (skg node (gnid 2) (skgRepos (nodeRepo main)) writeProtected (overridesHere 3) (view omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)) (birth (forks out) (contains in 1)))) title 2
+         ** (skg node (gnid 2) (skgRepos (nodeRepo main)) writeProtected (inPlaceOf 3) (view omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)) (birth (forks out) (contains in 1)))) title 2
          * (skg node (gnid 2) (skgRepos (nodeRepo main)) (view (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)))) title 2
          this one string could span pages
          ** (skg containerFolder)
@@ -187,7 +187,7 @@ async fn test_multi_root_view_with_node_limit (
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg node (gnid 2) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)) (birth (contains in 1)))) title 2
-         ** (skg node (gnid 2) (skgRepos (nodeRepo main)) writeProtected (overridesHere 3) (view omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)) (birth (forks out) (contains in 1)))) title 2
+         ** (skg node (gnid 2) (skgRepos (nodeRepo main)) writeProtected (inPlaceOf 3) (view omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)) (birth (forks out) (contains in 1)))) title 2
          * (skg node (gnid 2) (skgRepos (nodeRepo main)) (view (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)))) title 2
          this one string could span pages
          ** (skg containerFolder)

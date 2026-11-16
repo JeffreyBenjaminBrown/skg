@@ -214,11 +214,11 @@ fn buffer_validation_error_text (
       } else {
         format!("The idFolder under node {} was edited; saving would not honor that, so the save was aborted:\n- ids claimed by the buffer: {}\n- the node's real ids: {}\n- Reordering is fine, but IDs cannot be added, removed or edited through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
                 recorder . 0, fmt_gnids(buffer_gnids), fmt_gnids(real_gnids)) }},
-    BufferValidationError::OverridesHere_Mismatch(carrier, original, effective, _) => {
+    BufferValidationError::InPlaceOf_Mismatch(carrier, original, effective, _) => {
       let fmt_opt = |gnid : &Option<ID>| -> String {
         gnid . as_ref () . map ( |i| i . 0 . clone () )
           . unwrap_or_else ( || "<none>" . to_string () ) };
-      format!("Invalid (overridesHere ...) fact; saving it would rewrite a contains list, so the save was aborted:\n- the node carrying the fact: {}\n- the original the fact claims it stands for: {}\n- what the server would show in place of that original: {}\n- The fact looks hand-edited or stale. Re-render the view (close and reopen, or C-c g RET) and retry.\n",
+      format!("Invalid (inPlaceOf ...) fact; saving it would rewrite a contains list, so the save was aborted:\n- the node carrying the fact: {}\n- the original the fact claims it stands for: {}\n- what the server would show in place of that original: {}\n- The fact looks hand-edited or stale. Re-render the view (close and reopen, or C-c g RET) and retry.\n",
               fmt_opt (carrier), original . 0, fmt_opt (effective)) },
     BufferValidationError::Multiple_Defining_Viewnodes (gnid, _) => {
       format!("ID has multiple defining containers:\n- ID: {}\n",

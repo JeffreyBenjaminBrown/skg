@@ -68,7 +68,7 @@ use crate::refresh::chain::draw_containerward_chain;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgrepoOwner};
 use crate::types::tree::moves::{move_after, move_to_first_child, move_to_last_child};
-use crate::types::views_state::OverridesFollowed;
+use crate::types::views_state::Perspective;
 use crate::types::viewnode::{
   FoldAndFocus, Folder, FolderRelation, PropertyMember, ViewRequest, Viewnode,
   ViewnodeKind, Vognode, Warrant, viewnode_of};
@@ -812,7 +812,7 @@ fn keep_hidden_outside_folder_last (
 
 /// In a content view, under an editable occurrence, each member
 /// stands as the mirror the perspective puts in its place
-/// ('server/dbs/in_rust_graph/mirrors.rs'), marked '(overridesHere N)'
+/// ('server/dbs/in_rust_graph/mirrors.rs'), marked '(inPlaceOf N)'
 /// for the original N, which the save collects instead. The
 /// perspective is that of the author of the parent's top-level tree's
 /// root ('perspective_owner_of_tree_containing'): the user's under an
@@ -824,7 +824,7 @@ fn keep_hidden_outside_folder_last (
 /// another's place is re-pointed whenever it is not the mirror shown,
 /// as after a switch of perspective. Where the mirror shown is the
 /// original itself, the member shown in its place loses
-/// 'overridesHere', is warranted only as itself (and so, unwarranted,
+/// 'inPlaceOf', is warranted only as itself (and so, unwarranted,
 /// vanishes), and the original is reinstated beside it. The diff view
 /// substitutes nothing. At the buffer root, the view's roots are
 /// substituted by their own rule ('substitute_roots').
@@ -843,19 +843,19 @@ fn substitute_mirrors (
      || tree . get (parent) . unwrap () . value () . editable_gnid () . is_none ()
   { return Ok (( )); }
   let owner : SkgrepoOwner = perspective_owner_of_tree_containing (
-    walk . truth . config, walk . truth . graph, &walk . overrides_followed,
+    walk . truth . config, walk . truth . graph, &walk . perspective,
     tree . get (parent) . unwrap () );
   if is_raw_where_another_mirror_would_stand (tree, parent, &owner, walk)
   { return Ok (( )); }
   for child in children_of (tree, parent) {
-    let (gnid, overridesHere, warrant) : (ID, Option<ID>, Warrant) =
+    let (gnid, in_place_of, warrant) : (ID, Option<ID>, Warrant) =
       match &tree . get (child) . unwrap () . value () . kind {
         ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
-          ( occurrence . gnid . clone (), occurrence . overridesHere . clone (),
+          ( occurrence . gnid . clone (), occurrence . in_place_of . clone (),
             occurrence . viewStats . warrant ),
         _ => continue, };
     let pid : ID = walk . truth . graph . pid_else_raw_id (&gnid);
-    match overridesHere {
+    match in_place_of {
       None => if warrant == Warrant::ByGraph {
         let shown : ID = mirror_shown (
           walk . truth . config, walk . truth . graph, walk . truth . restriction,
@@ -873,10 +873,10 @@ fn substitute_mirrors (
   Ok (( )) }
 
 /// Each root of the view shows what the view's perspective makes of
-/// the node it stands for (its '(overridesHere N)', else itself): the
+/// the node it stands for (its '(inPlaceOf N)', else itself): the
 /// root authors' show that node raw, as every fresh view does; one
 /// owner's perspective shows the mirror it puts in that node's place
-/// ('mirror_shown'), marked '(overridesHere N)' unless it is the node
+/// ('mirror_shown'), marked '(inPlaceOf N)' unless it is the node
 /// itself.
 /// The occurrence is re-pointed where it stands, so it keeps its
 /// viewnode ID whichever way it switches, and its children follow
@@ -890,23 +890,23 @@ fn substitute_roots (
   walk        : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
   for root in children_of (tree, buffer_root) {
-    let (gnid, overridesHere) : (ID, Option<ID>) =
+    let (gnid, in_place_of) : (ID, Option<ID>) =
       match &tree . get (root) . unwrap () . value () . kind {
         ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
-          ( occurrence . gnid . clone (), occurrence . overridesHere . clone () ),
+          ( occurrence . gnid . clone (), occurrence . in_place_of . clone () ),
         _ => continue, };
-    let original : ID = overridesHere . clone ()
+    let original : ID = in_place_of . clone ()
       . unwrap_or_else ( || walk . truth . graph . pid_else_raw_id (&gnid) );
-    let shown : ID = match &walk . overrides_followed {
-      OverridesFollowed::RootAuthors => original . clone (),
-      OverridesFollowed::Owner (owner) => mirror_shown (
+    let shown : ID = match &walk . perspective {
+      Perspective::RootAuthors => original . clone (),
+      Perspective::Owner (owner) => mirror_shown (
         walk . truth . config, walk . truth . graph, walk . truth . restriction,
         owner, &original ), };
     let marked : Option<ID> = ( shown != original ) . then ( || original . clone () );
     let repointed : bool = walk . truth . graph . pid_else_raw_id (&gnid) != shown;
     let was_editable : bool =
       tree . get (root) . unwrap () . value () . editable_gnid () . is_some ();
-    if repointed || overridesHere != marked
+    if repointed || in_place_of != marked
     { show_mirror (tree, root, &shown, marked, walk) ?; }
     if repointed { redraw_folders (tree, root, was_editable, walk) ?; }}
   Ok (( )) }
@@ -1010,19 +1010,19 @@ fn has_members (
            walk . truth . graph, pid, folder, walk . truth . restriction )
          . is_some_and ( |members| ! members . is_empty () ), } }
 
-/// Make the occurrence at 'child' show 'shown', with 'overridesHere'
+/// Make the occurrence at 'child' show 'shown', with 'inPlaceOf'
 /// as given ('point_occurrence_at').
 fn show_mirror (
   tree          : &mut Tree<Viewnode>,
   child         : NodeId,
   shown         : &ID,
-  overridesHere : Option<ID>,
+  in_place_of : Option<ID>,
   walk          : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
   point_occurrence_at (tree, child, shown, walk) ?;
   if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
     &mut tree . get_mut (child) . unwrap () . value () . kind
-  { occurrence . overridesHere = overridesHere; }
+  { occurrence . in_place_of = in_place_of; }
   Ok (( )) }
 
 /// The original that 'child' stood for now stands as itself: 'child'
@@ -1040,7 +1040,7 @@ fn stop_substituting (
 ) -> Result<(), Box<dyn Error>> {
   if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
     &mut tree . get_mut (child) . unwrap () . value () . kind
-  { occurrence . overridesHere = None; }
+  { occurrence . in_place_of = None; }
   let warrant : Warrant = warrant_of_child (
     Some (goal), tree . get (child) . unwrap () . value () )
     . unwrap_or (Warrant::No);
@@ -1092,7 +1092,7 @@ fn is_raw_where_another_mirror_would_stand (
   let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) : &ViewnodeKind =
     &node . value () . kind else { return false; };
   raw_position
-  && occurrence . overridesHere . is_none ()
+  && occurrence . in_place_of . is_none ()
   && mirror_shown ( walk . truth . config, walk . truth . graph,
                     &walk . unrestricted, owner, &occurrence . gnid )
      != walk . truth . graph . pid_else_raw_id (&occurrence . gnid) }

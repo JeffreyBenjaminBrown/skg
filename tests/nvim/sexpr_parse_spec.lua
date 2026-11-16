@@ -127,7 +127,7 @@ describe('skg.sexpr.parse printing', function ()
                 .. '(diff (rel removed) (processed rel)))')
     round_trips('(skg alias (diff (rel added)))')
     round_trips('(skg (oldText title))')
-    round_trips('(skg node (gnid x) (overridesHere 4) '
+    round_trips('(skg node (gnid x) (inPlaceOf 4) '
                 .. '(view cycle repoBoundary))')
     round_trips('(skg node (gnid x) (view (rels "2(1,1)L 3S")))')
   end)

@@ -399,7 +399,7 @@ pub(crate) fn add_editableView_request (
 
 /// The merged sibling's editability, and its edit request with it,
 /// passes to the result, unless the result stands for another node (a
-/// node and its shown overrider stand for one gnid) whose editable
+/// node and the mirror shown in its place stand for one gnid) whose editable
 /// occurrence is elsewhere in the buffer.
 pub(crate) fn merge_editability (
   tree             : &mut Tree<Viewnode>,

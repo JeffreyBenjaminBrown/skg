@@ -2,7 +2,7 @@
 ;;; Fork a foreign N into a public clone C (implicit fork), then run
 ;;; skg-fork-node on the shown substitute C and rotate its clone to a
 ;;; private skgrepo, forming the chain D overrides C overrides N. Viewing
-;;; N's container then shows the chain end D, marked (overridesHere N),
+;;; N's container then shows the chain end D, marked (inPlaceOf N),
 ;;; and the save accepts that chain-end carrier.
 
 (load-file "../../../elisp/skg-init.el")
@@ -74,7 +74,7 @@
     (let ((shown (skg-test-wait-for
                   (lambda ()
                     (with-current-buffer p-buf
-                      (string-match-p "(overridesHere N)" (buffer-string))))
+                      (string-match-p "(inPlaceOf N)" (buffer-string))))
                   10)))
       (unless shown
         (test-fail "the public clone was not shown in N's place:\n%s"
@@ -82,7 +82,7 @@
     ;; 5. Explicitly fork the shown substitute C.
     (with-current-buffer p-buf
       (goto-char (point-min))
-      (unless (re-search-forward "(overridesHere N)" nil t)
+      (unless (re-search-forward "(inPlaceOf N)" nil t)
         (test-fail "could not find the shown substitute:\n%s" (buffer-string)))
       (skg-fork-node)))
 
@@ -101,7 +101,7 @@
   (message "✓ the public clone was forked into a private clone (skgRepos (nodeRepo rotated))")
 
   ;; 7. Reopen P (all skgrepos unrestricted): the chain end D -- a private-repo
-  ;;    node -- is now shown in N's place, still marked (overridesHere N).
+  ;;    node -- is now shown in N's place, still marked (inPlaceOf N).
   (let ((p-buf (chain-test--reopen-P)))
     (let ((end-shown
            (skg-test-wait-for
@@ -110,7 +110,7 @@
                 (save-excursion
                   (goto-char (point-min))
                   (catch 'found
-                    (while (re-search-forward "(overridesHere N)" nil t)
+                    (while (re-search-forward "(inPlaceOf N)" nil t)
                       (let ((line (buffer-substring-no-properties
                                    (line-beginning-position) (line-end-position))))
                         (when (string-match-p "(skgRepos (nodeRepo private))" line)
@@ -120,7 +120,7 @@
       (unless end-shown
         (test-fail "the chain end D (a private node) was not shown for N:\n%s"
                    (with-current-buffer p-buf (buffer-string))))
-      (message "✓ the chain end D (private) is shown in N's place (overridesHere N)")
+      (message "✓ the chain end D (private) is shown in N's place (inPlaceOf N)")
       ;; 8. Saving the chain-end view succeeds (tamper check accepts the
       ;;    chain-end carrier).
       (with-current-buffer p-buf

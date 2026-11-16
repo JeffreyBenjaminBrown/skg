@@ -119,7 +119,7 @@ pub(super) fn refresh_and_render (
   mode   : RefreshMode,
   budget : usize,
 ) -> Result<String, Box<dyn Error>> {
-  refresh_viewforest (forest, record, truth, mode, budget, OverridesFollowed::RootAuthors) ?;
+  refresh_viewforest (forest, record, truth, mode, budget, Perspective::RootAuthors) ?;
   viewforest_to_string (forest) }
 
 /// Refresh 'forest' under each of 'restrictions' in turn, as a view
@@ -207,7 +207,7 @@ fn run_parsed_asserting_fixpoint (
   if let Err (failure) = refresh_reaches_fixpoint (
     &text, graph,
     |again, again_record| refresh_viewforest (
-      again, again_record, &truth, mode, budget, OverridesFollowed::RootAuthors )) {
+      again, again_record, &truth, mode, budget, Perspective::RootAuthors )) {
     panic! ( "the refresh of a refresh's output is no fixpoint: {}", failure ); }
   Run { forest, text } }
 
@@ -237,7 +237,7 @@ pub(super) fn parse (
 /// One line per viewnode in buffer order, indented two spaces per
 /// generation below the roots: its kind and what it stands for, then
 /// 'wp' (write-protected), 'noClaim', '⊥' (no warrant), 'ᗣ' (a ghost
-/// warrant), 'folded', and for an overrider '(overridesHere N)'.
+/// warrant), 'folded', and for an overrider '(inPlaceOf N)'.
 pub(super) fn outline (
   forest : &ViewForest,
 ) -> String {
@@ -276,8 +276,8 @@ fn describe (
       if occurrence . is_writeProtected () { parts . push ("wp" . into ()); }
       if ! occurrence . claimsMembership { parts . push ("noClaim" . into ()); }
       parts . extend ( warrant_atom (occurrence . viewStats . warrant) );
-      if let Some (original) = &occurrence . overridesHere {
-        parts . push ( format! ("(overridesHere {})", original) ); }},
+      if let Some (original) = &occurrence . in_place_of {
+        parts . push ( format! ("(inPlaceOf {})", original) ); }},
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) => {
       parts . push ( format! ("ghost {}", ghost . gnid) );
       if ! ghost . claimsMembership { parts . push ("noClaim" . into ()); }

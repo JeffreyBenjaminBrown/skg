@@ -1,5 +1,5 @@
--- Cycling a view's perspective, whose overrides it follows. Mirrors
--- tests/elisp/test-skg-override-perspective.el.
+-- Cycling a view's perspective. Mirrors
+-- tests/elisp/test-skg-perspective.el.
 
 local helpers = dofile(
   debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
@@ -9,7 +9,7 @@ local client = require('skg.client')
 local keymaps = require('skg.keymaps')
 local length_prefix = require('skg.length_prefix')
 local lock = require('skg.lock')
-local override_perspective = require('skg.override_perspective')
+local perspective = require('skg.perspective')
 local save = require('skg.save')
 local state = require('skg.state')
 
@@ -19,7 +19,7 @@ local function view (view_id)
     '* (skg node (gnid r)) r', 'skg://' .. view_id, view_id)
 end
 
-describe('skg.override_perspective', function ()
+describe('skg.perspective', function ()
   local sent, shown
   local real_send, real_notify, real_confirm
 
@@ -44,7 +44,7 @@ describe('skg.override_perspective', function ()
   it('refuses a buffer with unsaved edits, sending nothing', function ()
     local buf = view('r')
     vim.bo[buf].modified = true
-    local ok, err = pcall(override_perspective.override_perspective)
+    local ok, err = pcall(perspective.cycle_perspective)
     assert.is_false(ok)
     assert.are.equal(
       'Save or revert this buffer first: changing its perspective'
@@ -56,7 +56,7 @@ describe('skg.override_perspective', function ()
 
   it('refuses outside a skg view', function ()
     helpers.buffer_with('* a')
-    local ok, err = pcall(override_perspective.override_perspective)
+    local ok, err = pcall(perspective.cycle_perspective)
     assert.is_false(ok)
     assert.are.equal('Not in a skg view', tostring(err))
     assert.are.same({}, sent)
@@ -65,69 +65,69 @@ describe('skg.override_perspective', function ()
   it('asks for the next perspective, whatever the buffer shows: the'
      .. ' server computes the cycle', function ()
     local buf = view('r')
-    override_perspective.override_perspective()
+    perspective.cycle_perspective()
     assert.are.equal(
-      '((request . "set overrides followed") (view-id . "r")'
-      .. ' (overrides-followed . "next"))\n', sent[1])
-    assert.is_truthy(state.response_handler_map['overrides-followed'])
-    assert.are.equal('override perspective', lock.stream_in_progress)
+      '((request . "set perspective") (view-id . "r")'
+      .. ' (perspective . "next"))\n', sent[1])
+    assert.is_truthy(state.response_handler_map['perspective'])
+    assert.are.equal('cycle perspective', lock.stream_in_progress)
     assert.is_false(vim.bo[buf].modifiable) -- the stream's lock
     helpers.reset_client_state()
-    buffer.set_override_perspective(buf, 'owner of tracy', "tracy's overrides")
-    override_perspective.override_perspective()
+    buffer.set_perspective(buf, 'owner of tracy', "tracy's perspective")
+    perspective.cycle_perspective()
     assert.are.equal(
-      '((request . "set overrides followed") (view-id . "r")'
-      .. ' (overrides-followed . "next"))\n', sent[2])
+      '((request . "set perspective") (view-id . "r")'
+      .. ' (perspective . "next"))\n', sent[2])
   end)
 
   it('sets the buffer and the statusline mark from the answer, and'
      .. ' names the perspective', function ()
     local buf = view('r')
-    override_perspective.handler(require('skg.sexpr.parse').read(
-      '((response-type overrides-followed) (view-id "r")'
-      .. ' (overrides-followed "user") (perspective-name "your overrides"))'))
-    assert.are.equal('user', vim.b[buf].skg_overrides_followed)
-    assert.are.equal(':your overrides',
-                     buffer.override_perspective_mode_line(buf))
-    assert.are.equal('Perspective: your overrides.', shown[1])
-    override_perspective.handler(require('skg.sexpr.parse').read(
-      '((response-type overrides-followed) (view-id "r")'
-      .. ' (overrides-followed "owner of tracy")'
-      .. ' (perspective-name "tracy\'s overrides"))'))
-    assert.are.equal('owner of tracy', vim.b[buf].skg_overrides_followed)
-    assert.are.equal(":tracy's overrides",
-                     buffer.override_perspective_mode_line(buf))
-    assert.are.equal("Perspective: tracy's overrides.", shown[2])
-    override_perspective.handler(require('skg.sexpr.parse').read(
-      '((response-type overrides-followed) (view-id "r")'
-      .. ' (overrides-followed "root authors")'
-      .. ' (perspective-name "each root author\'s overrides (tracy\'s)"))'))
-    assert.is_nil(vim.b[buf].skg_overrides_followed)
-    assert.is_nil(vim.b[buf].skg_override_perspective_name)
-    assert.are.equal('', buffer.override_perspective_mode_line(buf))
-    assert.are.equal("Perspective: each root author's overrides (tracy's).",
+    perspective.handler(require('skg.sexpr.parse').read(
+      '((response-type perspective) (view-id "r")'
+      .. ' (perspective "user") (perspective-name "your perspective"))'))
+    assert.are.equal('user', vim.b[buf].skg_perspective)
+    assert.are.equal(':your perspective',
+                     buffer.perspective_mode_line(buf))
+    assert.are.equal('Showing your perspective.', shown[1])
+    perspective.handler(require('skg.sexpr.parse').read(
+      '((response-type perspective) (view-id "r")'
+      .. ' (perspective "owner of tracy")'
+      .. ' (perspective-name "tracy\'s perspective"))'))
+    assert.are.equal('owner of tracy', vim.b[buf].skg_perspective)
+    assert.are.equal(":tracy's perspective",
+                     buffer.perspective_mode_line(buf))
+    assert.are.equal("Showing tracy's perspective.", shown[2])
+    perspective.handler(require('skg.sexpr.parse').read(
+      '((response-type perspective) (view-id "r")'
+      .. ' (perspective "root authors")'
+      .. ' (perspective-name "each root author\'s perspective (tracy\'s)"))'))
+    assert.is_nil(vim.b[buf].skg_perspective)
+    assert.is_nil(vim.b[buf].skg_perspective_name)
+    assert.are.equal('', buffer.perspective_mode_line(buf))
+    assert.are.equal("Showing each root author's perspective (tracy's).",
                      shown[3])
   end)
 
   it('leaves the choice on a refusal, and says why', function ()
     local buf = view('p')
-    override_perspective.handler(require('skg.sexpr.parse').read(
-      '((response-type overrides-followed) (view-id "p")'
-      .. ' (overrides-followed "root authors")'
-      .. ' (perspective-name "each root author\'s overrides (yours)")'
-      .. ' (content "No one\'s overrides would show this buffer'
+    perspective.handler(require('skg.sexpr.parse').read(
+      '((response-type perspective) (view-id "p")'
+      .. ' (perspective "root authors")'
+      .. ' (perspective-name "each root author\'s perspective (yours)")'
+      .. ' (content "No other perspective would show this buffer'
       .. ' differently from its root authors\'."))'))
-    assert.is_nil(vim.b[buf].skg_overrides_followed)
-    assert.is_truthy(shown[#shown]:find("No one's overrides", 1, true))
+    assert.is_nil(vim.b[buf].skg_perspective)
+    assert.is_truthy(shown[#shown]:find("No other perspective", 1, true))
   end)
 
   it('dispatches the answer and the stream: the choice is set, the'
      .. ' view redrawn and unlocked', function ()
     local buf = view('r')
-    override_perspective.override_perspective()
+    perspective.cycle_perspective()
     length_prefix.dispatch_by_type(
-      '((response-type overrides-followed) (view-id "r")'
-      .. ' (overrides-followed "user") (perspective-name "your overrides"))')
+      '((response-type perspective) (view-id "r")'
+      .. ' (perspective "user") (perspective-name "your perspective"))')
     length_prefix.dispatch_by_type(
       '((response-type rerender-lock) (lock-views (r)))')
     length_prefix.dispatch_by_type(
@@ -135,7 +135,7 @@ describe('skg.override_perspective', function ()
       .. ' (content "* (skg node (gnid r)) r redrawn"))')
     length_prefix.dispatch_by_type(
       '((response-type rerender-done) (errors ()) (warnings ()))')
-    assert.are.equal('user', vim.b[buf].skg_overrides_followed)
+    assert.are.equal('user', vim.b[buf].skg_perspective)
     assert.are.equal('* (skg node (gnid r)) r redrawn',
       vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1])
     assert.is_nil(lock.stream_in_progress)
@@ -146,22 +146,22 @@ describe('skg.override_perspective', function ()
   it('retries with the approved pids after a privacy challenge', function ()
     local buf = view('r')
     vim.fn.confirm = function () return 1 end
-    override_perspective.override_perspective()
+    perspective.cycle_perspective()
     length_prefix.dispatch_by_type(
       '((response-type overPrivateText-telescope-confirmation)'
-      .. ' (operation overrides-followed-switch) (pids (p1 p2))'
+      .. ' (operation perspective-switch) (pids (p1 p2))'
       .. ' (prompt "Include?"))')
-    assert.is_nil(state.response_handler_map['overrides-followed'])
+    assert.is_nil(state.response_handler_map['perspective'])
     length_prefix.dispatch_by_type(
       '((response-type rerender-lock) (lock-views ()))')
     length_prefix.dispatch_by_type(
       '((response-type rerender-done) (errors ()) (warnings ()))')
     vim.wait(2000, function () return #sent == 2 end, 10)
     assert.are.equal(
-      '((request . "set overrides followed") (view-id . "r")'
-      .. ' (overrides-followed . "next")'
+      '((request . "set perspective") (view-id . "r")'
+      .. ' (perspective . "next")'
       .. ' (approved-overPrivateText-pids "p1" "p2"))\n', sent[2])
-    assert.is_nil(vim.b[buf].skg_overrides_followed)
+    assert.is_nil(vim.b[buf].skg_perspective)
   end)
 
   it('rides in the save request, survives a filetype change, and a'
@@ -171,42 +171,42 @@ describe('skg.override_perspective', function ()
                        screen_lines_below_window_start = 0 }
     assert.is_falsy(save.save_request_sexp(
       'r', position, nil, nil, nil, nil, nil, nil,
-      vim.b[buf].skg_overrides_followed):find('overrides-followed', 1, true))
-    buffer.set_override_perspective(buf, 'owner of tracy', "tracy's overrides")
+      vim.b[buf].skg_perspective):find('perspective', 1, true))
+    buffer.set_perspective(buf, 'owner of tracy', "tracy's perspective")
     vim.bo[buf].filetype = 'text'
     vim.bo[buf].filetype = 'org'
-    assert.are.equal('owner of tracy', vim.b[buf].skg_overrides_followed)
+    assert.are.equal('owner of tracy', vim.b[buf].skg_perspective)
     assert.is_truthy(save.save_request_sexp(
       'r', position, nil, nil, nil, nil, nil, nil,
-      vim.b[buf].skg_overrides_followed):find(
-        '(view-id . "r") (overrides-followed . "owner of tracy")', 1, true))
+      vim.b[buf].skg_perspective):find(
+        '(view-id . "r") (perspective . "owner of tracy")', 1, true))
     -- The save itself reads the buffer's choice: its request line is
     -- the first thing it sends (the envelope follows).
     save.request_save_buffer()
     assert.is_truthy(sent[1]:find('save buffer', 1, true))
     assert.is_truthy(sent[1]:find(
-      '(overrides-followed . "owner of tracy")', 1, true))
+      '(perspective . "owner of tracy")', 1, true))
     helpers.reset_client_state()
     -- Reopening a view in the same buffer is a fresh view.
     local again = view('r')
     assert.are.equal(buf, again)
-    assert.is_nil(vim.b[again].skg_overrides_followed)
-    assert.is_nil(vim.b[again].skg_override_perspective_name)
+    assert.is_nil(vim.b[again].skg_perspective)
+    assert.is_nil(vim.b[again].skg_perspective_name)
   end)
 
-  it('is on <localleader>vo and :SkgOverridePerspective, and vp is free',
+  it('is on <localleader>vo and :SkgCyclePerspective, and vp is free',
      function ()
     local found, vp = nil, nil
     for _, binding in ipairs(keymaps.content_view_bindings) do
       if binding[1] == 'vo' then found = binding[2] end
       if binding[1] == 'vp' then vp = binding[2] end end
-    assert.are.equal('OverridePerspective', found)
+    assert.are.equal('CyclePerspective', found)
     assert.is_nil(vp)
-    local spec = keymaps.commands.OverridePerspective
-    assert.are.equal('skg.override_perspective', spec.module)
-    assert.are.equal('override_perspective', spec.fn)
+    local spec = keymaps.commands.CyclePerspective
+    assert.are.equal('skg.perspective', spec.module)
+    assert.are.equal('cycle_perspective', spec.fn)
     keymaps.define_ex_commands()
-    assert.are.equal(2, vim.fn.exists(':SkgOverridePerspective'))
+    assert.are.equal(2, vim.fn.exists(':SkgCyclePerspective'))
     local buf = view('r')
     local key = vim.api.nvim_replace_termcodes(
       vim.g.maplocalleader or '\\', true, false, true)

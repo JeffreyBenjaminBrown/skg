@@ -212,7 +212,7 @@ fn the_merged_siblings_relationship_request_is_carried () {
                Some ( RelationshipEditRequest::RelRepo ( SkgrepoName::from ("private") )) ); }
 
 /// p contains n, which o overrides. Under p, o stands for n
-/// ('overridesHere'), write-protected, and beside it n itself is
+/// ('inPlaceOf'), write-protected, and beside it n itself is
 /// editable: the two stand for one gnid, so they merge into o's place.
 fn an_overrider_beside_its_editable_original (
   first_roots : &str,
@@ -222,7 +222,7 @@ fn an_overrider_beside_its_editable_original (
     ** {} o
     ** {} n
     ", first_roots, occurrence_metadata ("p", ""),
-       occurrence_metadata ("o", "writeProtected (overridesHere n)"),
+       occurrence_metadata ("o", "writeProtected (inPlaceOf n)"),
        occurrence_metadata ("n", "noClaim") ) }
 
 fn overridden () -> InRustGraph {
@@ -237,7 +237,7 @@ fn the_result_takes_the_merged_siblings_editability () {
     &an_overrider_beside_its_editable_original (""), &overridden ());
   assert_eq! ( run . outline (), "\
 node p
-  node o (overridesHere n)" ); }
+  node o (inPlaceOf n)" ); }
 
 #[test]
 fn the_result_stays_write_protected_when_its_node_is_editable_elsewhere () {
@@ -251,4 +251,4 @@ fn the_result_stays_write_protected_when_its_node_is_editable_elsewhere () {
   assert_eq! ( run . outline (), "\
 node o
 node p
-  node o wp (overridesHere n)" ); }
+  node o wp (inPlaceOf n)" ); }

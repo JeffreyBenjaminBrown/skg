@@ -95,7 +95,7 @@ fn assert_sharing_stats_in_view_of_R (
     // assert_op_in_view_of_P.
     let c_lines : Vec<&str> = lines_containing (buf, "(gnid C)");
     assert! ( c_lines . iter ()
-              . any ( |l| l . contains ("(overridesHere P)") ),
+              . any ( |l| l . contains ("(inPlaceOf P)") ),
       "{}: C is shown in place of P, marked:\n{}", label, buf ); }}
 
 fn assert_op_in_view_of_P (

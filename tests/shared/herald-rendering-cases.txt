@@ -94,8 +94,8 @@
 (skg node (gnid x) (view (rels (contains (in 2) (out 0 (unintegrated 0))))))
 ---- text: 2C
 ---- styles: medium*1 normal*1
-==== forks: overrides-here beside an ancestor h
-(skg node (gnid x) (overridesHere y) (view (rels (forks (out 1 (ancestors 8))))))
+==== forks: inPlaceOf beside an ancestor h
+(skg node (gnid x) (inPlaceOf y) (view (rels (forks (out 1 (ancestors 8))))))
 ---- text: Kĥh
 ---- styles: normal*1 crucial*1 medium*1
 ==== birth: links and forks

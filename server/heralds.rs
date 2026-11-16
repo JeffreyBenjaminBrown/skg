@@ -551,10 +551,10 @@ pub fn herald_rule_table () -> HeraldRule {
           rule ("props", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
           vac ("birth"),
           leaf ("cycle", "⟳") ]),
-        // overridesHere is displayed as a crucial ĥ inside the O token
+        // inPlaceOf is displayed as a crucial ĥ inside the K token
         // by the client relationship renderer. The atom's
         // ID payload is load-bearing save metadata, never displayed.
-        vac ("overridesHere"),
+        vac ("inPlaceOf"),
         rule ("skgRepos", vec! [
           vac ("nodeRepo"),
           // relRepo is a derived fact, not a save request.  It
@@ -978,7 +978,7 @@ fn graphstats_atoms () -> Vec<&'static str> {
 /// The match atoms of ViewnodeStats, from
 /// occurrence_metadata_to_string (org_to_text.rs): the
 /// facts of '(view ...)', the relRepo of '(skgRepos ...)', and the
-/// occurrence's 'overridesHere'; and the property members' warrant
+/// occurrence's 'inPlaceOf'; and the property members' warrant
 /// atoms. The relationship facts are the forms named in
 /// 'emittable_metadata_atoms'.
 fn viewstats_atoms () -> Vec<&'static str> {
@@ -993,7 +993,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
     } = v; }
   let _ = guard;
   vec! [ "cycle", "repoBoundary", "noWarrant", "omittedBody",
-         "overridesHere", "relRepo",
+         "inPlaceOf", "relRepo",
          // A ghost warrant ('Warrant::ByHead').
          "ghostWarrant" ] }
 

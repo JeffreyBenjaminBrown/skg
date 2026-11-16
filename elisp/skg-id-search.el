@@ -136,7 +136,7 @@ nil (no ID on the line), or `ambiguous' (IDs on both sides of point)."
 (defun skg-goto ()
   "Open a content view for the nearest ID on the current line.
 The requested node itself is the raw root. Recursive content may
-still use override substitution. In a raw .skg file, IDs on both
+still use mirror substitution. In a raw .skg file, IDs on both
 sides of point are ambiguous: it says so and visits nothing."
   (interactive)
   (let (( result (skg-nearest-id) ))

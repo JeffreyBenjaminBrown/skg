@@ -320,7 +320,7 @@ pub(crate) fn entombstone (
 /// it: its pid, title and home skgrepo, and, when editable, its body.
 /// It keeps where it stands, its fold state and its requests. When it
 /// was editable as another gnid (one that became an extra ID, or the
-/// overridden node an overrider is shown in place of), the gnid's one
+/// original a mirror is shown in place of), the gnid's one
 /// editability passes to 'pid', unless another occurrence holds that,
 /// and then it is write-protected.
 pub(crate) fn point_occurrence_at (

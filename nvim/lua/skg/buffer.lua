@@ -138,18 +138,17 @@ function M.text (buf)
     vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
 end
 
--- ── a view's perspective: whose overrides it follows ───────────────
+-- ── a view's perspective ───────────────────────────────────────────
 --
--- 'vim.b.skg_overrides_followed': this view's perspective, whose
--- overrides it follows, as the server names it on the wire: nil for
--- its root authors' (a tree rooted at a node of yours follows yours,
--- one rooted at another's node follows that author's), as every fresh
--- view does; "user" for yours, or "owner of NAME" for another owner's,
--- in every tree. 'vim.b.skg_override_perspective_name': how the server
--- named it ("tracy's overrides", say), nil for the root authors'.
--- 'override_perspective.override_perspective' sets both once the
+-- 'vim.b.skg_perspective': this view's perspective, as the server
+-- names it on the wire: nil for its root authors' (a tree rooted at a
+-- node of yours is drawn from yours, one rooted at another's node from
+-- that author's), as every fresh view is; "user" for yours, or "owner of NAME" for another owner's,
+-- in every tree. 'vim.b.skg_perspective_name': how the server
+-- named it ("tracy's perspective", say), nil for the root authors'.
+-- 'perspective.cycle_perspective' sets both once the
 -- server has switched the view. A save sends the first as
--- (overrides-followed . NAME), so that the server checks and redraws
+-- (perspective . NAME), so that the server checks and redraws
 -- the buffer as it was drawn, and keeps it for the redraws it starts
 -- itself, even after a restart. Like every 'vim.b' variable they
 -- survive filetype changes, as Emacs's permanent-locals do.
@@ -160,23 +159,23 @@ end
 ---@param buf integer
 ---@param followed string|nil
 ---@param name string|nil
-function M.set_override_perspective (buf, followed, name)
+function M.set_perspective (buf, followed, name)
   local default = followed == nil or followed == 'root authors'
-  vim.b[buf].skg_overrides_followed = (not default) and followed or nil
-  vim.b[buf].skg_override_perspective_name = (not default) and name or nil
+  vim.b[buf].skg_perspective = (not default) and followed or nil
+  vim.b[buf].skg_perspective_name = (not default) and name or nil
 end
 
 ---The statusline's mark for a view shown from a perspective other than
----its root authors': ":your overrides", say, there, "" elsewhere. The
+---its root authors': ":your perspective", say, there, "" elsewhere. The
 ---client draws no statusline of its own; put
----'%{v:lua.require'skg.buffer'.override_perspective_mode_line()}' in
----yours (Emacs's mode name reads "SKG:your overrides", say).
+---'%{v:lua.require'skg.buffer'.perspective_mode_line()}' in
+---yours (Emacs's mode name reads "SKG:your perspective", say).
 ---@param buf integer|nil default the current buffer
 ---@return string
-function M.override_perspective_mode_line (buf)
-  local followed = vim.b[buf or 0].skg_overrides_followed
+function M.perspective_mode_line (buf)
+  local followed = vim.b[buf or 0].skg_perspective
   if not followed then return '' end
-  return ':' .. (vim.b[buf or 0].skg_override_perspective_name or followed)
+  return ':' .. (vim.b[buf or 0].skg_perspective_name or followed)
 end
 
 ---Record the normalized text from a successful server replacement.
@@ -216,10 +215,10 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_id)
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(org_text, '\n'))
-  -- A fresh view follows its root authors' overrides, even in a buffer
+  -- A fresh view is drawn from its root authors' perspective, even in a buffer
   -- reused by name from a view shown from another perspective. (Emacs
   -- reuses a buffer only for a search run again, and resets it there.)
-  M.set_override_perspective(buf, nil, nil)
+  M.set_perspective(buf, nil, nil)
   M.configure_view_buffer(buf, view_id)
   vim.api.nvim_set_current_buf(buf)
   M.act_on_fold_and_focus_atoms(buf, nil)

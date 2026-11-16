@@ -45,7 +45,7 @@
 use crate::from_text::local_fieldintent_collection::predicates::{
   occurrence_child_counts_as_content,
   occurrence_child_counts_as_visible_content,
-  deleted_overrider_keeps_its_original,
+  deleted_mirror_keeps_its_original,
   member_counts_for_partnerFolder };
 use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, DefiningFolderRecorder, LocalContext, FieldIntent,
@@ -62,8 +62,8 @@ use std::collections::HashSet;
 
 /// Whether the user owns a skgrepo ('SkgConfig::skgrepo_is_owned').
 /// The traversal asks it of one thing only: whether a parent's
-/// content list is another's, where a deleted overrider keeps its
-/// original ('deleted_overrider_keeps_its_original').
+/// content list is another's, where a deleted mirror keeps its
+/// original ('deleted_mirror_keeps_its_original').
 pub type IsOwned<'a> = &'a dyn Fn (&SkgrepoName) -> bool;
 
 pub fn collect_instructions_locally (
@@ -484,8 +484,8 @@ fn claiming_gnid_only_or_ghost_member (
 
 /// This returns the content of an editable vognode: its occurrence
 /// children that pass the contains predicate, and, where the vognode
-/// is another's ('of_another'), the originals that deleted overriders
-/// stand for ('deleted_overrider_keeps_its_original'). It does not dedup,
+/// is another's ('of_another'), the originals that deleted mirrors
+/// stand for ('deleted_mirror_keeps_its_original'). It does not dedup,
 /// because validation ('claiming_children_have_distinct_gnids')
 /// already guarantees distinctness. Each member is paired with its
 /// headline's explicit '(editRequest (relRepo NAME))' request, if any (see
@@ -510,9 +510,9 @@ fn content_members (
     match &child . value() . kind {
       ViewnodeKind::Vognode (Vognode::Occurrence (t)) => {
         if occurrence_child_counts_as_content (t)
-           || ( of_another && deleted_overrider_keeps_its_original (t) ) {
+           || ( of_another && deleted_mirror_keeps_its_original (t) ) {
           contents . push ((
-            // collected_id, not id: a shown overrider stands for
+            // collected_id, not id: a shown mirror stands for
             // the original member it is shown in place of.
             t . collected_gnid (),
             RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned () )); }},
@@ -533,7 +533,7 @@ fn visible_content_members (
       ViewnodeKind::Vognode (Vognode::Occurrence (t))
         if occurrence_child_counts_as_visible_content (t) => {
         visible . push (
-          // collected_id: a shown overrider presents the original,
+          // collected_id: a shown mirror presents the original,
           // so hide/unhide inference must speak of the original.
           t . collected_gnid ()); },
       _ => visible . extend (

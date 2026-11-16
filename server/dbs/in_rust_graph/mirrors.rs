@@ -1,5 +1,5 @@
 //! Mirrors, and which of a note's mirrors stands in its place
-//! ('docs/override.org', "Mirror substitution").
+//! ('docs/mirrors.org', "Mirror substitution").
 //!
 //! A *fork* of a note N is a note that records a relationship of
 //! 'MIRROR_RELATION' to N: the forker forks the forkee. The *mirrors*
@@ -28,7 +28,7 @@
 //! rooted at a foreign node shows what that node's author would see,
 //! throughout the tree, even under a third author's nodes; a view
 //! rooted at an owned node, what the user would. A view switched to
-//! one owner's perspective ('OverridesFollowed::Owner': the user's, or
+//! one owner's perspective ('Perspective::Owner': the user's, or
 //! a foreign owner's) is drawn from that owner's in every tree.
 
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -37,7 +37,7 @@ use crate::herald_tokens::Side;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, SkgrepoOwner};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
-use crate::types::views_state::OverridesFollowed;
+use crate::types::views_state::Perspective;
 
 use ego_tree::NodeRef;
 use std::collections::{HashSet, VecDeque};
@@ -269,11 +269,11 @@ fn reaches_by_forkee_steps (
   false }
 
 /// The owner from whose perspective the top-level tree containing
-/// 'position' is drawn, in a view drawn from 'overrides_followed'.
+/// 'position' is drawn, in a view drawn from 'perspective'.
 /// The owner's, in a view switched to one owner's perspective.
 /// Otherwise the root author's: the owner ('SkgConfig::skgrepo_owner')
 /// of the home skgrepo, as 'graph' knows it, of the node that tree's
-/// root, the child of the buffer root, stands for (its '(overridesHere
+/// root, the child of the buffer root, stands for (its '(inPlaceOf
 /// N)', else itself: a root another perspective replaced still has its
 /// original's author); the user when that root is not an occurrence of
 /// a node 'graph' knows (a new node, a ghost, a tombstone), or when
@@ -281,10 +281,10 @@ fn reaches_by_forkee_steps (
 pub fn perspective_owner_of_tree_containing (
   config             : &SkgConfig,
   graph              : &InRustGraph,
-  overrides_followed : &OverridesFollowed,
+  perspective        : &Perspective,
   position           : NodeRef<Viewnode>,
 ) -> SkgrepoOwner {
-  if let OverridesFollowed::Owner (owner) = overrides_followed {
+  if let Perspective::Owner (owner) = perspective {
     return owner . clone (); }
   let tree_root : Option<NodeRef<Viewnode>> =
     once (position) . chain ( position . ancestors () )
@@ -294,7 +294,7 @@ pub fn perspective_owner_of_tree_containing (
     tree_root . and_then ( |root| match &root . value () . kind {
       ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
         graph . pid_and_skgrepo (
-          occurrence . overridesHere . as_ref () . unwrap_or (&occurrence . gnid) )
+          occurrence . in_place_of . as_ref () . unwrap_or (&occurrence . gnid) )
         . map ( |(_pid, home)| home ),
       _ => None, } );
   match root_home {

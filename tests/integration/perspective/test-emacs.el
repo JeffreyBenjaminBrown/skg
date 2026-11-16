@@ -1,5 +1,5 @@
-;;; Integration test: cycling a view's perspective, whose overrides it
-;;; follows ('skg-override-perspective'). See run-test.sh for the data.
+;;; Integration test: cycling a view's perspective
+;;; ('skg-cycle-perspective'). See run-test.sh for the data.
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../test-wait.el")
@@ -19,7 +19,7 @@
     (when (search-forward (format "(gnid %s)" gnid) nil t)
       (line-beginning-position))))
 
-(defun integration-test-override-perspective ()
+(defun integration-test-perspective ()
   (let ((test-port (getenv "SKG_TEST_PORT")))
     (when test-port (setq skg-port (string-to-number test-port))))
   (skg-request-single-root-content-view-from-id "R")
@@ -34,14 +34,14 @@
     (unless buf (test-fail "the view of R, showing A, did not open"))
     (switch-to-buffer buf)
     (with-current-buffer buf
-      (when skg-overrides-followed
-        (test-fail "a fresh view follows its root authors' overrides"))
+      (when skg-perspective
+        (test-fail "a fresh view is not drawn from its root authors' perspective"))
       ;; Point on A's headline; the switch must leave it on U's, which
       ;; stands in the same place.
       (goto-char (test--line-of-gnid "A"))
-      (skg-override-perspective)
+      (skg-cycle-perspective)
       (unless (skg-test-wait-for
-               (lambda () (and (equal skg-overrides-followed "user")
+               (lambda () (and (equal skg-perspective "user")
                                (test--line-of-gnid "U")
                                (not skg--stream-in-progress)))
                10)
@@ -49,17 +49,17 @@
       (when (test--line-of-gnid "A")
         (test-fail "switched, the view still shows A:\n%s" (test--text)))
       (unless (equal (line-beginning-position) (test--line-of-gnid "U"))
-        (test-fail "point left the headline M's overrider stands on"))
-      (unless (equal (eval (cadr mode-line-process) t) ":your overrides")
-        (test-fail "the mode line does not say the view follows your overrides"))
-      (message "✓ switched to your overrides; U stands in M's place")
+        (test-fail "point left the headline M's mirror stands on"))
+      (unless (equal (eval (cadr mode-line-process) t) ":your perspective")
+        (test-fail "the mode line does not say the view shows your perspective"))
+      (message "✓ switched to your perspective; U stands in M's place")
       ;; Unsaved edits refuse the switch.
       (goto-char (test--line-of-gnid "U"))
       (forward-line 1)
       (insert "a body line for U\n")
       (forward-line -1)
       (unless (condition-case nil
-                  (progn (skg-override-perspective) nil)
+                  (progn (skg-cycle-perspective) nil)
                 (user-error t))
         (test-fail "a buffer with unsaved edits was switched"))
       (message "✓ refused while dirty")
@@ -72,39 +72,39 @@
                20)
         (test-fail "the save did not finish:\n%s" (test--text)))
       (unless (and (test--line-of-gnid "U") (not (test--line-of-gnid "A"))
-                   (equal skg-overrides-followed "user"))
-        (test-fail "after the save the view no longer follows your overrides:\n%s"
+                   (equal skg-perspective "user"))
+        (test-fail "after the save the view no longer shows your perspective:\n%s"
                    (test--text)))
       (message "✓ a save keeps the choice")
       ;; The next perspective is third's, which shows B.
-      (skg-override-perspective)
+      (skg-cycle-perspective)
       (unless (skg-test-wait-for
-               (lambda () (and (equal skg-overrides-followed "owner of third")
+               (lambda () (and (equal skg-perspective "owner of third")
                                (test--line-of-gnid "B")
                                (not skg--stream-in-progress)))
                10)
         (test-fail "the next perspective does not show B:\n%s" (test--text)))
-      (unless (equal (eval (cadr mode-line-process) t) ":third's overrides")
-        (test-fail "the mode line does not name third's overrides"))
-      (message "✓ switched to third's overrides; B stands in M's place")
+      (unless (equal (eval (cadr mode-line-process) t) ":third's perspective")
+        (test-fail "the mode line does not name third's perspective"))
+      (message "✓ switched to third's perspective; B stands in M's place")
       ;; After the last, the root authors' again, showing A.
-      (skg-override-perspective)
+      (skg-cycle-perspective)
       (unless (skg-test-wait-for
-               (lambda () (and (null skg-overrides-followed)
+               (lambda () (and (null skg-perspective)
                                (test--line-of-gnid "A")
                                (not skg--stream-in-progress)))
                10)
         (test-fail "switched back, the view does not show A:\n%s" (test--text)))
       (when (eval (cadr mode-line-process) t)
         (test-fail "the root authors' perspective is marked in the mode line"))
-      (message "✓ switched back to the root authors' overrides")))
+      (message "✓ switched back to the root authors' perspective")))
   (integration-test-the-root-too)
   (message "PASS: Integration test successful!")
   (kill-emacs 0))
 
 ;; The root too: a view of M, which A (M's own author's), U (yours)
-;; and B (third's) each override, shows M as its root from the root
-;; authors' perspective and each override from its author's, re-pointed
+;; and B (third's) each fork, shows M as its root from the root
+;; authors' perspective and each fork from its author's, re-pointed
 ;; where the root stands, so point stays on it; the buffer keeps its name.
 (defun test--root-line ()
   (save-excursion
@@ -125,23 +125,23 @@
     (switch-to-buffer buf)
     (with-current-buffer buf
       (let ((name (buffer-name)))
-        (dolist (step '(("user" "U" ":your overrides")
-                        ("owner of foreign" "A" ":foreign's overrides")
-                        ("owner of third" "B" ":third's overrides")
+        (dolist (step '(("user" "U" ":your perspective")
+                        ("owner of foreign" "A" ":foreign's perspective")
+                        ("owner of third" "B" ":third's perspective")
                         (nil "M" nil)))
           (goto-char (point-min))
           (end-of-line)
           (let ((followed (nth 0 step)) (shown (nth 1 step)))
-            (skg-override-perspective)
+            (skg-cycle-perspective)
             (unless (skg-test-wait-for
-                     (lambda () (and (equal skg-overrides-followed followed)
+                     (lambda () (and (equal skg-perspective followed)
                                      (string-match-p (format "(gnid %s)" shown)
                                                      (test--root-line))
                                      (not skg--stream-in-progress)))
                      10)
               (test-fail "the root is not %s from %s:\n%s" shown followed (test--text)))
             (unless (eq (equal shown "M")
-                        (not (string-match-p "(overridesHere M)" (test--root-line))))
+                        (not (string-match-p "(inPlaceOf M)" (test--root-line))))
               (test-fail "the root %s does not stand for M as it should:\n%s"
                          shown (test--text)))
             (unless (equal (line-number-at-pos) 1)
@@ -156,4 +156,4 @@
                       (message "TIMEOUT: Integration test timed out!")
                       (kill-emacs 1)))
 
-(integration-test-override-perspective)
+(integration-test-perspective)

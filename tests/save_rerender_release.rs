@@ -14,7 +14,7 @@
 // of 'tele' has a second perspective, other's.
 
 use skg::serve::ViewsState;
-use skg::serve::handlers::overrides_followed::handle_set_overrides_followed_request;
+use skg::serve::handlers::perspective::handle_set_perspective_request;
 use skg::serve::handlers::rerender_views::handle_rerender_views_request;
 use skg::serve::handlers::save_buffer::handle_save_buffer_request;
 use skg::serve::handlers::single_root_view::handle_single_root_view_request;
@@ -25,7 +25,7 @@ use skg::test_utils::{
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{SkgConfig, SkgrepoName, TantivyIndex};
-use skg::types::views_state::{OpenViews, OverridesFollowed, ViewforestId};
+use skg::types::views_state::{OpenViews, Perspective, ViewforestId};
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::error::Error;
@@ -207,7 +207,7 @@ fn a_withheld_save_rerender_is_released_by_rerendering_its_views
     assert_eq! ( main_files_titled (&f, "a new node") . len (), 0 ); }
   Ok (()) }
 
-/// Send "set overrides followed" for "tele-view", asking for the next
+/// Send "set perspective" for "tele-view", asking for the next
 /// perspective, with 'extra_fields': every message of the answer.
 fn switch_tele_view (
   f            : &Fixture,
@@ -215,9 +215,9 @@ fn switch_tele_view (
   extra_fields : &str,
 ) -> Vec<String> {
   let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
-  handle_set_overrides_followed_request (
+  handle_set_perspective_request (
     &mut stream,
-    &format! ( "((request . \"set overrides followed\") (view-id . \"tele-view\") (overrides-followed . \"next\"){})",
+    &format! ( "((request . \"set perspective\") (view-id . \"tele-view\") (perspective . \"next\"){})",
                extra_fields ),
     &f . env, views_state, &f . restriction );
   drop (stream);
@@ -240,27 +240,27 @@ fn a_privacy_challenge_stops_a_perspective_switch_until_approved
   { let messages : Vec<String> = switch_tele_view (&f, &mut connection, "");
     assert! ( messages [0] . starts_with (
                 "((response-type overPrivateText-telescope-confirmation) \
-                  (operation overrides-followed-switch) (pids (tele))" ),
+                  (operation perspective-switch) (pids (tele))" ),
               "{:?}", messages );
     assert! ( ! messages . iter () . any ( |message|
-                message . contains ("(response-type overrides-followed)")
+                message . contains ("(response-type perspective)")
                 || message . contains ("A title kept private") ),
               "{:?}", messages );
     assert! ( messages . last () . unwrap () . contains ("(response-type rerender-done)"),
               "{:?}", messages );
-    assert_eq! ( connection . open_views . overrides_followed_by_view (&view_id),
-                 OverridesFollowed::RootAuthors ); }
+    assert_eq! ( connection . open_views . perspective_of_view (&view_id),
+                 Perspective::RootAuthors ); }
   { let messages : Vec<String> = switch_tele_view (
       &f, &mut connection, " (approved-overPrivateText-pids \"tele\")" );
-    assert_eq! ( extract_string_field_from_sexp (&messages [0], "overrides-followed")
+    assert_eq! ( extract_string_field_from_sexp (&messages [0], "perspective")
                    . as_deref (), Some ("owner of other"), "{:?}", messages );
     let switched : String = messages . iter ()
       . find ( |message| message . contains ("(response-type rerender-view)") )
       . and_then ( |message| extract_string_field_from_sexp (message, "content") )
       . expect ("the switch rerenders the view");
     assert! ( switched . contains ("(gnid other-child)")
-              && switched . contains ("(overridesHere child)"),
+              && switched . contains ("(inPlaceOf child)"),
               "{}", switched );
-    assert_ne! ( connection . open_views . overrides_followed_by_view (&view_id),
-                 OverridesFollowed::RootAuthors ); }
+    assert_ne! ( connection . open_views . perspective_of_view (&view_id),
+                 Perspective::RootAuthors ); }
   Ok (( )) }

@@ -37,7 +37,7 @@ use skg::types::save::{NodeInstruction, SaveNode};
 use skg::types::viewnode::{
   Viewnode,
   viewforest_root_viewnode};
-use skg::types::views_state::{OpenViews, OverridesFollowed, ViewState, ViewforestId, ViewnodeIdRecord};
+use skg::types::views_state::{OpenViews, Perspective, ViewState, ViewforestId, ViewnodeIdRecord};
 
 use std::collections::{BTreeSet, HashSet};
 use std::error::Error;
@@ -104,7 +104,7 @@ fn all_tests
 ///
 /// Installs the explicit graph handle (override resolution reads
 /// it), so it assumes per-test process isolation (nextest), like
-/// tests/override_substitution.rs.
+/// tests/mirror_substitution.rs.
 #[test]
 fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
 ) -> Result<(), Box<dyn Error>> {
@@ -123,7 +123,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
           config, Some (tantivy),
           &[ ID::from ("ovr-sub-container") ] ) ?;
       assert! (
-        view_all . contains ("(overridesHere ovr-sub-original)"),
+        view_all . contains ("(inPlaceOf ovr-sub-original)"),
         "unrestricted the overrider should substitute for N:\n{}",
         view_all );
       assert! (
@@ -152,7 +152,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
                     viewnode_id_record : ViewnodeIdRecord::default (),
                     extend_at_next_rerender_all : false,
                     skgrepo_restriction_at_last_render : restriction . clone (),
-                    overrides_followed : OverridesFollowed::RootAuthors });
+                    perspective : Perspective::RootAuthors });
       let (mut server_stream, _client_stream) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       std::thread::scope ( |scope| {
@@ -178,7 +178,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
         "the restricted overrider's title must not leak:\n{}", view_public );
       assert! ( ! view_public . contains ("ovr-sub-overrider"),
         "the restricted overrider's id must not leak:\n{}", view_public );
-      assert! ( ! view_public . contains ("overridesHere"),
+      assert! ( ! view_public . contains ("inPlaceOf"),
         "nothing carries an override marker:\n{}",
         view_public );
       assert! ( ! view_public . contains ("ovr-sub-child"),
@@ -395,7 +395,7 @@ async fn skgrepo_set_switch_rerenders_views (
           viewnode_id_record : ViewnodeIdRecord::default (),
           extend_at_next_rerender_all : false,
           skgrepo_restriction_at_last_render : restriction . clone (),
-          overrides_followed : OverridesFollowed::RootAuthors, });
+          perspective : Perspective::RootAuthors, });
       let (mut server_stream, _client_stream) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       std::thread::scope ( |scope| {

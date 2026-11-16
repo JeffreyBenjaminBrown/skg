@@ -402,7 +402,7 @@ fn diff_form (
 /// Render metadata for an Occurrence:
 ///   [focused] [folded] [bodyFolded] node (gnid X)
 ///   (skgRepos (nodeRepo R) [(relRepo R)]) [noClaim] [writeProtected]
-///   [(overridesHere X)] [(editRequest ...)] [(viewRequests ...)]
+///   [(inPlaceOf X)] [(editRequest ...)] [(viewRequests ...)]
 ///   [(view [omittedBody] [(rels ...)] [(props ...)] [(birth ...)]
 ///          [noWarrant] [cycle] [repoBoundary])]
 ///   [(diff ...)]
@@ -474,8 +474,8 @@ fn occurrence_metadata_to_string (
       // sexp uses only this short form on both emission and parsing.
       parts . push ( "writeProtected" . to_string () ); }
     if let Some (ref original) =
-      occurrence . overridesHere {
-      parts . push ( format! ("(overridesHere {})",
+      occurrence . in_place_of {
+      parts . push ( format! ("(inPlaceOf {})",
                                original . 0 )); }
     parts . extend ( editRequest_form (
       edit_request (occurrence), request ));

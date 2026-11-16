@@ -123,9 +123,9 @@ M.commands = {
                    desc = "Edit the node's metadata as an org tree" },
   ViewAncestry = { module = 'skg.view_ancestry', fn = 'view_ancestry',
                    desc = 'Show only the outline ancestry of point' },
-  OverridePerspective = { module = 'skg.override_perspective',
-                          fn = 'override_perspective',
-                          desc = "Show this view from the next perspective: whose overrides it follows" },
+  CyclePerspective = { module = 'skg.perspective',
+                       fn = 'cycle_perspective',
+                       desc = "Show this view from the next perspective" },
   OrgBodyToggle = { module = 'skg.folds', fn = 'org_body_toggle',
                     desc = "Hide or show the body of the headline at point" },
   ReadableIdsToggle = { module = 'skg.readable_ids', fn = 'toggle',
@@ -413,7 +413,7 @@ M.content_view_bindings = {
   { 'vL', 'ToggleRepoOverlayOnLinks' }, -- C-c v L
   { 'vm', 'ViewMetadata' },              -- C-c v m
   { 'va', 'ViewAncestry' },           -- C-c v a
-  { 'vo', 'OverridePerspective' },       -- C-c v o
+  { 'vo', 'CyclePerspective' },       -- C-c v o
   { 'vr', 'ReadableIdsToggle' },         -- C-c v r
   { 'vR', 'ReadableIdsRefresh' },        -- C-c v R
   { 'vs', 'ViewLinkstack' },               -- C-c v s

@@ -456,7 +456,7 @@ fn diff_view_narrowed_by_a_switch (
   if let Err (failure) = refresh_reaches_fixpoint (
     &narrowed, graph,
     |again, again_record| refresh_viewforest (
-      again, again_record, &narrowed_truth, mode, 100, OverridesFollowed::RootAuthors )) {
+      again, again_record, &narrowed_truth, mode, 100, Perspective::RootAuthors )) {
     panic! ( "the narrowed diff view is no fixpoint: {}", failure ); }
   (opened, narrowed, forest) }
 

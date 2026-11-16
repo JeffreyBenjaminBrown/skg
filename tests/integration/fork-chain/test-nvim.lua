@@ -4,7 +4,7 @@
 -- skg.views.fork_node on the shown substitute C and rotate
 -- its clone to a private skgrepo, forming the chain D overrides C
 -- overrides N. Viewing N's container then shows the chain end D,
--- marked (overridesHere N), and the save accepts that chain-end
+-- marked (inPlaceOf N), and the save accepts that chain-end
 -- carrier.
 
 local T = dofile('../test-nvim-lib.lua')
@@ -97,13 +97,13 @@ print('foreign N forked into a public clone')
 -- 4. Reopen P: the public clone C is shown in N's place.
 p_buf = reopen_P()
 local shown = T.wait_for(function ()
-  return T.buffer_text(p_buf):find('(overridesHere N)', 1, true)
+  return T.buffer_text(p_buf):find('(inPlaceOf N)', 1, true)
 end, 10)
 T.check(shown, "the public clone was not shown in N's place")
 
 -- 5. Explicitly fork the shown substitute C.
 vim.api.nvim_set_current_buf(p_buf)
-goto_line_containing('(overridesHere N)',
+goto_line_containing('(inPlaceOf N)',
   'could not find the shown substitute')
 view_requests.fork_node()
 
@@ -119,11 +119,11 @@ save.approve_fork()
 print('the public clone was forked into a private clone (skgRepos (nodeRepo rotated))')
 
 -- 7. Reopen P (all skgrepos unrestricted): the chain end D -- a private-repo
---    node -- is now shown in N's place, still marked (overridesHere N).
+--    node -- is now shown in N's place, still marked (inPlaceOf N).
 p_buf = reopen_P()
 local function chain_end_shown ()
   for _, line in ipairs(vim.api.nvim_buf_get_lines(p_buf, 0, -1, false)) do
-    if line:find('(overridesHere N)', 1, true)
+    if line:find('(inPlaceOf N)', 1, true)
        and line:find('(skgRepos (nodeRepo private))', 1, true) then
       return true
     end
@@ -132,7 +132,7 @@ local function chain_end_shown ()
 end
 local end_shown = T.wait_for(chain_end_shown, 10)
 T.check(end_shown, 'the chain end D (a private node) was not shown for N')
-print("the chain end D (private) is shown in N's place (overridesHere N)")
+print("the chain end D (private) is shown in N's place (inPlaceOf N)")
 
 -- 8. Saving the chain-end view succeeds (tamper check accepts the
 --    chain-end carrier).

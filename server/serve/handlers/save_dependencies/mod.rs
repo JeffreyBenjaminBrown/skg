@@ -198,7 +198,7 @@ fn dependencies_from_text (
 }
 
 /// The graphnodes a dirty view holds viewnodes of: occurrences (and the
-/// overrides each shows), gnid-only viewnodes, ghosts and ID property
+/// originals the mirrors shown stand for), gnid-only viewnodes, ghosts and ID property
 /// members. A merge request or a link does not make its target one: it
 /// holds no copy of the target, so a save that changes the target
 /// clobbers nothing the view holds.
@@ -210,7 +210,7 @@ fn dependencies_from_viewforest (
     match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) => {
         result . insert (occurrence . gnid . clone ());
-        result . extend (occurrence . overridesHere . iter () . cloned ()); }
+        result . extend (occurrence . in_place_of . iter () . cloned ()); }
       ViewnodeKind::Vognode (Vognode::GnidOnly (gnid_only)) => {
         result . insert (gnid_only . gnid . clone ()); }
       ViewnodeKind::Vognode (Vognode::Ghost (ghost)) => {

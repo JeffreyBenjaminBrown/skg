@@ -11,7 +11,7 @@ use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructio
   find_contradictory_processed_requests, find_inconsistent_instructions};
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving_in_graph;
 use skg::dbs::in_rust_graph::InRustGraph;
-use skg::types::views_state::OverridesFollowed;
+use skg::types::views_state::Perspective;
 use skg::types::errors::HeadlineName;
 use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
 use skg::types::viewnode::ViewnodeId;
@@ -213,7 +213,7 @@ fn validation_refuses_contradictory_processed_requests () -> Result<(), Box<dyn 
                 path : PathBuf::from ("/tmp/main"), owned : true } ) ]));
   let errors : Vec<BufferValidationError> = find_buffer_errors_for_saving_in_graph (
     &viewforest, &InRustGraph::from_graphnodes (&[]), &config,
-    OverridesFollowed::RootAuthors ) ?;
+    Perspective::RootAuthors ) ?;
   let refusals : Vec<&BufferValidationError> = errors . iter ()
     . filter ( |e| matches! ( e, BufferValidationError::ContradictoryProcessedRequests (..) ))
     . collect ();

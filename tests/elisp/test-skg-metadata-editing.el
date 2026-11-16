@@ -44,7 +44,7 @@ plain parens. Fields producing no herald get none."
 applying it untouched leaves the headline as it was."
   (let ((headline (concat "** (skg (vnid 0b) focused folded node (gnid n)"
                           " (skgRepos (nodeRepo main) (relRepo pub)) noClaim writeProtected"
-                          " (overridesHere o) (editRequest (relRepo pub) (processed node))"
+                          " (inPlaceOf o) (editRequest (relRepo pub) (processed node))"
                           " (viewRequests editableView) (view cycle)"
                           " (diff (rel added) (leaves 1 rel))) a title"))
         (source (generate-new-buffer "*test-sexp-edit-source*")))

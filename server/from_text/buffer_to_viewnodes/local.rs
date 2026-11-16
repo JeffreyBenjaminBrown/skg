@@ -666,7 +666,7 @@ pub fn claiming_children_have_distinct_gnids (
   for child in node_ref . children() {
     let content_gnid : Option<ID> =
       // collected IDs, not own IDs: distinctness guards the
-      // collected contains list, and a shown overrider can
+      // collected contains list, and a shown mirror can
       // legitimately appear twice when it stands for two distinct
       // originals.
       match &child . value() . kind {

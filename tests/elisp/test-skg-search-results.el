@@ -54,9 +54,9 @@
           (set-buffer-modified-p nil))
         (kill-buffer buffer-name)))))
 
-(ert-deftest test-skg-search-run-again-follows-its-root-authors-overrides ()
-  "A search run again redraws its buffer as a fresh view, which follows
-its root authors' overrides, so a perspective chosen in that buffer
+(ert-deftest test-skg-search-run-again-shows-its-root-authors-perspective ()
+  "A search run again redraws its buffer as a fresh view, which is drawn
+from its root authors' perspective, so a perspective chosen in that buffer
 before does not survive into it, in the mode line or in saves."
   (let ((buffer-name (skg-search-buffer-name "again-test"))
         (payload "((response-type search-results) (content \"* (skg node (gnid a)) a hit\") (warnings ()))"))
@@ -64,11 +64,11 @@ before does not survive into it, in the mode line or in saves."
         (progn
           (skg--display-search-results payload "again-test")
           (with-current-buffer buffer-name
-            (skg--set-override-perspective "user" "your overrides"))
+            (skg--set-perspective "user" "your perspective"))
           (skg--display-search-results payload "again-test")
           (with-current-buffer buffer-name
-            (should-not skg-overrides-followed)
-            (should-not skg-override-perspective-name)))
+            (should-not skg-perspective)
+            (should-not skg-perspective-name)))
       (when (get-buffer buffer-name)
         (with-current-buffer buffer-name
           (remove-hook 'kill-buffer-hook #'skg-send-close-view t)

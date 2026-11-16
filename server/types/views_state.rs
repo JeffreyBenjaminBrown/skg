@@ -49,7 +49,7 @@ pub struct ViewState {
   pub viewnode_id_record : ViewnodeIdRecord,
   pub extend_at_next_rerender_all : bool, // for a buffer of the diff view a reload named: the next "rerender all views" that rerenders it extends it ('DiffViewBufferRerender::ExtendingWhereAReloadAsked')
   pub skgrepo_restriction_at_last_render : SkgrepoRestriction, // the skgrepo restriction the view was last rendered (or registered) under. A save of the view is refused while the connection's shows another set of skgrepos ('error_unless_view_was_rendered_under_current_restriction').
-  pub overrides_followed : OverridesFollowed, // the perspective the view's rerenders substitute by: set by the "set overrides followed" request and by each save, which names it
+  pub perspective : Perspective, // the perspective the view's rerenders substitute by: set by the "set perspective" request and by each save, which names it
 }
 
 /// A view's perspective: where a node stands as content, the refresh
@@ -57,10 +57,10 @@ pub struct ViewState {
 /// ranks first ('substitute_mirrors' in 'server/refresh/visit.rs';
 /// 'server/dbs/in_rust_graph/mirrors.rs'). The client holds the choice for its
 /// buffer and names it in each save; the connection keeps it for the
-/// rerenders it starts ('ViewState::overrides_followed'). A fresh view
+/// rerenders it starts ('ViewState::perspective'). A fresh view
 /// follows its root authors'.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub enum OverridesFollowed {
+pub enum Perspective {
   /// Each top-level tree is drawn from its root's author's
   /// perspective: the user's under an owned root, that author's under
   /// a foreign one
@@ -122,23 +122,23 @@ impl DiffViewBufferKind {
 // Implementations
 //
 
-impl OverridesFollowed {
-  /// The user's overrides, in every tree.
+impl Perspective {
+  /// The user's perspective, in every tree.
   pub fn user (
-  ) -> OverridesFollowed {
-    OverridesFollowed::Owner (SkgrepoOwner::User) }
+  ) -> Perspective {
+    Perspective::Owner (SkgrepoOwner::User) }
 
-  /// The '(overrides-followed . "...")' of a save or of a "set
-  /// overrides followed" request: "root authors", "user", or "owner
+  /// The '(perspective . "...")' of a save or of a "set perspective"
+  /// request: "root authors", "user", or "owner
   /// of NAME" for a foreign owner, NAME the first of its skgrepos in
   /// declaration order ('SkgConfig::skgrepo_owner').
   pub fn wire_name (
     &self,
   ) -> String {
     match self {
-      OverridesFollowed::RootAuthors => "root authors" . to_string (),
-      OverridesFollowed::Owner (SkgrepoOwner::User) => "user" . to_string (),
-      OverridesFollowed::Owner (SkgrepoOwner::Foreign (name)) =>
+      Perspective::RootAuthors => "root authors" . to_string (),
+      Perspective::Owner (SkgrepoOwner::User) => "user" . to_string (),
+      Perspective::Owner (SkgrepoOwner::Foreign (name)) =>
         format! ("owner of {}", name . 0), } }
 
   /// The choice 'name' gives ('wire_name'). "owner of NAME" may name
@@ -148,25 +148,25 @@ impl OverridesFollowed {
   pub fn from_wire_name (
     name   : &str,
     config : &SkgConfig,
-  ) -> Option<OverridesFollowed> {
+  ) -> Option<Perspective> {
     match name {
-      "root authors" => Some (OverridesFollowed::RootAuthors),
-      "user"         => Some (OverridesFollowed::user ()),
+      "root authors" => Some (Perspective::RootAuthors),
+      "user"         => Some (Perspective::user ()),
       _ => {
         let skgrepo : SkgrepoName =
           SkgrepoName::from ( name . strip_prefix ("owner of ") ? );
         if ! config . skgrepos . contains_key (&skgrepo)
            || config . skgrepo_is_owned (&skgrepo) { return None; }
-        Some ( OverridesFollowed::Owner ( config . skgrepo_owner (&skgrepo) )) }} }
+        Some ( Perspective::Owner ( config . skgrepo_owner (&skgrepo) )) }} }
 
-  /// How a message to the user names an owner's overrides: "your
-  /// overrides", or "NAME's overrides".
-  pub fn name_of_owners_overrides (
+  /// How a message to the user names an owner's perspective: "your
+  /// perspective", or "NAME's perspective".
+  pub fn name_of_owners_perspective (
     owner : &SkgrepoOwner,
   ) -> String {
     match owner {
-      SkgrepoOwner::User => "your overrides" . to_string (),
-      SkgrepoOwner::Foreign (name) => format! ("{}'s overrides", name . 0), } }
+      SkgrepoOwner::User => "your perspective" . to_string (),
+      SkgrepoOwner::Foreign (name) => format! ("{}'s perspective", name . 0), } }
 }
 
 impl ViewforestId {
@@ -251,7 +251,7 @@ impl OpenViews {
                     viewnode_id_record,
                     extend_at_next_rerender_all : false,
                     skgrepo_restriction_at_last_render : rendered_under . clone (),
-                    overrides_followed : OverridesFollowed::default () };
+                    perspective : Perspective::default () };
       self . views . insert ( viewforest_id, state ); }
 
   /// 'register_view' for a buffer of the diff view.
@@ -289,23 +289,23 @@ impl OpenViews {
       state . extend_at_next_rerender_all =
         extend && state . diffView_buffer_kind . is_some (); }}
 
-  /// Record whose overrides the open view 'viewforest_id' follows.
-  pub fn set_overrides_followed (
+  /// Record the perspective of the open view 'viewforest_id'.
+  pub fn set_perspective (
     &mut self,
-    viewforest_id      : &ViewforestId,
-    overrides_followed : OverridesFollowed,
+    viewforest_id : &ViewforestId,
+    perspective : Perspective,
   ) {
     if let Some (state) = self . views . get_mut (viewforest_id) {
-      state . overrides_followed = overrides_followed; }}
+      state . perspective = perspective; }}
 
-  /// Whose overrides the open view 'viewforest_id' follows; a view
-  /// the connection does not hold follows its root authors'.
-  pub fn overrides_followed_by_view (
+  /// The perspective of the open view 'viewforest_id'; a view
+  /// the connection does not hold is drawn from its root authors'.
+  pub fn perspective_of_view (
     &self,
     viewforest_id : &ViewforestId,
-  ) -> OverridesFollowed {
+  ) -> Perspective {
     self . views . get (viewforest_id)
-      . map ( |state| state . overrides_followed . clone () )
+      . map ( |state| state . perspective . clone () )
       . unwrap_or_default () }
 
   /// Whether any open view is a buffer of the diff view.
@@ -382,7 +382,7 @@ impl OpenViews {
                            viewnode_id_record,
                            extend_at_next_rerender_all : false,
                            skgrepo_restriction_at_last_render : rendered_under . clone (),
-                           overrides_followed : OverridesFollowed::default () } ); }}
+                           perspective : Perspective::default () } ); }}
 
   pub fn unregister_view (
     &mut self,

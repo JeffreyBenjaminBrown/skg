@@ -82,8 +82,8 @@ Fails the test if it is not found."
       (skg--change-repo-at-point "owned")
       (skg-approve-fork)))
 
-  ;; 5. Reopen Q fresh: override substitution now shows the clone in M's
-  ;;    place, carrying (overridesHere M).
+  ;; 5. Reopen Q fresh: mirror substitution now shows the clone in M's
+  ;;    place, carrying (inPlaceOf M).
   (let ((q-buf (fork-test--buffer-showing "Q")))
     (when (buffer-live-p q-buf) (kill-buffer q-buf)))
   (skg-request-single-root-content-view-from-id "Q")
@@ -92,14 +92,14 @@ Fails the test if it is not found."
                         (let ((q-buf (fork-test--buffer-showing "Q")))
                           (and q-buf
                                (with-current-buffer q-buf
-                                 (string-match-p "(overridesHere M)"
+                                 (string-match-p "(inPlaceOf M)"
                                                  (buffer-string))))))
                       10)))
     (unless substituted
       (let ((q-buf (fork-test--buffer-showing "Q")))
         (test-fail "the clone was not shown in M's place on reopen:\n%s"
                    (if q-buf (with-current-buffer q-buf (buffer-string)) "<no Q buffer>"))))
-    (message "✓ approve: the clone is shown in M's place with (overridesHere M)"))
+    (message "✓ approve: the clone is shown in M's place with (inPlaceOf M)"))
 
   ;; 6. DECLINE on a second node M2 (in Q2): the lingering fork atom is
   ;;    stripped and nothing is committed.
@@ -131,7 +131,7 @@ Fails the test if it is not found."
     ;; Give the view a beat, then assert no substitution happened.
     (skg-test-wait-for (lambda () nil) 1)
     (with-current-buffer q2-buf
-      (when (string-match-p "(overridesHere M2)" (buffer-string))
+      (when (string-match-p "(inPlaceOf M2)" (buffer-string))
         (test-fail "decline must not commit a clone overriding M2:\n%s"
                    (buffer-string))))
     (message "✓ decline committed nothing (no clone overrides M2)"))

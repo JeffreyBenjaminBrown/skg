@@ -18,7 +18,7 @@ use crate::refresh::{Truth, refresh_content_viewforest};
 use crate::rerender_pass::RerenderPassContext;
 use crate::types::env::RuntimeGeneration;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::views_state::{OverridesFollowed, ViewnodeIdRecord, pids_from_viewforest};
+use crate::types::views_state::{Perspective, ViewnodeIdRecord, pids_from_viewforest};
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
@@ -62,10 +62,10 @@ pub fn render_initial_view (
 ) -> Result<(ViewForest, String), Box<dyn Error>> {
   let mut viewforest : ViewForest = stub_of_fresh_content_view (
     root_gnids, &runtime . graph );
-  refresh_content_viewforest ( // a fresh view follows its root authors' overrides
+  refresh_content_viewforest ( // a fresh view is drawn from its root authors' perspective
     &mut viewforest, &mut ViewnodeIdRecord::default (),
     &Truth::of_runtime (runtime, restriction),
-    OverridesFollowed::RootAuthors ) ?;
+    Perspective::RootAuthors ) ?;
   let text : String = viewforest_to_string (&viewforest) ?;
   Ok (( viewforest, text )) }
 
@@ -104,14 +104,14 @@ pub(crate) fn stub_of_fresh_content_view (
 
 /// The refresh of an open content view, against the pass's runtime
 /// generation and under its skgrepo restriction, following
-/// 'overrides_followed' ('refresh_view' in 'server/rerender_pass.rs').
+/// 'perspective' ('refresh_view' in 'server/rerender_pass.rs').
 pub(crate) fn refresh_content_view (
   viewforest         : &mut ViewForest,
   viewnode_id_record : &mut ViewnodeIdRecord,
   context            : &mut RerenderPassContext<'_>,
-  overrides_followed : OverridesFollowed,
+  perspective        : Perspective,
 ) -> Result<(), Box<dyn Error>> {
   refresh_content_viewforest (
     viewforest, viewnode_id_record,
     &Truth::of_runtime (&context . runtime, context . skgrepo_restriction),
-    overrides_followed ) }
+    perspective ) }

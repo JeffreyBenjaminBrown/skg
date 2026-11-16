@@ -61,7 +61,7 @@ use crate::types::save::{
   NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan, format_save_error_as_org };
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::ViewnodeId;
-use crate::types::views_state::{DiffViewBufferKind, OverridesFollowed, ViewforestId, ViewnodeIdRecord};
+use crate::types::views_state::{DiffViewBufferKind, Perspective, ViewforestId, ViewnodeIdRecord};
 use crate::rerender_pass::update_views_after_save;
 use crate::view_text_delta::{changed_headlines, changed_headlines_entry};
 
@@ -310,8 +310,8 @@ pub fn handle_save_buffer_request (
     preview_from_request (request);
   let named_diffView_buffer_kind_result : Result<Option<DiffViewBufferKind>, String> =
     named_diffView_buffer_kind_from_request (request);
-  let overrides_followed_result : Result<OverridesFollowed, String> =
-    overrides_followed_from_save_request (
+  let perspective_result : Result<Perspective, String> =
+    perspective_from_save_request (
       request, & env . runtime_snapshot () . config );
   { // Send the early broad lock before reading the buffer, so the client's
     // one-shot save-lock handler always fires exactly once and balances its
@@ -331,7 +331,7 @@ pub fn handle_save_buffer_request (
             .and_then (|content| parse_save_request_envelope (
               &content, viewforest_id_from_request_result . as_ref () . ok ())),
           named_diffView_buffer_kind_result
-            . and_then ( |kind| overrides_followed_result
+            . and_then ( |kind| perspective_result
                          . map ( |followed| (kind, followed) )))
   {
     (Ok (_envelope), Err (error_msg)) if preview =>
@@ -344,7 +344,7 @@ pub fn handle_save_buffer_request (
           TcpToClient::SaveResult,
           & sexp_to_client_string ( &empty_response_sexp (
             &error_msg, &[], &save_point_position )) )); }
-    (Ok (envelope), Ok ((named_diffView_buffer_kind, overrides_followed))) => {
+    (Ok (envelope), Ok ((named_diffView_buffer_kind, perspective))) => {
       if let (Ok (viewforest_id), false) =
         (&viewforest_id_from_request_result, preview) {
         crate::view_snapshots::record_received (
@@ -367,7 +367,7 @@ pub fn handle_save_buffer_request (
             delete_from,
             &envelope . other_views,
             named_diffView_buffer_kind,
-            overrides_followed,
+            perspective,
             preview ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
@@ -701,17 +701,17 @@ fn named_diffView_buffer_kind_from_request (
         "The save request names the diff view buffer {:?}, which the diff view does not have. Nothing was saved.",
         name )), }}
 
-/// The request's '(overrides-followed . "NAME")': whose overrides the
-/// saved buffer was drawn following ('OverridesFollowed::wire_name');
+/// The request's '(perspective . "NAME")': the perspective the
+/// saved buffer was drawn from ('Perspective::wire_name');
 /// its root authors' without one. A name no choice has refuses the
 /// save.
-fn overrides_followed_from_save_request (
+fn perspective_from_save_request (
   request : &str,
   config  : &SkgConfig,
-) -> Result<OverridesFollowed, String> {
-  match value_from_request_sexp ("overrides-followed", request) {
-    Err (_) => Ok (OverridesFollowed::RootAuthors),
-    Ok (name) => OverridesFollowed::from_wire_name (&name, config)
+) -> Result<Perspective, String> {
+  match value_from_request_sexp ("perspective", request) {
+    Err (_) => Ok (Perspective::RootAuthors),
+    Ok (name) => Perspective::from_wire_name (&name, config)
       . ok_or_else ( || format! (
         "The save request says the buffer was drawn from the perspective {:?}, which names none. Nothing was saved.",
         name )), }}
@@ -960,7 +960,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
     viewforest_id_from_request_result, views_state, skgrepo_restriction,
     approved_forks, fork_skgrepos, approved_hoist_pids,
     &StrandedsReview::NotReviewed, DeleteFrom::NotChosen,
-    &[], None, OverridesFollowed::RootAuthors ) . await
+    &[], None, Perspective::RootAuthors ) . await
 }
 
 pub async fn update_from_and_rerender_buffer_with_approvals (
@@ -978,14 +978,14 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   delete_from               : DeleteFrom,
   other_views               : &[ClientViewSnapshot],
   named_diffView_buffer_kind : Option<DiffViewBufferKind>,
-  overrides_followed         : OverridesFollowed,
+  perspective                : Perspective,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   update_from_and_rerender_buffer_with_approvals_or_preview (
     stream, org_buffer_text, baseline, env,
     viewforest_id_from_request_result, views_state, skgrepo_restriction,
     approved_forks, fork_skgrepos, approved_hoist_pids, strandeds_review,
     delete_from, other_views, named_diffView_buffer_kind,
-    overrides_followed, false ) . await }
+    perspective, false ) . await }
 
 /// As 'update_from_and_rerender_buffer_with_approvals', but when
 /// 'preview', stop once the plan is built and checked against the
@@ -1006,7 +1006,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
   delete_from               : DeleteFrom,
   other_views               : &[ClientViewSnapshot],
   named_diffView_buffer_kind : Option<DiffViewBufferKind>, // the request's '(diff-view-buffer . "...")': the buffer of the diff view it saves, for a view the connection does not hold
-  overrides_followed         : OverridesFollowed, // the request's '(overrides-followed . "...")': whose overrides the buffer was drawn following
+  perspective                : Perspective, // the request's '(perspective . "...")': the perspective the buffer was drawn from
   preview                    : bool, // the request's '(preview . "true")'
 ) -> Result<SaveResponse, Box<dyn Error>> {
   error_unless_view_was_rendered_under_current_restriction (
@@ -1035,7 +1035,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
           ) . entered();
         buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
           org_buffer_text, &runtime . graph, &runtime . config,
-          skgrepo_restriction, fork_skgrepos, &baseline, overrides_followed . clone () )
+          skgrepo_restriction, fork_skgrepos, &baseline, perspective . clone () )
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
   if viewforest . is_empty ()
@@ -1300,7 +1300,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
         skgrepo_restriction,
         &fork_specs,
         named_diffView_buffer_kind,
-        overrides_followed ) ?;
+        perspective ) ?;
     { // Nonfatal parse warnings (e.g. discarded folder headline text)
       // precede the rerender's warnings.
       let mut warnings : Vec<String> = parse_warnings;
@@ -1436,31 +1436,31 @@ fn viewforest_ids_of_views_to_lock (
   lock_viewforest_ids }
 
 #[cfg(test)]
-mod overrides_followed_tests {
+mod perspective_tests {
   use super::*;
   use crate::types::misc::{Skgrepo, SkgrepoOwner};
   use std::path::PathBuf;
 
   #[test]
-  fn a_save_names_whose_overrides_its_buffer_follows_and_a_bad_name_refuses_it () {
+  fn a_save_names_its_buffers_perspective_and_a_bad_name_refuses_it () {
     let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
     for (name, owned) in [ ("main", true), ("tracy", false) ] {
       config . skgrepos . insert (
         SkgrepoName::from (name),
         Skgrepo { name : SkgrepoName::from (name), abbreviation : None,
                   path : PathBuf::from (name), owned } ); }
-    let named = |sexp : &str| overrides_followed_from_save_request (
+    let named = |sexp : &str| perspective_from_save_request (
       &format! ("((request . \"save buffer\") (view-id . \"v\"){})", sexp), &config );
-    assert_eq! ( named (""), Ok (OverridesFollowed::RootAuthors) );
-    assert_eq! ( named (" (overrides-followed . \"user\")"),
-                 Ok (OverridesFollowed::user ()) );
-    assert_eq! ( named (" (overrides-followed . \"root authors\")"),
-                 Ok (OverridesFollowed::RootAuthors) );
-    assert_eq! ( named (" (overrides-followed . \"owner of tracy\")"),
-                 Ok ( OverridesFollowed::Owner (
+    assert_eq! ( named (""), Ok (Perspective::RootAuthors) );
+    assert_eq! ( named (" (perspective . \"user\")"),
+                 Ok (Perspective::user ()) );
+    assert_eq! ( named (" (perspective . \"root authors\")"),
+                 Ok (Perspective::RootAuthors) );
+    assert_eq! ( named (" (perspective . \"owner of tracy\")"),
+                 Ok ( Perspective::Owner (
                    SkgrepoOwner::Foreign ( SkgrepoName::from ("tracy") )) ));
-    assert! ( named (" (overrides-followed . \"mine\")") . is_err () );
-    assert! ( named (" (overrides-followed . \"owner of main\")") . is_err (),
+    assert! ( named (" (perspective . \"mine\")") . is_err () );
+    assert! ( named (" (perspective . \"owner of main\")") . is_err (),
               "an owned skgrepo names no foreign owner" );
-    assert! ( named (" (overrides-followed . \"owner of nobody\")") . is_err () ); }
+    assert! ( named (" (perspective . \"owner of nobody\")") . is_err () ); }
 }

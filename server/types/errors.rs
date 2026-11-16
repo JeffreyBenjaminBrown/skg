@@ -141,7 +141,7 @@ pub enum BufferValidationError {
                                   Vec<ID>,  // ids the buffer's idFolder claims
                                   Vec<ID>,  // the recorder's real ids (pid + extra_ids); empty if the recorder is not in the graph
                                   HeadlineName), // the recorder's occurrence
-  OverridesHere_Mismatch         (Option<ID>, // the carrier's own ID
+  InPlaceOf_Mismatch         (Option<ID>, // the carrier's own ID
                                   ID,         // the original the fact claims
                                   Option<ID>, // the mirror the graph says stands for that original; None if the graph was unavailable
                                   HeadlineName), // the carrier
@@ -354,8 +354,8 @@ impl std::fmt::Display for BufferValidationError {
         write! (f, "Cannot change flags of node {:?} from foreign repo '{}'; this gesture never creates an implicit fork.", gnid, skgrepo),
       BufferValidationError::FlagEditOnUnknownNode (gnid) =>
         write! (f, "Cannot change flags of unsaved or unknown graphnode {:?}; save the node first.", gnid),
-      BufferValidationError::OverridesHere_Mismatch(carrier, original, effective, headline) =>
-        write!(f, "Node {:?} ({}) carries the fact (overridesHere {:?}), but it is not a mirror of that original (whose mirror shown here is {:?}). The fact looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, headline, original, effective),
+      BufferValidationError::InPlaceOf_Mismatch(carrier, original, effective, headline) =>
+        write!(f, "Node {:?} ({}) carries the fact (inPlaceOf {:?}), but it is not a mirror of that original (whose mirror shown here is {:?}). The fact looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, headline, original, effective),
       BufferValidationError::ChangedSinceRendered {
         gnid, change : StaleGraphnodeReport::Deleted, headlines } =>
         write!(f, "Node {:?} ({}) was deleted after this buffer was rendered. Nothing was saved; reopen a fresh view and reapply the edit.",
@@ -388,7 +388,7 @@ impl BufferValidationError {
         | BufferValidationError::EditedWriteProtectedOccurrence { headline, .. }
         | BufferValidationError::FlagsSurfaceEdited { headline, .. }
         | BufferValidationError::IDFolder_Edited (_, _, _, headline)
-        | BufferValidationError::OverridesHere_Mismatch (_, _, _, headline) =>
+        | BufferValidationError::InPlaceOf_Mismatch (_, _, _, headline) =>
         vec! [ headline ],
       BufferValidationError::Multiple_Defining_Viewnodes (_, headlines)
         | BufferValidationError::AmbiguousDeletion (_, headlines)

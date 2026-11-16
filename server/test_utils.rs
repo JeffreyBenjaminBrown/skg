@@ -33,7 +33,7 @@ use crate::serve::handlers::save_buffer::{
 };
 use crate::serve::parse_metadata_sexp::{MetadataKind, ViewnodeMetadata};
 use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::{OpenViews, OverridesFollowed, ViewforestId, ViewnodeIdRecord};
+use crate::types::views_state::{OpenViews, Perspective, ViewforestId, ViewnodeIdRecord};
 use crate::types::misc::{MSV, SkgConfig, Skgrepo, ID, TantivyIndex, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::nodes::complete::Graphnode;
@@ -547,7 +547,7 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
     &SkgrepoRestriction::unrestricted (config),
     true, &HashMap::new (), &std::collections::HashSet::new (),
     &StrandedsReview::NotReviewed,
-    DeleteFrom::NotChosen, other_views, None, OverridesFollowed::RootAuthors ) . await
+    DeleteFrom::NotChosen, other_views, None, Perspective::RootAuthors ) . await
 }
 
 /// Send 'org_buffer_text' as a save with '(preview . "true")': the
@@ -567,7 +567,7 @@ pub async fn save_preview_test (
     views_state, &SkgrepoRestriction::unrestricted (config),
     false, &HashMap::new (), &std::collections::HashSet::new (),
     &StrandedsReview::NotReviewed, DeleteFrom::NotChosen, &[], None,
-    OverridesFollowed::RootAuthors, true ) . await }
+    Perspective::RootAuthors, true ) . await }
 
 /// As 'update_from_and_rerender_buffer_test', but lets the test choose
 /// whether forks are approved -- pass false to exercise the
@@ -967,7 +967,7 @@ pub fn draw_containerward_chains_under_members (
   truth   : &Truth,
   mode    : RefreshMode,
 ) -> Result<(), Box<dyn Error>> {
-  let walk : Walk = Walk::new (truth, mode, 0, OverridesFollowed::RootAuthors);
+  let walk : Walk = Walk::new (truth, mode, 0, Perspective::RootAuthors);
   for member in members {
     draw_containerward_chain (tree, *member, &walk) ?; }
   Ok (( )) }

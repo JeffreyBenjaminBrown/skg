@@ -123,7 +123,7 @@ fn forkee_members_written_in (
       for member in forkee . children () {
         let Some (occurrence) : Option<&Occurrence> = occurrence_of (member)
           else { continue; };
-        // A shown overrider stands for the original it is shown in
+        // A shown mirror stands for the original it is shown in
         // place of, which is what the forkee's list names.
         let named : ID = occurrence . collected_gnid ();
         if occurrence_child_counts_as_content (occurrence)

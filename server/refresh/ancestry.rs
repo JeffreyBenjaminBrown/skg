@@ -117,8 +117,8 @@ pub fn described_node (
 
 /// The gnids the view shows above the headline at 'treeid': of each
 /// vognode among its ancestors, the gnid it stands for, and an
-/// occurrence's collected gnid too when it is shown in place of an
-/// overridden node. Folders and other scaffolds stand for no gnid and
+/// occurrence's collected gnid too when it is shown in place of
+/// another note. Folders and other scaffolds stand for no gnid and
 /// are passed over. The headline's own gnid is not among them.
 pub fn view_ancestor_gnids (
   tree   : &Tree<Viewnode>,

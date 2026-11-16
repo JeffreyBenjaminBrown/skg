@@ -4,7 +4,7 @@
 # the override-chains arc): fork a foreign node into a public clone, then
 # explicitly fork that clone (the shown substitute) into a private clone.
 # The result is an owned chain D overrides C overrides N; viewing N's
-# container shows the chain end D, marked (overridesHere N), and the save
+# container shows the chain end D, marked (inPlaceOf N), and the save
 # accepts the chain-end carrier.
 #
 # Repos: public + private (owned) and foreign.

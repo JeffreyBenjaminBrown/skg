@@ -200,7 +200,7 @@ impl Goal {
 
 /// What a child stands for in its parent's goal, if anything: an
 /// occurrence stands for the gnid its parent's list would hold (the
-/// original of a shown overrider), a ghost or a gnid-only vognode for
+/// original of a shown mirror), a ghost or a gnid-only vognode for
 /// its gnid, a property member for its value.
 pub(crate) fn member_of_child (
   viewnode : &Viewnode,

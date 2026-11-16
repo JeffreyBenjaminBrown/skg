@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Integration test for cycling a view's perspective, whose overrides it
-# follows ('docs/api-and-formats.org', "Set overrides followed").
+# Integration test for cycling a view's perspective
+# ('docs/api-and-formats.org', "Set perspective").
 # Foreign R contains M and K; A, also foreign, U, owned, and B, of a
-# second foreign owner, "third", each override M. The client opens R,
+# second foreign owner, "third", each fork M. The client opens R,
 # which shows A in M's place; switches the view to the next
 # perspective, the user's, which shows U there; is refused the switch
 # while the buffer has unsaved edits; saves, which keeps the
@@ -18,9 +18,9 @@ PROJECT_ROOT="$(cd "$TEST_DIR/../../.." && pwd)"
 
 source "$TEST_DIR/../test-lib.sh"
 
-echo "=== SKG Override Perspective Integration Test ==="
+echo "=== SKG Perspective Integration Test ==="
 
-WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/skg-overrides-followed-XXXXXX")
+WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/skg-perspective-XXXXXX")
 cp -r "$TEST_DIR/data/foreign" "$TEST_DIR/data/owned" "$TEST_DIR/data/third" "$WORK_DIR/"
 trap 'cleanup; rm -rf "$WORK_DIR"' EXIT
 

@@ -100,7 +100,7 @@ local committed = T.wait_for(function ()
   if not buf then return false end
   local s = T.buffer_text(buf)
   return s:find('(forks (out 1))', 1, true)
-     and s:find('(overridesHere N)', 1, true)
+     and s:find('(inPlaceOf N)', 1, true)
      and s:find('N-edited', 1, true)
 end, 10)
 T.check(committed, 'the fork did not commit after approval')
