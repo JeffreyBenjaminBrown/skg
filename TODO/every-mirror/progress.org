@@ -1772,3 +1772,268 @@ ID or title moved). No fixture's graph changed.
   searchable old word.
 *** DONE
 The slice's headline in '1_plan.org' is DONE.
+** Review fixes
+What the review of plan 1 ('review-1-terms.org', 'review-1-probes.org')
+found, and what each became. Run on 2026-11-16, after 0a514711.
+*** Commits
+- f13038a1 every-mirror plan 1 review: a re-pointed occurrence draws its folders afresh
+- 6900d475 every-mirror plan 1 review: deleting a restricted viewnode in the forks folders changes nothing
+- 0322002b every-mirror plan 1 review: heralds.org writes a forker's other forkees as the renderer does, K2b
+- 8e629e3c every-mirror plan 1 review: the migration tool's commit line only for a gitrepo's top level
+- 11f63fa9 every-mirror plan 1 review: retired-key refusals name the October tool and every skgrepo
+- 5fa40ea4 every-mirror plan 1 review: the names and labels the terms review found
+- fdb913c4 every-mirror plan 1 review: docs, per the terms review
+- e966d323 every-mirror plan 1 review: every suppressed search hit stands under the hit that suppressed it
+- (the commit carrying this record) every-mirror plan 1 review: the record
+*** Suites
+All green at the end; no failure left to classify.
+- As I went: item 1, 'grouped_forks', 'grouped_views' and the lib,
+  495 of 495; item 2, every grouped binary and the lib, 1245 of 1245
+  (two 'hidden_nodes' tests failed first: they encoded the old rule,
+  and were adapted, see "Deviations"); items 4b and 4c, the new and
+  changed tests 2 of 2; item 5, 1246 of 1246, 'bash/emacs-tests.sh'
+  503 of 503 (one failure first: the rendering cases' style runs, which
+  pin the labels' lengths, fixed), 'bash/nvim-tests.sh' no failure,
+  the migration tool's tests 17 of 17, the AI tool's tests PASS (one
+  failure first: its perspective test pinned viewnode IDs that item 1
+  now renews, adapted); item 6, 1246 of 1246.
+- 'bash/integration-tests.sh': 76 of 76 (both clients), first run.
+- 'bash/all-tests.sh', first run, on e966d323's tree: all pass: build,
+  Emacs 503 of 503, Neovim (no failure), nextest 1246 of 1246,
+  doctests, team tools, AI reader, integration 76 of 76.
+- The probe of item 1, end to end against an isolated
+  'target/debug/skg' (port 24811, scratch data, stopped by its PID and
+  the port confirmed free, the scratch deleted): see "The probes'
+  findings".
+Logs: 'tests/results/every-mirror/review-fixes-plan1/' (item1-narrow,
+item2-narrow, item5-narrow, item5-emacs, item5-nvim, item5-ai-tool,
+item6-narrow, integration.out and integration-tests.log, all-tests.out,
+all-tests-ALL.org, all-tests-nextest.log, emacs.log, nvim.log,
+ai-reader.log; 'probe-item1/' holds the rebuilt fixture and the
+probe's transcript).
+*** The probes' findings
+**** "Did not match" 1: a re-pointed occurrence kept its forks folder (fixed)
+Reproduced first, on a scratch copy of the probe's s1 fixture
+(migrated with the tool) and a 'target/debug' server: 'view P', then
+alice's perspective, then the root authors' drew exactly the probe's
+'transcripts/s1/repro/' buffer (u3's forks folder holding b3 claiming
+nothing, so 'detach'; f1priv in its own folder; and so on).
+
+The deciding code: 'substitute_mirrors' ('server/refresh/visit.rs')
+re-pointed a content occurrence with 'show_mirror' and left its
+children alone. A content child's own visit recomputes its goal, so
+its content was judged afresh, but the forks folder kept its members
+with the claims they had drawn for the old note: a member claiming
+nothing stays under an editable parent ('mark_claims' keeps it, as a
+detachment the user wrote), and is warranted if either side of the
+fork holds. 'substitute_roots' already called 'redraw_folders' for a
+re-pointed root. Now 'substitute_mirrors' calls it for each occurrence
+it re-points (both cases: a raw occurrence given a mirror, and a
+mirror re-pointed to another). What only a root asks for (its
+containers folder, its editable-view request) moved out, to
+'ask_for_what_a_fresh_root_asks'.
+
+Pinned by 'a_re_pointed_content_child_draws_its_forks_folder_afresh'
+('tests/mirror_substitution.rs', new fixture
+'fixtures-re-pointed-child': P contains alice's N, bob's F forks N,
+the user's U forks F), which switches alice, bob, alice, root
+authors, twice round, and checks each folder's members, no 'noWarrant',
+F claiming under U, and the view back at the root authors' equal to
+the fresh one. It fails on the old code (U's folder held F itself).
+Re-run end to end on the final binary
+('tests/results/every-mirror/review-fixes-plan1/probe-item1/'): alice's
+perspective then the root authors' draws the fresh view's text again
+(viewnode IDs aside), so do the third and sixth presses of the cycle
+(root authors', bob's, alice's, twice round, none refused), no view
+drawn holds a 'detach' or an unwarranted member, and an edit of u3
+then saves ("saved, 0 errors"). The probe's own s1 fixture was lost
+(see "Deviations"), so this ran on one rebuilt from the review's
+description, in today's format; its fresh view matches the probe's.
+
+'TODO/problems.org', "A buffer that shows a forker as claiming nothing
+can undo a fork another view made": fixed in part. Its "Related"
+sentence (this bug) is fixed; its main case is not, since the cause is
+'mark_claims' keeping a member that claims nothing, which this does
+not touch. The entry stays, rewritten to name that cause and to say
+the related case is fixed.
+**** "Did not match" 3: deleting a restricted placeholder (fixed, as decided provisionally)
+Deleting a restricted viewnode (a member whose node the skgrepo
+restriction keeps out) from a forks folder now changes no
+relationship: 'preserve_invisible_members'
+('server/from_text/supplement_from_disk.rs') treats a fork of a
+restricted node as unseen, so the weave keeps it; the save writes
+nothing, and the rerender draws the restricted viewnode again. The
+same for the folder of what a note hides outside its fork partners
+('apply_hiddenoutside_edits' no longer counts a hide of a restricted
+node replaceable), and for the Q12 hide-on-delete
+('resolve_forks_folder_removals' skips a forker whose node is
+restricted). New 'InRustGraph::node_is_restricted'. Tests:
+'deleting_a_restricted_viewnode_from_the_forks_folder_changes_no_relationship'
+and '..._from_the_hidden_outside_folder_unhides_nothing'
+('tests/forker_hides_under_a_narrowing.rs'). Docs:
+'docs/api-and-formats.org' ("Restricted-skgrepo nodes"),
+'docs/data-model_technical.org' ("The forks folder"),
+'docs/sharing-model.org', both 'COMMANDS' docs.
+**** "Did not match" 2: 'K2b', not 'Kb3' (docs fixed)
+'docs/heralds.org' ("Birth") now writes the forker's count before the
+'b', as the renderer and 'C9a' do, and gives 'bK2b' for a mutual. No
+other doc wrote 'Kb3' (the plan, a record, is left as written).
+**** Minor: the migration tool's commit line (fixed)
+'is_a_gitrepos_top_level' ('git rev-parse --show-toplevel' compared
+with DIR) replaces 'is_in_a_gitrepo'; a new test checks that a folder
+deeper in a gitrepo gets no line; the README says so.
+**** Minor: an October key's startup report (fixed)
+'migration_tools_for' ('retired_keys.rs') names
+'tools/migrate-skg-keys-2026-10/migrate.py, then
+tools/migrate-forks-2026-11/migrate.py' when an October key is among
+a file's keys; the startup report and the HEAD refusal use it. Tested
+in 'init_refuses_retired_keys_naming_every_such_file'.
+**** Minor: the HEAD refusal named only the first skgrepo (fixed)
+'read_graph_snapshot_per_skgrepo' collects each skgrepo's refusal
+('TreeReadError::HoldsRetiredKeys') and refuses with all of them, one
+line each. New test
+'a_refusal_of_retired_keys_at_head_names_every_such_skgrepo', fixture
+'tests/graph_straddle/fixtures/retired_keys_at_two_heads'.
+**** Matched but flagged: search suppression (kept; reachability fixed)
+Suppression is unchanged. But a suppressed hit related to the standing
+hit only through other mirrors stood nowhere in the buffer: the
+standing hit's forks folder holds its direct partners, and its
+members are drawn without folders of their own (the probe's N, M1,
+R2, Y, Z; the existing test even pinned "G, which F forks, is not
+shown"). Now 'draw_search_buffer' asks each note on a shortest fork
+path from the standing hit to each such hit for its own forks folder
+and refreshes again until each stands
+('request_forks_folders_toward_suppressed_hits', with a guard so no
+occurrence is asked twice), and collapses those nested folders. On
+the probe's s2 data, 'search note' now shows N in E1's forks folder
+and M1, E2, R2, R1 in N's. The end-to-end test expects G in F's forks
+folder; 'docs/mirrors.org' and 'docs/api-and-formats.org' ("Text
+search") say so.
+**** Not acted on
+The probe's open observation in section 32 (the 'M' ✓ under one
+folder and not the other) is for the diff view's review, as it says.
+*** The terms review's findings
+**** 1. "fork" and "its forks" (fixed)
+The glossary ("mirror, and a perspective's skgrepo list") now defines
+the bare word: a fork is a note that forks another, "a fork of N"
+forks N; and "its forks" (the forks folder's name) is its fork
+partners, either way. What then lied was reworded: =hides= is "hides
+from what it forks", for now, in the glossary,
+'NodeRelation::Hides''s comment, 'docs/heralds.org',
+'docs/data-model_friendly.org', the AI tool's README and the tests'
+docstrings; the hidden and hider folders read "It hides these from
+what it forks." and "These hide it from what they fork.";
+'gnids_shown_through_forks' is 'gnids_shown_through_forkees'.
+'2_plan.org''s slice 4 now says the labels return to "from its forks"
+/ "from their forks" when hides widen to every partner.
+**** 2. "a fork" in a note's place (fixed)
+Both 'COMMANDS' docs, the AI tool's README ("Whose skgrepo list ranks
+the mirrors is the perspective") and 'docs/sharing-model.org' say
+"one of its mirrors".
+**** 3. The compound folders (fixed, the atoms kept)
+The hidden-outside label says what plan 1 built: "b hides these, but
+nothing it forks contains them." (server, the emitted rule table, the
+rendering cases, the AI tool's expected files, the docs quoting it);
+'2_plan.org''s slice 4 says it widens back. 'CompoundFolderParties::forker'
+is 'hider', the style keys are 'hiddenInForkPartnerFolder_hider' and
+'hiddenOutsideOfForkPartnersFolder_hider'. The atoms
+'hiddenInForkPartnerFolder' and 'hiddenOutsideOfForkPartnersFolder'
+are kept: plan 2 makes them true, and renaming them twice would churn
+every client and buffer.
+**** 4. One name for the forkeeward walk (fixed)
+'reaches_forkeeward', and 'side_of_mirror_shown''s docstring in those
+words.
+**** 5. "the fork rules" (fixed by a glossary entry)
+Chosen over renaming the module: the names were set one slice ago and
+match the startup warnings users read ("fork rule warnings"), and most
+of the rules are about forks. The glossary entry says what the rules
+are (rules 4 to 6 of the hard validation constraints), and why the
+skgrepo, self-containment and self-hide rules are checked with them.
+The module's comment cites it, and "the same note as it" is now "its
+mirror, which may stand in its place".
+**** 6. "mirror" in other senses (fixed by the caveat)
+The glossary's caveat names the save's mirror, a Neovim function
+mirroring an Emacs one, and a server mirror. The docstrings and Jeff's
+essay are left as written.
+**** 7. "carrier" (fixed)
+The headline bearing '(inPlaceOf N)' is its bearer: the variables in
+'validate_tree.rs', 'errors.rs', 'save.rs' and the tests, the docs
+('docs/api-and-formats.org', 'docs/mirrors.org', 'viewnode.rs''s
+comment, which also said "after O"). The glossary keeps "carrier" for
+IDs and says so.
+**** 8. The introspect tool (fixed)
+"fork-rule checks", "fork-rule scope/steps". A grep of 'tools/' less
+the migration tools finds the old words only in
+'tools/transplant-changes-from-one-repo-to-repo/' (marked stale in
+slice 5) and in "subscription" as Jeff's plan, both left.
+**** 9. Variables left from the retired words (fixed)
+'followed' is 'perspective' in both clients and the AI tool. 'here' is
+'shows_in_place_of' ('shows-in-place-of' in Emacs), not 'in_place_of',
+which already names the function's argument there. 'subs' is
+'forkees'.
+**** 10. forkerward, forkeeward, and the role tree (fixed)
+'mirrors.rs' uses "forkeeward"; the role-tree definition covers the
+forks folder's two roles.
+**** 11. 'hidden_in_its_forks_folder' (fixed)
+'is_hidden_by_the_forks_folders_viewparent'.
+**** 12. "forks" for fork operations (fixed)
+The clients' approval docstrings, the test helpers' docstrings, and
+'docs/forks.org' (which now opens with "The *fork operation*").
+**** 13. "side" and "role" (fixed)
+'ForksFolderMemberRoles', 'forks_folder_member_roles',
+'birth_facts_of_fork_roles', and the docs citing them.
+**** 14. Coined terms (fixed by glossary entries)
+"the tamper check" (with "bearer", under "mirror substitution") and
+"retired keys". The serde alias 'hides_from_its_subscriptions' is kept,
+as the plan decided (behavior 2): it is the October 2026 key, and
+removing it is the follow-up that removes the retired-key check.
+**** 15. Stale comments (fixed)
+'server/heralds.rs' lists the hidden-outside folder among the editable
+ones; 'elisp/skg-request-views.el' says "the relation's folders";
+'tests/content_view.rs' says "the note's fork partners"; the history
+in 'tests/mirror_substitution.rs' is replaced by the rule it guards.
+**** 16. "Subscribe granularly" (kept)
+Jeff's essay; his call, as the review says.
+**** Question 2: citations (fixed, but the docs' TODO links)
+The tests cite "rule N of 'docs/mirrors.org', \"Which mirror stands\"";
+'jeffs_example_from_both_perspectives' is
+'each_owner_ranks_its_own_skgrepos_first', stating the rule; the two
+tests named for "q3" are '..._and_the_original_stands'. The earlier
+citations ('editability.rs''s "plan 04.1", 'stage_and_commit.rs''s and
+'commit_processed.rs''s "decision 4") state what they cite. The docs'
+links to 'TODO/every-mirror/2_plan.org' stay, since plan 2 runs next.
+*** Deviations
+- Item 2 covers the forks folder and the hidden-outside folder, the
+  forks and hides the decision names. A restricted viewnode in a
+  note's content keeps its documented rule (deleting it removes the
+  containment, and may infer a hide of it): the decision's first
+  clause, read alone, would change that too. Jeff may want it widened.
+- Item 6 needed a fix, so the search buffer can now be deeper than one
+  folder under a hit, along fork paths only.
+- The fix of item 1 gives a re-pointed occurrence's folders new
+  viewnode IDs (as a re-pointed root's always had), so the AI tool's
+  perspective test no longer pins the IDs under the re-pointed child.
+- Two hidden_nodes tests encoded the old rule of item 2 and were
+  adapted: 'deleting_a_restricted_vognodes_line_removes_its_record_alone'
+  became '..._in_the_hidden_outside_folder_changes_no_record';
+  'a_restricted_headline_whose_record_a_save_removed_goes_quietly'
+  now removes the record through an unrestricted save of another view.
+- Logs are under 'tests/results/every-mirror/review-fixes-plan1/',
+  copied there after 'bash/all-tests.sh' (which wipes 'tests/results/').
+- A loss: 'bash/all-tests.sh' also wiped
+  'tests/results/every-mirror/probes-plan1/', the probe's transcripts,
+  fixtures and helper scripts, which 'review-1-probes.org' cites. I
+  copied my own logs out but not those, and the scratch copy of s1 I
+  had made from them was deleted just before. The review's text
+  stands; the files it cites are gone. For the re-run of item 1 I
+  rebuilt s1 from the review's description
+  ('review-fixes-plan1/probe-item1/fixture/', today's format, so the
+  migration is not re-run). It too lives under 'tests/results/', so
+  the next 'all-tests.sh' wipes it: copy it out first if it is wanted.
+*** Unfinished
+- 'TODO/problems.org''s entry on a forker drawn claiming nothing:
+  its main case (another view makes the note fork a member this buffer
+  shows claiming nothing).
+- Whether item 2's rule should reach restricted viewnodes in content
+  (Jeff's call).
+- The transition (migrating 'data/'), as before: Jeff's.
