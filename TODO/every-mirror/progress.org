@@ -3411,7 +3411,7 @@ agent per slice.
 - (the commit carrying this record) every-mirror plan 3 slice 1: docs,
   record, DONE
 *** Suites
-- The slice's own tests: 'tests/dbs/in_rust_graph/mirrors.rs' 16 of 16;
+- The slice's own tests: 'tests/dbs/in_rust_graph/mirrors.rs' 15 of 15;
   'mirror_substitution::' (31 sub-tests) passed on its first run
   after the adaptations below. The new tie order was checked against
   the old: with "N itself" moved back after "the one no other forks",
