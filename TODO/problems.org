@@ -26,7 +26,20 @@
   an indirect member's: a hide typed there of something only such a
   member contains is drawn in that member's hidden-in folder, and the
   save says nothing of the move. The check should read the folder's
-  members ('fork_partners_shown').
+  members ('forks_folder_members_shown').
+* A forks-folder member's containers folder is drawn only when the member is (2026-11-16)
+  Found while fixing the probe review of every-mirror plan 3 (its
+  record, "Review fixes"). A member of a content view's forks folder
+  gets its containers folder when it is drawn, or when an
+  editable-view request extends it
+  ('add_containers_folder_to_a_standing_member' in
+  'server/refresh/visit.rs'). One that stood with none (nothing but
+  its view-ancestors contained it) and that a save, or another view,
+  gives a container stays bare in the redraw, where a fresh view
+  names the container; and one that becomes a repeat keeps the folder
+  a fresh view would not draw. The review fixed both for members of
+  the integrated-elsewhere folder; forks-folder members could follow
+  the same rule.
 * A stale-buffer warning names the note when only its forker changed (2026-11-16)
   Found by the probe pass of every-mirror plan 2 ('TODO/every-mirror/review-2-probes.org',
   observation of 35). Client A holds N's view, where R, a forker as

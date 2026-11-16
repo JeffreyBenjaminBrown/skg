@@ -4223,3 +4223,273 @@ are DONE.
 - Terms: "set aside" (of a child the buffer shows in a member's
   integrated-elsewhere or hidden-in folder: not cut), in the glossary's
   "cut" entry and 'docs/forks.org'.
+** Review fixes
+The fixes for 'review-3-terms.org' and 'review-3-probes.org', on
+2026-11-16, by one agent, on the orchestrator's brief (its decision on
+terms finding 1 included, which Jeff may overrule).
+*** Commits
+- 256961cd every-mirror plan 3 review: a standing integrated member
+  names its new keeper (probe 38; terms finding 12's rename)
+- ddd21bc1 every-mirror plan 3 review: only owned notes keep what the
+  integrated folder lists (terms finding 1, as the orchestrator
+  decided)
+- d004d074 every-mirror plan 3 review: the forks folder's label covers
+  indirect members (terms finding 2)
+- 8515981a every-mirror plan 3 review: the integrated folder has no
+  hider (terms finding 9)
+- 79305f8c every-mirror plan 3 review: two test comments cite no
+  conversation or plan (question 2)
+- 98119014 every-mirror plan 3 review: one meaning per term, in code
+  and docs (the other terms findings)
+- 9070beee every-mirror plan 3 review: an integrated member become a
+  repeat drops its containers folder (found by the end-to-end check)
+- (the commit carrying this record) every-mirror plan 3 review: record
+*** Suites
+- Reproduced first, each on the code before its fix:
+  'hides_by_integration::a_member_standing_in_the_folder_names_its_new_keeper'
+  failed ("d's containers folder names y": left [], right ["y"]);
+  '...::under_a_foreign_note_what_it_contains_is_not_kept_by_the_user'
+  failed (M drew d in its integrated-elsewhere folder under foreign
+  x); the repeat half of the first test failed with its vanish
+  disabled. Each passes with its fix.
+- 'bash/nextest.sh': 1276 of 1276 after fixes 1 and 2 (the new
+  sub-tests live in 'hides_by_integration::all_tests', so the count
+  stays); 1267 of 1276 once during the renames, my slip (see
+  "Deviations"), fixed before any commit; then 1276 of 1276, and 1276
+  of 1276 after the repeat half.
+- The herald tests ('test(herald)'): 30 of 30 after the label.
+- The AI tool's tests: PASS after the label (its expected views
+  updated with it).
+- 'bash/integration-tests.sh' (Emacs): 39 of 39, twice (the second on
+  a binary rebuilt after the last server change, since the first may
+  have run an older 'target/debug/skg').
+- 'bash/all-tests.sh', first run, after every code change: all pass:
+  Emacs 503 of 503, Neovim pass, nextest 1276 of 1276, doctests, team
+  tools, AI reader, integration 78 of 78 (both clients). Only this
+  record and 'TODO/problems.org' changed after it.
+- No failure needed classifying but my own slip.
+- End to end, per '/verify', on 'target/debug/skg' (port 28011),
+  scratch data from the probe pass's fixture script with M3
+  containing e3 and M containing d (the state probes 13 and 23 left),
+  under '/tmp/claude-1000/every-mirror-p3-review-fixes/e2e/':
+  - Probe 38, first case: e3 kept by M3 alone; z's view adds e3; M3's
+    view removes e3 from M3: "Hides nothing: 'e3' left 'my x3', but
+    'my z' keeps it."; the saved view draws e3's containers folder
+    naming my z, and equals a fresh view but for viewnode IDs. Then C
+    keeps e3 too, and M3's collateral rerender adds C to that folder.
+  - Probe 38, second case: d (M's content and in x's folder) added
+    under C: the collateral view and a fresh one both draw d as a
+    repeat, no containers folder.
+  - Collateral, the member no longer a repeat: home's view removes d
+    from M (C keeps it): M's collateral view draws d's containers
+    folder naming C, equal to a fresh view; d put back under M from
+    M's view: the folder goes, equal to a fresh view.
+  - The foreign note, on a fresh copy of the fixture: x's view shows
+    my x (M) with no integrated-elsewhere folder and without d, which
+    x contains; saved unchanged, nothing written. M's own view shows
+    d in x's integrated-elsewhere folder (M, owned, keeps it).
+  The server was stopped by its PID, its port checked free, the
+  scratch data deleted; transcripts and scripts in
+  '/tmp/claude-1000/every-mirror-p3-review-fixes/e2e/'
+  ('transcripts/', 'bin/e2e.py' to 'e2e4.py'; 'e2e2.py' first typed
+  M under C with d and was refused as two defining occurrences of d,
+  then used home's view instead).
+Logs: 'tests/results/every-mirror/review-fixes-plan3/'
+(new-tests-before-fix.log, new-tests-fix1.log, new-tests-fix2.log,
+repeat-test-without-fix.log, repeat-test.log, nextest-fixes-1-2.log,
+nextest-terms.log, nextest.log, heralds-label.log, ai-tool-label.log,
+integration.out, and the full run's all-tests.out, all-tests-ALL.org
+and all-tests-*.log). 'tests/results/every-mirror/' was copied out
+before 'bash/all-tests.sh' and put back after it.
+*** What each finding became
+**** Probe 38: a standing integrated member whose keeper changes
+Fixed. 'add_containers_folder_to_an_extended_member' became
+'add_containers_folder_to_a_standing_member' ('server/refresh/visit.rs'):
+at the visit of a member of an integrated-elsewhere folder that stood
+in the buffer, it adds the containers folder whenever that folder
+would name a container outside the member's view-ancestors
+('names_a_container_outside_its_view_ancestors'), and, the other half
+of "statelessly", takes away the containers folder of such a member
+that has become a repeat (found end to end: d put back under M kept
+the folder a fresh view does not draw). Its forks-folder case is
+unchanged (extended members only). Both halves cover the saved view
+and every collateral view, since both are refreshes. Pinned by
+'hides_by_integration::a_member_standing_in_the_folder_names_its_new_keeper'.
+**** Probe 38's "known gap": a keeper that is a view-ancestor goes unnamed
+The rule stands: the containers folder under an integrated-elsewhere
+member still leaves out its view-ancestors. Why: a view-ancestor that
+keeps the child draws it among its own content, above in the view
+and drawn first (the refresh walks in level order, and an
+integrated-elsewhere folder is drawn only under an editable member of
+an editable note's forks folder, so every ancestor's content is
+drawn before it). So the member is then a repeat of that occurrence,
+which shows where it is kept; naming the ancestor again in a folder
+would repeat what the view shows. The sibling gap in forks folders
+(a member that stood bare, given a container by a save, stays bare;
+one become a repeat keeps its folder) is listed in
+'TODO/problems.org', "A forks-folder member's containers folder is
+drawn only when the member is".
+**** Terms 1: "kept elsewhere" when the note is foreign
+As the orchestrator decided: the integrated-elsewhere folder lists
+what an owned note but the member contains, the note among them only
+when owned ('integrated_elsewhere' in 'server/refresh/goal.rs').
+Under a foreign note, what it contains of a member's content is its
+own: the member shows it neither as content (as before plan 3) nor in
+the folder. The save already read it so (its "drawn before" sets
+subtract the note's contains, owned or not; "kept elsewhere" asks
+'owned_notes_containing'), so only the goal and the docs changed:
+the glossary's "integrated" entry, forks.org's "What you keep
+elsewhere", the variant's doc and the herald table's comment. The
+label "It contains these, and you keep them elsewhere." is now true.
+Pinned under an owned note by
+'hides_by_integration::what_the_user_keeps_elsewhere_stands_in_its_own_folder'
+(d, which M contains) and under a foreign one by the new
+'...::under_a_foreign_note_what_it_contains_is_not_kept_by_the_user'
+(a view of x: M draws z only and no such folder; G and F still draw
+what y keeps).
+**** Terms 2: the forks folder's label
+See "Labels" below.
+**** Terms 3: integrated, kept elsewhere, unintegrated
+One meaning each. "Integrated" and "kept elsewhere" are one set,
+named both ways (the glossary says so): what an owned note but the
+member contains. "Unintegrated content" is what a member shows: its
+content neither the note's own (contained or hidden by it) nor
+integrated. 'less_what_the_note_integrates' is 'what_the_member_shows';
+the save's local 'integrated' sets are 'hidden_contained_or_set_aside'
+(forkee step) and 'hidden_or_contained_by_the_note' (forker step).
+The AI tool's README defines "unintegrated" the same way. Not
+renamed, since fix 2 made them true: 'kept_elsewhere',
+'kept_elsewhere_counts', 'kept_elsewhere_before_save'.
+**** Terms 4: fork partner
+The glossary says a fork partner is direct: an indirect member is no
+fork partner, and "members of the forks folder" covers both.
+'fork_partners_shown' is 'forks_folder_members_shown',
+'gnids_shown_through_fork_partners' is
+'gnids_shown_through_forks_folder_members'; the hide report's module
+doc, its comments, the relation comment, the nodeMerge doc, the
+save's comments, the API doc's hide-report entry, the AI tool's README
+and the header of 'tests/hides_apply_to_every_fork_partner.rs' say
+"member" where they meant any. Kept, as the plan kept them: the atom
+'hiddenInForkPartnerFolder' and its function 'hidden_in_fork_partner',
+'hidden_outside_of_fork_partners', the test file's name. The
+hidden-outside label "no fork partner shown contains them" is true
+but names a smaller set than its rule: for Jeff.
+**** Terms 5: "forker as such" covers indirect members
+Kept. Renaming touches a variant, two types, a field, a context
+variant, three functions and the docs: not small. The glossary now
+says the term is named for the commoner case, and that an indirect
+member that forks nothing of the note's is one all the same.
+**** Terms 6: 'default_perspective_skgrepo'
+Renamed 'first_owned_else_first_declared_skgrepo'; its doc names its
+two uses and says neither is the default perspective. The glossary
+defines "the user's own skgrepo list" beside "a perspective's skgrepo
+list".
+**** Terms 7: the folder's three names
+In code the folder goes by its atom: 'in_kept_or_hidden_folder' is
+'in_integratedElsewhere_or_hiddenIn_folder',
+'members_of_kept_and_hidden_folders' is
+'members_of_integratedElsewhere_and_hiddenIn_folders', and the test
+'a_stale_buffer_does_not_hide_what_its_integrated_folder_showed' is
+'...what_its_integratedElsewhere_folder_showed'. Prose keeps "the
+integrated-elsewhere folder" and "the folder of what the user keeps
+elsewhere", which now say one thing (finding 3).
+**** Terms 8: 'drawn_before' and 'shown_before'
+'shown_before' is 'drawn_before'.
+**** Terms 9: the integrated folder's "hider"
+Done as proposed: 'compound_folder_parties' and 'described_node' no
+longer take the integrated-elsewhere folder; its goal reads its
+viewparent and 'note_of_member_as_such'. The glossary's compound
+folder entry says it shows no hide, and the four folders join
+"forking, containment and, for three of them, hiding".
+**** Terms 10: "its forks"
+Rather than reword the hidden and hider labels, the glossary now
+defines "its forks" as the members of its forks folder (fork
+partners and indirect members), so that "hides from its forks" and
+both labels are true of what a hide does. The three doc lines that
+meant forkees say "forkees" ('docs/data-model_technical.org' twice,
+'docs/api-and-formats.org'); the rule-2 sentences say "however many
+of its mirrors are there".
+**** Terms 11: "direct member"
+Dropped: the glossary's forks-folder entry, its headline and
+'docs/data-model_technical.org' say "fork partner"; three citations
+of the old headline now cite "the forks folder".
+**** Terms 12: 'add_containers_folder_under_forks_folder_member'
+Renamed 'add_containers_folder_under_member' (with fix 1).
+**** Terms 13: declaration order
+The glossary has an entry "declaration order" (owned entries the
+privacy order; "first-declared"). One name: "config order" and
+"config-first" are gone from docs, comments, an elisp docstring and
+a test message; 'owned_skgrepos_in_config_order' and
+'first_owned_skgrepo_in_config_order' are '..._in_declaration_order'.
+The unused 'SkgConfig::first_owned_skgrepo' ("backwards-compatible
+name") was deleted.
+**** Terms 14: "the perspective is a skgrepo"
+"One skgrepo, or the root homes, one per tree" in the glossary,
+'docs/mirrors.org' (twice), both COMMANDS docs, the API doc and the
+AI tool's README.
+**** Terms 15: "what it adds" said of an indirect member
+Both COMMANDS docs and the AI tool's README say "what a member shows".
+**** Terms 16: smaller drifts
+All as proposed: "set aside" bold in the glossary; 'tests/fork.rs'
+says "the user keeps"; 'docs/sharing-model.org' says "the clone's own
+content"; 'mirrors_of_note_with_forkees'; 'as_named_beside_the_note';
+'viewnodestats.rs' says "counts".
+**** Question 2: citations
+'tests/dbs/in_rust_graph/mirrors.rs' describes its four mirrors
+without citing a conversation; 'tests/mirror_substitution.rs' says
+"The save plan warns". The older doc links to 'TODO/' were left.
+*** Labels
+The forks folder's label, false of indirect members, now adds that
+the rest fork or are forked by others in the folder: true of every
+member, since an indirect member is joined to the note through
+another mirror, which forks it or is forked by it. Updated in
+'server/heralds.rs', 'tests/shared/herald-rules.sexp' (regenerated
+by 'emit-herald-rules'), 'tests/shared/herald-rendering-cases.txt'
+(its style count 77), 'skg_for_ai.py's
+'HERALD_PHRASES_HOLDING_HANDLE_WORDS', seven of the AI tool's
+expected views and its tests, and 'docs/heralds.org', 'forks.org',
+'sharing-model.org', 'glossary.org'. The clients read the label from
+the server's table; neither holds a copy.
+Every folder label now ('server/heralds.rs'), for Jeff to reword:
+- forksFolder: "It forks these, or these fork it, or these fork or
+  are forked by others here."
+- integratedElsewhereFolder: "☮ It contains these, and you keep them
+  elsewhere."
+- hiddenInForkPartnerFolder: "☮ It contains these, but c hides them."
+- hiddenByForkerFolder: "☮ a hides these, which c contains."
+- hiddenOutsideOfForkPartnersFolder: "b hides these, but no fork
+  partner shown contains them." (true, but its rule leaves out what
+  any member contains, indirect ones included)
+- hiddenFolder: "☮ It hides these from its forks."
+- hiderFolder: "☮ These hide it from their forks."
+- containerFolder: "☮ These also contain it."
+- mentionerFolder: "☮ These link to it."
+- acquiredByFolder: "☮ it was acquired by"
+- acquiredFolder: "☮ it acquired"
+- illegalEditFolder: "☮ ILLEGAL EDIT TO FOREIGN NODE"
+- aliasFolder: "aliases"; idFolder: "IDs"; flagsFolder: "☮ flags"
+*** Deviations
+- Terms finding 10 was met by redefining "its forks" (the forks
+  folder's members) rather than rewording two labels, which are
+  Jeff's.
+- Terms finding 3's 'kept_elsewhere*' renames were not made: with
+  fix 2 the names are true.
+- Terms finding 13 went further than a glossary entry: "config order"
+  was renamed everywhere outside 'TODO/' (two functions, comments,
+  docs, an elisp docstring, a test message), and a dead legacy
+  function went.
+- Fix 1 also takes away a containers folder under an integrated
+  member become a repeat (found end to end, pinned by the same test).
+- A slip of mine, caught by nextest before any commit: removing the
+  integrated folder from 'compound_folder_parties' first left
+  'described_node' reading it through them, and nine tests failed
+  (the folder vanished). 'described_node' now reads it as any other
+  folder.
+*** Unfinished
+- The labels, all of them Jeff's to reword (above); the
+  hidden-outside label's "fork partner" and the atom
+  'hiddenInForkPartnerFolder' are his to rename or keep.
+- 'TODO/problems.org': the new entry on forks-folder members'
+  containers folders.
+- "Forker as such" stays a misnomer for an indirect member that forks
+  nothing of the note's, as the glossary now says.
