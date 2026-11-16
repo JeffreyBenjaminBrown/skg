@@ -6,15 +6,15 @@
 # Headlines 9, node occurrences 7, distinct nodes 6, folders 2.
 # Skgrepos: fred (foreign) 4, main (owned) 3.
 # Foreign 4, write-protected 7, folded 2.
-# Contained elsewhere too 3, subscribed to 2, subscribing 1.
+# Contained elsewhere too 3, forked 2, forking 1.
 # Links 0, distinct targets 0, resolved 0, unresolved 0.
 # Server errors 0, warnings 0.
-* Fred's note ⟨0a ☮ C1 1/L 1S ⌂:fred⟩
+* Fred's note ⟨0a ☮ C1 1/L 1K ⌂:fred⟩
 ** ⟨0b ☮ These subscribe to it. folded⟩
-*** Second child, a subscriber ⟨0c ☮ 1C 1/L Sb H2 ⌂:main⟩
+*** Second child, a subscriber ⟨0c ☮ 1C 1/L Kb H2 ⌂:main⟩
 **** The fixture root ⟨0d ☮B 1C2a L2a⟩
 ***** Above the root ⟨0e ☮ Ca⟩
 * An aside of Fred's ⟨0f ☮ 1H ⌂:fred⟩
 * A detail of Fred's ⟨0g ☮ 1C 1H ⌂:fred⟩
 ** ⟨0h ☮ These also contain it. folded⟩
-*** Fred's note ⟨0i ☮ Cb 1/L 1S⟩
+*** Fred's note ⟨0i ☮ Cb 1/L 1K⟩

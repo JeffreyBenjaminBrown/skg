@@ -4,7 +4,7 @@
 -- content is the owned M):
 --  - forking a dirty buffer is refused (no confirmation appears);
 --  - fork_node on M -> a fork-confirmation buffer; APPROVE -> the
---    clone is created (overrides M) and shown in M's place on reopen;
+--    clone is created (forks M) and shown in M's place on reopen;
 --  - on a second node M2, fork_node -> DECLINE strips the lingering
 --    (viewRequests fork) atom and commits nothing.
 

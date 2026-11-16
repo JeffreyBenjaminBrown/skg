@@ -1462,7 +1462,7 @@ M.relRepo_unsupported_folder_atoms = {
 ---viewparent records the relationship to each member.
 ---Mirrors skg--writable-folder-relations.
 M.writable_folder_relations = {
-  { atom = 'subscribeeFolder', relation = 'subscribesTo' } }
+  { atom = 'subscribeeFolder', relation = 'forks' } }
 
 ---The menu entry that removes the pending '(editRequest (relRepo
 ---...))' request instead of setting one. For a relationship already on
@@ -1675,18 +1675,14 @@ M.relationship_role_menu_prose = {
     'Links are inferred from body text; they carry no false relRepo, so there is nothing to set.' },
   mentioned = { kind = false, description =
     'Links are inferred from body text; they carry no false relRepo, so there is nothing to set.' },
-  subscriber = { kind = false, description =
-    'A subscriberFolder member: the subscribesTo relationship belongs to the member (the subscriber), not to the view-parent. Write-protected from here.' },
-  subscribee = { kind = 'subscribee', description =
-    "A member of the view-parent's subscribeeFolder. Sets the repo of each subscribesTo relationship from the view-parent." },
+  forker = { kind = false, description =
+    'A subscriberFolder member: the forks relationship belongs to the member (the forker), not to the view-parent. Write-protected from here.' },
+  forkee = { kind = 'subscribee', description =
+    "A member of the view-parent's subscribeeFolder. Sets the repo of each forks relationship from the view-parent." },
   hider = { kind = false, description =
     'Hide repos are derived at save, floored at the most public explaining subscription; the hiderFolder is write-protected.' },
   hidden = { kind = false, description =
-    'Hide repos are derived at save, floored at the most public explaining subscription; the hiddenFolder is write-protected.' },
-  overrider = { kind = false, description =
-    'No folder shows the overrides relation; only the fork operation records it, so there is nothing to set from here.' },
-  overridden = { kind = false, description =
-    'No folder shows the overrides relation; only the fork operation records it, so there is nothing to set from here.' } }
+    'Hide repos are derived at save, floored at the most public explaining subscription; the hiddenFolder is write-protected.' } }
 
 ---The relationship-kind menu: one entry { relation, roles } per
 ---relation in 'shared/relations.json', each role { role, kind,

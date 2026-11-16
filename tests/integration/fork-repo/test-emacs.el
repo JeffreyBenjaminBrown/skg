@@ -104,9 +104,9 @@ the clone landed in the rotated repo."
            (content (with-temp-buffer
                       (insert-file-contents clone-file)
                       (buffer-string))))
-      (unless (string-match-p "overrides" content)
-        (test-fail "the clone in owned2 should override N:\n%s" content)))
-    (message "✓ the clone landed in the rotated repo owned2 and overrides N"))
+      (unless (string-match-p "^forks:" content)
+        (test-fail "the clone in owned2 should fork N:\n%s" content)))
+    (message "✓ the clone landed in the rotated repo owned2 and forks N"))
 
   (message "PASS: Fork repo-rotation integration test successful!")
   (kill-emacs 0))

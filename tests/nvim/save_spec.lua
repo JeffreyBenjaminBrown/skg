@@ -708,7 +708,7 @@ describe('skg.save hides', function ()
       save.handle_save_sexp(buf, sexpr.read(
         '((content "* (skg node (gnid g)) g\n") (errors ()) (warnings ())'
         .. ' (hides ("Hides \'m\' from \'g\', as content of \'j\'."'
-        .. ' "Hides nothing: \'y\' left \'g\', but it is no content of \'j\', nor overrides any.")))'))
+        .. ' "Hides nothing: \'y\' left \'g\', but it is no content of \'j\', nor a mirror of any.")))'))
       save.handle_save_sexp(buf, sexpr.read(
         '((content "* (skg node (gnid g)) g\n") (errors ()) (warnings ()))'))
     end)
@@ -717,7 +717,7 @@ describe('skg.save hides', function ()
     assert(ok, err)
     assert.are.same({
       "Hides 'm' from 'g', as content of 'j'.\n"
-        .. "Hides nothing: 'y' left 'g', but it is no content of 'j', nor overrides any." },
+        .. "Hides nothing: 'y' left 'g', but it is no content of 'j', nor a mirror of any." },
       vim.tbl_filter(function (message)
         return message:find('Hides', 1, true) ~= nil
       end, shown))

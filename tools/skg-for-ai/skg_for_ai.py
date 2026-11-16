@@ -475,7 +475,7 @@ def parse_command_line (argv):
   delete_references_parser = commands . add_parser (
     "delete-references",
     help = ( "remove every owned structured reference (contains, "
-             "subscribesTo, hidesFromSubs, overrides) to the absent node ID" ),
+             "forks, hides) to the absent node ID" ),
     parents = [ port_option ] )
   delete_references_parser . add_argument ( "id" )
   delete_references_parser . add_argument (
@@ -1203,8 +1203,8 @@ def waiting_clause (entry):
 def command_delete_references (arguments):
   """Send "delete references to absent node" for an ID the graph lacks,
   as the clients' 'skg-delete-references-to-absent-node' ('C-c d a')
-  does: the server removes it from every owned 'contains',
-  'subscribesTo', 'hidesFromSubs' and 'overrides' list, and rerenders
+  does: the server removes it from every owned 'contains', 'forks'
+  and 'hides' list, and rerenders
   the views that showed one. Without '--yes' nothing is sent, since the
   server asks first only when titles or bodies link to the ID; when it
   asks, its warning is printed, and '--leave-links' approves, sending
@@ -1212,8 +1212,8 @@ def command_delete_references (arguments):
   refuses while a view the daemon holds has unsaved edits."""
   if not arguments . yes:
     print ( f"Not sent. This removes every owned structured reference to the "
-            f"absent node {arguments . id} (in 'contains', 'subscribesTo', "
-            "'hidesFromSubs' and 'overrides' lists); run again with '--yes'." )
+            f"absent node {arguments . id} (in 'contains', 'forks' and "
+            "'hides' lists); run again with '--yes'." )
     return
   connection = connect_to_server (arguments . port)
   try:
@@ -1868,7 +1868,7 @@ def relationship_heralds_text (metadata):
   tokens = []
   for relation_name, letter in RELATIONS_IN_DISPLAY_ORDER:
     form = metadata_form (rels, relation_name)
-    if form is not None or ( relation_name == "overrides" and overrides_here ):
+    if form is not None or ( relation_name == "forks" and overrides_here ):
       token = relation_token (relation_name, letter, form, overrides_here)
       if token:
         tokens . append (token)
@@ -1881,7 +1881,7 @@ def relationship_heralds_text (metadata):
 def relation_token (relation_name, letter, form, overrides_here):
   in_side = relation_side_text (relation_name, "in", form)
   out_side = relation_side_text (relation_name, "out", form)
-  here = relation_name == "overrides" and overrides_here
+  here = relation_name == "forks" and overrides_here
   if not in_side and not out_side and not here:
     return ""
   return in_side + letter + ( "ĥ" if here else "" ) + out_side
@@ -2633,12 +2633,12 @@ def summary_lines (parsed_view, link_statuses, repo_ownership, view,
                 metadata, "folded" )))),
     facts ( ( "Contained elsewhere too",
               count_where (contained_by_a_node_outside_its_ancestry) ),
-            ( "subscribed to",
+            ( "forked",
               count_where ( lambda metadata :
-                side_count (metadata, "subscribesTo", "in") > 0 )),
-            ( "subscribing",
+                side_count (metadata, "forks", "in") > 0 )),
+            ( "forking",
               count_where ( lambda metadata :
-                side_count (metadata, "subscribesTo", "out") > 0 ))),
+                side_count (metadata, "forks", "out") > 0 ))),
     facts ( ( "Links", link_count ),
             ( "distinct targets", len (statuses) ),
             ( "resolved", resolved_count ),
@@ -4363,8 +4363,7 @@ def predicted_forks (edited, original, headline_of_handle, ownership,
           "other edits; save them first, as a client forks only from a "
           "saved buffer, so that the clone is the node as it is saved." )
       forks . lines . append (
-        f"Fork: {described}, by request: a new clone of it subscribes to "
-        "it and overrides it." )
+        f"Fork: {described}, by request: a new clone of it forks it." )
       forks . gnids . append (gnid)
       continue
     skgrepo = headline_node_repo ( view_line . metadata )
@@ -4388,8 +4387,7 @@ def predicted_forks (edited, original, headline_of_handle, ownership,
     forks . lines . append (
       f"Fork: {described}, of the foreign skgrepo '{skgrepo}', whose "
       f"{' and ' . join (changed)} changed: the edit goes to a new clone of "
-      "it, which subscribes to it and overrides it; the original stays as "
-      "it is." )
+      "it, which forks it; the original stays as it is." )
     forks . gnids . append (gnid)
   if not forks . lines:
     return forks

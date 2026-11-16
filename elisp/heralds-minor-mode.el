@@ -548,7 +548,7 @@ of birth facts (RELATION SIDE [GEN]), already accounts for."
   "Render relation REL's token from FORM, or nil if it has nothing to show."
   (let ((in-s (heralds--rel-side-text rel 'in form birth write-protected))
         (out-s (heralds--rel-side-text rel 'out form birth write-protected))
-        (here (and (eq rel 'overrides) overrides-here)))
+        (here (and (eq rel 'forks) overrides-here)))
     (unless (and (string-empty-p in-s) (string-empty-p out-s) (not here))
       (concat in-s
               (heralds--styled (heralds--rel-letter rel)
@@ -564,7 +564,7 @@ of birth facts (RELATION SIDE [GEN]), already accounts for."
   "Render the semantic `(rels ...)' and `(props ...)' facts in SEXP's
 `(view ...)', styled by its `(birth ...)', to one propertized string,
 or nil if there are none / they produce nothing. Tokens are the
-relations in display order (C L S O H), then the property counts A I
+relations in display order (C L K H), then the property counts A I
 F, space-separated."
   (let* ((view (cdr (assq 'view (cdr sexp))))
          (rels (assq 'rels view))
@@ -578,7 +578,7 @@ F, space-separated."
              (tokens '()))
         (dolist (rel heralds--rel-order)
           (let ((form (assq rel (cdr rels))))
-            (when (or form (and (eq rel 'overrides) overrides-here))
+            (when (or form (and (eq rel 'forks) overrides-here))
               (let ((tok (heralds--rel-token rel form birth write-protected
                                              overrides-here)))
                 (when tok (push tok tokens))))))

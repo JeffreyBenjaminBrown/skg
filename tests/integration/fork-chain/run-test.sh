@@ -77,12 +77,12 @@ if grep -q "$PRIV_ID" "$PUB_CLONE"; then
   cat "$PUB_CLONE"
   exit 1
 fi
-if ! grep -q "overrides" "$PUB_CLONE" || ! grep -q "N" "$PUB_CLONE"; then
-  echo "✗ FAIL: the public clone should override the foreign N:"
+if ! grep -q "^forks:" "$PUB_CLONE" || ! grep -q "N" "$PUB_CLONE"; then
+  echo "✗ FAIL: the public clone should fork the foreign N:"
   cat "$PUB_CLONE"
   exit 1
 fi
-echo "✓ public clone overrides N and names no private id"
+echo "✓ public clone forks N and names no private id"
 
 echo ""
 echo "=== Test Complete ==="

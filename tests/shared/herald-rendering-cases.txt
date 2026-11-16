@@ -94,13 +94,13 @@
 (skg node (gnid x) (view (rels (contains (in 2) (out 0 (unintegrated 0))))))
 ---- text: 2C
 ---- styles: medium*1 normal*1
-==== overrides: overrides-here beside an ancestor h
-(skg node (gnid x) (overridesHere y) (view (rels (overrides (out 1 (ancestors 8))))))
----- text: Oĥh
+==== forks: overrides-here beside an ancestor h
+(skg node (gnid x) (overridesHere y) (view (rels (forks (out 1 (ancestors 8))))))
+---- text: Kĥh
 ---- styles: normal*1 crucial*1 medium*1
-==== birth: links and overrides
-(skg node (gnid x) (view (rels (linksTo (in 5 (substantive 2)) (out 3)) (overrides (out 1))) (birth (overrides out 2))))
----- text: 2/5L3 O1
+==== birth: links and forks
+(skg node (gnid x) (view (rels (linksTo (in 5 (substantive 2)) (out 3)) (forks (out 1))) (birth (forks out 2))))
+---- text: 2/5L3 K1
 ---- styles: high*1 medium*2 normal*2 -*1 low*1 medium*1
 ==== birth: contains
 (skg node (gnid x) (view (rels (contains (in 1) (out 2))) (birth (contains in 1))))
@@ -114,14 +114,10 @@
 (skg node (gnid x) (view (rels (contains (out 8 (unintegrated 2)))) (birth (contains in 1))))
 ---- text: C2/8
 ---- styles: low*1 medium*1 normal*2
-==== birth: subscribesTo
-(skg node (gnid x) (view (rels (subscribesTo (in 1) (out 2))) (birth (subscribesTo in 2))))
----- text: 1S2
+==== birth: forks
+(skg node (gnid x) (view (rels (forks (in 1) (out 2))) (birth (forks in 2))))
+---- text: 1K2
 ---- styles: high*1 low*1 medium*1
-==== birth: overrides
-(skg node (gnid x) (view (rels (overrides (in 1) (out 2))) (birth (overrides in 2))))
----- text: 1O2
----- styles: low*2 medium*1
 ==== birth: hidesFromSubs
 (skg node (gnid x) (view (rels (hidesFromSubs (in 1) (out 2))) (birth (hidesFromSubs in 2))))
 ---- text: 1H2
@@ -192,21 +188,21 @@
 (skg folded aliasFolder)
 ---- text: aliases
 ---- styles: message*7
-==== carriers: two subscribers, one the parent
-(skg node (gnid x) (view (rels (subscribesTo (in 2 (ancestors 1))))))
----- text: 2aS
+==== carriers: two forkers, one the parent
+(skg node (gnid x) (view (rels (forks (in 2 (ancestors 1))))))
+---- text: 2aK
 ---- styles: high*1 low*1 normal*1
-==== carriers: the parent is the only subscriber
-(skg node (gnid x) (view (rels (subscribesTo (in 1 (ancestors 1))))))
----- text: aS
+==== carriers: the parent is the only forker
+(skg node (gnid x) (view (rels (forks (in 1 (ancestors 1))))))
+---- text: aK
 ---- styles: high*1 normal*1
 ==== birth-explained: the parent is the sole container
 (skg node (gnid x) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1))))
 ---- text: aC
 ---- styles: low*2
-==== birth-explained: a subscribee whose subscriber is the grandparent
-(skg node (gnid x) (view (rels (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2))))
----- text: bS
+==== birth-explained: a forkee whose forker is the grandparent
+(skg node (gnid x) (view (rels (forks (in 1 (ancestors 2)))) (birth (forks in 2))))
+---- text: bK
 ---- styles: medium*1 low*1
 ==== birth-explained: not when another node also contains it
 (skg node (gnid x) (view (rels (contains (in 2 (ancestors 1)))) (birth (contains in 1))))

@@ -45,8 +45,7 @@ In order, it:
   placed write-protected; refused placements), refuses an edit of a
   write-protected foreign node, makes it editable with 'editable',
   forks a placed foreign node by adding a child to it (declined
-  without '--yes', approved with it: the clone subscribes to and
-  overrides it), forks an owned node with 'fork' (refused beside
+  without '--yes', approved with it: the clone forks it), forks an owned node with 'fork' (refused beside
   another edit, then approved), and subscribes and hides by editing a
   subscribee folder;
 - on a fourth scratch server, writes the words of a handle:
@@ -831,7 +830,7 @@ def check_removal (context):
   # it, so the removal hides nothing, and the save says why.
   hides_nothing = ( "Hides nothing: 'Contained twice' left 'Second child, a "
                     "subscriber', but it is no content of 'Fred's note', nor "
-                    "overrides any.\n" )
+                    "a mirror of any.\n" )
   require_output ( run_save (folder, "--yes"),
                    report + saved_line (0) + hides_nothing +
                    written_paths (folder) )
@@ -1512,8 +1511,8 @@ def check_implicit_fork_declined (context):
     REPORT_HEAD +
     "New: 'My note on it', under ⟨0h⟩ 'An aside of Fred's'.\n"
     "Fork: ⟨0h⟩ 'An aside of Fred's', of the foreign skgrepo 'fred', whose "
-    "children changed: the edit goes to a new clone of it, which subscribes "
-    "to it and overrides it; the original stays as it is.\n"
+    "children changed: the edit goes to a new clone of it, which forks it; "
+    "the original stays as it is.\n"
     + FORK_INTO_MAIN + NOT_SAVED )
   require_output (
     run_save (folder, "--yes", "--fork-into", "fred"),
@@ -1528,8 +1527,8 @@ def check_implicit_fork_declined (context):
 
 def check_implicit_fork_approved (context):
   """With '--yes' the server's fork confirmation is printed and
-  approved: a clone in 'main' holds the edit and subscribes to and
-  overrides the original, which is unchanged, and the re-rendered view
+  approved: a clone in 'main' holds the edit and forks the original,
+  which is unchanged, and the re-rendered view
   shows the clone in the original's place."""
   folder = context [ "fork_folder" ]
   fred_before = fred_files (context)
@@ -1540,8 +1539,8 @@ def check_implicit_fork_approved (context):
     REPORT_HEAD +
     "New: 'My note on it', under ⟨0h⟩ 'An aside of Fred's'.\n"
     "Fork: ⟨0h⟩ 'An aside of Fred's', of the foreign skgrepo 'fred', whose "
-    "children changed: the edit goes to a new clone of it, which subscribes "
-    "to it and overrides it; the original stays as it is.\n"
+    "children changed: the edit goes to a new clone of it, which forks it; "
+    "the original stays as it is.\n"
     + FORK_INTO_MAIN +
     "Server: fork confirmation: the save forks 1 node, and writes nothing "
     "until that is approved.\n"
@@ -1559,22 +1558,20 @@ def check_implicit_fork_approved (context):
                   "An aside of Fred's" )
   require_equal ( "the clone's content", skg_list (context, clone_id, "contains"),
                   [ child_id ] )
-  require_equal ( "what the clone subscribes to",
-                  skg_list (context, clone_id, "subscribesTo"), [ "fred-aside-id" ] )
-  require_equal ( "what the clone overrides",
-                  skg_list (context, clone_id, "overrides"), [ "fred-aside-id" ] )
+  require_equal ( "what the clone forks",
+                  skg_list (context, clone_id, "forks"), [ "fred-aside-id" ] )
   require_equal ( "the foreign files after the fork",
                   fred_files (context), fred_before )
   require_equal ( "the container's content after the fork",
                   skg_list (context, "child-a-id", "contains"),
                   [ "fred-detail-id", "elsewhere-id", "fred-aside-id", "shared-id" ] )
-  require_in_compact ( folder, "*** An aside of Fred's ⟨0h C1 S1 Oĥ1⟩\n"
+  require_in_compact ( folder, "*** An aside of Fred's ⟨0h C1 Kĥ1⟩\n"
                                "**** My note on it ⟨0t⟩\n" )
 
 def check_explicit_fork (context):
   """'fork' on an owned node, as the clients' 'skg-fork-node' marks
   it: refused beside other edits, then approved with '--yes', making a
-  clone in 'main' that subscribes to and overrides it."""
+  clone in 'main' that forks it."""
   folder = fresh_root_view (context, "fork-explicit")
   shared = compact_line_starting (folder, "*** Contained twice ⟨0o ")
   edit_compact ( folder, [ ( shared, shared [ : -1 ] + " fork⟩" ) ])
@@ -1598,8 +1595,8 @@ def check_explicit_fork (context):
   require_output (
     run_save (folder, "--yes"),
     REPORT_HEAD +
-    "Fork: ⟨0o⟩ 'Contained twice', by request: a new clone of it subscribes "
-    "to it and overrides it.\n" + FORK_INTO_MAIN +
+    "Fork: ⟨0o⟩ 'Contained twice', by request: a new clone of it forks "
+    "it.\n" + FORK_INTO_MAIN +
     "Server: fork confirmation: the save forks 1 node, and writes nothing "
     "until that is approved.\n"
     "Clone-to-be: 'Contained twice', in 'main' (the server suggests "
@@ -1611,10 +1608,8 @@ def check_explicit_fork (context):
   clone_id = clone_file [ : - len (".skg") ]
   require_equal ( "the explicit clone's title", skg_title (context, clone_id),
                   "Contained twice" )
-  require_equal ( "what the explicit clone subscribes to",
-                  skg_list (context, clone_id, "subscribesTo"), [ "shared-id" ] )
-  require_equal ( "what the explicit clone overrides",
-                  skg_list (context, clone_id, "overrides"), [ "shared-id" ] )
+  require_equal ( "what the explicit clone forks",
+                  skg_list (context, clone_id, "forks"), [ "shared-id" ] )
   require_equal ( "the forked node's title", skg_title (context, "shared-id"),
                   "Contained twice" )
 
@@ -1637,8 +1632,8 @@ def check_subscribing_and_hiding_by_placing (context):
                              "\n*** Fred's ⟨node:fred-note-id⟩\n" ) ], base_name )
   if "Server: saved," not in run_save (folder, "--yes") . stdout:
     raise CaseFailure ( "the subscribing save failed" )
-  require_equal ( "what the node subscribes to",
-                  skg_list (context, "elsewhere-id", "subscribesTo"),
+  require_equal ( "what the node forks",
+                  skg_list (context, "elsewhere-id", "forks"),
                   [ "fred-note-id" ] )
   detail = next ( line for line in read_file (compact_path) . split ("\n")
                   if line . startswith ("**** A detail of Fred's ⟨") )
@@ -1649,13 +1644,13 @@ def check_subscribing_and_hiding_by_placing (context):
   if hide_line not in reported:
     raise CaseFailure ( f"the report before the hiding save printed {reported!r}" )
   require_equal ( "what the node hides before the save",
-                  skg_list (context, "elsewhere-id", "hidesFromSubs"), [] )
+                  skg_list (context, "elsewhere-id", "hides"), [] )
   completed = run_save (folder, "--yes")
   if ( "Fork:" in completed . stdout or "Server: saved," not in completed . stdout
        or completed . stdout . count (hide_line) != 1 ):
     raise CaseFailure ( f"the hiding save printed {completed . stdout!r}" )
   require_equal ( "what the node hides from its subscriptions",
-                  skg_list (context, "elsewhere-id", "hidesFromSubs"),
+                  skg_list (context, "elsewhere-id", "hides"),
                   [ "fred-detail-id" ] )
   lines = read_file (compact_path) . split ("\n")
   start = next ( index for index, line in enumerate (lines)
@@ -1667,8 +1662,8 @@ def check_subscribing_and_hiding_by_placing (context):
                  base_name )
   reported = run_save (folder) . stdout
   if ( "Hides nothing: 'Contained twice' left 'A second container, outside "
-       "the view', but it is no content of 'Fred's note', nor overrides "
-       "any.\n" ) not in reported:
+       "the view', but it is no content of 'Fred's note', nor a mirror "
+       "of any.\n" ) not in reported:
     raise CaseFailure ( f"the report of a removal that hides nothing printed {reported!r}" )
 
 # ============================================================
@@ -1779,7 +1774,10 @@ def check_write_protecting (context):
 def check_search_matching (context):
   """'noSearchMatching' sets the node's flag, 'searchMatching' clears
   it. 'noSearchMatching subtree' sets it on the node and every member
-  occurrence below, skipping the foreign ones, which it names."""
+  occurrence below, skipping the foreign and the write-protected ones,
+  which it names. (Fred's note, typed into 'Contained twice', is drawn
+  there as 'Second child', the user's fork of it, which is editable
+  elsewhere in the view and so write-protected there.)"""
   folder = fresh_root_view (context, "search-matching")
   edit_compact ( folder, [ ( "** First child ⟨0d aC1⟩",
                              "** First child ⟨0d aC1 noSearchMatching⟩" ) ])
@@ -1821,8 +1819,7 @@ def check_search_matching (context):
                     "'(flag noSearchMatching true)': the node no longer matches "
                     "searches.",
                     "Skipped: 'noSearchMatching subtree' on ⟨0a⟩ leaves ⟨0k⟩ "
-                    "'Fred's note' (foreign), ⟨0l⟩ 'A detail of Fred's' "
-                    "(foreign)." ] )
+                    "'Second child, a subscriber' (write-protected)." ] )
   for node_id in [ "root-id", "child-a-id", "shared-id", "child-b-id" ]:
     require_equal ( node_id + "'s flags after 'noSearchMatching subtree'",
                     skg_list (context, node_id, "flags"), [ "NoSearchMatching" ] )
@@ -2281,7 +2278,7 @@ EXPECTED_DIFF_COMPACT = (
   "content 2, ghost 2, oldText title 1.\n"
   "# Skgrepos: main (owned) 6.\n"
   "# Foreign 0, write-protected 1, folded 0.\n"
-  "# Contained elsewhere too 0, subscribed to 0, subscribing 1.\n"
+  "# Contained elsewhere too 0, forked 0, forking 1.\n"
   "# Links 3, distinct targets 3, resolved 2, unresolved 1 (missing 1).\n"
   "# Server errors 0, warnings 0.\n"
   # The deleted node's other container, a root of its own
@@ -2304,7 +2301,7 @@ EXPECTED_DIFF_COMPACT = (
   # container stands above it, so no containers folder is drawn; its
   # '~+' says the change.
   "**** A new grandchild ⟨0j ∃+ ~+⟩\n"
-  "*** Second child, a subscriber ⟨0k ☮ a/L S1 H2⟩\n" )
+  "*** Second child, a subscriber ⟨0k ☮ a/L K1 H2⟩\n" )
 
 # ============================================================
 # The daemon: each case runs on the graph and the daemon the earlier
@@ -3053,8 +3050,8 @@ def check_deleting_references (context):
   require_output (
     run_tool ([ "delete-references", "absent-id" ]),
     "Not sent. This removes every owned structured reference to the absent "
-    "node absent-id (in 'contains', 'subscribesTo', 'hidesFromSubs' and "
-    "'overrides' lists); run again with '--yes'.\n" )
+    "node absent-id (in 'contains', 'forks' and 'hides' lists); run again "
+    "with '--yes'.\n" )
   warning = [ "Server: delete-references confirmation: titles or bodies link to "
               "absent-id; the cleanup leaves those links, dangling. Remove the "
               "structured references?",
@@ -3100,9 +3097,9 @@ FOLLOWS_YOURS_SUMMARY = (
   "# Perspective: your overrides (each root author's overrides are the default).\n" )
 FOLLOWS_THIRDS_SUMMARY = (
   "# Perspective: third's overrides (each root author's overrides are the default).\n" )
-R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Oĥ1⟩\n** K ⟨0c⟩\n"
-R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Oĥ1 ⌂:main⟩\n** K ⟨0c⟩\n"
-R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Oĥ1 ⌂:third⟩\n** K ⟨0c⟩\n"
+R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨0c It subscribes to these.⟩\n**** M ⟨0d ☮ 2C 3bK⟩\n***** P ⟨0e ☮ Ca ⌂:main⟩\n***** R ⟨0f ☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
+R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨0c It subscribes to these.⟩\n**** M ⟨0d ☮ 2C 3bK ⌂:foreign⟩\n***** P ⟨0e ☮ Ca ⌂:main⟩\n***** R ⟨0f ☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
+R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨0c It subscribes to these.⟩\n**** M ⟨0d ☮ 2C 3bK ⌂:foreign⟩\n***** P ⟨0e ☮ Ca ⌂:main⟩\n***** R ⟨0f ☮ C2a ⟳⟩\n** K ⟨0g⟩\n"
 
 def copy_overrides_followed_fixture (data_root):
   """The overrides-followed data, with a config naming its two foreign
@@ -3187,8 +3184,8 @@ def check_saving_a_view_that_follows_yours (context):
   which would be refused against the root author's, and the rerendered
   view still shows U, its sidecar still recording the choice."""
   folder = context [ "own_folder" ]
-  edit_compact ( folder, [ ( "** U ⟨0b Oĥ1 ⌂:main⟩\n",
-                             "** U ⟨0b Oĥ1 ⌂:main⟩\nU's new body.\n" ) ], "view_R" )
+  edit_compact ( folder, [ ( "** U ⟨0b Kĥ1 ⌂:main⟩\n",
+                             "** U ⟨0b Kĥ1 ⌂:main⟩\nU's new body.\n" ) ], "view_R" )
   require_failure (
     run_tool ([ "override-perspective", os . path . join (folder, "view_R.view.json"),
                 "root-authors" ]),
@@ -3196,7 +3193,7 @@ def check_saving_a_view_that_follows_yours (context):
   require_save_succeeds ( os . path . join (folder, "view_R.view.json") )
   require_equal ( "R's view, saved", r_tree (folder),
                   FOLLOWS_YOURS_SUMMARY + R_SHOWING_U )
-  require_in_file ( folder, "view_R", "** U ⟨0b Oĥ1 ⌂:main⟩\nU's new body.\n" )
+  require_in_file ( folder, "view_R", "** U ⟨0b Kĥ1 ⌂:main⟩\nU's new body.\n" )
   require_equal ( "U's body", skg_body (context, "U"), [ "U's new body." ] )
   require_equal ( "the saved sidecar's choice",
                   read_sidecar (folder, "view_R") [ "overrides_followed" ], "user" )
@@ -3227,8 +3224,8 @@ def check_following_the_root_authors_again (context):
                   "root authors" )
 
 def check_the_root_too (context):
-  """A view of M, which U, the user's, overrides, shows U as its root
-  from the user's perspective, standing for M ('ĥ' after its 'O'),
+  """A view of M, which U, the user's, forks, shows U as its root
+  from the user's perspective, standing for M ('ĥ' after its 'K'),
   and M again from the root authors'."""
   folder = context [ "own_folder" ]
   require_tool_run ([ "view", "M", "--out-dir", folder ])
@@ -3239,7 +3236,7 @@ def check_the_root_too (context):
                       "user" ])
   switched = root ()
   require_equal ( "M's root from your perspective",
-                  ( switched . startswith ("U ⟨0a O"), "ĥ" in switched ), ( True, True ) )
+                  ( switched . startswith ("U ⟨0a K"), "ĥ" in switched ), ( True, True ) )
   require_tool_run ([ "override-perspective", os . path . join (folder, "view_M.view.json"),
                       "root-authors" ])
   require_equal ( "M's root from the root authors' again", root (), fresh )

@@ -2,7 +2,7 @@
 ;;; Open owned container Q (whose content is the owned M):
 ;;;  - forking a dirty buffer is refused (no confirmation appears);
 ;;;  - skg-fork-node on M -> a fork-confirmation buffer; APPROVE -> the
-;;;    clone is created (overrides M) and shown in M's place on reopen;
+;;;    clone is created (forks M) and shown in M's place on reopen;
 ;;;  - on a second node M2, skg-fork-node -> DECLINE strips the lingering
 ;;;    (viewRequests fork) atom and commits nothing.
 

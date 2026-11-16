@@ -704,7 +704,7 @@ describe('skg.metadata relRepo gesture', function ()
       '** (skg subscribeeFolder)',
       '*** (skg node (gnid seen) (skgRepos (nodeRepo public)) writeProtected) seen' })
     assert.are.same({ recorder = 'anchor', member = 'seen',
-                      relation = 'subscribesTo' }, metadata.rel_at_line(3))
+                      relation = 'forks' }, metadata.rel_at_line(3))
   end)
 
   it("refuses a writable folder's member in words that name the"
@@ -959,7 +959,7 @@ describe('skg.metadata relRepo gesture', function ()
     assert.is_falsy(buffer_text():find('editRequest'))
   end)
 
-  it('offers the two writable kinds among the five relations', function ()
+  it('offers the two writable kinds among the four relations', function ()
     local tree = metadata.relationship_kind_menu_tree()
     local relations, kinds = {}, {}
     for _, relation in ipairs(tree) do
@@ -967,8 +967,8 @@ describe('skg.metadata relRepo gesture', function ()
       for _, role in ipairs(relation.roles) do
         if role.kind then table.insert(kinds, role.kind) end end
     end
-    assert.are.same({ 'contains', 'linksTo', 'subscribesTo',
-                      'hidesFromSubs', 'overrides' }, relations)
+    assert.are.same({ 'contains', 'linksTo', 'forks',
+                      'hidesFromSubs' }, relations)
     assert.are.same({ 'content', 'subscribee' }, kinds)
   end)
 
@@ -980,9 +980,9 @@ describe('skg.metadata relRepo gesture', function ()
     metadata.relationship_kind_menu_choose(nil, function (kind)
       chosen = kind end)
     metadata.relationship_kind_menu_choose(
-      { role = 'subscriber', kind = false,
+      { role = 'forker', kind = false,
         description = metadata.relationship_role_menu_prose
-                        .subscriber.description },
+                        .forker.description },
       function (kind) chosen = kind end)
     vim.notify = original_notify
     assert.is_nil(chosen)

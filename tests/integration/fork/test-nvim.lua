@@ -93,14 +93,13 @@ metadata.change_repo_at_line(clone_line, 'owned')
 save.approve_fork()
 
 -- 6. The fork commits and P immediately replaces N with the clone.
--- The clone itself now carries its two outbound relationships. Match the
+-- The clone itself now carries its outbound fork. Match the
 -- commit-signal facts as substrings, not the whole rels form.
 local committed = T.wait_for(function ()
   local buf = buffer_showing('P')
   if not buf then return false end
   local s = T.buffer_text(buf)
-  return s:find('(subscribesTo (out 1))', 1, true)
-     and s:find('(overrides (out 1))', 1, true)
+  return s:find('(forks (out 1))', 1, true)
      and s:find('(overridesHere N)', 1, true)
      and s:find('N-edited', 1, true)
 end, 10)

@@ -94,7 +94,7 @@ viewparent, relation = the folder's relation."
      (beginning-of-line)
      (should (equal (skg--rel-at-point)
                     '(:recorder "anchor" :member "seen"
-                      :relation "subscribesTo"))))))
+                      :relation "forks"))))))
 
 (ert-deftest test-rel-writable-folder-member-refusals-name-the-folders-viewparent ()
   "A writable folder's member under a write-protected viewparent, or
@@ -676,10 +676,9 @@ the subtree, while preserving derived facts."
 
 (ert-deftest test-relationship-kind-menu-settable-roles ()
   "The menu tree offers exactly the two writable kinds, one per
-writable position, and covers all five schema relations."
+writable position, and covers all four schema relations."
   (should (equal (mapcar #'car (skg--relationship-kind-menu-tree))
-                 '("contains" "linksTo" "subscribesTo"
-                   "hidesFromSubs" "overrides")))
+                 '("contains" "linksTo" "forks" "hidesFromSubs")))
   (should (equal (delq nil
                        (mapcar (lambda (role) (nth 1 role))
                                (apply #'append
@@ -708,11 +707,11 @@ does neither."
              (lambda (kind) (setq chosen kind))))
           (with-current-buffer "*skg-relationship-kinds*"
             (goto-char (point-min))
-            (search-forward "* subscribes")
+            (search-forward "* forks")
             (beginning-of-line)
             (skg--relationship-kind-menu-choose) ;; level-1: a no-op
             (should-not chosen)
-            (should-error (test--choose-menu-role "** subscriber")
+            (should-error (test--choose-menu-role "** forker")
                           :type 'user-error))
           (test--choose-menu-role "** content")
           (should (eq chosen 'content))

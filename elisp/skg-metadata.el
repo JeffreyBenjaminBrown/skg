@@ -264,7 +264,7 @@ the relationship belongs to the other end, so setting its repo here would
 be meaningless.")
 
 (defconst skg--writable-folder-relations
-  '((subscribeeFolder . "subscribesTo"))
+  '((subscribeeFolder . "forks"))
   "The partner folder atoms whose members' relationships are writable
 from this side, each mapped to its relation's wire name
 (NodeRelation::relation_name, server/dbs/in_rust_graph/
@@ -430,18 +430,14 @@ next save will do with the relationship."
      "Links are inferred from body text; they carry no false relRepo, so there is nothing to set.")
     ("mentioned" nil
      "Links are inferred from body text; they carry no false relRepo, so there is nothing to set.")
-    ("subscriber" nil
-     "A subscriberFolder member: the subscribesTo relationship belongs to the member (the subscriber), not to the view-parent. Write-protected from here.")
-    ("subscribee" subscribee
-     "A member of the view-parent's subscribeeFolder. Sets the repo of each subscribesTo relationship from the view-parent.")
+    ("forker" nil
+     "A subscriberFolder member: the forks relationship belongs to the member (the forker), not to the view-parent. Write-protected from here.")
+    ("forkee" subscribee
+     "A member of the view-parent's subscribeeFolder. Sets the repo of each forks relationship from the view-parent.")
     ("hider" nil
      "Hide repos are derived at save, floored at the most public explaining subscription; the hiderFolder is write-protected.")
     ("hidden" nil
-     "Hide repos are derived at save, floored at the most public explaining subscription; the hiddenFolder is write-protected.")
-    ("overrider" nil
-     "No folder shows the overrides relation; only the fork operation records it, so there is nothing to set from here.")
-    ("overridden" nil
-     "No folder shows the overrides relation; only the fork operation records it, so there is nothing to set from here."))
+     "Hide repos are derived at save, floored at the most public explaining subscription; the hiddenFolder is write-protected."))
   "For each relation role in 'shared/relations.json',
 (ROLE-NAME KIND-OR-NIL DESCRIPTION), as the relationship-kind menu of
 `skg-set-relRepo-recursive' shows it. ROLE-NAME is the role the

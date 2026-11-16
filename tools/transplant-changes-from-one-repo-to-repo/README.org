@@ -1,3 +1,11 @@
+* Stale since November 2026: the keys it reads are retired
+Its scripts read and write the '.skg' keys 'subscribesTo',
+'hidesFromSubs' and 'overrides', which became 'forks' and 'hides'
+('tools/migrate-forks-2026-11/README.org'). A server refuses files
+holding the old keys. Before using it again, rename those keys in
+'02_collect_targets.py', '04_check_alignment.py', '05_build_diff.py'
+and 'skg_fmt.py' (and drop 'overrides', whose relationships are
+'forks' now).
 * Jeff's 2-paragraph overview
 
 Given two repos,

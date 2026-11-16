@@ -144,7 +144,7 @@
                                       (line-beginning-position)
                                       (line-end-position))))
                       (and (not (string-match-p "(gnid F)" root-line))
-                           (string-match-p "(overrides (out 1))" root-line)
+                           (string-match-p "(forks (out 1))" root-line)
                            (string-match-p "N-new" (buffer-string))))))))
          10)
       (test-fail "F's original buffer did not replace root F with K:\n%s"
@@ -158,8 +158,7 @@
           (unless (and k-line
                        (string-match "(gnid \\([^ )]+\\))" k-line)
                        (not (string-match-p "overridesHere" k-line))
-                       (string-match-p "(subscribesTo (out 1))" k-line)
-                       (string-match-p "(overrides (out 1))" k-line))
+                       (string-match-p "(forks (out 1))" k-line))
             (test-fail "K lacks its expected F relationships:\n%s"
                        (buffer-string)))
         (setq k-gnid (match-string 1 k-line)))
@@ -175,8 +174,8 @@
         (test-fail "K still contains O directly:\n%s" (buffer-string))))
 
     ;; 6. Fresh graph-derived views verify all three nodes independently:
-    ;; F still contains O and now has one incoming subscriber/overrider;
-    ;; K subscribes to/overrides F and contains N; N contains O.
+    ;; F still contains O and now has one incoming forker;
+    ;; K forks F and contains N; N contains O.
     (skg-request-single-root-content-view-from-id "F")
     (let ((f-buf
            (skg-test-wait-for (lambda () (fork-test--root-buffer "F")) 10)))
@@ -184,8 +183,7 @@
       (with-current-buffer f-buf
         (let ((f-line (buffer-substring-no-properties
                        (line-beginning-position) (line-end-position))))
-          (unless (and (string-match-p "(subscribesTo (in 1))" f-line)
-                       (string-match-p "(overrides (in 1))" f-line)
+          (unless (and (string-match-p "(forks (in 1))" f-line)
                        (string-match-p "(contains (out 1))" f-line))
             (test-fail "F's post-fork graph relationships are wrong:\n%s"
                        (buffer-string))))))

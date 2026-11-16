@@ -388,7 +388,7 @@ end
 local function rel_chunks (rel, form, birth, write_protected, overrides_here)
   local in_c = rel_side_chunks(rel, 'in', form, birth, write_protected)
   local out_c = rel_side_chunks(rel, 'out', form, birth, write_protected)
-  local here = rel == 'overrides' and overrides_here
+  local here = rel == 'forks' and overrides_here
   if #in_c == 0 and #out_c == 0 and not here then return nil end
   local born = false
   for _, fact in ipairs(birth) do
@@ -407,7 +407,7 @@ end
 ---virtual-text chunks: the relation tokens from its '(rels ...)',
 ---styled by its '(birth ...)', then the property counts from its
 ---'(props ...)'. Nil if it has none or they produce nothing. Tokens
----are the relations in display order (C L S O H), then the property
+---are the relations in display order (C L K H), then the property
 ---counts A I F, space-separated. 'writeProtected' and
 ---'(overridesHere O)' stand at the top level of SEXP.
 ---@param sexp any
@@ -439,7 +439,7 @@ function M.render_rel_facts (sexp)
   end
   for _, rel in ipairs(REL_ORDER) do
     local form = rels and assq(rels, rel)
-    if form or (rel == 'overrides' and overrides_here) then
+    if form or (rel == 'forks' and overrides_here) then
       add_token(rel_chunks(rel, form, birth, write_protected, overrides_here))
     end
   end
