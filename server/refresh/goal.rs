@@ -270,7 +270,7 @@ fn content_goal (
   let restriction : &SkgrepoRestriction = walk . truth . restriction;
   let note : Option<ID> = note_of_member_as_such (tree, parent);
   let unintegrated : &dyn Fn (Vec<ID>) -> Vec<ID> = &|contents : Vec<ID>| -> Vec<ID> {
-    less_what_the_forker_integrates (
+    less_what_the_note_integrates (
       graph, restriction, note . as_ref (), &contents ) };
   if let Some (goal) = diff_view::content_goal (pid, unintegrated, walk) {
     return goal; }
@@ -300,14 +300,14 @@ pub(crate) fn content_goal_gnids (
   let contents : Vec<ID> = members . iter ()
     . map ( |member| member . member . id () . clone () )
     . collect ();
-  less_what_the_forker_integrates (graph, restriction, note, &contents) }
+  less_what_the_note_integrates (graph, restriction, note, &contents) }
 
 /// 'contents' less what 'note' hides or contains, as the truth
 /// has it ('unintegrated_content_gnids'): what a member as such of
-/// the note's forks folder shows of its content (the note being the
-/// forker of a forkee as such, and the forkee of a forker as such).
+/// the note's forks folder shows of its content ('docs/glossary.org',
+/// "what a member shows"), whichever role the member plays there.
 /// All of 'contents' when there is no note.
-fn less_what_the_forker_integrates (
+fn less_what_the_note_integrates (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
   note        : Option<&ID>,
@@ -328,19 +328,20 @@ fn less_what_the_forker_integrates (
 fn unintegrated_content_gnids (
   graph               : &InRustGraph,
   content_gnids      : &[ID],
-  forker_hidden       : &[ID],
-  forker_contains     : &[ID],
+  note_hides          : &[ID],
+  note_contains       : &[ID],
 ) -> Vec<ID> {
   let contents : Vec<ID> = resolve_all (content_gnids, graph);
-  let hidden : Vec<ID> = resolve_all (forker_hidden, graph);
-  let contained : Vec<ID> = resolve_all (forker_contains, graph);
+  let hidden : Vec<ID> = resolve_all (note_hides, graph);
+  let contained : Vec<ID> = resolve_all (note_contains, graph);
   setlike_vector_subtraction (
     setlike_vector_subtraction (contents, &hidden), &contained) }
 
 /// When the occurrence at 'treeid' is a member as such of a forks
 /// folder (a member the folder's relation warrants: a forkee as such,
-/// which its viewparent forks and which claims where the folder reads
-/// claims, or a forker as such, which forks it and claims nothing),
+/// which claims, its viewparent forking it, or a forker as such,
+/// which claims nothing: in a view the refresh draws, one that forks
+/// its viewparent and that the viewparent does not fork),
 /// the note whose folder holds it, the folder's viewparent. Either
 /// shows its content less what that note contains or hides.
 pub(crate) fn note_of_member_as_such (
@@ -584,22 +585,24 @@ pub(crate) fn partnerFolder_members_in_graph (
       viewparent_pid, recorder_role, skgrepo_restriction ) };
   Some (members) }
 
-/// What 'note' hides in the content of 'member', a member as such of
-/// its forks folder (a forkee or forker as such), by the records the
-/// skgrepo restriction shows: the goal of the compound folder
-/// 'HiddenInForkPartner' under the member.
+/// What 'hider' hides in the content of 'container', by the records
+/// the skgrepo restriction shows, in the order of the hides list: the
+/// goal of the compound folder 'HiddenInForkPartner' under a member
+/// as such (the member the container, the note whose forks folder
+/// holds it the hider), and of the folder of what a forker as such
+/// hides of the note's content (the roles swapped).
 pub(crate) fn hidden_in_fork_partner (
-  member     : &ID,
-  note       : &ID,
+  container  : &ID,
+  hider      : &ID,
   walk       : &Walk,
 ) -> Vec<ID> {
   let graph : &InRustGraph = walk . truth . graph;
   let goal : Vec<ID> = goal_list_for_hiddenInForkPartner_folder (
     graph,
     &graph . outbound_gnids_for_relation_gated (
-      member, NodeRelation::Contains, walk . truth . restriction ),
+      container, NodeRelation::Contains, walk . truth . restriction ),
     &graph . outbound_gnids_for_relation_gated (
-      note, NodeRelation::Hides, walk . truth . restriction ));
+      hider, NodeRelation::Hides, walk . truth . restriction ));
   resolve_all (&goal, graph) }
 
 /// What 'forker', a forker as such in the forks folder of 'note',

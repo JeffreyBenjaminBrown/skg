@@ -1375,11 +1375,11 @@ fn add_folders (
 fn add_hidden_outside_folder (
   tree              : &mut Tree<Viewnode>,
   forks_folder      : NodeId,
-  forker            : &ID,
+  hider             : &ID,
   walk              : &mut Walk,
 ) {
   if child_folder (tree, forks_folder, &Folder::HiddenOutsideOfForkPartners) . is_none ()
-     && ! hidden_outside_of_fork_partners (forker, walk) . is_empty ()
+     && ! hidden_outside_of_fork_partners (hider, walk) . is_empty ()
   { let hidden_outside : NodeId = tree . get_mut (forks_folder) . unwrap ()
       . append ( viewnode_of (
         ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners) )) . id ();

@@ -43,11 +43,11 @@ fn lowering_produces_ordered_nodeInstructions_and_signals () {
       **** (skg node (gnid visible) (skgRepos (nodeRepo main))) visible
       * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
       "} );
-  let LoweringOutput { intents, visibility, .. } =
+  let LoweringOutput { intents, forkee_visibility, .. } =
     lower_collected_fieldIntents (collected) . unwrap();
   { // There is one visibility pair, aimed at the forker.
-    assert_eq!( visibility . len(), 1 );
-    let (forker, signal) = &visibility [0];
+    assert_eq!( forkee_visibility . len(), 1 );
+    let (forker, signal) = &forkee_visibility [0];
     assert_eq!( forker, &ID::from ("root") );
     assert_eq!( signal . forkee, ID::from ("e") );
     assert_eq!( signal . visible, vec![ID::from ("visible")] ); }

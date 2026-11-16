@@ -630,7 +630,7 @@ such": a member of a forks folder that claims (and,
 in the refresh, that the graph warrants). They are not just forkees,
 but they are being shown /as/ forkees. A forkee as such shows its
 content less what the forker contains or hides
-('less_what_the_forker_integrates' in 'server/refresh/goal.rs').
+('less_what_the_note_integrates' in 'server/refresh/goal.rs').
 
 In a content view, under an editable forker, the refresh draws a
 forkee as such as it draws content: write-protected, carrying an
@@ -667,7 +667,7 @@ stands as a forkee as such.) A *member as such* is either a forkee as
 such or a forker as such: an occurrence member of a forks folder.
 *What a member shows* of its content is its content less what N
 contains or hides, by the records the skgrepo restriction shows, in
-the member's order ('less_what_the_forker_integrates' in
+the member's order ('less_what_the_note_integrates' in
 'server/refresh/goal.rs', whose 'note' is the forker of a forkee as
 such and the forkee of a forker as such; 'note_of_member_as_such').
 For a forker that is what it adds to N; one that adds nothing shows
@@ -711,7 +711,7 @@ view"). Where the same save
 removes the claim of a mutual (a detachment), a cut from it only
 hides: the detachment stands. A foreign N can record neither a fork
 nor a hide, so a save that cuts from F or unhides under it is refused,
-naming N ('cut_under_a_foreign_note'), in the words the
+naming N ('refusal_to_change_what_a_foreign_note_hides'), in the words the
 forkee-visibility step uses. The fork rules still bind: a save that
 would make N fork F while N contains F is refused. The step reads F's
 content and N's hides and content by the records the skgrepo
@@ -745,7 +745,7 @@ hide recorded in a restricted section is neither removed nor moved,
 and no hide is written of a member that only a restricted record
 explains. Only a forker the user owns records hides: a save whose
 step would hide or unhide anything in a foreign forker is refused,
-naming the forker ('cut_under_a_foreign_note').
+naming the forker ('refusal_to_change_what_a_foreign_note_hides').
 
 *** role tree, and the -ward adjectives
 

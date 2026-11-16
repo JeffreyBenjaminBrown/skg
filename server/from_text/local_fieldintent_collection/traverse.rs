@@ -142,12 +142,12 @@ fn visit (
 
 /// What a member as such of a forks folder knows of the note whose
 /// folder holds it (the folder's recorder): its ID, whether it is
-/// editable, and whether it forks the member (a forkee as such) or
-/// not (a forker as such).
+/// editable, and whether the member claims (a forkee as such: the
+/// note forks it) or not (a forker as such).
 struct MemberAsSuchContext<'a> {
   note             : &'a ID,
   note_is_editable : bool,
-  note_forks_it    : bool,
+  member_claims    : bool,
 }
 
 fn visit_occurrence (
@@ -165,14 +165,14 @@ fn visit_occurrence (
         Some ( MemberAsSuchContext {
           note             : forker,
           note_is_editable : *forker_is_editable,
-          note_forks_it    : true } ),
+          member_claims    : true } ),
       LocalContext::ForkerAsSuchPosition {
-        forkee, forkee_is_editable }
+        note, note_is_editable }
         if ! t . claimsMembership =>
         Some ( MemberAsSuchContext {
-          note             : forkee,
-          note_is_editable : *forkee_is_editable,
-          note_forks_it    : false } ),
+          note,
+          note_is_editable : *note_is_editable,
+          member_claims    : false } ),
       _ => None };
   let is_editable : bool =
     ! t . is_writeProtected();
@@ -188,7 +188,7 @@ fn visit_occurrence (
     // Emission happens only inside this block, because an
     // write-protected vognode emits nothing.
     match member_as_such_context {
-      Some (MemberAsSuchContext { note, note_is_editable, note_forks_it }) => {
+      Some (MemberAsSuchContext { note, note_is_editable, member_claims }) => {
         if owned (& t . home_skgrepo) {
           // An owned member as such saves its own title and body,
           // and nothing else of itself: what it shows of its
@@ -222,7 +222,7 @@ fn visit_occurrence (
           collected . instructionMerge_fieldIntent (
             &headline,
             note . clone(),
-            if note_forks_it {
+            if member_claims {
               FieldIntent::ForkeeVisibility (
                 ForkeeVisibility {
                   forkee : t . gnid . clone(),
@@ -230,7 +230,7 @@ fn visit_occurrence (
             } else {
               FieldIntent::ForkerVisibility (
                 ForkerVisibility {
-                  forker : t . gnid . clone(),
+                  forker_as_such : t . gnid . clone(),
                   visible } ) } ) ?; }
         // Delete, NodeMerge and flag edit requests here are
         // ignored: a member as such can affect only its own title
@@ -397,13 +397,13 @@ fn visit_forks_folder (
           match &child . value() . kind {
             ViewnodeKind::Folder (Folder::HiddenOutsideOfForkPartners) =>
               LocalContext::HiddenOutsidePosition {
-                forker          : recorder . gnid . clone(),
+                hider           : recorder . gnid . clone(),
                 is_saveEligible : recorder . is_saveEligible },
             ViewnodeKind::Vognode (Vognode::Occurrence (t))
               if ! t . claimsMembership =>
               LocalContext::ForkerAsSuchPosition {
-                forkee             : recorder . gnid . clone(),
-                forkee_is_editable : recorder . is_editable },
+                note             : recorder . gnid . clone(),
+                note_is_editable : recorder . is_editable },
             _ =>
               // The forker's identity is passed even when the recorder is
               // not save-eligible, because text claims outlive the
@@ -431,7 +431,7 @@ fn visit_hiddenOutside_folder (
   owned     : IsOwned,
 ) -> Result<(), String> {
   if let LocalContext::HiddenOutsidePosition {
-    forker, is_saveEligible } = context
+    hider, is_saveEligible } = context
   {
     if *is_saveEligible {
       let mut members : Vec<ID> = Vec::new ();
@@ -449,7 +449,7 @@ fn visit_hiddenOutside_folder (
           members . push (gnid); }}
       collected . instructionMerge_fieldIntent (
         &node_ref . value () . headline_name (),
-        forker . clone(),
+        hider . clone(),
         FieldIntent::HiddenOutsideEdit (HiddenOutsideEdit { members }) ) ?; }}
   recurse_with_uniform_context (
     node_ref, &LocalContext::UnderWriteProtectedFolder, collected, owned)

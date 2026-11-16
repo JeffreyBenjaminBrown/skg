@@ -78,12 +78,12 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
     nodeMerge_pairs (&collected);
   let (resolved, post_skgsave_commit_notice_candidates)
     : (lower::LoweredNodeIntents, Vec<PostSkgsaveCommitNoticeCandidate>) = {
-    let LoweringOutput { intents, visibility, forker_visibility,
+    let LoweringOutput { intents, forkee_visibility, forker_visibility,
                          hidden_outside, forks_folder_members } =
       lower_collected_fieldIntents (collected)
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     resolve_visibility (
-      intents, &visibility, &forker_visibility,
+      intents, &forkee_visibility, &forker_visibility,
       &hidden_outside, &forks_folder_members,
       graph, config, skgrepo_restriction ) ? };
   let with_disk : NodeInstructions_with_Repomoves =

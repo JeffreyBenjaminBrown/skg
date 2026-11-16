@@ -73,10 +73,10 @@ fn visibility_pairs_from_tree (
 ) -> Vec<(ID, ForkeeVisibility)> {
   let forest : ViewForest =
     ViewForest::from_internal_tree (viewforest);
-  let LoweringOutput { visibility, .. } =
+  let LoweringOutput { forkee_visibility, .. } =
     lower_collected_fieldIntents (
       collect_instructions_locally (&forest, &|_| true) . unwrap() ) . unwrap();
-  visibility }
+  forkee_visibility }
 
 fn visibility_pairs_from_org (
   input : &str,

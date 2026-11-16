@@ -278,7 +278,7 @@ pub struct LoweredNodeIntents {
 
 pub struct LoweringOutput {
   pub intents        : LoweredNodeIntents,
-  pub visibility     : Vec<(ID, ForkeeVisibility)>, // Each pair is (forker, signal); the list is in forker first-emission order.
+  pub forkee_visibility : Vec<(ID, ForkeeVisibility)>, // Each pair is (forker, signal); the list is in forker first-emission order.
   pub forker_visibility : Vec<(ID, ForkerVisibility)>, // Each pair is (the note whose forks folder shows the forker as such, signal), in the note's first-emission order.
   pub hidden_outside : Vec<(ID, HiddenOutsideEdit)>,
   pub forks_folder_members : Vec<(ID, ForksFolderMembers)>, // Each pair is (the note the forks folder describes, its members).
@@ -304,19 +304,19 @@ pub fn lower_collected_fieldIntents (
 ) -> Result<LoweringOutput, String> {
   let CollectedFieldIntents { order, lowerable_order, mut by_pid, .. }
     = collected;
-  let visibility : Vec<(ID, ForkeeVisibility)> = {
+  let forkee_visibility : Vec<(ID, ForkeeVisibility)> = {
     // The signals are extracted across all entries, in
     // first-emission order -- including from the signals-only
     // entries, which lower to no NodeIntent.
-    let mut visibility : Vec<(ID, ForkeeVisibility)> =
+    let mut forkee_visibility : Vec<(ID, ForkeeVisibility)> =
       Vec::new();
     for pid in &order {
       let entry : &FieldIntentsForOneId =
         by_pid . get (pid)
         . ok_or ( "lower_collected_fieldIntents: order names a PID missing from the map" . to_string() ) ?;
-      for signal in &entry . visibility {
-        visibility . push (( pid . clone(), signal . clone() )); }}
-    visibility };
+      for signal in &entry . forkee_visibility {
+        forkee_visibility . push (( pid . clone(), signal . clone() )); }}
+    forkee_visibility };
   let forker_visibility : Vec<(ID, ForkerVisibility)> = {
     let mut signals : Vec<(ID, ForkerVisibility)> = Vec::new ();
     for pid in &order {
@@ -366,7 +366,7 @@ pub fn lower_collected_fieldIntents (
     { return Err ( format!(
         "lower_collected_fieldIntents: entry for {} has field intents but no title/body",
         pid )); }}
-  Ok (LoweringOutput { intents, visibility, forker_visibility, hidden_outside, forks_folder_members }) }
+  Ok (LoweringOutput { intents, forkee_visibility, forker_visibility, hidden_outside, forks_folder_members }) }
 
 /// This assumes the entry is lowerable: it holds a delete or a
 /// title/body, having been named by 'lowerable_order'.
@@ -425,7 +425,7 @@ impl LoweredNodeIntents {
   /// nodeIntent whose contains is Specified -- the candidates for
   /// inferring hides from contains removals (see
   /// 'infer_hides_from_contains_removals'). Cloned out so the caller
-  /// can mutate self (via 'apply_hiderel_delta_to_forker') while
+  /// can mutate self (via 'apply_hiderel_delta_to_hider') while
   /// iterating.
   pub fn nodeSaveIntents_with_specified_contains (
     &self,
@@ -443,56 +443,56 @@ impl LoweredNodeIntents {
           _ => None })
       . collect () }
 
-  /// This returns the forker's contains as it will stand after
+  /// This returns the note's contains as it will stand after
   /// this save: from its Save nodeIntent if that specifies them, and
   /// otherwise from disk. An unspecified contains is the one on disk:
   /// an owned member as such emits a Save for its title and body
   /// alone.
-  pub fn forker_contains_after_save (
+  pub fn note_contains_after_save (
     &self,
-    forker_from_disk : &Graphnode,
+    note_from_disk : &Graphnode,
   ) -> HashSet<ID> {
-    match self . by_pid . get (&forker_from_disk . pid) {
+    match self . by_pid . get (&note_from_disk . pid) {
       Some (NodeIntent::Save (intent))
         if ! intent . contains . is_unspecified () =>
           intent . contains . or_default () . iter ()
           . map ( |(gnid, _)| gnid . clone () ) . collect (),
       _ =>
-        members_of (&forker_from_disk . contains)
+        members_of (&note_from_disk . contains)
         . into_iter() . collect(),
     }}
 
-  /// As 'forker_contains_after_save', but for the post-save list of
+  /// As 'note_contains_after_save', but for the post-save list of
   /// forkees.  Edits of the hidden-outside compound partner folder
   /// must classify hides against this list, not against a stale disk
   /// fork that the same buffer removed.
-  pub fn forker_forks_after_save (
+  pub fn note_forks_after_save (
     &self,
-    forker_from_disk : &Graphnode,
+    note_from_disk : &Graphnode,
   ) -> Vec<ID> {
-    match self . by_pid . get (&forker_from_disk . pid) {
+    match self . by_pid . get (&note_from_disk . pid) {
       Some (NodeIntent::Save (intent))
         if ! intent . forks . is_unspecified () =>
           gnids_only (intent . forks . or_default ()),
       _ =>
         members_of (
-          forker_from_disk . forks . or_default () ),
+          note_from_disk . forks . or_default () ),
     }}
 
   /// The hide IDs after the preceding inference stages.  Edits of the
   /// hidden-outside compound partner folder run last, so they calculate
   /// their delta against this intermediate state.
-  pub fn forker_hides_after_resolution (
+  pub fn note_hides_after_resolution (
     &self,
-    forker_from_disk : &Graphnode,
+    note_from_disk : &Graphnode,
   ) -> Vec<ID> {
-    match self . by_pid . get (&forker_from_disk . pid) {
+    match self . by_pid . get (&note_from_disk . pid) {
       Some (NodeIntent::Save (intent))
         if ! intent . hides . is_unspecified () =>
           intent . hides . or_default () . to_vec (),
       _ =>
         members_of (
-          forker_from_disk . hides . or_default () ),
+          note_from_disk . hides . or_default () ),
     }}
 
   /// This sets the contains of 'member', a member as such of a forks
@@ -563,19 +563,19 @@ impl LoweredNodeIntents {
       forks . push (( forkee . clone (), None )); }
     intent . forks = MSV::Specified (forks); }
 
-  /// This applies inferred hides/unhides to the forker's
+  /// This applies inferred hides/unhides to the hider's
   /// nodeIntent, creating a Save nodeIntent from its disk state if it has
   /// none. A Delete nodeIntent is left untouched, because deleting wins.
-  pub fn apply_hiderel_delta_to_forker (
+  pub fn apply_hiderel_delta_to_hider (
     &mut self,
-    forker           : Graphnode,
+    hider           : Graphnode,
     inferred_hides   : &[ID],
     inferred_unhides : &[ID],
   ) {
     let base_hides : MSV<ID> =
-      members_msv (&forker . hides);
+      members_msv (&hider . hides);
     if let Some (intent) =
-      self . by_pid . get_mut (&forker . pid)
+      self . by_pid . get_mut (&hider . pid)
     { intent . apply_hiderel_delta (
         &base_hides,
         inferred_hides,
@@ -583,12 +583,12 @@ impl LoweredNodeIntents {
       return; }
     let mut intent : NodeIntent =
       NodeIntent::graph_save_from_graphnode (
-        forker . clone());
+        hider . clone());
     intent . apply_hiderel_delta (
       &base_hides,
       inferred_hides,
       inferred_unhides);
     let pid : ID =
-      forker . pid;
+      hider . pid;
     self . order . push (pid . clone());
     self . by_pid . insert (pid, intent); }}

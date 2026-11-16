@@ -118,7 +118,7 @@ fn forkee_as_such_emits_claim_and_visibility () {
     assert!( e . text_claims . is_empty () ); }
   { let forker : &FieldIntentsForOneId = entry (&collected, "forker");
     assert_eq!(
-      forker . visibility,
+      forker . forkee_visibility,
       vec![ ForkeeVisibility {
         forkee     : ID::from ("e"),
         visible    : vec![ID::from ("visible")] } ]);
@@ -151,7 +151,7 @@ fn foreign_forkee_as_such_emits_a_text_claim () {
       body     : Some ("Forkee body" . to_string()),
       headline : HeadlineName::of ( None, Some (&ID::from ("e")), "e" ) } ]);
   assert_eq!(
-    entry (&collected, "forker") . visibility,
+    entry (&collected, "forker") . forkee_visibility,
     vec![ ForkeeVisibility {
       forkee     : ID::from ("e"),
       visible    : vec![ID::from ("visible")] } ]); }
@@ -218,9 +218,9 @@ fn forker_as_such_emits_its_text_and_visibility_but_no_contains () {
     assert_eq!( recorder . forks, Some (vec![]) );
     assert_eq!( recorder . forker_visibility,
                 vec![ ForkerVisibility {
-                  forker  : ID::from ("forker"),
+                  forker_as_such : ID::from ("forker"),
                   visible : vec![ID::from ("forker-child")] } ]);
-    assert!( recorder . visibility . is_empty () ); }
+    assert!( recorder . forkee_visibility . is_empty () ); }
   { // Its editable children emit their own instructions.
     let child : &FieldIntentsForOneId = entry (&collected, "forker-child");
     assert!( child . title_and_body . is_some() ); }}
@@ -316,7 +316,7 @@ fn writeProtected_forkee_as_such_emits_nothing () {
       **** (skg node (gnid under) (skgRepos (nodeRepo main)) writeProtected) under
       "} );
   assert!( collected . by_pid . get (&ID::from ("e")) . is_none() );
-  assert_eq!( entry (&collected, "forker") . visibility, vec![] ); }
+  assert_eq!( entry (&collected, "forker") . forkee_visibility, vec![] ); }
 
 #[test]
 fn editable_forkee_under_writeProtected_forker_claims_without_visibility () {

@@ -28,10 +28,10 @@ pub enum LocalContext {
     forker                   : ID,
     forker_is_editable       : bool, },
   ForkerAsSuchPosition { // The node is a direct child of a forksFolder claiming nothing: a forker as such.
-    forkee                   : ID,
-    forkee_is_editable       : bool, },
+    note                     : ID,
+    note_is_editable         : bool, },
   HiddenOutsidePosition { // The one derived-but-editable compound partner folder under a forksFolder.
-    forker           : ID,
+    hider            : ID,
     is_saveEligible  : bool, },
   UnderWriteProtectedFolder, // The node is inside a write-protected partner folder, an idFolder, or a property member.
 }
@@ -114,8 +114,9 @@ pub struct ForkeeVisibility {
 }
 
 /// This is an unresolved signal: the buffer presents 'visible' as
-/// the visible content of 'forker', shown as such in the forks folder
-/// of the note it forks. That content is shown in part (less what the
+/// the visible content of 'forker_as_such', a member of the forks
+/// folder of a note claiming nothing there ('docs/glossary.org',
+/// "forker as such"). That content is shown in part (less what the
 /// note contains or hides), so it is never read as the forker's whole
 /// list: a child typed there joins it, a child the note hides shown
 /// there is unhidden, and a child cut from it makes the note fork the
@@ -123,11 +124,11 @@ pub struct ForkeeVisibility {
 /// ('resolve_forker_visibility').
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ForkerVisibility {
-  pub forker     : ID,
+  pub forker_as_such : ID,
   pub visible    : Vec<ID>, // These are the nodes *not* cut.
 }
 
-/// The explicitly submitted visible-outside subset for one forker.
+/// The explicitly submitted visible-outside subset for one hider.
 /// Unlike direct relationship sets it carries no skgrepo request: hide
 /// skgrepos are derived after forks and visibility are resolved.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -163,7 +164,7 @@ pub struct FieldIntentsForOneId {
   pub delete         : bool,
   pub node_merge     : Option<ID>, // This holds the acquiree.
   pub flag       : Option<(Flag, bool)>,
-  pub visibility     : Vec<ForkeeVisibility>,  // This slot is combineable.
+  pub forkee_visibility : Vec<ForkeeVisibility>,  // This slot is combineable.
   pub forker_visibility : Vec<ForkerVisibility>, // This slot is combineable.
   pub hidden_outside : Vec<HiddenOutsideEdit>,     // This slot is combineable.
   pub forks_folder_members : Vec<ForksFolderMembers>, // This slot is combineable.
@@ -246,7 +247,7 @@ impl CollectedFieldIntents {
         . or_default() };
     match intent {
       FieldIntent::ForkeeVisibility (v) => {
-        entry . visibility . push (v);
+        entry . forkee_visibility . push (v);
         Ok (( )) },
       FieldIntent::ForkerVisibility (v) => {
         entry . forker_visibility . push (v);

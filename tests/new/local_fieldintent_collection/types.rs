@@ -132,7 +132,7 @@ fn combineable_intents_always_combine () {
         headline : emitter () } )) . unwrap();
   let entry : &FieldIntentsForOneId =
     acc . by_pid . get (&ID::from ("forker")) . unwrap();
-  assert_eq!( entry . visibility . len(), 3 );
+  assert_eq!( entry . forkee_visibility . len(), 3 );
   assert_eq!( entry . text_claims . len(), 1 ); }
 
 #[test]
