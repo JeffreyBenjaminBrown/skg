@@ -818,6 +818,18 @@ Decision C; behavior 3.
 - Run the suites as slice 1 does.
 
 ** TODO Slice 4: the sweep, and the record
+*** Corrections carried from slice 3
+**** A stale buffer must not hide what its integrated folder showed
+Slice 3 reads what the view drew from the graph at save time. If an
+owned note stops keeping a child after a view of N was drawn, and that
+view is saved with no redraw between, the save hides the child,
+though the buffer showed it in the member's integrated-elsewhere
+folder, not as cut. The save should also read what the buffer shows:
+a child standing in a member's integrated-elsewhere folder or hidden
+folder in the saved buffer is not cut from that member. Pin it with a
+two-view test (one view un-keeps the child; the other, stale, saves
+an unrelated edit; no hide is recorded). The same reading closes the
+older gap for hides another view removed, if it does; record whether.
 - Re-read 'docs/glossary.org', 'docs/forks.org', 'docs/mirrors.org'
   and 'docs/sharing-model.org' whole for sentences the slices left
   stale ("each root author's", "owner's perspective", "nested",
