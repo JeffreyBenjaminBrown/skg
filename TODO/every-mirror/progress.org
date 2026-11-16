@@ -238,3 +238,178 @@ stands) appears in none of that hit's folders, since the enrichment
 draws direct relatives only, and so will slice 6's forks folder. Does
 that matter? Unpinned so far: an owned hit suppressing a foreign hit
 that forks it.
+** Slice 3: monogamy and the owned-cycle refusal go; a note may not contain what it forks
+*** Commits
+- 843c0284 every-mirror plan 1 slice 3: the fork rules replace monogamy and the owned-cycle refusal
+- (the commit carrying this record) every-mirror plan 1 slice 3: docs, record, DONE
+*** Suites
+- 'bash/nextest.sh': 1233 of 1233 pass. Its first run, before the
+  adaptations below, had 4 failures, each an expected fixture
+  adaptation (listed under "Tests adapted").
+- The AI tool's tests (after 'cargo build --bin skg'): PASS.
+- 'bash/integration-tests.sh': 38 of 38 pass (the Emacs pass). Its
+  first run had 1 failure, 'valid_and_invalid_saves', an expected
+  adaptation (below).
+- 'bash/all-tests.sh': all pass: build, Emacs 502 of 502, Neovim 20
+  of 20, nextest 1233 of 1233, doctests, team tools 3 and 9, AI
+  reader, integration 76 of 76 (both clients).
+- Also, per the '/verify' skill, an isolated 'target/debug' server on
+  port 24753 with scratch data (owned 1 contains n and m, r overrides
+  n; foreign f, owned c forking it), each save a hand-made buffer
+  over TCP: m given an overridden folder holding n saved (a second
+  owned overrider), and the view of 1 then showed n and m raw (Q3
+  rule 3); m overriding m, n containing n, r (which overrides n)
+  containing n, and n containing r were each refused, NOTHING WAS
+  SAVED, naming the rule; an explicit fork of n was refused with the
+  new wording, naming m. The server was stopped by its PID, its port
+  checked free, the scratch folder deleted.
+Logs: 'tests/results/every-mirror/slice3-plan1/' (nextest-first.log,
+nextest.log, ai-tool.log, integration-first.log, integration.log,
+all-tests.out, all-tests-ALL.org, verify-probes/, verify-server.log).
+*** What "forks" means here, until slice 5
+The rules ('SelfFork', 'ForkeeContained', 'ForkerContained') read a
+note's 'subscribesTo' and its 'overrides' alike ('FORK_RELATIONS' in
+'server/dbs/in_rust_graph/override_invariants.rs'): slice 5 makes
+every subscription and every override one 'forks' relationship, so a
+rule over 'overrides' alone would admit now, from a subscription,
+what the migrated data would then refuse at startup. Slice 5 replaces
+the two-element constant with 'NodeRelation::Forks' and drops the
+"(subscribes to or overrides)" in the messages.
+
+The fork operation's guard (Q6) reads 'MIRROR_RELATION' (today
+'overrides'): it asks whether the user already owns a mirror-making
+fork of the note, which today is what the operation itself writes, and
+slice 5 switches it with the mirrors in one place. A note of the
+user's that only subscribes to N does not trip it until then.
+*** Deviations from the plan's "how"
+**** Logs under 'tests/results/every-mirror/slice3-plan1/'
+As the launch brief said.
+**** Two violations for decision 7 and Q9, not one
+'ForkeeContained { forker, forkee }' (a note forks and contains one
+note) and 'ForkerContained { forker, forkee }' (a note contains a note
+that forks it; the same fact as forking a note that contains it).
+Each names both notes; a pair seen from both of its notes is reported
+once.
+**** The rules read owned notes only, with any partner
+A violation needs an owned note in the pair: an owned note containing
+a foreign note that forks it is refused, and so is an owned note
+forking a foreign note that contains it (Q9's wording). Foreign
+pairs are not checked.
+**** A dangling ID breaks no pair rule
+'ForkeeContained' is not reported when the forked-and-contained ID
+names no note. A fixture ('tests/delete_strips_references_from_neighbors/fixtures-absent-reference-command/owner.skg')
+deliberately holds a dangling 'gone' in all four lists, to pin the
+cleanup of absent references; nothing says a dangling ID is the same
+note as anything. Once a note answers to it the pair is refused, and
+the save that creates it checks the notes that name it (below).
+**** The scope is wider than "touched pids and re-keyed nodes"
+'derive_affected_override_scope' returns the touched notes; the notes
+each touched note contains or forks (a touched foreign note can make
+an owned partner break Q9's rule: the proptest found this); the notes
+that contain or fork a touched note (a note created where a dangling
+ID stood); and the recorders, in the base, of each ID a nodeMerge
+re-keys. One per-note function serves the whole-graph check and the
+save's, so they cannot disagree; the proptest compares them.
+**** The formatter
+'format_override_invariant_violations' became
+'describe_override_invariant_violation' (one sentence per violation):
+its only caller dropped the header line and prefixed each line with
+"* " a second time.
+**** Module and type names kept
+'override_invariants.rs', 'OverrideInvariantViolation',
+'BufferValidationError::OverrideInvariantViolation',
+'is_override_invariant_only', 'derive_affected_override_scope' and
+'validate_affected_override_invariants' keep their names (no slice
+renames them; slice 9's sweep meets them). 'GraphChangeSet' has one
+'override_pids_to_check' for 'override_skgrepos_to_check' and
+'override_targets_to_check', and the save's trace line one
+'override_pids_checked' for three counters. The fork operation's
+check is 'existing_owned_fork_of' in 'server/from_text/fork.rs'.
+**** The nodeMerge test is a save test
+The plan puts "a nodeMerge of a note with the note it overrides saves
+without a self-reference" in 'tests/unit/prepared_graph_update.rs',
+which never runs the nodeMerge. It is
+'tests/merge/merge_with_a_note_it_forks.rs' (the whole save; a
+subscribes to, overrides and hides b, and b overrides a); the
+preparation tests got the former collision now preparing, and the
+backstop: an acquirer left overriding its acquiree is refused as
+'SelfFork'.
+**** Beyond the plan's lists
+'tools/introspect/profile-with-org-report/' (its descriptions of the
+removed functions and its counters); 'docs/diff-view.org' (its
+example of a commit that fails validation) and 'docs/sharing-model.org'
+(the invariants paragraph). The 'TODO/problems.org' entry "Override
+invariants are validated by two divergent implementations" is
+obsolete (one per-note function now), and moved to
+'TODO/DONE/problems.org'.
+*** Tests adapted
+- 'tests/dbs/in_rust_graph/override_invariants.rs': rewritten: several
+  owned forks of one note, owned chains and cycles pass; each new
+  violation, by override and by subscription, by an extra ID; foreign
+  notes unchecked; a self-link and a contained fork sibling pass; a
+  nodeMerge re-keying, an extra ID closing a self-fork, a note
+  created where a dangling ID stood, an ownership change, each caught
+  by the save's scope; the proptest now varies subscriptions and
+  contents too.
+- 'tests/dbs/in_rust_graph/complete_validation.rs': its canonical-entry
+  test pins 'ForkeeContained' (two overriders of one target pass).
+- 'tests/init_refusal.rs': init refuses a self-override (fixture: N,
+  and R overriding N and R).
+- 'tests/unit/prepared_graph_update.rs': the collision test went; two
+  added (above).
+- 'tests/partner_folder_matrix.rs': the monogamy save test became two:
+  a second owned overrider saves; a self-override is refused, disk
+  unchanged.
+- 'tests/pruned_change_view/commit_processed.rs':
+  'a_commit_leaving_two_owned_overriders_is_refused' became
+  'a_commit_leaving_a_note_containing_its_forker_is_refused' (stage
+  and commit still refuses a candidate that fails validation).
+- 'tests/save/extra_id_revocation.rs': the rejected merge is now one
+  that makes R fork and contain N1 (fixture
+  'tests/save/override_collision/' moved to
+  'tests/save/merge_forkee_contained/').
+- 'tests/save/write_protected_edits.rs': its "accepted new
+  occurrence" was node 1 inside itself, which Q7 now refuses; it uses
+  node 4.
+- The integration test 'valid_and_invalid_saves' (both clients): its
+  valid save was the root containing itself; it is now a new child.
+- 'tests/fork.rs': the re-fork tests renamed
+  ('forking_a_note_one_already_forks_is_refused',
+  'explicit_fork_round_trip_and_refork_refusal'), the first also
+  pinning the new wording.
+*** Tests added
+- 'tests/override_substitution.rs':
+  'a_second_owned_overrider_saves_and_q3s_mirror_stands',
+  'an_owned_mutual_pair_saves_and_q3s_mirror_stands' (each N shown
+  raw by Q3's rule 3, where R stood before).
+- 'tests/overrideward_view_subtree.rs':
+  'an_owned_mutual_pair_both_matching_shows_one_hit'.
+- 'tests/merge/merge_with_a_note_it_forks.rs' (checked to fail without
+  the nodeMerge's filter).
+*** Fixtures changed
+- 'tests/init_refusal/fixtures/owned/owned/': R1, R2 gone; R added.
+- 'tests/overrideward_view_subtree/fixtures/owned/main/': O1 and O2
+  (an owned mutual pair) added.
+- 'tests/merge/merge_with_a_note_it_forks/fixtures/': new.
+- 'tests/save/merge_forkee_contained/fixtures/' (was
+  'override_collision'): N1, N2, R.
+*** Unfinished, and notes for later slices and Jeff
+- Slice 4 removes the overridden folder; the new tests that make an
+  owned note override another through it
+  ('partner_folder_matrix', 'override_substitution', the
+  'verify' probes) need another way then, as the old monogamy test
+  did.
+- A nodeMerge whose acquirer forks X while the acquiree contains X (or
+  the reverse) is refused, 'ForkeeContained' naming the acquirer: the
+  nodeMerge drops only the merged note's own IDs. Whether it should
+  drop such a pair too is not decided anywhere.
+- At startup a foreign author's fork R of an owned note E that
+  contains R refuses the start (E is "an owned note containing a note
+  that forks it"); the user must edit E's file by hand. No data either
+  server reads holds such a pair today (the plan's count).
+- The guard's message still labels N "Foreign node" for an explicit
+  fork of an owned note (pre-existing wording).
+- SelfHides was verified by unit tests only; the probes did not reach
+  it through a buffer.
+*** DONE
+The slice's headline in '1_plan.org' is DONE.

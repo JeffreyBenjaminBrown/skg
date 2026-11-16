@@ -1,3 +1,25 @@
+* Override invariants are validated by two divergent implementations (noted during override-chains planning; obsolete 2026-11-16)
+  Obsolete since every-mirror plan 1, slice 3: monogamy and the owned
+  cycle check are gone, and the startup check and the save's check
+  now run one per-note function ('violations_of_note' in
+  'server/dbs/in_rust_graph/override_invariants.rs') over the whole
+  graph and over the save's affected notes, so they cannot disagree.
+  The entry as it stood:
+   Monogamy (and, once
+   [[../override-chains/1_plan.org][the override-chains plan]] lands,
+   cycle-freedom) is checked in BOTH 'validate_override_invariants' (a
+   full O(V) scan) and 'validate_touched_override_invariants' (an
+   incremental O(touched) scan), in
+   server/dbs/in_rust_graph/override_invariants.rs. They already hand-roll
+   the same "follow owned overrider relationships, resolving extra-ids via
+   'pid_of'" logic twice; adding cycle detection duplicates it a third and
+   fourth time. A divergence (e.g. one resolves extra-ids, the other
+   forgets) would let bad data through the fast save path and only catch it
+   at the next rebuild. Opportunity: extract one shared primitive (e.g.
+   'user_owned_override_cycle_through(pid)', or have the validators reuse
+   'resolve_override''s seen-set/=cycle_detected=) so the save-time and
+   init/rebuild gates cannot disagree. Pre-existing (monogamy is already
+   duplicated); surfaced while planning override chains.
 * A redraw the user did not ask for undoes the folds changed since the last save (2026-11-13; fixed 2026-11-13)
   A view's fold state reaches the server only as the 'folded' and
   'bodyFolded' atoms of a save. A rerender after another writer's

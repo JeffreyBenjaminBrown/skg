@@ -17,17 +17,19 @@ The relRepo is independent of either endpoint's home skgrepo: two
 public nodes can be connected by an override relationship recorded only
 in =private=.
 
-An overrider may override any number of nodes.  Owned override data has
-two invariants in the opposite direction:
+An overrider may override any number of nodes, and any number of
+nodes, owned or not, may override one node.  Thus =R -> N1= and
+=R -> N2= are legal, as are the linear chain =D -> C -> N=, two owned
+notes overriding one target, and owned mutual overrides
+(=A -> B -> A=).  Mirror substitution, which ranks a note's mirrors by
+skgrepo, has no special case for a branch or a cycle (see "Mirror
+substitution").
 
-1. A target has at most one owned overrider.
-2. Owned override chains are acyclic.
-
-Thus =R -> N1= and =R -> N2= are legal, as is the linear chain
-=D -> C -> N=.  Two owned nodes overriding the same target are not
-legal.  Foreign data can contain branches or cycles; Skg preserves
-them, and mirror substitution, which ranks a note's mirrors by
-skgrepo, has no special case for either (see "Mirror substitution").
+What an owned note may not do, the save and the startup refuse
+('docs/data-model_technical.org', "Hard validation constraints"):
+override or subscribe to itself; contain or hide itself; both override
+(or subscribe to) and contain one note; or contain a note that
+overrides (or subscribes to) it.
 
 ** Direct visits are exact
 
@@ -309,7 +311,10 @@ unchanged.
 =skg-fork-node= (=C-c m f=) explicitly forks an owned node, commonly to
 add a more-private layer such as =D= over =C=.  Forking a substituted
 viewnode forks the carrier on screen and therefore deepens the chain.
-Creating a second owned overrider for the same target is refused.
+Either gesture is refused on a note you already fork, naming your fork
+of it ('docs/forks.org', "Once forked: the fork operation's guard");
+a second owned overrider made otherwise (in the overridden folder, or
+by a nodeMerge) is saved.
 
 The subscription and override are paired by the fork operation, not by
 the data model.  Removing either relationship later does not
@@ -405,7 +410,7 @@ not perform interactive override substitution.
 
 - [[file:../server/serve/handlers/single_root_view.rs][exact direct visits]]
 - [[file:../server/dbs/in_rust_graph/mirrors.rs][mirrors, and which one stands]]
-- [[file:../server/dbs/in_rust_graph/override_invariants.rs][owned monogamy and cycle invariants]]
+- [[file:../server/dbs/in_rust_graph/override_invariants.rs][what an owned note may not fork, contain or hide]]
 - [[file:../server/refresh/visit.rs][substitution and raw positions ('substitute_mirrors')]]
 - [[file:../server/rerender_pass.rs][saved-view fork replacement and collateral rerendering]]
 - [[file:../server/types/views_state.rs][open-view root registration]]

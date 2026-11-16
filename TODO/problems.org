@@ -844,23 +844,6 @@ gap too. Details, options and questions:
    recorder could remove most non-content dangling relationships. These
    paths need raw-ID-aware enumeration and a true Unknown case if the
    deletion policy covers all four structured outbound fields.
-* Problems noted during override-chains planning (TODO/override-chains/)
-** TODO Override invariants are validated by two divergent implementations
-   Monogamy (and, once
-   [[./override-chains/1_plan.org][the override-chains plan]] lands,
-   cycle-freedom) is checked in BOTH 'validate_override_invariants' (a
-   full O(V) scan) and 'validate_touched_override_invariants' (an
-   incremental O(touched) scan), in
-   server/dbs/in_rust_graph/override_invariants.rs. They already hand-roll
-   the same "follow owned overrider relationships, resolving extra-ids via
-   'pid_of'" logic twice; adding cycle detection duplicates it a third and
-   fourth time. A divergence (e.g. one resolves extra-ids, the other
-   forgets) would let bad data through the fast save path and only catch it
-   at the next rebuild. Opportunity: extract one shared primitive (e.g.
-   'user_owned_override_cycle_through(pid)', or have the validators reuse
-   'resolve_override''s seen-set/=cycle_detected=) so the save-time and
-   init/rebuild gates cannot disagree. Pre-existing (monogamy is already
-   duplicated); surfaced while planning override chains.
 * Problems noted while writing the autofork discussion (2026-07-11)
   Found while researching TODO/DONE/privacy-telescope/2_discussion.org.
   Both are documentation defects, not code bugs.

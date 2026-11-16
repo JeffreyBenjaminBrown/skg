@@ -70,12 +70,18 @@ rejected when any of these conditions holds:
 2. An extra ID belongs to more than one node.
 3. An ID is both a primary ID and an extra ID.
 4. A node's home skgrepo is absent from the current configuration.
-5. Owned override relationships give one target more than one owned
-   overrider (override monogamy).
-6. Owned override relationships contain a cycle.  Linear override chains are
-   allowed; foreign override facts are display-only and do not substitute.
+5. An owned note forks itself, contains itself or hides itself (a note
+   forks another when it subscribes to it or overrides it).  A link to
+   itself is fine.
+6. An owned note both forks and contains one note, contains a note that
+   forks it, or forks a note that contains it.  A dangling ID, naming no
+   note, breaks no such pair.
 7. Any stored graph index differs from an independently recomputed
    one.
+
+Any number of notes, owned or not, may fork one note, and forks may form
+cycles: mirror substitution ([[file:override.org][override.org]], "Mirror
+substitution") ranks a note's mirrors and has no cycle case.
 
 Relationship roles are enforced by distinct Rust fields.  A node has exactly
 one =home_repo= in its composed representation.  Telescope validation also
@@ -86,8 +92,9 @@ repair while retaining readable data.
 The incremental proof relies on induction: startup or rebuild establishes a
 valid base, and each serialized save proves that its delta preserves validity.
 Which node carries each ID is evaluated as one simultaneous final-state overlay;
-override checks include touched skgrepos, changed canonical targets, and
-untouched inbound overriders affected by either.  Local graph-index checks compare
+the checks of forks, contents and hides cover the touched notes, the notes
+they contain or fork or that contain or fork them, and untouched notes whose
+contents or forks name an ID that canonicalization re-keys.  Local graph-index checks compare
 only keys that could change.  The complete validator remains an independent
 startup/rebuild gate and test oracle.
 

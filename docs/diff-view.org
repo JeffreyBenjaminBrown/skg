@@ -818,9 +818,9 @@ request, naming its skgrepo. Then the graph the commits would leave
 is read as the straddle's before-graph is ('read_candidate_graph_snapshot',
 each owned skgrepo from its gitrepo's last prepared tree, each foreign
 one from its worktree), and must
-- pass the whole-graph validation (two owned overriders of one target,
-  or an override cycle, can fail here, since no waiting rule holds
-  them back: the user marks or unmarks the other override);
+- pass the whole-graph validation (a note left containing a note that
+  forks it, say, can fail here, since no waiting rule holds such a
+  pair back: the user marks or unmarks the other relationship);
 - name, in the four lists, no node it lacks unless HEAD or the worktree
   names it so too;
 - differ from the worktree by exactly the change-forest leaves of the

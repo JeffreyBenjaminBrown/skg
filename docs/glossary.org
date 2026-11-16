@@ -1227,8 +1227,11 @@ perspective). Children of N
 that the forking edit deleted become C's
 =hidesFromSubs=, and thereafter any child removed from
 an owned subscriber's contains that some subscribee still contains is
-hidden likewise on save (re-adding it unhides). A node may have at
-most one clone you own (override monogamy).
+hidden likewise on save (re-adding it unhides). The fork operation
+refuses to fork a node you already fork, naming your fork of it:
+silently making a second clone would more often be an accident. A
+deliberate second fork is made by having another note of yours fork
+N, which nothing refuses: any number of notes may fork one note.
 
 Forking spans two gestures, foreign and owned:
 

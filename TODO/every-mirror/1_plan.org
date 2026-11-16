@@ -1377,7 +1377,7 @@ data still has no cycle or second owned overrider; foreign data may.
   'bash/nextest.sh', the AI tool's tests, 'bash/integration-tests.sh',
   then 'bash/all-tests.sh'.
 
-** TODO Slice 3: monogamy and the owned-cycle refusal go; a note may not contain what it forks
+** DONE Slice 3: monogamy and the owned-cycle refusal go; a note may not contain what it forks
 Questions: Q6, Q7.
 - 'override_invariants.rs': remove 'MultipleOwnedOverriders' and
   'OwnedOverrideCycle'; add 'SelfFork' (Q7) for an owned note listing

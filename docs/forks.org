@@ -147,9 +147,9 @@ instead — either way =N= stays in the container's contents. If you point
 carrying an =overridesHere= part), it forks the node on screen — the
 overrider — deepening the chain, never re-forking the node it stands for.
 
-If the node already has a clone you own, =skg-fork-node= is rejected by
-the same monogamy rule (below); deepen the chain by forking the
-/overrider/, not the already-overridden node.
+If you already fork the node, =skg-fork-node= is rejected by the same
+guard (below); deepen the chain by forking the /overrider/, not the
+already-overridden node.
 
 ** Unintegrated content: the subscribeeFolder
 
@@ -313,12 +313,18 @@ takes =N= out of the list =C= stood in, as removing any child does.
 Under someone else's note that is an edit of their note, so it forks
 it, and the save asks first.
 
-** Once forked: monogamy
+** Once forked: the fork operation's guard
 
-A node may have at most one clone /you/ own. If you try to fork something
-you have already forked, the save is rejected with a message naming your
-existing clone — edit that clone instead. (The underlying data may
-override a node many times; only your own override is limited to one.)
+If you try to fork something you already fork, the save is rejected
+with a message naming your fork of it — edit that fork instead. This
+guards the gesture, not the data: an edit that silently made a second
+clone would more often be an accident. Any number of notes, yours
+among them, may fork one note; to fork it a second time deliberately,
+make another note of yours fork it.
+
+A note may not fork itself, nor contain a note it forks or a note that
+forks it: a fork is the same note, and containing it is like containing
+oneself. The save refuses each.
 
 ** Conclusion
 
