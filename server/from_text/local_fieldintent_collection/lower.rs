@@ -444,16 +444,19 @@ impl LoweredNodeIntents {
       . collect () }
 
   /// This returns the forker's contains as it will stand after
-  /// this save: from its Save nodeIntent if it has one, and otherwise
-  /// from disk.
+  /// this save: from its Save nodeIntent if that specifies them, and
+  /// otherwise from disk. An unspecified contains is the one on disk:
+  /// an owned member as such emits a Save for its title and body
+  /// alone.
   pub fn forker_contains_after_save (
     &self,
     forker_from_disk : &Graphnode,
   ) -> HashSet<ID> {
     match self . by_pid . get (&forker_from_disk . pid) {
-      Some (NodeIntent::Save (intent)) =>
-        intent . contains . or_default () . iter ()
-        . map ( |(gnid, _)| gnid . clone () ) . collect (),
+      Some (NodeIntent::Save (intent))
+        if ! intent . contains . is_unspecified () =>
+          intent . contains . or_default () . iter ()
+          . map ( |(gnid, _)| gnid . clone () ) . collect (),
       _ =>
         members_of (&forker_from_disk . contains)
         . into_iter() . collect(),

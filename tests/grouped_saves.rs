@@ -12,6 +12,10 @@ mod tcp_stream_pair;
 #[allow(dead_code)] // Each test file uses only some of the helpers.
 mod save_handler_helpers;
 
+#[path = "shared/view_and_save_helpers.rs"]
+#[allow(dead_code)] // Each test file uses only some of the helpers.
+mod view_and_save_helpers;
+
 #[path = "shared/parse_helpers.rs"]
 #[allow(dead_code)] // This target uses only some of the helpers.
 mod parse_helpers;
@@ -60,6 +64,9 @@ mod save_dirty_conflicts;
 
 #[path = "save_stale_buffers.rs"]
 mod save_stale_buffers;
+
+#[path = "members_as_such_and_stale_buffers.rs"]
+mod members_as_such_and_stale_buffers;
 
 #[path = "save_rerender_release.rs"]
 mod save_rerender_release;

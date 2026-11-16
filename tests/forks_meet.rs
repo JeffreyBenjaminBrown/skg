@@ -252,4 +252,10 @@ async fn moving_y_from_t_into_n_makes_n_fork_t (
   assert_eq! ( saved, view_of (config, tantivy, "N") ?,
                "the redrawn view is the fresh view of N" );
   is_a_fixpoint (&saved, "N", config, tantivy) . await ?;
+  { // R's view now shows T, N's mutual, under N, and under T what it
+    // shows of its own forkee N. N's contains there is the one on
+    // disk, so nothing under T was cut: saved unchanged, it writes
+    // nothing.
+    let rs_view : String = view_of (config, tantivy, "R") ?;
+    is_a_fixpoint (&rs_view, "R", config, tantivy) . await ?; }
   Ok (( )) }

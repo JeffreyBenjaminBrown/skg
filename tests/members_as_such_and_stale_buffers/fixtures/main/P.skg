@@ -1,0 +1,10 @@
+pid: P
+title: P
+contains:
+- pa
+- pb
+forks:
+- Pe
+hides:
+- pw
+- ph2
