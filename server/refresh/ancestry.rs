@@ -97,14 +97,13 @@ pub fn parent_reads_claims (
     _ => false, } }
 
 /// The node the folder at 'folder' describes, whose relationships,
-/// properties or hides it shows: for a compound folder, the member as
-/// such it stands under (in the folder of what the note hides in that
-/// member, of what the member contains that the user keeps elsewhere,
-/// or of what that member hides of the note's content), or the
-/// note whose hides outside its fork partners the folder shows
-/// ('compound_folder_parties'); for any other folder, its
-/// viewparent. None if 'folder' is no folder, or stands where its
-/// ancestry is missing.
+/// properties or hides it shows: for a compound folder that shows a
+/// hide, the member as such it stands under (in the folder of what
+/// the note hides in that member, or of what that member hides of the
+/// note's content), or the note whose hides outside its fork partners
+/// the folder shows ('compound_folder_parties'); for any other folder,
+/// the integrated-elsewhere folder among them, its viewparent. None if
+/// 'folder' is no folder, or stands where its ancestry is missing.
 pub fn described_node (
   tree   : &Tree<Viewnode>,
   folder : NodeId,
@@ -112,7 +111,7 @@ pub fn described_node (
   let ViewnodeKind::Folder (kind) : &ViewnodeKind =
     &tree . get (folder) ? . value () . kind else { return None; };
   match kind {
-    Folder::HiddenInForkPartner | Folder::IntegratedElsewhere => {
+    Folder::HiddenInForkPartner => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       parties . container },
     Folder::HiddenOutsideOfForkPartners | Folder::HiddenByForker => {
@@ -146,15 +145,15 @@ pub fn view_ancestor_gnids (
 ///   note > forksFolder > member > hiddenInForkPartnerFolder
 /// (what the note hides of the member's content) the member is the
 /// container, the folder's viewparent, and the note the hider, three
-/// generations up; so too in
-///   note > forksFolder > member > integratedElsewhereFolder
-/// (what the member contains that the user keeps elsewhere), where the
-/// note's hides are what the folder leaves out; in
+/// generations up; in
 ///   note > forksFolder > forker > hiddenByForkerFolder
 /// (what a forker as such hides of the note's content) the forker is
 /// the hider and the note the container; in
 ///   note > forksFolder > hiddenOutsideOfForkPartnersFolder
-/// the note is the hider, two up, and there is no container.
+/// the note is the hider, two up, and there is no container. The
+/// integrated-elsewhere folder, under a member as such, shows no hide,
+/// so it has no parties: its goal reads the member, its viewparent,
+/// and the note whose forks folder holds it ('note_of_member_as_such').
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CompoundFolderParties {
   pub hider      : NodeId,
@@ -172,7 +171,7 @@ pub fn compound_folder_parties (
     &tree . get (folder) ? . value () . kind else { return None; };
   let required : Vec<NodeId> = required_ancestors (tree, folder);
   match kind { // the places are those of the rows ANC_UNDER_A_MEMBER_AS_SUCH and ANC_HIDDEN_OUTSIDE
-    Folder::HiddenInForkPartner | Folder::IntegratedElsewhere => Some ( CompoundFolderParties {
+    Folder::HiddenInForkPartner => Some ( CompoundFolderParties {
       hider      : *required . get (2) ?,
       container  : Some ( *required . first () ? ) } ),
     Folder::HiddenByForker => Some ( CompoundFolderParties {

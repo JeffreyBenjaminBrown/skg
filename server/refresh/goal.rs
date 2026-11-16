@@ -554,11 +554,11 @@ fn folder_goal (
           . collect (),
         &HashMap::new () ))),
     Folder::IntegratedElsewhere => {
-      let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
+      let member : NodeId = described_node (tree, folder) ?;
       Some ( Goal::ordered ( gnid_items (
         integrated_elsewhere (
-          &occurrence_pid_of (parties . container ?) ?,
-          &occurrence_pid_of (parties . hider) ?, walk ),
+          &occurrence_pid_of (member) ?,
+          &note_of_member_as_such (tree, member) ?, walk ),
         &HashMap::new ()))) },
     Folder::HiddenInForkPartner => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
