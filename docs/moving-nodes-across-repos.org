@@ -30,13 +30,13 @@ and the skgrepo change will now be visible.
 
 *** Foreign skgrepos are rejected on either end
 Foreign skgrepos (repos whose config entry says =foreign = true=,
-forked in via subscriptions) are write-protected. Trying to move a node *into* or *out
+forked in via =forks= relationships) are write-protected. Trying to move a node *into* or *out
 of* a foreign skgrepo produces
 =BufferValidationError::CannotMoveToOrFromForeignRepo=
 (=server/from_text/supplement_from_disk.rs:56=). The buffer save
 fails entirely, and nothing is written. If you need data from a
-foreign skgrepo in a skgrepo you own, the model is to subscribe and
-override, not move.
+foreign skgrepo in a skgrepo you own, the model is to fork, not
+move.
 
 *** Cannot move and merge a node in the same save
 If a single save tries both to move a node's skgrepo *and* to merge
@@ -54,7 +54,7 @@ Add the skgrepo first, and restart the server or rebuild its stores
 ('skg-rebuild-session-lifetime-stores', which re-reads the config)
 before doing the move.
 
-*** Containment, subscriptions, links: all unaffected
+*** Containment, forks, links: all unaffected
 All graph relationships are by ID, not =(ID, repo)=. The set of
 relationships to/from the moved node is invariant under a skgrepo move.
 Don't expect anything related to graph topology to change.

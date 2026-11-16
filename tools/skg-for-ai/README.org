@@ -145,8 +145,8 @@ to the roots. The kinds:
 |---------------+---------+----------------------------------------------------------------------------------|
 | containers    | C-c l c | the containers folder: what contains the node                                    |
 | mentioners    | C-c l m | the mentioners folder: what links to it                                          |
-| subscribesTo  | C-c l s | the subscribees folder (what it subscribes to) and the subscribers folder        |
-| hidesFromSubs | C-c l h | the hidden folder (what it hides from its subscriptions) and the hiders folder   |
+| subscribesTo  | C-c l s | the subscribees folder (what it forks) and the subscribers folder (its forkers)  |
+| hidesFromSubs | C-c l h | the hidden folder (what it hides from what it forks) and the hiders folder       |
 | aliases       | C-c l a | the aliases folder                                                               |
 | flags         | C-c l p | the flags folder: its true flags                                                 |
 A write-protected folder (☮) is one whose membership cannot be
@@ -192,14 +192,15 @@ whose overrides it follows, as the clients' 'skg-override-perspective'
 ('C-c v o' in Emacs) does, and writes the view again;
 'override-perspective SIDECAR PERSPECTIVE' switches to the one named:
 'root-authors', 'user', or a foreign skgrepo's name, for its owner.
-Where a node stands as content and an override of it exists, the view
-shows the override in its place, the overriding node, marked 'ĥ' after
-its 'O' ('⟨0b Oĥ1⟩'). Whose overrides count is the perspective: a
+Where a node stands as content and a fork of it exists (a note that
+forks it, or one joined to it by forks: a mirror, 'docs/override.org',
+"Mirrors"), the view may show the fork in its place, marked 'ĥ' after
+its 'K' ('⟨0b Kĥ1⟩'). Whose forks count is the perspective: a
 fresh view follows each tree's root author's (under a root of yours,
 yours; under a teammate's root, that teammate's); the others follow
 one author's in every tree, whoever wrote the root, so you read the
 view as that author would. The cycle holds the root authors', then
-yours and each other author's whose overrides would show the view
+yours and each other author's whose forks would show the view
 differently, in a fixed order; the server computes it afresh at each
 switch. It prints the server's name for the perspective,
 'Perspective: your overrides.' or 'Perspective: tracy's overrides.' or
@@ -263,7 +264,7 @@ applying. It prints the responses as 'raw' does.
 
 'delete-references ID' removes every owned structured reference to
 the node ID, which the graph must lack: ID leaves every 'contains',
-'subscribesTo', 'hidesFromSubs' and 'overrides' list of the owned
+'forks' and 'hides' list of the owned
 skgrepos that names it, as the clients'
 'skg-delete-references-to-absent-node' ('C-c d a', on an unknown
 viewnode) does; links in titles and bodies stay. Without '--yes' it
@@ -403,16 +404,16 @@ client shows them, the heralds are:
 *** The relationship heralds
 The relationship heralds are rendered as the clients render them;
 'docs/heralds.org', "Relationship heralds", explains them. In display
-order: 'C' contains, 'L' links to, 'S' subscribes to, 'O' overrides,
-'H' hides from its subscriptions. A count before a letter counts the
+order: 'C' contains, 'L' links to, 'K' forks (the K of forK; 'F' is
+the flags count), 'H' hides from its subscriptions. A count before a letter counts the
 nodes on the relation's in-side ("two nodes contain this"), a count
 after it the out-side ("this contains three"). A lowercase letter is
 an ancestor in this view: 'a' the viewparent, 'b' the grandparent, and
 so on; it replaces the count when ancestors make up the whole side. A
 fraction marks a subset: '1/5L', five nodes link here and one of them
 is substantive; 'C2/8', eight contents, two not yet integrated by the
-subscriber above. 'ĥ' after 'O' says this occurrence stands in for a
-node it overrides. The property counts 'A' (aliases), 'I' (extra IDs)
+subscriber above. 'ĥ' after 'K' says this occurrence stands in for a
+node it is a mirror of. The property counts 'A' (aliases), 'I' (extra IDs)
 and 'F' (true flags) follow. So '⟨0h 2aC3⟩' has two containers, one
 of them the viewparent, and three contents.
 
@@ -425,7 +426,7 @@ other form, 'aC10' or '2aC' among them, stays.
 A headline whose home skgrepo differs from its nearest node
 occurrence above it, or a root, carries '⌂:LABEL' after its
 relationship heralds, LABEL the skgrepo's label from the table the
-server sends beside its herald rules: '⟨0h ☮ C1 1/L bS ⌂:fred⟩' is a
+server sends beside its herald rules: '⟨0h ☮ C1 1/L bK ⌂:fred⟩' is a
 note of the 'fred' skgrepo under a node of another. Every other
 headline shares its skgrepo with the nearest node above it.
 *** Change facts, in the diff view
@@ -491,8 +492,8 @@ occurrences, distinct nodes, folders and other kinds; the node
 occurrences in each skgrepo, owned or foreign; the occurrences in
 foreign skgrepos, the write-protected and the folded headlines; those
 contained elsewhere too (a 'contains' in-side larger than its ancestor
-flags, so a container not above it in this view); those subscribed to
-and those subscribing; the links, their distinct targets, and how many
+flags, so a container not above it in this view); those forked
+("forked N") and those forking ("forking M"); the links, their distinct targets, and how many
 of those resolve; and the server's errors and warnings, which the
 sidecar lists. A view shown from a perspective other than its root authors'
 ('override-perspective') names it on the line after the first,
@@ -778,7 +779,7 @@ anything that wants waking when it does can follow the file
 
 * How 'forest' draws a folder
 The server has no request that answers "what links here" or "what
-subscribes to this". The clients ask for a folder by saving the view
+forks this". The clients ask for a folder by saving the view
 with a view request on the node's headline, '(viewRequests (folder
 mentioners))' for 'C-c l m' in Emacs, or '(viewRequests flags)' for
 'C-c l p', and the re-rendered buffer the save returns shows the
@@ -888,11 +889,11 @@ without '--yes' the report shows the fork and nothing is sent, and a
 '--fork-into' naming a foreign skgrepo is refused; with '--yes' the
 server's confirmation is printed and approved, and the '.skg' files
 show a clone in the owned skgrepo that contains the new child and
-subscribes to and overrides the original, which is unchanged. Then
+forks the original, which is unchanged. Then
 'fork' on an owned node is refused beside another edit, and alone is
-approved, making a clone that subscribes to and overrides it. Last, a
+approved, making a clone that forks it. Last, a
 foreign node placed in the subscribee folder 'forest subscribesTo'
-draws is subscribed to, and its unintegrated child, removed, is
+draws is forked, and its unintegrated child, removed, is
 hidden, neither save forking.
 
 Then, on a fourth server over a fresh copy of the fixture, it writes the
@@ -998,7 +999,7 @@ daemon rewrites the view of the node that named it.
 Last, on an eighth server over a copy of the data of
 'tests/integration/overrides-followed/' (foreign R contains M and K;
 A, foreign, U, owned, and B, of a second foreign owner "third", each
-override M; P, owned, contains M), it checks 'override-perspective'.
+fork M; P, owned, contains M), it checks 'override-perspective'.
 On a command's own connection, the view of R shows A in M's place;
 'override-perspective' (the next) shows U, its summary line and its
 sidecar saying so; a switch to 'user' is refused for P's view, whose
@@ -1019,11 +1020,11 @@ files instead of comparing; read the difference before keeping it.
 The fixture has two skgrepos, a foreign 'fred' listed first and an
 owned 'main'. Its root contains two children and is contained by a
 node above it; one child contains a node that a node outside the view
-also contains; the other subscribes to a foreign node and hides two
-foreign nodes from its subscriptions, one of which the view shows
+also contains; the other forks a foreign node and hides two
+foreign nodes from what it forks, one of which the view shows
 folded in a hidden-outside-of-subscribee folder. The root's body links
 to a node in the view, to a foreign node, and to an ID nobody wrote.
-Outside the view, an owned node with a true flag overrides another,
+Outside the view, an owned node with a true flag forks another,
 which has an alias.
 
 * Writing
@@ -1162,7 +1163,7 @@ from then on.
 With 'subtree', as 'C-c s R', it sets every relationship of one kind
 in the subtree: written on a node, its content relationships, its
 own among them when its parent's list holds it; on a subscribee
-folder, the subscriptions in it. The walk is the clients': it does not go below a
+folder, the 'forks' relationships in it. The walk is the clients': it does not go below a
 write-protected node or a subscribee as such.
 *** 'noSearchMatching' and 'searchMatching'
 'noSearchMatching' keeps the node from matching any search, by its
@@ -1260,16 +1261,16 @@ preview, which writes nothing, and prints each line of the server's
 answer, as in
 #+begin_example
 Hides 'A detail of Fred's' from 'A second container, outside the view', as content of 'Fred's note'.
-Hides nothing: 'Contained twice' left 'Second child, a subscriber', but it is no content of 'Fred's note', nor overrides any.
+Hides nothing: 'Contained twice' left 'Second child, a subscriber', but it is no content of 'Fred's note', nor a mirror of any.
 #+end_example
 'Hides' and 'Stops hiding' name what the save adds to or takes from
 the subscriber's hides, and the subscribee whose content holds it.
-'Hides nothing:' is a child that left a note that subscribes to
+'Hides nothing:' is a child that left a note that forks
 something without hiding anything, and the rule that kept it from
-hiding: it is no content of the subscribee and overrides none of it,
+hiding: it is no content of the subscribee and a mirror of none of it,
 or what it stands for was hidden already, or is still contained, or
 the same save shows it in the subscribee folder. A removal from a note
-that subscribes to nothing prints no line. Every word is the
+that forks nothing prints no line. Every word is the
 server's ('docs/api-and-formats.org', "Save buffer"). When the server
 would refuse the save, the report says so, with its errors, and the
 hides are not printed; a question the save would ask (a fork, Hoist)
@@ -1374,10 +1375,10 @@ of it."
 
 Placed in an editable folder of a 'forest' view, a node joins that
 folder's relation instead: in the subscribee folder ('forest
-subscribesTo ID') the folder's node subscribes to it. Under a
-subscribee as such, the subscribed node in that folder, stand its
+subscribesTo ID') the folder's node forks it. Under a
+subscribee as such, the forked node in that folder, stand its
 children the subscriber has not integrated; removing one there hides
-it from the subscription, as in the clients.
+it from the subscriber, as in the clients.
 
 A placed node takes no other word in its handle, no body and no
 children in the save that places it: it is saved write-protected,
@@ -1387,8 +1388,8 @@ stops at a placed ID the graph lacks or the skgrepo restriction
 hides.
 ** Forking
 A fork ('docs/forks.org') makes an editable clone, in a skgrepo you
-own, of a node: the clone subscribes to the original and overrides
-it, so it stands in the original's place in your views, while the
+own, of a node: the clone forks the original, so it stands in the
+original's place in your views, while the
 original's later content reaches you as unintegrated content in the
 clone's subscribee folder. It is how a teammate's node becomes yours
 to edit, without changing theirs.
@@ -1411,7 +1412,7 @@ node").
 The report says what forks, and where the clone goes:
 #+begin_example
 Bodies changed: 1 (⟨0b⟩).
-Fork: ⟨0b⟩ 'to Ed', of the foreign skgrepo 'public', whose body changed: the edit goes to a new clone of it, which subscribes to it and overrides it; the original stays as it is.
+Fork: ⟨0b⟩ 'to Ed', of the foreign skgrepo 'public', whose body changed: the edit goes to a new clone of it, which forks it; the original stays as it is.
 Fork into: 'first', the one skgrepo this server owns, unless the edit settles another. The server asks before forking; '--yes' approves.
 Not saved. Run again with '--yes' to save.
 #+end_example
@@ -1439,20 +1440,19 @@ again, on the same connection, with '(approved-forks . "true")' and
 clone's skgrepo, the placeholder replaced by the '--fork-into' or
 default skgrepo. The answer to that save is the ordinary one, and its
 re-rendered view, written over the files, shows the clone in the
-original's place, marked 'Oĥ'. '--yes' approves only the forks the
+original's place, marked 'Kĥ'. '--yes' approves only the forks the
 report listed: if the server lists another, nothing is saved, and the
 tool says which.
 
 The clone copies the original's title, body and content list (the
-IDs, not the subtree) with the edit applied, subscribes to it and
-overrides it; a child the edit removed becomes one the clone hides
-from its subscription. The original is not written. A node may have
+IDs, not the subtree) with the edit applied, and forks it; a child
+the edit removed becomes one the clone hides from what it forks. The original is not written. A node may have
 one clone you own; forking it again is refused, naming the clone.
 *** Forking a node you own
 'fork' in the handle of a node you own forks it, as the clients'
 'skg-fork-node' ('C-c m f') does: '⟨0d aC1 fork⟩'. Its clone
-subscribes to it and overrides it, and the original keeps its own
-content; a chain of overrides deepens this way. As the clients refuse
+forks it, and the original keeps its own
+content; a chain of forks deepens this way. As the clients refuse
 to fork from a buffer with unsaved changes, so that the clone is the
 node as saved, a 'fork' beside any other edit of the compact view is
 an error: save the other edits first. The confirmation and its
@@ -1710,7 +1710,7 @@ round and its answer reads as it is.
 | C-c g m, M; C-c G m, M     | skg-goto-in-magit, ...-parent                    | Emacs-only by nature (magit); git reads the node's file directly                                                                                              |
 | C-c g v                    | skg-goto-viewnode-id                             | needs nothing: the handle is the viewnode ID; 'grep' finds it                                                                                                 |
 | C-c t r                    | skg-investigate-unknown-node                     | 'raw' only: "investigate unknown node"                                                                                                                        |
-| C-c l a, o, h, s, p, c, m  | skg-show-folderOf-*                              | 'forest KIND ID'; 'contains ID', 'links-here ID'; in its editable folders '⟨node:ID⟩' subscribes or overrides, and a removal under a subscribee as such hides |
+| C-c l a, o, h, s, p, c, m  | skg-show-folderOf-*                              | 'forest KIND ID'; 'contains ID', 'links-here ID'; in its editable folders '⟨node:ID⟩' forks, and a removal under a subscribee as such hides |
 | C-c s e                    | skg-set-editable                                 | 'editable' in the handle                                                                                                                                      |
 | C-c s w, C-c s W           | skg-request-write-protected(-recursive)          | 'write-protect', 'write-protect subtree' in the handle                                                                                                        |
 | C-c s t                    | skg-detach                                       | 'detach' in the handle; removing the headline also takes it out of its parent                                                                                 |

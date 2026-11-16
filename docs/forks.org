@@ -6,7 +6,7 @@ The clone keeps a live link to the original, so the original's later
 additions still reach you, but your edits never touch the original.
 
 See also [[file:./sharing-model.org][the sharing model]] for the underlying
-relations (=subscribes=, =overrides=,
+relations (=forks=,
 =hidesFromSubs=) and =glossary.org= ("clone, and the fork operation",
 "subscribee as such", "override substitution").
 
@@ -27,8 +27,8 @@ The save does not skgsave-commit blindly. The server first returns a
 *fork-confirmation buffer* and asks you to approve. The buffer opens
 with a foldable instructions headline, then two levels per fork: each
 top headline is the *clone-to-be* (your edited title), and under it
-is the *original* it forks (its real id and foreign skgrepo, marked
-=pO= — "its parent overrides it"). One headline cannot honestly stand
+is the *original* it forks (its real id and foreign skgrepo,
+write-protected). One headline cannot honestly stand
 for both, since you may have re-titled the clone and the two live in
 different skgrepos.
 
@@ -81,9 +81,9 @@ you own. =C=:
   skgrepo. Under a skgrepo restriction =C= copies only the children
   you can see; the rest stay =N='s, and surface under =C= as
   unintegrated content after a skgrepo widening;
-- *subscribes to* =N=, so =N='s later additions surface to you as
-  unintegrated content (below);
-- *overrides* =N=, so /mirror substitution/ shows =C= wherever =N=
+- *forks* =N=, recorded once, which does two things. =N='s later
+  additions surface to you as unintegrated content (below). And =C=
+  and =N= are mirrors, so /mirror substitution/ shows =C= wherever =N=
   would otherwise appear as content, from your perspective, whose
   list of skgrepos ranks yours first — you see and edit =C= in =N='s
   place from then on, without =N='s containers being rewritten to point
@@ -93,7 +93,7 @@ you own. =C=:
   warning says; see
   [[file:./override.org][override.org]], "Mirror substitution");
 - *hides* any child of =N= that your forking edit /deleted/, so what
-  you dismissed does not come straight back as unintegrated subscribed
+  you dismissed does not come straight back as unintegrated forked
   content (below). Later deletions from =C= hide likewise — see
   "Editing the clone", below.
 
@@ -128,14 +128,14 @@ fork request so the next save does not re-fork).
 Two differences from the implicit fork:
 
 - The original is *yours*, so it is /not/ dropped — your edits to it
-  still save normally; the gesture only /adds/ the clone that overrides
+  still save normally; the gesture only /adds/ the clone that forks
   it.
 - The *suggested* skgrepo is your *config-first* owned skgrepo (the
   first =[[repos]]= you own in =skgconfig.toml=), since there is no
   foreign ancestor to infer from.
 
-The result is an *override chain*: =D overrides C overrides N=. Chains
-of any length are legal (only a /cycle/ is forbidden — see
+The result is a *fork chain*: =D forks C forks N=. Chains
+of any length are legal, and so are cycles (see
 [[file:./sharing-model.org][the sharing model]]). When all skgrepos are unrestricted,
 viewing =N='s container shows the chain's end =D=, where =D= is in
 =C='s skgrepo or a more private one (your perspective ranks your
@@ -145,15 +145,15 @@ skgrepo-set to hide =D='s skgrepo and the same view shows the middle =C=
 instead — either way =N= stays in the container's contents. If you point
 =skg-fork-node= at a node that is /itself/ a shown substitute (one
 carrying an =overridesHere= part), it forks the node on screen — the
-overrider — deepening the chain, never re-forking the node it stands for.
+fork shown — deepening the chain, never re-forking the node it stands for.
 
 If you already fork the node, =skg-fork-node= is rejected by the same
-guard (below); deepen the chain by forking the /overrider/, not the
-already-overridden node.
+guard (below); deepen the chain by forking your /fork/, not the
+already-forked node.
 
 ** Unintegrated content: the subscribeeFolder
 
-Because =C= subscribes to =N=, a generated *subscribeeFolder* appears
+Because =C= forks =N=, a generated *subscribeeFolder* appears
 under =C= listing =N= as a /subscribee-as-such/. Its content is exactly
 what you have *not* yet integrated: a subscribee-as-such shows only the
 children the subscriber (=C=) neither hides nor already contains. A fresh
@@ -183,7 +183,7 @@ instead, marked as standing in for the original:
 #+begin_example
 ,* mysticism                         (yours)
 ,** common objects with mystical associations
-,*** eggy mysticism      «Oĥ» (shown in place of Egg Man's "mystical")
+,*** eggy mysticism      «Kĥ» (shown in place of Egg Man's "mystical")
 ,**** Which came first, the chicken or the egg?
 ,*** subscribeeFolder
 ,**** mystical           (the subscribee-as-such; empty so far)
@@ -203,7 +203,7 @@ his two new children — which you have not integrated — show up under the
 subscribee-as-such:
 
 #+begin_example
-,*** eggy mysticism      «Oĥ»
+,*** eggy mysticism      «Kĥ»
 ,**** Which came first, the chicken or the egg?
 ,*** subscribeeFolder
 ,**** mystical
@@ -215,7 +215,7 @@ Since [[file:./tree-folding-is-powerful.org][branches can be folded]], even
 hundreds of new originals' children need not clutter your view. To
 integrate one, move it into your clone's own content; it then drops out
 of the subscribee-as-such (it is now contained). You can also hide
-individual children, or unsubscribe entirely.
+individual children.
 
 *** Writing in an unintegrated child integrates it
 
@@ -227,7 +227,7 @@ subscriber's content, by the ID the original's list names, and moves
 its headline, with what you typed, to the end of the subscriber's
 content; the count of unintegrated children falls by one. Your fork
 of it, if the edit made one, is drawn in its place there, since a
-view of your own note follows your overrides. Read as mail, with the
+view of your own note follows your forks. Read as mail, with the
 subscribee folder of your fork of someone's inbox note as the list of
 messages you have not touched, a reply files the message it answers.
 
@@ -247,18 +247,18 @@ it does, and that switching the view to your own perspective
 
 Suppose the clone =C= and the original =N= both contain a child =X=,
 and you delete =X= from =C= (or move it elsewhere). Without more, =X=
-would immediately resurface under =C= as unintegrated subscribed
+would immediately resurface under =C= as unintegrated forked
 content — you removed it, =N= still contains it. So the save records a
-hide: =C= now =hidesFromSubs= =X=, and the subscription
+hide: =C= now =hidesFromSubs= =X=, and the subscribee folder
 stays quiet about it. Putting =X= back among =C='s contents removes
 the hide again. (This is the same rule the forking edit itself
 follows: children of =N= you deleted /while/ forking are born hidden.
-And it holds for any owned subscriber, not just clones — a fork is
-just subscribe + override.)
+And it holds for any owned note that forks something, not just
+clones.)
 
 A removed child stands for the member of =N='s contents that is its
 mirror (=docs/override.org=, "Mirrors"). If =N= contains =X= and
-someone forked =X= into =X'= (=X'= overrides =X=), =N='s contents
+someone forked =X= into =X'= (=X'= forks =X=), =N='s contents
 still name =X=, as every container's do; =X'= is shown in its place
 only where the perspective ranks it first. So removing =X'= from
 =C= hides =X=, just as removing =X= would, unless =C= still contains
@@ -272,7 +272,7 @@ Each save says what it hid and stopped hiding, since no edit shows a
 hide: "Hides 'X' from 'C', as content of 'N'." And a child that left
 a subscriber without hiding anything earns "Hides nothing:", with the
 rule that held, most often that the child is no content of =N= and
-overrides none of it. Emacs shows the lines in the echo area after the
+a mirror of none of it. Emacs shows the lines in the echo area after the
 save, Neovim notifies them, and skg-for-ai prints them in the report
 before the save as well as after it ('docs/api-and-formats.org', "Save
 buffer").
@@ -294,7 +294,7 @@ hides =N= from your subscriber, as below.)
 
 Under a note of your own, deleting =C= where it is drawn in =N='s
 place takes =N= out of your note as well, and, where your note
-subscribes to =N='s container, hides =N= from it: there the list is
+forks =N='s container, hides =N= from it: there the list is
 yours to change, and the deletion is read as the removal of =N= too.
 To keep =N= in your note, delete =C= from a view where it is not drawn
 in =N='s place, such as a view of =C= itself.

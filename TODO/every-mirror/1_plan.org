@@ -1469,7 +1469,7 @@ until slice 6), and keep what they assert.
 - This slice changes what the server writes into buffers: run the
   suites as slice 2 does.
 
-** TODO Slice 5: one relation, 'forks', in files, graph, save and wire
+** DONE Slice 5: one relation, 'forks', in files, graph, save and wire
 *** Corrections carried from slice 1
 Run the migration tool once per fixture's own set of skgrepos, never
 over all of 'tests/' at once: it groups sections by pid across every

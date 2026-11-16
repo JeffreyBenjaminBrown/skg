@@ -1,3 +1,14 @@
+* String-typed relation lookups fail silently (noticed during the herald-colors renames, 2026-10-04; fixed 2026-11-16)
+  Fixed in every-mirror plan 1, slice 5, when 'subscribesTo' and
+  'overrides' became 'forks': 'find_related_nodes' now panics on an
+  unknown (relation, input role, output role) triple, naming it. The
+  entry as it stood:
+  'find_related_nodes' in 'server/dbs/in_rust_graph/query.rs' takes
+  the relation and roles as strings, and an unknown combination
+  returns an empty set (the '_ => {}' arm). Renaming a relation left
+  test calls passing a stale name, which showed up only as a confusing
+  assertion failure. Taking a 'RelationRole' (or panicking on an
+  unknown triple) would make such mistakes loud.
 * Override invariants are validated by two divergent implementations (noted during override-chains planning; obsolete 2026-11-16)
   Obsolete since every-mirror plan 1, slice 3: monogamy and the owned
   cycle check are gone, and the startup check and the save's check

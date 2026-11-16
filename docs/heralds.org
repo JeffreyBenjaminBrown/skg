@@ -56,7 +56,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 
 | Kind                 | Style       | Glyphs                                                                        |
 |----------------------+-------------+-------------------------------------------------------------------------------|
-| relationship letters | normal      | =C L S O H=                                                                   |
+| relationship letters | normal      | =C L K H=                                                                     |
 | the birth letter     | low         | the letter of a relation that put this occurrence here                       |
 | relationship sides   | their tier  | counts and ancestor flags; see [[*Relationship heralds][Relationship heralds]]                     |
 | property counts      | boring      | =A3= aliases, =I1= extra IDs, =F2= true flags                                 |
@@ -80,8 +80,8 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 
 ** Relationship heralds
 *** Letters and sides
-The relations, in display order, are =C= contains, =L= links to, =S=
-subscribes to, =O= overrides the view of, and =H= hides from its
+The relations, in display order, are =C= contains, =L= links to, =K=
+forks (the K of forK; =F= is the flags count), and =H= hides from its
 subscriptions. A relation's token has an in-side before its letter and
 an out-side after it. The in-side counts nodes that relate to this node
 ("N nodes contain it"); the out-side counts nodes this node relates to
@@ -96,8 +96,7 @@ Each side has a tier, which says how much it deserves attention.
 |-----------------------+---------------------------------+----------------------------------------------------------------------------|
 | contains              | medium                          | normal; low on a write-protected occurrence; unintegrated numerator medium |
 | links to              | medium; substantive subset high | normal                                                                     |
-| subscribes to         | high                            | medium                                                                     |
-| overrides the view of | low                             | medium                                                                     |
+| forks                 | high                            | medium                                                                     |
 | hides                 | medium                          | normal                                                                     |
 
 Most normal sides are normal because their members are usually visible
@@ -118,8 +117,8 @@ Every glyph has a floor, the least tier it shows: =a= is at least low,
 A side's tier is shown by one part of the side, its carrier: its
 numeral, if it shows one, and otherwise all its ancestor flags. The
 carrier shows the greater of its floor and the side's tier; every other
-glyph shows just its floor. On the subscribesTo in-side, whose tier is
-high, =2aS= shows the 2 high and the 'a' low, while =aS= has no
+glyph shows just its floor. On the forks in-side, whose tier is
+high, =2aK= shows the 2 high and the 'a' low, while =aK= has no
 numeral, so its 'a' carries the tier and is shown high.
 
 *** Fractions
@@ -155,14 +154,15 @@ The letter of a relation that put this occurrence here is shown low;
 its counts keep their own styles. An occurrence can have more than one
 birth relation. A side whose only members are ancestors that the birth
 relation already accounts for has tier low: =aC= (the parent is the sole
-container) shows the 'a' low. A subscribee's =bS= (its subscriber is the
-grandparent) shows the 'b' medium, because of b's floor.
+container) shows the 'a' low. A subscribee's =bK= (its subscriber, which
+forks it, is the grandparent) shows the 'b' medium, because of b's
+floor; a subscriber-folder member shows =Kb=.
 
-Immediately after =O=, a crucial =ĥ= (precomposed h with circumflex)
-means this occurrence substitutes for a node it overrides. =2Oĥ3= is an
+Immediately after =K=, a crucial =ĥ= (precomposed h with circumflex)
+means this occurrence stands in the place of one of its mirrors. =2Kĥ3= is an
 example. It comes from the load-bearing 'overridesHere' part; an
 occurrence without that fact has no =ĥ=. The
-eighth ancestor is a plain =h=, so =Oĥh= shows the two glyphs together.
+eighth ancestor is a plain =h=, so =Kĥh= shows the two glyphs together.
 The fact preserves the original member ID when a substituted view
 is saved. See [[file:override.org][override behavior]].
 

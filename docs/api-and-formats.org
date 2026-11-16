@@ -104,8 +104,8 @@ So far there are these endpoints:
       containerward chain.
     - Under each hit hang its containers folder, whose members carry
       the containerward chain; its subscribee folder, the visible
-      nodes it subscribes to; and its subscriber folder, the visible
-      nodes that subscribe to it. A folder with no member is not drawn. The
+      nodes it forks; and its subscriber folder, the visible
+      nodes that fork it. A folder with no member is not drawn. The
       members are write-protected. Everything under a hit is folded,
       so that the hit shows collapsed; but a hit found through an
       alias shows its folders, each collapsed except its alias
@@ -115,10 +115,11 @@ So far there are these endpoints:
       list ranks first stands, ties going as that document's rules 1
       and 2 say and then to the least pid; if it is owned, every other
       hit among them is suppressed at the top level, and one it
-      subscribes to or that subscribes to it reappears in its
+      forks or that forks it reappears in its
       subscribee or subscriber folder ('suppressed_result_gnids'); a
-      suppressed hit related to it only by an override reappears in
-      neither. A foreign hit suppresses nothing.
+      suppressed hit that is its mirror only through other notes (a
+      sibling fork, say) reappears in neither. A foreign hit
+      suppresses nothing.
     - The search draws the enrichment under the same
       skgrepo restriction as it searches under. The containerward
       chain stops before restricted containers.
@@ -165,10 +166,10 @@ So far there are these endpoints:
     buffer; nothing is rendered. A node that is a root only of buffers
     of the diff view gets a new content view.
   - The requested node opens as itself, shown raw. Because the raw root
-    is an overridden node shown raw, its immediate children are also shown
+    is a node shown raw where another mirror could stand, its immediate children are also shown
     raw (one level); substitution resumes at the grandchildren. See
-    "Override substitution" below. Override facts can be inspected in
-    the heralds (the O token).
+    "Override substitution" below. Fork facts can be inspected in
+    the heralds (the K token).
 
 ** Close view
   - Request: =((request . "close view") (view-id . "VIEW_ID"))=. Each
@@ -343,11 +344,11 @@ So far there are these endpoints:
        - =Stops hiding 'M' from 'S', as content of 'E'.= for each it
          removes;
        - =Hides nothing: 'R' left 'S', but WHY.= for each child R that
-         left the content of an owned subscriber S, which subscribes to
+         left the content of an owned subscriber S, which forks
          something, whose departure hid nothing. WHY names the rule:
-         =it is no content of 'E', nor overrides any= (R neither is a
-         member of a subscribee's content nor overrides one, as a
-         subscriber's own note does), =it was hidden already= (or
+         =it is no content of 'E', nor a mirror of any= (R neither is a
+         member of a subscribee's content nor a mirror of one, as a
+         subscriber's own fork of it is), =it was hidden already= (or
          ='M', which it stands for, was hidden already=), ='S' still
          contains 'M', which it stands for=, or =this save shows it
          under 'E'= (an explicit gesture in the subscribee folder won).
@@ -477,8 +478,8 @@ So far there are these endpoints:
     graph's title of it, its ID, and the aspects that differ from the
     baseline's copy ("the title (then "X", now "Y")", "the body", "the
     content (gained IDS, lost IDS)", "the home skgrepo (then A, now
-    B)", and by name the aliases, extra IDs, flags, subscriptions,
-    hides and overrides); a changed body is followed by its changed
+    B)", and by name the aliases, extra IDs, flags, forks and
+    hides); a changed body is followed by its changed
     lines, baseline against graph, each lost line prefixed "- " and
     each gained one "+ ", at most 40 each way. A deleted node's error
     says instead "It was deleted after this buffer was rendered." The
@@ -537,7 +538,7 @@ So far there are these endpoints:
     every dirty client view, the server parses and unions
     dependencies from its clean baseline, current text, and registered viewforest
     when present. A dependency is a graphnode the view holds a viewnode of: an
-    occurrence, the overrides an occurrence shows, a gnid-only viewnode, a
+    occurrence, the original an occurrence's =(overridesHere N)= names, a gnid-only viewnode, a
     ghost, or an ID property member. A merge request's target and a link's
     target are not dependencies merely by being named there: the request or
     the link holds no copy of the target, so a save that changes the target
@@ -1080,6 +1081,9 @@ keeps them as text ('TODO/problems.org').
       at, its title then, its own relation lists then, and every node of
       that tree that referred to it (links included); or
       =** never present in the git history of any skgrepo=.
+  - A historical blob holding keys retired in November 2026 (see
+    "The .skg file format") is still read, with those keys ignored: as
+    having no forks (and no hides, where it holds =hidesFromSubs=).
   - Refused, with the reason as an error, unless the connection is
     unrestricted: history can hold the text of any skgrepo.
   - Logic: =server/serve/handlers/investigate_unknown_node.rs=,
@@ -1128,7 +1132,7 @@ keeps them as text ('TODO/problems.org').
 ** relRepo info
   - Request: ((request . "relRepo info") (recorder . "ID")
     (member . "ID") (relation . "contains")) — relation is one of
-    =contains=, =subscribesTo=: the two
+    =contains=, =forks=: the two
     relations an explicit =(editRequest (relRepo ...))= request can name.
   - Response: LP response-type "relRepo-info" with
     =((default "NAME") (current "NAME"))=. =(current ...)= is absent
@@ -1330,9 +1334,9 @@ one automatically.
     changed recorder or the absent ID; the other views are not
     rerendered.
   - The mutation removes only exact raw-ID matches in owned =contains=,
-    =subscribesTo=, =hidesFromSubs=, and
-    =overrides= lists.  It leaves text links and foreign telescopes
-    untouched.
+    =forks= and =hides= lists (the warning's structured relationships
+    name these fields "contains", "forks" and "hidesFromSubs").  It
+    leaves text links and foreign telescopes untouched.
 
 ** Rerender all views
   - Request: =((request . "rerender all views")
@@ -1698,8 +1702,8 @@ no folder unasked but where something changed.
 
 - =(folder RELNAME)= — build both folders of the relation, populated from the
   graph. RELNAME is =aliases=,
-  =hidesFromSubs=, =subscribesTo=, =containers= or =mentioners=.
-  No folder shows =overrides=: only the fork operation records it.
+  =hidesFromSubs=, =subscribesTo= (the folders of =forks=), =containers=
+  or =mentioners=.
   The editable folder (=subscribeeFolder= / =aliasFolder=)
   appears even when empty (its editable "add here" surface); an empty
   write-protected folder is pruned. =containers= and =mentioners= each
@@ -1750,7 +1754,7 @@ no folder unasked but where something changed.
   folder dismisses this optional viewbranch and has no persistence meaning;
   edits within a retained folder are rejected rather than silently ignored.
 - =fork= — the explicit =skg-fork-node= gesture: clone this (owned)
-  node into a private fork that overrides it. Consumed on the save path
+  node into a private fork that forks it. Consumed on the save path
   at fork detection (the refresh leaves it alone), then dropped. Emitted
   by =skg-fork-node= (=C-c m f=).
 
@@ -1863,7 +1867,7 @@ no assembled glyphs, omitted numerals or colors. For example:
     (linksTo (in 5 (ancestors 1 2)
                    (substantive 2 (ancestors 1)))
              (out 3 (ancestors 2)))
-    (overrides (out 1 (ancestors 1))))
+    (forks (out 1 (ancestors 1))))
   (props (aliases 2) (extraIds 1) (flags 3))
   (birth (contains in 1)))
 #+end_example
@@ -1875,7 +1879,7 @@ say; =COUNT= is the complete distinct visible node count even when
 ancestor flags let the client omit its numeral. =GEN= is an ancestor
 generation: 1 is the viewparent, 2 the grandparent, counting
 non-vognode levels. Relation keys are =contains=, =linksTo=,
-=subscribesTo=, =overrides=, and =hidesFromSubs=. The =linksTo=
+=forks=, and =hidesFromSubs=. The =linksTo=
 incoming side adds =(substantive COUNT (ancestors GEN...))= for the
 subset whose skgrepo has a nonempty body, visible direct content, or
 more than one distinct visible resolved target. Its outgoing side
@@ -1901,8 +1905,8 @@ all are zero.
 this occurrence, read from where it stands: for each, the side of
 this node it is on (=in= or =out=) and the ancestor generation it
 accounts for. =GEN= is omitted when no ancestor accounts for it, as
-for a node shown in place of a node it overrides, which carries
-=(overrides out)=. An occurrence that does not stand as a member of its
+for a node shown in place of a node it forks, which carries
+=(forks out)=. An occurrence that does not stand as a member of its
 viewparent carries none: where the viewparent's claims are read, one
 claiming nothing; in a write-protected folder, one the folder's
 relation does not warrant; under a write-protected occurrence, every
@@ -1911,21 +1915,21 @@ child ('stands_as_member' in =server/refresh/viewnodestats.rs=).
 | Birth                            | Facts                                                        |
 |----------------------------------+--------------------------------------------------------------|
 | ordinary content                 | =(contains in 1)=                                            |
-| subscribee-folder member         | =(subscribesTo in 2)=                                       |
-| subscriber-folder member         | =(subscribesTo out 2)=                                      |
+| subscribee-folder member         | =(forks in 2)=                                               |
+| subscriber-folder member         | =(forks out 2)=                                              |
 | hidden-folder member             | =(hidesFromSubs in 2)=                        |
 | hider-folder member              | =(hidesFromSubs out 2)=                       |
 | container-folder member          | =(contains out 2)=                            |
 | mentioner-folder member          | =(linksTo out 2)=                             |
 | hidden-in-subscribee member      | =(hidesFromSubs in 4) (contains in 2)=        |
 | hidden-outside-subscribee member | =(hidesFromSubs in 3)=                        |
-| shown overrider (overrides-here) | =(overrides out)=                                    |
+| mirror shown (overridesHere)     | =(forks out)= or =(forks in)=                                |
 A member of an acquisition folder carries none: a nodeMerge is no
 relation.
 See [[file:./heralds.org][heralds.org]] for the rendered notation and styles.
 
-The graph counts fold into these forms (=overriding= / =subscribing= /
-=hiding= become the =O= / =S= / =H= tokens; =aliasing= / =extraIDs= /
+The graph counts fold into these forms (=forks= / =hidesFromSubs=
+become the =K= / =H= tokens; =aliasing= / =extraIDs= /
 true flags become the =Ak= / =Ik= / =Fk= property tokens), and the
 per-relation view-position flags are the ancestor-lettered tokens.
 
@@ -1939,7 +1943,7 @@ recorded in a foreign skgrepo never carries it: a foreign skgrepo has
 no privacy rank, and only its own node records the relationship. It is recomputed
 at every rendering, and the save never reads it as a request, which
 is =(editRequest (relRepo NAME))=. And =(overridesHere N)=, crucial
-=ĥ= immediately after the =O= token, is a load-bearing declared part,
+=ĥ= immediately after the =K= token, is a load-bearing declared part,
 documented in "Override substitution and the overridesHere part"
 below.
 
@@ -1962,10 +1966,10 @@ perspective's skgrepo list ranks first, never in the diff view
 ('substitute_mirrors' in =server/refresh/visit.rs=;
 =docs/override.org=, "Mirror substitution", says what N's mirrors are
 and how a tie is broken). The mirrors of N are N and the notes joined
-to it by override relationships, followed either way, under the
+to it by =forks= relationships, followed either way, under the
 skgrepo restriction; the list of an owner's perspective is that
 owner's skgrepos most private first, then every other skgrepo in
-declaration order. An owned chain D overrides C overrides N, all in
+declaration order. An owned chain D forks C forks N, all in
 one skgrepo, shows D; where a mirror's skgrepo is restricted, the
 chain is cut there. The refresh
 substitutes at every refresh, a member already shown raw included,
@@ -2030,7 +2034,7 @@ so a node whose only other mirror is invisible under the skgrepo
 restriction is shown raw too, and so are its children.
 
 A substituted viewnode carries the keyed form
-=(overridesHere N)= -- crucial =ĥ= immediately after =O= -- naming the original it
+=(overridesHere N)= -- crucial =ĥ= immediately after =K= -- naming the original it
 stands for. The part is load-bearing at save: wherever it
 appears, extraction collects N rather than the carrying node's own
 ID, so a container's contains list round-trips to the original
@@ -2052,9 +2056,10 @@ mirror shown, the refresh reinstates it beside the carrier, which,
 unwarranted as itself, vanishes.
 
 A mirror shown in N's place carries a birth fact for the relation
-between them: =(overrides out)= when it reaches N by overriding only
-(it overrides a note that ... overrides N), =(overrides in)= when by
-being overridden only, none otherwise (a sibling, say);
+between them: =(forks out)= when it reaches N by forker steps only
+(it forks a note that ... forks N), =(forks in)= when by
+forkee steps only (N forks a note that ... forks it), =(forks out)=
+where both hold (mutual forks), none otherwise (a sibling, say);
 'side_of_mirror_shown' in =server/dbs/in_rust_graph/mirrors.rs=.
 
 * skgconfig.toml
@@ -2334,8 +2339,8 @@ Fields:
 - =body=: An optional string, perhaps with newlines. Home only.
 - =aliases=: Optional list of strings. Each section may contribute
   aliases; an alias's relRepo is its section's skgrepo.
-- =contains=, =subscribesTo=: Ordered relations. One flat YAML
-  sequence per relation, one entry per line:
+- =contains=, =forks=: Ordered relations, =forks= written after
+  =contains=. One flat YAML sequence per relation, one entry per line:
   - =- ID= — a member recorded at this section's skgrepo. Identical
     syntax in every section, so a membership moving between skgrepos
     diffs as a clean one-line delete/add pair.
@@ -2346,10 +2351,36 @@ Fields:
     on save from the in-memory order; hand-written anchors are
     honored on load (a dangling anchor's run falls back with a
     warning, and duplicate anchors concatenate in file order).
-- =hidesFromSubs=, =overrides=: Unordered
-  relations; plain lists of IDs. The effective list is the union
-  across sections; each entry's relRepo is its section's
-  skgrepo.
+- =hides=: The relation =hidesFromSubs=, unordered; a plain list of
+  IDs. The effective list is the union across sections; each entry's
+  relRepo is its section's skgrepo. The key used before October 2026,
+  =hides_from_its_subscriptions=, still loads.
+- =flags=: See "Node flags". The key used before October 2026, =misc=,
+  still loads.
+
+The keys retired in November 2026 -- =subscribesTo=, =overrides=,
+=hidesFromSubs=, and the October 2026 names of the first two,
+=subscribes_to= and =overrides_view_of= -- are refused, never read
+('RETIRED_SKG_KEYS' in =server/dbs/filesystem/retired_keys.rs=), since
+a key the format does not know would be dropped silently and erased
+by the next save:
+- A worktree file holding one is unreadable, so the server refuses
+  to start. The startup report
+  =DATA_ROOT/initialization-error_unreadable-skg-files.org= names
+  every such file of each skgrepo, by path, the keys it holds, and
+  what to do: for an owned skgrepo, run
+  =tools/migrate-forks-2026-11/migrate.py= over your skgrepos (its
+  =README.org= says how) and commit each; for a foreign one, its owner
+  should, and until then you may remove it from =skgconfig.toml=.
+- A git tree holding one -- HEAD, or the tree stage-and-commit would
+  commit -- refuses the diff view and stage-and-commit, naming the
+  files and saying to commit the migration (=git -C PATH commit -am
+  'Migrate to forks'=).
+- The diff's per-file blob reader treats such a blob as absent, with a
+  warning in the server log.
+- The vanished-node search ("Investigate unknown node") still reads
+  historical blobs holding them, ignoring those keys, so that such a
+  blob reads as having no forks.
 
 The composition of all same-pid sections (in fold order: an owned
 node's most public first) yields the
@@ -2783,8 +2814,8 @@ is rerendered: a restricted node is never a ghost there.
 Saving preserves what rendering omitted: a member whose record is
 restricted cannot be deleted (or even seen), so the save combines the
 buffer's visible lists with the disk lists -- order-preserving (the
-anchored weave) for =contains= and =subscribesTo=, set-difference
-for =overrides= -- restoring only the members whose records are
+anchored weave) for =contains= and =forks= alike -- restoring only
+the members whose records are
 restricted, and a node's aliases whose records are restricted. A
 restricted viewnode keeps its member in the list while
 it claims, and deleting its line removes the record, as deleting an
@@ -2862,16 +2893,16 @@ principle as follows.
     request, is refused ("Cannot move a record out of a restricted
     repo ...").
   - A new hide's relRepo is at least as private as each record that
-    explains it: the hider's subscription and the subscribee's
+    explains it: the hider's =forks= record and the subscribee's
     contains record, the more private of the two, the most public such
     explanation winning; and at least the more private of the two
     homes. Removals infer hides only from what the set shows: the
-    subscriber's visible subscriptions, their contents by visible
+    subscriber's visible forks, their contents by visible
     records, and its visible hides, so that re-adding a member drops
     no restricted hide of it.
   - A fork copies into its clone only the records the set shows, each
     at the more private of its relRepo, when owned, and the clone's
-    home. The rest stays the original's; the clone subscribes to it,
+    home. The rest stays the original's; the clone forks it,
     so after a skgrepo widening the rest shows under the clone as
     unintegrated content.
   - Deleting a node whose telescope has a restricted section is

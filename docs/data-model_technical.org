@@ -25,9 +25,8 @@ derived text links.
 | =overPrivateText_telescope= | =bool= | True when the selected title or body came from a section below the home skgrepo.  Release decisions use this conservative folded fact. |
 | =aliases= | =MSV<RelPartner<String>>= | Search aliases and the skgrepo at which each is recorded. |
 | =contains= | =Vec<RelPartner<ID>>= | Ordered content children and each relationship's relRepo. |
-| =subscribesTo= | =MSV<RelPartner<ID>>= | Nodes whose content this node follows, with relRepos. |
-| =hidesFromSubs= | =MSV<RelPartner<ID>>= | Nodes suppressed when reached through this node's subscriptions, with relRepos. |
-| =overrides= | =MSV<RelPartner<ID>>= | Nodes for which this node may substitute during recursive rendering, with relRepos. |
+| =forks= | =MSV<RelPartner<ID>>= | Ordered nodes this node forks, with relRepos: their content it does not contain or hide shows under it, and each is its mirror.  Stored under the '.skg' key 'forks'. |
+| =hidesFromSubs= | =MSV<RelPartner<ID>>= | Nodes suppressed when reached through what this node forks, with relRepos.  Stored under the '.skg' key 'hides'. |
 | =flags= | =Vec<Flag>= | Node flags: import provenance (=Had_ID_Before_Import=, =Was_Overloaded=) and behavior settings such as =NoSearchMatching=. |
 | =linksTo= | =Vec<ID>= on =GraphnodeInRust= | Outbound Org =id:= links parsed from title/body text.  Derived rather than serialized as a graph field. |
 
@@ -48,9 +47,8 @@ that hand-authored or temporarily incomplete graphs remain representable.
 | Relationship | First role | Second role | Semantics |
 |--------------+------------+-------------+-----------|
 | =contains= | container | contained | Ordered document/content nesting. |
-| =subscribesTo= | subscriber | subscribee | The subscriber incorporates later content from the subscribee.  A fork initially creates both a subscription and an override relationship to the original. |
-| =hidesFromSubs= | hider | hidden | Suppresses the hidden node only when it would be reached through the hider's subscriptions. |
-| =overrides= | overrider | overridden | Replaces the overridden node in recursive content rendering when the eligible owned override chain resolves to it. |
+| =forks= | forker | forkee | The forker shows the forkee's content that the forker neither contains nor hides, and the two are mirrors: either may stand in the other's place where mirror substitution acts.  The fork operation's clone forks its original. |
+| =hidesFromSubs= | hider | hidden | Suppresses the hidden node only when it would be reached through what the hider forks. |
 | =linksTo= | mentioner | mentioned | Plain Org ID links derived from text. |
 
 Home skgrepo and which node carries each extra ID are node properties, not separate runtime
@@ -70,8 +68,7 @@ rejected when any of these conditions holds:
 2. An extra ID belongs to more than one node.
 3. An ID is both a primary ID and an extra ID.
 4. A node's home skgrepo is absent from the current configuration.
-5. An owned note forks itself, contains itself or hides itself (a note
-   forks another when it subscribes to it or overrides it).  A link to
+5. An owned note forks itself, contains itself or hides itself.  A link to
    itself is fine.
 6. An owned note both forks and contains one note, contains a note that
    forks it, or forks a note that contains it.  A dangling ID, naming no
@@ -124,9 +121,8 @@ derived indexes are:
 | Index | Key -> value | Purpose |
 |-------+--------------+---------|
 | =contained_by= | contained pid -> container pids | Inverse =contains= traversal. |
-| =subscribers_of= | subscribee pid -> subscriber pids | Inverse subscription traversal. |
+| =forkers_of= | forkee pid -> forker pids | Inverse =forks= traversal, mirror lookup and validation. |
 | =hiders_of= | hidden pid -> hider pids | Inverse hiding lookup. |
-| =overriders_of= | overridden pid -> overrider pids | Override lookup and validation. |
 | =mentioners_of= | destination pid -> linking pids | Incoming text-link traversal. |
 | =extra_id_to_pid= | extra ID -> primary ID | Canonical identity resolution. |
 
@@ -135,7 +131,7 @@ nodes and build recorderward relmaps.  This makes results independent of file re
 order.  Incremental mutation instead installs the batch's complete final
 identity state first, then reindexes each touched node and every untouched
 recorder whose raw relationship can resolve differently under the final identity
-map.  All five recorderward relmaps use that same final resolver.  Deletion is
+map.  All four recorderward relmaps use that same final resolver.  Deletion is
 supported: references to a deleted PID remain raw and surviving recorders are
 rekeyed where canonical resolution changed.  Writers clone the persistent
 graph and swap in one new =Arc= atomically; readers retain the immutable
@@ -305,7 +301,7 @@ viewparent's list. That is declared: the bare atom =noClaim= says no,
 its absence yes (=claimsMembership= on the occurrence, the ghost, the
 unknown viewnode, the restricted viewnode, the alias and the ID). The save reads claims only under an
 editable occurrence, and under an editable folder (subscribee,
-overridden, hidden-outside-of-subscribee, alias) of one
+hidden-outside-of-subscribee, alias) of one
 (=parent_reads_claims= in =server/refresh/ancestry.rs=); under any
 other viewparent no child claims, whatever it carries, and the
 server writes no =noClaim= there. A child *is warranted* when the
@@ -346,7 +342,7 @@ over, since the view already shows that container
 Each item names a gnid, by the pid its list entry resolves to or the
 raw ID when nothing answers to it, or a property value. The goal is
 ordered where the viewparent's own file records the order (content,
-aliases, and the subscribee, overridden, hidden and
+aliases, and the subscribee, hidden and
 hidden-outside-of-subscribee folders: =Folder::goal_is_ordered=), and
 unordered elsewhere. In the diff view the goal is the union
 of the parent's lists in the two graphs of the straddle, an item only
@@ -374,8 +370,8 @@ while it claims, and deleting its line removes the record.
 The rule behind the mirror: the skgrepo restriction limits what the
 save may write as it limits what the refresh may show. Every decision
 of the save that a record's absence from the buffer drives (a member
-gone from a list, a hide, an alias, an extra ID, a subscription or an
-override gone, a relRepo or a home that differs) asks the record's
+gone from a list, a hide, an alias, an extra ID, a forks relationship
+gone, a relRepo or a home that differs) asks the record's
 visibility first, and a record the skgrepo restriction keeps out is
 neither removed, moved nor rewritten, whatever the buffer shows in its
 place. A write that acts on the skgrepo restriction's silence is a defect.
@@ -388,7 +384,7 @@ subscribee's visible record shows the hidden node as its content, and
 no hide is written of a member that only a restricted record
 explains. The inference of hides from a removal
 (=infer_hides_from_contains_removals=) reads the same way: the
-subscriber's visible subscriptions, their content by visible records,
+subscriber's visible forks, their content by visible records,
 and its visible hides.
 
 The rule has a converse for what the save creates: no record lands in
@@ -397,7 +393,7 @@ holds it there (=refuse_records_landing_restricted= in
 =server/from_text/validate.rs=, after the suppression of writes to
 restricted nodes, which keys on the graph's home as well as the
 buffer's). A new hide's relRepo is at least as private as each record
-that explains it, the subscription and the contains record
+that explains it, the forks relationship and the contains record
 (=hide_skgrepo=), so that a public hide never names a private
 membership. The writes built from the graph rather than the buffer
 obey the rule apart: a fork's clone copies only the visible records
@@ -463,12 +459,12 @@ text calls them the ladder):
    order, and every other child rides right after the sibling it
    followed; where it is not, nothing moves, and a drawn item follows
    the last child the goal names;
-7. substitution: in a content view, under an editable occurrence, an
-   overridden member is shown as its overrider with =(overridesHere
-   N)=, except where P is itself overridden and shown raw (a root, or a
-   member of a folder other than the subscribee folder); when the
-   override is gone, the shown overrider loses the part and the
-   original is reinstated beside it
+7. substitution: in a content view, under an editable occurrence, a
+   member is shown as the mirror shown for it, with =(overridesHere
+   N)=, except where P is itself shown raw where another mirror would
+   stand (a root, or a member of a folder other than the subscribee
+   folder); when the original itself becomes the mirror shown, the
+   carrier loses the part and the original is reinstated beside it
    (=docs/api-and-formats.org=, "Override substitution and the
    overridesHere part");
 8. requests: each child's view requests are fulfilled and dropped
@@ -487,7 +483,7 @@ A content view draws some folders unasked, as it always has
 (=add_default_folders=): an occurrence that an editable-view request
 extends, a fresh view's roots and every occurrence the refresh draws
 editable among them, shows its subscribee folder
-when it subscribes to something the skgrepo restriction shows, and the
+when it forks something the skgrepo restriction shows, and the
 folder of what it hides outside its subscribees inside that, when it
 hides something there; an editable subscribee shown as such shows the
 folder of what its subscriber hides in it, when that holds anything.

@@ -231,12 +231,14 @@ content subtree), which writes a =writeProtectedView= or
 *** relation, relationship, member, membership, partner
 
 As in TypeDB, a *relation* is a kind of relationship: =contains=,
-=linksTo=, =subscribesTo=, =hidesFromSubs=, =overrides=. Each names
-its two roles: container contains content, mentioner linksTo
-mentioned, subscriber subscribesTo subscribee, overrider overrides
-overridden, hider hidesFromSubs hidden. =hidesFromSubs= is short for
-"hides from its subscriptions": the hider hides the hidden node from
-what the hider sees through its subscriptions. A *relationship* is one instance of a relation: this
+=linksTo=, =forks=, =hidesFromSubs=. Each names its two roles:
+container contains content, mentioner linksTo mentioned, forker forks
+forkee, hider hidesFromSubs hidden. A forks B says two things: A shows
+B's content that A neither contains nor hides (see "subscribee as
+such"), and A and B are mirrors (see "mirror"). =hidesFromSubs= is
+short for "hides from its subscriptions": the hider hides the hidden
+node from what the hider shows of its forkees. (In a '.skg' file its
+key is 'hides'.) A *relationship* is one instance of a relation: this
 node contains that one. (Graph theory would call it an edge; we don't,
 because the word is opaque to newcomers.)
 
@@ -386,7 +388,7 @@ skgrepo gesture ('skg-set-repo' with =C-u=, =C-u C-c s s=;
 Recall that viewnodes and graphnodes are distinct.
 Some viewnodes correspond to individual graphnodes.
 Other viewnodes mediate a relationship between their parent and their children.
-For instance, a 'subscribee folder' viewnode contains its parent's subscribees:
+For instance, a 'subscribee folder' viewnode contains the nodes its parent forks:
 #+begin_example
   * subscriber
   ** subscribee folder
@@ -395,15 +397,15 @@ For instance, a 'subscribee folder' viewnode contains its parent's subscribees:
 #+end_example
 
 In that example, the first viewnode represents a graphnode,
-as do the last two. The subscriber subscribes to the two subscribees.
+as do the last two. The subscriber forks the two subscribees.
 The second viewnode, though, corresponds to nothing in the graph.
 It exists only to name the relationship between its children and its parent.
 
 A *partner folder* is the general concept. In code it is a variant of
 'Folder', an enum that also holds the three property folders (see
 "Folder, and its per-kind rules").
-Recall that there are five relations in the graph:
-containment, link, subscription, hiding, and overriding.
+Recall that there are four relations in the graph:
+containment, link, forking, and hiding.
 Because a node can be on either side of each relationship --
 it can be the container or the content, the hider or the hidden, etc. --
 there are many kinds of partner folder. Each lists, as its children,
@@ -415,20 +417,16 @@ recorders that record its parent:
 |---------------+----------------------------+-------------------------|
 | containment   | not implemented[1]         | containerFolder         |
 | link          | not implemented[2]         | mentionerFolder         |
-| subscription  | subscribeeFolder           | subscriberFolder        |
+| forking       | subscribeeFolder           | subscriberFolder        |
 | hiding        | hiddenFolder               | hiderFolder             |
-| overriding    | not implemented[3]         | not implemented[3]      |
 
 1. A contentFolder would be silly: a node's contents are already its
    ordinary viewchildren.
 2. A mentionedFolder would be silly: the links are already visible in
    the node's own text.
-3. No folder shows overriding: only the fork operation records it, and
-   a fork's subscription, which the subscription folders show, records
-   the same pair.
 
 The two compound partner folders (see "compound partner folder")
-each join three relationships -- subscription, hiding and containment:
+each join three relationships -- forking, hiding and containment:
 - a *hiddenInSubscribeeFolder*, under a subscribee as such, lists that
   subscribee's contents which the subscriber hides;
 - a *hiddenOutsideOfSubscribeeFolder*, under a subscribeeFolder, lists
@@ -471,7 +469,7 @@ A compound partner folder is a partner folder whose membership joins
 more than one relationship, as against the ordinary partner folders,
 which read one relation role. There are two, and each joins three
 nodes -- a subscriber N, a subscribee S and a hidden node H -- by
-"N subscribes to S", "N hides H" and "S contains H". The *hidden-in
+"N forks S", "N hides H" and "S contains H". The *hidden-in
 compound partner folder* (=hiddenInSubscribeeFolder=) stands under S
 inside N's subscribee folder and holds N's hides that S contains, in
 the order of N's hides list. The *hidden-outside compound partner
@@ -507,7 +505,7 @@ kept where it stands.  If the
 refresh finds that a real member is missing from the view, it
 reinstates that member (see "reinstated").
 
-For instance, if nodes R and T subscribe to nodes N, the user might land
+For instance, if nodes R and T fork node N, the user might land
 at a view like the following:
 #+begin_example
   * N
@@ -521,15 +519,17 @@ and this change would be respected in the display, but have no effect
 in the graph. The user could insert X under subscriberFolder,
 but because it is a write-protected set, X claims nothing there: it
 is shown unwarranted (⊥), and has no effect on N.
-(If the user wants X to subscribe to N, they must modify X, not N.)
+(If the user wants X to fork N, they must modify X, not N.)
 The user could delete R, but it is reinstated as soon as they save,
 because, again, the subscriberFolder is a write-protected set.
 
 *** "subscribee as such"
 
-In Skg some nodes are "subscribers", which "subscribe" to "subscribees".
+In Skg some nodes fork others: the forker forks the forkee.
 (See [[file:./data-model_technical.org][the technical data model]].)
-A node that plays the 'subscribee' role can be viewed as an ordinary node,
+Where a forker's forkees are listed under it, the forker is called the
+"subscriber" and each forkee a "subscribee".
+A node that plays the forkee role can be viewed as an ordinary node,
 or /as/ a subscribee. In the latter case it appears
 underneath the relevant subscriber, in a 'subscribeeFolder':
 #+begin_example
@@ -550,8 +550,8 @@ what the relevant subscriber hides, nothing else.
 
 The *subscribee-visibility step* (a term of plan 10) is the step of
 the save that, for a subscribee as such shown editable under its
-subscriber, reads what the buffer shows of the subscribee's content
-and rewrites the subscriber's hides to match: content shown there,
+subscriber (the note that forks it), reads what the buffer shows of
+the subscribee's content and rewrites the subscriber's hides to match: content shown there,
 claiming, is unhidden, and content not shown, which the subscriber
 does not contain, is hidden ('resolve_visibility' in
 'server/from_text/local_fieldintent_collection/resolve_visibility.rs').
@@ -571,10 +571,8 @@ containerward chain. A role, unlike a relation, is directed, so a
 role tree goes one way.
 
 The adjectives containerward, contentward, mentionerward,
-subscriberward, subscribeeward, and so on name the role a role tree
-follows: a containerward role tree follows the container role. The
-overrider and overridden roles have no partner folder, so no role
-tree.
+forkerward, forkeeward, and so on name the role a role tree
+follows: a containerward role tree follows the container role.
 
 *** foldering, the containerward chain, chain node
 
@@ -585,9 +583,9 @@ write-protected throughout. A folder request ('(folder containers)'
 and its siblings, the =C-c l= commands) draws one; a fresh content
 view draws a containers folder on each root; the search enrichment
 (what a text search draws under each hit, in the one message that
-answers it) draws a containers folder under each hit, its two
-subscription folders when it has such relatives, and its alias folder
-when an alias of its node matched.
+answers it) draws a containers folder under each hit, its
+subscribee and subscriber folders when it has such relatives, and its
+alias folder when an alias of its node matched.
 
 The *containerward chain* is the one tree that goes on below a
 folder. Under each member of a partner folder, of any kind but the
@@ -666,7 +664,7 @@ not stale. "Stale" applies to a graphnode; by extension, a buffer or
 view is stale when it holds a stale graphnode's copy, and a save or
 write is stale when it would write one. The stale error names what
 changed at its own grain ('StaleAspect': the title, body, content,
-aliases, extra IDs, flags, subscriptions, hides, overrides or home
+aliases, extra IDs, flags, forks, hides or home
 skgrepo), not as diff aspects: it says "body" where they say "text".
 
 The records in 'TODO/' that predate these words say "outdated" for
@@ -817,7 +815,7 @@ list names it, else a tombstone.
 
 An *unknown graphnode* (a term of plan 10) is the graphnode an ID
 names that the graph does not have: the ID is one that some node's
-contains, subscribesTo, hidesFromSubs or overrides list names but
+contains, forks or hides list names but
 that no graphnode answers to, as primary or extra ID; such an ID is
 *dangling*. A view shows it as an unknown viewnode (see "ghost,
 unknown viewnode"), which claims membership, since removing it would
@@ -897,10 +895,10 @@ counting down from its root, is the opposite direction.
 
 *** mirror, and a perspective's skgrepo list
 
-A *fork* of a note N, here, is a note that overrides N (see "clone,
+A *fork* of a note N, here, is a note that forks N (see "clone,
 and the fork operation" for the gesture that makes one). The
 *mirrors* of N are N and every note joined to N by a path of
-'overrides' relationships, followed in either direction, every
+'forks' relationships, followed in either direction, every
 relationship's relRepo and every note's home skgrepo on the path shown
 by the skgrepo restriction ('mirrors_of' in
 'server/dbs/in_rust_graph/mirrors.rs'). Two forks of one note are
@@ -928,11 +926,11 @@ perspective, the user's or a foreign owner's ('OverridesFollowed';
 Emacs 'C-c v o'). The owner need not own the mirror shown: where the
 owner has no mirror of N, the first by declaration order stands. When
 the mirror shown is N itself, nothing substitutes. An owned chain D
-overrides C overrides N, all in one skgrepo, shows D; visibility
+forks C forks N, all in one skgrepo, shows D; visibility
 gating can cut the chain, so that a middle node shows.
 
 The shown substitute carries the fact '(overridesHere N)'
-(the crucial herald =ĥ= after =O=), naming the original it stands for. A viewnode's
+(the crucial herald =ĥ= after =K=), naming the original it stands for. A viewnode's
 collected ID is what it contributes to its parent's saved lists:
 the fact's original if present, else its own ID -- so saving a
 view that shows R in place of N keeps N in the parent's contains.
@@ -948,10 +946,7 @@ A view opened on one node always shows the requested node itself,
 shown raw: it is the view's *raw root*, so that its immediate
 children are shown raw too. Switched to one owner's perspective, the
 view shows the mirror of the root that owner's skgrepo list ranks
-first instead, standing for it ('OverridesFollowed'). In the search buffer, each hit shows its override
-folders, holding its visible direct override relatives in both
-directions. Override facts also appear in explicitly requested override
-folders.
+first instead, standing for it ('OverridesFollowed').
 
 *** perspective
 
@@ -1181,7 +1176,7 @@ relationship from an owned recorder to a foreign member defaults to the recorder
 home, deliberately making the foreign ID and relationship visible at
 that owned skgrepo without proposing a foreign write. Every relRepo is
 clamped to be no more public than the recorder's home. Hides have
-a higher floor (at least the most public subscription explaining
+a higher floor (at least the most public forks relationship explaining
 them; see "floor" below). A
 =(relRepo NAME)= atom (the =skg-set-relRepo= gesture)
 overrides sticky with any skgrepo at least as private as the relationship's
@@ -1220,13 +1215,12 @@ they are never stranded.
 
 To *fork* a node N is to turn it into an editable *clone* C in a
 skgrepo you own. C copies N's title, body, and child-list (the child IDs
-only — shallow), =subscribesTo= N (so N's later additions surface to C
-as unintegrated subscribed content) and =overrides= N (so
-override substitution shows C wherever N would appear, from your
-perspective). Children of N
+only — shallow), and =forks= N, once (so N's later additions surface
+to C as unintegrated forked content, and override substitution shows C
+wherever N would appear, from your perspective). Children of N
 that the forking edit deleted become C's
 =hidesFromSubs=, and thereafter any child removed from
-an owned subscriber's contains that some subscribee still contains is
+an owned forker's contains that some forkee still contains is
 hidden likewise on save (re-adding it unhides). The fork operation
 refuses to fork a node you already fork, naming your fork of it:
 silently making a second clone would more often be an accident. A
@@ -1239,7 +1233,7 @@ Forking spans two gestures, foreign and owned:
   save; any real change to a foreign node is read as a fork request, and
   the save asks you to confirm. N is left untouched on disk.
 - /explicit/ (owned N): =skg-fork-node= (=C-c m f=), for a node you
-  already own — used to deepen an override chain (D overrides C overrides
+  already own — used to deepen a fork chain (D forks C forks
   N, all owned). N keeps its own content; only the clone is added. The
   clone is built from N's saved state, so the command refuses a dirty
   buffer.
@@ -1456,7 +1450,7 @@ graphnodes, in two halves: a node is changed *out* when its own file
 records a change (it is new or deleted, or its text, aliases, extra
 IDs, flags, home skgrepo or own relationships changed), and *in* when
 its recorders' files do (its set of containers, mentioners,
-subscribers, overriders or hiders changed). A node can be both. A
+forkers or hiders changed). A node can be both. A
 relRepo move puts only the recorder in C, and a change of order alone
 puts nothing in it. *R*, the content origins, is the set of content
 origins reached from C by walking containerward through the union of
@@ -1699,7 +1693,7 @@ almost certainly need not read this section.
 
 For a set of IDs in one graph snapshot, the *update-relevant
 neighborhood* contains the IDs themselves, their immediate neighbors in
-both directions along =contains=, =linksTo=, =subscribesTo=, and
+both directions along =contains=, =linksTo=, =forks=, and
 =hidesFromSubs=, and every mirror of each ID, whatever any skgrepo
 restriction shows (see "mirror"): a change to any relationship among a
 note's mirrors can change which of them stands where another is
@@ -1759,7 +1753,7 @@ request is "single-root".
 
 A relationship is recorded in the .skg file of one of its two nodes, its
 *recorder*: the node playing the relation's first role (the container,
-the mentioner, the subscriber, the hider, the overrider). The other node
+the mentioner, the forker, the hider). The other node
 is a member of the recorder's list. The relationship as the
 recorder's file states it, in one of its sections, is a *record* (see
 "record, restricted, visible").
@@ -1962,7 +1956,7 @@ stands where the first of them stood and has a fresh viewnode ID.
 It is folded only if every sibling was, and its body is folded only
 if every sibling's was; it is focused if any sibling was; it is
 editable if any sibling was, unless it stands for another node (a
-node and its shown overrider stand for one gnid) whose editable
+node and the mirror shown for it stand for one gnid) whose editable
 occurrence is elsewhere in the buffer; it claims membership if any
 sibling did. It carries the union of the siblings' view requests,
 and the edit request and relationship request of whichever sibling
@@ -2213,7 +2207,7 @@ envelope.
 The /search index/ is Tantivy's. The /git index/ is git's staging
 area; next to HEAD and worktree it needs no qualifier ("HEAD vs
 index"). A /graph index/ is a derived map inside the in-Rust graph:
-the /recorderward relmaps/ ('contained_by', 'subscribers_of', ...), plus
+the /recorderward relmaps/ ('contained_by', 'forkers_of', ...), plus
 'extra_id_to_pid'. A recorderward relmap maps each member of one
 relation to the recorders that list it. (Not "inverse": today every
 relationship is recorded by its first member, but the data model may
@@ -2240,7 +2234,8 @@ into a more public telescope section. Hoist /moves/ text to home.
 
 *** hiderel = "hides" relationship
 
-See [[file:./data-model_technical.org][the technical data model]] for the hiding
+A relationship of the relation =hidesFromSubs=, which a '.skg' file
+records under the key 'hides'. See [[file:./data-model_technical.org][the technical data model]] for the hiding
 relationship.
 
 *** kv-pair = key-value pair

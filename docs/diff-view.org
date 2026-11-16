@@ -62,9 +62,12 @@ marker, which is always processed. Its sets are empty: it renders no pruned chan
 ** Refusals
 Every buffer is refused, and the client stops, unless the
 connection is unrestricted, and when the graph straddle cannot be built: an
-owned skgrepo that is not in a gitrepo or has no HEAD commit, or a
-HEAD that fails the whole-graph validation. A merge commit at HEAD is
-no reason to refuse.
+owned skgrepo that is not in a gitrepo or has no HEAD commit, a
+HEAD that fails the whole-graph validation, or a HEAD holding '.skg'
+keys retired in November 2026 ('docs/api-and-formats.org', "The .skg
+file format"). That last refusal names the files and says to commit
+the migration ("git -C PATH commit -am 'Migrate to forks'"). A merge
+commit at HEAD is no reason to refuse.
 ** Foreign skgrepos
 Foreign skgrepos are read at their worktrees in both halves of the
 straddle, so they never produce a change: they are outside C, the
@@ -108,10 +111,10 @@ C is the set of changed graphnodes, read off the change-forest leaves
 - out-changed: the recorders of leaves, the nodes whose own files
   record a change -- a new or deleted node, a changed title or body,
   alias, extra ID, flag or home skgrepo, an added or removed member of
-  its contains, subscribesTo, overrides or hidesFromSubs list, or a
+  its contains, forks or hides list, or a
   moved relRepo of one;
 - in-changed: the nodes whose set of containers, mentioners,
-  subscribers, overriders or hiders changed: every member of a
+  forkers or hiders changed: every member of a
   relationship leaf whose relationship exists in one graph only, and
   every node a recorder mentions in one graph only (a mention is no
   leaf: it changes with its mentioner's text, the mentioner's leaf),
@@ -247,9 +250,9 @@ where the interleaved diff of the two lists puts it (below). The
 content changeset marker, "its content changed", gathers the
 relationship leaves of the content list.
 *** the in-folders and out-folders
-A changed set of containers, mentioners, subscribers, overriders or
+A changed set of containers, mentioners, forkers or
 hiders adds a write-protected folder labelled "its other containers changed
-(other files)" and so on; a changed set of subscribees, overridden or
+(other files)" and so on; a changed set of forkees or
 hidden nodes adds the existing folder labelled "its subscribees
 changed (this file)" and so on. A containers folder is drawn only
 when a container not above the node in the view gained or lost it,
@@ -341,7 +344,7 @@ gnid the commit left an extra ID of its acquirer becomes an
 occurrence of the acquirer, in place.
 
 The goal orders what it warrants where the graph records an order
-(content, aliases, the subscribee, overridden and hidden folders);
+(content, aliases, the subscribee and hidden folders);
 every other child stays right after the sibling it followed. So a
 buffer saves back to itself, and a view other than the one saved
 follows a reorder saved elsewhere.
@@ -642,14 +645,14 @@ They skip a write-protected occurrence (☮; a ghost is not skipped)
 standing directly in a folder whose changed label says "(other
 files)", the folders 'folder_heralds.other_files' in
 'shared/herald-styles.json' lists: its other containers, mentioners,
-subscribers, overriders and hiders. Each such member records its
+subscribers and hiders. Each such member records its
 relationship to the folder's viewparent in its own file, so every
 change it carries is a leaf it records, and in a buffer extended to
 every change its node has an editable occurrence, where the refresh
 draws every leaf the node records: its node changes on its headline
 or under it, its relationships among its content or in a folder of
 its own file. A ghost is visited because a deleted node's ghost
-draws no partner folders: a deleted subscriber's subscription stands
+draws no partner folders: a deleted subscriber's =forks= relationship stands
 only on its ghost in the subscribers folder. A member made editable
 inside such a folder (C-c s e) is not skipped, nor is anything under
 it, since its changes are then drawn there. So in a buffer extended
@@ -699,8 +702,8 @@ their relRepos), as it writes any node. An out-link to a node still
 deleted is kept as HEAD recorded it, and shows as that node's ghost,
 claiming membership, so a later save keeps it.
 Then it re-adds the node's in-links, from the before-graph's inbound
-indexes: each node that recorded it at HEAD (as content, a
-subscription, an override or a hide) gains it in that list, at the
+indexes: each node that recorded it at HEAD (as content, as a
+forkee or as a hidden node) gains it in that list, at the
 index it had at HEAD, clamped to the list's length, in the skgrepo
 that recorded it, unless that recorder is itself deleted (it is
 skipped) or lists it already. A recorder the save already writes, as
@@ -821,8 +824,8 @@ one from its worktree), and must
 - pass the whole-graph validation (a note left containing a note that
   forks it, say, can fail here, since no waiting rule holds such a
   pair back: the user marks or unmarks the other relationship);
-- name, in the four lists, no node it lacks unless HEAD or the worktree
-  names it so too;
+- name, in its contains, forks and hides lists, no node it lacks
+  unless HEAD or the worktree names it so too;
 - differ from the worktree by exactly the change-forest leaves of the
   changed nodes left out, keys and fingerprints both, among the leaves
   recorded in owned skgrepos.
@@ -833,6 +836,8 @@ it yet, or this is a bug, since the waiting rule should have prevented
 it; the server's log then has the sets compared
 ('check_candidate', 'server/serve/handlers/stage_and_commit.rs'). A
 commit of everything passes the same check, expecting no leaf left.
+A tree to commit holding '.skg' keys retired in November 2026 is
+refused as such a HEAD is ("Refusals").
 ** The commit
 Each owned skgrepo with something to commit gets one git-commit, in
 config order, with the message, by its gitrepo's configured user; in

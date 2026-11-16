@@ -39,7 +39,7 @@ The error names each such node, the view's headlines for it, and what
 changed in it since the view was drawn: the title (old and new), the
 body (with its changed lines, then against now), the content (the IDs
 gained and lost), the home skgrepo (old and new), or by name its
-aliases, extra IDs, flags, subscriptions, hides or overrides; or that
+aliases, extra IDs, flags, forks or hides; or that
 the node was deleted. Your edits stay in the view: archive them if
 needed (M-x skg-show-unsaved-changes), open a fresh view, and reapply them.
 
@@ -103,7 +103,7 @@ parent's content, say. A member that one view's save added is drawn
 into every other view that shows its list, as a fresh view draws its
 members: editable where no other occurrence of its node is and the
 node budget allows, and then with its subscribee folder when it
-subscribes to something the skgrepo restriction shows. A headline
+forks something the skgrepo restriction shows. A headline
 standing for a node the save deleted vanishes from every content
 view, with whatever stood under it; in the diff view it becomes the
 node's ghost.
@@ -198,8 +198,8 @@ are bumped in the ranking via their prominence multiplier.
 The hits come best first, each a write-protected headline showing
 its node's title. Under each hang, folded, its containers folder,
 whose members carry their own containers up to the roots, and,
-when there are any, a folder of the nodes it subscribes to and one
-of the nodes that subscribe to it. A hit found through an alias shows those
+when there are any, a folder of the nodes it forks and one
+of the nodes that fork it. A hit found through an alias shows those
 folders collapsed and its alias folder open, holding all of the
 node's aliases, the matching one among them. The search buffer
 arrives whole, in one answer, and is an ordinary view.
@@ -377,8 +377,8 @@ or go to the content view of it that was already open if that exists
 (a buffer of the diff view does not count: the node gets a new view).
 
 The requested node itself is always the raw root. Recursive content
-below it can still use override substitution. Override facts remain
-visible in its heralds (the O token).
+below it can still use override substitution. Fork facts remain
+visible in its heralds (the K token).
 
 If you're not sure whether the cursor is on something visitable
 (a link or a node's metadata),
@@ -469,8 +469,8 @@ The hiderFolder and hiddenFolder -- both write-protected (☮). Hiding is edited
 a subscribee-as-such, never from these folders. On a node that neither
 hides nor is hidden, nothing appears.
 *** C-c l s : skg-show-folderOf-subscribesTo
-The subscribeeFolder (the nodes this node subscribes to -- editable, shown
-even when empty) and the subscriberFolder (the nodes that subscribe to
+The subscribeeFolder (the nodes this node forks -- editable, shown
+even when empty) and the subscriberFolder (the nodes that fork
 this one -- write-protected, ☮).
 *** C-c l p : skg-show-folderOf-flags
 Shows the write-protected =flagsFolder=. It lists only true node-file
@@ -783,15 +783,15 @@ subtree at point (the node at point's own relationship to its viewparent
 included). Also reachable as =C-u C-c s r=.
 
 It first presents an org-menu asking what kinds of relations to
-the viewparent should qualify: the schema's five node-node
+the viewparent should qualify: the schema's four node-node
 relations are the level-1 headlines, and each level-2 headline is a
 role the view-child would play in that relation toward its
 viewparent. Only two roles are settable from the child's
-position -- =content= (ordinary content) and =subscribee= (a
+position -- =content= (ordinary content) and =forkee= (a
 subscribeeFolder member); RET on any other role explains why its
 relationship cannot be set from there (write-protected folders belong
 to the other end; links carry no independent skgrepo; hide skgrepos
-are derived at save; no folder shows overrides). RET picks a
+are derived at save). RET picks a
 role; q aborts.
 
 It then prompts for a skgrepo over every skgrepo, plus the
@@ -993,7 +993,7 @@ the buffer shows them, write-protected or not: with n their
 existence, with r their content relationships (and the new node's own
 relationship to the headline above it), with b both. With two prefix
 arguments (C-u C-u), the server instead follows every relationship
-each new node records (contains, subscribes to, hides, overrides).
+each new node records (contains, forks, hides).
 Every mark works on write-protected headlines too.
 
 *** C-c m n p : skg-mark-node-processed
@@ -1048,10 +1048,10 @@ parent; the replacement child is write-protected, so its own text is
 not rewritten from the link label.
 *** C-c m f : skg-fork-node
 Fork the node at point that you already own: create a private
-clone that overrides it. This is the explicit counterpart to the
+clone that forks it. This is the explicit counterpart to the
 implicit fork (which is triggered by editing a /foreign/ node);
-use it to deepen an override chain, e.g. to layer a private =D=
-over a public clone =C= that already overrides a foreign =N=.
+use it to deepen a fork chain, e.g. to layer a private =D=
+over a public clone =C= that already forks a foreign =N=.
 
 Refuses if the buffer has unsaved changes ("Save the buffer
 before forking."), so the clone's saved state matches what you see.
@@ -1066,7 +1066,7 @@ next save does not re-fork). Quitting a prompt with C-g leaves the
 confirmation buffer open: there set a clone's skgrepo with =C-c s s=,
 approve with =C-c C-c=, or decline with =C-c C-k=.
 
-The clone subscribes to and overrides the node, and the original
+The clone forks the node, and the original
 keeps its own (owned) content. A node may have at most one clone
 you own; forking an already-forked node is rejected, naming the
 existing clone. See =docs/forks.org=.
@@ -1307,8 +1307,8 @@ Shows this view from the next perspective: whose overrides it
 follows. Each switch names the perspective it shows; it redraws the
 buffer, and refuses while it has unsaved edits.
 
-Where a node stands as another's content and someone has overridden
-it, a view shows one overrider in its place. A fresh view shows its
+Where a node stands as another's content and someone has forked
+it, a view may show one fork in its place. A fresh view shows its
 root authors' overrides: under a root of yours, yours; under a root
 someone else wrote, that author's, throughout the tree, so you see
 what they would see, and your own forks of their nodes do not show
@@ -1329,10 +1329,10 @@ version again, unedited; your clone shows from yours. The mode name names any pe
 root authors': "SKG:your overrides", "SKG:tracy's overrides". The
 buffer keeps its perspective through its saves and the redraws the
 server sends unasked. The switch is refused in a buffer of the diff
-view, which shows no overrider in place of what it overrides, and
+view, which shows no fork in place of what it forks, and
 where no other perspective would show the buffer differently.
 The roots are replaced too: from an author's perspective, a root that
-author overrides shows the override, standing where the root stood,
+author forks shows that author's fork, standing where the root stood,
 with the cursor still on it if it was, and with its own folders, as
 a fresh view of it would draw them (its containers, its subscribee
 folder and count, and any other folder you had opened there); from the
@@ -1646,7 +1646,7 @@ is not a lossless general-purpose Org conversion.
 Existing =[[id:ID][label]]= links retain their targets. File links and headline
 search links are not converted to Skg ID links, and attachments are not copied.
 Relative file links may no longer resolve after import. The importer does not
-validate that linked IDs exist. It creates no subscriptions, hides, or overrides.
+validate that linked IDs exist. It creates no forks or hides.
 **** Making the imported data available in Skg
 The command writes one 'ID.skg' file per resulting node. It does not edit
 configuration, start the server, or refresh a running server's graph and

@@ -1,40 +1,49 @@
-* Override relationships, substitution, and navigation
+* Fork relationships, substitution, and navigation
 #+date: 2026-09-20
 
 ** The relationship
 
-If =R= overrides =N=, =R= is the /overrider/ and =N= is the
-/overridden/ node.  The relationship is stored on =R= as an entry in
-its =overrides= list:
+If =R= forks =N=, =R= is the /forker/ and =N= is the /forkee/.  The
+relationship is stored on =R= as an entry in its =forks= list, which
+a '.skg' file writes under the key =forks=:
 
 #+begin_example
-R.overrides = [N]
+R.forks = [N]
 #+end_example
 
 The stored value is a =RelPartner<ID>=.  Its =member= is =N= and its
 =relRepo= says which telescope section records the relationship.
 The relRepo is independent of either endpoint's home skgrepo: two
-public nodes can be connected by an override relationship recorded only
-in =private=.
+public nodes can be connected by a =forks= relationship recorded only
+in =private=.  The list is ordered, and a more private section places
+its members among a more public section's with anchors, as =contains=
+does ('docs/api-and-formats.org', "The .skg file format").
 
-An overrider may override any number of nodes, and any number of
-nodes, owned or not, may override one node.  Thus =R -> N1= and
-=R -> N2= are legal, as are the linear chain =D -> C -> N=, two owned
-notes overriding one target, and owned mutual overrides
-(=A -> B -> A=).  Mirror substitution, which ranks a note's mirrors by
-skgrepo, has no special case for a branch or a cycle (see "Mirror
-substitution").
+=R= forks =N= says two things.  =R= shows =N='s content that =R=
+neither contains nor hides: under =R='s subscribee folder, =N= is a
+subscribee as such ('docs/glossary.org', "subscribee as such").  And
+=R= and =N= are mirrors, so either may stand in the other's place
+(see "Mirror substitution").  So a fork shown, editable, in its
+original's place draws, by default, its subscribee folder with the
+original in it, and
+two notes that fork one note can stand in each other's places.
+
+A forker may fork any number of nodes, and any number of nodes, owned
+or not, may fork one node.  Thus =R -> N1= and =R -> N2= are legal, as
+are the linear chain =D -> C -> N=, two owned notes forking one
+target, and owned mutual forks (=A -> B -> A=).  Mirror substitution,
+which ranks a note's mirrors by skgrepo, has no special case for a
+branch or a cycle (see "Mirror substitution").
 
 What an owned note may not do, the save and the startup refuse
 ('docs/data-model_technical.org', "Hard validation constraints"):
-override or subscribe to itself; contain or hide itself; both override
-(or subscribe to) and contain one note; or contain a note that
-overrides (or subscribes to) it.
+fork itself; contain or hide itself; both fork and contain one note;
+or contain a note that forks it.
 
 ** Direct visits are exact
 
 Visiting an ID opens that exact node as the raw root of a content view.
-It does not redirect to an overrider and does not stop at a choice
+It does not redirect to a fork and does not stop at a choice
 buffer.  Re-visiting an ID that is already a root switches to its open
 content view proper, never to a buffer of the diff view.  A node whose home skgrepo the current
 skgrepo restriction keeps out cannot be visited.
@@ -43,29 +52,27 @@ This makes every viewnode used for navigation a stable destination.  In
 particular, selecting a node in search results or a partner folder
 opens the selected node itself.
 
-The root's ordinary =O= relationship herald reports its visible
-override facts.  No folder shows the overrides relation: only the fork
-operation records it (see "How override relationships are created"),
-and a fork's subscription records the same pair, which the subscription
-folders show (=C-c l s=).
+The root's ordinary =K= relationship herald reports its visible
+=forks= facts, and the subscribee and subscriber folders show them
+(=C-c l s=).
 
 ** Partner folders in search results
 
 Search hits are raw, write-protected, non-content roots.  In the
 search enrichment, each result N gains, folded, its subscribee folder
-(the nodes N subscribes to) and its subscriber folder (the nodes that
-subscribe to N), each drawn only when it has a member.  The members are
-write-protected, and show N's direct subscription relatives only.  Node
-visibility and the subscription's relRepo both gate them.
+(the nodes N forks) and its subscriber folder (the nodes that
+fork N), each drawn only when it has a member.  The members are
+write-protected, and show N's direct =forks= relatives only.  Node
+visibility and the relationship's relRepo both gate them.
 
 Search also groups hits that are mirrors of one another (see "Mirror
 substitution").  Among them, the hit the user's skgrepo list ranks
 first stands, ties going as rules 1 and 2 of "Which mirror stands"
 say and then to the least pid; if it is owned, every other hit among
-them is suppressed at the top level, and one it subscribes to or that
-subscribes to it directly reappears in one of its two subscription
-folders.  A suppressed hit related to it only by an override, or only
-through other mirrors, reappears in neither.
+them is suppressed at the top level, and one it forks or that
+forks it directly reappears in its subscribee or subscriber
+folder.  A suppressed hit related to it only through other mirrors
+reappears in neither.
 A foreign hit never suppresses another top-level result, although
 visible foreign relatives can occur in the folders: a
 foreign mutual pair that both match shows both.
@@ -77,8 +84,8 @@ rule ('server/dbs/in_rust_graph/mirrors.rs').
 
 *** Mirrors
 
-A /fork/ of a note =N= is a note that overrides =N=.  The /mirrors/
-of =N= are =N= and every note joined to it by a path of override
+A /fork/ of a note =N= is a note that forks =N=.  The /mirrors/
+of =N= are =N= and every note joined to it by a path of =forks=
 relationships, followed in either direction, each relationship's
 relRepo and each note's home skgrepo shown by the skgrepo
 restriction.  So two forks of one note are mirrors of each other, a
@@ -97,13 +104,13 @@ home skgrepo comes first in that list; where several do, the tie is
 broken thus:
 
 1. One mirror alone in that skgrepo stands.
-2. Otherwise, if exactly one of them is overridden by none of the
-   others, it stands.  An owned chain =D overrides C overrides N=, all
+2. Otherwise, if exactly one of them is forked by none of the
+   others, it stands.  An owned chain =D forks C forks N=, all
    in one skgrepo, shows =D=.
 3. Otherwise =N= itself stands, if it is one of them: two forks of =N=
    in =N='s own skgrepo, or a mutual pair in one skgrepo, show =N= as
    itself.
-4. Otherwise the one nearest =N= along override relationships, in
+4. Otherwise the one nearest =N= along =forks= relationships, in
    either direction, and among equals the least pid.
 
 When the mirror shown is =N=, nothing substitutes.  The perspective's
@@ -111,7 +118,7 @@ owner need not own the mirror shown: where =O= has no mirror of =N=,
 the first by declaration order stands, whoever wrote it.  So, for
 
 #+begin_example
-D overrides C overrides N
+D forks C forks N
 #+end_example
 
 with =C= and =N= in the user's public skgrepo and =D= in the user's
@@ -149,9 +156,9 @@ re-pointed where it stands; from the root authors', it shows that node raw again
 ('substitute_roots' in =server/refresh/visit.rs=). A re-pointed root's
 folders are drawn afresh for the node it now shows, as a fresh view of
 it draws them ('redraw_folders'): its containers folder; where the root
-is editable, its subscribee folder with its count where it subscribes;
+is editable, its subscribee folder with its count where it forks;
 and, where each other folder the old root held stood (mentioners,
-aliases, subscriptions, ...), that folder for the new node and the
+aliases, forkees, ...), that folder for the new node and the
 other folder of its relation, hidden in
 the root if the old one was (its members are drawn anew, unfolded),
 unless it would be empty and is one the user could type
@@ -163,8 +170,8 @@ write-protected root, such as a search hit, stays so and gains no
 content. An ID folder is not redrawn, since no request draws one. So
 from the user's perspective a view of a foreign note the user forked
 shows the fork's subscribee folder, counting what the user has
-neither filed nor hidden. Since the view's root is now the overrider,
-asking to view that overrider on the same connection lands in this
+neither filed nor hidden. Since the view's root is now the fork,
+asking to view that fork on the same connection lands in this
 view, as following a link to any open root does.
 
 Substitution is disabled in the diff view.  Every refresh of a content
@@ -193,7 +200,7 @@ When a node for which another mirror would stand is deliberately
 shown raw ('is_raw_where_another_mirror_would_stand'), its immediate
 content children are also shown raw.  Substitution resumes at
 the grandchildren.  This one-level rule makes the raw node show its own
-children rather than its overrider's interpretation of them.
+children rather than another mirror's interpretation of them.
 
 *** The just-saved fork buffer
 
@@ -239,29 +246,30 @@ restriction changed.
 ** Heralds and reasons for placement
 
 See [[file:heralds.org][the herald legend]] for the full relationship
-notation. A crucial =ĥ= directly after =O= marks actual substitution at
+notation. A crucial =ĥ= directly after =K= marks actual substitution at
 this occurrence.
 
-An ordinary relationship =O= says that the node participates in a
-visible override relationship.  A highlighted birth =O= says that an
-override relationship is why this particular viewnode is present beneath
+An ordinary relationship =K= says that the node participates in a
+visible =forks= relationship.  A highlighted birth =K= says that a
+=forks= relationship is why this particular viewnode is present beneath
 its org parent.
 
-Substituted viewnodes carry override
+Substituted viewnodes carry =forks=
 birth information: a mirror shown in =N='s place carries
-=(overrides out)= when it reaches =N= by overriding only (it
-overrides a note that ... overrides =N=), =(overrides in)= when by
-being overridden only, and none otherwise (a sibling fork, say).  A
-node can have ordinary =O= facts without a highlighted birth =O= when
+=(forks out)= when it reaches =N= by forker steps only (it
+forks a note that ... forks =N=), =(forks in)= when by
+forkee steps only, =(forks out)= where both hold (mutual forks), and
+none otherwise (a sibling fork, say).  A
+node can have ordinary =K= facts without a highlighted birth =K= when
 its placement comes from some other relationship.
 
-** How override relationships are created
+** How fork relationships are created
 
 *** Forking
 
 Editing an editable foreign node and saving requests an implicit fork.
-After confirmation, Skg creates an owned clone which subscribes to and
-overrides the foreign original.  It shallow-copies the edited content
+After confirmation, Skg creates an owned clone which forks the
+foreign original, recording =forks: [N]= once.  It shallow-copies the edited content
 IDs and hides original children removed by the edit.  The original is
 unchanged.
 
@@ -270,62 +278,59 @@ add a more-private layer such as =D= over =C=.  Forking a substituted
 viewnode forks the carrier on screen and therefore deepens the chain.
 Either gesture is refused on a note you already fork, naming your fork
 of it ('docs/forks.org', "Once forked: the fork operation's guard");
-a second owned overrider made otherwise (by a nodeMerge, or in a
-note's file) is saved.
-
-The subscription and override are paired by the fork operation, not by
-the data model.  Removing either relationship later does not
-automatically remove the other.
+a second owned fork made otherwise (by a nodeMerge, in a subscribee
+folder, or in a note's file) is saved.
 
 *** Direct editing and imported data
 
-No buffer position edits a note's overrides: a save keeps the
-overrides its file records.  Raw or imported =.skg= data can contain
-override facts, with or without a subscription.
+The subscribee folder is editable: a member typed there makes its
+viewparent fork it, and a member removed from it ends that =forks=
+relationship.  Raw or imported =.skg= data can contain =forks= facts
+too.
 
 ** Merge behavior
 
-When node =A= acquires node =B=, their outbound =overrides=
-lists are combined.  Duplicate partners keep the more-private
+When node =A= acquires node =B=, their outbound =forks=
+lists are combined, less any partner that is one of the merged
+node's own IDs.  Duplicate partners keep the more-private
 relRepo, and each relRepo is clamped no more public than =A='s
 home.  References to =B='s primary or extra IDs resolve canonically to
 =A= after the merge.
 
-Merge validates the resulting owned override graph atomically.  If
-owned =R1= overrides =A= and owned =R2= overrides =B=, merging =A= and
-=B= would make two owned nodes override one canonical target.  The
-merge is rejected and identifies the participants so the user can
-establish an explicit chain first.  Cycle creation is rejected for the
-same reason.  Merge does not create a subscription-and-override pair.
+Merge validates the result as a save does: a merge that would leave an
+owned note containing a note it forks, or one that forks it, is
+rejected ('docs/data-model_technical.org', "Hard validation
+constraints").  Two owned notes forking the merged node, or a cycle
+of forks, are no reason to refuse.
 
 ** Deletion and dangling references
 
 Deleting a node removes its primary and extra IDs from the outbound
 relationship lists of owned referencers, including
-=overrides=.  Foreign files are not rewritten.  The explicit
-absent-reference cleanup can remove an exact dangling override partner
+=forks=.  Foreign files are not rewritten.  The explicit
+absent-reference cleanup can remove an exact dangling =forks= partner
 from owned data.
 
-A deleted overrider shown in its original's place, marked
+A deleted fork shown in its original's place, marked
 =(overridesHere N)=, under a container the user does not own, still
 collects =N= for that container's list
 ('deleted_overrider_keeps_its_original' in
 =server/from_text/local_fieldintent_collection/predicates.rs=): the
-deletion takes the overrider out of the graph, not =N= out of the
+deletion takes the fork out of the graph, not =N= out of the
 container, so the container is not forked, and the rerender draws =N=
 there again. Under an owned container the deletion removes =N= from
 its list too ([[file:./forks.org][forks.org]], "Taking back a fork").
 
-An override target that is an unknown graphnode cannot substitute,
+A forkee that is an unknown graphnode cannot substitute,
 because there is no node to show.
 
 ** Skgrepo-set behavior
 
-The partner folders, the containerward chain, search grouping, =O=
+The partner folders, the containerward chain, search grouping, =K=
 relationship counts, and automatic substitution all
 derive their topology from relRepo-gated relationship accessors.
 
-For mirror substitution, an override relationship joins two mirrors
+For mirror substitution, a =forks= relationship joins two mirrors
 only when its relRepo and both notes' home skgrepos are unrestricted.
 A relationship outside the skgrepo restriction therefore cannot
 silently select a node which the corresponding folders and heralds
@@ -335,7 +340,7 @@ omit, and a restricted note in the middle of a path cuts it.
 
 Initial construction of the default =subscribeeFolder= also obtains its
 members through the generic directional, relRepo-gated accessor before
-deciding whether the folder would be empty.  A private subscription between
+deciding whether the folder would be empty.  A private =forks= relationship between
 two public nodes therefore creates neither a member nor an empty default
 folder in a public-only view.  An explicitly requested editable folder may
 still be created empty, as intended.

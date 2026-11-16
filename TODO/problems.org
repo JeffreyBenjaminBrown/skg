@@ -194,13 +194,6 @@ gap too. Details, options and questions:
   failure. On 2026-10-05 they were moved to
   '~/.local/state/nvim/shada-moved-aside-2026-10-05/'. Starting test
   Neovims with 'shada=NONE' (or '-i NONE') would prevent it.
-** String-typed relation lookups fail silently
-  'find_related_nodes' in 'server/dbs/in_rust_graph/query.rs' takes
-  the relation and roles as strings, and an unknown combination
-  returns an empty set (the '_ => {}' arm). Renaming a relation left
-  test calls passing a stale name, which showed up only as a confusing
-  assertion failure. Taking a 'RelationRole' (or panicking on an
-  unknown triple) would make such mistakes loud.
 * Findings from the simplification reconnaissance (2026-09-25)
   Research and proposed slices: [[file:astra-cleans-up.org][Making Skg easier to change]].
   These are source-inspection findings; no application changes or runtime
@@ -324,6 +317,12 @@ gap too. Details, options and questions:
    the FIRST bad file, so "Found 1 unreadable file(s)" actually means
    "1 unreadable *folder*" -- with 2 bad files you still get 1, and
    fixing one just reveals the next on the following boot.
+   Fixed for one error only (every-mirror plan 1, slice 5): a file
+   holding a '.skg' key retired in November 2026 is named by its path,
+   and the folder's read goes on to name every such file
+   ('RetiredKeysInFiles', 'server/dbs/filesystem/retired_keys.rs').
+   Every other unreadable file still names the folder and ends the
+   read, as below.
    Suggested fix: at line 203, '. map_err' the error to attach
    'path . display ()' before propagating; and either collect per-file
    errors instead of aborting the folder, or rename the count to say

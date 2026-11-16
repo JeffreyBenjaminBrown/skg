@@ -281,7 +281,7 @@ pub fn commit_nodes (
 /// Decision 4 of the plan this implements: the graph the prepared
 /// commits would leave ('PreparedCommits::final_tree_of', with the
 /// foreign skgrepos at their worktrees) must read back, pass the
-/// whole-graph validation, name in the four lists no node it lacks
+/// whole-graph validation, name in the three lists no node it lacks
 /// unless HEAD or the worktree names it so too, and differ from the
 /// worktree by exactly the change-forest leaves the nodes 'left_out'
 /// record, keys and fingerprints both, among the leaves recorded in an
@@ -348,7 +348,7 @@ pub fn check_candidate (
 const NOT_EXPECTED : &str =
   "Either a '.skg' file changed on disk and the server has not reloaded it yet, so try again in a moment, or this is a bug; the server's log has what was compared.";
 
-/// The relationships of 'graph', in the four lists, whose member
+/// The relationships of 'graph', in the three lists, whose member
 /// resolves to no node.
 fn dangling_relationships (
   graph : &InRustGraph,

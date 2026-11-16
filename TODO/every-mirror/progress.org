@@ -609,3 +609,298 @@ said once, in general terms, after the 'forest' kinds.
   length; slices 5 and 8 rename it.
 *** DONE
 The slice's headline in '1_plan.org' is DONE.
+** Slice 5: one relation, 'forks', in files, graph, save and wire
+*** Commits
+- ec1d728a every-mirror plan 1 slice 5: one relation, 'forks', in the server; old keys refused
+- c3a978f0 every-mirror plan 1 slice 5: the fixtures migrated to 'forks'
+- 8cdb694d every-mirror plan 1 slice 5: the clients, the AI tool and the tools speak 'forks'
+- 8fef657d every-mirror plan 1 slice 5: the Neovim fork-repo test checks the clone's 'forks'
+- (the commit carrying this record) every-mirror plan 1 slice 5: docs, record, DONE
+*** Suites
+- 'bash/nextest.sh': 1238 of 1238 pass. Its first run, with the
+  mechanical renames made, had 28 failures (1205 of 1233), every one
+  an expected fixture adaptation (listed under "Tests adapted"),
+  except 'file_io::test_node_io', a stale scratch folder from earlier
+  runs (see Deviations); the second had 18, the third 1, each again an
+  expected adaptation. The count is net of the tests added and the
+  ones removed (the set-difference merge's four, the overrides case of
+  'none_node_fields_are_noops'), listed below.
+- 'python3 tools/migrate-forks-2026-11/test_migrate.py': 16 of 16.
+- The AI tool's tests (after 'cargo build --bin skg'): PASS. Its first
+  run had 13 failures, each an expected adaptation (the letter 'K',
+  the summary line, the forks' subscribee folders, the substituted
+  subscriber in 'check_search_matching').
+- 'bash/emacs-tests.sh' 501 of 501; 'bash/nvim-tests.sh' no failure.
+- 'bash/integration-tests.sh': 38 of 38 (the Emacs pass), first run.
+- 'bash/all-tests.sh', first run: all passed but the Neovim
+  integration test 'fork-repo' (new: it still looked for 'overrides'
+  in the clone's file; a missed adaptation, fixed in 8fef657d and
+  passing alone). Second run, at 8fef657d: all pass: build, Emacs 501
+  of 501, Neovim (no failure), nextest 1238 of 1238, doctests, team
+  tools, AI reader, integration 76 of 76 (both clients).
+- Also, per the '/verify' skill, an isolated 'target/debug' server on
+  port 24755 with scratch data (owned P contains foreign N and owned
+  C; C contains c1, forks N, hides n2; all in the new keys): it
+  started; a view of P showed C in N's place, '(birth (forks out)
+  ...)', its 'K' token and '(rels (forks (out 1)))', and N in C's
+  subscribee folder born '(forks in 2)'; a save adding n1 to C's
+  subscribee folder wrote 'forks: [N, n1]' and kept 'hides: [n2]'.
+  Then, stopped by its PID and given two owned files and one foreign
+  file holding retired keys, it refused to start ("Found 3 unreadable
+  file(s)"), and its report named each file, its keys, and the owned
+  and foreign advice. Its port was checked free, the scratch folder
+  deleted (report, saved file and views kept under 'verify/').
+Logs: 'tests/results/every-mirror/slice5-plan1/' (nextest-first.log,
+nextest-2.log, nextest-3.log, nextest.log, ai-tool-first.log,
+ai-tool.log, integration-first.log, emacs.log, nvim.log,
+migrate-run.log, migrate-dryrun.log, all-tests.out, all-tests-ALL.org,
+first-full-run/, verify/).
+*** The fixtures' migration
+The tool ran once per fixture's own set of skgrepos, 70 runs (the
+groups: each fixture root with its 'skgconfig.toml', else its
+'fixtures*' folder; each integration test's 'data/'; each HEAD and
+each worktree snapshot of the diff-view fixtures apart, a case's
+skgrepos of one snapshot together). Totals: 162 files changed, 15
+relationships paired, 121 subscribe-only, 61 override-only, 0
+overrides dropped as recorded elsewhere, 0 duplicates, 1 self-fork
+dropped, 32 'hidesFromSubs' keys renamed, nothing refused; a dry run
+afterwards changed nothing. The one self-fork was
+'tests/init_refusal/fixtures/owned/owned/R.skg', which pins init
+refusing a self-fork: it was put back by hand ('forks: [N, R]').
+No marks fixture under 'tests/' or the AI tool names 'SubscribesTo',
+'Overrides' or 'HidesFromSubs' (the pitfall's grep), so no '--marks'
+run was needed.
+Hand-edited inline YAML: the Rust tests' string fixtures
+('editability_carrier', 'fork_merge_delete_under_a_narrowing',
+'hidden_nodes', 'hide_inference_under_a_narrowing',
+'restricted_graphnode_in_the_buffer', 'subscriber_hides_under_a_narrowing',
+'viewnode_id_stability', 'pruned_change_view/{restore, commit_processed}'),
+the integration tests 'diff-view-motions' and
+'save_collateral_delete_then_edit_under_it' ('run-test.sh'), and the
+fixture READMEs of 'hidden_from_subscriptions', 'subscribee_folder',
+'content_view/fixtures-shared-cycle' and
+'editable_view_cascade_and_budget'.
+*** Deviations from the plan's "how"
+**** Logs under 'tests/results/every-mirror/slice5-plan1/'
+As the launch brief said.
+**** The three commits are green only together
+The plan asks for the server, the fixtures' migration and the clients
+committed apart, each green. The refusal of the retired keys (Q5),
+which the pitfall "An unknown key is dropped silently" puts in the
+same slice as the new struct, makes that impossible for the first two:
+the server commit refuses every unmigrated fixture, and the migrated
+fixtures are unreadable to the server before it. So the server commit
+alone fails the Rust suites that read fixtures, the server and
+fixtures commits together pass 'bash/nextest.sh', and the clients'
+suites and the integration tests pass from the third commit on (the
+clients read 'shared/relations.json', which the server commit
+changes). Each commit builds. The split is kept for the history's
+sake.
+**** The unreadable-files entry: fixed in part, not marked planned
+The plan asks to prefix 'TODO/problems.org''s "The unreadable-files
+report names the REPO FOLDER, not the file" with 'FIX PLANNED: ' for
+the retired-key part only. That part is fixed here, and nothing plans
+the rest, so the entry keeps its headline and gains a paragraph saying
+what is fixed. "String-typed relation lookups fail silently" is fixed
+(the panic is the remedy it names), so it moved to
+'TODO/DONE/problems.org' rather than being marked planned.
+**** 'set_difference_merge' removed
+Its only caller was the restricted save's merge of 'overrides'
+('preserve_invisible_members'); 'forks' is woven as 'subscribesTo'
+was. Its four unit tests went with it.
+**** The retired keys, and where they are checked
+'server/dbs/filesystem/retired_keys.rs' (new) holds the list
+('subscribesTo', 'overrides', 'hidesFromSubs', 'subscribes_to',
+'overrides_view_of'), the check (a substring test, then the YAML's
+top-level keys only when one matches, so titles and bodies never
+trip it and an ordinary file is not parsed twice), and the error,
+'RetiredKeysInFiles', which an 'io::Error' carries so that
+'read_skg_sections_from_folder' can collect every such file of a
+folder and the startup report can name each, with advice by the
+skgrepo's ownership. Checked in 'read_graphnode' (every worktree
+read) and 'read_skgrepo_from_tree' (HEAD and the candidate tree;
+its refusal names up to five files and the commit to make), and, as a
+blob treated as absent, in the diff's per-file reader. Not in
+'parse_blob_node' (the vanished-node search). The October alias
+'hides_from_its_subscriptions' still loads for the hides field (the
+plan keeps it); only 'hidesFromSubs' is retired.
+**** Wording the plan did not fix
+The fork confirmation buffer says the clone "forks the original"; the
+stale-buffer error names the aspect "forks" (for "subscriptions" and
+"overrides"); the hide report says a removed child is "no content of
+X, nor a mirror of any" (it said "nor overrides any";
+'member_it_stands_for' asks for mirrors since slice 2); the AI tool's
+summary line says "forked N, forking M". The relationship-kind menus
+of both clients have roles 'forker' and 'forkee' ('forkee' still
+dispatching on the kind 'subscribee' until slice 6).
+**** 'tools/find-danglers/find.py' adapted, the transplant tool marked stale
+The first reads the current keys ('forks', 'hides'); the second, a
+one-time tool no suite runs, has a README headline saying which
+scripts read the retired keys.
+**** 'file_io::test_node_io' clears its scratch folder first
+It writes and reads '/tmp/file_io_test' and failed on a file an earlier
+run had left there in the old format; any machine that ran the suite
+before would hit it once.
+*** Tests adapted (expected fixture adaptations)
+Each follows decisions 1 and 5: every former subscription and
+override is one 'forks' relationship, so a former override-only fork
+now shows its forkee's unintegrated content (a fork shown in its
+original's place draws its subscribee folder, by default, with the
+original in it), and a former subscription-only one now makes mirrors.
+None pinned a behavior neither decision settles, so the plan's
+expected stop did not arise.
+- Names on the wire and in files, mechanically: '(rels (forks ...))'
+  and '(birth (forks ...))' for 'subscribesTo' and 'overrides' in the
+  Rust tests' expected buffers; the herald letter 'K' for 'S' and 'O'
+  ('tests/shared/herald-rendering-cases.txt': the 'overrides' birth
+  case went, now the same as the 'forks' one); the files' 'forks' and
+  'hides' keys wherever a test reads a file's list ('list_in',
+  'skg_list'; several assertions of an empty 'hidesFromSubs' list
+  would otherwise have passed vacuously); 'find_related_nodes' triples
+  ('tests/merge/merge_nodes.rs'); 'RelationCounts', 'AncestorFlags'
+  and 'NodeRelation' in 'tests/herald_tokens.rs'; the relRepo-info
+  relation "forks" (both clients' 'rel-at-point' tests, the unit test
+  of 'relation_from_client_string', which now refuses "subscribesTo").
+- Tests that set both lists, or only 'overrides', now set 'forks':
+  'override_invariants' (the "by override and by subscription" pairs
+  became one case each; the proptest varies two picks of forks),
+  'mirrors', 'complete_validation', 'internal_index_validation' (five
+  relmaps, four inverse relations), 'relation_accessors' (its node
+  helpers lost the overrides argument), 'prepared_graph_update',
+  'telescope', 'telescope_invariants' (three relations), 'save_leveling',
+  'none_node_fields_are_noops' (the overrides case went; the forks
+  case expects the migrated five members), 'delete_references_to_absent_node'
+  (three structured fields), 'merge_nodes', 'file_io', 'mutation_gate',
+  'body_yaml_format', 'fork' (the clone forks its original once),
+  'repo_sets' ('restricted_save_preserves_invisible_fork_targets').
+- 'tests/unit/telescope.rs': 'pre_october_2026_keys_still_load' became
+  'pre_october_2026_hides_and_flags_keys_still_load' (the October
+  names of the other two are retired keys).
+- Former override-only forks now draw their subscribee folders:
+  'tests/refresh/substitution.rs' (six outlines),
+  'tests/refresh/reinstate.rs' (the fixpoint outline),
+  'tests/extend_partner_folder_member.rs' (N now forks Overridden too),
+  'tests/override_substitution.rs' ('a_replaced_root_shows_its_own_containers'
+  checks U's containers folder only; M's containers now show under M,
+  in U's subscribee folder; 'an_owned_mutual_pair_saves_and_q3s_mirror_stands':
+  R shows in N's subscribee folder, not in N's place), the AI tool's
+  'forest-flags_overrider-id' and the three perspective views of R.
+- Former subscription-only forks now make mirrors:
+  'tests/content_view.rs' (2 and 3 both fork 4 and 5, so they are
+  mirrors, and 2, forked by none of them, stands for 3: Q3 rule 2),
+  the AI tool's 'check_search_matching' (Fred's note, typed into a
+  container, is drawn as the user's 'Second child', which forks it,
+  write-protected there, so the subtree flag skips that occurrence
+  instead of two foreign ones).
+- 'tests/view_stats_sharing.rs': "gO" (a subscribee as such its
+  recorder also overrides) is gone with the two relations; it pins
+  instead that E and F are both born of R's fork and show it, and Op
+  as a forks-out to generation 1.
+- Birth facts: '(forks out)' and '(forks in)' for a shown mirror
+  ('a_third_authors_mirror_stands_where_the_user_has_none',
+  'delete_strips_references_from_neighbors').
+- 'tests/init_refusal.rs': 'init_refuses_a_self_override' is
+  'init_refuses_a_self_fork'.
+- The integration tests 'fork', 'fork-chain', 'fork-repo' (their clone
+  checks), and the chain-role helpers of 'save_collateral_break_cycle'
+  and 'save_collateral_add_content_and_modify_text' ('forks' ->
+  forker).
+*** Tests added
+- 'tests/unit/retired_keys.rs' (4): each retired key found, in order;
+  none in a migrated file; a key named in a title or body is no key;
+  the error names every file with its keys.
+- 'tests/init_refusal.rs', 'init_refuses_retired_keys_naming_every_such_file':
+  an owned skgrepo with two old files and a migrated one, a foreign
+  one with one old file; init refuses with "3 unreadable file(s)", and
+  the report names each file, its keys and the advice for its owner.
+- 'tests/graph_straddle.rs',
+  'a_head_holding_retired_keys_refuses_until_the_migration_is_committed'
+  (fixture 'tests/graph_straddle/fixtures/retired_keys_at_head/').
+- 'tests/investigate_unknown_node.rs',
+  'a_deleted_node_whose_blob_holds_retired_keys_is_reported'.
+- 'tests/unit/processed_store.rs',
+  'a_marks_file_loads_whole_once_the_forks_migration_has_run' (an old
+  mark empties the store; the file as the tool leaves it, the tool's
+  real output, loads whole).
+- 'tests/dbs/in_rust_graph/relation_accessors.rs',
+  'find_related_nodes_panics_on_a_name_no_relation_has'.
+- "A former subscribe-only fixture now substitutes and a former
+  override-only one now shows its unintegrated content": pinned by the
+  adapted 'content_view' and 'refresh/substitution' tests above, not by
+  new ones.
+*** Fixtures changed
+- Every fixture '.skg' holding the old keys, by the tool (above); the
+  hand-edited inline YAML and READMEs (above);
+  'tests/init_refusal/fixtures/owned/owned/R.skg' (its self-fork put
+  back).
+- New: 'tests/graph_straddle/fixtures/retired_keys_at_head/' (HEAD in
+  the old format, the worktree migrated);
+  'tests/unit/processed_store/marks_{before,after}_the_forks_migration.json'.
+- 'tools/skg-for-ai/test-expected/': eight compact views (letters
+  'K', the summary's "forked N, forking M", and the overrider's
+  subscribee folder).
+*** Names, for the slices after
+- 'NodeRelation::SubscribesTo' is 'NodeRelation::Forks' (relation name
+  "forks"); 'NodeRelation::Overrides' is gone. 'NodeRelation::ALL' has
+  four. 'RelationRole::SUBSCRIBER'/'SUBSCRIBEE' are 'FORKER'/'FORKEE';
+  'OVERRIDER'/'OVERRIDDEN' are gone. 'OUTBOUND_RELATIONSHIP_TYPES' has
+  ("forks", "forker", "forkee").
+- The relmap 'subscribers_of' is 'forkers_of'; 'overriders_of' is gone.
+- The field 'subscribesTo' is 'forks' on 'Graphnode', 'GraphnodeInRust',
+  'GraphnodeOnDisk', 'SectionSlices', 'ComposedNode',
+  'DecompositionInput', 'NodeSaveIntent', 'RequestedRelRepos' and the
+  save's per-ID entry ('types.rs'); every 'overrides' field is gone.
+  'GraphnodeOnDisk::hidesFromSubs' keeps its name, serialized as
+  'hides'.
+- 'FieldIntent::SetSubscribesTo' is 'FieldIntent::SetForks'.
+- 'RelationCounts::{subscribers, subscribees}' are '{forkers,
+  forkees}'; 'overriders', 'overrides_out' are gone.
+  'AncestorFlags::{subscribes_in, subscribes_out}' are '{forks_in,
+  forks_out}'; the 'overrides_*' slots are gone.
+- 'StructuredField::SubscribesTo' is 'Forks' (label "forks");
+  'Overrides' is gone.
+- 'FORK_RELATIONS' is gone; the fork rules and 'MIRROR_RELATION' read
+  'NodeRelation::Forks'.
+- 'set_difference_merge' ('weave.rs') is gone.
+- New: 'server/dbs/filesystem/retired_keys.rs' ('RETIRED_SKG_KEYS',
+  'FORKS_MIGRATION_TOOL', 'retired_keys_held', 'RetiredKeysInFiles'
+  with 'into_io_error' and 'carried_by', 'quoted_keys',
+  'what_to_do_about_retired_keys'); 'tree_holds_retired_keys'
+  ('git_snapshot.rs').
+- The test helper 'save_added_overrides' is 'save_added_forks'.
+- 'shared/relations.json': 'forks', letter 'K', display position 2
+  (hidesFromSubs 3), roles 'forker' (subscriberFolder) and 'forkee'
+  (subscribeeFolder); 'shared/herald-styles.json' "side_tiers"."forks".
+- Kept for later slices: the folder kinds, atoms and labels, the
+  request '(folder subscribesTo)', 'FolderRelation::SubscribesTo', the
+  save's subscription vocabulary (slice 7), 'hidesFromSubs' as the
+  relation's code and wire name (slice 7), '(overridesHere N)' and the
+  perspective names (slice 8).
+*** Unfinished, and notes for later slices and Jeff
+- The record's suites show the whole slice green; the server commit
+  alone is not (see Deviations).
+- The migration tool renames marks of 'HidesFromSubs' to 'Hides'
+  (slice 1); the variant is still 'HidesFromSubs' until slice 7, so
+  the tool must not run on a real marks file before slice 7 lands (it
+  runs after the plan, as planned). The docs agent of this slice
+  flagged it; nothing changed.
+- 'docs/' was updated by a delegated agent from a brief of this
+  slice's facts and checked by spot reading; it coined
+  "forkerward, forkeeward" in the glossary for the role-tree
+  adjectives, and wrote in 'docs/override.org' that a member typed
+  into a subscribee folder makes its viewparent fork it.
+- The default subscribee folder under a mirror shown in its original's
+  place (a fork forks its original) is new to every view of substituted
+  forks, Jeff's included, once his data is migrated: a fork shown in
+  place of a note now carries, unfolded, a subscribee folder with the
+  note, as any fork drawn editable does. Slice 6's forks folder and
+  Q14 decide its final shape; plan 2 its display.
+- A note that only subscribed to another now stands in its place, and
+  siblings stand for each other (Q2), wherever the perspective's list
+  ranks them first: Jeff's three subscribe-only notes become mutual
+  forks of Claude's, as the plan foresaw; the fixture 'content_view'
+  shows how far that reaches.
+- 'docs/override.org' still uses the overrides vocabulary for the
+  perspective and the part (slices 8 and 9).
+*** DONE
+The slice's headline in '1_plan.org' is DONE.

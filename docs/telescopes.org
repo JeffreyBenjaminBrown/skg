@@ -43,7 +43,7 @@ Abort leaves every file alone; manual repair requires making the same
 title/body-only edits in the =.skg= sections. Noninteractive and
 maintenance writers have no implicit Hoist answer and refuse. Every
 relationship (a =contains=
-membership, a subscription, a hide, an override) carries its own
+membership, a =forks= relationship, a hide) carries its own
 relRepo: the skgrepo of the section that records it.
 
 Reading the node *composes* the sections, most public first, into one
@@ -91,8 +91,8 @@ public than the recorder's home (a section more public than the home
 would imply a title-less public face). Hides floor higher:
 a hide reveals that you hide something, so it must be at least as
 private as both endpoints and the most public explanation of it. An
-explanation is a subscription whose subscribee contains the hidden
-node, and stands at the more private of the subscription's relRepo
+explanation is a =forks= relationship whose forkee contains the hidden
+node, and stands at the more private of that relationship's relRepo
 and the relRepo of that contains relationship, so a public hide never
 names a private membership.
 

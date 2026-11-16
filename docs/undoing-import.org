@@ -5,7 +5,7 @@ originals if you need their exact structure and metadata.
 
 The current export removes Skg metadata and rewrites ID links as file or
 headline links. It does not preserve node IDs, aliases, privacy sections,
-subscriptions, overrides, or hides. Shared nodes and cycles can appear as
+forks, or hides. Shared nodes and cycles can appear as
 link leaves rather than repeated subtrees. Reimporting cannot reconstruct
 the original graph; the existing Org-roam importer also requires file-level
 IDs that this export does not generate.
