@@ -218,16 +218,16 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       &viewforest, & new_with_explicit_skgrepo, config ) };
   let default_clone_skgrepo : Option<SkgrepoName> = {
     // The active-aware default for a fork whose skgrepo can be neither
-    // user-set nor inferred: prefer the config-first owned skgrepo that
+    // user-set nor inferred: prefer the first-declared owned skgrepo that
     // is unrestricted under the restricted set, so the fork reaches the
     // confirmation buffer (where the user can rotate it) instead of
     // dead-ending on ForkRepoRestricted when a restricted owned skgrepo
-    // happens to sort first. Falls back to the config-first owned skgrepo
+    // happens to sort first. Falls back to the first-declared owned skgrepo
     // -- then ForkRepoRestricted fires only when the user owns no unrestricted
     // skgrepo at all (the genuine "activate one first" case), and
     // ForkRepoUnresolved only when the user owns no skgrepo at all.
     let owned_in_order : Vec<SkgrepoName> =
-      config . owned_skgrepos_in_config_order ();
+      config . owned_skgrepos_in_declaration_order ();
     let unrestricted_owned : Option<SkgrepoName> =
       owned_in_order . iter ()
       . find ( |name| skgrepo_restriction . contains_skgrepo (name) )
@@ -401,7 +401,7 @@ fn dead_link_warnings (
 /// built from N's current disk/graph snapshot (not the buffer): the
 /// client refuses to fork a dirty buffer, so disk == what the user sees,
 /// and N's own owned save proceeds separately. The clone skgrepo resolves
-/// user-set-else-config-first-owned: the shared 'CloneRepoInputs'
+/// user-set-else-first-declared-owned: the shared 'CloneRepoInputs'
 /// carries the explicit-child and inferred-ancestor maps too, but both
 /// are keyed by foreign pids, so an owned fork target never hits them.
 /// D2's 'validate_fork_view_requests' has already rejected an unsaved

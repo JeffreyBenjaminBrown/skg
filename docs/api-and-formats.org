@@ -364,7 +364,7 @@ So far there are these endpoints:
          such E, whose content it joins), or ='Y' keeps it= (or ='Y'
          keeps 'M', which it stands for=; several keepers =keep=):
          an owned note Y other than S contains it after the save, so
-         no partner shows it ('docs/forks.org', "What you keep
+         no member of the forks folder shows it ('docs/forks.org', "What you keep
          elsewhere").
        Each quoted name is a title, as the save leaves it. A fork's
        clone counts as a forker with no hides on disk, named =the
@@ -879,7 +879,7 @@ keeps them as text ('TODO/problems.org').
     logs them and asks for the rerender as the clients do.
   - Message: LP =((response-type repo-files-reloaded) (reloaded ((SKGREPO N) ...)) (warnings ("WARNING" ...)) (view-ids (VIEW_ID ...)))=.
     =reloaded= names each skgrepo with files reloaded and how
-    many, in config order. The warnings are one per node or batch
+    many, in declaration order. The warnings are one per node or batch
     that could not be reloaded, saying why and that the server keeps
     serving the previous version. A connection is not told of a
     skgrepo its skgrepo restriction keeps out, nor of a problem
@@ -1013,7 +1013,7 @@ keeps them as text ('TODO/problems.org').
       empty.
     - =((commits (("SKGREPO" "COMMIT-ID") ...)) (committed-nodes N) (left-nodes L) (waiting (("PID" "TITLE" REASON "PID" "TITLE") ...)) (errors (...)) (warnings ()))=
       otherwise. =commits= lists each owned skgrepo git-committed, in
-      config order, one commit each, by its gitrepo's configured user,
+      declaration order, one commit each, by its gitrepo's configured user,
       with MESSAGE; a skgrepo with nothing to commit is not listed. N
       counts the nodes that went in (a node whose file changed only in
       bytes the parser does not read included); L the changed nodes that
@@ -1182,7 +1182,7 @@ keeps them as text ('TODO/problems.org').
   - Response: LP =((response-type repos) (restriction "NAME")
     (foreign-repos "shown") (repos ((name "NAME") (path "PATH")
     (abbreviation "ABBR") (owned "true") (shown "true")) ...))=, one
-    entry per configured skgrepo, in fold order: config order, the
+    entry per configured skgrepo, in fold order: declaration order, the
     owned ones in privacy order (most public first; see "skgconfig.toml
     > Skgrepos"). =PATH= is the skgrepo's path as the config writes it:
     relative to the data root when it lies below it, else absolute.
@@ -2060,9 +2060,10 @@ perspective's skgrepo list ranks first, never in the diff view
 =docs/mirrors.org=, "Mirror substitution", says what N's mirrors are
 and how a tie is broken). The mirrors of N are N and the notes joined
 to it by =forks= relationships, followed either way, under the
-skgrepo restriction; a perspective is a skgrepo S, and its list is S,
+skgrepo restriction; a perspective is a skgrepo S (or the root homes,
+one per tree), and its list is S,
 then every other skgrepo in declaration order. In its own skgrepo N
-itself stands, however many of its forks are there; a chain D forks
+itself stands, however many of its mirrors are there; a chain D forks
 C forks N kept in one skgrepo other than N's shows D there; where a
 mirror's skgrepo is restricted, the chain is cut there. The refresh
 substitutes at every refresh, a member already shown raw included,
@@ -2321,7 +2322,7 @@ two things:
   round, in the manifest's order; a pair two manifests disagree about,
   as the manifest of the more private one says (the one whose own
   manifest lists the other; failing that, the one listed first in the
-  config); and any other pair in config order, so far as the ordered
+  config); and any other pair in declaration order, so far as the ordered
   pairs allow.
 
 The server warns at startup about a disagreeing pair when some node
@@ -3009,7 +3010,7 @@ principle as follows.
     on record is any fork partner the graph has, whatever the skgrepo
     restriction, a forker the hider hides included: the floor asks
     who can read the hide, not what a view draws. Removals infer hides only from
-    what the set shows: the note's visible forks, forkers and
+    what the set shows: the note's visible forkees, forkers and
     indirect members (less those it hides), their contents by visible
     records, and its visible hides, so that re-adding a member drops no restricted
     hide of it.

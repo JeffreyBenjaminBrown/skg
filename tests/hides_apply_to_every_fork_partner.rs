@@ -1,9 +1,10 @@
 // cargo nextest run --test grouped_forks -E 'test(hides_apply_to_every_fork_partner::)'
 //
-// A note's hides apply to every fork partner its forks folder shows,
-// forkees and forkers alike ('docs/glossary.org', "hides"); a forker
-// the note hides is none of them, so the file's name means the
-// partners shown. The fixture: N,
+// A note's hides apply to every member its forks folder shows,
+// forkees, forkers and indirect members alike ('docs/glossary.org',
+// "hides"); a forker the note hides is none of them. This file tests
+// the fork partners, forkees and forkers; 'hides_by_integration.rs'
+// and 'flat_forks_folders.rs' take in indirect members. The fixture: N,
 // owned, contains X1 and X2, forks E and hides W and H2. E, its
 // forkee, contains e1; F, its forker, contains X1, W and f1. G stands
 // alone. So W, which only F contains, has a reason: it stands in F's

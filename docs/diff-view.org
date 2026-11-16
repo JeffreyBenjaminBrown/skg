@@ -860,7 +860,7 @@ A tree to commit holding '.skg' keys retired in November 2026 is
 refused as such a HEAD is ("Refusals").
 ** The commit
 Each owned skgrepo with something to commit gets one git-commit, in
-config order, with the message, by its gitrepo's configured user; in
+declaration order, with the message, by its gitrepo's configured user; in
 a gitrepo shared by several, each commit's parent is the one before.
 So a home skgrepo move between two skgrepos is one node in two
 commits. A commit's tree is the tree before it with the skgrepo's

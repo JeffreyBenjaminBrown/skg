@@ -4,8 +4,8 @@
 // such") in views saved with their baselines, as a client saves
 // them, so that the stale-buffer check
 // ('server/serve/handlers/save_staleness.rs') judges each save:
-// - An indirect member ('docs/glossary.org', "direct member, indirect
-//   member") stands in the note's flat forks folder, editable,
+// - An indirect member ('docs/glossary.org', "the forks folder")
+//   stands in the note's flat forks folder, editable,
 //   claiming nothing: a fresh view saves unchanged with no warning,
 //   edits of a direct member save, and a cut from the indirect member
 //   makes the note fork it and hide what was cut.
@@ -340,7 +340,7 @@ fn integration_fixture (
                  &["public", "private", "theirs"] ) }
 
 #[test]
-fn a_stale_buffer_does_not_hide_what_its_integrated_folder_showed
+fn a_stale_buffer_does_not_hide_what_its_integratedElsewhere_folder_showed
   () -> Result<(), Box<dyn Error>> {
   // The first client's view of M shows a, which y keeps, in x's folder
   // of what the user keeps elsewhere, not as x's content. The second

@@ -389,7 +389,7 @@ async fn a_reply_under_an_unread_message_integrates_it (
             && unread . iter () . any ( |line| line . contains ("integratedElsewhereFolder") )
             && first_says (&kept_elsewhere, "folded"),
     "the redrawn view must count one message unread, m2, and draw m1 there \
-     only in the folder of what the reader keeps elsewhere:\n{}",
+     only in the folder of what the user keeps elsewhere:\n{}",
     redrawn );
   // A fresh view draws t editable too, its count saying one message
   // is unread.
@@ -496,7 +496,7 @@ async fn a_reply_deeper_in_an_unread_message_integrates_the_message (
   assert_eq! ( members_of (& node_from_disk (config, "f") ? . contains),
                vec! [ ID::from ("d"), ID::from ("m1") ],
     "the answer must file m1, the message it is in, in f" );
-  let from_fs_content : String = // from m1 as f's content on, past t's folder of what f keeps elsewhere
+  let from_fs_content : String = // from m1 as f's content on, past t's folder of what the user keeps elsewhere
     response . saved_view . lines ()
     . skip_while ( |line| ! ( line . starts_with ("** ") && line . contains ("(gnid m1)") ))
     . map ( |line| format! ("{}\n", line) )
@@ -551,7 +551,7 @@ async fn a_third_partys_reply_in_anothers_unread_list_warns (
 
 /// The explicit fork of an owned node P: the SavePlan carries one
 /// ForkSpec whose clone copies P's disk snapshot (title/contains),
-/// forks=[P], in the config-first owned
+/// forks=[P], in the first-declared owned
 /// skgrepo. P itself keeps its own (owned) save -- it is not dropped like
 /// a foreign fork's original.
 async fn explicit_fork_save_instruction (
@@ -571,7 +571,7 @@ async fn explicit_fork_save_instruction (
   assert_eq! ( members_of ( c . forks . or_default () ), vec! [ ID::from ("P") ],
     "clone forks P" );
   assert_eq! ( c . home_skgrepo, SkgrepoName::from ("owned"),
-    "clone defaults to the config-first owned repo; got {:?}",
+    "clone defaults to the first-declared owned repo; got {:?}",
     c . home_skgrepo );
   assert_ne! ( c . pid, ID::from ("P"),
     "clone has a fresh pid, not P's" );

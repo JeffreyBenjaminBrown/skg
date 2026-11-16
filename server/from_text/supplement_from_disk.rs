@@ -538,7 +538,7 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
 /// such pair of records is visible; with none found, the endpoint
 /// rule alone applies (junk-tolerant; the validators report residue).
 /// This is wider than the partners that explain a hide in a view
-/// ('fork_partners_shown'): the floor asks who can read the hide's
+/// ('forks_folder_members_shown'): the floor asks who can read the hide's
 /// record, not what a view draws, so it counts every record the graph
 /// has, whatever the skgrepo restriction, and a forker the hider hides
 /// too, whose records a reader of the hide sees all the same.

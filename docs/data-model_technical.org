@@ -409,8 +409,8 @@ forkee's visible record shows the hidden node as its content, and
 no hide is written of a member that only a restricted record
 explains. The inference of hides from a removal
 (=infer_hides_from_contains_removals=) reads the same way: the
-note's visible forks, forkers and indirect members (the members its
-forks folder shows, =fork_partners_shown=), their content by visible
+note's visible forkees, forkers and indirect members (the members its
+forks folder shows, =forks_folder_members_shown=), their content by visible
 records, and its visible hides. A child removed from the note that
 such a member still contains is hidden, a forker's content as a
 forkee's, so that it does not come back under that member, unless
@@ -579,9 +579,9 @@ unsayable.
 
 *** The forks folder
 The forks folder ('Folder::Forks', =forksFolder=) under an occurrence
-of a note N holds every mirror of N, each once, flat: its *direct
-members*, N's fork partners (the notes N forks, or forkees, and
-those that fork it), and its *indirect members*, the other mirrors
+of a note N holds every mirror of N, each once, flat: N's fork
+partners (the notes N forks, or forkees, and those that fork it),
+and its *indirect members*, the other mirrors
 of N, joined to it only through others; all by records the skgrepo
 restriction shows. A *mutual* both forks N and is forked by it; a
 *forker-only member* forks N and is not forked by it.
@@ -593,7 +593,7 @@ relRepo of each unknown or restricted one; then its forker-only
 members (=forker_only_members=): the notes that fork N, less those N
 forks or hides, by the declaration order of their home skgrepos
 ('SkgConfig::declaration_rank'), then pid; then its indirect members
-(=indirect_members=): the mirrors of N ('mirrors_of_note_forking',
+(=indirect_members=): the mirrors of N ('mirrors_of_note_with_forkees',
 N forking what its list names) less N, its fork partners and what N
 hides, nearest first, then by the declaration order of their homes,
 then pid; the members of both tails unclaimable
@@ -650,10 +650,10 @@ read as its whole list. It also emits a signal,
 =FieldIntent::ForksFolderMembers=, listing every vognode the folder
 shows, claiming or not, but those marked for deletion. Visibility
 resolution then hides in N each member of the folder as the view
-drew it ('fork_partners_shown' with N's forkees on disk; in the diff
+drew it ('forks_folder_members_shown' with N's forkees on disk; in the diff
 view, whose forks folders hold direct partners only, N's forkees and
 forker-only members) that would stand in it claiming nothing after
-the save (with N's forks as the save leaves them), that the folder
+the save (with N's forkees as the save leaves them), that the folder
 no longer shows, and that N does not hide already
 (=resolve_forks_folder_removals= in =resolve_visibility.rs=), before
 the edits of the hidden-outside folder, which run last. So a forkee

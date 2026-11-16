@@ -176,7 +176,7 @@ pub fn mirrors_of (
 /// the notes it forks those 'forkees' names (visible records, as a
 /// view drew them or a save leaves them) rather than those its list
 /// names. Every other note's relationships are the graph's.
-pub fn mirrors_of_note_forking (
+pub fn mirrors_of_note_with_forkees (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
   note        : &ID,
@@ -234,7 +234,7 @@ fn mirrors_reached (
 /// '(forker, forkee)': the relationship's relRepo and the partner's
 /// home skgrepo are both visible. A note's direct partners, as the
 /// walk of 'mirrors_of' follows them; the members of a note's forks
-/// folder are 'fork_partners_shown' ('server/refresh/goal.rs').
+/// folder are 'forks_folder_members_shown' ('server/refresh/goal.rs').
 fn visible_fork_relationships_of (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
@@ -311,10 +311,11 @@ fn reaches_forkeeward (
 /// home: the home skgrepo, as 'graph' knows it, of the node that
 /// tree's root, the child of the buffer root, stands for (its
 /// '(inPlaceOf N)', else itself: a root another perspective replaced
-/// still has its original's home); the config's default
-/// ('SkgConfig::default_perspective_skgrepo') when that root is not an
-/// occurrence of a node 'graph' knows (a new node, a ghost, a
-/// tombstone), or when 'position' is the buffer root itself.
+/// still has its original's home); the first owned skgrepo, else the
+/// first declared ('SkgConfig::first_owned_else_first_declared_skgrepo'),
+/// when that root is not an occurrence of a node 'graph' knows (a new
+/// node, a ghost, a tombstone), or when 'position' is the buffer root
+/// itself.
 pub fn perspective_skgrepo_of_tree_containing (
   config             : &SkgConfig,
   graph              : &InRustGraph,
@@ -334,4 +335,4 @@ pub fn perspective_skgrepo_of_tree_containing (
           occurrence . in_place_of . as_ref () . unwrap_or (&occurrence . gnid) )
         . map ( |(_pid, home)| home ),
       _ => None, } );
-  root_home . unwrap_or_else ( || config . default_perspective_skgrepo () ) }
+  root_home . unwrap_or_else ( || config . first_owned_else_first_declared_skgrepo () ) }

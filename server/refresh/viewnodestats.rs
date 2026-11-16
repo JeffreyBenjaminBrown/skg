@@ -37,7 +37,7 @@ pub fn set_viewnodestats_in_viewforest (
   config                : &SkgConfig,
   restriction           : &SkgrepoRestriction,
   relRepos              : &mut RelRepoLookup,
-  is_diff_view          : bool, // where a member as such keeps what the user keeps elsewhere among its content ('content_goal_gnids')
+  is_diff_view          : bool, // where a member as such counts what the user keeps elsewhere among its content ('content_goal_gnids')
 ) {
   let multi_skgrepo : bool = config . skgrepos . len () > 1;
   let mut ancestor_gnids : HashSet<ID> = HashSet::new ();

@@ -14,7 +14,8 @@
 //! forker or an indirect member it does not hide), and whose departure hid
 //! nothing, earns a "Hides nothing:" line naming the rule that held:
 //! among them, that an owned note keeps it after the save
-//! ('owned_notes_containing'), so that no partner shows it.
+//! ('owned_notes_containing'), so that no member of the forks folder
+//! shows it.
 //! .
 //! Only what the skgrepo restriction shows counts, as in the
 //! inference: a hide or a member whose record is kept out of sight is
@@ -24,7 +25,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text::local_fieldintent_collection::resolve_visibility::member_it_stands_for;
-use crate::refresh::goal::{ContainsAfterSave, fork_partners_shown, owned_notes_containing};
+use crate::refresh::goal::{ContainsAfterSave, forks_folder_members_shown, owned_notes_containing};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig};
 use crate::types::nodes::complete::Graphnode;
@@ -105,14 +106,14 @@ pub fn hide_report_lines (
         . map ( |disk| visible_members (disk . forks . or_default ()) )
         . unwrap_or_default (), };
     let partner_contents : Vec<(ID, Vec<ID>)> =
-      fork_partners_shown (graph, restriction, &node . pid, &forkees) . iter ()
+      forks_folder_members_shown (graph, restriction, &node . pid, &forkees) . iter ()
       . map ( |partner| (
         partner . clone (),
         graphnode_from_graph (graph, partner)
           . map ( |partner| visible_members (&partner . contains) )
           . unwrap_or_default () ))
       . collect ();
-    let containers_of = |member : &ID| -> String { // the fork partners whose content holds 'member', named
+    let containers_of = |member : &ID| -> String { // the forks folder's members whose content holds 'member', named
       partner_contents . iter ()
         . filter ( |(_, content)| content . contains (member) )
         . map ( |(partner, _)| label (partner) )
@@ -157,7 +158,7 @@ pub fn hide_report_lines (
                   &[ node . pid . clone () ], Some (&after_save) ))
         . unwrap_or_default ()
         . iter () . map ( |keeper| label (keeper) ) . collect ();
-      let placed_under : Vec<String> = // the fork partners this save places the child under
+      let placed_under : Vec<String> = // the forks folder's members this save places the child under
         partner_contents . iter ()
         . filter ( |(partner, content_before)|
                    ! content_before . contains (child)

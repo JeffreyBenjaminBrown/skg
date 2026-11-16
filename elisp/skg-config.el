@@ -132,7 +132,7 @@ repos are on no rung, wherever the config lists them."
   (skg--owned-repos))
 
 (defun skg--foreign-repo-names ()
-  "Return the names of the configured foreign repos, in config order, or nil."
+  "Return the names of the configured foreign repos, in declaration order, or nil."
   (let ((config-file (skg-config-file)))
     (when config-file
       (skg-foreign-repos-from-toml config-file))))

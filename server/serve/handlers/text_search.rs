@@ -583,7 +583,7 @@ fn hits_among_mirrors_of (
 /// Which of 'hits', hits that are mirrors of one another, the user's
 /// own skgrepo list ranks first: the perspective of the config's
 /// first owned skgrepo in declaration order (the most public;
-/// 'SkgConfig::default_perspective_skgrepo'), then the others in
+/// 'SkgConfig::first_owned_else_first_declared_skgrepo'), then the others in
 /// declaration order. Several there tie: the only one none of the
 /// others forks stands, else the least pid.
 fn hit_standing_among (
@@ -591,7 +591,7 @@ fn hit_standing_among (
   hits   : &Mirrors,
 ) -> Option<ID> {
   let tied : Vec<Mirror> = first_ranked_mirrors (
-    config, &config . default_perspective_skgrepo (), hits );
+    config, &config . first_owned_else_first_declared_skgrepo (), hits );
   if tied . len () == 1 { return Some ( tied [0] . pid . clone () ); }
   the_only_one_forked_by_none_of_the_others (&tied, hits)
     . or_else ( || tied . into_iter () . map ( |mirror| mirror . pid ) . min () ) }

@@ -46,7 +46,7 @@ pub fn changed_skg_paths_by_stem (
   config : &SkgConfig,
 ) -> Result<BTreeMap<ID, Vec<ChangedSkgPath>>, String> {
   let mut by_stem : BTreeMap<ID, Vec<ChangedSkgPath>> = BTreeMap::new ();
-  for skgrepo_name in config . owned_skgrepos_in_config_order () {
+  for skgrepo_name in config . owned_skgrepos_in_declaration_order () {
     let skgrepo : &Skgrepo = config . skgrepos . get (&skgrepo_name)
       . ok_or_else ( || format! ( "Repo '{}' not found in config", skgrepo_name )) ?;
     let in_skgrepo = |e : String| -> String {
@@ -154,7 +154,7 @@ pub struct PreparedCommit {
   pub paths       : Vec<ChangedSkgPath>,
 }
 
-/// Every git-commit to be made, in config order, and the tree each
+/// Every git-commit to be made, in declaration order, and the tree each
 /// owned skgrepo's gitrepo will hold once all are made (HEAD's, for a
 /// gitrepo with none).
 #[derive(Clone, Debug, Default)]
@@ -163,7 +163,7 @@ pub struct PreparedCommits {
   pub final_tree_of : HashMap<SkgrepoName, Oid>,
 }
 
-/// Build, for each owned skgrepo in config order, the tree of its
+/// Build, for each owned skgrepo in declaration order, the tree of its
 /// commit: the tree its gitrepo holds before it (HEAD's, or that of
 /// the commit before it in the same gitrepo) with its paths among
 /// 'paths' taken from the worktree. A skgrepo whose tree would not
@@ -177,7 +177,7 @@ pub fn prepare_commits (
 ) -> Result<PreparedCommits, String> {
   let mut prepared : PreparedCommits = PreparedCommits::default ();
   let mut tree_of_gitrepo : HashMap<PathBuf, Oid> = HashMap::new ();
-  let owned : Vec<SkgrepoName> = config . owned_skgrepos_in_config_order ();
+  let owned : Vec<SkgrepoName> = config . owned_skgrepos_in_declaration_order ();
   let mut gitrepo_of : HashMap<SkgrepoName, PathBuf> = HashMap::new ();
   for skgrepo_name in &owned {
     let in_skgrepo = |e : String| -> String {

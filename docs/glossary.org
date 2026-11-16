@@ -237,10 +237,11 @@ forkee, hider hides hidden. A forks B says two things: A shows
 B's content that A neither contains nor hides, nor the user keeps in
 another note of theirs (see "forkee as such" and "integrated"), and A
 and B are mirrors (see "mirror"). =hides= means
-"hides from its forks": the hider keeps the hidden node out of what
-it shows of every member its forks folder shows, a note it forks, one
-forking it, or an indirect member, that it does not hide
-('fork_partners_shown' in 'server/refresh/goal.rs'; see "the forks
+"hides from its forks", from every member of its forks folder: the
+hider keeps the hidden node out of what it shows of every member its
+forks folder shows, a note it forks, one forking it, or an indirect
+member, that it does not hide
+('forks_folder_members_shown' in 'server/refresh/goal.rs'; see "the forks
 folder"). A member that contains the hidden node *explains* the hide:
 the view draws it there, under that member, and a hide no member
 explains stands in the hidden-outside folder (see "compound partner
@@ -466,7 +467,8 @@ recorders that record its parent; for forking, one folder lists both:
    "the forks folder".
 
 The four compound partner folders (see "compound partner folder")
-each join several relationships -- forking, containment, and hiding:
+each join several relationships -- forking, containment and, for
+three of them, hiding:
 - an *integratedElsewhereFolder*, under a member as such of a forks
   folder, lists that member's contents which the user keeps elsewhere
   (see "integrated");
@@ -520,18 +522,22 @@ containerward chain, under a member of the forks folder in a
 containers folder of its own (see "foldering, the containerward
 chain, chain node").
 
-*** the forks folder, fork partner, forker-only member, mutual, direct member, indirect member
+*** the forks folder, fork partner, forker-only member, mutual, indirect member
 
 The *forks folder* ('Folder::Forks', atom =forksFolder=, label "It
 forks these, or these fork it, or these fork or are forked by others
 here.") is the one partner folder of the
 relation 'forks'. Under an occurrence of a note N it holds every
 mirror of N (see "mirror") but N, each once, by records the skgrepo
-restriction shows: it is *flat*. Its *direct members* are N's *fork
-partners*: each note N forks, and each that forks N. A *mutual* forks
-N and is forked by it; a *forker-only member* forks N and is not
-forked by it. Its *indirect members* are N's other mirrors, joined to
-N only through other mirrors (a fork of N's forkee, say). In a
+restriction shows: it is *flat*. Its members are N's *fork
+partners* -- each note N forks, and each that forks N -- and its
+indirect members. A *mutual* forks N and is forked by it; a
+*forker-only member* forks N and is not forked by it. Its *indirect
+members* are N's other mirrors, joined to N only through other
+mirrors (a fork of N's forkee, say). A fork partner is direct: an
+indirect member is no fork partner of N, and the code says "members
+of the forks folder" ('forks_folder_members_shown') where it means
+both. In a
 content view a forkee or mutual stands there as a forkee as such, a
 forker-only or an indirect member as a forker as such (see "forkee
 as such" and "forker as such"). No member of a forks folder shows a
@@ -596,7 +602,7 @@ compound partner folder* (=hiddenOutsideOfForkPartnersFolder=, label
 "b hides these, but no fork partner shown contains them.") stands last in N's forks folder and holds N's hides that no
 member of N's forks folder contains, in the order of N's hides
 list. The members are those its forks folder shows, forkees,
-forkers and indirect members alike ('fork_partners_shown'), so a
+forkers and indirect members alike ('forks_folder_members_shown'), so a
 hide is there exactly when no member of the same folder explains it:
 a hide of something only a forker or an indirect member contains
 stands in that member's hidden-in folder instead. A forker or an
@@ -604,11 +610,12 @@ indirect member N hides stands there, since the forks folder does
 not draw it (nor, so, count it as a member), and removing it there
 unhides it. The note whose hides a compound folder shows is its
 *hider* ('CompoundFolderParties::hider'), and, for the two folders
-under a member as such, the note whose content holds what is hidden
-is its *container* ('CompoundFolderParties::container'): the member
-for the hidden-in and integrated-elsewhere folders, N for the
-hidden-by folder (the integrated-elsewhere folder's "hider" is N,
-whose hides it leaves out). Both read each relationship by the records the skgrepo
+under a member as such that show a hide, the note whose content holds
+what is hidden is its *container* ('CompoundFolderParties::container'):
+the member for the hidden-in folder, N for the hidden-by folder. The
+integrated-elsewhere folder shows no hide and has neither: its goal
+reads the member and N ('note_of_member_as_such'). The hidden-in,
+hidden-by and hidden-outside folders read each relationship by the records the skgrepo
 restriction shows: under a skgrepo narrowing, a hide of H that S
 contains only by a restricted record stands in the hidden-outside
 folder, and a hide recorded in a restricted section stands in
@@ -679,7 +686,7 @@ such": a member of a forks folder that claims (and,
 in the refresh, that the graph warrants). They are not just forkees,
 but they are being shown /as/ forkees. A forkee as such shows its
 content less what the forker contains or hides and what the user
-keeps elsewhere ('less_what_the_note_integrates' in
+keeps elsewhere ('what_the_member_shows' in
 'server/refresh/goal.rs'; see "integrated").
 
 In a content view, under an editable forker, the refresh draws a
@@ -719,7 +726,10 @@ graph says ('docs/forks.org', "Claims in a redrawn view"), so a forker
 as such there is a forker-only member, a note that forks N and that N
 does not fork, or an indirect member, a mirror of N joined to it only
 through others (see "the forks folder"); the messages call either "a
-member claiming nothing". In a buffer the user has edited, it may also be a
+member claiming nothing". The term is named for the commoner case:
+an indirect member need fork nothing of N's (where A forks B and B
+forks C, C is an indirect member of A's forks folder), and is a
+forker as such all the same. In a buffer the user has edited, it may also be a
 forkee the user detached (a pending detachment), until the save ends
 that fork. (A mutual claims, so it stands as a forkee as such.) A
 *member as such* is either a forkee as such or a forker as such: an
@@ -727,10 +737,10 @@ occurrence member of a forks folder. The refresh also asks that it be
 warranted ('note_of_member_as_such'); the save reads its position and
 claim alone, as it cannot know a warrant.
 *What a member shows* of its content, its *unintegrated content*, is
-its content less what N hides, less what N contains, and less what
-any owned note but the member contains, by the records the skgrepo
-restriction shows, in the member's order
-('less_what_the_note_integrates' in 'server/refresh/goal.rs';
+its content that is neither N's own, hidden or contained by N, nor
+integrated, contained by an owned note but the member, by the records
+the skgrepo restriction shows, in the member's order
+('what_the_member_shows' in 'server/refresh/goal.rs';
 'note_of_member_as_such'; see "integrated"); the '(unintegrated
 COUNT ...)' part of its view stats counts it, an indirect member's
 too. What the member contains that the user keeps elsewhere stands in
@@ -824,7 +834,7 @@ and the view showed there, that the buffer no longer shows claiming
 under it, nor in the member's folder of what the user keeps elsewhere
 or of what the note hides in it: a stale buffer may still show a child
 there after another view stopped keeping it, or unhid it, and the
-save reads that child as set aside, not cut. The member's own list
+save reads that child as *set aside*, not cut. The member's own list
 never changes: a cut edits the note
 whose forks folder holds the member. A cut from a forkee hides the
 child in the note unless the note, or a note of the user's graph but
@@ -1205,12 +1215,12 @@ counting down from its root, is the opposite direction.
 A *fork*, bare, is a note that forks another: a *fork of* N is a
 note that forks N (see "clone, and the fork operation" for the
 gesture that makes one, which is always "the fork operation", never
-bare "a fork"). A note's *forks*, as in "its forks", are its fork
-partners, either way: the notes it forks and the notes that fork it.
-So "its forks" is wider than "the forks of it"; where only one
-direction is meant, say "its forkees" or "its forkers", or "what it
-forks". Its forks folder, named for them, holds its indirect members
-too ("the forks folder"). The
+bare "a fork"). A note's *forks*, as in "its forks", are the members
+of its forks folder ("the forks folder"): its fork partners, either
+way, the notes it forks and the notes that fork it, and its indirect
+members. So "its forks" is wider than "the forks of it"; where only
+one direction is meant, say "its forkees" or "its forkers", or "what
+it forks". The
 *mirrors* of N are N and every note joined to N by a path of
 'forks' relationships, followed in either direction, every
 relationship's relRepo and every note's home skgrepo on the path shown
@@ -1225,6 +1235,13 @@ of a skgrepo S ranks a note's mirrors: S first, then every other
 skgrepo in the config's declaration order, whose owned entries run
 most public first ('SkgConfig::perspective_skgrepo_list'). Who owns a
 skgrepo plays no part. It is not a privacy rank, nor the fold order.
+The *user's own skgrepo list* is the skgrepo list of the perspective
+of the user's first owned skgrepo in declaration order, the most
+public (else the first declared:
+'SkgConfig::first_owned_else_first_declared_skgrepo'); it ranks
+search hits that are mirrors of one another ('docs/mirrors.org').
+It is no perspective of a view's, and not the default perspective,
+the root homes.
 
 *** mirror substitution, and the vocabulary around it
 
@@ -1240,7 +1257,7 @@ homes', the tree's root's home skgrepo
 tree of a view switched to it ('Perspective'; Emacs 'C-c v o'). The
 mirror shown may be in any skgrepo: where the perspective's holds no
 mirror of N, the first declared that holds one stands. In its own
-skgrepo N itself stands, however many of its forks are there; so when
+skgrepo N itself stands, however many of its mirrors are there; so when
 the mirror shown is N itself, nothing substitutes. An owned chain D
 forks C forks N, kept in one skgrepo other than N's, shows D there;
 visibility gating can cut the chain, so that a middle node shows.
@@ -1274,13 +1291,14 @@ the root that skgrepo's list ranks first instead, standing for it
 
 *** perspective
 
-A view's *perspective* is a skgrepo, whose skgrepo list ranks the
-mirrors it shows (see "mirror"; 'Perspective'; on the wire
-"perspective", the request "set perspective"): its *root homes*, as
-every fresh view's is (each top-level tree is drawn from the
-perspective of the home skgrepo of the node its root stands for; on
-the wire "root homes"), or one skgrepo's in every tree, owned or
-foreign, its roots included (on the wire "skgrepo NAME"). So a
+A view's *perspective* is one skgrepo, or its root homes, one per
+tree; a skgrepo's list ranks the mirrors each tree shows (see
+"mirror"; 'Perspective'; on the wire "perspective", the request "set
+perspective"): its *root homes*, as every fresh view's is (each
+top-level tree is drawn from the perspective of the home skgrepo of
+the node its root stands for; on the wire "root homes"), or one
+skgrepo's in every tree, owned or foreign, its roots included (on the
+wire "skgrepo NAME"). So a
 private and a public fork of one note can each be chosen. 'C-c v o'
 (Neovim '<localleader>vo') cycles a view through the root homes and
 then each skgrepo home to a mirror in the view whose perspective
@@ -1489,6 +1507,15 @@ showing overPrivateText in a view, which is the text-release
 approval's separate question (see "overPrivateText"). See
 [[file:./telescopes.org][privacy telescopes]] for the invariant the
 repair restores.
+
+*** declaration order
+
+The *declaration order* is the order in which the config lists every
+skgrepo, owned and foreign ('SkgConfig::skgrepos_in_declaration_order',
+'SkgConfig::declaration_rank'). Its owned entries are the privacy
+order (see "privacy order and relRepo"), and the fold order of a
+foreign node permutes its foreign ones. A user's *first-declared*
+owned skgrepo is the first owned one in it, the most public.
 
 *** privacy order and relRepo
 

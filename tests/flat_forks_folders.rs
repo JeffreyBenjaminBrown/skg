@@ -1,9 +1,9 @@
 // cargo nextest run --test grouped_forks -E 'test(flat_forks_folders::)'
 //
 // Flat forks folders ('docs/forks.org', "Every mirror, flat"): a note's
-// forks folder lists every mirror of it, each once, its direct fork
+// forks folder lists every mirror of it, each once, its fork
 // partners first, then its indirect members ('docs/glossary.org',
-// "direct member, indirect member"), which claim nothing; no member
+// "the forks folder"), which claim nothing; no member
 // shows a forks folder unless asked.
 // The fixture: "main" (owned) is declared before "theirs" (foreign).
 // A, in main, contains a1, forks B and hides d2. B, in main, contains

@@ -480,9 +480,9 @@ Each node a forksFolder holds that the node does not fork (a forker
 as such, claiming nothing: one that forks the node, =Kb=, or an
 indirect member, a mirror of the node joined to it only through
 others, with no 'b' flag) is drawn the same way: editable unless a
-repeat or past the budget, showing what it adds to the node's content
-(its content less what the node contains or hides, and less what
-another node you own contains), with its own folders. Under it,
+repeat or past the budget, showing what a member shows (its content
+less what the node contains or hides, and less what another node you
+own contains), with its own folders. Under it,
 first, stands the folder of what it contains that you keep elsewhere,
 then the folder of what the node hides of its content ("☮ It
 contains these, but c hides them."), then,
@@ -1104,7 +1104,7 @@ Otherwise it stamps the node and auto-saves; the server returns
 the usual fork-confirmation buffer (=skg://fork-confirmation=).
 There you must set the clone's skgrepo with 'SetRepo'
 (<localleader>ss) (it starts as the placeholder PICK-A-REPO,
-with your config-first owned skgrepo suggested above it), then
+with your first-declared owned skgrepo suggested above it), then
 approve with <localleader>cc; or decline with <localleader>ck
 (which also strips the fork request so the next save does not
 re-fork). ':w' on the fork-confirmation buffer refuses and points
@@ -1364,8 +1364,8 @@ buffer, and refuses while it has unsaved edits.
 
 Where a node stands as another's content and it has mirrors (notes
 joined to it by forks, either way), a view may show one of its mirrors
-in its place. A perspective is a skgrepo: from it, a node shows its
-mirror in that skgrepo, the node itself if it is homed there, else the
+in its place. A perspective is one skgrepo, or the root homes, one per
+tree: from a skgrepo, a node shows its mirror in that skgrepo, the node itself if it is homed there, else the
 mirror in the skgrepo the config declares first. A fresh view is drawn
 from its root homes: each tree from its root's home skgrepo,
 throughout the tree, so a view of your note shows your mirrors where

@@ -221,8 +221,8 @@ fn visit_occurrence (
           // forksFolder; without this guard those could emit
           // contradictory hide edits for one ID.
           let visible : Vec<ID> = visible_content_members (node_ref);
-          let in_kept_or_hidden_folder : Vec<ID> =
-            members_of_kept_and_hidden_folders (node_ref);
+          let in_integratedElsewhere_or_hiddenIn_folder : Vec<ID> =
+            members_of_integratedElsewhere_and_hiddenIn_folders (node_ref);
           collected . instructionMerge_fieldIntent (
             &headline,
             note . clone(),
@@ -230,12 +230,12 @@ fn visit_occurrence (
               FieldIntent::ForkeeVisibility (
                 ForkeeVisibility {
                   forkee : t . gnid . clone(),
-                  visible, in_kept_or_hidden_folder } )
+                  visible, in_integratedElsewhere_or_hiddenIn_folder } )
             } else {
               FieldIntent::ForkerVisibility (
                 ForkerVisibility {
                   forker_as_such : t . gnid . clone(),
-                  visible, in_kept_or_hidden_folder } ) } ) ?; }
+                  visible, in_integratedElsewhere_or_hiddenIn_folder } ) } ) ?; }
         // Delete, NodeMerge and flag edit requests here are
         // ignored: a member as such can affect only its own title
         // and body (when owned), what the note hides, and, by a
@@ -605,7 +605,7 @@ fn visible_content_members (
 /// not cut from the member, even where the graph changed since the
 /// buffer was drawn (another view stopped keeping it, or unhid it):
 /// the save reads what the buffer showed ('resolve_visibility').
-fn members_of_kept_and_hidden_folders (
+fn members_of_integratedElsewhere_and_hiddenIn_folders (
   node_ref : NodeRef<Viewnode>,
 ) -> Vec<ID> {
   node_ref . children ()

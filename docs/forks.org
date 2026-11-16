@@ -40,7 +40,7 @@ names one owned skgrepo (see "Adding new content", below) — the
 clone-to-be shows that skgrepo, settled, and you are not asked again.
 Otherwise its skgrepo starts as the placeholder =PICK-A-REPO=, with a
 suggested skgrepo noted just above it (the inferred skgrepo for a
-foreign fork, or your config-first owned skgrepo otherwise), and the
+foreign fork, or your first-declared owned skgrepo otherwise), and the
 client *prompts you to choose* for each such clone — the suggestion
 is the prompt's default; =S-left= / =S-right= cycle the skgrepos you own.
 You can also set a skgrepo by hand: point on the clone-to-be headline,
@@ -105,7 +105,7 @@ you own. =C=:
 your edit, or picked at the prompt (see above). When nothing specified
 it, the /suggestion/ is the skgrepo *inferred* from =N='s nearest
 owned ancestor in the view, or, with no owned ancestor, your
-config-first owned skgrepo. So a foreign node with no owned ancestor
+first-declared owned skgrepo. So a foreign node with no owned ancestor
 still forks — it just suggests a default you confirm or change. The
 fork can only fail for lack of a skgrepo if you own *no* skgrepo at
 all. (The inference takes =N='s /immediate/ owned container, never a
@@ -134,7 +134,7 @@ Two differences from the implicit fork:
 - The original is *yours*, so it is /not/ dropped — your edits to it
   still save normally; the gesture only /adds/ the clone that forks
   it.
-- The *suggested* skgrepo is your *config-first* owned skgrepo (the
+- The *suggested* skgrepo is your *first-declared* owned skgrepo (the
   first =[[repos]]= you own in =skgconfig.toml=), since there is no
   foreign ancestor to infer from.
 

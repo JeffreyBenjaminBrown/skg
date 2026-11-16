@@ -658,29 +658,23 @@ impl SkgConfig {
       . unwrap_or (false)
   }
 
-  /// The owned skgrepo names in privacy order, most public first: the
-  /// privacy ladder (see 'privacy_ladder').
-  pub fn owned_skgrepos_in_config_order (
+  /// The owned skgrepo names in declaration order, which is privacy
+  /// order, most public first: the privacy ladder (see
+  /// 'privacy_ladder').
+  pub fn owned_skgrepos_in_declaration_order (
     &self,
   ) -> Vec<SkgrepoName> {
     self . privacy_ladder () }
 
   /// The default owned skgrepo for a fork's clone when its skgrepo could
-  /// not be inferred or user-set: the user's config-first owned skgrepo
-  /// (matching the Emacs client's 'skg--default-repo', which is
-  /// TOML-first). None only when the user owns no skgrepo at all -- the
-  /// one case 'ForkRepoUnresolved' still fires.
-  pub fn first_owned_skgrepo_in_config_order (
+  /// not be inferred or user-set: the user's first-declared owned
+  /// skgrepo (matching the Emacs client's 'skg--default-repo', which
+  /// is TOML-first). None only when the user owns no skgrepo at all --
+  /// the one case 'ForkRepoUnresolved' still fires.
+  pub fn first_owned_skgrepo_in_declaration_order (
     &self,
   ) -> Option<SkgrepoName> {
-    self . owned_skgrepos_in_config_order () . into_iter () . next () }
-
-  /// Backwards-compatible name for the config-first owned skgrepo
-  /// default; see 'first_owned_repo_in_config_order'.
-  pub fn first_owned_skgrepo (
-    &self,
-  ) -> Option<SkgrepoName> {
-    self . first_owned_skgrepo_in_config_order () }
+    self . owned_skgrepos_in_declaration_order () . into_iter () . next () }
 
   /// Every skgrepo name in declaration order, or alphabetical when
   /// declaration order is unavailable (a dummy/test config, whose
@@ -766,14 +760,17 @@ impl SkgConfig {
     declared . iter () . position ( |name| name == skgrepo )
       . unwrap_or ( declared . len () ) }
 
-  /// The skgrepo whose perspective stands where nothing names one: the
-  /// first owned skgrepo in declaration order (the most public), else
-  /// the first skgrepo declared, else none (an empty name, holding
-  /// nothing).
-  pub fn default_perspective_skgrepo (
+  /// The first owned skgrepo in declaration order (the most public),
+  /// else the first skgrepo declared, else none (an empty name, holding
+  /// nothing): the home a view reads for a root the graph does not know
+  /// ('perspective_skgrepo_of_tree_containing'), and the skgrepo whose
+  /// perspective's skgrepo list is the user's own skgrepo list, which
+  /// ranks search hits ('docs/glossary.org', "perspective"). Neither is
+  /// the default perspective, the root homes.
+  pub fn first_owned_else_first_declared_skgrepo (
     &self,
   ) -> SkgrepoName {
-    self . first_owned_skgrepo_in_config_order ()
+    self . first_owned_skgrepo_in_declaration_order ()
       . or_else ( || self . skgrepos_in_declaration_order () . into_iter () . next () )
       . unwrap_or_default () }
 

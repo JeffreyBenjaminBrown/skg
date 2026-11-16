@@ -122,7 +122,7 @@ fn forkee_as_such_emits_claim_and_visibility () {
       vec![ ForkeeVisibility {
         forkee     : ID::from ("e"),
         visible    : vec![ID::from ("visible")],
-        in_kept_or_hidden_folder : vec![] } ]);
+        in_integratedElsewhere_or_hiddenIn_folder : vec![] } ]);
     assert_eq!( forker . forks,
                 Some (vec![(ID::from ("e"), None)]) ); }
   { // Ordinary editable children of a forkee-as-such still
@@ -156,7 +156,7 @@ fn foreign_forkee_as_such_emits_a_text_claim () {
     vec![ ForkeeVisibility {
       forkee     : ID::from ("e"),
       visible    : vec![ID::from ("visible")],
-      in_kept_or_hidden_folder : vec![] } ]); }
+      in_integratedElsewhere_or_hiddenIn_folder : vec![] } ]); }
 
 #[test]
 fn aliasfolder_under_forkee_as_such_emits_nothing () {
@@ -222,7 +222,7 @@ fn forker_as_such_emits_its_text_and_visibility_but_no_contains () {
                 vec![ ForkerVisibility {
                   forker_as_such : ID::from ("forker"),
                   visible : vec![ID::from ("forker-child")],
-                  in_kept_or_hidden_folder : vec![] } ]);
+                  in_integratedElsewhere_or_hiddenIn_folder : vec![] } ]);
     assert!( recorder . forkee_visibility . is_empty () ); }
   { // Its editable children emit their own instructions.
     let child : &FieldIntentsForOneId = entry (&collected, "forker-child");

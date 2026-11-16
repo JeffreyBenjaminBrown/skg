@@ -33,7 +33,7 @@
   "Config text with three owned repos, in this declared order:
 public, private, trusted. (The names don't need to reflect an actual
 privacy order for these tests -- only that `skg--repo-names'
-returns them in this config order, which is all the client-side menu
+returns them in this declaration order, which is all the client-side menu
 depends on; the server enforces the real floor at save.)")
 
 (defun test--with-skg-content-view (org-text config-text body-fn)

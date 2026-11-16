@@ -139,7 +139,7 @@ pub struct CloneSkgrepoInputs {
   pub user_set          : HashMap<ID, SkgrepoName>, // What the user chose in the confirmation buffer, riding back on the approve re-save's fork-repos field.
   pub explicit_child    : HashMap<ID, SkgrepoName>, // What the saved metadata already specified, via explicit skgrepos on N's new children ('explicit_new_child_repos_for_foreign_vognodes').
   pub inferred_ancestor : HashMap<ID, SkgrepoName>, // N's nearest owned ancestor in the view ('owned_ancestor_repos_for_foreign_vognodes') -- always unrestricted.
-  pub default           : Option<SkgrepoName>,      // The caller's active-aware config-first owned skgrepo.
+  pub default           : Option<SkgrepoName>,      // The caller's active-aware first-declared owned skgrepo.
 }
 
 /// Build the ForkSpec for a fork of the foreign buffer node N,

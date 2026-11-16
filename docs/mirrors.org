@@ -111,7 +111,8 @@ special case.
 Where =N= stands as content of an editable occurrence in a content
 view, or as a root of it, the refresh shows the mirror of =N= that
 the perspective's skgrepo list ranks first ('mirror_shown').  A
-perspective is a skgrepo =S= (see "Perspectives"), and its list
+perspective is one skgrepo =S=, or the root homes, one per tree (see
+"Perspectives"), and the list of =S=
 ('SkgConfig::perspective_skgrepo_list') is =S=, then every other
 skgrepo in the config's declaration order, whose owned entries run
 most public first.  The mirror shown is the one whose home skgrepo
@@ -148,8 +149,9 @@ itself.
 
 *** Perspectives
 
-A view's perspective is a skgrepo.  Until the user chooses one, each
-top-level tree of the view is drawn from its root's home skgrepo, the
+A view's perspective is one skgrepo, or its root homes, one skgrepo
+per tree.  Until the user chooses a skgrepo, each top-level tree of
+the view is drawn from its root's home skgrepo, the
 /root homes/ ('perspective_skgrepo_of_tree_containing'): the home of
 the node the root stands for (its =(inPlaceOf N)=, else itself),
 throughout the tree, beneath notes homed elsewhere too.  So a view

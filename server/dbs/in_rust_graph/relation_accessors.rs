@@ -32,7 +32,7 @@ pub enum NodeRelation {
   Contains,
   LinksTo,
   Forks, // "forker forks forkee": the forker shows the forkee's content it neither contains nor hides, and the two are mirrors ('server/dbs/in_rust_graph/mirrors.rs').
-  Hides, // "hides from its forks": the hider keeps the hidden node out of what it shows of every fork partner its forks folder shows ('fork_partners_shown').
+  Hides, // "hides from its forks": the hider keeps the hidden node out of what it shows of every member its forks folder shows ('forks_folder_members_shown').
 }
 
 /// The ordinary relations of the update-relevant neighborhood

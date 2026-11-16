@@ -111,7 +111,7 @@ pub struct ForksFolderMembers {
 pub struct ForkeeVisibility {
   pub forkee     : ID,
   pub visible    : Vec<ID>, // These are the nodes *not* to hide.
-  pub in_kept_or_hidden_folder : Vec<ID>, // what the buffer shows in the forkee's folder of what the user keeps elsewhere, or of what the forker hides in it: set aside there, not cut
+  pub in_integratedElsewhere_or_hiddenIn_folder : Vec<ID>, // what the buffer shows in the forkee's folder of what the user keeps elsewhere, or of what the forker hides in it: set aside there, not cut
 }
 
 /// This is an unresolved signal: the buffer presents 'visible' as
@@ -128,7 +128,7 @@ pub struct ForkeeVisibility {
 pub struct ForkerVisibility {
   pub forker_as_such : ID,
   pub visible    : Vec<ID>, // These are the nodes *not* cut.
-  pub in_kept_or_hidden_folder : Vec<ID>, // what the buffer shows in the forker's folder of what the user keeps elsewhere, or of what the note hides in it: set aside there, not cut
+  pub in_integratedElsewhere_or_hiddenIn_folder : Vec<ID>, // what the buffer shows in the forker's folder of what the user keeps elsewhere, or of what the note hides in it: set aside there, not cut
 }
 
 /// The explicitly submitted visible-outside subset for one hider.

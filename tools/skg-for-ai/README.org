@@ -199,8 +199,9 @@ skgrepo (the words may be given apart or quoted together).
 Where a node stands as content and it has mirrors (notes joined to
 it by forks, either way: 'docs/mirrors.org', "Mirrors"), the view may
 show one of its mirrors in its place, marked 'ĥ' after its 'K'
-('⟨0b Kĥ1⟩'). The perspective is a skgrepo, whose skgrepo list (it,
-then the config's declaration order) ranks the mirrors: a fresh view
+('⟨0b Kĥ1⟩'). The perspective is one skgrepo, or the root homes, one
+per tree; a skgrepo's list (it, then the config's declaration order)
+ranks the mirrors: a fresh view
 follows each tree's root's home skgrepo, the root homes (a view of
 your note, your note's skgrepo; of a teammate's, theirs); the others
 follow one skgrepo's in every tree, owned or foreign, whatever the
@@ -1285,12 +1286,12 @@ Hides nothing: 'Contained twice' left 'Second child, a forker', but it is no con
 'Hides' and 'Stops hiding' name what the save adds to or takes from
 a note's hides, and the member of its forks folder (a note it forks,
 or a forker or other mirror it does not hide) whose content holds it. 'Hides nothing:' is a child
-that left a note with such a fork partner without hiding anything,
-and the rule that kept it from hiding: it is no content of the
-partners and a mirror of none of it,
+that left a note with such a member without hiding anything,
+and the rule that kept it from hiding: it is no content of those
+members and a mirror of none of it,
 or what it stands for was hidden already, or is still contained, or
 the same save shows it in the forks folder, or another node you own
-keeps it ("but 'Y' keeps it"), so that no partner shows it. A removal from a note
+keeps it ("but 'Y' keeps it"), so that no member of the forks folder shows it. A removal from a note
 that forks nothing prints no line. Every word is the
 server's ('docs/api-and-formats.org', "Save buffer"). When the server
 would refuse the save, the report says so, with its errors, and the
@@ -1397,8 +1398,9 @@ of it."
 Placed in an editable folder of a 'forest' view, a node joins that
 folder's relation instead: in the forks folder ('forest forks ID')
 the folder's node forks it. Under a forkee as such, the forked node
-in that folder, stand its children the forker has not integrated:
-neither contains, nor hides, nor keeps in another node you own;
+in that folder, stand its unintegrated children: those the forker
+neither contains nor hides, and that you keep in no other node you
+own;
 those you keep elsewhere stand first, folded, under "☮ It contains
 these, and you keep them elsewhere.", each with the folder of its
 containers ('docs/forks.org', "What you keep elsewhere"). Removing
@@ -1409,8 +1411,9 @@ note that forks the folder's node, and that it does not fork, stands
 there claiming nothing; removing it hides it in the folder's node.
 So does each other mirror of the folder's node, joined to it only
 through others (an indirect member): claiming nothing, and removing
-it hides it there too. Under either, a forker as such, stands what it
-adds to the folder's node's content; removing one of those makes the
+it hides it there too. Under either, a forker as such, stands what a
+member shows: its content less what the folder's node contains or
+hides and what you keep in another node; removing one of those makes the
 folder's node fork it, and hides the child unless the node, or another
 node you own, contains it after the save.
 A node placed under a forkee or forker as such joins that member's

@@ -3,7 +3,7 @@ use crate::dbs::node_lookup::{graphnode_by_gnid, opt_graphnode_by_gnid};
 use crate::from_text::local_fieldintent_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
 use crate::from_text::local_fieldintent_collection::types::CollectedFieldIntents;
-use crate::refresh::goal::{fork_partners_shown, owned_notes_containing};
+use crate::refresh::goal::{forks_folder_members_shown, owned_notes_containing};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::save::{NodeMerge, SaveNode, DeleteNode};
 use crate::types::misc::{MSV, RelPartner, SkgConfig, SkgrepoName, ID, members_of, rel_partners_at_relRepo};
@@ -77,10 +77,10 @@ fn nodeMerge_from_acquirer_and_acquiree (
     // so these ids are dropped from the combined
     // hides below.
     let mut shown : HashSet<ID> =
-      gnids_shown_through_fork_partners (
+      gnids_shown_through_forks_folder_members (
         &acquirer_from_disk, graph, config ) ?;
     shown . extend (
-      gnids_shown_through_fork_partners (
+      gnids_shown_through_forks_folder_members (
         &acquiree_from_disk, graph, config ) ? );
     shown };
   let updated_acquirer : Graphnode =
@@ -226,17 +226,17 @@ fn three_nodeMerged_graphnodes(
       MSV::Specified (combined); }
   Ok (updated_acquirer) }
 
-/// The ids 'node' shows as unintegrated content of its fork
-/// partners: contained by some fork partner its forks folder shows
-/// ('fork_partners_shown': a node it forks, or one forking it, or
-/// another mirror of it, that it does not hide), neither hidden by it
-/// nor among its own contents,
-/// and contained by no owned note but that partner
+/// The ids 'node' shows as unintegrated content of the members of
+/// its forks folder: contained by some member its forks folder shows
+/// ('forks_folder_members_shown': a node it forks, or one forking it,
+/// or another mirror of it, that it does not hide), neither hidden by
+/// it nor among its own contents,
+/// and contained by no owned note but that member
 /// ('owned_notes_containing'; 'docs/glossary.org', "what a member
 /// shows"). Every record counts, since a nodeMerge is built from the
 /// graph, not from what a view drew. A partner with no disk entry
 /// contributes nothing.
-fn gnids_shown_through_fork_partners (
+fn gnids_shown_through_forks_folder_members (
   node   : &Graphnode,
   graph  : &InRustGraph,
   config : &SkgConfig,
@@ -247,7 +247,7 @@ fn gnids_shown_through_fork_partners (
   let contains : Vec<ID> =
     members_of ( & node . contains );
   let unrestricted : SkgrepoRestriction = SkgrepoRestriction::unrestricted (config);
-  for partner_gnid in fork_partners_shown (
+  for partner_gnid in forks_folder_members_shown (
     graph, &unrestricted, &node . pid,
     &members_of ( node . forks . or_default () ))
   { let Some (partner) = opt_graphnode_by_gnid (
@@ -372,6 +372,6 @@ mod flag_tests {
     let graph : InRustGraph = InRustGraph::from_graphnodes (
       &[ a . clone (), f, g, owned ("x"), owned ("y"), owned ("z") ] );
     assert_eq! (
-      gnids_shown_through_fork_partners (&a, &graph, &config ()) . unwrap (),
+      gnids_shown_through_forks_folder_members (&a, &graph, &config ()) . unwrap (),
       HashSet::from ([ ID::from ("y") ]) ); }
 }

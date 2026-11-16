@@ -30,7 +30,7 @@
 //! too.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::mirrors::{Mirror, mirrors_of_note_forking};
+use crate::dbs::in_rust_graph::mirrors::{Mirror, mirrors_of_note_with_forkees};
 use crate::dbs::in_rust_graph::relation_accessors::{GnidPresence, NodeRelation, RelationRole};
 use crate::graph_straddle::types::Partner;
 use crate::refresh::Walk;
@@ -282,7 +282,7 @@ fn content_goal (
   let unintegrated : &dyn Fn (Vec<ID>) -> Vec<ID> = &|contents : Vec<ID>| -> Vec<ID> {
     // The diff view draws no folder of what the user keeps
     // elsewhere, so there a member keeps it among its content.
-    less_what_the_note_integrates (
+    what_the_member_shows (
       graph, config, restriction, pid, note . as_ref (), &contents,
       ! walk . is_diff_view () ) };
   if let Some (goal) = diff_view::content_goal (pid, unintegrated, walk) {
@@ -318,7 +318,7 @@ pub(crate) fn content_goal_gnids (
   let contents : Vec<ID> = members . iter ()
     . map ( |member| member . member . id () . clone () )
     . collect ();
-  less_what_the_note_integrates (
+  what_the_member_shows (
     graph, config, restriction, member, note, &contents, kept_elsewhere_counts ) }
 
 /// 'contents', the content of 'member', less what 'note' hides or
@@ -328,7 +328,7 @@ pub(crate) fn content_goal_gnids (
 /// note's forks folder shows of its content ('docs/glossary.org',
 /// "what a member shows"), whichever role the member plays there. All
 /// of 'contents' when there is no note.
-fn less_what_the_note_integrates (
+fn what_the_member_shows (
   graph                 : &InRustGraph,
   config                : &SkgConfig,
   restriction           : &SkgrepoRestriction,
@@ -693,9 +693,9 @@ pub(crate) fn forker_only_members (
     . collect () }
 
 /// The indirect members of the forks folder describing 'described'
-/// ('docs/glossary.org', "direct member, indirect member"): its
+/// ('docs/glossary.org', "the forks folder"): its
 /// mirrors under the skgrepo restriction, were the notes it forks
-/// those 'forkees' names ('mirrors_of_note_forking'), less itself,
+/// those 'forkees' names ('mirrors_of_note_with_forkees'), less itself,
 /// its fork partners (those 'forkees' names and those forking it) and
 /// those it hides by records the skgrepo restriction shows, nearest
 /// first. A mirror reached only through a note it hides is still one:
@@ -717,7 +717,7 @@ pub(crate) fn indirect_members (
       graph ))
     . chain ( once (described_pid) )
     . collect ();
-  mirrors_of_note_forking (graph, restriction, described, forkees)
+  mirrors_of_note_with_forkees (graph, restriction, described, forkees)
     . members . into_iter ()
     . filter ( |mirror| ! left_out . contains (&mirror . pid) )
     . collect () }
@@ -727,11 +727,11 @@ pub(crate) fn indirect_members (
 /// the caller reads as the view drew them or as a save leaves them),
 /// each resolved to its pid, then its forker-only members
 /// ('forker_only_members'), then its indirect members
-/// ('indirect_members'). These are the partners that explain a hide
+/// ('indirect_members'). These are the members that explain a hide
 /// of the note's ('docs/glossary.org', "hides"): what one of them
 /// contains, the view draws under it, and the note's hide of it
 /// stands there.
-pub(crate) fn fork_partners_shown (
+pub(crate) fn forks_folder_members_shown (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
   note        : &ID,
@@ -784,7 +784,7 @@ pub(crate) fn partnerFolder_members_in_graph (
       . into_iter ()
       . map ( |member| member . member . into_id () )
       . collect ();
-    return Some ( fork_partners_shown (
+    return Some ( forks_folder_members_shown (
       graph, skgrepo_restriction, viewparent_pid, &forkees )); }
   let member_role : RelationRole = kind . relation_member_role () ?;
   let recorder_role : RelationRole =
@@ -854,7 +854,7 @@ fn goal_list_for_hiddenInForkPartner_folder (
 /// folder 'HiddenOutsideOfForkPartners', in the order of its hides
 /// list. Its fork partners are the members its forks folder shows,
 /// forkees, forkers and indirect members alike
-/// ('fork_partners_shown'): a hide one of
+/// ('forks_folder_members_shown'): a hide one of
 /// them contains stands under that member instead, in its folder of
 /// what the note hides in it. A partner's content is read by the same
 /// records, so a hide of something a partner contains only by a
@@ -869,7 +869,7 @@ pub(crate) fn hidden_outside_of_fork_partners (
     graph,
     &graph . outbound_gnids_for_relation_gated (
       note, NodeRelation::Hides, restriction ),
-    &fork_partners_shown (
+    &forks_folder_members_shown (
       graph, restriction, note,
       &graph . outbound_gnids_for_relation_gated (
         note, NodeRelation::Forks, restriction )),

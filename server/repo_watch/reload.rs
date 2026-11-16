@@ -48,7 +48,7 @@ pub struct RepoChangeNotice {
   /// The nodes the batch wrote to or deleted from the graph, or whose
   /// illegal edits it changed.
   pub changed_pids : HashSet<ID>,
-  /// For each skgrepo, in config order, how many of its files the
+  /// For each skgrepo, in declaration order, how many of its files the
   /// batch reloaded.
   pub files_reloaded : Vec<(SkgrepoName, usize)>,
   /// What could not be reloaded.

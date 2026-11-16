@@ -472,7 +472,7 @@ fn forkee_hiderel_intent_collects_visible_content (
        ForkeeVisibility {
          forkee     : ID::from ("forkee"),
          visible    : vec![ID::from ("a"), ID::from ("b")],
-         in_kept_or_hidden_folder : vec![],
+         in_integratedElsewhere_or_hiddenIn_folder : vec![],
        })]); }
 
 #[test]
@@ -495,13 +495,13 @@ fn forkee_hiderel_intents_preserve_forkee_tree_order (
          ForkeeVisibility {
            forkee     : ID::from ("first"),
            visible    : vec![ID::from ("first-child")],
-           in_kept_or_hidden_folder : vec![],
+           in_integratedElsewhere_or_hiddenIn_folder : vec![],
          }),
       (ID::from ("forker"),
          ForkeeVisibility {
            forkee     : ID::from ("second"),
            visible    : vec![ID::from ("second-child")],
-           in_kept_or_hidden_folder : vec![],
+           in_integratedElsewhere_or_hiddenIn_folder : vec![],
          })]); }
 
 #[test]
@@ -522,7 +522,7 @@ fn forkee_hiderel_intent_uses_only_children (
        ForkeeVisibility {
          forkee     : ID::from ("forkee"),
          visible    : vec![ID::from ("child")],
-         in_kept_or_hidden_folder : vec![],
+         in_integratedElsewhere_or_hiddenIn_folder : vec![],
        })]); }
 
 #[test]
@@ -583,7 +583,7 @@ fn forkee_hiderel_intent_excludes_non_content_delete_and_ghost_children (
        ForkeeVisibility {
          forkee     : ID::from ("forkee"),
          visible    : vec![ID::from ("keep")],
-         in_kept_or_hidden_folder : vec![],
+         in_integratedElsewhere_or_hiddenIn_folder : vec![],
        })]); }
 
 #[test]
@@ -612,7 +612,7 @@ fn forkee_hiderel_intent_ignores_hidden_folder_contents (
        ForkeeVisibility {
          forkee     : ID::from ("forkee"),
          visible    : vec![ID::from ("visible")],
-         in_kept_or_hidden_folder : vec![ID::from ("kept"), ID::from ("hidden-in")],
+         in_integratedElsewhere_or_hiddenIn_folder : vec![ID::from ("kept"), ID::from ("hidden-in")],
        })]); }
 
 #[test]
