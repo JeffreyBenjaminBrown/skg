@@ -47,7 +47,6 @@ use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::forest::in_content_position;
 use crate::types::viewnode::{
   Existence, Folder, PropertyMember, Viewnode, ViewnodeKind, Vognode, Warrant};
-use crate::util::setlike_vector_subtraction;
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -267,7 +266,7 @@ pub(crate) fn chain_goal (
       pid, NodeRelation::Contains, walk . truth . restriction );
   Goal::unordered ( gnid_items (containers, &HashMap::new ())) }
 
-/// An occurrence's content ('content_goal_gnids'), with the relRepo
+/// An occurrence's content ('what_the_member_shows'), with the relRepo
 /// of each unknown or restricted member.
 fn content_goal (
   tree   : &Tree<Viewnode>,
@@ -293,42 +292,23 @@ fn content_goal (
   let relRepos : HashMap<ID, SkgrepoName> =
     unknown_or_restricted_members_relRepos (graph, restriction, pid, &members);
   Goal::ordered ( gnid_items (
-    content_goal_gnids ( graph, config, restriction, pid, &members, note . as_ref (), true ),
+    unintegrated ( members . iter ()
+                   . map ( |member| member . member . id () . clone () )
+                   . collect () ),
     &relRepos )) }
-
-/// The content the occurrence of 'member' shows: the members of its
-/// 'contains' list whose records the skgrepo restriction shows
-/// ('members', gated, a raw ID where nothing answers), less what
-/// 'note' hides or contains and, where 'kept_elsewhere_counts' (outside
-/// the diff view, which draws no folder of it), what the user keeps
-/// elsewhere, when the occurrence is a member as such of the note's
-/// forks folder (a forkee or forker as such). The restricted members
-/// among them are drawn as Restricted vognodes. The stats pass counts
-/// a member's unintegrated content from it, so that the count is what
-/// is drawn.
-pub(crate) fn content_goal_gnids (
-  graph                 : &InRustGraph,
-  config                : &SkgConfig,
-  restriction           : &SkgrepoRestriction,
-  member                : &ID,
-  members               : &[RelPartner<RelationshipMemberKey>],
-  note                  : Option<&ID>,
-  kept_elsewhere_counts : bool,
-) -> Vec<ID> {
-  let contents : Vec<ID> = members . iter ()
-    . map ( |member| member . member . id () . clone () )
-    . collect ();
-  what_the_member_shows (
-    graph, config, restriction, member, note, &contents, kept_elsewhere_counts ) }
 
 /// 'contents', the content of 'member', less what 'note' hides or
 /// contains and, where 'kept_elsewhere_counts', less what an owned
 /// note but 'member' contains ('owned_notes_containing'), as the truth
-/// has it ('unintegrated_content_gnids'): what a member as such of the
-/// note's forks folder shows of its content ('docs/glossary.org',
-/// "what a member shows"), whichever role the member plays there. All
-/// of 'contents' when there is no note.
-fn what_the_member_shows (
+/// has it: what a member as such of the note's forks folder shows of
+/// its content ('docs/glossary.org', "what a member shows"),
+/// whichever role the member plays there. All of 'contents' when
+/// there is no note. The restricted members among them are drawn as
+/// Restricted vognodes. The stats pass counts a member's unintegrated
+/// content from it, so that the count is what is drawn. 'contents'
+/// keep their raw IDs; extra IDs are resolved before comparing
+/// membership, without substituting mirrors.
+pub(crate) fn what_the_member_shows (
   graph                 : &InRustGraph,
   config                : &SkgConfig,
   restriction           : &SkgrepoRestriction,
@@ -339,37 +319,21 @@ fn what_the_member_shows (
 ) -> Vec<ID> {
   let Some (note) : Option<&ID> = note
     else { return contents . to_vec (); };
-  unintegrated_content_gnids (
-    graph, contents,
-    &graph . outbound_gnids_for_relation_gated (
-      note, NodeRelation::Hides, restriction ),
-    &graph . outbound_gnids_for_relation_gated (
-      note, NodeRelation::Contains, restriction ),
-    &|gnid : &ID| -> bool {
-      kept_elsewhere_counts
-      && ! owned_notes_containing (
-             graph, config, restriction, gnid,
-             from_ref (member), None ) . is_empty () } ) }
-
-/// What a member as such shows of its content: its content less
-/// what the note whose forks folder holds it hides or contains, and
-/// less what 'kept_elsewhere' says the user keeps in another owned
-/// note. Inputs preserve raw IDs; extra IDs are resolved before
-/// comparing membership, without substituting mirrors.
-fn unintegrated_content_gnids (
-  graph               : &InRustGraph,
-  content_gnids      : &[ID],
-  note_hides          : &[ID],
-  note_contains       : &[ID],
-  kept_elsewhere      : &dyn Fn (&ID) -> bool,
-) -> Vec<ID> {
-  let contents : Vec<ID> = resolve_all (content_gnids, graph);
-  let hidden : Vec<ID> = resolve_all (note_hides, graph);
-  let contained : Vec<ID> = resolve_all (note_contains, graph);
-  setlike_vector_subtraction (
-    setlike_vector_subtraction (contents, &hidden), &contained)
+  let hidden_or_contained : HashSet<ID> =
+    resolve_all (
+      &graph . outbound_gnids_for_relation_gated (
+        note, NodeRelation::Hides, restriction ), graph )
     . into_iter ()
-    . filter ( |gnid| ! kept_elsewhere (gnid) )
+    . chain ( resolve_all (
+      &graph . outbound_gnids_for_relation_gated (
+        note, NodeRelation::Contains, restriction ), graph ))
+    . collect ();
+  resolve_all (contents, graph) . into_iter ()
+    . filter ( |gnid| ! hidden_or_contained . contains (gnid)
+                      && ! ( kept_elsewhere_counts
+                             && ! owned_notes_containing (
+                                    graph, config, restriction, gnid,
+                                    from_ref (member), None ) . is_empty () ))
     . collect () }
 
 /// The notes a save writes, as the question which owned notes
@@ -494,18 +458,6 @@ pub(crate) fn note_of_member_as_such (
     return None; }
   folder . parent () ? . value () . occurrence_gnid () . cloned () }
 
-/// When the occurrence at 'treeid' is a forker as such (a member as
-/// such claiming nothing, 'note_of_member_as_such': a forker-only or
-/// an indirect member), the note whose forks folder holds it.
-pub(crate) fn note_of_forker_as_such (
-  tree   : &Tree<Viewnode>,
-  treeid : NodeId,
-) -> Option<ID> {
-  let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) : &ViewnodeKind =
-    &tree . get (treeid) ? . value () . kind else { return None; };
-  if occurrence . claimsMembership { return None; }
-  note_of_member_as_such (tree, treeid) }
-
 /// When the occurrence at 'treeid' is a forker as such that forks the
 /// note whose forks folder holds it, by a record the skgrepo
 /// restriction shows, that note: where the folder of what it hides of
@@ -517,8 +469,11 @@ pub(crate) fn note_forked_by_forker_as_such (
   treeid : NodeId,
   walk   : &Walk,
 ) -> Option<ID> {
-  let note : ID = note_of_forker_as_such (tree, treeid) ?;
-  let forker : ID = tree . get (treeid) ? . value () . occurrence_gnid () ? . clone ();
+  let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) : &ViewnodeKind =
+    &tree . get (treeid) ? . value () . kind else { return None; };
+  if occurrence . claimsMembership { return None; } // A forker as such claims nothing; a mutual claims.
+  let note : ID = note_of_member_as_such (tree, treeid) ?;
+  let forker : ID = occurrence . gnid . clone ();
   let graph : &InRustGraph = walk . truth . graph;
   let note_pid : ID = graph . pid_else_raw_id (&note);
   graph . outbound_gnids_for_relation_gated (
@@ -560,24 +515,21 @@ fn folder_goal (
           &occurrence_pid_of (member) ?,
           &note_of_member_as_such (tree, member) ?, walk ),
         &HashMap::new ()))) },
-    Folder::HiddenInForkPartner => {
+    Folder::HiddenInForkPartner | Folder::HiddenByForker => {
+      // Each folder's own parties ('compound_folder_parties'): the
+      // hidden-by folder's are the hidden-in folder's, swapped.
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
       Some ( Goal::unordered ( gnid_items (
-        hidden_in_fork_partner (
-          &occurrence_pid_of (parties . container ?) ?,
-          &occurrence_pid_of (parties . hider) ?, walk ),
-        &HashMap::new ()))) },
-    Folder::HiddenByForker => {
-      // Under a forker as such that forks the note only: under a
-      // forkee as such (a forker the user made a forkee) or an
-      // indirect member it holds nothing, and goes.
-      let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
-      Some ( Goal::unordered ( gnid_items (
-        if note_forked_by_forker_as_such (tree, parties . hider, walk) . is_some () {
-          hidden_by_forker (
-            &occurrence_pid_of (parties . hider) ?,
-            &occurrence_pid_of (parties . container ?) ?, walk )
-        } else { Vec::new () },
+        if matches! ( kind, Folder::HiddenByForker )
+          && note_forked_by_forker_as_such (tree, parties . hider, walk) . is_none ()
+        { // The hidden-by folder holds something under a forker as
+          // such that forks the note only: under a forkee as such (a
+          // forker the user made a forkee) or an indirect member it
+          // holds nothing, and goes.
+          Vec::new () }
+        else { hidden_in_fork_partner (
+                 &occurrence_pid_of (parties . container ?) ?,
+                 &occurrence_pid_of (parties . hider) ?, walk ) },
         &HashMap::new ()))) },
     Folder::HiddenOutsideOfForkPartners => {
       let parties : CompoundFolderParties = compound_folder_parties (tree, folder) ?;
@@ -815,39 +767,17 @@ pub(crate) fn hidden_in_fork_partner (
   walk       : &Walk,
 ) -> Vec<ID> {
   let graph : &InRustGraph = walk . truth . graph;
-  let goal : Vec<ID> = goal_list_for_hiddenInForkPartner_folder (
-    graph,
-    &graph . outbound_gnids_for_relation_gated (
-      container, NodeRelation::Contains, walk . truth . restriction ),
-    &graph . outbound_gnids_for_relation_gated (
-      hider, NodeRelation::Hides, walk . truth . restriction ));
-  resolve_all (&goal, graph) }
-
-/// What 'forker', a forker as such in the forks folder of 'note',
-/// hides of the note's content, by the records the skgrepo
-/// restriction shows: the goal of the compound folder
-/// 'HiddenByForker' under the forker. The same intersection as
-/// the hidden-in folder's, with the parties' roles swapped.
-pub(crate) fn hidden_by_forker (
-  forker     : &ID,
-  note       : &ID,
-  walk       : &Walk,
-) -> Vec<ID> {
-  hidden_in_fork_partner (note, forker, walk) }
-
-/// Goal list for a hiddenInForkPartnerFolder: the intersection of the
-/// hider's hides-list and the container's contains-list, in the
-/// order of the hides list.
-fn goal_list_for_hiddenInForkPartner_folder (
-  graph                : &InRustGraph,
-  container_contains   : &[ID],
-  hider_hides          : &[ID],
-) -> Vec<ID> {
-  let contains_set : HashSet<ID> =
-    resolve_all (container_contains, graph) . into_iter () . collect ();
-  hider_hides . iter ()
-    . filter ( |gnid| contains_set . contains (&graph . pid_else_raw_id (gnid)) )
-    . cloned () . collect () }
+  let container_contains : HashSet<ID> =
+    resolve_all ( &graph . outbound_gnids_for_relation_gated (
+                    container, NodeRelation::Contains, walk . truth . restriction ),
+                  graph )
+    . into_iter () . collect ();
+  resolve_all ( &graph . outbound_gnids_for_relation_gated (
+                  hider, NodeRelation::Hides, walk . truth . restriction ),
+                graph )
+    . into_iter ()
+    . filter ( |gnid| container_contains . contains (gnid) )
+    . collect () }
 
 /// What 'note' hides that none of its fork partners contains, by the
 /// records the skgrepo restriction shows: the goal of its compound
@@ -865,38 +795,22 @@ pub(crate) fn hidden_outside_of_fork_partners (
 ) -> Vec<ID> {
   let graph : &InRustGraph = walk . truth . graph;
   let restriction : &SkgrepoRestriction = walk . truth . restriction;
-  let goal : Vec<ID> = goal_list_for_hiddenOutsideOfForkPartners_folder (
-    graph,
-    &graph . outbound_gnids_for_relation_gated (
-      note, NodeRelation::Hides, restriction ),
-    &forks_folder_members_shown (
+  let all_partner_content : HashSet<ID> =
+    forks_folder_members_shown (
       graph, restriction, note,
       &graph . outbound_gnids_for_relation_gated (
-        note, NodeRelation::Forks, restriction )),
-    restriction );
-  resolve_all (&goal, graph) }
-
-/// Goal list for a hiddenOutsideOfForkPartnersFolder: the note's
-/// hides-list minus everything any of its fork partners contains by a
-/// record the skgrepo restriction shows.
-fn goal_list_for_hiddenOutsideOfForkPartners_folder (
-  graph             : &InRustGraph,
-  note_hides        : &[ID],
-  fork_partners     : &[ID],
-  restriction       : &SkgrepoRestriction,
-) -> Vec<ID> {
-  let partner_content_of : &dyn Fn (&ID) -> Vec<ID> = &|partner : &ID| -> Vec<ID> {
-    graph . outbound_gnids_for_relation_gated (
-      &graph . pid_else_raw_id (partner), NodeRelation::Contains, restriction ) };
-  let all_partner_content : HashSet<ID> =
-    fork_partners . iter ()
-      . flat_map ( |pid| partner_content_of (pid) )
-      . map ( |gnid| graph . pid_else_raw_id (&gnid) )
-      . collect ();
-  note_hides . iter ()
-    . filter ( |gnid| ! all_partner_content
-              . contains (&graph . pid_else_raw_id (gnid)) )
-    . cloned () . collect () }
+        note, NodeRelation::Forks, restriction ))
+    . iter ()
+    . flat_map ( |partner| graph . outbound_gnids_for_relation_gated (
+                   &graph . pid_else_raw_id (partner), NodeRelation::Contains, restriction ))
+    . map ( |gnid| graph . pid_else_raw_id (&gnid) )
+    . collect ();
+  resolve_all ( &graph . outbound_gnids_for_relation_gated (
+                  note, NodeRelation::Hides, restriction ),
+                graph )
+    . into_iter ()
+    . filter ( |gnid| ! all_partner_content . contains (gnid) )
+    . collect () }
 
 /// A property folder's goal: the node's aliases whose records the
 /// skgrepo restriction shows (in order, each with its relRepo when

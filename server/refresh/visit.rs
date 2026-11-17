@@ -52,7 +52,7 @@ use crate::refresh::editability::{
 use crate::refresh::extent::{Extent, extent_of_parent};
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, goal_of_parent, has_a_fork_partner,
-  hidden_by_forker, hidden_in_fork_partner, hidden_outside_of_fork_partners,
+  hidden_in_fork_partner, hidden_outside_of_fork_partners,
   integrated_elsewhere, member_of_child, note_forked_by_forker_as_such,
   note_of_member_as_such, visible_illegal_edits};
 use crate::refresh::goal::partnerFolder_members_in_graph;
@@ -171,7 +171,7 @@ fn add_default_folders (
         ! hidden_in_fork_partner (&pid, &note, walk) . is_empty () ),
       ( Folder::HiddenByForker,
         note_forked_by_forker_as_such (tree, parent, walk) . is_some ()
-        && ! hidden_by_forker (&pid, &note, walk) . is_empty () ), ]
+        && ! hidden_in_fork_partner (&note, &pid, walk) . is_empty () ), ]
     { last_placed = match child_folder (tree, parent, &kind) {
         Some (present) => Some (present),
         None if holds_something => {
@@ -216,7 +216,9 @@ fn add_illegal_edit_folder (
   walk   : &mut Walk,
 ) {
   if walk . is_diff_view () { return; }
-  let Some (pid) : Option<ID> = occurrence_pid (tree, parent) else { return; };
+  let Some (pid) : Option<ID> =
+    tree . get (parent) . unwrap () . value () . occurrence_gnid () . cloned ()
+    else { return; };
   let edits : Vec<IllegalEdit> = visible_illegal_edits (&pid, walk);
   if edits . is_empty () { return; }
   let drawn : Folder = Folder::IllegalEdit {
@@ -236,16 +238,6 @@ fn add_illegal_edit_folder (
       move_to_first_child (tree, parent, new)
         . expect ("add_illegal_edit_folder: the folder was just added"); }, }}
 
-/// The pid of the occurrence at 'treeid', if it is one.
-fn occurrence_pid (
-  tree   : &Tree<Viewnode>,
-  treeid : NodeId,
-) -> Option<ID> {
-  match &tree . get (treeid) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
-      Some ( occurrence . gnid . clone () ),
-    _ => None, }}
-
 /// Whether the illegal-edit folder at 'child', under 'parent', no
 /// longer stands for an illegal edit: its viewparent is no occurrence
 /// of a node the user illegally edited, as the skgrepo restriction
@@ -260,7 +252,7 @@ fn illegal_edit_is_gone (
                   ViewnodeKind::Folder (Folder::IllegalEdit { .. }) ) {
     return false; }
   walk . is_diff_view ()
-  || occurrence_pid (tree, parent)
+  || tree . get (parent) . unwrap () . value () . occurrence_gnid () . cloned ()
      . is_none_or ( |pid| visible_illegal_edits (&pid, walk) . is_empty () ) }
 
 //

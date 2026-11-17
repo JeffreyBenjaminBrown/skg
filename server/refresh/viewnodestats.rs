@@ -12,7 +12,7 @@ use crate::types::viewnode::{
   GraphnodeStats, Folder, Viewnode, ViewnodeKind, Vognode, Warrant };
 use crate::refresh::ancestry::{
   CompoundFolderParties, compound_folder_parties, required_ancestors};
-use crate::refresh::goal::{content_goal_gnids, note_of_member_as_such};
+use crate::refresh::goal::{note_of_member_as_such, what_the_member_shows};
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 use std::iter::once;
@@ -37,7 +37,7 @@ pub fn set_viewnodestats_in_viewforest (
   config                : &SkgConfig,
   restriction           : &SkgrepoRestriction,
   relRepos              : &mut RelRepoLookup,
-  is_diff_view          : bool, // where a member as such counts what the user keeps elsewhere among its content ('content_goal_gnids')
+  is_diff_view          : bool, // where a member as such counts what the user keeps elsewhere among its content ('what_the_member_shows')
 ) {
   let multi_skgrepo : bool = config . skgrepos . len () > 1;
   let mut ancestor_gnids : HashSet<ID> = HashSet::new ();
@@ -239,27 +239,26 @@ fn set_herald_strings_in_viewnode (
   let unintegrated : Option<usize> =
     // A member as such counts the nodes its content goal draws as
     // occurrences: nodes the skgrepo restriction shows, as the count of its
-    // contents is ('RelationCounts'). An indirect member stands in
-    // neither fork role ('fork_roles'), but shows its content as any
-    // member as such does, and counts it too. The diff view draws no
+    // contents is ('RelationCounts'). The diff view draws no
     // folder of what the user keeps elsewhere, so there a member
     // counts it among its content, where it draws it.
-    if stands_as_member_here || fork_roles . is_some () {
-      note_of_member_as_such (tree, treeid) . map ( |note| {
-        let members : HashSet<ID> = content_goal_gnids (
-          graph, config, restriction, node_pid,
-          &graph . outbound_member_keys_for_relation_gated (
-            node_pid, NodeRelation::Contains, restriction ),
-          Some (&note), ! is_diff_view )
-          . into_iter ()
-          . filter ( |gnid| graph . node_is_shown (gnid, restriction) )
-          . collect ();
-        for (gnid, generation) in &ancestors {
-          if members . contains (gnid)
-            && flags . contains_out . contains (generation) {
-            flags . contents_unintegrated_out . push (*generation); } }
-        members . len () })
-    } else { None };
+    note_of_member_as_such (tree, treeid) . map ( |note| {
+      let contents : Vec<ID> =
+        graph . outbound_member_keys_for_relation_gated (
+          node_pid, NodeRelation::Contains, restriction )
+        . iter () . map ( |member| member . member . id () . clone () )
+        . collect ();
+      let members : HashSet<ID> = what_the_member_shows (
+        graph, config, restriction, node_pid,
+        Some (&note), &contents, ! is_diff_view )
+        . into_iter ()
+        . filter ( |gnid| graph . node_is_shown (gnid, restriction) )
+        . collect ();
+      for (gnid, generation) in &ancestors {
+        if members . contains (gnid)
+          && flags . contains_out . contains (generation) {
+          flags . contents_unintegrated_out . push (*generation); } }
+      members . len () });
   let side_of_mirror : Option<Side> = // shown in another's place: which side of it
     in_place_of . as_ref () . and_then ( |original|
       side_of_mirror_shown (graph, restriction, node_pid, original) );

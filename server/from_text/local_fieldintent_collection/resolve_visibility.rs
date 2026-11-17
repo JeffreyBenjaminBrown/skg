@@ -533,7 +533,7 @@ fn members_with_visible_records (
 /// member it could not show. Nor does it unhide a member it showed as a
 /// restricted viewnode (its node kept out): deleting that line changes
 /// no relationship to the note it stands for. What counts as inside is what the folder's goal
-/// subtracts ('goal_list_for_hiddenOutsideOfForkPartners_folder'): the content
+/// subtracts ('hidden_outside_of_fork_partners'): the content
 /// of each member the forks folder shows, forkee, forker or indirect
 /// ('forks_folder_members_shown'), by the records the skgrepo restriction
 /// shows. So a hide of something only a forker contains, which the
@@ -632,7 +632,7 @@ fn apply_hiddenoutside_edits (
 /// mirror of a partner's member hides that member, unless the
 /// same save leaves F containing the member. Placing a mirror
 /// drops no hide, as containing it does not integrate the member
-/// ('unintegrated_content_gnids' in 'server/refresh/goal.rs' compares
+/// ('what_the_member_shows' in 'server/refresh/goal.rs' compares
 /// IDs): an unhidden member would come back as unintegrated. Details:
 /// - Members whose records the skgrepo restriction keeps out were
 ///   omitted from the buffer, not removed, so they never count as
