@@ -678,6 +678,8 @@ fn infer_hides_from_contains_removals (
       opt_graphnode_by_gnid (
         graph, config, &hider_pid ) ?
     else { continue; };
+    let key : &dyn Fn (&ID) -> ID =
+      &|gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
     let hider_contains : Vec<ID> =
       members_of (&hider_from_disk . contains);
     let visible_contains : HashSet<&ID> =
@@ -686,30 +688,30 @@ fn infer_hides_from_contains_removals (
           skgrepo_restriction, &member . relRepo ))
       . map ( |member| &member . member )
       . collect ();
+    let new_contains_keys : HashSet<ID> =
+      new_contains . iter () . map (key) . collect ();
     let removed : Vec<ID> = {
-      let new_contains_set : HashSet<&ID> =
-        new_contains . iter () . collect ();
-      let signal_visible : HashSet<&ID> = // children the same save explicitly shows through a member as such of this forker's forks folder
+      let signal_visible : HashSet<ID> = // children the same save explicitly shows through a member as such of this forker's forks folder
         member_as_such_visibility . iter ()
         . filter ( |(pid, _)| *pid == hider_pid )
-        . flat_map ( |(_, signal)| signal . visible . iter () )
+        . flat_map ( |(_, signal)| signal . visible . iter () . map (key) )
         . collect ();
       hider_contains . iter ()
-        . filter ( |gnid| ! new_contains_set . contains (gnid) )
-        . filter ( |gnid| ! signal_visible . contains (gnid) )
+        . filter ( |gnid| ! new_contains_keys . contains (&key (gnid)) )
+        . filter ( |gnid| ! signal_visible . contains (&key (gnid)) )
         . filter ( |gnid| visible_contains . contains (gnid) )
         . cloned () . collect () };
-    let inferred_unhides : Vec<ID> = {
-      let disk_contains : HashSet<&ID> =
-        hider_contains . iter () . collect ();
+    let inferred_unhides : Vec<ID> = { // as the hider's hides name them
+      let disk_contains_keys : HashSet<ID> =
+        hider_contains . iter () . map (key) . collect ();
       let disk_hides : Vec<ID> = // a restricted hide stays, as the buffer could not show it
         members_with_visible_records (
           hider_from_disk . hides . or_default (),
           skgrepo_restriction );
-      new_contains . iter ()
-        . filter ( |gnid| ! disk_contains . contains (gnid) )
-        . filter ( |gnid| disk_hides . contains (gnid) )
-        . cloned () . collect () };
+      disk_hides . into_iter ()
+        . filter ( |gnid| new_contains_keys . contains (&key (gnid))
+                          && ! disk_contains_keys . contains (&key (gnid)) )
+        . collect () };
     let inferred_hides : Vec<ID> =
       if removed . is_empty () { Vec::new () }
       else {
@@ -738,8 +740,6 @@ fn infer_hides_from_contains_removals (
           partner_contents . iter ()
           . flat_map ( |(_, content)| content . iter () . cloned () )
           . collect ();
-        let key : &dyn Fn (&ID) -> ID =
-          &|gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
         let would_show_under_a_partner : &dyn Fn (&ID) -> bool =
           // Some partner containing it would show it after the save:
           // no owned note but that partner keeps it then.
@@ -750,11 +750,10 @@ fn infer_hides_from_contains_removals (
             . any ( |(partner, _)| owned_notes_containing_after_save (
                       lowered, member, partner,
                       graph, config, skgrepo_restriction ) . is_empty () ) };
-        let new_contains_set : HashSet<&ID> = new_contains . iter () . collect ();
         removed . iter ()
           . filter_map ( |gnid| member_it_stands_for (
             graph, skgrepo_restriction, gnid, &partner_content ))
-          . filter ( |member| ! new_contains_set . contains (member) )
+          . filter ( |member| ! new_contains_keys . contains (&key (member)) )
           . filter ( |member| would_show_under_a_partner (member) )
           . collect () };
     if inferred_hides . is_empty () && inferred_unhides . is_empty ()

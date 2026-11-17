@@ -14,7 +14,9 @@
 // - cutting the sibling hides it alone, and cutting the child shown by
 //   its pid hides it, as its forkee's list names it;
 // - a hide of the child, as the list names it, moved out of the
-//   forkee's folder of what the note hides in it, is removed.
+//   forkee's folder of what the note hides in it, is removed;
+// - so is it when the child is moved from that folder into the note's
+//   own content (the contains-removal step, 'resolve_visibility.rs').
 // And one for the conflict check: in Q's view k2 stands under F2 and
 // under G2; cut from G2 alone, the save is refused as conflicting.
 
@@ -22,7 +24,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 
 use crate::view_and_save_helpers::{
-  content_of, depth, hides_of, ids, is_a_fixpoint, line_of, refusal_of,
+  contains_of, content_of, depth, hides_of, ids, is_a_fixpoint, line_of, refusal_of,
   save_cleanly, skg_files, under, view_of, without_subtree_of};
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
@@ -62,7 +64,15 @@ fn all_tests
                      format! ( "pid: {}\ntitle: {}\nforks:\n- {}\nhides:\n- {}\n",
                                case . note, case . note, case . forkee, case . extra )) ?;
                    Ok (( )) } ) ?;
-        a_hidden_child_moved_back_out_is_unhidden (&case, &s . config, &mut s . tantivy) . await ?; }
+        a_hidden_child_moved_back_out_is_unhidden (&case, &s . config, &mut s . tantivy) . await ?;
+        s . reset_with_fixture_prep (
+          "a_hidden_child_moved_into_the_note_is_unhidden", FIXTURES,
+          |root| { std::fs::write (
+                     root . join ( format! ("main/{}.skg", case . note) ),
+                     format! ( "pid: {}\ntitle: {}\nforks:\n- {}\nhides:\n- {}\n",
+                               case . note, case . note, case . forkee, case . extra )) ?;
+                   Ok (( )) } ) ?;
+        a_hidden_child_moved_into_the_note_is_unhidden (&case, &s . config, &mut s . tantivy) . await ?; }
       s . reset ("a_cut_from_one_forkee_of_a_child_another_shows_by_an_extra_id_conflicts", FIXTURES) ?;
       a_cut_from_one_forkee_of_a_child_another_shows_by_an_extra_id_conflicts (&s . config, &mut s . tantivy) . await ?;
       Ok (( )) } )) }
@@ -197,4 +207,32 @@ async fn a_cut_from_one_forkee_of_a_child_another_shows_by_an_extra_id_conflicts
   assert! ( refusal . contains ("Conflicting forkee visibility edits for forker Q and content k2"),
             "{}", refusal );
   assert_eq! ( skg_files (config) ?, before, "nothing is written" );
+  Ok (( )) }
+
+/// The note hides the child, as the forkee's list names it. The view
+/// shows the child in the forkee's folder of what the note hides in
+/// it; moved from there into the note's own content, it is unhidden:
+/// the note contains it, and its hide, as the list names it, is
+/// removed.
+async fn a_hidden_child_moved_into_the_note_is_unhidden (
+  case    : &Case,
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let view : String = view_of (config, tantivy, case . note) ?;
+  let note_line : &str = line_of (&view, case . note);
+  let child_line : &str = line_of (&view, case . child); // in the forkee's folder of what the note hides in it
+  let moved_in : String = without_folder_under (
+    &view, case . forkee, "hiddenInForkPartnerFolder" )
+    . replacen (
+      &format! ("{}\n", note_line),
+      &format! ( "{}\n{} {}\n",
+                 note_line, "*" . repeat ( depth (note_line) + 1 ),
+                 child_line . trim_start_matches ('*') . trim_start () ),
+      1 );
+  let saved : String = save_cleanly (&moved_in, case . note, config, tantivy) . await ?;
+  assert_eq! ( contains_of (config, case . note) ?, ids (&[case . child]),
+               "the note contains the child:\n{}", saved );
+  assert_eq! ( hides_of (config, case . note) ?, Vec::<ID>::new (),
+               "the hide is removed:\n{}", saved );
   Ok (( )) }
