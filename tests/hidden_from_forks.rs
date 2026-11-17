@@ -10,8 +10,8 @@
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::metadata_canon::without_viewnode_ids;
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
+use crate::view_and_save_helpers::node_from_disk;
 use indoc::indoc;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::assert_metadata_eq;
 use skg::test_utils::{
   extract_string_field_from_sexp,
@@ -230,16 +230,6 @@ fn insert_after_line_containing (
       result . extend (
         insertion . lines() . map ( |l| l . to_string() )); }}
   result . join ("\n") + "\n" }
-
-fn node_from_disk (
-  config : &SkgConfig,
-  pid    : &str,
-) -> Result<Graphnode, Box<dyn Error>> {
-  let gnid : ID = ID::from (pid);
-  read_all_skg_files_from_skgrepos (config)?
-    . into_iter()
-    . find ( |node| node . pid == gnid )
-    . ok_or_else ( || format! ("node not found on disk: {}", pid) . into() ) }
 
 #[test]
 fn all_tests

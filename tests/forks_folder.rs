@@ -24,17 +24,16 @@ use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 use std::collections::BTreeMap;
 
+use crate::view_and_save_helpers::{
+  forks_of, hides_of, ids, line_of, save as save_as_view_of, skg_files, view_of};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::dbs::node_lookup::graphnode_by_gnid;
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::test_utils::{
-  graph_handle_from_config, run_with_shared_test_stores, single_root_view};
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::types::errors::SaveError;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex, members_of};
-use skg::types::nodes::complete::Graphnode;
+use skg::types::misc::{SkgConfig, TantivyIndex};
 use skg::types::views_state::{OpenViews, ViewforestId};
 
 const FIXTURES : &str = "tests/forks_folder/fixtures";
@@ -69,39 +68,14 @@ fn all_tests
 // Helpers
 //
 
-/// A fresh view of N, without viewnode IDs.
-fn view_of_n (
-  config  : &SkgConfig,
-  tantivy : &TantivyIndex,
-) -> Result<String, Box<dyn Error>> {
-  let (view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("N")) ?;
-  Ok ( without_viewnode_ids (&view) ) }
-
 async fn save (
   buf     : &str,
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None, };
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response : SaveResponse = update_from_and_rerender_buffer (
-    &mut stream, buf, config, tantivy, &graph,
-    &Ok ( ViewforestId::ContentView ("view of N" . to_string ()) ),
-    &mut views_state ) . await ?;
+  let response : SaveResponse = save_as_view_of (buf, "N", config, tantivy) . await ?;
   assert! ( response . errors . is_empty (), "save errors: {:?}", response . errors );
   Ok (response) }
-
-fn line_of<'a> (
-  buf  : &'a str,
-  gnid : &str,
-) -> &'a str {
-  buf . lines ()
-    . find ( |line| line . contains (&format! ("(gnid {})", gnid)) )
-    . unwrap_or_else ( || panic! ( "no line shows {} in:\n{}", gnid, buf )) }
 
 /// 'buf' without the first line showing 'gnid', and the lines under
 /// it: a forkee as such, drawn editable, shows its own folders.
@@ -140,43 +114,6 @@ fn outline (
     . map ( |line| line . split (" (skgRepos") . next () . unwrap () . to_string () )
     . collect () }
 
-fn node (
-  config : &SkgConfig,
-  pid    : &str,
-) -> Result<Graphnode, Box<dyn Error>> {
-  graphnode_by_gnid (
-    &graph_handle_from_config (config) ? . load_full (), config, &ID::from (pid) ) }
-
-fn forks_of (
-  config : &SkgConfig,
-  pid    : &str,
-) -> Result<Vec<ID>, Box<dyn Error>> {
-  Ok ( members_of ( node (config, pid) ? . forks . or_default () )) }
-
-fn hides_of (
-  config : &SkgConfig,
-  pid    : &str,
-) -> Result<Vec<ID>, Box<dyn Error>> {
-  Ok ( members_of ( node (config, pid) ? . hides . or_default () )) }
-
-fn ids (
-  pids : &[&str],
-) -> Vec<ID> {
-  pids . iter () . map ( |pid| ID::from (*pid) ) . collect () }
-
-/// Every .skg file of the fixture's one skgrepo, by name.
-fn skg_files (
-  config : &SkgConfig,
-) -> Result<BTreeMap<String, String>, Box<dyn Error>> {
-  let folder : &std::path::Path = &config . skgrepos . values () . next () . unwrap () . path;
-  let mut files : BTreeMap<String, String> = BTreeMap::new ();
-  for entry in std::fs::read_dir (folder) ? {
-    let path : std::path::PathBuf = entry ? . path ();
-    if path . extension () . is_some_and ( |extension| extension == "skg" ) {
-      files . insert ( path . file_name () . unwrap () . to_string_lossy () . to_string (),
-                       std::fs::read_to_string (&path) ? ); }}
-  Ok (files) }
-
 //
 // The sub-tests
 //
@@ -185,7 +122,7 @@ async fn the_folder_holds_forkees_mutuals_then_forkers (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let view : String = view_of_n (config, tantivy) ?;
+  let view : String = view_of (config, tantivy, "N") ?;
   assert_eq! ( outline (&view), [
     "* (skg node (gnid N)",
     "** (skg forksFolder)",
@@ -215,7 +152,7 @@ async fn an_unchanged_save_writes_nothing (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let view : String = view_of_n (config, tantivy) ?;
+  let view : String = view_of (config, tantivy, "N") ?;
   let before : BTreeMap<String, String> = skg_files (config) ?;
   let response : SaveResponse = save (&view, config, tantivy) . await ?;
   assert_eq! ( skg_files (config) ?, before );
@@ -226,7 +163,7 @@ async fn a_typed_member_is_forked (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let view : String = view_of_n (config, tantivy) ?;
+  let view : String = view_of (config, tantivy, "N") ?;
   let m : &str = line_of (&view, "M");
   let typed : String = view . replace (
     m, &format! ( "{}\n*** (skg node (gnid T) (skgRepos (nodeRepo main))) T", m ));
@@ -240,7 +177,7 @@ async fn deleting_a_forkee_ends_the_fork (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let view : String = view_of_n (config, tantivy) ?;
+  let view : String = view_of (config, tantivy, "N") ?;
   let response : SaveResponse =
     save (&without_line_of (&view, "E"), config, tantivy) . await ?;
   assert_eq! ( forks_of (config, "N") ?, ids (&["M"]) );
@@ -253,7 +190,7 @@ async fn deleting_a_mutual_ends_the_fork_and_hides_it (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let view : String = view_of_n (config, tantivy) ?;
+  let view : String = view_of (config, tantivy, "N") ?;
   let response : SaveResponse =
     save (&without_line_of (&view, "M"), config, tantivy) . await ?;
   assert_eq! ( forks_of (config, "N") ?, ids (&["E"]) );
@@ -272,7 +209,7 @@ async fn detaching_a_mutual_ends_the_fork_only (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let view : String = view_of_n (config, tantivy) ?;
+  let view : String = view_of (config, tantivy, "N") ?;
   let m : &str = line_of (&view, "M");
   let detached : String = view . replace (
     m, &m . replacen ("(skgRepos (nodeRepo main))", "(skgRepos (nodeRepo main)) noClaim", 1) );
@@ -288,7 +225,7 @@ async fn deleting_a_forker_hides_it_until_the_hide_is_removed (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let view : String = view_of_n (config, tantivy) ?;
+  let view : String = view_of (config, tantivy, "N") ?;
   let hidden : SaveResponse =
     save (&without_line_of (&view, "F"), config, tantivy) . await ?;
   assert_eq! ( forks_of (config, "N") ?, ids (&["E", "M"]) );
@@ -313,7 +250,7 @@ async fn attaching_a_forker_makes_it_a_mutual (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let view : String = view_of_n (config, tantivy) ?;
+  let view : String = view_of (config, tantivy, "N") ?;
   let f : &str = line_of (&view, "F");
   let attached : String = view . replace ( f, &f . replacen (" noClaim", "", 1) );
   let response : SaveResponse = save (&attached, config, tantivy) . await ?;
@@ -327,7 +264,7 @@ async fn a_relRepo_request_on_a_forker_is_refused (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let view : String = view_of_n (config, tantivy) ?;
+  let view : String = view_of (config, tantivy, "N") ?;
   let f : &str = line_of (&view, "F");
   let requested : String = view . replace (
     f, &f . replacen (" noClaim", " noClaim (editRequest (relRepo main))", 1) );

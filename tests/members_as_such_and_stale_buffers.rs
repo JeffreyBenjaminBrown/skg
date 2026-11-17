@@ -38,32 +38,18 @@ use crate::save_handler_helpers::{
   Fixture, collateral_view, fixture_from, left_as_the_graph_has_it,
   new_connection, open_view, save, save_with_other_views, saved, saved_view,
   warnings_of};
-use crate::view_and_save_helpers::{line_of, under, without_subtree_of};
+use crate::view_and_save_helpers::{line_of, skg_files, under, without_subtree_of};
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
 
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;
-use std::path::PathBuf;
 
 fn fixture (
 ) -> Result<Fixture, Box<dyn Error>> {
   fixture_from ( "tests/members_as_such_and_stale_buffers/fixtures",
                  "members-as-such-and-stale-buffers", &["main", "theirs"] ) }
-
-/// Every .skg file of the fixture, by skgrepo and name.
-fn skg_files (
-  f : &Fixture,
-) -> BTreeMap<String, String> {
-  let mut files : BTreeMap<String, String> = BTreeMap::new ();
-  for skgrepo in ["main", "theirs"] {
-    for entry in fs::read_dir ( f . dir . path () . join (skgrepo) ) . unwrap () {
-      let path : PathBuf = entry . unwrap () . path ();
-      files . insert (
-        format! ( "{}/{}", skgrepo, path . file_name () . unwrap () . to_string_lossy () ),
-        fs::read_to_string (&path) . unwrap () ); }}
-  files }
 
 fn file_text (
   f       : &Fixture,
@@ -124,12 +110,12 @@ fn saves_unchanged_writing_nothing (
   view_id     : &str,
   view        : &str,
 ) -> String {
-  let before : BTreeMap<String, String> = skg_files (f);
+  let before : BTreeMap<String, String> = skg_files (&f . config) . unwrap ();
   let result : String = save (f, views_state, view_id, view, Some (view));
   assert! ( saved (&result), "{}", result );
   assert! ( ! warnings_of (&result) . contains ("Left as the graph has it"),
             "no node is stale:\n{}", result );
-  assert_eq! ( skg_files (f), before, "an unchanged save writes nothing" );
+  assert_eq! ( skg_files (&f . config) . unwrap (), before, "an unchanged save writes nothing" );
   saved_view (&result) }
 
 //

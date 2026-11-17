@@ -19,8 +19,8 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
-use skg::types::views_state::OpenViews;
 
+use crate::save_handler_helpers::new_connection;
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::error::Error;
 use std::fs;
@@ -49,11 +49,6 @@ fn fixture (
   let env : SkgEnv = skg_env_from_parts (
     &config, &tantivy, &graph_handle_from_config (&config) ?);
   Ok ( Fixture { _dir : dir, config_path, env } ) }
-
-fn new_connection (
-) -> ViewsState {
-  ViewsState { open_views     : OpenViews::new (),
-               graph_straddle : None, } }
 
 /// Append to the config file the skgrepo 'third', more private than
 /// 'second', and change its port to 1731.

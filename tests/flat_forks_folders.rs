@@ -24,8 +24,8 @@ use std::error::Error;
 use std::collections::BTreeMap;
 
 use crate::view_and_save_helpers::{
-  content_of, first_forks_folders_members, ids, line_of, node, save_cleanly,
-  skg_files, under, view_of, without_subtree_of};
+  content_of, first_forks_folders_members, ids, is_a_fixpoint, line_of, node,
+  save_cleanly, skg_files, under, view_of, without_subtree_of};
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::misc::{SkgConfig, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
@@ -53,20 +53,6 @@ fn all_tests
 //
 // Helpers
 //
-
-/// Save 'view' unchanged as a view of 'root': no file is written, and
-/// the saved view is 'view' again.
-async fn is_a_fixpoint (
-  view    : &str,
-  root    : &str,
-  config  : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-) -> Result<(), Box<dyn Error>> {
-  let before : BTreeMap<String, String> = skg_files (config) ?;
-  let saved : String = save_cleanly (view, root, config, tantivy) . await ?;
-  assert_eq! ( skg_files (config) ?, before, "an unchanged save writes nothing" );
-  assert_eq! ( saved, view, "and draws the view again as it was" );
-  Ok (( )) }
 
 /// Whether the headline 'line' stands for a member claiming nothing,
 /// born of nothing, with no fork toward the note two levels up: an

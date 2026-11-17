@@ -25,20 +25,12 @@
 // 'tests/hide_inference_under_a_narrowing.rs'.
 
 use std::error::Error;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
-use std::net::TcpStream;
 
-use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::dbs::node_lookup::graphnode_by_gnid;
+use crate::view_and_save_helpers::{depth, hides_of, ids, line_of, save, view_of};
 use skg::metadata_canon::without_viewnode_ids;
-use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::test_utils::{
-  graph_handle_from_config, run_with_shared_test_stores, single_root_view};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex, members_of};
-use skg::types::nodes::complete::Graphnode;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::test_utils::run_with_shared_test_stores;
+use skg::types::misc::{SkgConfig, TantivyIndex};
 
 const FIXTURES : &str = "tests/hides_apply_to_every_fork_partner/fixtures";
 
@@ -70,41 +62,10 @@ async fn save_cleanly (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None, };
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response : SaveResponse = update_from_and_rerender_buffer (
-    &mut stream, buf, config, tantivy, &graph,
-    &Ok ( ViewforestId::ContentView ( "view of N" . to_string () )),
-    &mut views_state ) . await ?;
+  let response : SaveResponse = save (buf, "N", config, tantivy) . await ?;
   assert! ( response . errors . is_empty (),
             "save errors: {:?}\n\nbuffer:\n{}", response . errors, buf );
   Ok (response) }
-
-/// A fresh view of N, without viewnode IDs.
-fn view_of_n (
-  config  : &SkgConfig,
-  tantivy : &TantivyIndex,
-) -> Result<String, Box<dyn Error>> {
-  let (view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("N")) ?;
-  Ok ( without_viewnode_ids (&view) ) }
-
-fn depth (
-  line : &str,
-) -> usize {
-  line . chars () . take_while ( |c| *c == '*' ) . count () }
-
-/// The first line showing 'gnid'.
-fn line_of<'a> (
-  buf  : &'a str,
-  gnid : &str,
-) -> &'a str {
-  buf . lines ()
-    . find ( |line| line . contains (&format! ("(gnid {})", gnid)) )
-    . unwrap_or_else ( || panic! ( "no line shows {} in:\n{}", gnid, buf )) }
 
 /// The first line containing 'text', and the lines under it.
 fn subtree_at<'a> (
@@ -149,19 +110,6 @@ fn with_line_after (
   let line : &str = line_of (buf, gnid);
   buf . replacen ( &format! ("{}\n", line), &format! ("{}\n{}\n", line, new), 1 ) }
 
-fn hides_of (
-  config : &SkgConfig,
-  pid    : &str,
-) -> Result<Vec<ID>, Box<dyn Error>> {
-  let node : Graphnode = graphnode_by_gnid (
-    &graph_handle_from_config (config) ? . load_full (), config, &ID::from (pid) ) ?;
-  Ok ( members_of ( node . hides . or_default () ) ) }
-
-fn ids (
-  pids : &[&str],
-) -> Vec<ID> {
-  pids . iter () . map ( |pid| ID::from (*pid) ) . collect () }
-
 //
 // The sub-tests
 //
@@ -174,7 +122,7 @@ async fn a_hide_only_a_forker_explains_stands_under_that_forker (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let view : String = view_of_n (config, tantivy) ?;
+  let view : String = view_of (config, tantivy, "N") ?;
   let under_f : Vec<&str> = subtree_at (&view, "(gnid F)");
   let under_f : String = under_f . join ("\n") + "\n";
   assert_eq! ( gnids_under (&under_f, "hiddenInForkPartnerFolder"), vec! ["W"],
@@ -189,7 +137,7 @@ async fn editing_the_hidden_outside_folder_unhides_and_hides (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let view : String = view_of_n (config, tantivy) ?;
+  let view : String = view_of (config, tantivy, "N") ?;
   let h2 : &str = line_of (&view, "H2");
   let g : String = format! ( "{} (skg node (gnid G) (skgRepos (nodeRepo main))) G",
                              "*" . repeat (depth (h2)) );
@@ -210,7 +158,7 @@ async fn an_unhide_under_a_forker_survives_the_hidden_outside_folder (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let view : String = view_of_n (config, tantivy) ?;
+  let view : String = view_of (config, tantivy, "N") ?;
   let hidden_in : Vec<&str> = subtree_at (&view, "hiddenInForkPartnerFolder");
   assert! ( hidden_in [1] . contains ("(gnid W)")
             && hidden_in [2 ..] . iter () . all ( |line| depth (line) > depth (hidden_in [1]) ),
@@ -237,7 +185,7 @@ async fn removing_a_child_a_forker_contains_hides_it (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let view : String = view_of_n (config, tantivy) ?;
+  let view : String = view_of (config, tantivy, "N") ?;
   let x1 : &str = view . lines ()
     . find ( |line| depth (line) == 2 && line . contains ("(gnid X1)") )
     . unwrap_or_else ( || panic! ( "no X1 in N's content:\n{}", view ));
@@ -263,12 +211,12 @@ async fn emptying_the_hidden_outside_folder_lets_it_go (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let view : String = view_of_n (config, tantivy) ?;
+  let view : String = view_of (config, tantivy, "N") ?;
   let response : SaveResponse =
     save_cleanly (&without_lines (&view, &[line_of (&view, "H2")]), config, tantivy) . await ?;
   assert_eq! ( hides_of (config, "N") ?, ids (&["W"]), "H2 is unhidden" );
   let saved : String = without_viewnode_ids (&response . saved_view);
   assert! ( ! saved . contains ("hiddenOutsideOfForkPartnersFolder"),
             "the emptied folder goes:\n{}", saved );
-  assert_eq! ( saved, view_of_n (config, tantivy) ?, "the redrawn view is the fresh view" );
+  assert_eq! ( saved, view_of (config, tantivy, "N") ?, "the redrawn view is the fresh view" );
   Ok (( )) }

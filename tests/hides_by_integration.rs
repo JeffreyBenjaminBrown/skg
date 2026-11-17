@@ -38,18 +38,16 @@
 // folder of what the user keeps elsewhere.
 
 use std::error::Error;
-use std::collections::BTreeMap;
 
 use crate::view_and_save_helpers::{
-  content_of, depth, first_forks_folders_members, ids, line_of, node, save,
-  save_cleanly, skg_files, under, view_of, with_line_after_subtree_of,
-  without_subtree_of};
+  contains_of, content_of, depth, first_forks_folders_members, forks_of, hides_of,
+  ids, is_a_fixpoint, line_of, save, save_cleanly, under, view_of,
+  with_line_after_subtree_of, without_subtree_of};
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{multi_root_view_with_skgrepo_set, run_with_shared_test_stores};
-use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex, members_of};
-use skg::types::nodes::complete::Graphnode;
+use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 
 const FIXTURES : &str = "tests/hides_by_integration/fixtures";
 
@@ -95,20 +93,6 @@ fn all_tests
 //
 // Helpers
 //
-
-/// Save 'view' unchanged as a view of 'root': no file is written, and
-/// the saved view is 'view' again.
-async fn is_a_fixpoint (
-  view    : &str,
-  root    : &str,
-  config  : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-) -> Result<(), Box<dyn Error>> {
-  let before : BTreeMap<String, String> = skg_files (config) ?;
-  let saved : String = save_cleanly (view, root, config, tantivy) . await ?;
-  assert_eq! ( skg_files (config) ?, before, "an unchanged save writes nothing" );
-  assert_eq! ( saved, view, "and draws the view again as it was" );
-  Ok (( )) }
 
 /// The gnids of the children of the first folder of kind 'atom'
 /// directly under the first line showing 'member', in order.
@@ -186,26 +170,6 @@ fn without_line_at_depth (
                       && depth (line) > at_depth ))
     . map ( |(_, line)| format! ("{}\n", line) )
     . collect () }
-
-fn hides_of (
-  config : &SkgConfig,
-  pid    : &str,
-) -> Result<Vec<ID>, Box<dyn Error>> {
-  let note : Graphnode = node (config, pid) ?;
-  Ok ( members_of ( note . hides . or_default () )) }
-
-fn forks_of (
-  config : &SkgConfig,
-  pid    : &str,
-) -> Result<Vec<ID>, Box<dyn Error>> {
-  let note : Graphnode = node (config, pid) ?;
-  Ok ( members_of ( note . forks . or_default () )) }
-
-fn contains_of (
-  config : &SkgConfig,
-  pid    : &str,
-) -> Result<Vec<ID>, Box<dyn Error>> {
-  Ok ( members_of ( &node (config, pid) ? . contains )) }
 
 //
 // The sub-tests

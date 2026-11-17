@@ -7,6 +7,9 @@
 mod git_fixture_helpers;
 #[path = "shared/tcp_stream_pair.rs"]
 mod tcp_stream_pair;
+#[path = "shared/view_and_save_helpers.rs"]
+#[allow(dead_code)] // Each test file uses only some of the helpers.
+mod view_and_save_helpers;
 
 #[path = "content_view.rs"]
 mod content_view;

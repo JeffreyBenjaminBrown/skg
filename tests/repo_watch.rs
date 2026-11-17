@@ -23,8 +23,8 @@ use skg::test_utils::{
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
-use skg::types::views_state::OpenViews;
 
+use crate::save_handler_helpers::new_connection;
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::error::Error;
 use std::fs;
@@ -73,11 +73,6 @@ fn fixture (
   let watcher : RepoWatcherHandle = start_repo_watcher (env . clone ()) ?;
   sleep ( Duration::from_millis (100) ); // the watcher thread starts watching
   Ok ( Fixture { dir, config, env, _watcher : watcher } ) }
-
-fn new_connection (
-) -> ViewsState {
-  ViewsState { open_views     : OpenViews::new (),
-               graph_straddle : None, } }
 
 fn skg_path (
   f       : &Fixture,

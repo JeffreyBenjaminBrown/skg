@@ -1,13 +1,15 @@
 // View and save helpers for the tests of the forks folder's members
 // as such: each test saves a buffer as a view of one root, reads a
 // fresh view, and finds headlines by their gnid.
-// Declared in 'tests/grouped_forks.rs'.
+// Declared in 'tests/grouped_forks.rs', 'tests/grouped_saves.rs' and
+// 'tests/grouped_views.rs'.
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::net::TcpStream;
 
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::node_lookup::graphnode_by_gnid;
 use skg::metadata_canon::without_viewnode_ids;
@@ -16,7 +18,7 @@ use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{graph_handle_from_config, single_root_view};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::types::errors::SaveError;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::misc::{ID, SkgConfig, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::format_save_error_as_org;
 use skg::types::views_state::{OpenViews, ViewforestId};
@@ -59,6 +61,20 @@ pub async fn save_cleanly (
   let response : SaveResponse = save (buf, root, config, tantivy) . await ?;
   assert! ( response . errors . is_empty (), "save errors: {:?}", response . errors );
   Ok ( without_viewnode_ids (&response . saved_view) ) }
+
+/// Save 'view' unchanged as a view of 'root': no file is written, and
+/// the saved view is 'view' again.
+pub async fn is_a_fixpoint (
+  view    : &str,
+  root    : &str,
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let before : BTreeMap<String, String> = skg_files (config) ?;
+  let saved : String = save_cleanly (view, root, config, tantivy) . await ?;
+  assert_eq! ( skg_files (config) ?, before, "an unchanged save writes nothing" );
+  assert_eq! ( saved, view, "and draws the view again as it was" );
+  Ok (( )) }
 
 /// What the save of 'buf' says, which must refuse it.
 pub async fn refusal_of (
@@ -184,6 +200,35 @@ pub fn node (
 ) -> Result<Graphnode, Box<dyn Error>> {
   graphnode_by_gnid (
     &graph_handle_from_config (config) ? . load_full (), config, &ID::from (pid) ) }
+
+/// The node 'pid' as the files on disk have it.
+pub fn node_from_disk (
+  config : &SkgConfig,
+  pid    : &str,
+) -> Result<Graphnode, Box<dyn Error>> {
+  let gnid : ID = ID::from (pid);
+  read_all_skg_files_from_skgrepos (config) ?
+    . into_iter ()
+    . find ( |node| node . pid == gnid )
+    . ok_or_else ( || format! ("node not found on disk: {}", pid) . into () ) }
+
+pub fn hides_of (
+  config : &SkgConfig,
+  pid    : &str,
+) -> Result<Vec<ID>, Box<dyn Error>> {
+  Ok ( members_of ( node (config, pid) ? . hides . or_default () )) }
+
+pub fn forks_of (
+  config : &SkgConfig,
+  pid    : &str,
+) -> Result<Vec<ID>, Box<dyn Error>> {
+  Ok ( members_of ( node (config, pid) ? . forks . or_default () )) }
+
+pub fn contains_of (
+  config : &SkgConfig,
+  pid    : &str,
+) -> Result<Vec<ID>, Box<dyn Error>> {
+  Ok ( members_of ( &node (config, pid) ? . contains )) }
 
 pub fn ids (
   pids : &[&str],

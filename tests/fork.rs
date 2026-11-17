@@ -10,6 +10,7 @@
 // grouped_forks installers.
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
+use crate::view_and_save_helpers::node_from_disk;
 use std::error::Error;
 use std::net::TcpStream;
 
@@ -122,16 +123,6 @@ async fn fork_specs_from (
 ) -> Result<Vec<ForkSpec>, Box<dyn Error>> {
   Ok ( buffer_to_validated_saveplan ( buffer, config, &SkgrepoRestriction::unrestricted (config) )
         ? . 1 . fork_specs ) }
-
-fn node_from_disk (
-  config : &SkgConfig,
-  pid    : &str,
-) -> Result<Graphnode, Box<dyn Error>> {
-  let gnid : ID = ID::from (pid);
-  read_all_skg_files_from_skgrepos (config) ?
-    . into_iter ()
-    . find ( |node| node . pid == gnid )
-    . ok_or_else ( || format! ("node not found on disk: {}", pid) . into () ) }
 
 /// The single clone produced by saving the FORK_BUFFER -- the owned
 /// node whose forks names N. (Its pid is a fresh uuid we
