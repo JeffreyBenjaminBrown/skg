@@ -98,3 +98,6 @@ mod partner_folder_warnings;
 
 #[path = "view_stats_sharing.rs"]
 mod view_stats_sharing;
+
+#[path = "mirror_in_place_of_an_extra_id.rs"]
+mod mirror_in_place_of_an_extra_id;

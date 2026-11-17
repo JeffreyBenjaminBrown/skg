@@ -13,6 +13,7 @@
 //! row. The gnids a view shows above a headline are read here too
 //! ('view_ancestor_gnids').
 
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::ID;
 use crate::types::viewnode::{
   ChangeViewnode, Folder, PropertyMember, Viewnode, ViewnodeKind, Vognode};
@@ -122,18 +123,21 @@ pub fn described_node (
 /// The gnids the view shows above the headline at 'treeid': of each
 /// vognode among its ancestors, the gnid it stands for, and an
 /// occurrence's collected gnid too when it is shown in place of
-/// another note. Folders and other scaffolds stand for no gnid and
+/// another note, as its pid in 'graph' (its '(inPlaceOf N)' may say
+/// an extra ID). Folders and other scaffolds stand for no gnid and
 /// are passed over. The headline's own gnid is not among them.
 pub fn view_ancestor_gnids (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
+  graph  : &InRustGraph,
 ) -> HashSet<ID> {
   let Some (node) : Option<NodeRef<Viewnode>> = tree . get (treeid)
     else { return HashSet::new (); };
   node . ancestors ()
     . flat_map ( |ancestor| match &ancestor . value () . kind {
       ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
-        vec! [ occurrence . gnid . clone (), occurrence . collected_gnid () ],
+        vec! [ occurrence . gnid . clone (),
+               graph . pid_else_raw_id ( &occurrence . collected_gnid () ) ],
       ViewnodeKind::Vognode (vognode) => vec! [ vognode . gnid () . clone () ],
       _ => Vec::new (), } )
     . collect () }

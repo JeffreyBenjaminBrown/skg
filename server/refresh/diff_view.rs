@@ -373,7 +373,7 @@ fn expected_change_viewnodes (
         matches! ( change_key (viewnode), Some (ChangeKey::ChangesetMarker (_)) ) };
       let partner_folders : Vec<Viewnode> =
         if in_c { changed_partner_folder_kinds (
-                    &aspects, &view_ancestor_gnids (tree, parent) ) . into_iter ()
+                    &aspects, &view_ancestor_gnids (tree, parent, walk . truth . graph) ) . into_iter ()
                   . map ( |kind| viewnode_of (ViewnodeKind::Folder (kind)) )
                   . collect () }
         else { Vec::new () };
@@ -471,7 +471,7 @@ pub(crate) fn tag_children (
   let chain : bool = is_chain_parent (tree, parent, true);
   for child in children_of (tree, parent) {
     let item : Option<GoalItem> =
-      member_of_child (tree . get (child) . unwrap () . value ())
+      member_of_child (tree . get (child) . unwrap () . value (), walk . truth . graph)
       . and_then ( |member| goal ? . item_for (&member) . cloned () );
     let rel : Option<Existence> = item . as_ref () . and_then ( |item| item . rel );
     { let mut child_mut : NodeMut<Viewnode> = tree . get_mut (child) . unwrap ();

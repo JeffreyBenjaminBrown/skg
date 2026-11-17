@@ -208,13 +208,18 @@ impl Goal {
 /// What a child stands for in its parent's goal, if anything: an
 /// occurrence stands for the gnid its parent's list would hold (the
 /// original of a shown mirror), a ghost or a gnid-only vognode for
-/// its gnid, a property member for its value.
+/// its gnid, a property member for its value. An occurrence's gnid is
+/// its pid in 'graph', as the goal names it: the original of a shown
+/// mirror is the ID its '(inPlaceOf N)' says, which may be an extra
+/// ID (after a nodeMerge).
 pub(crate) fn member_of_child (
   viewnode : &Viewnode,
+  graph    : &InRustGraph,
 ) -> Option<GoalMember> {
   match &viewnode . kind {
     ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
-      Some ( GoalMember::Gnid ( occurrence . collected_gnid () )),
+      Some ( GoalMember::Gnid (
+        graph . pid_else_raw_id ( &occurrence . collected_gnid () ))),
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
       Some ( GoalMember::Gnid ( ghost . gnid . clone () )),
     ViewnodeKind::Vognode (Vognode::GnidOnly (gnid_only)) =>
@@ -540,7 +545,7 @@ fn folder_goal (
       let goal : Goal = partnerFolder_goal (kind, &described_pid () ?, walk) ?;
       Some ( if kind . omits_view_ancestors () {
                goal . without_gnids ( &view_ancestor_gnids (
-                 tree, described_node (tree, folder) ? ))
+                 tree, described_node (tree, folder) ?, walk . truth . graph ))
              } else { goal } ) }, } }
 
 /// The goal of a partner folder of this kind describing 'described':

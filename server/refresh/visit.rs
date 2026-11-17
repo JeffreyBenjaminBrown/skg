@@ -69,7 +69,7 @@ pub(crate) fn visit_parent (
   diff_view::tag_children (tree, parent, goal . as_ref (), walk) ?;
   if let Some (goal) = &goal {
     if goal . ordered {
-      reorder (tree, parent, goal) ?; }}
+      reorder (tree, parent, goal, walk . truth . graph) ?; }}
   keep_hidden_outside_folder_last (tree, parent) ?;
   substitute_mirrors (tree, parent, goal . as_ref (), walk) ?;
   fulfill_view_requests (tree, parent, walk) ?;
@@ -276,7 +276,7 @@ fn viewnode_merge (
   parent : NodeId,
   walk   : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  for (_gnid, duplicates) in duplicate_viewnode_siblings (tree, parent) {
+  for (_gnid, duplicates) in duplicate_viewnode_siblings (tree, parent, walk . truth . graph) {
     let result : NodeId = duplicates [0];
     for merged_sibling in &duplicates [1..] {
       merge_into (tree, result, *merged_sibling, walk) ?; }
@@ -289,12 +289,13 @@ fn viewnode_merge (
 fn duplicate_viewnode_siblings (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
+  graph  : &InRustGraph,
 ) -> Vec<(ID, Vec<NodeId>)> {
   let mut groups : Vec<(ID, Vec<NodeId>)> = Vec::new ();
   let mut group_of_gnid : HashMap<ID, usize> = HashMap::new ();
   for child in children_of (tree, parent) {
     let Some (GoalMember::Gnid (gnid)) : Option<GoalMember> =
-      vognode_member (tree . get (child) . unwrap () . value ())
+      vognode_member (tree . get (child) . unwrap () . value (), graph)
       else { continue; };
     match group_of_gnid . get (&gnid) {
       Some (group) => groups [*group] . 1 . push (child),
@@ -306,9 +307,10 @@ fn duplicate_viewnode_siblings (
 
 fn vognode_member (
   viewnode : &Viewnode,
+  graph    : &InRustGraph,
 ) -> Option<GoalMember> {
   match &viewnode . kind {
-    ViewnodeKind::Vognode (_) => member_of_child (viewnode),
+    ViewnodeKind::Vognode (_) => member_of_child (viewnode, graph),
     _ => None, } }
 
 /// Merge 'merged_sibling' into 'result', a duplicate earlier among
@@ -393,8 +395,9 @@ fn merge_requests (
 pub(crate) fn warrant_of_child (
   goal     : Option<&Goal>,
   viewnode : &Viewnode,
+  graph    : &InRustGraph,
 ) -> Option<Warrant> {
-  let member : GoalMember = member_of_child (viewnode) ?;
+  let member : GoalMember = member_of_child (viewnode, graph) ?;
   let claims : bool = viewnode . claims () == Some (true);
   Some ( match goal {
     None => Warrant::ByGraph,
@@ -421,7 +424,7 @@ fn set_warrants (
       if is_root { Warrant::ByGraph } // a root carries no warrant fact
       else if orphan_under_a_tombstone (tree, parent, child, walk) { Warrant::No }
       else { match warrant_of_child (
-               goal, tree . get (child) . unwrap () . value () ) {
+               goal, tree . get (child) . unwrap () . value (), walk . truth . graph ) {
         Some (warrant) => warrant,
         None => continue, }};
     tree . get_mut (child) . unwrap () . value () . set_warrant (warrant); }}
@@ -471,7 +474,7 @@ fn claim_forks_folder_members_as_the_graph_does (
   { return; }
   for child in children_of (tree, parent) {
     let Some (claimable) : Option<bool> =
-      member_of_child ( tree . get (child) . unwrap () . value () )
+      member_of_child ( tree . get (child) . unwrap () . value (), walk . truth . graph )
       . and_then ( |member| goal . item_for (&member) )
       . filter ( |item| item . warrant == Warrant::ByGraph )
       . map ( |item| item . claimable )
@@ -511,12 +514,12 @@ fn mark_claims (
       if viewnode . is_occurrence () {
         tree . get_mut (child) . unwrap () . value () . set_claim (true); }}
     else if claims_are_read {
-      let warrant : Option<Warrant> = warrant_of_child (goal, viewnode);
+      let warrant : Option<Warrant> = warrant_of_child (goal, viewnode, walk . truth . graph);
       if ! claims && warrant == Some (Warrant::No)
          && is_hidden_by_the_forks_folders_viewparent (tree, parent, child, walk) {
         vanish (tree, child, walk) ?; }
       else { vanish_if_unwarranted (tree, child, warrant, walk) ?; }}
-    else if warrant_of_child (goal, viewnode) == Some (Warrant::No)
+    else if warrant_of_child (goal, viewnode, walk . truth . graph) == Some (Warrant::No)
             && leaves_its_write_protected_folder (tree, parent, child, walk) {
       vanish (tree, child, walk) ?; }
     else if claims {
@@ -543,7 +546,7 @@ fn leaves_its_write_protected_folder (
   matches! ( tree . get (parent) . unwrap () . value () . kind,
              ViewnodeKind::Folder (Folder::IntegratedElsewhere) )
   || unhidden_in_the_hides_folder (tree, parent, child, walk)
-  || view_ancestor_in_its_folder (tree, parent, child)
+  || view_ancestor_in_its_folder (tree, parent, child, walk . truth . graph)
   || is_hidden_by_the_forks_folders_viewparent (tree, parent, child, walk)
   || is_hiddenByForkerFolder_under_no_forker_as_such (tree, parent, walk) }
 
@@ -599,6 +602,7 @@ fn view_ancestor_in_its_folder (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
   child  : NodeId,
+  graph  : &InRustGraph,
 ) -> bool {
   let omits : bool = matches! ( &tree . get (parent) . unwrap () . value () . kind,
                                 ViewnodeKind::Folder (folder)
@@ -607,9 +611,9 @@ fn view_ancestor_in_its_folder (
   let Some (described) : Option<NodeId> = described_node (tree, parent)
     else { return false; };
   let Some (GoalMember::Gnid (gnid)) : Option<GoalMember> =
-    member_of_child ( tree . get (child) . unwrap () . value () )
+    member_of_child ( tree . get (child) . unwrap () . value (), graph )
     else { return false; };
-  view_ancestor_gnids (tree, described) . contains (&gnid) }
+  view_ancestor_gnids (tree, described, graph) . contains (&gnid) }
 
 /// Whether 'child' stands in the hides folder at 'parent' for a
 /// graphnode its described node hides by no record at all, visible or
@@ -691,11 +695,11 @@ fn reinstate (
 ) -> Result<(), Box<dyn Error>> {
   let mut present : HashSet<GoalMember> =
     tree . get (parent) . unwrap () . children ()
-    . filter_map ( |child| member_of_child (child . value ()) )
+    . filter_map ( |child| member_of_child (child . value (), walk . truth . graph) )
     . collect ();
   let mut last_named : Option<NodeId> = // the child a drawn one follows, where the goal has no order
     tree . get (parent) . unwrap () . children ()
-    . filter ( |child| member_of_child (child . value ())
+    . filter ( |child| member_of_child (child . value (), walk . truth . graph)
                        . is_some_and ( |member| goal . item_for (&member) . is_some () ))
     . map ( |child| child . id () )
     . last ();
@@ -703,7 +707,7 @@ fn reinstate (
     if present . contains (&item . member) { continue; }
     let Some (drawn) : Option<Viewnode> = draw_item (tree, parent, item, goal, walk) ?
       else { continue; };
-    if let Some (member) = member_of_child (&drawn) {
+    if let Some (member) = member_of_child (&drawn, walk . truth . graph) {
       // In the diff view two items can name one node: a list entry
       // the worktree cannot resolve, which HEAD resolves to a node
       // HEAD's list also names. Its ghost stands for both.
@@ -860,7 +864,7 @@ fn names_a_container_outside_its_view_ancestors (
   let Some (gnid) : Option<&ID> =
     tree . get (member) . unwrap () . value () . occurrence_gnid ()
     else { return false; };
-  let view_ancestors : HashSet<ID> = view_ancestor_gnids (tree, member);
+  let view_ancestors : HashSet<ID> = view_ancestor_gnids (tree, member, walk . truth . graph);
   partnerFolder_members_in_graph (
     walk . truth . graph, gnid, &Folder::Container, walk . truth . restriction )
     . is_some_and ( |containers| containers . iter ()
@@ -923,13 +927,14 @@ fn reorder (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
   goal   : &Goal,
+  graph  : &InRustGraph,
 ) -> Result<(), Box<dyn Error>> {
   let children : Vec<NodeId> = children_of (tree, parent);
   let mut front : Vec<NodeId> = Vec::new ();
   let mut groups : Vec<(usize, Vec<NodeId>)> = Vec::new ();
   for child in &children {
     let position : Option<usize> =
-      member_of_child (tree . get (*child) . unwrap () . value ())
+      member_of_child (tree . get (*child) . unwrap () . value (), graph)
       . and_then ( |member| goal . position_of (&member) );
     match (position, groups . last_mut ()) {
       (Some (position), _) => groups . push (( position, vec! [*child] )),
@@ -1064,7 +1069,9 @@ fn substitute_roots (
     let shown : ID = mirror_shown (
       walk . truth . config, walk . truth . graph, walk . truth . restriction,
       &skgrepo, &original );
-    let marked : Option<ID> = ( shown != original ) . then ( || original . clone () );
+    let marked : Option<ID> = // as the root's '(inPlaceOf N)' says it, else none
+      ( shown != walk . truth . graph . pid_else_raw_id (&original) )
+      . then ( || original . clone () );
     let repointed : bool = walk . truth . graph . pid_else_raw_id (&gnid) != shown;
     let was_editable : bool =
       tree . get (root) . unwrap () . value () . editable_gnid () . is_some ();
@@ -1237,7 +1244,7 @@ fn stop_substituting (
     &mut tree . get_mut (child) . unwrap () . value () . kind
   { occurrence . in_place_of = None; }
   let warrant : Warrant = warrant_of_child (
-    Some (goal), tree . get (child) . unwrap () . value () )
+    Some (goal), tree . get (child) . unwrap () . value (), walk . truth . graph )
     . unwrap_or (Warrant::No);
   tree . get_mut (child) . unwrap () . value () . set_warrant (warrant);
   let vanishes : bool = // as 'vanish_if_unwarranted' would have it
@@ -1254,7 +1261,7 @@ fn stop_substituting (
 
 /// Draw 'original' right after the child at 'after' (first, when
 /// None), unless a sibling already stands for it or the goal does not
-/// name it.
+/// name it, by its pid ('original' may be an extra ID).
 fn reinstate_original_after (
   tree     : &mut Tree<Viewnode>,
   parent   : NodeId,
@@ -1263,9 +1270,11 @@ fn reinstate_original_after (
   goal     : &Goal,
   walk     : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  let member : GoalMember = GoalMember::Gnid ( original . clone () );
+  let member : GoalMember =
+    GoalMember::Gnid ( walk . truth . graph . pid_else_raw_id (original) );
   let stands : bool = tree . get (parent) . unwrap () . children ()
-    . any ( |sibling| member_of_child (sibling . value ()) . as_ref () == Some (&member) );
+    . any ( |sibling| member_of_child (sibling . value (), walk . truth . graph) . as_ref ()
+                      == Some (&member) );
   if stands { return Ok (( )); }
   let Some (item) : Option<&GoalItem> = goal . item_for (&member) else { return Ok (( )); };
   let item : GoalItem = item . clone ();
