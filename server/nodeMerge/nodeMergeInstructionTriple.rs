@@ -85,6 +85,7 @@ fn nodeMerge_from_acquirer_and_acquiree (
     shown };
   let updated_acquirer : Graphnode =
     three_nodeMerged_graphnodes( config,
+                           graph,
                            &acquirer_from_disk,
                            &acquiree_from_disk,
                            &acquiree_text_preserver,
@@ -108,8 +109,13 @@ fn nodeMerge_from_acquirer_and_acquiree (
 /// - Filtered hides: can't hide your own
 ///   content, and can't hide what either member showed pre-merge
 ///   ('shown_pre_merge')
+/// Members of the lists compare by pid ('InRustGraph::pid_else_raw_id'
+/// in 'graph', from before the nodeMerge): a list may name a note by an
+/// extra ID. Each record is kept as its list names it, the first of
+/// two naming one note.
 fn three_nodeMerged_graphnodes(
   config: &SkgConfig,
+  graph: &InRustGraph,
   acquirer_from_disk: &Graphnode,
   acquiree_from_disk: &Graphnode,
   acquiree_text_preserver: &Graphnode,
@@ -142,6 +148,7 @@ fn three_nodeMerged_graphnodes(
   // sides carry, the more private skgrepo wins (the safe tie-break); every
   // skgrepo clamps at the acquirer's home, since no section may be more
   // public than its home.
+  let key = |gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
   let combine_rel_partners =
     |lists : &[&[RelPartner<ID>]]| -> Vec<RelPartner<ID>> {
       let home    : &SkgrepoName = & updated_acquirer . home_skgrepo;
@@ -151,22 +158,17 @@ fn three_nodeMerged_graphnodes(
           let skgrepo : SkgrepoName = config . more_private_of (
             m . relRepo . clone (), home . clone () );
           match out . iter_mut ()
-            . find ( |o| o . member == m . member ) {
+            . find ( |o| key (&o . member) == key (&m . member) ) {
             Some (existing) => {
               existing . relRepo = config . more_private_of (
                 existing . relRepo . clone (), skgrepo ); }
             None => out . push ( RelPartner::at_relRepo (
               skgrepo, m . member . clone () )), }} }
       out };
-  let new_contains : Vec<ID> = {
-    // [preserver] + acquirer's old content + acquiree's old content
-    let mut combined : Vec<ID> =
-      vec![ acquiree_text_preserver . pid . clone() ];
-    combined . extend (
-      members_of (& acquirer_from_disk . contains) );
-    combined . extend (
-      members_of (& acquiree_from_disk . contains) );
-    dedup_vector (combined) };
+  let new_contains : HashSet<ID> = // acquirer's old content + acquiree's old content, by pid (the preserver is new, and hidden by neither)
+    members_of (& acquirer_from_disk . contains) . iter ()
+    . chain ( members_of (& acquiree_from_disk . contains) . iter () )
+    . map (key) . collect ();
   let own_gnids : Vec<ID> = // the merged note's IDs, the acquiree's among them: it may not contain, fork or hide any of them
     updated_acquirer . all_gnids() . cloned() . collect::<Vec<_>>();
   let not_own = |m : &RelPartner<ID>| -> bool {
@@ -218,9 +220,9 @@ fn three_nodeMerged_graphnodes(
           acquiree_from_disk . hides
             . or_default () ] );
     combined . retain ( // if it's in 'new_contains', then it's not here
-      |m| ! new_contains . contains ( &m . member ));
+      |m| ! new_contains . contains ( &key (&m . member) ));
     combined . retain (
-      |m| ! shown_pre_merge . contains ( &m . member ));
+      |m| ! shown_pre_merge . contains ( &key (&m . member) ));
     combined . retain (not_own);
     updated_acquirer . hides =
       MSV::Specified (combined); }
@@ -235,17 +237,18 @@ fn three_nodeMerged_graphnodes(
 /// ('owned_notes_containing'; 'docs/glossary.org', "what a member
 /// shows"). Every record counts, since a nodeMerge is built from the
 /// graph, not from what a view drew. A partner with no disk entry
-/// contributes nothing.
+/// contributes nothing. Each is its pid, as the lists are compared.
 fn gnids_shown_through_forks_folder_members (
   node   : &Graphnode,
   graph  : &InRustGraph,
   config : &SkgConfig,
 ) -> Result<HashSet<ID>, Box<dyn Error>> {
+  let key = |gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
   let mut shown : HashSet<ID> = HashSet::new ();
-  let hides : Vec<ID> =
-    members_of ( node . hides . or_default () );
-  let contains : Vec<ID> =
-    members_of ( & node . contains );
+  let hides : HashSet<ID> =
+    members_of ( node . hides . or_default () ) . iter () . map (key) . collect ();
+  let contains : HashSet<ID> =
+    members_of ( & node . contains ) . iter () . map (key) . collect ();
   let unrestricted : SkgrepoRestriction = SkgrepoRestriction::unrestricted (config);
   for partner_gnid in forks_folder_members_shown (
     graph, &unrestricted, &node . pid,
@@ -253,7 +256,7 @@ fn gnids_shown_through_forks_folder_members (
   { let Some (partner) = opt_graphnode_by_gnid (
       graph, config, &partner_gnid ) ?
     else { continue; };
-    for gnid in members_of ( & partner . contains ) {
+    for gnid in members_of ( & partner . contains ) . iter () . map (key) {
       if ! hides . contains (&gnid)
         && ! contains . contains (&gnid)
         && owned_notes_containing (
@@ -332,7 +335,9 @@ mod flag_tests {
         acquiree . flags . push (Flag::NoSearchMatching); }
       let preserver : Graphnode = create_acquiree_text_preserver (&acquiree);
       let merged : Graphnode = three_nodeMerged_graphnodes (
-        &config (), &acquirer, &acquiree, &preserver, &HashSet::new ())
+        &config (),
+        &InRustGraph::from_graphnodes (&[ acquirer . clone (), acquiree . clone () ]),
+        &acquirer, &acquiree, &preserver, &HashSet::new ())
         . unwrap ();
       assert_eq! ( flag_is_true (
         &merged . flags, Flag::NoSearchMatching), expected );
