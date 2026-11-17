@@ -4493,3 +4493,6 @@ Every folder label now ('server/heralds.rs'), for Jeff to reword:
   containers folders.
 - "Forker as such" stays a misnomer for an indirect member that forks
   nothing of the note's, as the glossary now says.
+
+* Plan 4
+Started 2026-11-17 01:35 UTC; Jeff asked for it; no open questions.
