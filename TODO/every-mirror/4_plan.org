@@ -608,7 +608,7 @@ names which do not exist (correcting a name changes no line count):
 - Narrow suites: 'cargo build' and 'bash/nextest.sh' (the doctests
   read doc comments: 'bash/all-tests.sh' runs them).
 
-** TODO Slice 7: the measure of the whole, and the record
+** DONE Slice 7: the measure of the whole, and the record
 - Measure as "Measuring lines" says, at 2ddc0ff8 and at HEAD, and
   record in 'progress.org', under "* Plan 4", "The whole":
   - server/*.rs total, code and comments, before and after, beside

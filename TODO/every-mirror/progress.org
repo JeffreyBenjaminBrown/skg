@@ -4913,3 +4913,108 @@ None.
 *** Unfinished
 Nothing.
 *** DONE
+
+** Slice 7: the measure of the whole, and the record
+*** Commits
+- (the commit carrying this record) every-mirror plan 4 slice 7: the
+  measure of the whole, record, DONE
+*** Suites
+Logs under 'tests/results/every-mirror/slice7-plan4/'. The tree's code
+is slice 6's; this slice changed only 'TODO/'.
+- 'bash/integration-tests.sh': 39 of 39.
+- 'bash/all-tests.sh': all pass: Emacs 503 of 503, Neovim pass,
+  nextest 1276 of 1276, doctests, team tools, AI reader, integration
+  78 of 78.
+No failure to classify.
+*** Names removed or changed
+None. 'git grep -n -w' of every name the records of slices 1 to 6
+list as removed, over the whole tree, finds no hit outside 'TODO/'
+('TODO/problems.org' included). The only hits of two of those words
+are other things: 'fixtures-multi' names folders of 'tests/fork/' and
+'tests/mirror_substitution/' (slice 1 removed only
+'tests/override_menu/fixtures-multi/'), and 'view_of_n' a local
+variable in 'tests/pruned_change_view/editing.rs'.
+*** The whole
+Measured with the plan's 'measure' at b343cfa9 (before plan 1),
+2ddc0ff8 (after plan 3, this plan's base) and 9559b4d0 (after slice 6;
+slice 7 changed no measured file).
+| what                  | b343cfa9 total / code / comments | 2ddc0ff8 total / code / comments | after plan 4 total / code / comments | plan 4's change      |
+|-----------------------+----------------------------------+----------------------------------+--------------------------------------+----------------------|
+| server/*.rs           | 52,375 / 42,454 / 9,921          | 54,450 / 43,752 / 10,698         | 53,922 / 43,478 / 10,444             | -528 / -274 / -254   |
+| elisp/*.el            | 14,113 / 13,106 / 1,007          | 14,147 / 13,138 / 1,009          | 14,143 / 13,134 / 1,009              | -4 / -4 / 0          |
+| nvim/*.lua            | 14,963 / 10,808 / 4,155          | 15,027 / 10,841 / 4,186          | 15,027 / 10,841 / 4,186              | 0                    |
+| tools/skg-for-ai/*.py | 10,034 / 9,633 / 401             | 10,220 / 9,802 / 418             | 10,220 / 9,802 / 418                 | 0                    |
+| tests/*.rs            | 52,759 / 47,322 / 5,437          | 57,386 / 50,865 / 6,521          | 57,160 / 50,647 / 6,513              | -226 / -218 / -8     |
+| tests/*.el            | 17,351 / 16,299 / 1,052          | 17,653 / 16,570 / 1,083          | 17,626 / 16,543 / 1,083              | -27 / -27 / 0        |
+| tests/*.lua           | 15,209 / 13,602 / 1,607          | 15,542 / 13,865 / 1,677          | 15,542 / 13,865 / 1,677              | 0                    |
+So 'server/*.rs' stands 1,547 lines (1,024 code, 523 comments) above
+b343cfa9, down from 2,075 (1,298, 777) after plan 3: plan 4 took back
+a quarter of what plans 1 to 3 added.
+
+Each slice's measured change (total / code / comments):
+| slice | server/*.rs        | elisp | tests/*.rs         | tests/*.el | other |
+|-------+--------------------+-------+--------------------+------------+-------|
+|     1 | -151 / -124 / -27  |    -4 | -66 / -65 / -1     |        -27 |     0 |
+|     2 | -55 / -55 / 0      |     0 | +14 / +14 / 0      |          0 |     0 |
+|     3 | -95 / -69 / -26    |     0 | 0                  |          0 |     0 |
+|     4 | -36 / -26 / -10    |     0 | 0                  |          0 |     0 |
+|     5 | 0                  |     0 | -174 / -167 / -7   |          0 |     0 |
+|     6 | -191 / 0 / -191    |     0 | 0                  |          0 |     0 |
+|     7 | 0                  |     0 | 0                  |          0 |     0 |
+|   sum | -528 / -274 / -254 |    -4 | -226 / -218 / -8   |        -27 |     0 |
+Not counted by 'measure': slice 1's deleted fixtures (63 lines of
+'.skg', '.toml' and '.org').
+*** Proposed to Jeff, not executed
+Copied from the plan, each with its lines as the code now stands.
+None was touched.
+- P1. The mirrors' tie: after "the note itself", the least pid.
+  Deletes 'the_only_one_forked_by_none_of_the_others', the field
+  'Mirrors::forks' and its writers, the fork filtering of
+  'hits_among_mirrors_of', the distance comparison and two
+  'tied . len () == 1' branches: about 39 server lines (the plan's 45
+  less the six module-doc lines slice 6 already replaced with a
+  pointer). Changes two expectations of 'tests/dbs/in_rust_graph/mirrors.rs'
+  (rules three and four), which mirror stands for an owned chain kept
+  in one skgrepo other than the note's, and 'docs/mirrors.org',
+  "Which mirror stands".
+- P2. One visibility step instead of two: about 70 server lines.
+  Changes how a forkee's contains named by an extra ID, and a claiming
+  member the graph does not yet record as forked, are read.
+- P3. The hidden-by folder ('Folder::HiddenByForker'), folded into
+  the hidden-in folder or dropped: about 100 server lines and 20
+  elsewhere. Users see one folder fewer under a forker that forks the
+  note.
+- P4. One list for the forks folder's tails: about 10 server lines. A
+  forker whose home skgrepo the restriction keeps out, but whose fork
+  record it shows, would leave the folder.
+- P5. The AI tool's old sidecars: about 7 lines. A command on a
+  sidecar saved before plan 3 would send the old perspective name,
+  which the server refuses.
+*** After the migration
+Copied from the plan; measured now. These stay until every skgrepo is
+migrated to the 'forks' format and the live servers run this branch.
+- 'server/dbs/filesystem/retired_keys.rs': 133 lines (103 code, 30
+  comments), and its readers in 'one_node.rs', 'multiple_nodes.rs',
+  'server/git_ops/diff.rs' and 'git_snapshot.rs': about 245 server
+  lines in all.
+- The serde alias 'hides_from_its_subscriptions'
+  ('server/types/nodes/fs.rs' 63) and its comment.
+- Tests: 'tests/unit/retired_keys.rs' (39 lines); the retired-keys
+  case of 'tests/init_refusal.rs' (about 100 of its 128); the
+  retired-keys cases and fixtures of 'tests/graph_straddle.rs'; the
+  old-format blob of 'tests/investigate_unknown_node.rs'; the
+  'SubscribesTo' mark of 'tests/unit/processed_store.rs' and its
+  fixture.
+- The migration tools: 'tools/migrate-forks-2026-11/' (1,231 lines)
+  and 'tools/migrate-skg-keys-2026-10/' (84).
+- 'docs/api-and-formats.org', "The .skg file format": the retired keys
+  and the October alias.
+*** Put back, would change behavior
+Nothing, in any slice.
+*** Deviations
+None.
+*** Unfinished
+The review of 'coding-advice/plans.org' ("After each plan"): one agent
+reading the plan's whole diff, which the plan schedules after this
+slice.
+*** DONE
