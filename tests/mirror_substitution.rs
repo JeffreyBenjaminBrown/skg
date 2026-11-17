@@ -291,7 +291,7 @@ async fn save_roundtrips_to_original_and_is_a_fixpoint (
       Ok (( )) }
 
 /// In its own skgrepo a note stands as itself, however many of its
-/// forks are there (rule 2 of 'docs/mirrors.org', "Which mirror
+/// forks are there (rule 1 of 'docs/mirrors.org', "Which mirror
 /// stands"): a view of P, drawn from "main", shows N, R only in its
 /// forks folder. M, in N's skgrepo, comes to fork N beside R (saved
 /// through the save's graph update); N's three mirrors tie there, and
@@ -328,7 +328,7 @@ async fn a_second_owned_fork_saves_and_the_original_stands (
   Ok (( )) }
 
 /// N comes to fork R, which forks N: an owned mutual pair, in
-/// one skgrepo (saved as above). N stands as itself there (rule 2 of
+/// one skgrepo (saved as above). N stands as itself there (rule 1 of
 /// 'docs/mirrors.org', "Which mirror stands"); R
 /// is drawn in N's forks folder, a mutual, born of both sides.
 async fn an_owned_mutual_pair_saves_and_the_original_stands (

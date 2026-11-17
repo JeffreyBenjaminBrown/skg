@@ -161,8 +161,8 @@ fn suppression_anchors_at_owned (
   Ok (( )) }
 
 /// Owned O1 and O2 fork each other, and both match: one stands,
-/// the other is suppressed. They tie (one skgrepo, each forked by the
-/// other), and a tie among hits goes to the least pid, O1.
+/// the other is suppressed. They tie (one skgrepo), and a tie among
+/// hits goes to the least pid, O1.
 fn an_owned_mutual_pair_both_matching_shows_one_hit (
   graph  : &InRustGraph,
   config : &SkgConfig,

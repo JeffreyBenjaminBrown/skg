@@ -15,8 +15,7 @@ use crate::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::mirrors::{
-  Mirror, Mirrors, first_ranked_mirrors, mirrors_of,
-  the_only_one_forked_by_none_of_the_others};
+  Mirror, Mirrors, first_ranked_mirrors, mirrors_of};
 use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::refresh::{Truth, refresh_content_viewforest};
@@ -562,39 +561,31 @@ pub fn suppressed_result_gnids (
                             . filter ( |pid| pid != &standing ) ); }}
   suppressed }
 
-/// The mirrors of 'hit' that are hits, with the fork relationships
-/// among them.
+/// The mirrors of 'hit' that are hits.
 fn hits_among_mirrors_of (
   graph           : &InRustGraph,
   restriction     : &SkgrepoRestriction,
   hit             : &ID,
   matches_by_gnid : &MatchGroups,
 ) -> Mirrors {
-  let mirrors : Mirrors = mirrors_of (graph, restriction, hit, None);
-  let members : Vec<Mirror> = mirrors . members . into_iter ()
+  let members : Vec<Mirror> = mirrors_of (graph, restriction, hit, None)
+    . members . into_iter ()
     . filter ( |mirror| matches_by_gnid . contains_key (&mirror . pid) )
     . collect ();
-  let is_member = |pid : &ID| -> bool { members . iter () . any ( |m| &m . pid == pid ) };
-  let forks : HashSet<(ID, ID)> = mirrors . forks . into_iter ()
-    . filter ( |(forker, forkee)| is_member (forker) && is_member (forkee) )
-    . collect ();
-  Mirrors { members, forks } }
+  Mirrors { members } }
 
 /// Which of 'hits', hits that are mirrors of one another, the user's
 /// own skgrepo list ranks first: the perspective of the config's
 /// first owned skgrepo in declaration order (the most public;
 /// 'SkgConfig::first_owned_else_first_declared_skgrepo'), then the others in
-/// declaration order. Several there tie: the only one none of the
-/// others forks stands, else the least pid.
+/// declaration order. Several there tie, and the least pid stands.
 fn hit_standing_among (
   config : &SkgConfig,
   hits   : &Mirrors,
 ) -> Option<ID> {
-  let tied : Vec<Mirror> = first_ranked_mirrors (
-    config, &config . first_owned_else_first_declared_skgrepo (), hits );
-  if tied . len () == 1 { return Some ( tied [0] . pid . clone () ); }
-  the_only_one_forked_by_none_of_the_others (&tied, hits)
-    . or_else ( || tied . into_iter () . map ( |mirror| mirror . pid ) . min () ) }
+  first_ranked_mirrors (
+    config, &config . first_owned_else_first_declared_skgrepo (), hits )
+    . into_iter () . map ( |mirror| mirror . pid ) . min () }
 
 /// Builds the stub of the search buffer ('draw_search_buffer'): one
 /// root per hit, best first, each a write-protected occurrence titled

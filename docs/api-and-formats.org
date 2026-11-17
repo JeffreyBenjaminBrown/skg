@@ -118,8 +118,8 @@ So far there are these endpoints:
       list ranks first stands: the list of the perspective of the
       config's first owned skgrepo, the most public, then the others
       in declaration order, so that among owned hits the most public
-      stands; several in one skgrepo tie, and the only one none of
-      the others forks stands, else the least pid. If it is owned, every other
+      stands; several in one skgrepo tie, and the least pid
+      stands. If it is owned, every other
       hit among them is suppressed at the top level
       ('suppressed_result_gnids'), and reappears in the one forks
       folder of the hit standing, which lists every mirror of it, one
@@ -2063,9 +2063,9 @@ to it by =forks= relationships, followed either way, under the
 skgrepo restriction; a perspective is a skgrepo S (or the root homes,
 one per tree), and its list is S,
 then every other skgrepo in declaration order. In its own skgrepo N
-itself stands, however many of its mirrors are there; a chain D forks
-C forks N kept in one skgrepo other than N's shows D there; where a
-mirror's skgrepo is restricted, the chain is cut there. The refresh
+itself stands, however many of its mirrors are there; of several in
+one skgrepo other than N's, the least pid stands; where a mirror's
+skgrepo is restricted, a chain of forks is cut there. The refresh
 substitutes at every refresh, a member already shown raw included,
 and re-points a member shown in another's place whenever it is not
 the mirror shown, since it decides from the buffer and the graph as

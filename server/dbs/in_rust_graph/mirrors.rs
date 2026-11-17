@@ -27,15 +27,12 @@ pub struct Mirror {
   pub distance : usize,
 }
 
-/// The mirrors of one note N, and the fork relationships among them.
+/// The mirrors of one note N.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Mirrors {
   /// N first, then the others nearest first. Empty when the graph
   /// lacks N.
   pub members : Vec<Mirror>,
-  /// Each visible relationship between two members, as
-  /// '(forker, forkee)'.
-  pub forks   : HashSet<(ID, ID)>,
 }
 
 impl Mirrors {
@@ -77,16 +74,9 @@ pub fn mirror_shown_among (
   mirrors  : &Mirrors,
 ) -> ID {
   let tied : Vec<Mirror> = first_ranked_mirrors (config, skgrepo, mirrors);
-  if tied . len () == 1 {
-    return tied [0] . pid . clone (); }
-  if tied . is_empty ()
-     || tied . iter () . any ( |mirror| &mirror . pid == original ) {
+  if tied . iter () . any ( |mirror| &mirror . pid == original ) {
     return original . clone (); }
-  if let Some (pid) = the_only_one_forked_by_none_of_the_others (&tied, mirrors) {
-    return pid; }
-  tied . into_iter ()
-    . min_by ( |a, b| ( a . distance, &a . pid ) . cmp (&( b . distance, &b . pid )) )
-    . map ( |mirror| mirror . pid )
+  tied . into_iter () . map ( |mirror| mirror . pid ) . min ()
     . unwrap_or_else ( || original . clone () ) }
 
 /// The members of 'mirrors' homed in the first skgrepo of the
@@ -106,21 +96,6 @@ pub fn first_ranked_mirrors (
   mirrors . members . iter ()
     . filter ( |mirror| mirror . home == first_home )
     . cloned () . collect () }
-
-/// Of 'tied', some of 'mirrors''s members, the only one that none of
-/// the others forks, if exactly one is.
-pub fn the_only_one_forked_by_none_of_the_others (
-  tied    : &[Mirror],
-  mirrors : &Mirrors,
-) -> Option<ID> {
-  let forked_by_none_of_the_others : Vec<&Mirror> = tied . iter ()
-    . filter ( |mirror| ! tied . iter () . any ( |other|
-      other . pid != mirror . pid
-      && mirrors . forks . contains (&( other . pid . clone (), mirror . pid . clone () )) ))
-    . collect ();
-  match forked_by_none_of_the_others . as_slice () {
-    [one] => Some ( one . pid . clone () ),
-    _ => None, }}
 
 /// Either of 'candidate' and 'original' may be a pid or an extra ID.
 pub fn is_mirror_of (
@@ -158,20 +133,19 @@ pub fn mirrors_of (
       forker != &start
       || start_forkees . as_ref () . is_none_or ( |forkees| forkees . contains (forkee) ) };
   let mut mirrors : Mirrors = Mirrors {
-    members : vec! [ Mirror { pid : start . clone (), home : start_home, distance : 0 } ],
-    forks   : HashSet::new (), };
+    members : vec! [ Mirror { pid : start . clone (), home : start_home, distance : 0 } ] };
   let mut seen : HashSet<ID> = HashSet::from ([ start . clone () ]);
   let mut frontier : VecDeque<(ID, usize)> = VecDeque::from ([ ( start . clone (), 0 ) ]);
   while let Some ((pid, distance)) = frontier . pop_front () {
-    let relationships : Vec<(ID, (ID, ID))> =
+    let partners : Vec<ID> =
       visible_fork_relationships_of (graph, restriction, &pid) . into_iter ()
       . filter ( |(_partner, fork)| relationship_stands (fork) )
+      . map ( |(partner, _fork)| partner )
       . chain ( start_forkees . iter () . flatten ()
                 . filter ( |_| pid == start )
-                . map ( |forkee| ( forkee . clone (), ( start . clone (), forkee . clone () )) ))
+                . cloned () )
       . collect ();
-    for (partner, fork) in relationships {
-      mirrors . forks . insert (fork);
+    for partner in partners {
       if ! seen . insert ( partner . clone () ) { continue; }
       let home : SkgrepoName = graph . nodes . get (&partner)
         . map ( |node| node . home_skgrepo . clone () )

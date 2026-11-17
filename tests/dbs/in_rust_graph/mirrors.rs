@@ -168,22 +168,21 @@ fn a_foreign_two_cycle_shows_the_first_ranked_from_either_note () {
   every_one_shows (&notes, "your-y", "b");
   every_one_shows (&notes, "my-x", "a"); }
 
-/// Rule 1 of 'docs/mirrors.org', "Which mirror stands": one mirror
-/// alone in the first-ranked skgrepo stands, though a forker of it is
-/// elsewhere.
+/// One mirror alone in the first-ranked skgrepo stands, though a
+/// forker of it is elsewhere.
 #[test]
-fn rule_one_a_mirror_alone_in_the_first_skgrepo_stands () {
+fn a_mirror_alone_in_the_first_skgrepo_stands () {
   every_one_shows (
     &[ note ("n", "your-x", &[]), note ("c", "my-y", &["n"]),
        note ("d", "your-y", &["c"]) ],
     "my-y", "c" ); }
 
-/// Rule 2 of 'docs/mirrors.org', "Which mirror stands": N itself
+/// Rule 1 of 'docs/mirrors.org', "Which mirror stands": N itself
 /// stands among a tie in its own skgrepo: two forks of N there; an
 /// owned chain D forks C forks N kept there; a mutual pair there,
 /// from either note.
 #[test]
-fn rule_two_the_note_itself_stands_among_a_tie () {
+fn the_note_itself_stands_among_a_tie () {
   let siblings : Vec<Graphnode> = vec! [
     note ("n", "my-x", &[]), note ("r", "my-x", &["n"]), note ("t", "my-x", &["n"]) ];
   assert_eq! ( shown (&siblings, &unrestricted (), "my-x", "n"), ID::from ("n") );
@@ -196,31 +195,30 @@ fn rule_two_the_note_itself_stands_among_a_tie () {
   assert_eq! ( shown (&mutual, &unrestricted (), "my-x", "a"), ID::from ("a") );
   assert_eq! ( shown (&mutual, &unrestricted (), "my-x", "b"), ID::from ("b") ); }
 
-/// Rule 3 of 'docs/mirrors.org', "Which mirror stands": N is not
+/// Rule 2 of 'docs/mirrors.org', "Which mirror stands": N is not
 /// among the tie, a chain D forks C forks N kept in one skgrepo other
-/// than N's, so the one no other there forks, D, stands in N's place.
-/// Asked of C or D, the note itself is among the tie, so stands.
+/// than N's, so the least pid there, C, stands in N's place. Asked of
+/// C or D, the note itself is among the tie, so stands.
 #[test]
-fn rule_three_the_one_no_other_there_forks_stands () {
+fn a_chain_kept_outside_the_notes_skgrepo_shows_its_least_pid () {
   let notes : Vec<Graphnode> = vec! [
     note ("n", "your-x", &[]), note ("c", "my-x", &["n"]),
     note ("d", "my-x", &["c"]) ];
-  for (asked, expected) in [ ("n", "d"), ("c", "c"), ("d", "d") ] {
+  for (asked, expected) in [ ("n", "c"), ("c", "c"), ("d", "d") ] {
     assert_eq! ( shown (&notes, &unrestricted (), "my-x", asked), ID::from (expected),
                  "asked of {}", asked ); }}
 
-/// Rule 4 of 'docs/mirrors.org', "Which mirror stands": N is not
+/// Rule 2 of 'docs/mirrors.org', "Which mirror stands": N is not
 /// among the tie (a, b and c, all in 'my-x', where b and c fork N
-/// and a forks b; a and c are forked by none of
-/// the others), so the nearest to N stands, and among equals (b and c)
-/// the least pid. 'a', the least pid of all, is farther.
+/// and a forks b), so the least pid, a, stands, though b and c are
+/// nearer N.
 #[test]
-fn rule_four_the_nearest_then_the_least_pid_stands () {
+fn the_least_pid_stands_however_far_from_the_note () {
   assert_eq! (
     shown ( &[ note ("n", "your-x", &[]), note ("b", "my-x", &["n"]),
                note ("c", "my-x", &["n"]), note ("a", "my-x", &["b"]) ],
             &unrestricted (), "my-x", "n" ),
-    ID::from ("b") ); }
+    ID::from ("a") ); }
 
 /// A restricted note in the middle of a path cuts it: 'c', homed in
 /// 'my-x', which the restriction keeps out, joins 'n' to 'd', which

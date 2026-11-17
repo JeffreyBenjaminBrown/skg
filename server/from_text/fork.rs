@@ -553,7 +553,6 @@ fn mirror_shown_once_cloned (
   let mut mirrors : Mirrors = mirrors_of (graph, restriction, &spec . original_gnid, None);
   mirrors . members . push ( Mirror {
     pid : clone . pid . clone (), home : clone . home_skgrepo . clone (), distance : 1 } );
-  mirrors . forks . insert (( clone . pid . clone (), spec . original_gnid . clone () ));
   mirror_shown_among (config, skgrepo, stands_for, &mirrors) }
 
 #[cfg(test)]

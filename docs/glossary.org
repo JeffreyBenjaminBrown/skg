@@ -1258,9 +1258,10 @@ tree of a view switched to it ('Perspective'; Emacs 'C-c v o'). The
 mirror shown may be in any skgrepo: where the perspective's holds no
 mirror of N, the first declared that holds one stands. In its own
 skgrepo N itself stands, however many of its mirrors are there; so when
-the mirror shown is N itself, nothing substitutes. An owned chain D
-forks C forks N, kept in one skgrepo other than N's, shows D there;
-visibility gating can cut the chain, so that a middle node shows.
+the mirror shown is N itself, nothing substitutes. Of several
+mirrors in one skgrepo other than N's, the least pid stands;
+visibility gating can cut a chain of forks, so that a middle node
+shows.
 
 The shown substitute carries the fact '(inPlaceOf N)'
 (the crucial herald =ĥ= after =K=; 'in_place_of' on the occurrence),

@@ -78,12 +78,11 @@ substitution").  Among them, the hit the user's own skgrepo list
 ranks first stands: the list of the perspective of the config's first
 owned skgrepo (the most public), then the others in declaration
 order, so that among owned hits the most public stands.  Several in
-one skgrepo tie: the only one none of the others forks stands, else
-the least pid.  If the hit standing is owned, every other hit among
-them is suppressed at the top level, and reappears in the forks
-folder of the hit standing, which lists every mirror of it, the
-indirect ones (related to it only through other mirrors) after its
-fork partners.  So every suppressed hit stands in the one forks
+one skgrepo tie, and the least pid stands.  If the hit standing is
+owned, every other hit among them is suppressed at the top level,
+and reappears in the forks folder of the hit standing, which lists
+every mirror of it, the indirect ones (related to it only through
+other mirrors) after its fork partners.  So every suppressed hit stands in the one forks
 folder of the hit that suppressed it (or, where that hit hides it,
 in that folder's folder of what it hides outside its fork
 partners).
@@ -118,15 +117,15 @@ skgrepo in the config's declaration order, whose owned entries run
 most public first.  The mirror shown is the one whose home skgrepo
 comes first in that list; where several do, the tie is broken thus:
 
-1. One mirror alone in that skgrepo stands.
-2. Otherwise =N= itself stands, if it is one of them: two forks of =N=
-   in =N='s own skgrepo, an owned chain =D forks C forks N= kept
-   there, or a mutual pair in one skgrepo, show =N= as itself.
-3. Otherwise, if exactly one of them is forked by none of the
-   others, it stands.  A chain =D forks C forks N= kept in one
-   skgrepo other than =N='s shows =D= there.
-4. Otherwise the one nearest =N= along =forks= relationships, in
-   either direction, and among equals the least pid.
+1. =N= itself stands, if it is one of them: two forks of =N= in
+   =N='s own skgrepo, an owned chain =D forks C forks N= kept there,
+   or a mutual pair in one skgrepo, show =N= as itself.
+2. Otherwise the one with the least pid stands, whatever forks what.
+   A chain =D forks C forks N= kept in one skgrepo other than =N='s
+   shows there whichever of =C= and =D= has the lesser pid.  A
+   clone's pid is a random UUID, so a fork made in the skgrepo of the
+   mirror shown there stands in its place or not by chance; where it
+   does not, the save says so.
 
 When the mirror shown is =N=, nothing substitutes.  Who owns a
 skgrepo plays no part: where =S= holds no mirror of =N=, the first

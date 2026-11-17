@@ -128,7 +128,7 @@ async fn test_multi_root_view_with_shared_nodes (
       // so node 2 appears first as a root, then as a child (marked
       // write-protected). Node 3, a mirror of 2 (2 and 3 fork 4 and 5,
       // and 5 forks 3), stands as itself: all are in one skgrepo, where
-      // a note stands as itself (rule 2 of 'docs/mirrors.org', "Which
+      // a note stands as itself (rule 1 of 'docs/mirrors.org', "Which
       // mirror stands"). Editable nodes with forks get forks folder
       // children, and each forks folder has the note's fork partners
       // as its children. Each member as such is drawn editable, with
@@ -194,7 +194,7 @@ async fn test_multi_root_view_with_node_limit (
       // as a root, so write-protected, and 3; root 2's containers
       // folder costs nothing). 2, 3, 4 and 5 are mirrors (2 and 3 fork
       // 4 and 5, 5 forks 3 and 4), all in 'main', where each stands as
-      // itself (rule 2 of 'docs/mirrors.org', "Which mirror stands").
+      // itself (rule 1 of 'docs/mirrors.org', "Which mirror stands").
       // 3 takes the last unit and is drawn editable, with its forks
       // folder; root 2 extends its body + default folders (folders are
       // not budget-bound); the members as such of both forks folders
