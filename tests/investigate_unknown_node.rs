@@ -199,3 +199,26 @@ fn a_deleted_node_whose_blob_holds_retired_keys_is_reported (
   assert! ( ! content . contains ("forks"),
             "a retired key is read as no forks:\n{}", content );
   Ok (( )) }
+
+/// A node another file names by one of its extra IDs: 'xv', which had
+/// the extra ID 'xv2', deleted in a later commit, where 'q' contained
+/// it as 'xv2' and 'r' linked to it so. Both are reported as referring
+/// to it.
+#[test]
+fn a_reference_by_an_extra_id_is_reported (
+) -> Result<(), Box<dyn Error>> {
+  let f : Fixture = fixture () ?;
+  let skgrepo : &Path = &f . config . skgrepos [&SkgrepoName::from ("main")] . path;
+  let gitrepo : Repository = Repository::open (skgrepo) ?;
+  fs::write ( skgrepo . join ("xv.skg"), "title: Extra\npid: xv\nextra_ids:\n- xv2\n" ) ?;
+  write_node (skgrepo, "q", "Q", "", &["xv2"]) ?;
+  write_node (skgrepo, "r", "R", "links [[id:xv2][it]]", &[]) ?;
+  commit_everything (&gitrepo, "add xv, named by its extra ID") ?;
+  fs::remove_file ( skgrepo . join ("xv.skg") ) ?;
+  commit_everything (&gitrepo, "delete xv") ?;
+  let (content, errors) : (String, bool) = investigate (&f, "xv", "other") ?;
+  assert! ( ! errors, "no error expected:\n{}", content );
+  assert! ( content . contains ("**** q (via contains)")
+            && content . contains ("**** r (via link)"),
+            "q's and r's references by xv2 must be shown:\n{}", content );
+  Ok (( )) }

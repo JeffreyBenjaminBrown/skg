@@ -15,7 +15,7 @@ use crate::types::nodes::complete::Graphnode;
 use crate::types::links::links_from_node;
 
 use git2::{Commit, ObjectType, Repository, TreeWalkMode, TreeWalkResult};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug)]
@@ -149,7 +149,9 @@ fn sighting_at_commit (
     keep ("hides", hides_gnids . or_default ());
     outbound };
   let inbound : Vec<(ID, &'static str)> =
-    inbound_references_in_tree (gitrepo, prefix, skgrepo_name, gnid, &tree);
+    inbound_references_in_tree (
+      gitrepo, prefix, skgrepo_name,
+      &own . all_gnids () . cloned () . collect (), &tree );
   Some ( VanishedNodeSighting {
     home_skgrepo : skgrepo_name . clone (),
     last_present : commit_stamp (commit),
@@ -161,12 +163,13 @@ fn sighting_at_commit (
     inbound, } ) }
 
 /// Every node in 'tree' (other than the id's own file) that refers to
-/// the id, with the relation(s) it does so by.
+/// the id, by any of 'gnids' (the node's pid and extra IDs then), with
+/// the relation(s) it does so by.
 fn inbound_references_in_tree (
   gitrepo        : &Repository,
   prefix      : &Path,
   skgrepo_name : &SkgrepoName,
-  gnid          : &ID,
+  gnids         : &HashSet<ID>,
   tree        : &git2::Tree,
 ) -> Vec<(ID, &'static str)> {
   let mut inbound : Vec<(ID, &'static str)> = Vec::new ();
@@ -182,21 +185,21 @@ fn inbound_references_in_tree (
     let Ok (node) = parse_blob_node (
       blob . content (), skgrepo_name, &rel_path )
       else { return TreeWalkResult::Ok; }; // an unparseable neighbor cannot hide the parseable ones
-    if node . pid == *gnid {
+    if gnids . contains (&node . pid) {
       return TreeWalkResult::Ok; }
     let mut note = |name : &'static str, hit : bool| {
       if hit { inbound . push ( (node . pid . clone (), name) ); }};
     note ("contains",
-          node . contains . iter () . any ( |m| &m . member == gnid ));
+          node . contains . iter () . any ( |m| gnids . contains (&m . member) ));
     note ("forks",
           node . forks . or_default () . iter ()
-            . any ( |m| &m . member == gnid ));
+            . any ( |m| gnids . contains (&m . member) ));
     note ("hides",
           node . hides . or_default () . iter ()
-            . any ( |m| &m . member == gnid ));
+            . any ( |m| gnids . contains (&m . member) ));
     note ("link",
           links_from_node (&node) . iter ()
-            . any ( |l| l . gnid == *gnid ));
+            . any ( |l| gnids . contains (&l . gnid) ));
     TreeWalkResult::Ok
   }) . ok ();
   inbound }
