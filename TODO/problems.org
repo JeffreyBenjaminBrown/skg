@@ -6,6 +6,33 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* IDs compared letter for letter outside every-mirror's diff (2026-11-17)
+  Seen during "IDs compared as equivalence classes"
+  (TODO/every-mirror/progress.org, plan 4), on lines the branch did
+  not change; none fixed or reproduced. Each compares
+  a side that may hold an extra ID (after a nodeMerge) with a pid.
+  - 'NodeSaveIntent::apply_hiderel_delta' ('lower.rs') dedups the
+    hides and removes unhides raw. Every caller filters by pid first,
+    so a hide is written twice only if the contains-removal step hides
+    a child the note already hides by another of its IDs (a note that
+    contains and hides one child). Resolving needs the graph passed in.
+  - The save's distinctness validators ('claiming_children_have_distinct_gnids',
+    'partnerFolder_children_have_distinct_gnids' in
+    'buffer_to_viewnodes/local.rs') and 'dedup_members_by_gnid'
+    ('traverse.rs') compare collected gnids raw: an occurrence of K
+    beside a mirror '(inPlaceOf X)', X an extra ID of K, pass as
+    distinct, and the parent's contains would list K and X.
+  - 'id_rule' ('refresh/id_rule.rs'), the restricted branch: a buffer
+    gnid against the goal's pids. A restricted member a stale buffer
+    names by an extra ID is tombstoned and reinstated rather than kept.
+  - 'relationship_at_head' ('diff_view/restore_requests.rs') resolves
+    HEAD's members through the graph at HEAD and the key through the
+    live graph: after a nodeMerge since HEAD folded m into k, a
+    restore of a record naming m may be dropped as one HEAD lacks.
+  - The "investigate unknown node" request finds a note in history by
+    its file name ('<id>.skg', 'sight_gnids_in_gitrepo'), so an
+    unknown ID that was an extra ID of a vanished note is reported as
+    never present.
 * A headline whose 'writeProtected' mark is gone is read as the node's whole content (2026-11-17)
   Found while fixing "A moved headline whose content was not drawn"
   (TODO/every-mirror/progress.org, plan 4). Older than every-mirror.

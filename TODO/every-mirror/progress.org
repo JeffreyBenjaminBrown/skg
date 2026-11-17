@@ -5447,3 +5447,318 @@ editable in an editable note's forks folder (every part but
 *** Unfinished
 The stripped-mark shape, as above.
 *** DONE
+** IDs compared as equivalence classes
+Assigned 2026-11-17, after 2d4bf385: audit every comparison of note
+IDs in code written or changed since the branch left the remote's main
+('git diff db470627 HEAD'), and fix each that compares a side that may
+hold an extra ID (any list read from a file, a buffer's
+'(inPlaceOf N)') letter for letter. Jeff's rule: the IDs for a note
+are equivalent. The helpers: 'InRustGraph::pid_of' and
+'pid_else_raw_id', 'resolve_all' ('goal.rs'), the save's
+'IdResolution' and 'replace_gnid_with_pid' (buffer occurrences carry
+pids after the parse), and the recorderward relmaps, keyed by pid
+('canonical_key'). A node's own lists in the graph
+('GraphnodeInRust') are raw, as the file names them.
+*** Commits
+- 243ec32a every-mirror: IDs compared as equivalence classes: the
+  contains-removal step
+- 431e6611 every-mirror: IDs compared as equivalence classes: the
+  nodeMerge's lists
+- 01992639 every-mirror: IDs compared as equivalence classes: a
+  mirror's original in the refresh
+- c5dd7ffa every-mirror: IDs compared as equivalence classes: a
+  vanished node's referrers
+- (the commit carrying this record) every-mirror: IDs compared as
+  equivalence classes, record
+*** The faults fixed
+**** The contains-removal step's unhide
+N hides m, as F's list names k; the user moves k from F's folder of
+what N hides in it into N's own content. 'infer_hides_from_contains_removals'
+looked for k in N's hides letter for letter: the hide stayed, and the
+view drew k twice, as N's child and as hidden. It now keys N's
+contains, its hides and the buffer's children by pid, and finds an
+unhide as N's hides name it.
+**** The nodeMerge's lists
+'three_nodeMerged_graphnodes' combined and filtered contains, forks
+and hides raw: a contains k, b contains m (an ID of k) made the
+merged note contain one note twice (forks likewise); c contains p, d
+hides q (an ID of p) left the merged note hiding what it contains; h
+hides s, i shows r (s an ID of r) through a forkee left the merged
+note hiding what the acquiree showed. Each now compares by pid in the
+graph before the nodeMerge, keeping a record as its list names it.
+'gnids_shown_through_forks_folder_members' read its own hides and
+contains raw too; fixed alongside, though no case I found shows it
+apart from the others (the combined hides' own filters mask it).
+**** A mirror's original in the refresh
+A mirror drawn '(inPlaceOf X)', X since folded into K by a nodeMerge
+made from another view. 'member_of_child' gave the raw X, which the
+parent's goal (naming K) did not find: the headline lost its warrant,
+vanished and was redrawn fresh, losing its viewnode ID, its fold and
+what was extended under it. At a root, 'substitute_roots' compared
+the shown K with the raw X and left it marked as standing in place of
+itself. 'view_ancestor_gnids' kept the raw X, so a containers folder
+below listed K, which the view shows above (masked on the old code by
+the vanish, so its test fails only with that function unfixed).
+'reinstate_original_after' compared the original raw too. All now
+compare by pid; the mark keeps the ID it says, so a save still
+collects X as the parent's list names it.
+**** A vanished node's referrers
+The "investigate unknown node" report's referrers
+('inbound_references_in_tree') compared each list with the node's
+pid alone; a reference by one of its extra IDs then was left out. It
+now compares with the pid and the extra IDs at that commit.
+*** Every place surveyed
+129 places, by file and function. "Safe" says why both sides are pids
+or resolved.
+**** server/from_text/local_fieldintent_collection/resolve_visibility.rs
+- 'resolve_visibility', forkee loop (forker contains, visible
+  content, shown before, set aside, hides, unhides): safe, keyed
+  ('key', 2d4bf385).
+- 'add_children_placed_under_member_as_such' (named, placed,
+  position): safe, keyed; 'placed' compares one buffer list with
+  itself.
+- 'resolve_forker_visibility' (shown before, visible, set aside,
+  hidden or contained, the note's forks): safe, keyed or pids.
+- 'resolve_forks_folder_removals' (shown, forked after save, hidden,
+  drawn, deleted): safe, pids or keyed.
+- 'forks_folder_members_drawn': safe, returns pids.
+- 'apply_hiddenoutside_edits' (seen, inside, replaceable, submitted,
+  current keys): safe, keyed; 'node_is_restricted' resolves.
+- 'infer_hides_from_contains_removals', removed, unhides, hides: fixed.
+- 'infer_hides_from_contains_removals', 'hider_pid', 'visible_contains':
+  safe, pids, or one disk list against itself.
+- 'member_it_stands_for': safe, mirrors are pids and the member is
+  resolved.
+- 'validate_no_overlapping_forkee_hiderel_conflicts': safe, keyed
+  (2d4bf385).
+**** server/from_text/local_fieldintent_collection/ (other files)
+- lower.rs 'lower_collected_fieldIntents', 'each_entrys_slot_in_order'
+  and the 'by_pid' gets: safe, buffer pids.
+- lower.rs 'contains_after_save': safe, resolves.
+- lower.rs 'note_contains_after_save', 'note_forks_after_save',
+  'note_hides_after_resolution': safe, return the raw lists, and every
+  caller keys them.
+- lower.rs 'set_contains_of_member_as_such',
+  'set_contains_of_new_member_as_such': safe, gets by buffer pid.
+- lower.rs 'add_forkee_to_note' ('gnid == forkee'): safe, the forkee
+  is a pid, the caller checked the disk forks by key, and a specified
+  forks list holds buffer pids.
+- lower.rs 'NodeSaveIntent::apply_hiderel_delta' (dedup, retain; its
+  lines predate the diff, its callers are in it): safe as reached,
+  since every caller filters its hides by key against the hider's
+  hides and names its unhides as the hides do (a cut from two forkees
+  naming one child differently, tried, writes one hide); latent, in
+  'TODO/problems.org'.
+- types.rs 'instructionMerge_fieldIntent': safe, keyed by buffer pid.
+- traverse.rs 'forks_folder_members_shown', 'visible_content_members',
+  'members_of_integratedElsewhere_and_hiddenIn_folders',
+  'visit_forks_folder', 'partnerFolder_members': safe, emit buffer
+  IDs that every consumer keys.
+**** server/from_text/ (other files)
+- hide_report.rs 'hide_report_lines': safe, through
+  'visible_members', 'key', resolved deletions and
+  'member_it_stands_for'.
+- file_what_is_written_in.rs 'file_forkee_members_written_in',
+  'forkee_members_written_in', 'is_written_in': safe, resolved.
+- file_what_is_written_in.rs 'file_in_forker' (planned position,
+  mirrors, hides): safe, resolved; 'node . pid == forker' compares
+  pids.
+- fork.rs 'existing_owned_fork_of': safe, resolves.
+- fork.rs 'forks_the_view_will_not_show' (shown, clone, original):
+  safe, pids ('original_gnid' is the buffer node's pid).
+- fork.rs 'mirror_shown_once_cloned': safe, 'stands_for' is a pid.
+- fork.rs 'build_fork_clone', hides filter: safe, both sides in the
+  disk spelling after supplementation.
+- supplement_from_disk.rs 'preserve_invisible_members' (forks as
+  submitted): safe, buffer IDs mapped to the disk spelling by
+  'relationship_member_key'.
+- supplement_from_disk.rs
+  'apply_sticky_relRepos_in_graph_with_prospective_homes', 'hide_skgrepo':
+  safe, by 'member_key' and 'pid_of'.
+- strandeds.rs 'stranded_relationships', 'default_relRepo': safe,
+  resolved.
+- validate.rs 'buffernode_differs_from_disknode': safe, one spelling
+  after supplementation; 'refuse_records_landing_restricted': safe,
+  'relationship_member_key'.
+- validate_tree.rs 'inPlaceOf_part_errors': safe, 'is_mirror_of'
+  resolves both; 'validate_fork_view_requests': safe, pids and
+  'pid_of'.
+- buffer_to_viewnodes/local.rs ('sibling == kind'): no IDs.
+**** server/refresh/goal.rs
+- 'Goal::with_order', 'ordered_then_unordered' (dedup): safe, every
+  producer gives keys.
+- 'item_for', 'position_of', 'keeps_the_views_order', 'names_gnid':
+  safe given a key; their callers' keys fixed below.
+- 'member_of_child': fixed.
+- 'without_gnids' (folder goal minus view-ancestors): fixed, by
+  'view_ancestor_gnids'.
+- 'chain_goal', 'content_goal', 'what_the_member_shows',
+  'integrated_elsewhere', 'note_forked_by_forker_as_such',
+  'hidden_in_fork_partner', 'hidden_outside_of_fork_partners': safe,
+  'resolve_all' or 'pid_else_raw_id' on both sides.
+- 'ContainsAfterSave::contents_saved_for', 'owned_notes_containing':
+  safe, saved and deleted notes are pids, the target resolved.
+- 'folder_goal' (illegal edit), 'occurrence_pid_of': safe, pids.
+- 'forks_folder_goal' (ranks, least-pid ties), 'forker_only_members',
+  'indirect_members', 'forks_folder_members_shown',
+  'partnerFolder_members_in_graph': safe, pids (ties among pids).
+- 'property_goal': safe by design, the IDs folder lists each ID as
+  itself.
+- 'gnid_items', 'unknown_or_restricted_members_relRepos': safe, keyed
+  and looked up by one key.
+**** server/refresh/visit.rs
+- 'warrant_of_child' (set_warrants, mark_claims, stop_substituting):
+  fixed, by 'member_of_child'.
+- 'duplicate_viewnode_siblings', 'vognode_member': fixed, likewise.
+- 'claim_forks_folder_members_as_the_graph_does': fixed likewise
+  (latent: members of a forks folder are never substituted).
+- 'reinstate' (present, last named): fixed likewise.
+- 'reorder': fixed likewise.
+- 'view_ancestor_in_its_folder',
+  'names_a_container_outside_its_view_ancestors': fixed, by
+  'member_of_child' and 'view_ancestor_gnids'.
+- 'reinstate_original_after': fixed, the original by pid.
+- 'substitute_roots' ('marked'): fixed, the original by pid.
+- 'substitute_mirrors': safe, 'shown' and 'pid' are pids and the
+  original is resolved.
+- 'add_default_folders', 'add_hidden_outside_folder_to_forks_folder',
+  'add_illegal_edit_folder', 'illegal_edit_is_gone',
+  'orphan_under_a_tombstone', 'redraw_folders', 'add_folders': safe,
+  occurrence pids (the refresh re-kinds each occurrence to its pid
+  before these run).
+- 'is_hidden_by_the_forks_folders_viewparent',
+  'unhidden_in_the_hides_folder', 'is_raw_where_another_mirror_would_stand':
+  safe, resolved on both sides.
+- 'after_drawing', 'add_containers_folder_under_member',
+  'add_containers_folder_to_a_standing_member': safe,
+  'editability_key' resolves; 'holder != treeid' compares NodeIds.
+- 'draw_item': safe, a goal key.
+**** server/refresh/ (other files)
+- ancestry.rs 'view_ancestor_gnids': fixed.
+- diff_view.rs 'tag_children', 'expected_change_viewnodes': fixed
+  with the shared helpers (an identity in the diff view, which
+  substitutes nothing).
+- diff_view.rs 'forks_folder_goal': safe, straddle partners are pids
+  within each graph.
+- id_rule.rs 'rekind_to_ghost': safe, HEAD pids against straddle
+  pids; 'rekind_to_gnid_only', 'goal_relRepo': safe, raw against the
+  goal's raw unknown entries; 'acquired_since_head': raw by design.
+- editability.rs 'is_a_repeat', 'extend_requested_content': safe,
+  'editability_is_held' resolves.
+- viewnodestats.rs 'forks_folder_member_roles',
+  'set_herald_strings_in_viewnode', 'set_omitted_body',
+  'set_relRepo': safe, pids or resolved ('what_the_member_shows',
+  'side_of_mirror_shown', 'relRepo_memoized').
+- mod.rs, extent.rs, tail.rs, rerender_pass.rs, update_buffer.rs:
+  renames and threading; 'replace_saved_view_fork_roots' compares two
+  IDs read from one headline.
+**** server/dbs/
+- fork_rules.rs 'derive_fork_rule_scope', 'violations_of_note',
+  'violations_of_owned_note', 'foreign_note_taking_part',
+  'dedup_violations': safe, 'outbound_keys' resolves each list and the
+  inbound accessors give pids.
+- mirrors.rs 'Mirrors::contains', 'mirror_shown_among': safe, every
+  caller passes a pid; 'is_mirror_of', 'mirrors_of',
+  'mirror_pids_ignoring_restriction', 'side_of_mirror_shown',
+  'reaches_forkeeward', 'perspective_skgrepo_of_tree_containing':
+  safe, resolved or pid accessors; 'first_ranked_mirrors': skgrepo
+  names.
+- relation_accessors.rs 'update_relevant_neighborhood_over',
+  'node_is_restricted'; query.rs 'find_related_nodes'; in_rust_graph.rs
+  (forkers_of, hiders_of, 'inbound_recorders_at');
+  internal_index_validation.rs; stats.rs; complete_validation.rs;
+  prepared_update.rs ('fork_rule_pids_to_check'): safe, canonical
+  keys or 'pid_of'.
+- filesystem (retired_keys, multiple_nodes, one_node), init: no note
+  IDs compared.
+**** server/nodeMerge/nodeMergeInstructionTriple.rs
+- 'three_nodeMerged_graphnodes', 'combine_rel_partners': fixed.
+- 'three_nodeMerged_graphnodes', hides filters ('new_contains',
+  'shown_pre_merge'): fixed.
+- 'three_nodeMerged_graphnodes', 'not_own': safe, 'own_gnids' holds
+  every ID of both members.
+- 'gnids_shown_through_forks_folder_members': fixed.
+- 'nodeMerge_from_acquirer_and_acquiree' (the delete): safe, the
+  acquiree's pid.
+**** server/diff_view/, server/git_ops/, server/save.rs and the rest
+- diff_view/changes.rs 'changed_partner_folder_kinds': safe, leaf pids
+  against ancestors drawn by leaf pid.
+- diff_view/processed_requests.rs: safe, 'vognode_leaf_pid', 'pid_of'.
+- diff_view/restore_requests.rs 'add_restore_instructions',
+  'in_links_at_head', 'add_relationship': safe as changed; the
+  unchanged 'relationship_at_head' is in 'TODO/problems.org'.
+- git_ops/vanished.rs 'inbound_references_in_tree': fixed.
+- git_ops (git_snapshot, stage_and_commit, diff): no note IDs.
+- save.rs 'apply_delete_propagation_cleanup': safe, a delete's gnid
+  is the buffer occurrence's pid ('replace_gnid_with_pid');
+  'restricted_records_naming_deleted_graphnodes': safe, every ID of
+  the node.
+- delete_references_to_absent_node.rs 'rewrite': safe by intent, an
+  absent node has no other IDs.
+- telescope/, graph_straddle/, types/, heralds.rs, herald_tokens.rs,
+  org_to_text.rs, export_org.rs, import_*, repo_watch/: renames or
+  skgrepo names.
+**** server/serve/ and the clients
+- handlers/perspective.rs 'original_at_substitution_position': safe,
+  its consumer 'mirrors_of' resolves; the candidate and home lists
+  compare skgrepo names.
+- handlers/text_search.rs 'suppressed_result_gnids' (sort, grouped,
+  least pid), 'hits_among_mirrors_of', 'stub_root_of_hit': safe, hits
+  are the search index's pids, mirrors pids.
+- handlers/save_buffer.rs 'post_skgsave_commit_hiddenoutside_warnings':
+  safe, keyed.
+- handlers/save_staleness.rs 'change_since_rendered': safe by intent,
+  a literal comparison tells whether a file changed.
+- handlers/save_dependencies 'dependencies_from_viewforest': safe,
+  'matching_identity' resolves.
+- relRepo_info.rs, stage_and_commit.rs, parse_metadata_sexp.rs,
+  metadata_fields.rs, protocol.rs, main.rs, test_utils.rs: no note IDs
+  compared.
+- elisp/ (heralds-minor-mode, skg-buffer, skg-metadata, skg-processed,
+  skg-request-perspective), nvim/lua/skg/, tools/skg-for-ai/: no note
+  IDs compared; they compare relation atoms, folder atoms, ancestor
+  generations, perspective names and viewforest IDs.
+*** Suites
+Logs under 'tests/results/every-mirror/ids-as-equivalence-classes/'.
+- 'cargo build --bin skg' and 'cargo build --tests': no warning.
+- After each fix, the narrow suites: 'cargo nextest run --test
+  grouped_forks --test grouped_saves --test grouped_views', 270 of
+  270 after the first fix and 272 of 272 after the third;
+  'cargo nextest run -E "test(local_fieldintent_collection)"', 61 of
+  61; 'cargo nextest run -E "test(nodeMerge) | test(merge)"', 74 of
+  74; 'cargo nextest run -E "test(refresh) | test(diff_view) |
+  test(mirror)"', 219 of 219; the 'investigate_unknown_node' tests, 6
+  of 6.
+- 'bash/integration-tests.sh': 39 of 39.
+- 'bash/all-tests.sh': all pass: Emacs 503 of 503, Neovim pass,
+  nextest 1282 of 1282, doctests, team tools, AI reader, integration
+  78 of 78. (It deletes 'tests/results/every-mirror/', restored from a
+  copy after.)
+*** Tests added, and why
+Each fails on the old code, run sub-test by sub-test against HEAD's
+copy of the files fixed.
+- 'tests/forkee_content_named_by_an_extra_id.rs',
+  'a_hidden_child_moved_into_the_note_is_unhidden' (both cases): the
+  contains-removal step's unhide.
+- 'tests/merge/merge_compares_ids_by_pid.rs' (fixture beside it),
+  three checks of one nodeMerge call: a note both members name
+  differently is recorded once (contains and forks); the acquirer
+  does not hide what it contains by another ID; nor what the acquiree
+  showed by another ID.
+- 'tests/mirror_in_place_of_an_extra_id.rs' (fixture beside it): a
+  mirror in place of an extra ID keeps its headline (viewnode ID,
+  fold, mark); a root in place of an extra ID of what it shows is
+  unmarked; a containers folder omits the original a mirror above
+  stands for (fails with 'view_ancestor_gnids' unfixed; on the whole
+  old code the vanish of the first sub-test masks it).
+- 'tests/investigate_unknown_node.rs',
+  'a_reference_by_an_extra_id_is_reported'.
+A sub-test tried and dropped: a child cut from two forkees whose
+lists name it differently is hidden once. It passes on the old code
+(the forkee step filters by pid what the note already hides), so it
+pins nothing.
+*** Outside the diff
+Places with the same fault on lines the branch did not change: the
+entry "IDs compared letter for letter outside every-mirror's diff" in
+'TODO/problems.org'.
+*** DONE
