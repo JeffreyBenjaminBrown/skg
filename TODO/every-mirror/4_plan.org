@@ -563,7 +563,7 @@ compared with 'diff' against the shared one at 2ddc0ff8.
   grouped_saves --test grouped_views', then 'bash/nextest.sh'. The
   test counts must equal the base's: no test may vanish.
 
-** TODO Slice 6: comments that restate code, history or a doc
+** DONE Slice 6: comments that restate code, history or a doc
 Expected: server about 200 comment lines (the survey's range is 146
 to 346), no code.
 The survey read the comments of the twelve server files whose comment

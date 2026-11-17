@@ -4799,3 +4799,117 @@ None.
 *** Unfinished
 Nothing.
 *** DONE
+
+** Slice 6: comments that restate code, history or a doc
+*** Commits
+- 9559b4d0 every-mirror plan 4 slice 6: comments that restate code,
+  history or a doc
+- (the commit carrying this record) every-mirror plan 4 slice 6:
+  record, DONE
+*** Suites
+Logs under 'tests/results/every-mirror/slice6-plan4/'.
+- 'cargo build': no warning.
+- 'bash/nextest.sh': 1276 of 1276; 'cargo test --doc': pass.
+- 'cargo build --bin skg', then the AI tool's tests: PASS.
+- 'bash/integration-tests.sh': 39 of 39.
+- 'bash/all-tests.sh': all pass: Emacs 503 of 503, Neovim pass,
+  nextest 1276 of 1276, doctests, team tools, AI reader, integration
+  78 of 78.
+No failure to classify.
+*** Names removed or changed
+None: only comments changed. Citations corrected (no line count
+changed): 'lower.rs' cites 'gnids_only_msv_ref'; 'lower.rs' (twice),
+'serve/handlers/relRepo_info.rs' and 'dbs/filesystem/one_node.rs'
+cite 'apply_sticky_relRepos_in_graph'; 'viewnodestats.rs' cites
+'ancestor_gnids'; the doc of 'gnid_items' ('goal.rs') stands above
+it, not above 'visible_illegal_edits'; the doc of
+'add_hidden_outside_folder' ('visit.rs') names 'hider'.
+*** Lines
+Before: slice 4's after (slice 5 touched no server file). After:
+9559b4d0.
+| what                  | before total / code / comments | after total / code / comments | change total / code / comments |
+|-----------------------+--------------------------------+-------------------------------+--------------------------------|
+| server/*.rs           | 54,113 / 43,478 / 10,635       | 53,922 / 43,478 / 10,444      | -191 / 0 / -191                |
+| elisp, nvim, tools, tests | as after slice 5           | unchanged                     | 0                              |
+Comment lines by file:
+| file ('server/')                                             | before | after | change |
+|--------------------------------------------------------------+--------+-------+--------|
+| refresh/visit.rs                                             |    430 |   367 |    -63 |
+| from_text/local_fieldintent_collection/resolve_visibility.rs |    268 |   237 |    -31 |
+| serve/handlers/perspective.rs                                |    100 |    70 |    -30 |
+| dbs/in_rust_graph/mirrors.rs                                 |     89 |    62 |    -27 |
+| from_text/local_fieldintent_collection/traverse.rs           |    189 |   179 |    -10 |
+| types/viewnode.rs                                            |    528 |   518 |    -10 |
+| from_text/local_fieldintent_collection/lower.rs              |    119 |   113 |     -6 |
+| refresh/goal.rs                                              |    219 |   215 |     -4 |
+| refresh/viewnodestats.rs                                     |    151 |   147 |     -4 |
+| dbs/in_rust_graph/fork_rules.rs                              |     60 |    56 |     -4 |
+| refresh/editability.rs                                       |    152 |   150 |     -2 |
+| dbs/filesystem/retired_keys.rs                               |     30 |    30 |      0 |
+What went, by kind:
+- Module docs that repeated a 'docs/' section became pointers to it:
+  'mirrors.rs' ('docs/mirrors.org', "Mirrors", "Which mirror stands",
+  "Perspectives"), 'visit.rs' ('docs/data-model_technical.org', "The
+  walk and the refresh's rungs"), 'perspective.rs'
+  ('docs/api-and-formats.org', "Set perspective"). So did the doc of
+  'add_default_folders', which repeated that section's paragraph on
+  it sentence for sentence, and most of 'perspective_to_show''s.
+- 'resolve_visibility.rs': the module doc's paragraphs on the forker
+  signal and the forks-folder signal shrank to pointers to
+  'resolve_forker_visibility' and 'resolve_forks_folder_removals';
+  those two functions' docs and 'add_children_placed_under_member_as_such''s
+  point to 'docs/forks.org' ("Cutting from a forker", "Adding a child
+  under a member as such") and keep what that doc does not say.
+- Restatements of "what a member shows" became citations of
+  'what_the_member_shows' (in 'goal.rs''s module doc and
+  'note_of_member_as_such', 'traverse.rs''s module doc,
+  'resolve_visibility.rs', 'viewnodestats.rs'), and restatements of a
+  goal function's doc became citations of it ('Folder::Forks' and
+  'Folder::IntegratedElsewhere' in 'types/viewnode.rs').
+- Docs that restated a name or the lines below: in 'visit.rs'
+  ('vognode_member', 'merge_fold_and_focus', 'keep_hidden_outside_folder_last',
+  'show_mirror', 'request_stays', 'write_protect_content_subtree',
+  'children_of'), 'lower.rs' (three setters), 'traverse.rs' (two
+  comments on arms and one on the owned member's save, which the
+  module doc states), 'fork_rules.rs' ('validate_fork_rules', and the
+  module doc's restatement of the glossary), 'types/viewnode.rs'
+  ('goal_is_ordered', 'is_editable' listed their arms). The two
+  further statements of adding the hidden-outside folder
+  ('add_folders', 'add_hidden_outside_folder_to_forks_folder') cite
+  'add_hidden_outside_folder'.
+- History: "an older server" ('visit.rs', 'editability.rs'),
+  "anymore" ('herald_tokens.rs', 'save.rs').
+*** Kept, with why
+- The nine rung banners of 'visit.rs': with the module doc a pointer,
+  they are what maps the file's sections to the doc's numbered rungs.
+- The forkee-visibility policy in 'resolve_visibility.rs''s module
+  doc: the forkee loop has no doc of its own, so it is the rule's one
+  statement; so is its paragraph on the skgrepo restriction.
+- The docs of 'infer_hides_from_contains_removals',
+  'apply_hiddenoutside_edits', 'member_it_stands_for',
+  'resolve_forks_folder_removals' and
+  'validate_no_overlapping_forkee_hiderel_conflicts': each states the
+  rule where it is decided.
+- 'retired_keys.rs': its module doc is the reason for the check.
+- 'fork_rules.rs': the sentence on cycles (the glossary's entry does
+  not state it) and the docs of the two 'describe_' functions (they
+  say where each text is used).
+- 'goal_is_ordered' was shortened, not made a pointer: its list says
+  why three derived folders are ordered.
+*** Put back, would change behavior
+Nothing.
+*** Deviations
+- 'supplement_from_disk.rs' now cites
+  'apply_sticky_relRepos_in_graph_with_prospective_homes', which the
+  code below it calls, rather than 'apply_sticky_relRepos_in_graph', a
+  '#[cfg(test)]' wrapper of it. 'tests/unit/save_leveling.rs''s
+  header cited the same stale name, and cites
+  'apply_sticky_relRepos_in_graph', which it tests.
+- 'add_default_folders''s doc, not in the plan's table, was a
+  sentence-for-sentence copy of a doc paragraph, so it became a
+  pointer.
+*** Fixtures changed
+None.
+*** Unfinished
+Nothing.
+*** DONE
