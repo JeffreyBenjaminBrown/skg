@@ -1,0 +1,772 @@
+#+title: Plan 4 of every-mirror: deleting what plans 1 to 3 left behind
+#+startup: overview
+
+* Status: approved; to be executed
+Nothing here is open for discussion, and the plan holds no open
+question. Every candidate whose deletion would change what a user
+sees or what the server writes was moved to "Proposed to Jeff, not
+executed", and no slice executes it.
+
+* Assignment and authority
+Plans 1 to 3 of every-mirror ('TODO/every-mirror/1_plan.org',
+'2_plan.org', '3_plan.org', and their records in
+'TODO/every-mirror/progress.org') merged 'subscribesTo' and
+'overrides' into one relation, 'forks', and reworked how forks are
+shown. That should have let code go. Instead 'server/**/*.rs' grew
+from 52,375 lines at b343cfa9 (the commit before plan 1) to 54,450 at
+2ddc0ff8 (this plan's base). Code went from 42,454 to 43,752 lines
+and comments from 9,921 to 10,698. Nobody had been told to delete.
+This plan is that pass, and nothing else. Jeff asked for it on
+2026-11-17. The candidates below were surveyed and measured from the
+code at 2ddc0ff8.
+
+Every name cited in the present tense is the code's at 2ddc0ff8. A
+slice that renames or removes something records it in its record
+("Names removed or changed"), and each later slice maps a cited name
+through those records before relying on it.
+
+An agent executes one slice per launch ('coding-advice/orchestration.org').
+Read, before the first edit: 'coding-advice/names.org',
+'coding-advice/formatting.org', 'coding-advice/ai-agents.org',
+'coding-advice/no-legacy-support.org', 'coding-advice/common-gotchas.md',
+'coding-advice/when-to-stop.org', 'coding-advice/commit-messages.org'.
+
+* The hard rules
+These bind every slice, before anything below.
+- Two live servers run 'target/release/skg' under a loop that reruns
+  the binary when it exits: Jeff's on port 1730 and Claude's on 1761,
+  each reading real data in the OLD format. Never build into
+  'target/release' (no '--release'; no 'bash/start-servers.sh'
+  without '--deb'). Never connect to either port, and never signal
+  either process. The suites build and run 'target/debug/skg' on
+  their own ports.
+- Never write anything under 'data/'. This plan has no reason to read
+  it either.
+- Never stage Jeff's untracked files: 'TODO/total-diff-view/since-main.org',
+  'data/bash/trim-node-bodies.sh', 'docs/en-espanol.org',
+  'the-social-algorithm.org', 'unsaved-edits.org'. Never stage a '~'
+  file (such as 'tests/hidden_from_subscriptions.rs~'), an '.elc', a
+  '__pycache__', or anything under 'tests/results/'. Stage by path,
+  and only what the slice touched.
+- Never run two full suites at once. 'bash/nextest.sh',
+  'bash/integration-tests.sh' and 'bash/all-tests.sh' each count as
+  full: together they collide on fixed temporary paths and on the
+  Tantivy writer. Run 'bash/all-tests.sh' in the background, with no
+  timeout under 15 minutes.
+- 'bash/all-tests.sh' wipes 'tests/results/'. Before every full run,
+  copy 'tests/results/every-mirror/' to
+  '/tmp/claude-1000/every-mirror-results-backup/', and copy it back
+  after the run. Logs of this plan go under
+  'tests/results/every-mirror/sliceN-plan4/'.
+- The rule of this plan: every deletion leaves what a user sees and
+  what the server writes unchanged. The proof is that the existing
+  suites stay green with no test expectation changed. The one
+  exception is a test that tests only the deleted internals. It goes
+  with them; or, where it pins an internal value that the slice
+  merges under one name, it takes the new name and keeps its expected
+  contents. If a slice finds that a deletion would change any other
+  expectation, it does not change the expectation. It puts the
+  deletion back, records it under the slice ("Put back, would change
+  behavior"), and goes on with the rest of the slice.
+
+* Commits
+On main. Each slice makes one code commit, or more where its parts
+are disparate; every commit leaves the tree green. The first line is
+"every-mirror plan 4 slice N: ..."; 'coding-advice/commit-messages.org'
+covers the rest. The slice's last commit carries its record and flips
+its headline here to DONE. End every commit message with
+'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>'. If this
+plan, 'progress.org' or a doc the slice edits is dirty with Jeff's
+edits, commit only the slice's own hunks ('coding-advice/orchestration.org',
+"Files Jeff is editing during a run").
+
+Each slice's record goes into 'TODO/every-mirror/progress.org' under a
+new top-level headline "* Plan 4", one subheadline per slice. It has
+the shape 'coding-advice/orchestration.org' gives ("The report
+shape"), plus two lists:
+- "Names removed or changed";
+- "Lines": the slice's measured change ("Measuring lines" below),
+  given separately for 'server/', 'elisp/', 'nvim/', 'tools/' and
+  'tests/', with code and comments apart, and before and after each.
+Deviations from this plan's "how" go there too, with their reasons.
+
+* Scope
+** In scope
+Deleting code, comments, tests and fixtures that are redundant,
+duplicated or dead, where the deletion changes no behavior. These are
+the candidates of "Implementation sequence". Most were left by plans 1
+to 3; a few older dead functions and files found by the same survey
+are included, since deleting them is equally safe.
+** Out of scope, decided
+- Any change a user could see, or that the server would write
+  differently. Each such candidate found is under "Proposed to Jeff,
+  not executed", with what would change and the lines it would save.
+- The refusal of files and git trees holding retired keys, and the
+  migration tools. They stay until every skgrepo is migrated: without
+  the refusal, an unknown key would be dropped silently ("After the
+  migration").
+- Tests that pin a refusal of an old name ('(folder overrides)' in
+  'tests/partner_folder_matrix.rs', "subscribesTo" in
+  'tests/unit/relRepo_info.rs' and
+  'tests/dbs/in_rust_graph/relation_accessors.rs', "user" and "owner
+  of" in 'tests/mirror_substitution.rs' and 'save_buffer.rs''s unit
+  test). They test behavior (an unknown name is refused), not dead
+  internals, so they stay.
+- Nodes in a fixture folder named exactly 'fixtures' that no test
+  names (such as the 'roOvr-*' nodes of
+  'tests/partner_folder_matrix/fixtures/'). 'tests/idempotence.rs'
+  draws every node of every such folder, so deleting them would reduce
+  its coverage.
+- Renaming for its own sake ('coding-advice/names.org', "Avoid
+  gratuitous renaming"). A slice renames something only where two
+  things it merges had two names.
+- Docs ('docs/'), but for sentences a deletion makes false: a doc
+  citing a deleted name is updated to cite what stands.
+- Label wording, and 'TODO/problems.org'.
+
+* Vocabulary
+No term is coined. The words are the glossary's ('docs/glossary.org'):
+*member as such*, *forkee as such*, *forker as such*, *the
+forkee-visibility step*, *the forker-visibility step*, *cut*, *set
+aside*, *integrated*, *indirect member*, *mirror*, and *a
+perspective's skgrepo list*. Three words are used as the code uses
+them:
+- A *visibility signal* is a 'ForkeeVisibility' or 'ForkerVisibility'
+  value ('server/from_text/local_fieldintent_collection/types.rs').
+- The *tie* is the set of a note's mirrors homed in the first skgrepo
+  of a perspective's skgrepo list that holds any of them
+  ('first_ranked_mirrors', 'server/dbs/in_rust_graph/mirrors.rs').
+- An *alias function* is a function whose whole body calls one other
+  function with its own arguments, unchanged or reordered.
+
+* Agreed behavior
+** Nothing a user sees or the server writes changes
+Everything stays byte for byte as at 2ddc0ff8:
+- every buffer the server draws;
+- every file and git-commit it writes;
+- every message, refusal, warning and hide report;
+- every wire answer;
+- every client's and the AI tool's output.
+The suites are the proof. 'bash/all-tests.sh' was green at 2ddc0ff8
+(plan 3's review record: Emacs 503 of 503, Neovim pass, nextest 1276
+of 1276, doctests, team tools, AI reader, integration 78 of 78). It
+must stay green at the end of every slice, with no expectation
+changed but those "The hard rules" allow.
+** What stays as it is, among the defaults a user sees
+All of these are kept, and none changes:
+- mirror substitution and its four tie rules;
+- the perspective cycle (C-c v o) and its wire names;
+- the flat forks folder: its members, their order, claims and heralds;
+- the integrated-elsewhere, hidden-in, hidden-by and hidden-outside
+  folders, their contents, places and fold states;
+- the containers folder under each member;
+- the search buffer's one flat forks folder per hit, and its
+  suppression;
+- every save refusal, every line of the hide report, and the
+  retired-key refusals;
+- the AI tool's reading of old sidecars.
+** Measuring lines
+A comment line is one that, with its leading blanks stripped, begins
+with the language's comment marker: '//' in Rust (doc comments
+included), ';' in Emacs Lisp, '--' in Lua, and '#' in Python and
+shell. Every other line, blank ones included, counts as code, so
+Python docstrings count as code. The figures above were counted this
+way. The measurement is a one-time shell function, typed at the
+repository's root, not a workspace member. It reads tracked files
+only:
+#+begin_src sh
+measure () { # DIR EXT COMMENT_REGEX
+  git ls-files -z -- "$1" | grep -z -E "\.$2\$" | xargs -0 cat \
+  | awk -v re="$3" -v what="$1/*.$2" \
+      '{t=$0; sub(/^[ \t]+/,"",t); if (t ~ re) c++; else k++}
+       END {printf "%s: %d total, %d code, %d comments\n", what, c+k, k, c}'; }
+measure server rs '^//'
+measure elisp el '^;'
+measure nvim lua '^--'
+measure tools/skg-for-ai py '^#'
+measure tests rs '^//'; measure tests el '^;'; measure tests lua '^--'
+#+end_src
+A slice measures at its base commit and at its last commit. For the
+base, use a 'git worktree add' of it under '/tmp/claude-1000/' (run
+'measure' there, then remove the worktree), or the numbers the
+previous slice recorded as its "after".
+
+The figures at 2ddc0ff8:
+| what                  |  total |   code | comments |
+|-----------------------+--------+--------+----------|
+| server/*.rs           | 54,450 | 43,752 |   10,698 |
+| elisp/*.el            | 14,147 | 13,138 |    1,009 |
+| nvim/*.lua            | 15,027 | 10,841 |    4,186 |
+| tools/skg-for-ai/*.py | 10,220 |  9,802 |      418 |
+| tests/*.rs            | 57,386 | 50,865 |    6,521 |
+| tests/*.el            | 17,653 | 16,570 |    1,083 |
+| tests/*.lua           | 15,542 | 13,865 |    1,677 |
+
+The expected savings each slice gives below are estimates from the
+survey ("about"); the record gives the measured change.
+
+* Pitfalls the slices must respect
+** A 'pub' function nobody calls raises no warning
+The compiler's dead-code lint does not cover 'pub' items of a library
+crate. So "nothing calls it" is proved by grep, not by the build:
+before deleting a function, constant or file, run 'git grep -n -w
+NAME' over the whole tree. That covers 'server/', 'tests/', 'tools/'
+(several '[[bin]]' targets of 'Cargo.toml' live there, and
+'thoughts/smsn/find-keywords.rs' is one too), 'elisp/', 'nvim/',
+'bash/', 'windows/', 'shared/' and 'docs/'. A hit in 'docs/' or in a
+comment is a citation: rewrite it to cite what stands. The survey ran
+that grep for every name in slice 1 at 2ddc0ff8 and found no caller.
+** The two visibility signals are read in a fixed order
+'lower_collected_fieldIntents' ('lower.rs') extracts all the
+'ForkeeVisibility' signals in their notes' first-emission order, then,
+separately, all the 'ForkerVisibility' signals. Each reader in
+'resolve_visibility.rs' takes them in a fixed order:
+- 'validate_no_overlapping_forkee_hiderel_conflicts' reads the
+  forker signals first, then the forkee signals;
+- 'infer_hides_from_contains_removals' and
+  'add_children_placed_under_members_as_such' chain the forkee
+  signals, then the forker signals;
+- the forkee-visibility loop in 'resolve_visibility' reads the forkee
+  signals, then 'resolve_forker_visibility' reads the forker signals.
+A merged signal (slice 2) must keep each of those orders: filter the
+one list by its role, never interleave the roles. Order matters, for
+instance, in 'add_children_placed_under_member_as_such': where one
+node is a member under two notes, the later call's contains wins.
+** The two visibility steps differ, so they stay two
+The forkee-visibility loop ('resolve_visibility') and
+'resolve_forker_visibility' look alike but differ in three ways:
+- The forkee loop compares several sets by raw ID (for example
+  'visible_content . contains (gnid)'). The forker step compares by
+  'pid_else_raw_id' throughout.
+- The forker step reads all of a member's content as drawn where the
+  member is no mirror of the note ('is_mirror_of'). The forkee loop
+  always subtracts what the note contains or hides.
+- The forker step adds a fork; the forkee loop never does.
+Merging them changes output in edge cases, so the merge is "Proposed
+to Jeff" (P2). Slice 2 merges only the signals' types and the
+collection's positions, not the steps.
+** The unit tests of local collection name the signal types
+'tests/new/local_fieldintent_collection/{traverse,types,extraction,lower}.rs'
+pin which signal the traversal emits, with which contents, by naming
+'ForkeeVisibility', 'ForkerVisibility' and the slots
+'forkee_visibility' and 'forker_visibility'. These test only the
+internals slice 2 merges. They take the merged names and keep every
+expected value: the same member, the same role, the same lists.
+** The diff view shares the goal's functions
+'content_goal' returns early through 'diff_view::content_goal' with
+the closure 'unintegrated', which passes '! walk . is_diff_view ()'.
+Past that return the walk is not the diff view's, so the literal
+'true' that 'content_goal' passes to 'content_goal_gnids' equals that
+closure's flag. 'set_viewnodestats_in_viewforest' ('viewnodestats.rs')
+passes '! is_diff_view' itself. Slice 3 keeps both flags where they
+are.
+** The compound folders' parties are already swapped
+'compound_folder_parties' ('server/refresh/ancestry.rs') gives
+'Folder::HiddenInForkPartner' its member as container and its note as
+hider. It gives 'Folder::HiddenByForker' the note as container and
+the forker as hider. So 'hidden_in_fork_partner (container, hider)'
+read with each folder's own parties is each folder's goal, and
+'hidden_by_forker (forker, note)' is 'hidden_in_fork_partner (note,
+forker)'. Slice 3 relies on this. The hidden-by folder itself stays
+(P3).
+** 'forks_folder_members_shown' feeds the save
+Its order is read by 'hide_report.rs', 'resolve_visibility.rs' and
+'nodeMergeInstructionTriple.rs'. No slice changes it, and none merges
+'forker_only_members' with 'indirect_members' (P4).
+** The shared test helpers are declared in two targets
+'tests/shared/view_and_save_helpers.rs' is declared, with
+'#[allow(dead_code)]', in 'tests/grouped_forks.rs' and
+'tests/grouped_saves.rs'. Its header names only the first; slice 5
+fixes the header. A helper moved there from a file of
+'grouped_views' (such as 'hidden_from_forks.rs') needs the module
+declared in 'tests/grouped_views.rs' too. 'skg_files' in the shared
+module keys files as "skgrepo/name.skg"; a local copy that keys them
+as "name.skg" may be replaced only where the test compares two of its
+own results, never a literal path.
+** Comments state rules, and other comments cite them
+Many comments in 'resolve_visibility.rs', 'goal.rs', 'visit.rs' and
+'mirrors.rs' state the same rule several times: in the module doc, in
+a function doc, and at a call site. Docs and other comments cite these
+by function name. So slice 6 keeps each rule once, at the function
+that decides it, and makes a shortened comment point to that function
+or to the doc section by name. It never removes the only statement of
+a rule or a reason. A module doc that repeats a 'docs/' section
+sentence for sentence ('mirrors.rs' 4-32, for 'docs/mirrors.org'
+"Mirrors" and "Which mirror stands") shrinks to a pointer to that
+section.
+** The AI tool's tests run the server
+'python3 tools/skg-for-ai/test_skg_for_ai.py' runs 'target/debug/skg'.
+Run 'cargo build --bin skg' (debug) before it, in every slice that
+touches 'server/'.
+
+* Code map
+- Slice 1: 'server/dbs/filesystem/multiple_nodes.rs',
+  'server/types/tree/viewnode_graphnode.rs',
+  'server/dbs/in_rust_graph/containerward_role_tree.rs',
+  'server/telescope/invariants.rs', 'server/test_utils.rs',
+  'server/types/viewnode.rs', 'elisp/skg-config.el',
+  'tests/unit/scheduled_audit.rs', 'tests/override_menu/fixtures-multi/',
+  'tests/org-to-sexp/fixtures/'.
+- Slice 2: 'server/from_text/local_fieldintent_collection/{types,
+  traverse, lower, mod, resolve_visibility}.rs',
+  'tests/new/local_fieldintent_collection/{traverse, types,
+  extraction, lower}.rs'.
+- Slice 3: 'server/refresh/goal.rs', 'server/refresh/visit.rs',
+  'server/refresh/viewnodestats.rs', and a citation in
+  'server/from_text/local_fieldintent_collection/resolve_visibility.rs'.
+- Slice 4: 'server/dbs/in_rust_graph/mirrors.rs' and its seven
+  'mirrors_of' callers ('mirrors.rs', 'server/from_text/file_what_is_written_in.rs',
+  'server/from_text/fork.rs', 'resolve_visibility.rs',
+  'server/serve/handlers/perspective.rs',
+  'server/serve/handlers/text_search.rs', 'server/refresh/goal.rs',
+  and 'tests/dbs/in_rust_graph/mirrors.rs'); 'server/refresh/viewnodestats.rs'
+  and 'fork.rs' ('MIRROR_RELATION'); 'server/types/misc.rs' and its
+  callers 'server/from_text.rs', 'server/git_ops/git_snapshot.rs',
+  'server/git_ops/stage_and_commit.rs'; 'docs/data-model_technical.org' 596.
+- Slice 5: 'tests/forks_folder.rs', 'tests/hides_apply_to_every_fork_partner.rs',
+  'tests/flat_forks_folders.rs', 'tests/forks_meet.rs',
+  'tests/hides_by_integration.rs', 'tests/members_as_such_and_stale_buffers.rs',
+  'tests/reload_config.rs', 'tests/repo_watch.rs', 'tests/fork.rs',
+  'tests/hidden_from_forks.rs', 'tests/shared/view_and_save_helpers.rs',
+  'tests/grouped_views.rs'.
+- Slice 6: the comments of the server files the survey measured
+  (table under slice 6).
+
+* Implementation sequence
+Every slice runs its suites in this order, one at a time:
+1. its narrow suites (named in the slice);
+2. 'bash/integration-tests.sh';
+3. 'bash/all-tests.sh', with 'tests/results/every-mirror/' copied out
+   before and back after.
+None of these slices changes what the server writes into a buffer.
+The integration run is there to prove that.
+
+** TODO Slice 1: functions and files nothing uses
+Expected: server about 134 lines (code 110, comments 24); elisp 3;
+tests about 50 '.rs' lines, plus 14 fixture files (about 90 lines)
+that no test reads.
+- Delete these server functions, none of which any code calls
+  (measured with their doc comments):
+  | function                                        | file                                             | lines |
+  |-------------------------------------------------+--------------------------------------------------+-------|
+  | 'read_recently_modified_skgfiles_from_skgrepos' | 'server/dbs/filesystem/multiple_nodes.rs'        |    35 |
+  | 'delete_all_nodes_from_fs'                      | 'server/dbs/filesystem/multiple_nodes.rs'        |    34 |
+  | 'report_all_telescope_violations'               | 'server/telescope/invariants.rs'                 |    22 |
+  | 'find_children_by_gnids'                        | 'server/types/tree/viewnode_graphnode.rs'        |    15 |
+  | 'VognodeKind::what_a_headline_becomes'          | 'server/types/viewnode.rs'                       |    13 |
+  | 'reset_with_skgrepo_path' (in a test helper)    | 'server/test_utils.rs'                           |    12 |
+  | 'full_containerward_role_tree_from_inRustGraph' | 'server/dbs/in_rust_graph/containerward_role_tree.rs' |  9 |
+  Then remove any import, or private helper, that only these used.
+  The compiler's unused warnings name them; delete only what it names,
+  after a grep.
+- 'skg--repo-dir' ('elisp/skg-config.el' 313-315): no caller in
+  'elisp/' or 'tests/'. (The Neovim 'M.repo_dir' is used, and stays.)
+- 'tests/unit/scheduled_audit.rs' (50 lines): no '#[path]' includes
+  it, so it is never compiled. Its subject was deleted with TypeDB.
+- 'tests/override_menu/fixtures-multi/' (12 files): no test names it.
+  Its test was deleted earlier (1e7e9211), and plan 1 slice 5 migrated
+  it anyway. The 'idempotence.rs' sweep reads only folders named
+  exactly 'fixtures', so it never reads this one.
+- 'tests/org-to-sexp/fixtures/' (2 files): nothing names it.
+- Narrow suites: 'cargo build --bin skg', then 'bash/nextest.sh', then
+  'bash/emacs-tests.sh'.
+
+** TODO Slice 2: one member-as-such position and one visibility signal in the save
+Expected: server about 85 lines (code about 70); tests: the four
+unit-test files take the new names, with no change in line count to
+speak of.
+- 'LocalContext::ForkeeAsSuchPosition { forker, forker_is_editable }'
+  and 'ForkerAsSuchPosition { note, note_is_editable }' ('types.rs'
+  27-32) carry the same two facts. The claim that tells them apart is
+  the occurrence's own 'claimsMembership', which 'visit_occurrence'
+  ('traverse.rs' 162-178) already checks against the variant.
+  - One variant should stay: 'MemberAsSuchPosition { note,
+    note_is_editable }'.
+  - 'visit_forks_folder' (400-417) should give it to every child but
+    the hidden-outside folder.
+  - 'visit_occurrence' should read the claim from the occurrence
+    itself. 'struct MemberAsSuchContext' (149-153) then goes.
+  - Behavior is unchanged. Today a claiming occurrence gets
+    'ForkeeAsSuchPosition' and passes its guard, and one claiming
+    nothing gets 'ForkerAsSuchPosition' and passes its guard; no
+    occurrence ever fails its guard. Every non-occurrence child
+    ignores either variant.
+- 'ForkeeVisibility { forkee, visible, in_integratedElsewhere_or_hiddenIn_folder }'
+  and 'ForkerVisibility { forker_as_such, visible, in_integratedElsewhere_or_hiddenIn_folder }'
+  ('types.rs' 105-132) have the same shape. They should become one
+  struct, 'MemberAsSuchVisibility { member, role : MemberAsSuch,
+  visible, in_integratedElsewhere_or_hiddenIn_folder }'.
+  - 'MemberAsSuch' (today private in 'resolve_visibility.rs' 204-225,
+    with its 'word' and 'as_named_beside_the_note') should move beside
+    the struct, 'pub(crate)', with its two methods unchanged.
+  - The struct needs one 'FieldIntent' variant, one combineable slot
+    in 'FieldIntentsForOneId', and one list in 'LoweringOutput'.
+  - The readers in 'resolve_visibility.rs' each take the one list and
+    filter it by 'role', in the orders of the pitfall "The two
+    visibility signals are read in a fixed order".
+  - The forkee loop and 'resolve_forker_visibility' stay two (the
+    pitfall "The two visibility steps differ"). Each takes the list
+    filtered to its role, and its body changes only in field names.
+- 'lower_collected_fieldIntents' ('lower.rs' 309-345) builds its
+  signal lists with four copies of one loop. After the merge there
+  are three: the visibility signals, 'hidden_outside' and
+  'forks_folder_members'. They should be one generic helper (take
+  each entry in 'order', and push '(pid, signal)' for each item of
+  one slot), called three times. The error text stays the same:
+  "lower_collected_fieldIntents: order names a PID missing from the
+  map".
+- Comments: the docs of the two structs become one. The module doc
+  of 'resolve_visibility.rs' says "the visibility signals" where it
+  named the two types.
+- Narrow suites:
+  - 'cargo nextest run -E "test(local_fieldintent_collection)"';
+  - the forks tests ('cargo nextest run --test grouped_forks', and
+    '--test grouped_saves' for 'members_as_such_and_stale_buffers');
+  - 'bash/nextest.sh';
+  - 'cargo build --bin skg', then the AI tool's tests.
+
+** TODO Slice 3: the refresh's goal helpers that restate one another
+Expected: server about 100 lines (comments about 40).
+All in 'server/refresh/', each change verified at 2ddc0ff8 by its
+callers:
+- 'content_goal_gnids' (goal.rs 299-322, 24 lines) only maps
+  'members' to IDs and calls 'what_the_member_shows'.
+  - Its caller in 'content_goal' (296) should call the closure
+    'unintegrated' already built there (pitfall "The diff view shares
+    the goal's functions").
+  - The caller in 'viewnodestats.rs' (249) should map its members and
+    call 'what_the_member_shows' (made 'pub(crate)') with its own
+    '! is_diff_view'.
+  - The wrapper goes.
+- 'unintegrated_content_gnids' (354-373, 20 lines) has one caller,
+  'what_the_member_shows'. Inline it there as one filter over the
+  resolved contents: not hidden, not contained, not kept elsewhere.
+  'setlike_vector_subtraction' ('server/util.rs') keeps order and
+  duplicates, so the filter is equivalent. The citation of it at
+  'resolve_visibility.rs' 660 then cites 'what_the_member_shows'.
+- 'hidden_by_forker' (826-836, 11 lines) is an alias function of
+  'hidden_in_fork_partner' with its arguments swapped.
+  - Its callers should call 'hidden_in_fork_partner (note, forker)':
+    goal.rs 577, and visit.rs 174 as 'hidden_in_fork_partner (&note,
+    &pid, walk)'.
+  - The 'folder_goal' arms 'Folder::HiddenInForkPartner' and
+    'Folder::HiddenByForker' (563-581) should become one arm. It reads
+    'compound_folder_parties' (pitfall "The compound folders' parties
+    are already swapped") and keeps the hidden-by folder's guard:
+    empty unless 'note_forked_by_forker_as_such'.
+- 'goal_list_for_hiddenInForkPartner_folder' (838-850) and
+  'goal_list_for_hiddenOutsideOfForkPartners_folder' (879-899) each
+  have one caller, the function just above. Inline each there. Their
+  comments, and the citation at 'resolve_visibility.rs' 561, then cite
+  'hidden_in_fork_partner' and 'hidden_outside_of_fork_partners'.
+- 'note_of_forker_as_such' (497-507) has one caller,
+  'note_forked_by_forker_as_such'. Inline its claim check there; the
+  check must stay, since a mutual claims.
+- 'occurrence_pid' (visit.rs 239-247) restates
+  'Viewnode::occurrence_gnid' ('server/types/viewnode.rs'). Its two
+  callers (219, 263) should use '. occurrence_gnid () . cloned ()'.
+- 'viewnodestats.rs' 247 wraps the count in 'if stands_as_member_here
+  || fork_roles . is_some () { ... } else { None }'. Inside it,
+  'note_of_member_as_such' already returns 'None' wherever that test
+  is false: it requires a warranted occurrence member of a forks
+  folder, which is all 'forks_folder_member_roles' requires. So the
+  'if' and its comment's first half go; the 'map' stands alone.
+- Narrow suites:
+  - 'cargo nextest run -E "test(refresh)"';
+  - 'cargo nextest run --test grouped_forks';
+  - the herald tests ('cargo nextest run -E "test(herald)"');
+  - 'bash/nextest.sh';
+  - 'cargo build --bin skg', then the AI tool's tests.
+
+** TODO Slice 4: mirror and config aliases
+Expected: server about 30 lines (comments about 15); docs 1 line
+reworded.
+- 'mirrors_of' (mirrors.rs 166-173) and 'mirrors_of_note_with_forkees'
+  (175-185) both call 'mirrors_reached'. One forks list differs: none,
+  or the note's forkees as the caller reads them. They should be one
+  public 'mirrors_of (graph, restriction, gnid, forkees : Option<&[ID]>)'.
+  - The callers of 'mirrors_of' pass 'None': 'mirrors.rs' twice,
+    'file_what_is_written_in.rs' 208, 'fork.rs' 552,
+    'resolve_visibility.rs' 809, 'perspective.rs' 248,
+    'text_search.rs' 573, and 'tests/dbs/in_rust_graph/mirrors.rs' 237.
+  - 'goal.rs' 698 and 720 pass 'Some'.
+  - 'docs/data-model_technical.org' 596 then cites 'mirrors_of'.
+- 'MIRROR_RELATION' (mirrors.rs 46-48) is an alias of
+  'NodeRelation::Forks'. Its uses in 'mirrors.rs', 'fork.rs' and
+  'viewnodestats.rs' should say 'NodeRelation::Forks', and the module
+  doc's mention of it should say "a 'forks' relationship".
+- 'SkgConfig::owned_skgrepos_in_declaration_order' (misc.rs 661-667)
+  is an alias function of 'privacy_ladder'. Its callers
+  ('server/from_text.rs' 230, 'server/git_ops/git_snapshot.rs' 90,
+  'server/git_ops/stage_and_commit.rs' 49 and 180) should call
+  'privacy_ladder', whose doc already says it is the owned skgrepos in
+  declaration order.
+- 'SkgConfig::first_owned_skgrepo_in_declaration_order' (669-677)
+  has one caller (misc.rs 773). It should read 'self . privacy_ladder
+  () . into_iter () . next ()', and that caller's doc should keep the
+  sentence on the Emacs client's 'skg--default-repo'.
+- Narrow suites:
+  - 'cargo nextest run -E "test(mirror) | test(fork) | test(perspective) | test(search)"';
+  - 'bash/nextest.sh';
+  - 'cargo build --bin skg', then the AI tool's tests.
+
+** TODO Slice 5: the forks tests use the shared helpers
+Expected: tests about 170 '.rs' lines, all code but their doc
+comments; no expectation changes. Every helper named here was
+compared with 'diff' against the shared one at 2ddc0ff8.
+- 'tests/forks_folder.rs' predates the shared module. These local
+  copies should go, using 'tests/shared/view_and_save_helpers.rs':
+  - 'line_of' 98-104, 'node' 143-148 and 'ids' 162-165 are identical
+    to the shared ones;
+  - 'view_of_n' 72-78 is the shared 'view_of (config, tantivy, "N")';
+  - 'skg_files' 167-178 is read only in the before/after comparison
+    at 219-221 (pitfall "The shared test helpers are declared in two
+    targets");
+  - 'save' 80-96 should become a five-line wrapper of the shared
+    'save' that keeps its 'assert!'.
+  Keep 'without_line_of' and the refusal test's '{:?}' formatting as
+  they are: the shared 'without_subtree_of' and 'refusal_of' differ
+  in edge cases (a missing trailing newline; 'format_save_error_as_org').
+  About 60 to 75 lines.
+- 'tests/hides_apply_to_every_fork_partner.rs' also predates it. Its
+  'view_of_n' 87-93, 'depth' 95-98, 'line_of' 100-107, 'ids' 160-163
+  and 'hides_of' 152-158 should go. 'save_cleanly' 67-85 should become
+  a short wrapper of the shared 'save' that keeps its failure message.
+  About 40 lines.
+- 'is_a_fixpoint', 13 identical lines in each of
+  'flat_forks_folders.rs' 57-69, 'forks_meet.rs' 93-105 and
+  'hides_by_integration.rs' 99-111, should move into the shared module
+  once. 'hides_by_integration.rs' then drops its 'BTreeMap' import and
+  its 'skg_files' import. About 40 lines.
+- 'hides_of', 'forks_of' and 'contains_of' ('hides_by_integration.rs'
+  190-208, 'forks_folder.rs' 150-160) should move into the shared
+  module once. About 18 lines net of the above.
+- 'members_as_such_and_stale_buffers.rs' 'skg_files' 55-66, and its
+  'PathBuf' import, are the shared 'skg_files (&f.config)': same
+  folders, same keys, and only '.skg' files in its fixture. 13 lines.
+- 'new_connection' in 'tests/reload_config.rs' 53-56 and
+  'tests/repo_watch.rs' 77-80 is identical to
+  'save_handler_helpers::new_connection', already declared in their
+  target. 'node_from_disk' in 'tests/fork.rs' 126-134 and
+  'tests/hidden_from_forks.rs' 250-258 differ only in whitespace; one
+  copy goes into the shared module, declared in 'tests/grouped_views.rs'.
+  About 11 lines.
+- The shared module's header should name both targets that declare
+  it.
+- Leave alone the near-copies that are not identical:
+  'forks_meet::forks_folder_members_of' and 'folder_members_under',
+  'hides_by_integration::members_of_folder_under',
+  'mirror_substitution::forks_folder_members_under', and
+  'mirror_substitution::headline_depth', whose name a local variable
+  shadows.
+- Narrow suites: 'cargo nextest run --test grouped_forks --test
+  grouped_saves --test grouped_views', then 'bash/nextest.sh'. The
+  test counts must equal the base's: no test may vanish.
+
+** TODO Slice 6: comments that restate code, history or a doc
+Expected: server about 200 comment lines (the survey's range is 146
+to 346), no code.
+The survey read the comments of the twelve server files whose comment
+count grew most from b343cfa9 to 2ddc0ff8. The rule for each comment:
+- It stays if it states a rule, a reason, an invariant, or a
+  consequence the code does not show.
+- It goes, or shrinks to a pointer, if it restates the lines below
+  it, narrates history ("as an older server drew", "anymore"),
+  repeats at a call site the callee's own doc, or repeats a 'docs/'
+  section sentence for sentence.
+| file ('server/')                               | b343cfa9 | 2ddc0ff8 | low | high | where                                                                                                                                    |
+|------------------------------------------------+----------+----------+-----+------+------------------------------------------------------------------------------------------------------------------------------------------|
+| from_text/local_fieldintent_collection/resolve_visibility.rs |  106 |  273 |  30 |   70 | module doc 34-57 repeats the function docs; 290-304 and 342-381 repeat 'docs/forks.org' "Adding a child under a member as such" and "Cutting from a forker"; the "what a member shows" rule is stated ten times |
+| refresh/visit.rs                               |      304 |      431 |  30 |   70 | module doc 1-41 restates 'docs/data-model_technical.org' 442ff and the rung banners; nine three-line banners; three statements of adding the hidden-outside folder (188-192, 1453-1457, 1482-1485); lines restating a name (239, 366, 410, 1009-1010, 1270-1271, 1416, 1499-1500, 1513-1514, 1565); history at 873-874 |
+| refresh/goal.rs                                |      111 |      242 |  20 |   45 | the "what a member shows" rule in three docs (what slice 3 leaves of 299-308, 324-330, 354-358); 838-840, 879-881 restate one-line bodies |
+| dbs/in_rust_graph/mirrors.rs                   |        0 |       93 |  20 |   32 | module doc 4-32 repeats 'docs/mirrors.org' 101-160 and should become a pointer; 155-156, 166-167, 290-291 restate signatures |
+| serve/handlers/perspective.rs                  |        0 |      100 |  15 |   35 | 142-154 and 6-16 repeat 'docs/api-and-formats.org' "Set perspective"; 392-398 repeats 'first_ranked_after''s doc |
+| from_text/local_fieldintent_collection/traverse.rs |  159 |  193 |   8 |   20 | 32-43 repeats the member-as-such rule stated in 'resolve_visibility.rs'; 195-197 and 239-244 repeat 32-43; 308-310 describes the arms below |
+| types/viewnode.rs                              |      499 |      531 |   8 |   20 | 793-803 and 816-824 list the arms of the match below; 594-600 and 607-613 repeat goal.rs docs |
+| refresh/viewnodestats.rs                       |      119 |      153 |   5 |   15 | 139-148 repeats viewnode.rs 770-773; 240-246 repeats goal.rs (what slice 3 leaves) |
+| from_text/local_fieldintent_collection/lower.rs |      92 |      117 |   4 |   12 | 448-450, 525-529, 550-555 restate the bodies                                                                                              |
+| dbs/in_rust_graph/fork_rules.rs                |        0 |       60 |   3 |   12 | 4-7, 14-15 repeat the glossary's "the fork rules" (8-13, the reasons, stay); 58, 227, 246 restate names |
+| refresh/editability.rs                         |      133 |      152 |   3 |   10 | 384-385 history; 280-289 repeats the member-as-such rule                                                                                 |
+| dbs/filesystem/retired_keys.rs                 |        0 |       30 |   0 |    5 | 4-6 is the reason for the check, and stays                                                                                               |
+Line numbers are at 2ddc0ff8: slices 2 to 4 move them, so find each
+comment by its text. Fix, at the same time, the comments that cite
+names which do not exist (correcting a name changes no line count):
+- 'lower.rs' 95 names 'ids_only_msv_ref', which is
+  'gnids_only_msv_ref';
+- 'apply_sticky_relRepos', at 'lower.rs' 53 and 72,
+  'serve/handlers/relRepo_info.rs' 8, 'dbs/filesystem/one_node.rs'
+  311 and 'from_text/supplement_from_disk.rs' 129, is
+  'apply_sticky_relRepos_in_graph';
+- 'viewnodestats.rs' 771 names 'ancestor_ids', which is
+  'ancestor_gnids';
+- goal.rs 929-930, the doc of 'gnid_items', sits above
+  'visible_illegal_edits' and should move to 'gnid_items';
+- the doc of visit.rs 'add_hidden_outside_folder' says 'forker' where
+  the parameter is 'hider'.
+- History words outside the table go too: 'herald_tokens.rs' 6 and
+  'save.rs' 688 ("anymore").
+- Narrow suites: 'cargo build' and 'bash/nextest.sh' (the doctests
+  read doc comments: 'bash/all-tests.sh' runs them).
+
+** TODO Slice 7: the measure of the whole, and the record
+- Measure as "Measuring lines" says, at 2ddc0ff8 and at HEAD, and
+  record in 'progress.org', under "* Plan 4", "The whole":
+  - server/*.rs total, code and comments, before and after, beside
+    b343cfa9's 52,375 / 42,454 / 9,921;
+  - the same for 'elisp/', 'nvim/', 'tools/skg-for-ai/' and 'tests/';
+  - each slice's measured change, one line each, and their sum.
+- 'git grep -n -w' every name the slices removed (their records' lists)
+  over the whole tree, 'docs/' and 'TODO/problems.org' included. Each
+  remaining hit outside 'TODO/' (which is history) is rewritten to cite
+  what stands, or listed with why it stays.
+- Copy this plan's "Proposed to Jeff, not executed" and "After the
+  migration" into the record, each item with its measured lines, for
+  Jeff to choose from.
+- Run 'bash/integration-tests.sh', then 'bash/all-tests.sh' once more
+  on the final tree.
+
+* Proposed to Jeff, not executed
+Each of these would delete code, but would change what a user sees or
+what the server writes. The figures are the survey's, at 2ddc0ff8. No
+slice touches them.
+** P1. The mirrors' tie: after "the note itself", the least pid
+Today, where the deciding skgrepo holds several of a note N's mirrors
+('mirror_shown_among', 'mirrors.rs' 100-120), four rules apply in
+turn:
+1. one mirror alone stands;
+2. else N itself, if homed there;
+3. else the only one none of the others forks;
+4. else the nearest along forks, then the least pid.
+The search's 'hit_standing_among' ('text_search.rs' 583-597) applies
+1, 3 and the least pid. Jeff allowed any convenient deterministic rule
+after "the note itself". The simplest: N itself, else the least pid.
+- It would delete:
+  - 'the_only_one_forked_by_none_of_the_others' (mirrors.rs 140-153);
+  - the field 'Mirrors::forks' and its three writers (mirrors.rs 210
+    and 222, 'fork.rs' 555);
+  - the fork filtering in 'hits_among_mirrors_of' (text_search.rs
+    577-580);
+  - the distance comparison in 'mirror_shown_among' and two
+    'tied . len () == 1' branches;
+  - six lines of the module doc.
+  About 45 lines (14 of them comments). 'Mirror::distance' stays,
+  since the goal and 'member_it_stands_for' read it.
+- What changes:
+  - The tests 'rule_three_the_one_no_other_there_forks_stands' and
+    'rule_four_the_nearest_then_the_least_pid_stands'
+    ('tests/dbs/in_rust_graph/mirrors.rs') pin today's answers, so
+    their expectations would change: D forks C forks N, with C and D
+    in one skgrepo, would show C, not D; and of a, b and c, a would
+    stand, not b.
+  - For a user, an owned chain kept in one skgrepo other than N's
+    would show the least pid, not the newest fork. A clone's pid is a
+    random UUID ('fork.rs' 442), so a fork of the shown substitute,
+    made in the same skgrepo, would stand or not by chance, and the
+    save would then warn "No perspective shows your fork there".
+  - No other test and no integration test depends on it: the survey
+    checked every fixture with two or more mirrors in one skgrepo.
+  - 'docs/mirrors.org' "Which mirror stands" and
+    'docs/api-and-formats.org' 122 would be rewritten.
+** P2. One visibility step instead of two
+The forkee-visibility loop ('resolve_visibility' 112-173, 62 lines)
+and 'resolve_forker_visibility' (342-463, 122 lines) could be one step
+of about 110 lines, which would save about 70.
+What would change (the pitfall "The two visibility steps differ"):
+- A forkee whose contains list names a child by an extra ID (after a
+  nodeMerge) is compared today by raw ID, while the buffer shows that
+  child by its pid, so the step can read it as cut and hide it. The
+  survey did not drive this case end to end. One step keyed
+  throughout would read it as shown.
+- A claiming member that the graph does not record as forked (added
+  to the folder in the same save) today has its content, less what
+  the note contains or hides, read as drawn. One step would choose a
+  single reading for both roles.
+The refusal message of a foreign note keeps its two wordings either
+way.
+** P3. The hidden-by folder
+Fold the folder of what a forker hides of the note's content
+('Folder::HiddenByForker', atom 'hiddenByForkerFolder') into the
+hidden-in folder, or drop it. Users would see one folder fewer under
+each forker that forks the note.
+- It would delete about 100 server lines:
+  - 'note_forked_by_forker_as_such';
+  - 'is_hiddenByForkerFolder_under_no_forker_as_such';
+  - the folder's arm, rows and table entries in 'goal.rs',
+    'visit.rs', 'ancestry.rs', 'viewnodestats.rs', 'heralds.rs',
+    'types/viewnode.rs' and 'buffer_to_viewnodes/local.rs'.
+- And about 20 lines elsewhere: 'shared/herald-styles.json' (5),
+  'shared/metadata-fields.json' (1), both clients' folder lists (1
+  each), the AI tool's (1), and the pins in 'tests/forkers_drawn_editable.rs',
+  'tests/forks_meet.rs', 'tests/flat_forks_folders.rs',
+  'tests/metadata_fields_table.rs', 'tests/unit/viewnode.rs' and the
+  herald pins.
+** P4. One list for the forks folder's tails
+In 'forks_folder_goal' ('goal.rs'), the forker-only members and the
+indirect members are built and sorted apart (650-656, 712-713, and the
+'declaration_rank_of' closure). The forker-only members are the
+mirrors at distance 1 that the note does not fork. So one list of the
+note's mirrors, less itself, its forkees and its hides, sorted by
+(distance, declaration rank, pid), would give both tails, and save
+about 10 lines.
+What would change: 'forker_only_members' does not ask whether the
+forker's node is shown, while the mirror walk does. A forker whose
+home skgrepo the restriction keeps out, but whose fork record it
+shows, would leave the folder. The survey could not tell whether that
+is reachable. 'forker_only_members' itself stays either way, for the
+diff view.
+** P5. The AI tool's old sidecars
+'perspective_of_sidecar' ('tools/skg-for-ai/skg_for_ai.py' 944-952)
+reads any recorded perspective not beginning "skgrepo " as the
+default, so a sidecar saved before plan 3 ("user", "owner of NAME",
+"root authors") still works. Returning the recorded value as it is
+would save about 7 lines: 2 of code, the docstring's clause, three
+test rows of 'failures_of_perspective_names', and two README lines.
+A command on such a sidecar would then send the old name, and the
+server would refuse it.
+
+* After the migration
+These stay until every skgrepo, Jeff's and Claude's included, is
+migrated to the 'forks' format, and the live servers run a binary of
+this branch. Until then, without them, an unknown key would be
+dropped silently. Then, one slice:
+- 'server/dbs/filesystem/retired_keys.rs' (133 lines, 30 of them
+  comments), and its readers: 'one_node.rs' (the read refusal),
+  'multiple_nodes.rs' (the folder-wide collection and its report),
+  'server/git_ops/diff.rs', and 'server/git_ops/git_snapshot.rs' (the
+  tree refusal, 'tree_holds_retired_keys', 'TreeReadError::HoldsRetiredKeys').
+  By plan 1's diff those four files grew by about 110 lines net, so
+  about 245 server lines in all.
+- The serde alias 'hides_from_its_subscriptions'
+  ('server/types/nodes/fs.rs' 63) and its comment (38-39).
+- Tests: 'tests/unit/retired_keys.rs' (39); the retired-keys case of
+  'tests/init_refusal.rs' (about 100 of its 128 lines);
+  'tests/graph_straddle.rs' 147 and its fixtures
+  'retired_keys_at_head', 'retired_keys_at_two_heads'; the old-format
+  blob of 'tests/investigate_unknown_node.rs' 180-189; the
+  'SubscribesTo' mark of 'tests/unit/processed_store.rs' 101 and its
+  JSON fixture.
+- The migration tools: 'tools/migrate-forks-2026-11/' (1,231 lines)
+  and 'tools/migrate-skg-keys-2026-10/' (84 lines).
+- 'docs/api-and-formats.org', "The .skg file format": the retired keys
+  and the October alias.
+
+* Verification and completion
+Each slice ends with:
+- its suites green, but for failures it classifies as pre-existing or
+  flaky;
+- no test expectation changed, but those "The hard rules" allow;
+- its record in 'progress.org', with its measured lines;
+- its headline DONE.
+After slice 7, the review of 'coding-advice/plans.org' ("After each
+plan") is one agent reading the plan's whole diff. It looks for any
+change of behavior (a message, an order or a comparison that moved),
+for names the slices coined or left dangling, and for code that cites
+'TODO/'. Nothing in "Agreed behavior" changes, so the suites stand in
+for the probe pass.
+
+* Stops and deviations
+Stop only for the conditions in 'coding-advice/when-to-stop.org'. This
+plan expects no stop. A deletion that a suite shows would change
+behavior is not a stop: put it back, record it, and continue. If a
+whole slice comes to nothing that way, record that and mark it DONE.
+Other deviations go into 'progress.org' under the slice's record.
