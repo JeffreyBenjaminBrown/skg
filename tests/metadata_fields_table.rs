@@ -11,20 +11,22 @@
 // edit request and view request the parser knows; and its 'parts' stand
 // in the order the printer ('viewnode_to_string') writes them.
 
-use skg::org_to_text::viewnode_to_string;
+use skg::org_to_text::{viewforest_tree_to_string, viewnode_to_string};
 use skg::serve::parse_metadata_sexp::{
   MetadataKind, OccurrenceEditRequest, ViewnodeMetadata,
   parse_metadata_to_viewnodemd, viewnode_from_metadata};
 use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
-  ChangesetMarkerKind, DiffChange, Existence, FolderRelation, NodeEditRequest,
-  Folder, PropertyMember, ChangeViewnode, RelationshipEditRequest, ViewRequest,
-  Viewnode, ViewnodeKind, Vognode};
+  ChangesetMarkerKind, DiffChange, Editability, Existence, FolderRelation,
+  NodeEditRequest, Folder, PropertyMember, ChangeViewnode, RelationshipEditRequest,
+  ViewRequest, Viewnode, ViewnodeKind, Vognode, mk_viewnode, viewforest_root_viewnode,
+  viewnode_of};
 
+use ego_tree::Tree;
 use serde_json::Value;
 use sexp::Sexp;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
 /// The parsed table.
 fn metadata_fields_table (
@@ -471,6 +473,12 @@ fn each_variant_takes_its_tables_parts_and_no_other () {
 /// The table's 'parts' are the parts of '(skg ...)' in the order the
 /// printer writes them: an occurrence carrying every part prints each
 /// where the table puts it, and each kind's fields stand in that order.
+/// No occurrence carries both 'writeProtected' and 'contentInPart',
+/// which the printer writes on an editable one standing in a forks
+/// folder: so a write-protected occurrence carrying every other part,
+/// standing alone, prints each in order, and so does the same
+/// occurrence made editable, standing in an editable note's forks
+/// folder.
 #[test]
 fn the_printer_writes_the_parts_in_the_tables_order () {
   let table : Value = metadata_fields_table ();
@@ -496,13 +504,46 @@ fn the_printer_writes_the_parts_in_the_tables_order () {
     node : Some (Existence::Added), rel : None, properties : false };
   let printed : String = viewnode_to_string (
     &viewnode ) . unwrap ();
-  let Sexp::List (elements) = sexp::parse (&format! ("(skg {})", printed))
-    . unwrap () else { panic! ("{}", printed) };
-  let printed_parts : Vec<String> = elements [1..] . iter ()
+  assert_eq! ( parts_printed (&format! ("(skg {})", printed)),
+               parts_but (&parts, "contentInPart"), "{}", printed );
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
+    = &mut viewnode . kind {
+    occurrence . editability = Editability::Editable {
+      body : None, edit_request : None }; }
+  let mut tree : Tree<Viewnode> = Tree::new ( viewforest_root_viewnode () );
+  tree . root_mut ()
+    . append ( mk_viewnode ( ID::from ("note"), SkgrepoName::from ("main"),
+                             "note" . to_string (), true,
+                             Editability::Editable { body : None, edit_request : None },
+                             HashSet::new () ))
+    . append ( viewnode_of ( ViewnodeKind::Folder (Folder::Forks) ))
+    . append (viewnode);
+  let rendered : String = viewforest_tree_to_string (&tree) . unwrap ();
+  let member_line : &str = rendered . lines () . nth (2) . unwrap ();
+  let metadata : &str = // between the stars and the title
+    &member_line [ member_line . find ("(skg") . unwrap ()
+                   .. member_line . rfind (") ") . unwrap () + 1 ];
+  assert_eq! ( parts_printed (metadata),
+               parts_but (&parts, "writeProtected"), "{}", rendered ); }
+
+/// The parts of the metadata sexp 'metadata', '(skg ...)', each by its
+/// head, the kind's atom as 'KIND'.
+fn parts_printed (
+  metadata : &str,
+) -> Vec<String> {
+  let Sexp::List (elements) = sexp::parse (metadata)
+    . unwrap () else { panic! ("{}", metadata) };
+  elements [1..] . iter ()
     . map ( |element| {
       let head : String = match element {
         Sexp::List (items) => items [0] . to_string (),
         atom => atom . to_string (), };
       if head == "node" { "KIND" . to_string () } else { head } } )
-    . collect ();
-  assert_eq! ( printed_parts, parts, "{}", printed ); }
+    . collect () }
+
+/// 'parts' less 'left_out'.
+fn parts_but (
+  parts    : &[String],
+  left_out : &str,
+) -> Vec<String> {
+  parts . iter () . filter ( |part| *part != left_out ) . cloned () . collect () }

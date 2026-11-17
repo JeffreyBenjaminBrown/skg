@@ -280,7 +280,7 @@ async fn reader_view_with_unread_list (
     &graph . load_full (), view_id . clone (), f_tree, &pids,
     &SkgrepoRestriction::unrestricted (config) );
   assert! ( f_view . lines () . any ( |line|
-              line . contains ("(gnid t) (skgRepos (nodeRepo sender)) (view") ),
+              line . contains ("(gnid t) (skgRepos (nodeRepo sender)) contentInPart (view") ),
     "the fresh view must draw t editable:\n{}", f_view );
   let editable : String = f_view . clone ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =

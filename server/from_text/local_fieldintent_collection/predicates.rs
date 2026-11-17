@@ -63,3 +63,17 @@ pub fn occurrence_child_counts_as_visible_content (
   t . claimsMembership
     && !matches!( t . edit_request (),
                   Some (&NodeEditRequest::Delete)) }
+
+/// This returns true iff the save reads the children of the editable
+/// occurrence 't', standing anywhere but as a member as such of a
+/// forks folder, as its whole content. Not when its line says that
+/// the view drew it showing its content only in part
+/// ('Occurrence::shows_content_in_part'), as a member as such: it was
+/// moved from there, so the view never drew the rest of its content.
+/// The save then leaves its content as the graph has it, reading what
+/// stands under it as no list, and the next view draws that content
+/// whole ('docs/forks.org', "Moving a member out of the folder").
+pub fn children_are_its_whole_content (
+  t : &Occurrence,
+) -> bool {
+  ! t . shows_content_in_part }

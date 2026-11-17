@@ -989,12 +989,12 @@ async fn test_forkee_and_compound_partner_folders (
     let expected_view = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 3))))) R
        ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
        **** (skg hiddenInForkPartnerFolder)
        ***** (skg folded node (gnid hidden-in-E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) hidden-in-E1
        ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (forks (in 1))) cycle)) forkee-1
        **** (skg node (gnid E11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E11
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
+       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
        **** (skg hiddenInForkPartnerFolder)
        ***** (skg folded node (gnid hidden-in-E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) hidden-in-E2
        ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (forks (in 1))) cycle)) forkee-2
@@ -1059,7 +1059,7 @@ async fn test_hidden_within_but_none_without (
     let expected_view = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 1)) (hides (out 1))))) R
        ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 3 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 3 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
        **** (skg hiddenInForkPartnerFolder)
        ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) H
        ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 3 (ancestors 1))) (forks (in 1))) cycle)) forkee-1
@@ -1282,11 +1282,11 @@ async fn test_hidden_without_but_none_within (
     let expected_view = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 1))))) R
        ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 2 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
        **** (skg node (gnid E11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E11
        **** (skg node (gnid E12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) E12
        ***** (skg node (gnid E121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E121
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
+       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
        *** (skg hiddenOutsideOfForkPartnersFolder)
        **** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (hides (in 1 (ancestors 3)))) (birth (hides in 3)))) H
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
@@ -1415,12 +1415,12 @@ async fn test_overlapping_hidden_within (
     let expected_view = indoc! {
       "* (skg node (gnid R) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2)) (hides (out 1))))) R
        ** (skg forksFolder)
-       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
+       *** (skg node (gnid E1) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
        **** (skg hiddenInForkPartnerFolder)
        ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) H
        ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))) cycle)) forkee-1
        ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))))) forkee-2
-       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
+       *** (skg node (gnid E2) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
        **** (skg hiddenInForkPartnerFolder)
        ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) H
        ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))))) forkee-1

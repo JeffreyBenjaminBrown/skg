@@ -55,11 +55,11 @@ fn test_forks_folder_appears_for_forkers(
       "* (skg node (gnid 1) (skgRepos (nodeRepo home)) (view (rels (contains (out 4))) repoBoundary)) 1
       ** (skg node (gnid 11) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1)) (out 1)) (forks (out 1))) (birth (contains in 1)))) 11
       *** (skg forksFolder)
-      **** (skg node (gnid 11-sees) (skgRepos (nodeRepo away)) (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) 11-sees
+      **** (skg node (gnid 11-sees) (skgRepos (nodeRepo away)) contentInPart (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) 11-sees
       *** (skg node (gnid 111) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 111
       ** (skg node (gnid 12) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1))) (forks (out 1))) (birth (contains in 1)))) 12
       *** (skg forksFolder)
-      **** (skg node (gnid 12-sees) (skgRepos (nodeRepo away)) (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) 12-sees
+      **** (skg node (gnid 12-sees) (skgRepos (nodeRepo away)) contentInPart (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) 12-sees
       ** (skg node (gnid 13) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13
       ** (skg node (gnid 14) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 14
       *** (skg node (gnid 141) (skgRepos (nodeRepo home)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 141

@@ -388,7 +388,7 @@ fn a_switch_draws_restricted_vognodes_in_the_folders (
       assert_eq! ( widened, "\
 * (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 3)) (forks (out 1)) (hides (out 1))) repoBoundary)) r
 ** (skg (vnid 0b) forksFolder)
-*** (skg (vnid 0c) node (gnid hs) (skgRepos (nodeRepo private) (relRepo public)) (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) hs secret
+*** (skg (vnid 0c) node (gnid hs) (skgRepos (nodeRepo private) (relRepo public)) contentInPart (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) hs secret
 *** (skg (vnid 0d) hiddenOutsideOfForkPartnersFolder)
 **** (skg (vnid 0e) folded node (gnid hh) (skgRepos (nodeRepo private)) writeProtected (view (rels (hides (in 1 (ancestors 3)))) (birth (hides in 3)) repoBoundary)) hh secret
 ** (skg (vnid 0f) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
@@ -411,7 +411,7 @@ const SWITCHED_TO_PUBLIC : &str = "\
 const SWITCHED_BACK_TO_ALL : &str = "\
 * (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 3)) (forks (out 1))) repoBoundary)) r
 ** (skg (vnid 0b) forksFolder)
-*** (skg (vnid 0c) node (gnid hs) (skgRepos (nodeRepo private) (relRepo public)) (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) hs secret
+*** (skg (vnid 0c) node (gnid hs) (skgRepos (nodeRepo private) (relRepo public)) contentInPart (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) hs secret
 ** (skg (vnid 0d) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
 ** (skg (vnid 0e) node (gnid h) (skgRepos (nodeRepo private) (relRepo public)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (props (aliases 1)) (birth (contains in 1)) repoBoundary)) h secret
 *** (skg (vnid 0f) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1

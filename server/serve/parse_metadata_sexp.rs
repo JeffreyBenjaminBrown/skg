@@ -15,6 +15,7 @@
 //!   node [(gnid ID)] [(skgRepos [(nodeRepo REPO)] [(relRepo REPO)])]
 //!        [noClaim]          ; the occurrence claims no membership
 //!        [writeProtected]   ; marks the occurrence write-protected
+//!        [contentInPart]    ; drawn showing its content in part
 //!        [(inPlaceOf ID)]
 //!        [(editRequest [<delete | (merge ID) | (relRepo REPO)
 //!                       | (flag FLAG true|false) | restoreRel>]
@@ -129,6 +130,9 @@ pub struct OccurrenceMetadata {
   /// False when the headline carries 'noClaim'.
   pub claimsMembership : bool,
   pub writeProtected   : bool,
+  /// True when the headline carries 'contentInPart'
+  /// ('Occurrence::shows_content_in_part').
+  pub shows_content_in_part : bool,
   /// Load-bearing: save extraction round-trips the original ID
   /// through it.
   pub in_place_of      : Option<ID>,
@@ -144,6 +148,7 @@ impl Default for OccurrenceMetadata {
       home_skgrepo     : None,
       claimsMembership : true,
       writeProtected   : false,
+      shows_content_in_part : false,
       in_place_of      : None,
       edit_request     : None,
       view_requests    : HashSet::new (), } }
@@ -402,6 +407,7 @@ fn occurrence_from_metadata (
                          . unwrap_or_else (SkgrepoName::not_found),
       claimsMembership : occurrence . claimsMembership,
       in_place_of      : occurrence . in_place_of . clone (),
+      shows_content_in_part : occurrence . shows_content_in_part,
       graphStats       : metadata . graphStats . clone (),
       viewStats        : metadata . viewStats . clone (),
       relationshipEditRequest,
@@ -496,7 +502,7 @@ impl NamedKind {
   fn parts_the_table_leaves_out (&self) -> &'static [&'static str] {
     match self {
       NamedKind::Occurrence =>
-        &[ "gnid", "skgRepos", "inPlaceOf", "view", "diff" ],
+        &[ "gnid", "skgRepos", "contentInPart", "inPlaceOf", "view", "diff" ],
       NamedKind::Ghost =>
         &[ "gnid", "skgRepos", "view", "diff" ],
       NamedKind::GnidOnly (_) =>
@@ -555,6 +561,7 @@ struct WrittenParts {
                             Option<SkgrepoName> )>, // its relRepo
   noClaim        : bool,
   writeProtected : bool,
+  contentInPart  : bool,
   in_place_of    : Option<ID>,
   edit_request   : Option<WrittenEditRequest>,
   view_requests  : HashSet<ViewRequest>,
@@ -629,7 +636,7 @@ fn classify_metadata_element (
                           Ok (( String::new (), None )) },
         "bodyFolded" => { metadata . foldAndFocus . bodyFolded = true;
                           Ok (( String::new (), None )) },
-        "noClaim" | "writeProtected" => part (&atom),
+        "noClaim" | "writeProtected" | "contentInPart" => part (&atom),
         "node"       => a_kind (NamedKind::Occurrence),
         "ghost"      => a_kind (NamedKind::Ghost),
         "unknown"    => a_kind ( NamedKind::GnidOnly (GnidOnlyKind::Unknown) ),
@@ -722,6 +729,8 @@ fn read_metadata_part (
       written . noClaim = true,
     "writeProtected" =>
       written . writeProtected = true,
+    "contentInPart" =>
+      written . contentInPart = true,
     "view" | "diff" => {}, // derived facts, skipped whole
     "gnid" =>
       written . gnid = Some ( ID::from ( single_argument (name, args) ? )),
@@ -794,6 +803,7 @@ fn kind_with_its_parts (
         home_skgrepo   : nodeRepo,
         claimsMembership,
         writeProtected : written . writeProtected,
+        shows_content_in_part : written . contentInPart,
         in_place_of    : written . in_place_of,
         edit_request   : match written . edit_request {
           None => None,

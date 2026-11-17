@@ -1678,6 +1678,17 @@ other viewparent ('docs/glossary.org', "claims membership", lists
 them) no child claims, whatever it carries, and the server writes no
 =noClaim= there.
 
+The atom =contentInPart= marks an editable member as such of a forks
+folder, which shows its node's content only in part
+('docs/forks.org', "Moving a member out of the folder"). The server
+writes it on every editable occurrence standing directly in a forks
+folder, and on no other; it is a declared part, not a view fact, so
+it goes with the headline when the user moves it. Wherever such a
+headline stands but in a forks folder, the save reads its title and
+body and none of the headlines under it as its content: its content
+stays as the graph has it, and the redrawn view, which writes no
+=contentInPart= there, draws that content whole.
+
 The atom =omittedBody= in =(view ...)= accompanies =writeProtected= on a
 write-protected node whose graphnode has a body — one the rendering
 hides. Herald "B", hugging the ☮. A derived fact: the parser skips
@@ -2515,8 +2526,8 @@ Every headline has one shape:
 The parts are of two classes. The declared parts are what the client
 is responsible for and the save reads: the kind, the viewnode ID, the
 position atoms, =(gnid ID)=, =(skgRepos ...)=, =noClaim=,
-=writeProtected=, =(inPlaceOf ID)=, =(viewRequests ...)= and
-=(editRequest ...)=. The derived facts are what the server computes
+=writeProtected=, =contentInPart=, =(inPlaceOf ID)=, =(viewRequests
+...)= and =(editRequest ...)=. The derived facts are what the server computes
 at every rendering and nobody reads back: everything in =(view ...)=
 (see "Stats metadata: the view facts" above) and in =(diff ...)=
 (see "Metadata of the diff view" below). The parser skips both forms
@@ -2528,7 +2539,7 @@ writes =(skg folded)= on a headline that has no metadata yet. Each kind
 takes only its own declared parts:
 #+begin_example
 node [(gnid ID)] [(skgRepos [(nodeRepo R)] [(relRepo R)])]
-     [noClaim] [writeProtected] [(inPlaceOf ID)]
+     [noClaim] [writeProtected] [contentInPart] [(inPlaceOf ID)]
      [(editRequest [REQUEST] [PROCESSED])] [(viewRequests ...)]
      [(view ...)] [(diff ...)]
 ghost (gnid ID) (skgRepos (nodeRepo R)) [noClaim]

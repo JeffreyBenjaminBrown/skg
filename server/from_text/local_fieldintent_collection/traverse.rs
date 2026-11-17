@@ -50,6 +50,7 @@
 //! only through others, or a detached forkee.
 
 use crate::from_text::local_fieldintent_collection::predicates::{
+  children_are_its_whole_content,
   occurrence_child_counts_as_content,
   occurrence_child_counts_as_visible_content,
   deleted_mirror_keeps_its_original,
@@ -226,14 +227,16 @@ fn visit_occurrence (
               skgrepo : t . home_skgrepo . clone(),
               title   : t . title . clone(),
               body    : t . body() . cloned() } ) ?;
-          collected . instructionMerge_fieldIntent (
-            &headline,
-            t . gnid . clone(),
-            // This is always emitted, even if empty: an editable
-            // node's content is always Specified.
-            FieldIntent::SetContains (
-              content_members (
-                node_ref, ! owned (& t . home_skgrepo) ) )) ?;
+          if children_are_its_whole_content (t) {
+            collected . instructionMerge_fieldIntent (
+              &headline,
+              t . gnid . clone(),
+              // This is always emitted, even if empty: an editable
+              // node's content is always Specified where the view
+              // drew it whole.
+              FieldIntent::SetContains (
+                content_members (
+                  node_ref, ! owned (& t . home_skgrepo) ) )) ?; }
           if let Some (NodeEditRequest::NodeMerge (acquiree)) =
             t . edit_request()
           { collected . instructionMerge_fieldIntent (

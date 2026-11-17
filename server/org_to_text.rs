@@ -3,7 +3,7 @@ use crate::serve::util::sexp_to_client_string;
 use crate::types::misc::SkgrepoName;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ChangeFacts, FoldAndFocus, ProcessedRequest,
+  ChangeFacts, Folder, FoldAndFocus, ProcessedRequest,
   Viewnode, ViewnodeKind, Vognode, PropertyMember, ChangeViewnode, Occurrence,
   Ghost, GnidOnlyVognode, NodeEditRequest,
   RelationshipEditRequest,
@@ -91,9 +91,12 @@ fn render_view_roots_to_string <'a> (
     let claims_are_read : bool = // under any other parent no child claims
       node_ref . parent () . is_some_and ( |parent|
         parent_reads_claims ( node_ref . tree (), parent . id () ));
+    let in_a_forks_folder : bool =
+      node_ref . parent () . is_some_and ( |parent| matches! (
+        parent . value () . kind, ViewnodeKind::Folder (Folder::Forks) ));
     let mut out : String =
       viewnode_to_text_where_it_stands (
-        level, node_ref . value (), claims_are_read )?;
+        level, node_ref . value (), claims_are_read, in_a_forks_folder )?;
     for child in node_ref . children () {
       out . push_str (
         & render_node_subtree_to_org (
@@ -109,24 +112,28 @@ fn render_view_roots_to_string <'a> (
 
 /// Renders an Viewnode as org-mode formatted text.
 /// Not recursive -- just stars, metadata, title, and maybe a body.
-/// Standing alone, it is read as standing where its claim is read.
+/// Standing alone, it is read as standing where its claim is read,
+/// in no forks folder.
 /// ERRORS: If viewnode is a BufferRoot.
 pub fn viewnode_to_text (
   level    : usize,
   viewnode : &Viewnode,
 ) -> Result < String, Box<dyn Error> > {
-  viewnode_to_text_where_it_stands (level, viewnode, true) }
+  viewnode_to_text_where_it_stands (level, viewnode, true, false) }
 
 /// 'viewnode_to_text' for a viewnode whose viewparent reads its
 /// claim ('parent_reads_claims') when 'claims_are_read'. Elsewhere it
 /// carries no 'noClaim': no child there claims, whatever it carries.
+/// 'in_a_forks_folder': its viewparent is a forks folder.
 fn viewnode_to_text_where_it_stands (
-  level           : usize,
-  viewnode        : &Viewnode,
-  claims_are_read : bool,
+  level             : usize,
+  viewnode          : &Viewnode,
+  claims_are_read   : bool,
+  in_a_forks_folder : bool,
 ) -> Result < String, Box<dyn Error> > {
   let metadata_str : String =
-    viewnode_to_string_where_it_stands (viewnode, claims_are_read)?;
+    viewnode_to_string_where_it_stands (
+      viewnode, claims_are_read, in_a_forks_folder )?;
   let title : &str = viewnode . title ();
   let body : Option < &String > = viewnode . body ();
   if metadata_str . is_empty () && title . is_empty () {
@@ -160,27 +167,31 @@ fn viewnode_to_text_where_it_stands (
 /// every part standing at the top level, the derived facts gathered
 /// in '(view ...)' and '(diff ...)'.
 /// Standing alone, the viewnode is read as standing where its claim is
-/// read.
+/// read, in no forks folder.
 pub fn viewnode_to_string (
   viewnode : &Viewnode,
 ) -> Result < String, Box<dyn Error> > {
-  viewnode_to_string_where_it_stands (viewnode, true) }
+  viewnode_to_string_where_it_stands (viewnode, true, false) }
 
 /// 'viewnode_to_string' for a viewnode whose claim is read where it
 /// stands when 'claims_are_read'; otherwise it carries no 'noClaim'.
+/// 'in_a_forks_folder': its viewparent is a forks folder.
 fn viewnode_to_string_where_it_stands (
-  viewnode        : &Viewnode,
-  claims_are_read : bool,
+  viewnode          : &Viewnode,
+  claims_are_read   : bool,
+  in_a_forks_folder : bool,
 ) -> Result < String, Box<dyn Error> > {
   let parts_but_the_viewnode_id : String =
-    viewnode_to_string_without_viewnode_id (viewnode, claims_are_read) ?;
+    viewnode_to_string_without_viewnode_id (
+      viewnode, claims_are_read, in_a_forks_folder ) ?;
   Ok ( match &viewnode . viewnode_id {
     None      => parts_but_the_viewnode_id,
     Some (viewnode_id) => format! ("(vnid {}) {}", viewnode_id, parts_but_the_viewnode_id), } ) }
 
 fn viewnode_to_string_without_viewnode_id (
-  viewnode        : &Viewnode,
-  claims_are_read : bool,
+  viewnode          : &Viewnode,
+  claims_are_read   : bool,
+  in_a_forks_folder : bool,
 ) -> Result < String, Box<dyn Error> > {
   let change_facts : &ChangeFacts = &viewnode . change_facts;
   let request : &Option<ProcessedRequest> = &viewnode . processed_request;
@@ -201,7 +212,8 @@ fn viewnode_to_string_without_viewnode_id (
         viewnode . foldAndFocus )),
     ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
       Ok ( occurrence_metadata_to_string (
-        viewnode . foldAndFocus, occurrence, claims_are_read, change_facts, request )),
+        viewnode . foldAndFocus, occurrence, claims_are_read,
+        in_a_forks_folder, change_facts, request )),
     ViewnodeKind::Vognode (Vognode::GnidOnly (gnid_only)) =>
       Ok ( gnid_only_vognode_metadata_to_string (
         viewnode . foldAndFocus, gnid_only,
@@ -402,7 +414,7 @@ fn diff_form (
 /// Render metadata for an Occurrence:
 ///   [focused] [folded] [bodyFolded] node (gnid X)
 ///   (skgRepos (nodeRepo R) [(relRepo R)]) [noClaim] [writeProtected]
-///   [(inPlaceOf X)] [(editRequest ...)] [(viewRequests ...)]
+///   [contentInPart] [(inPlaceOf X)] [(editRequest ...)] [(viewRequests ...)]
 ///   [(view [omittedBody] [(rels ...)] [(props ...)] [(birth ...)]
 ///          [noWarrant] [cycle] [repoBoundary])]
 ///   [(diff ...)]
@@ -410,12 +422,14 @@ fn occurrence_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   occurrence : & Occurrence,
   claims_are_read     : bool,
+  in_a_forks_folder   : bool,
   change_facts        : & ChangeFacts,
   request             : & Option<ProcessedRequest>,
 ) -> String {
   fn node_parts (
     occurrence : & Occurrence,
     claims_are_read     : bool,
+    in_a_forks_folder   : bool,
     change_facts : & ChangeFacts,
     request   : & Option<ProcessedRequest>,
   ) -> Vec < String > {
@@ -473,6 +487,11 @@ fn occurrence_metadata_to_string (
       // cannot be edited (see Editability in types/viewnode.rs). The metadata
       // sexp uses only this short form on both emission and parsing.
       parts . push ( "writeProtected" . to_string () ); }
+    if in_a_forks_folder && ! occurrence . is_writeProtected () {
+      // An editable member as such shows its content in part
+      // ('Occurrence::shows_content_in_part'); the atom goes with
+      // the headline wherever it is moved.
+      parts . push ( "contentInPart" . to_string () ); }
     if let Some (ref original) =
       occurrence . in_place_of {
       parts . push ( format! ("(inPlaceOf {})",
@@ -484,7 +503,8 @@ fn occurrence_metadata_to_string (
     parts . extend ( diff_form (change_facts) );
     parts }
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
-  parts . extend ( node_parts (occurrence, claims_are_read, change_facts, request));
+  parts . extend ( node_parts (
+    occurrence, claims_are_read, in_a_forks_folder, change_facts, request ));
   parts . join (" ") }
 
 /// Render metadata for a ghost:

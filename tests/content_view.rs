@@ -157,9 +157,9 @@ async fn test_multi_root_view_with_shared_nodes (
          ** (skg containerFolder)
          *** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 2 (ancestors 2))) (hides (out 2))) (birth (contains out 2)))) title 1
          ** (skg forksFolder)
-         *** (skg node (gnid 4) (skgRepos (nodeRepo main)) (view (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg node (gnid 4) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
          this one string could span pages
-         *** (skg node (gnid 5) (skgRepos (nodeRepo main)) (view (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2)) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg node (gnid 5) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2)) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
          *** (skg node (gnid 3) (skgRepos (nodeRepo main)) noClaim writeProtected (view omittedBody (rels (contains (in 1) (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1))) (forks (in 1) (out 2))) (props (extraIds 1)))) title 3
          "};

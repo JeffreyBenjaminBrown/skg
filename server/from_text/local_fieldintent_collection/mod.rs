@@ -36,6 +36,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   Folder, NodeEditRequest, Viewnode, ViewnodeKind, Vognode};
 use lower::{lower_collected_fieldIntents, nodeMerge_pairs, LoweringOutput};
+use predicates::children_are_its_whole_content;
 use resolve_visibility::resolve_visibility;
 use traverse::collect_instructions_locally;
 use types::CollectedFieldIntents;
@@ -144,7 +145,10 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
 /// One warning per orphan graphnode the save creates: a node from a
 /// headline typed under a parent that reads no claims
 /// ('parent_reads_claims': a write-protected occurrence, a ghost, a
-/// gnid-only vognode, a tombstone, a write-protected folder). The node
+/// gnid-only vognode, a tombstone, a write-protected folder), or
+/// under an editable member as such moved out of its forks folder,
+/// whose children the save reads as no list
+/// ('children_are_its_whole_content'). The node
 /// is saved, and no list contains it. Under a tombstone, the headline
 /// takes its skgrepo from the nearest occurrence above
 /// ('complete_occurrence_skgrepo'), as under a ghost. A root is not
@@ -187,6 +191,11 @@ fn is_created_as_an_orphan (
   && match &parent . value () . kind {
     ViewnodeKind::BufferRoot => false,
     ViewnodeKind::Folder (Folder::Forks) if occurrence . claimsMembership => false,
+    ViewnodeKind::Vognode (Vognode::Occurrence (parent_occurrence))
+      if ! parent_occurrence . is_writeProtected ()
+         && ! children_are_its_whole_content (parent_occurrence) =>
+      ! parent . parent () . is_some_and ( |grandparent| matches! (
+          grandparent . value () . kind, ViewnodeKind::Folder (Folder::Forks) )),
     _ => ! parent_reads_claims (viewforest, parent . id ()), } }
 
 /// Transitional compatibility for direct extraction tests.

@@ -374,6 +374,17 @@ pub struct Occurrence {
   /// buffer validation (the headline bearing it must be a mirror of N, under
   /// the unrestricted skgrepo restriction: 'inPlaceOf_part_errors').
   pub in_place_of      : Option<ID>,
+  /// True when its line says 'contentInPart': the view drew it
+  /// editable showing its node's content only in part, as a member as
+  /// such of a forks folder ('what_the_member_shows' in
+  /// 'server/refresh/goal.rs'). The printer writes the atom by
+  /// position, wherever an editable occurrence stands directly in a
+  /// forks folder, so it travels with a headline moved out of the
+  /// folder; read only by the save, which never reads what stands
+  /// under such an occurrence as its whole list
+  /// ('children_are_its_whole_content' in
+  /// 'server/from_text/local_fieldintent_collection/predicates.rs').
+  pub shows_content_in_part : bool,
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
   pub graphStats    : GraphnodeStats,
@@ -1471,6 +1482,7 @@ pub fn default_occurrence (
     home_skgrepo: skgrepo,
     claimsMembership : true,
     in_place_of      : None,
+    shows_content_in_part : false,
     graphStats     : GraphnodeStats::default(),
     viewStats      : ViewnodeStats::default(),
     relationshipEditRequest : None,

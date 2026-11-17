@@ -63,6 +63,8 @@ mod forks_meet;
 mod forkee_content_named_by_an_extra_id;
 #[path = "members_typed_into_a_forks_folder.rs"]
 mod members_typed_into_a_forks_folder;
+#[path = "moved_headlines_whose_content_was_not_drawn.rs"]
+mod moved_headlines_whose_content_was_not_drawn;
 
 #[path = "hides_apply_to_every_fork_partner.rs"]
 mod hides_apply_to_every_fork_partner;

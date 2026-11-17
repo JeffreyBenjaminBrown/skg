@@ -221,7 +221,7 @@ async fn test_budget_reaches_forkees_and_content_in_level_order (
 
       let expected = indoc! {"* (skg node (gnid r) (skgRepos (nodeRepo main)) (view (rels (contains (out 1)) (forks (out 2))))) r
                               ** (skg forksFolder)
-                              *** (skg node (gnid s1) (skgRepos (nodeRepo main)) (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) s1
+                              *** (skg node (gnid s1) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) s1
                               *** (skg node (gnid s2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) s2
                               ** (skg node (gnid c1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) c1
                               *** (skg node (gnid c2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) c2

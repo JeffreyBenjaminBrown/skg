@@ -69,9 +69,9 @@ fn the_declared_parts_parse_back_in_any_order (
 ) {
   let in_print_order : ViewnodeMetadata = parse_metadata_to_viewnodemd (
     "(skg (vnid 1a) folded node (gnid n) (skgRepos (nodeRepo main) (relRepo pub)) \
-     noClaim writeProtected (inPlaceOf o) (viewRequests editableView))" ) . unwrap ();
+     noClaim writeProtected contentInPart (inPlaceOf o) (viewRequests editableView))" ) . unwrap ();
   let shuffled : ViewnodeMetadata = parse_metadata_to_viewnodemd (
-    "(skg (viewRequests editableView) (inPlaceOf o) writeProtected \
+    "(skg (viewRequests editableView) (inPlaceOf o) contentInPart writeProtected \
      (skgRepos (relRepo pub) (nodeRepo main)) noClaim (gnid n) node folded (vnid 1a))" )
     . unwrap ();
   assert_eq! ( in_print_order, shuffled );
@@ -82,6 +82,7 @@ fn the_declared_parts_parse_back_in_any_order (
   assert_eq! ( in_print_order . viewStats . relRepo, Some ( SkgrepoName::from ("pub") ));
   assert_eq! ( occurrence . in_place_of, Some ( ID::from ("o") ));
   assert! ( occurrence . writeProtected
+            && occurrence . shows_content_in_part
             && ! occurrence . claimsMembership
             && in_print_order . foldAndFocus . folded ); }
 
@@ -129,6 +130,8 @@ fn each_kind_takes_only_its_own_parts (
   for (metadata, refusal) in [
     ( "(skg ghost (gnid g) (skgRepos (nodeRepo main)) writeProtected)",
       "A headline of kind ghost does not take writeProtected" ),
+    ( "(skg ghost (gnid g) (skgRepos (nodeRepo main)) contentInPart)",
+      "A headline of kind ghost does not take contentInPart" ),
     ( "(skg ghost (gnid g) (skgRepos (nodeRepo main) (relRepo pub)))",
       "A ghost's skgRepos holds only (nodeRepo R)" ),
     ( "(skg ghost (skgRepos (nodeRepo main)))",
