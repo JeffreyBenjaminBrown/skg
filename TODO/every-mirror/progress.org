@@ -4688,3 +4688,59 @@ None.
 *** Unfinished
 Nothing.
 *** DONE
+
+** Slice 4: mirror and config aliases
+*** Commits
+- e2174090 every-mirror plan 4 slice 4: mirror and config aliases
+- (the commit carrying this record) every-mirror plan 4 slice 4:
+  record, DONE
+*** Suites
+Logs under 'tests/results/every-mirror/slice4-plan4/'.
+- 'cargo nextest run -E "test(mirror) | test(fork) | test(perspective)
+  | test(search)"': 183 of 183.
+- 'bash/nextest.sh': 1276 of 1276.
+- 'cargo build --bin skg', then the AI tool's tests: PASS.
+- 'bash/integration-tests.sh': 39 of 39.
+- 'bash/all-tests.sh': all pass: Emacs 503 of 503, Neovim pass,
+  nextest 1276 of 1276, doctests, team tools, AI reader, integration
+  78 of 78.
+No failure to classify.
+*** Names removed or changed
+- 'mirrors_of (graph, restriction, gnid)' and
+  'mirrors_of_note_with_forkees (graph, restriction, note, forkees)'
+  are 'mirrors_of (graph, restriction, gnid, start_forkees :
+  Option<&[ID]>)', which is the private walk 'mirrors_reached' made
+  public under that name. Every caller passes 'None' but
+  'indirect_members' ('goal.rs'), which passes 'Some'.
+- 'MIRROR_RELATION' is gone; its uses say 'NodeRelation::Forks', and
+  the module doc of 'mirrors.rs' says "a 'forks' relationship".
+  'fork.rs' now imports 'NodeRelation'.
+- 'SkgConfig::owned_skgrepos_in_declaration_order' and
+  'first_owned_skgrepo_in_declaration_order' are gone; callers call
+  'privacy_ladder'.
+- 'docs/data-model_technical.org' cites 'mirrors_of'; so does
+  'indirect_members''s doc. No other hit of the removed names outside
+  'TODO/'.
+*** Lines
+Before: slice 3's after. After: e2174090.
+| what                  | before total / code / comments | after total / code / comments | change total / code / comments |
+|-----------------------+--------------------------------+-------------------------------+--------------------------------|
+| server/*.rs           | 54,149 / 43,504 / 10,645       | 54,113 / 43,478 / 10,635      | -36 / -26 / -10                |
+| tests/*.rs            | 57,334 / 50,814 / 6,520        | unchanged                     | 0 (one call took 'None')       |
+| elisp, nvim, tools, tests' el and lua | as after slice 3 | unchanged                 | 0                              |
+'docs/data-model_technical.org': one line reworded.
+*** Put back, would change behavior
+Nothing.
+*** Deviations
+- The merged function's parameter keeps the walk's name,
+  'start_forkees', not the plan's 'forkees'.
+- The deleted doc of 'first_owned_skgrepo_in_declaration_order' also
+  said that it was the fork clone's default skgrepo and that
+  'ForkRepoUnresolved' fires only when the user owns no skgrepo; the
+  comments at 'server/from_text.rs' 222-228 and 'fork.rs' 149 already
+  say both, so it was not moved.
+*** Fixtures changed
+None.
+*** Unfinished
+Nothing.
+*** DONE

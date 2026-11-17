@@ -478,7 +478,7 @@ callers:
   - 'bash/nextest.sh';
   - 'cargo build --bin skg', then the AI tool's tests.
 
-** TODO Slice 4: mirror and config aliases
+** DONE Slice 4: mirror and config aliases
 Expected: server about 30 lines (comments about 15); docs 1 line
 reworded.
 - 'mirrors_of' (mirrors.rs 166-173) and 'mirrors_of_note_with_forkees'
