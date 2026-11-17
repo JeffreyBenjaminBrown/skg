@@ -292,19 +292,6 @@ impl SharedStoreSession {
         main_skgrepo_config (&self . temp_fixtures, &self . tantivy_folder) }};
     self . wipe_then_repopulate () }
 
-  /// Like 'reset', but for sub-tests that prepare their own skgrepo
-  /// directory (e.g. a gitrepo in a TempDir): no fixture copy; the
-  /// single-repo ("main") config points at `repo_path` directly.
-  pub fn reset_with_skgrepo_path (
-    &mut self,
-    subtest_name : &str,
-    skgrepo_path : &Path,
-  ) -> Result<(), Box<dyn Error>> {
-    println! ("-- sub-test: {}", subtest_name);
-    self . config =
-      main_skgrepo_config (skgrepo_path, &self . tantivy_folder);
-    self . wipe_then_repopulate () }
-
   /// Like 'reset', but loads a (possibly multi-repo) config from a
   /// TOML file, reading fixtures in place.
   pub fn reset_from_config (

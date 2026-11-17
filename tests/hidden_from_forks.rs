@@ -231,22 +231,6 @@ fn insert_after_line_containing (
         insertion . lines() . map ( |l| l . to_string() )); }}
   result . join ("\n") + "\n" }
 
-fn assert_line_order (
-  buffer : &str,
-  earlier : &str,
-  later   : &str,
-) {
-  let earlier_pos : usize =
-    buffer . find (earlier) . unwrap_or_else (||
-      panic! ("Expected {:?} in:\n{}", earlier, buffer));
-  let later_pos : usize =
-    buffer . find (later) . unwrap_or_else (||
-      panic! ("Expected {:?} in:\n{}", later, buffer));
-  assert!(
-    earlier_pos < later_pos,
-    "Expected {:?} before {:?} in:\n{}",
-    earlier, later, buffer ); }
-
 fn node_from_disk (
   config : &SkgConfig,
   pid    : &str,

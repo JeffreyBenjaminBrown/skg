@@ -10,7 +10,6 @@ use crate::dbs::filesystem::one_node::{
 use crate::dbs::filesystem::retired_keys::{
   RetiredKeysInFiles, quoted_keys, what_to_do_about_retired_keys,
 };
-use crate::repo_watch::own_writes::record_own_removal;
 use crate::types::misc::{SkgConfig, Skgrepo, ID, SkgrepoName};
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::complete::Graphnode;
@@ -286,42 +285,6 @@ pub fn read_skg_sections_from_folder (
     return Err ( retired . into_io_error () ); }
   Ok (sections) }
 
-/// Like `read_all_skg_files_from_repos` but only for telescopes
-/// with at least one section file whose mtime is more recent than
-/// `since`. A touched section reloads its whole telescope (all its
-/// sections, however old), since the composition needs every skgrepo.
-pub fn read_recently_modified_skgfiles_from_skgrepos (
-  config : &SkgConfig,
-  since  : std::time::SystemTime,
-) -> io::Result<Vec<Graphnode>> {
-  let mut modified_pids : Vec<ID> = Vec::new();
-  let mut seen_gnids      : HashSet<ID> = HashSet::new();
-  for (_skgrepo_name, skgrepo) in config . skgrepos . iter() {
-    let entries : ReadDir =
-      fs::read_dir (&skgrepo . path) ?;
-    for entry in entries {
-      let entry : DirEntry = entry ?;
-      let path  : PathBuf  = entry . path();
-      if !( path . is_file() &&
-            path . extension() . map_or (false,
-                                         |ext| ext == "skg")) {
-        continue; }
-      let mtime : std::time::SystemTime =
-        fs::metadata (&path) ? . modified() ?;
-      if mtime <= since { continue; }
-      let node_fs : GraphnodeOnDisk =
-        read_graphnode (&path) ?;
-      validate_pid_matches_filename (&node_fs, &path) ?;
-      let pid : ID =
-        node_fs . pid . clone();
-      if seen_gnids . insert (pid . clone()) {
-        modified_pids . push (pid); }} }
-  let mut all_nodes : Vec<Graphnode> = Vec::new();
-  for pid in modified_pids {
-    all_nodes . push (
-      graphnode_from_telescope_on_disk (config, &pid) ? ); }
-  Ok (all_nodes) }
-
 /// Reports each id claimed by more than one node, naming every
 /// claimant as "pid (home)" -- the pids are what the reader must
 /// open to repair the conflict, and both claimants can share one
@@ -447,38 +410,3 @@ pub fn write_all_nodes_to_fs (
   for telescope in &prepared {
     telescope . verify_hoist (&config) ?; }
   Ok (prepared . len ()) }
-
-/// Deleting a node deletes its whole telescope: every owned
-/// section file of that pid, in whatever skgrepo. (The RepoName in
-/// each target is the caller's belief about the home; kept in the
-/// signature for its callers, but every owned skgrepo is swept.)
-pub fn delete_all_nodes_from_fs (
-  delete_targets : Vec<(ID, SkgrepoName)>,
-  config         : SkgConfig,
-) -> io::Result<usize> { // number of nodes deleted
-
-  let mut deleted : usize = 0;
-  for (pid, _skgrepo) in delete_targets {
-    let mut any_removed : bool = false;
-    for skgrepo_name in config . ordered_skgrepos () {
-      if ! config . skgrepo_is_owned (&skgrepo_name) { continue; }
-      let path : String =
-        match crate::util::path_from_pid_and_skgrepo (
-          & config, & skgrepo_name, pid . clone () ) {
-          Ok (p) => p,
-          Err (_) => continue, };
-      if Path::new (&path) . exists () {
-        record_own_removal ( Path::new (&path) ); }
-      match fs::remove_file ( &path )
-      {
-        Ok ( () ) => {
-          any_removed = true; },
-        Err (e) if e . kind () == io::ErrorKind::NotFound => {
-          // No section at this repo, which is fine.
-        },
-        Err (e) => {
-          // TODO : Should return a list of IDs not found.
-          return Err (e); }} }
-    if any_removed {
-      deleted += 1; }}
-  Ok (deleted) }

@@ -6,7 +6,6 @@ use crate::types::viewnode::Vognode;
 
 use crate::refresh::ancestry::parent_reads_claims;
 use ego_tree::{Tree, NodeId, NodeRef};
-use std::collections::{HashMap, HashSet};
 
 /// The ID of this node if it is an occurrence,
 /// else that of its nearest occurrence ancestor.
@@ -25,22 +24,6 @@ pub fn gnid_from_self_or_nearest_ancestor (
       _ => {} }
     node = node . parent()
       . ok_or ("id_from_self_or_nearest_ancestor: reached root without finding ID")?; }}
-
-/// Returns a map from ID to NodeId for children that were found.
-/// IDs not found as children are not included in the result.
-pub fn find_children_by_gnids (
-  tree          : & Tree<Viewnode>,
-  parent_treeid : NodeId,
-  target_gnids : & HashSet < ID >,
-) -> HashMap < ID, NodeId > {
-  let mut result : HashMap < ID, NodeId > = HashMap::new();
-  for child in tree . get (parent_treeid) . unwrap() . children() {
-    match &child . value() . kind {
-      ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
-        if target_gnids . contains (&t . gnid)
-        { result . insert (t . gnid . clone (), child . id()); },
-      _ => {} } }
-  result }
 
 /// Check if all nodes at the specified generation satisfy the predicate.
 /// Returns true if the generation is empty (vacuously true).

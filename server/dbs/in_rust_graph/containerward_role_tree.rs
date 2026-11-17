@@ -69,16 +69,6 @@ fn assemble(
         . collect ();
       ContainerwardRoleTree::Inner ( gnid, children ) }, } }
 
-/// In-Rust-graph containerward role tree, walking the 'contained_by'
-/// recorderward relmap.
-pub fn full_containerward_role_tree_from_inRustGraph (
-  graph     : &InRustGraph,
-  origin    : &ID,
-  max_depth : usize,
-) -> ContainerwardRoleTree {
-  full_containerward_role_tree (
-    &containers_in_inRustGraph (graph), origin, max_depth ) }
-
 /// The containers of a node, through the graph's 'contained_by'
 /// recorderward relmap, as the partners function of the containerward
 /// role tree. Ungated: the caller gates what it shows.

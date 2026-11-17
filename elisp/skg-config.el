@@ -310,8 +310,4 @@ config-load time."
       (funcall flush)
       (nreverse result))))
 
-(defun skg--repo-dir (repo-name)
-  "Return absolute directory for REPO-NAME per skgconfig.toml, or nil."
-  (cdr (assoc repo-name (skg--repo-paths))))
-
 (provide 'skg-config)

@@ -254,29 +254,6 @@ pub fn validate_all_telescopes (
   all . sort_by ( |a, b| a . 0 . cmp ( &b . 0 ));
   all }
 
-/// The whole init/rebuild report: what the graph shows
-/// ('validate_all_telescopes') plus what the load saw that the
-/// graph cannot show -- compose complaints and ignored foreign pid
-/// collisions, which
-/// need a node's section list rather than its composition. Reporting
-/// failures are logged, not propagated: a report we could not write
-/// is no reason to refuse to start.
-pub fn report_all_telescope_violations (
-  config           : &SkgConfig,
-  graph            : &InRustGraph,
-  load_violations  : Vec<(ID, TelescopeViolation)>,
-) {
-  let all : Vec<(ID, TelescopeViolation)> = {
-    let mut all : Vec<(ID, TelescopeViolation)> =
-      validate_all_telescopes (config, graph);
-    all . extend (load_violations);
-    all . sort_by ( |a, b| a . 0 . cmp ( &b . 0 ));
-    all };
-  if let Err (e) = report_telescope_violations (
-    &all, &config . data_root ) {
-    tracing::warn! ( error = %e,
-                     "could not write the telescope report" ); }}
-
 /// Write the aggregated init report (one line per violation,
 /// grouped by node; a count up top) to
 /// DATA_ROOT/telescope-warnings.org, and log a summary. Removes a
