@@ -5264,3 +5264,186 @@ and deleted after.
 *** Unfinished
 Nothing.
 *** DONE
+
+** A moved headline whose content was not drawn
+The P2 probe's record ("Two save faults the P2 probe found",
+"Deviations") left a hazard: k4, moved out of F4's hidden-in folder
+without its own child, read as an edit that emptied it. Assigned
+2026-11-17, with the rule to restore: a save never reads a node's
+content from a position where the view did not draw that content; an
+occurrence moved out of such a position keeps its node's content as
+on disk until the view draws it and the user edits it there.
+*** Commits
+- b2f1cf64 every-mirror: a member moved out of its forks folder
+  keeps its content
+- (the commit carrying this record) every-mirror: a moved headline
+  whose content was not drawn, record
+*** The reproduction
+Against a 'target/debug/skg' on scratch data under
+'/tmp/claude-1000/emptied-node/' (port 28211), stopped and deleted
+after. N forks F (owned), hides k; F contains k and j; k contains c.
+N2 forks F2; F2 contains k2 and j2; k2 contains c2; Y2 keeps k2. N3
+forks F3 (foreign), hides k3; F3 contains k3 and j3; k3 contains c3.
+**** The reported move reads right
+The view draws k in F's hidden-in folder 'folded ... writeProtected',
+without c (under it only its containerward F), and k2 in F2's
+integrated-elsewhere folder likewise, with its containers folder. The
+buffers that move such a headline as an editor does, its metadata
+kept, alone or with what stands under it, save right on the old code:
+k is unhidden and keeps c; k2's move writes nothing. So does the same
+move with an editable-view request added ('C-c s e'): k is then drawn
+editable showing c.
+**** The loss needs a line without 'writeProtected'
+k's line moved as a bare '(skg node (gnid k)) k', or with
+'writeProtected' taken out of its metadata, empties k ('contains' is
+dropped from k.skg) and files k into N ("Writing in an unintegrated
+child integrates it"); k2 likewise, from the integrated-elsewhere
+folder (k2 emptied, N2 contains k2). The same bare line typed directly
+under N, with no forks folder involved, empties k too. The earlier
+drive's buffer is gone with its scratch folder, but only such a line
+reproduces it: the record's "without its own child" fits a line
+written as the old test helper writes one, '(skg node (gnid k4)) k4'.
+**** A member as such moved out: the loss a plain move reaches
+F, the forkee as such, is drawn editable, showing only j (k is
+hidden). Moved into N's content, its metadata kept, F's 'contains'
+became (j): k was dropped from F, the save saying "'k' left 'F'". The
+same holds for a forker as such moved anywhere, and under a foreign
+note's view for what that note contains, which a member shows
+nowhere. Moved with its folder of what N hides in it, or of what you
+keep elsewhere, the save is refused (those folders stand under a
+member only), so the loss follows the gesture that refusal invites:
+deleting the folder and saving again. Moved out, a foreign member (F3)
+was refused on the old code with 'ForkAlreadyExists (F3, N3)', its
+partial content read as an edit that forks it.
+*** The cause
+The save reads editability from the line alone ('writeProtected' in
+'parse_metadata_sexp.rs'), and an editable occurrence's children as
+its whole 'contains' ('visit_occurrence' and 'content_members' in
+'traverse.rs'), except where it stands as a member as such
+('LocalContext::MemberAsSuchPosition'). The refresh keeps the
+converse: it draws all of an editable occurrence's content and none
+of a write-protected one's ('extent.rs'), so 'writeProtected' is the
+line's "content not drawn" fact, and moving a headline keeps it. But
+a member as such is drawn editable with its content in part
+('member_as_such_may_be_editable' in 'editability.rs',
+'what_the_member_shows' in 'goal.rs'), and that fact was read from
+where the line stands at save time, not from the line: moved, the
+line said "editable, content drawn". 'parent_reads_claims' is not the
+deciding place: a member as such reads its children's claims, as
+visible content, without reading them as its list.
+*** The fix
+The line carries the fact. The printer writes the atom
+'contentInPart' on every editable occurrence standing directly in a
+forks folder ('in_a_forks_folder' in 'org_to_text.rs'), a declared
+part beside 'writeProtected' (the table's 'parts' order, the parser's
+'parts_the_table_leaves_out': the server writes it, no editor offers
+it). The parser reads it into 'Occurrence::shows_content_in_part'.
+Outside the member position the save reads such an occurrence's title
+and body and emits no 'SetContains'
+('children_are_its_whole_content' in 'predicates.rs'), so its content
+stays as on disk; a headline typed under it joins no list, and the
+orphan warning says so ('is_created_as_an_orphan'). The redrawn view
+writes no atom there and draws its content whole, where a cut is read
+as usual. Nothing but the save reads the field; the printer decides
+the atom by position at every rendering. Documented in
+'docs/forks.org', "Moving a member out of the folder", and
+'docs/api-and-formats.org' (the atom, and the grammar).
+*** Every position with the same shape
+**** Covered by the fix
+- An editable member as such, forkee, forker or indirect, moved out of
+  a forks folder: into the note's content, under another node, under
+  another member as such (as a child placed there), into the
+  hidden-outside folder, or to the top level. Also a member of a forks
+  folder drawn under a member by a folder request ('C-c l f').
+**** Safe already: drawn write-protected, and kept so when moved
+- Members of the hidden-in, hidden-by, integrated-elsewhere and
+  hidden-outside folders; containers and mentioners folders' members
+  and the containerward chain; search hits and the members of their
+  forks folders; repeats and occurrences past the node budget; every
+  folder member in the diff view. Each is drawn 'writeProtected'; a
+  move keeps the mark, and the save reads it as write-protected.
+**** Not covered: a line whose 'writeProtected' is gone
+The save cannot tell, statelessly, a line whose mark the user removed
+from one drawn editable: it is the user's statement that the line is
+editable, content and body as shown. Two gestures produce it: a
+headline naming an existing node typed bare (every client's paste
+writes it 'writeProtected (viewRequests editableView)' for this very
+reason, 'skg--insert-node-from-entry'), and the metadata editors
+('C-c v m'), whose cycle for 'writeProtected' runs through its default,
+false, so that the strip step drops the mark. Each empties the node's
+'contains' and body. This is older than plans 1-4. Entry added to
+'TODO/problems.org', "A headline whose 'writeProtected' mark is gone
+is read as the node's whole content".
+*** How old each shape is
+The member-moved-out loss is every-mirror's own: members as such were
+write-protected until plan 2, slice 2 (forkees as such drawn
+editable) and slice 3 (forkers likewise). The stripped-mark one is
+older than plans 1-4.
+*** Suites
+Logs under 'tests/results/every-mirror/moved-headline-content/'.
+- 'cargo build --bin skg' and the test builds: no warning.
+- 'cargo nextest run --test grouped_forks --test grouped_saves --test
+  grouped_views': 270 of 270, after adapting four tests (below).
+- The Rust census ('cargo nextest run --no-fail-fast'): four more
+  failures, all expected adaptations (the parts-order conformance test,
+  'hidden_nodes' twice, 'forks_folder_by_default'); then
+  'bash/nextest.sh': 1279 of 1279.
+- 'bash/integration-tests.sh': 39 of 39.
+- 'bash/all-tests.sh': all pass: Emacs 503 of 503, Neovim pass,
+  nextest 1279 of 1279, doctests, team tools, AI reader, integration
+  78 of 78. (It deletes 'tests/results/every-mirror/', restored from a
+  copy after.)
+No failure but the expected adaptations.
+*** Tests added, and why
+- 'tests/moved_headlines_whose_content_was_not_drawn.rs' (fixture
+  beside it; 'tests/idempotence.rs' finds the fixture by itself), six
+  sub-tests. Run one by one against the old server code (HEAD's
+  'server/' and table, the test's check that the member's line
+  carries 'contentInPart' left out):
+  - the reported case, k moved out of the hidden-in folder with its
+    mark, and the control: unhidden, k keeps c, stays write-protected;
+    an editable-view request draws c, and a cut of c there empties k.
+    Passes on the old code, as the drives showed: it guards the reading
+    that stays.
+  - the same from the integrated-elsewhere folder (k2): writes nothing.
+    Passes on the old code likewise.
+  - F moved out into N's content, retitled: keeps k and j, takes the
+    title; drawn whole there without the atom, a cut of j is read (the
+    control). Fails on the old code: F contains (j).
+  - F3, foreign, moved out: saves cleanly, forks nothing. Fails on the
+    old code: refused, 'ForkAlreadyExists'.
+  - G, a forker as such, moved under z: keeps g1 and g2. Fails on the
+    old code: G contains (g2).
+  - a headline typed under F moved out: the orphan warning, F keeps
+    its content. Fails on the old code at the warning: the old save
+    reads what stands under F, j and the typed headline, as its list.
+  Each moving sub-test first saves the move with the member's set-aside
+  folder, and checks the refusal writes nothing.
+- 'tests/metadata_grammar.rs': 'contentInPart' parses in any order
+  into the occurrence; a ghost refuses it.
+*** Tests adapted (expected fixture adaptations)
+Each expected line of an editable member as such gains
+'contentInPart': 'tests/content_view.rs' (2), 'tests/initial_view_bfs.rs'
+(1), 'tests/hidden_from_forks.rs' (7), 'tests/hidden_nodes.rs' (2),
+'tests/forks_folder_by_default.rs' (2), and the probe of t's
+editability in 'tests/fork.rs'. 'metadata_fields_table::
+the_printer_writes_the_parts_in_the_tables_order' printed one
+standalone occurrence carrying every part; no occurrence carries both
+'writeProtected' and 'contentInPart', so it now prints that occurrence
+write-protected standing alone (every part but 'contentInPart') and
+editable in an editable note's forks folder (every part but
+'writeProtected').
+*** Deviations
+- The orchestrator asked that the reported case and its
+  integrated-elsewhere twin fail on the old code. As an editor moves
+  them they do not: the old save reads them right, and their tests
+  pin that. The shape a plain move does reach is the member moved out,
+  which the fix covers and four tests pin failing on the old code.
+  The reported loss itself (a line without 'writeProtected') is not
+  fixed; see "Not covered".
+- The rule's "the view draws it and the user edits it there" holds
+  through the line: a member moved out stays editable (its title and
+  body were drawn and are saved) rather than turning write-protected.
+*** Unfinished
+The stripped-mark shape, as above.
+*** DONE

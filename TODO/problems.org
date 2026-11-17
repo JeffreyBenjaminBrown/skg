@@ -6,6 +6,30 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* A headline whose 'writeProtected' mark is gone is read as the node's whole content (2026-11-17)
+  Found while fixing "A moved headline whose content was not drawn"
+  (TODO/every-mirror/progress.org, plan 4). Older than every-mirror.
+  The save reads an occurrence's editability from its line alone, and
+  an editable one's children and body as its whole content and body.
+  The server draws an occurrence write-protected wherever it draws
+  none of its content (a member of a hidden-in or integrated-elsewhere
+  folder, a containers folder, a search hit, a repeat), and a move
+  keeps the mark, so a move is safe. Two gestures take the mark away:
+  - a headline naming an existing node typed bare, '(skg node (gnid
+    X)) X' (the clients' paste writes such a headline 'writeProtected
+    (viewRequests editableView)' for this reason, as
+    'skg--insert-node-from-entry' says);
+  - the metadata editors ('C-c v m'): 'shared/metadata-fields.json'
+    gives 'writeProtected' the default false and the value true, so
+    the cycle runs back to the default, and the strip step drops the
+    mark.
+  Either empties the node's 'contains' and its body at the next save,
+  and under a member as such files it into the note ("Writing in an
+  unintegrated child integrates it"). The line no longer says what the
+  view drew, so the save cannot tell statelessly. The second gesture
+  could be closed in the clients: cycling 'writeProtected' off could
+  write an editable-view request instead, which draws the content
+  before anything of it is read.
 * A fork's creation-time hides ignore what the user keeps elsewhere (2026-11-16)
   Found by every-mirror plan 3, slice 3 (its record, "Unfinished").
   'build_fork_clone' ('server/from_text/fork.rs') hides in the clone
