@@ -1,8 +1,5 @@
-//! The fork rules ('docs/glossary.org'): the rules an owned note's
-//! home skgrepo, forks, contents and hides must keep.
-//!
-//! A note *forks* another when it records a 'forks' relationship to
-//! it. An owned note may not
+//! The fork rules ('docs/glossary.org'). An owned note's home skgrepo
+//! must be configured ('UnknownSkgrepo'), and it may not
 //! - fork itself ('SelfFork'), contain itself ('SelfContains') or hide
 //!   itself ('SelfHides'); a link to itself is fine;
 //! - both fork and contain one note ('ForkeeContained'): a note it
@@ -55,7 +52,6 @@ pub enum ForkRuleViolation {
     forker : ID,
     forkee : ID }}
 
-/// Every violation among the graph's owned notes.
 pub fn validate_fork_rules (
   config : &SkgConfig,
   graph  : &InRustGraph,

@@ -308,7 +308,7 @@ pub(crate) fn prepare_graphnode_telescope (
 
 /// The two shapes 'write_graphnode_telescope' refuses, because
 /// writing either would publish or destroy the node's text. Both
-/// are unreachable through skg's own saves -- 'apply_sticky_relRepos'
+/// are unreachable through skg's own saves -- 'apply_sticky_relRepos_in_graph'
 /// clamps every relRepo to at least the recorder's home, so no save
 /// creates a section more public than the home -- and arrive only
 /// from hand-edited files, a pull, or a foreign overlay.

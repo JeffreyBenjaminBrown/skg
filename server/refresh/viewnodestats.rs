@@ -136,16 +136,14 @@ fn stands_as_member (
     ViewnodeKind::Folder (_) => t . viewStats . warrant == Warrant::ByGraph,
     _ => false, } }
 
-/// The roles in which a member of a forks folder stands as a member of
-/// it: as a forkee, when the folder's viewparent forks it (where the
-/// folder reads its members' claims, when it claims: the claim says
-/// the viewparent forks it; elsewhere, when the graph's warrant and a
-/// record the skgrepo restriction shows say so), and as a forker, when
-/// the graph's warrant and such a record say that it forks the
-/// viewparent, whatever it claims. A mutual stands in both; a forkee
-/// the user detached, and an indirect member, in neither: no birth
-/// fact and no relRepo, though an indirect member counts what it shows
-/// of its content as any member as such does.
+/// The roles ('FORKS_FOLDER_MEMBER_ROLES') in which a member of a forks
+/// folder stands as a member of it. As a forkee: where the folder
+/// reads its members' claims, when it claims; elsewhere, when the
+/// graph's warrant and a record the skgrepo restriction shows say the
+/// viewparent forks it. As a forker: when such a warrant and record
+/// say that it forks the viewparent, whatever it claims. A forkee the
+/// user detached, and an indirect member, stand in neither: no birth
+/// fact and no relRepo.
 struct ForksFolderMemberRoles {
   as_forkee : bool,
   as_forker : bool,
@@ -237,11 +235,9 @@ fn set_herald_strings_in_viewnode (
         RelationRole::new (NodeRelation::Hides, BinaryRolePosition::First) )
       { flags . record (NodeRelation::Hides, true, 3); }}}
   let unintegrated : Option<usize> =
-    // A member as such counts the nodes its content goal draws as
-    // occurrences: nodes the skgrepo restriction shows, as the count of its
-    // contents is ('RelationCounts'). The diff view draws no
-    // folder of what the user keeps elsewhere, so there a member
-    // counts it among its content, where it draws it.
+    // A member as such counts the nodes its content goal
+    // ('content_goal') draws as occurrences: nodes the skgrepo
+    // restriction shows, as the count of its contents is ('RelationCounts').
     note_of_member_as_such (tree, treeid) . map ( |note| {
       let contents : Vec<ID> =
         graph . outbound_member_keys_for_relation_gated (
@@ -767,7 +763,7 @@ fn nearest_occurrence_ancestor_skgrepo (
   None }
 
 /// The node's 'cycle' field becomes equal to
-/// whether the 'ancestor_ids' argument contains its ID.
+/// whether the 'ancestor_gnids' argument contains its ID.
 fn detect_and_mark_cycle (
   tree            : &mut Tree<Viewnode>,
   treeid          : NodeId,

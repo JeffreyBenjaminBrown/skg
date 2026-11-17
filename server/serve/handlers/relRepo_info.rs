@@ -5,7 +5,7 @@
 //! 'skg-set-relRepo' gesture uses this to offer only
 //! Skgrepos the save's default floor can accept, instead of the whole
 //! ladder. The reply is advisory: the save-time floor check in
-//! 'apply_sticky_relRepos' stays load-bearing, since buffers go stale
+//! 'apply_sticky_relRepos_in_graph' stays load-bearing, since buffers go stale
 //! and the '(editRequest (relRepo ...))' request is plain text anyone can type.
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;

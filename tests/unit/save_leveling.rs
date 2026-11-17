@@ -1,5 +1,5 @@
 //! Unit tests for the sticky-else-default relRepo rule
-//! ('apply_sticky_relRepos'), its home clamp, the hide floor, and the
+//! ('apply_sticky_relRepos_in_graph'), its home clamp, the hide floor, and the
 //! restricted-set deletion refusal. Each test builds the exact graph fixture
 //! it passes to the repo-resolution function.
 

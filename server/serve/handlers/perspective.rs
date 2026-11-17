@@ -1,22 +1,8 @@
-//! The "set perspective" request: switch the perspective of
-//! one open view ('Perspective'),
-//! and rerender it. The request names a perspective, or asks for the
-//! next one in the view's cycle ('perspective_to_show').
-//!
-//! The answer is a 'perspective' message naming the view, the
-//! perspective it now shows, and that perspective as a message to the
-//! user names it, followed by a rerender stream of that one view. A
-//! refusal answers in the same shape, carrying the view's unchanged
-//! perspective and its reason in 'content', followed by an empty
-//! rerender stream, since each client locks its buffers and sets its
-//! stream-in-progress guard before it sends the request. Under a
-//! skgrepo restriction, a rerender that would release overPrivateText
-//! text is challenged ('authorize_prepared_rerenders') before the view
-//! changes: the challenge and an empty rerender stream replace the
-//! answer, and the view keeps its perspective.
-//!
-//! The clients refuse to send it for a buffer with unsaved edits,
-//! which the rerender would replace.
+//! The "set perspective" request: switch the perspective of one open
+//! view ('Perspective') and rerender it. 'docs/api-and-formats.org',
+//! "Set perspective", gives the request, its answer, its refusals,
+//! the overPrivateText challenge, and the view's cycle of
+//! perspectives ('perspective_to_show').
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::mirrors::{
@@ -133,25 +119,14 @@ pub fn requested_perspective (
 
 /// The perspective the view 'viewforest_id', now showing 'current',
 /// is to show, and the view drawn from it, which is its rerender; or
-/// why it cannot be switched: the connection does not hold it; it is a
-/// buffer of the diff view (which substitutes no mirrors); "next"
-/// finds no perspective but the one shown; or a named perspective is
-/// not in the view's cycle. The root homes' is always in the cycle,
-/// so the way back is never refused.
-///
-/// The view's cycle of perspectives is the root homes', then each
-/// skgrepo whose perspective draws the view otherwise than the root
-/// homes' does, in the order 'perspective_rank' gives. Each skgrepo is
-/// judged by drawing the view from it, from what the connection holds,
-/// and comparing the text with the root homes' drawing
-/// ('view_drawn_from'), so a perspective that would change nothing is
-/// left out exactly. The skgrepos tried are those 'candidate_skgrepos'
-/// finds in the root homes' drawing and in the view's own, so that a
-/// member found from the root homes' is found from every
-/// perspective, whichever path led there. The cycle is never drawn
-/// whole: "next" draws candidates in rank order, from the first ranked
-/// after 'current', and stops at the first that is in the cycle
-/// ('first_ranked_after'); a named perspective draws only itself.
+/// why it cannot be switched. 'docs/api-and-formats.org', "Set
+/// perspective", states the refusals and the cycle. Each skgrepo is
+/// judged by drawing the view from it and comparing the text with the
+/// root homes' drawing ('view_drawn_from'); the skgrepos tried are
+/// those 'candidate_skgrepos' finds in the root homes' drawing and in
+/// the view's own, in the order 'perspective_rank' gives; "next" stops
+/// at the first in the cycle ('first_ranked_after'); a named
+/// perspective draws only itself.
 fn perspective_to_show (
   views_state   : &ViewsState,
   env           : &SkgEnv,
@@ -389,13 +364,8 @@ mod tests {
   ) -> Perspective {
     Perspective::Skgrepo ( SkgrepoName::from (name) ) }
 
-  /// The next perspective is the first in the cycle ranked after the
-  /// current one, wrapping to the root homes'. A current perspective
-  /// that has left the cycle (it would now show nothing differently)
-  /// is followed by the first member ranked after it, so no member is
-  /// skipped and the root homes' is always reached. Only the
-  /// candidates from the current one's rank up to the next are tried,
-  /// whatever order they come in.
+  /// 'first_ranked_after' as its doc says, a current perspective that
+  /// has left the cycle included, the candidates given in no order.
   #[test]
   fn the_next_perspective_follows_the_rank_even_when_the_current_one_left_the_cycle () {
     let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());

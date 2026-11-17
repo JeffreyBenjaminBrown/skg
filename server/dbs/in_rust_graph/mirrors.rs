@@ -1,35 +1,9 @@
-//! Mirrors, and which of a note's mirrors stands in its place
-//! ('docs/mirrors.org', "Mirror substitution").
-//!
-//! A *fork* of a note N is a note that records a 'forks'
-//! relationship to N: the forker forks the forkee. The *mirrors*
-//! of N are N and every note joined to N by a path of such
-//! relationships, followed in either direction, every relationship and
-//! every note on the path visible under the skgrepo restriction (the
-//! relationship's relRepo, and each note's home skgrepo). Being a
-//! mirror is symmetric and transitive, so a cycle of forks is no
-//! special case.
-//!
-//! Where substitution acts, a perspective's skgrepo S decides which of
-//! N's mirrors stands in N's place: the first by S's skgrepo list
-//! ('SkgConfig::perspective_skgrepo_list': S, then every other skgrepo
-//! in declaration order), by home skgrepo. Several mirrors in that
-//! first skgrepo tie, and the tie is broken thus:
-//! 1. one mirror alone there stands;
-//! 2. else N itself, if it is one of them;
-//! 3. else, if exactly one of them is forked by none of the others, it
-//!    stands (an owned chain D forks C forks N, all in one skgrepo
-//!    other than N's, shows D);
-//! 4. else the one nearest N along forks, in either direction, and
-//!    among equals the least pid.
-//! Who owns the skgrepos plays no part.
-//!
-//! A top-level tree of a view is drawn from the perspective of its
-//! root's home skgrepo ('perspective_skgrepo_of_tree_containing'),
-//! throughout the tree, even under nodes homed elsewhere; so a fresh
-//! view shows its root itself. A view switched to one skgrepo's
-//! perspective ('Perspective::Skgrepo') is drawn from it in every
-//! tree.
+//! Mirrors, and which of a note's mirrors stands in its place.
+//! 'docs/mirrors.org', "Mirror substitution", says what the mirrors of
+//! a note are ("Mirrors"), how a perspective's skgrepo list and the
+//! tie rules choose the one that stands ("Which mirror stands":
+//! 'mirror_shown_among'), and from which perspective each tree of a
+//! view is drawn ("Perspectives": 'perspective_skgrepo_of_tree_containing').
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
@@ -95,7 +69,7 @@ pub fn mirror_shown (
 
 /// Which of 'mirrors', the mirrors of 'original', stands in its place
 /// from the perspective of 'skgrepo': the first by its skgrepo list,
-/// ties broken as the module's comment says.
+/// ties broken as 'docs/mirrors.org' says ("Which mirror stands").
 pub fn mirror_shown_among (
   config   : &SkgConfig,
   skgrepo  : &SkgrepoName,
@@ -148,8 +122,7 @@ pub fn the_only_one_forked_by_none_of_the_others (
     [one] => Some ( one . pid . clone () ),
     _ => None, }}
 
-/// Whether 'candidate' is a mirror of 'original' under 'restriction'.
-/// Either may be a pid or an extra ID.
+/// Either of 'candidate' and 'original' may be a pid or an extra ID.
 pub fn is_mirror_of (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,

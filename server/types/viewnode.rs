@@ -575,13 +575,10 @@ pub enum ChangesetMarkerKind {
 /// flags.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Folder {
-  /// Collects every mirror of its parent, each once: the notes its
-  /// parent forks (the forkees, in its list's order, each claiming),
-  /// then the notes that fork its parent and that it neither forks
-  /// nor hides (the forker-only members), then its other mirrors that
-  /// it does not hide (the indirect members), each claiming nothing.
-  /// Editable: the save reads its claiming members as the parent's
-  /// 'forks'.
+  /// Collects every mirror of its parent, each once
+  /// ('forks_folder_goal'): the forkees, claiming, then the forker-only
+  /// and the indirect members, claiming nothing. Editable: the save
+  /// reads its claiming members as the parent's 'forks'.
   Forks,
   Hider, // Collects nodes that hide its parent. Write-protected (editable from the other side of the relationship).
   // This folder is not itself hidden. Its children represent the nodes hidden
@@ -590,11 +587,9 @@ pub enum Folder {
   Hidden,
   /// Child of a member as such of a forks folder (a forkee or forker
   /// as such). Collects the member's content that the user keeps
-  /// elsewhere: what an owned note but the member contains (the note
-  /// whose forks folder holds the member among them, when owned), less
-  /// what that note hides ('docs/glossary.org', "integrated").
-  /// Write-protected (the user keeps these in the notes that contain
-  /// them). Stands first among the member's folders.
+  /// elsewhere ('integrated_elsewhere'). Write-protected (the user
+  /// keeps these in the notes that contain them). Stands first among
+  /// the member's folders.
   IntegratedElsewhere,
   HiddenInForkPartner, // Child of a member as such of a forks folder (a forkee or forker as such). Collects children of the member that the note whose forks folder holds it hides. Write-protected (but these relationships are editable by modifying the listed contents of the member as such).
   HiddenByForker, // Child of a forker as such. Collects what the forker hides of the content of the note whose forks folder holds it. Write-protected (the forker's hides are its owner's, edited in its own view).
@@ -773,15 +768,12 @@ impl Folder {
   pub fn members_are_properties (&self) -> bool {
     matches! ( self, Folder::Alias | Folder::ID | Folder::Flags { .. } ) }
 
-  /// Whether the folder's goal has an order the view follows: the
-  /// viewparent's own file records the members in order (the
-  /// hidden and alias folders, the folder of what a member as such
-  /// contains that the user keeps elsewhere, in the member's list's
-  /// order, and the forkees that lead the forks
-  /// folder, whose other members follow them in the order the graph
-  /// and the config give: 'forks_folder_goal'), or the folder
-  /// is the compound partner folder of what a note hides outside its
-  /// fork partners, in the order of its hides list. False when other
+  /// Whether the folder's goal has an order the view follows: that of
+  /// a list in the viewparent's own file (for the folder of what a
+  /// member as such contains that the user keeps elsewhere, the
+  /// member's list; for the hidden-outside folder, the note's hides;
+  /// in the forks folder the forkees lead, and its other members
+  /// follow in the order 'forks_folder_goal' gives). False when other
   /// nodes' files record the members, or they are derived or
   /// unordered: the view then keeps the order its members already
   /// have.
@@ -798,9 +790,7 @@ impl Folder {
         | Folder::ID | Folder::Flags { .. } => false, } }
 
   /// Whether the save reads the folder's membership, so that a member
-  /// typed or removed there edits the graph: the forks and alias
-  /// folders, and the compound partner folder of
-  /// what a note hides outside its fork partners. Every other
+  /// typed or removed there edits the graph. Every other
   /// folder is write-protected: its members are edited from the other
   /// side of the relationship, or derived. (In the forks folder only a
   /// claiming member is the note's record: a forker-only member, which

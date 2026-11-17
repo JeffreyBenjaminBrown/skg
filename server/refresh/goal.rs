@@ -1,9 +1,7 @@
 //! The goal of a parent: what the truth says its children should
 //! contain. For an occurrence's content, its 'contains' list in file
-//! order (for a member as such of a forks folder, a forkee or a
-//! forker as such, less what the note whose folder holds it hides or
-//! contains, and less what an owned note but the member contains:
-//! 'docs/glossary.org', "what a member shows"); for a node of the
+//! order (for a member as such of a forks folder, what it shows:
+//! 'what_the_member_shows'); for a node of the
 //! containerward chain under a folder's
 //! member, its containers; for a folder, its partners in the folder's
 //! relation (for the containers folder, those the view does not
@@ -441,9 +439,7 @@ pub(crate) fn integrated_elsewhere (
 /// which claims, its viewparent forking it, or a forker as such,
 /// which claims nothing: in a view the refresh draws, a forker-only
 /// or an indirect member, which the viewparent does not fork),
-/// the note whose folder holds it, the folder's viewparent. Either
-/// shows its content less what that note contains or hides, and,
-/// outside the diff view, less what an owned note but it contains.
+/// the note whose folder holds it, the folder's viewparent.
 pub(crate) fn note_of_member_as_such (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
@@ -840,8 +836,6 @@ fn property_goal (
         . map ( |flag| GoalItem::by_graph (GoalMember::Flag (flag)) )
         . collect () ), } ) }
 
-/// Goal items of gnids, each warranted by the truth, with its relRepo
-/// from 'relRepos' where that holds one.
 /// The illegal edits to the node 'pid' ('InRustGraph::illegal_edits')
 /// in skgrepos the skgrepo restriction shows.
 pub(crate) fn visible_illegal_edits (
@@ -854,6 +848,8 @@ pub(crate) fn visible_illegal_edits (
     . cloned ()
     . collect () }
 
+/// Goal items of gnids, each warranted by the truth, with its relRepo
+/// from 'relRepos' where that holds one.
 fn gnid_items (
   gnids    : Vec<ID>,
   relRepos : &HashMap<ID, SkgrepoName>,

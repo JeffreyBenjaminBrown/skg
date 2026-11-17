@@ -50,7 +50,7 @@ pub struct NodeSaveIntent {
   // 'RelationshipEditRequest::RelRepo', 'FieldIntent'); None means
   // "derive" (sticky-else-default). 'requested_relRepos' extracts the
   // Some entries into a side-channel before 'into_graphnode'
-  // discards them, for 'apply_sticky_relRepos' to validate against
+  // discards them, for 'apply_sticky_relRepos_in_graph' to validate against
   // each relationship's floor.
   pub contains          : MSV<(ID, Option<SkgrepoName>)>,
   pub extra_ids         : Vec<ID>,
@@ -69,7 +69,7 @@ pub struct NodeSaveIntent {
 /// separately from
 /// Graphnode because Graphnode's 'RelPartner::skgrepo' is a
 /// plain RepoName with no "was this explicit" flag, and gets
-/// unconditionally resolved by 'apply_sticky_relRepos' -- this is the
+/// unconditionally resolved by 'apply_sticky_relRepos_in_graph' -- this is the
 /// side-channel that tells that pass which members carry a real,
 /// user-requested skgrepo to validate against the default
 /// floor, rather than deriving normally (see 'docs/telescopes.org',
@@ -92,7 +92,7 @@ fn gnids_only_msv_ref (
     MSV::Specified (v) => MSV::Specified (
       v . iter () . map ( |(gnid, _)| gnid . clone () ) . collect () ), }}
 
-/// As 'ids_only_msv_ref', consuming.
+/// As 'gnids_only_msv_ref', consuming.
 fn gnids_only_msv (
   msv : MSV<(ID, Option<SkgrepoName>)>,
 ) -> MSV<ID> {
@@ -434,11 +434,10 @@ impl LoweredNodeIntents {
           _ => None })
       . collect () }
 
-  /// This returns the note's contains as it will stand after
-  /// this save: from its Save nodeIntent if that specifies them, and
-  /// otherwise from disk. An unspecified contains is the one on disk:
-  /// an owned member as such emits a Save for its title and body
-  /// alone.
+  /// This returns the note's contains as it will stand after this
+  /// save: from its Save nodeIntent if that specifies them, otherwise
+  /// from disk (an owned member as such emits a Save for its title and
+  /// body alone).
   pub fn note_contains_after_save (
     &self,
     note_from_disk : &Graphnode,
@@ -512,10 +511,8 @@ impl LoweredNodeIntents {
     }}
 
   /// This sets the contains of 'member', a member as such of a forks
-  /// folder (a forkee or forker as such), to 'contains': on its Save
-  /// nodeIntent (an owned member as such emits one for its title and
-  /// body), or on one from its disk state if it has none. A Delete
-  /// nodeIntent is left untouched.
+  /// folder, to 'contains', on its Save nodeIntent, made from its disk
+  /// state where it has none. A Delete nodeIntent is left untouched.
   pub fn set_contains_of_member_as_such (
     &mut self,
     member   : Graphnode,
@@ -551,12 +548,9 @@ impl LoweredNodeIntents {
       intent . contains = MSV::Specified (
         contains . iter () . map ( |gnid| (gnid . clone (), None) ) . collect () ); }}
 
-  /// This adds 'forkee' to the forks of 'note', at the relRepo the
-  /// save derives for a new record: on its Save nodeIntent, whose
-  /// forks, where the buffer left them unspecified, start from disk;
-  /// or on one from its disk state if it has none. A Delete nodeIntent
-  /// is left untouched, because deleting wins. A forkee the forks
-  /// already name is not added again.
+  /// This adds 'forkee', once, to the forks of 'note', at the relRepo
+  /// the save derives for a new record. A Delete nodeIntent is left
+  /// untouched, because deleting wins.
   pub fn add_forkee_to_note (
     &mut self,
     note   : Graphnode,

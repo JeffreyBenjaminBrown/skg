@@ -1,44 +1,8 @@
 //! The visit of a parent: the refresh's rungs, applied at each
-//! parent P to its children, in order ('docs/data-model_technical.org',
-//! "The walk and the refresh's rungs"):
-//!  1. re-kind: each child that stands for a gnid becomes what the ID
-//!     rule says, where it stands (in a content view an occurrence
-//!     the rule makes a tombstone vanishes instead); each descriptor
-//!     (folder, property member, change viewnode) whose position the
-//!     ancestry table forbids, or whose change is gone, is
-//!     entombstoned, and so is an alias whose record the skgrepo
-//!     restriction keeps out;
-//!  2. viewnode merge: duplicate viewnode siblings, standing for one
-//!     gnid, are merged into one;
-//!  3. the goal and the warrant: each child's warrant is set from P's
-//!     goal;
-//!  4. claims: under an editable parent, every child that claims and
-//!     that the truth does not warrant vanishes, with its subtree;
-//!     under any other, no child claims; in a forks folder whose
-//!     claims the save reads, each member the goal names first takes
-//!     the claim the graph gives it;
-//!  5. reinstate: every goal item without a child is drawn, within the
-//!     extent;
-//!  6. reorder: where the goal has an order, the warranted children
-//!     take it, and every other child stays right after the sibling it
-//!     followed;
-//!  7. substitution: in a content view a node is shown as the mirror
-//!     the perspective puts in its place;
-//!  8. requests: each child's view requests are fulfilled and dropped,
-//!     but for a fork request, which stays for the save.
-//! Before them, an editable-view request on P is consumed, making P
-//! editable if the budget allows, and P charges the budget
-//! ('consume_editableView_request' in 'editability.rs'); the request
-//! passes on to the content P already shows
-//! ('extend_requested_content'); and P's default folders are added
-//! ('add_default_folders'); then P's goal is computed. The request
-//! goes when the visit ends. Between 5
-//! and 6 the diff view draws its change viewnodes and tags the
-//! children with their changes ('diff_view.rs'); after 6, in a
-//! forks folder, the folder of what its viewparent hides outside its
-//! fork partners goes last; after them, a folder left with no
-//! children and nothing the user could add there is entombstoned, so
-//! that the tail prunes it.
+//! parent P to its children, in order ('visit_parent'). Each rung,
+//! and what the visit does before and after them, is stated in
+//! 'docs/data-model_technical.org', "The walk and the refresh's
+//! rungs".
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
@@ -113,24 +77,10 @@ pub(crate) fn visit_parent (
   drop_editableView_request (tree, parent);
   Ok (( )) }
 
-/// The folders a content view shows without being asked: an
-/// occurrence that an editable-view request extends (a fresh view's
-/// roots, and every occurrence the refresh draws editable, among them)
-/// and that is no member as such of a forks folder
-/// ('note_of_member_as_such') shows its forks folder when it has a
-/// fork partner, either way, by a record the skgrepo restriction shows
-/// ('has_a_fork_partner'; with the folder of what it hides outside its
-/// fork partners, when that holds anything); a member as such shows
-/// one only when asked ('(folder forks)'), since the folder it stands
-/// in lists every mirror already. An editable member as such of a
-/// forks folder (a forkee or forker as such) shows, first, the folder
-/// of what it contains that the user keeps elsewhere
-/// ('integrated_elsewhere'), then the folder of what the note whose
-/// folder holds it hides in it, each when it holds anything; and an
-/// editable forker as such that forks that note
-/// ('note_forked_by_forker_as_such') shows, after them, the folder of
-/// what it hides of the note's content, when that holds anything. Not
-/// in the diff view.
+/// The folders a content view shows without being asked, as
+/// 'docs/data-model_technical.org' says ("The walk and the refresh's
+/// rungs", its paragraph on 'add_default_folders'). Not in the diff
+/// view.
 fn add_default_folders (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -185,11 +135,10 @@ fn add_default_folders (
           Some (folder) },
         None => last_placed, }; }}}
 
-/// In a forks folder of a content view, the compound folder of what
-/// its viewparent hides outside its fork partners, when it hides
-/// something there and the folder lacks one: so a forker that a save
-/// hid, which leaves the forks folder, stands there, where removing it
-/// unhides it.
+/// In a forks folder of a content view, the folder of what its
+/// viewparent hides outside its fork partners ('add_hidden_outside_folder'):
+/// so a forker that a save hid, which leaves the forks folder, stands
+/// there, where removing it unhides it.
 fn add_hidden_outside_folder_to_forks_folder (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -355,7 +304,6 @@ fn duplicate_viewnode_siblings (
     . filter ( |(_, group)| group . len () > 1 )
     . collect () }
 
-/// What a vognode stands for; None for any other kind.
 fn vognode_member (
   viewnode : &Viewnode,
 ) -> Option<GoalMember> {
@@ -399,7 +347,6 @@ fn merge_into (
   tree . get_mut (merged_sibling) . unwrap () . detach ();
   Ok (( )) }
 
-/// Folded, and body-folded, only if both were; focused if either was.
 fn merge_fold_and_focus (
   result         : &mut FoldAndFocus,
   merged_sibling : &FoldAndFocus,
@@ -862,8 +809,8 @@ pub(crate) fn add_containers_folder_under_member (
 /// ('add_containers_folder_under_member'), so that the view is the
 /// one a fresh view draws:
 /// - a member of a content view's forks folder that an
-///   editable-view request extends (as one an older server drew
-///   write-protected and bare, extended by C-c s e on its note);
+///   editable-view request extends (one standing write-protected and
+///   bare, extended by C-c s e on its note);
 /// - a member of a folder of what a member as such contains that the
 ///   user keeps elsewhere, whenever its containers folder would name
 ///   a keeper ('names_a_container_outside_its_view_ancestors'): one
@@ -998,8 +945,6 @@ fn reorder (
       move_to_last_child (tree, parent, child) ?; }}
   Ok (( )) }
 
-/// In a forks folder, the compound folder of what its viewparent hides
-/// outside its fork partners stands last, after the members.
 fn keep_hidden_outside_folder_last (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -1259,8 +1204,6 @@ fn has_members (
            walk . truth . graph, pid, folder, walk . truth . restriction )
          . is_some_and ( |members| ! members . is_empty () ), } }
 
-/// Make the occurrence at 'child' show 'shown', with 'inPlaceOf'
-/// as given ('point_occurrence_at').
 fn show_mirror (
   tree          : &mut Tree<Viewnode>,
   child         : NodeId,
@@ -1405,7 +1348,6 @@ fn fulfill_view_requests (
     { occurrence . view_requests . retain (request_stays); }}
   Ok (( )) }
 
-/// Whether 'fulfill_view_requests' leaves the request where it is.
 fn request_stays (
   request : &ViewRequest,
 ) -> bool {
@@ -1443,10 +1385,8 @@ fn folders_of_relation (
     FolderRelation::Mentioners    => vec! [ Folder::Mentioner ], } }
 
 /// Add each of 'folders' the occurrence at 'treeid' lacks, ahead of
-/// its other children, in the order given. A forks folder holds the
-/// compound folder of what its viewparent hides outside its fork
-/// partners, when it hides something there; new, its members are drawn
-/// folded ('Walk::folders_whose_drawn_members_are_folded').
+/// its other children, in the order given, and to a forks folder its
+/// hidden-outside folder ('add_hidden_outside_folder').
 fn add_folders (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
@@ -1471,7 +1411,7 @@ fn add_folders (
     move_to_first_child (tree, treeid, folder_treeid)
       . expect ("add_folders: the folder was just added"); }}
 
-/// In the forks folder at 'forks_folder', of 'forker', the
+/// In the forks folder at 'forks_folder', of 'hider', the
 /// compound folder of what it hides outside its fork partners, when it
 /// hides something there and the folder lacks one; new, its members
 /// are drawn folded ('Walk::folders_whose_drawn_members_are_folded').
@@ -1502,8 +1442,6 @@ fn child_folder (
         if discriminant (present) == discriminant (folder) ))
     . map ( |child| child . id () ) }
 
-/// Write-protect the occurrence at 'treeid' and every occurrence of
-/// its content subtree.
 fn write_protect_content_subtree (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
@@ -1554,7 +1492,6 @@ pub(crate) fn folder_goes_when_empty (
                   && ! folder . is_flags ()
                   && ! matches! ( folder, Folder::IllegalEdit { .. } )) }
 
-/// The children of 'parent', in order.
 pub(crate) fn children_of (
   tree   : &Tree<Viewnode>,
   parent : NodeId,

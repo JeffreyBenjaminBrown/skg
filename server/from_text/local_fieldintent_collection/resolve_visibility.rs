@@ -32,16 +32,8 @@
 //! - An E the graph lacks (typed there) has no list to lose: what it
 //!   shows is its contains ('set_contains_of_new_member_as_such').
 //! .
-//! A forker F shown as such in the forks folder of a note N (a
-//! forker-only or an indirect member, claiming nothing) gives a
-//! visibility signal too, read by the
-//! forker-visibility step ('resolve_forker_visibility'): F shows its
-//! content less what N contains or hides and what an owned note but F
-//! contains, so a child absent there is never removed from F. A child
-//! cut from F (drawn there, and shown neither there nor in F's folder
-//! of what the user keeps elsewhere or of what N hides in it) makes N
-//! fork F, and N hides it unless N, or an owned note but F, contains
-//! it after the save.
+//! A forker shown as such in a forks folder gives a visibility signal
+//! too, read by the forker-visibility step ('resolve_forker_visibility').
 //! .
 //! The skgrepo restriction limits what can be edited as well as what
 //! can be seen ('server/skgrepo_sets.rs'), so both E's content and R's
@@ -51,11 +43,8 @@
 //! inferred of a member that only a restricted record of E's
 //! explains.
 //! .
-//! A forks folder adds one more signal ('ForksFolderMembers'): a
-//! member of it claiming nothing (a forker-only or an indirect
-//! member), before the save and after it, that the folder no longer
-//! shows, was deleted there, and is hidden from the folder's note
-//! ('resolve_forks_folder_removals').
+//! A forks folder adds one more signal ('ForksFolderMembers'), read by
+//! 'resolve_forks_folder_removals'.
 //! .
 //! Resolution cannot run during collection, even in principle: it
 //! needs disk (the forkee's contains, the forker's hides)
@@ -263,20 +252,15 @@ fn kept_elsewhere_before_save (
     . is_empty () }
 
 /// Each child placed under a member M as such (a claiming child the
-/// buffer shows there that M's list does not name: a headline typed
-/// there, or a node moved there from elsewhere) joins M's content,
-/// when the user owns M: inserted right after the sibling it follows
-/// in the buffer that M's list names (or another child placed there),
-/// first when none precedes it ('docs/forks.org', "Adding a child
-/// under a member as such"). M's contains is read by the records the
-/// skgrepo restriction shows, as the view drew them; disk
-/// supplementation keeps the rest where they stand. Under a foreign M
-/// the save is refused: only M's owner can change its content, and
-/// making it one's own is done from a view of M as itself. A child a
-/// stale buffer shows under M, which another view removed from M's
-/// list since, is never put back here: the buffer's baseline shows
-/// it too, so M is a stale graphnode the buffer did not edit, left as
-/// the graph has it ('server/serve/handlers/save_staleness.rs').
+/// buffer shows there that M's list does not name) joins M's content
+/// when the user owns M, and the save is refused otherwise
+/// ('docs/forks.org', "Adding a child under a member as such", which
+/// says too why a stale buffer puts back nothing here). It goes right
+/// after the sibling it follows in the buffer that M's list names, or
+/// another child placed there, first when none precedes it. M's
+/// contains is read by the records the skgrepo restriction shows, as
+/// the view drew them; disk supplementation keeps the rest where they
+/// stand.
 fn add_children_placed_under_member_as_such (
   lowered             : &mut LoweredNodeIntents,
   member_from_disk    : &Graphnode,
@@ -314,19 +298,14 @@ fn add_children_placed_under_member_as_such (
   lowered . set_contains_of_member_as_such (member_from_disk . clone (), contains);
   Ok (( )) }
 
-/// The forker-visibility step, for a forker F shown as such in the
-/// forks folder of a note N (it forks N, or it is an indirect member,
-/// a mirror of N joined to it only through others, or N forked it and
+/// The forker-visibility step ('docs/forks.org', "Cutting from a
+/// forker"), for a forker F shown as such in the forks folder of a
+/// note N (it forks N, or it is an indirect member, or N forked it and
 /// the user detached it there). Where F is a mirror of N under the
-/// skgrepo restriction ('is_mirror_of'), F shows its content less
-/// what N contains or hides and what an owned note but F contains
-/// ('what_the_member_shows' in 'server/refresh/goal.rs'), and
+/// skgrepo restriction ('is_mirror_of'), the view drew F's content as
+/// 'what_the_member_shows' ('server/refresh/goal.rs') gives it, and
 /// otherwise all of it; either way by the records the skgrepo
-/// restriction shows, as the view drew it (the graph before the save).
-/// So:
-/// - a child placed under F (typed there, or moved there) has joined
-///   F's content already, when the user owns F, and the save was
-///   refused otherwise ('add_children_placed_under_members_as_such');
+/// restriction shows (the graph before the save). So:
 /// - a child of F that N hides, shown claiming under F (moved out of
 ///   F's folder of what N hides in it), is unhidden in N, as under a
 ///   forkee;
@@ -334,26 +313,17 @@ fn add_children_placed_under_member_as_such (
 ///   F, nor in F's folder of what the user keeps elsewhere or of what
 ///   N hides in it (where a stale buffer may show a child the graph
 ///   has since stopped keeping or hiding), was cut from it. A cut
-///   from a forker makes N fork F (so F, if
-///   it forks N, becomes a mutual), and N hides each child cut that it
-///   does not contain after the save, as a cut from a forkee does. A
-///   forker N already forks (a mutual the user detached there, in the
-///   same save) is not forked again: the detachment stands, and the
-///   cut only hides. A child N, or an owned note but F, contains
-///   after the save is not hidden: N's own, or integrated
-///   ('owned_notes_containing_after_save'). A move into an owned note
-///   records no hide. The view the save draws gives F its claim, as
-///   every view the refresh draws gives each member of a forks folder
-///   the claim the graph gives it ('claim_forks_folder_members_as_the_graph_does'
-///   in 'server/refresh/visit.rs').
+///   makes N fork F, but for a forker N already forks (a mutual the
+///   user detached there, in the same save: the detachment stands),
+///   and N hides each child cut that neither N nor an owned note but
+///   F contains after the save ('owned_notes_containing_after_save').
 /// A foreign N can record neither a fork nor a hide, so a save that
 /// cuts from F or unhides under it is refused
-/// ('refusal_to_change_what_a_foreign_note_hides'). A child F does not show (one N
-/// contains or hides) is absent from under F by design, and is never
-/// removed from F's list. A forker the graph lacks (typed there) has
-/// no list to lose: what it shows is its contains
-/// ('set_contains_of_new_member_as_such'), as for a forkee typed
-/// there.
+/// ('refusal_to_change_what_a_foreign_note_hides'). A child F does not
+/// show (one N contains or hides) is absent from under F by design,
+/// and is never removed from F's list. A forker the graph lacks
+/// (typed there) has no list to lose: what it shows is its contains
+/// ('set_contains_of_new_member_as_such').
 fn resolve_forker_visibility<'a> (
   lowered             : &mut LoweredNodeIntents,
   signals             : impl Iterator<Item = &'a (ID, MemberAsSuchVisibility)>,
@@ -651,12 +621,11 @@ fn apply_hiddenoutside_edits (
 ///   and the note's hides are read by their visible records. A
 ///   member only a restricted record explains is not hidden, and
 ///   re-adding a member drops no restricted hide of it.
-/// - A member the user keeps elsewhere after the save is not hidden:
-///   a partner shows what no owned note but itself contains
-///   ('docs/glossary.org', "what a member shows"), so only where some
-///   partner containing it would show it ('owned_notes_containing_after_save')
-///   does its removal hide it. Moving a child from F into another owned
-///   note records no hide.
+/// - A member the user keeps elsewhere after the save is not hidden,
+///   since no partner shows it ('what_the_member_shows'): only where
+///   some partner containing it would show it
+///   ('owned_notes_containing_after_save') does its removal hide it.
+///   Moving a child from F into another owned note records no hide.
 fn infer_hides_from_contains_removals (
   lowered                : &mut LoweredNodeIntents,
   member_as_such_visibility : &[(ID, MemberAsSuchVisibility)],

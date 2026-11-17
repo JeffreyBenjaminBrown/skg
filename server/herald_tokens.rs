@@ -3,7 +3,7 @@
 //! relation, per side: a member count and which tracked ancestors are
 //! members), plus the birth; the client decides letters,
 //! colors, order, and layout (see elisp/heralds-minor-mode.el and
-//! nvim/lua/skg/heralds.lua). No presentation lives here anymore.
+//! nvim/lua/skg/heralds.lua). No presentation lives here.
 //!
 //! Wire shape, three forms inside a node's '(view ...)' (a form,
 //! relation, side or sub-list is omitted when it would be empty apart

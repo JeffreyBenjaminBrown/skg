@@ -685,7 +685,7 @@ pub(crate) fn prepare_fs_update (
       prepared_deletions . push (path); }}
 
   let _ = skgrepo_moves;
-  // Repo moves need no file relocation of their own anymore: the
+  // Repo moves need no file relocation of their own: the
   // telescope write above places every section in its skgrepo and
   // sweeps owned sections whose skgrepo lost its last member. An
   // explicit old-path delete here would even be wrong for a

@@ -34,13 +34,12 @@
 //! a member of a write-protected folder, where it is save-eligible for
 //! itself but invisible to the folder's recorder.) An editable member
 //! as such is not save-eligible, since it shows its content in part
-//! (less what the note whose folder holds it contains or hides, and
-//! what an owned note but the member contains): an absent child is
-//! integrated (that note or another owned note keeps it) or hidden by
-//! that note, never removed from the member. But when the user owns the member, its title and
-//! body are saved, and a child typed under it joins its content
-//! ('resolve_visibility'). A foreign one's title and body are text
-//! claims, which must match the disk.
+//! ('what_the_member_shows' in 'server/refresh/goal.rs'): an absent
+//! child is integrated or hidden by the note, never removed from the
+//! member. But when the user owns the member, its title and body are
+//! saved, and nothing else of it, and a child typed under it joins its
+//! content ('resolve_visibility'). A foreign one's title and body are
+//! text claims, which must match the disk.
 //! .
 //! DEFINITION: a vognode is a *member as such* of a forks folder iff
 //! it is an occurrence direct child of the folder. One that claims is
@@ -171,9 +170,6 @@ fn visit_occurrence (
     match member_as_such_of {
       Some (( note, note_is_editable )) => {
         if owned (& t . home_skgrepo) {
-          // An owned member as such saves its own title and body,
-          // and nothing else of itself: what it shows of its
-          // content is partial, so its list is not read here.
           collected . instructionMerge_fieldIntent (
             &headline,
             t . gnid . clone(),
@@ -211,12 +207,9 @@ fn visit_occurrence (
                 role   : if t . claimsMembership { MemberAsSuch::Forkee }
                          else { MemberAsSuch::Forker },
                 visible, in_integratedElsewhere_or_hiddenIn_folder } )) ?; }
-        // Delete, NodeMerge and flag edit requests here are
-        // ignored: a member as such can affect only its own title
-        // and body (when owned), what the note hides, and, by a
-        // child typed under it, its own content
-        // ('resolve_visibility'). Deleting it from the folder is
-        // read from the folder ('ForksFolderMembers').
+        // Delete, NodeMerge and flag edit requests here are ignored
+        // (the module doc's "save-eligible"). Deleting it from the
+        // folder is read from the folder ('ForksFolderMembers').
       },
       None => {
         if has_delete_request {
@@ -280,9 +273,6 @@ fn recurse_under_vognode (
     let child_context : LocalContext =
       match &child . value() . kind {
         ViewnodeKind::Folder (Folder::Alias)
-          // The partner folder here is the forks folder, the one
-          // editable relation folder; the write-protected folders fall
-          // to the UnderWriteProtectedFolder arm below.
           | ViewnodeKind::Folder (Folder::Forks) =>
           match &recorder {
             Some (o) =>

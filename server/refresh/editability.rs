@@ -281,12 +281,10 @@ pub(crate) fn drawn_occurrence_editability (
 /// a member as such (a forkee as such, claiming, or a forker as such,
 /// claiming nothing): in a content view, the folder is a forks folder
 /// whose members' claims the save reads, since the note it describes
-/// is editable ('parent_reads_claims'). The save reads either kind's
-/// content as what it shows, never as its whole list (the glossary's
-/// "forker as such"). The folder's children are not editable content:
-/// they are partners, drawn as content is only as members as such.
-/// Never in the diff view, which keeps every folder's members
-/// write-protected.
+/// is editable ('parent_reads_claims'). The folder's children are not
+/// editable content: they are partners, drawn as content is only as
+/// members as such. Never in the diff view, which keeps every folder's
+/// members write-protected.
 fn member_as_such_may_be_editable (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
@@ -381,8 +379,8 @@ pub(crate) fn consume_editableView_request (
 /// which its own visit consumes, and which extends its content in
 /// turn. It passes through the occurrence's forks folder to the
 /// members as such standing there, claiming or not: so a forkee or
-/// forker drawn write-protected before (by an older server, or past
-/// the node budget) becomes editable when the user extends the note.
+/// forker drawn write-protected before (past the node budget, say)
+/// becomes editable when the user extends the note.
 /// A rerender with no request leaves them as they are.
 pub(crate) fn extend_requested_content (
   tree   : &mut Tree<Viewnode>,

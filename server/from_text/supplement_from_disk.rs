@@ -126,7 +126,7 @@ fn supplement_nodeSaveIntent_from_disk (
       // sticky about), but an explicit '(editRequest (relRepo ...))'
       // request must
       // still be validated against the default floor -- an empty
-      // disk stand-in reuses 'apply_sticky_relRepos' unchanged (its
+      // disk stand-in reuses 'apply_sticky_relRepos_in_graph_with_prospective_homes' unchanged (its
       // sticky lookups simply find nothing, falling through to
       // default every time).
       let requested_relRepos : RequestedRelRepos =
