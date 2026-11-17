@@ -21,7 +21,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::refresh::goal::ContainsAfterSave;
 use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, ForksFolderMembers, HiddenOutsideEdit, FieldIntentsForOneId,
-  ForkeeVisibility, ForkerVisibility };
+  MemberAsSuchVisibility };
 use crate::types::misc::{
   ID, MSV, RelPartner, SkgrepoName, members_msv, members_of,
   rel_partners_at_relRepo, rel_partners_at_relRepo_msv };
@@ -280,8 +280,7 @@ pub struct LoweredNodeIntents {
 
 pub struct LoweringOutput {
   pub intents        : LoweredNodeIntents,
-  pub forkee_visibility : Vec<(ID, ForkeeVisibility)>, // Each pair is (forker, signal); the list is in forker first-emission order.
-  pub forker_visibility : Vec<(ID, ForkerVisibility)>, // Each pair is (the note whose forks folder shows the forker as such, signal), in the note's first-emission order.
+  pub member_as_such_visibility : Vec<(ID, MemberAsSuchVisibility)>, // Each pair is (the note whose forks folder shows the member as such, signal); the list is in the note's first-emission order.
   pub hidden_outside : Vec<(ID, HiddenOutsideEdit)>,
   pub forks_folder_members : Vec<(ID, ForksFolderMembers)>, // Each pair is (the note the forks folder describes, its members).
 }
@@ -306,43 +305,18 @@ pub fn lower_collected_fieldIntents (
 ) -> Result<LoweringOutput, String> {
   let CollectedFieldIntents { order, lowerable_order, mut by_pid, .. }
     = collected;
-  let forkee_visibility : Vec<(ID, ForkeeVisibility)> = {
-    // The signals are extracted across all entries, in
-    // first-emission order -- including from the signals-only
-    // entries, which lower to no NodeIntent.
-    let mut forkee_visibility : Vec<(ID, ForkeeVisibility)> =
-      Vec::new();
-    for pid in &order {
-      let entry : &FieldIntentsForOneId =
-        by_pid . get (pid)
-        . ok_or ( "lower_collected_fieldIntents: order names a PID missing from the map" . to_string() ) ?;
-      for signal in &entry . forkee_visibility {
-        forkee_visibility . push (( pid . clone(), signal . clone() )); }}
-    forkee_visibility };
-  let forker_visibility : Vec<(ID, ForkerVisibility)> = {
-    let mut signals : Vec<(ID, ForkerVisibility)> = Vec::new ();
-    for pid in &order {
-      let entry : &FieldIntentsForOneId = by_pid . get (pid)
-        . ok_or ( "lower_collected_fieldIntents: order names a PID missing from the map" . to_string () ) ?;
-      for signal in &entry . forker_visibility {
-        signals . push ((pid . clone (), signal . clone ())); }}
-    signals };
-  let hidden_outside : Vec<(ID, HiddenOutsideEdit)> = {
-    let mut edits : Vec<(ID, HiddenOutsideEdit)> = Vec::new ();
-    for pid in &order {
-      let entry : &FieldIntentsForOneId = by_pid . get (pid)
-        . ok_or ( "lower_collected_fieldIntents: order names a PID missing from the map" . to_string () ) ?;
-      for edit in &entry . hidden_outside {
-        edits . push ((pid . clone (), edit . clone ())); }}
-    edits };
-  let forks_folder_members : Vec<(ID, ForksFolderMembers)> = {
-    let mut signals : Vec<(ID, ForksFolderMembers)> = Vec::new ();
-    for pid in &order {
-      let entry : &FieldIntentsForOneId = by_pid . get (pid)
-        . ok_or ( "lower_collected_fieldIntents: order names a PID missing from the map" . to_string () ) ?;
-      for signal in &entry . forks_folder_members {
-        signals . push ((pid . clone (), signal . clone ())); }}
-    signals };
+  // The signals are extracted across all entries, in first-emission
+  // order -- including from the signals-only entries, which lower to
+  // no NodeIntent.
+  let member_as_such_visibility : Vec<(ID, MemberAsSuchVisibility)> =
+    each_entrys_slot_in_order (
+      &order, &by_pid, |entry| &entry . member_as_such_visibility ) ?;
+  let hidden_outside : Vec<(ID, HiddenOutsideEdit)> =
+    each_entrys_slot_in_order (
+      &order, &by_pid, |entry| &entry . hidden_outside ) ?;
+  let forks_folder_members : Vec<(ID, ForksFolderMembers)> =
+    each_entrys_slot_in_order (
+      &order, &by_pid, |entry| &entry . forks_folder_members ) ?;
   let mut intents : LoweredNodeIntents =
     LoweredNodeIntents {
       order  : Vec::with_capacity (lowerable_order . len()),
@@ -368,7 +342,22 @@ pub fn lower_collected_fieldIntents (
     { return Err ( format!(
         "lower_collected_fieldIntents: entry for {} has field intents but no title/body",
         pid )); }}
-  Ok (LoweringOutput { intents, forkee_visibility, forker_visibility, hidden_outside, forks_folder_members }) }
+  Ok (LoweringOutput { intents, member_as_such_visibility, hidden_outside, forks_folder_members }) }
+
+/// Each item of the slot 'slot_of' picks, of each entry 'order'
+/// names, in that order, paired with the entry's PID.
+fn each_entrys_slot_in_order<T : Clone> (
+  order   : &[ID],
+  by_pid  : &HashMap<ID, FieldIntentsForOneId>,
+  slot_of : impl Fn (&FieldIntentsForOneId) -> &Vec<T>,
+) -> Result<Vec<(ID, T)>, String> {
+  let mut items : Vec<(ID, T)> = Vec::new ();
+  for pid in order {
+    let entry : &FieldIntentsForOneId = by_pid . get (pid)
+      . ok_or ( "lower_collected_fieldIntents: order names a PID missing from the map" . to_string () ) ?;
+    for item in slot_of (entry) {
+      items . push (( pid . clone (), item . clone () )); }}
+  Ok (items) }
 
 /// This assumes the entry is lowerable: it holds a delete or a
 /// title/body, having been named by 'lowerable_order'.

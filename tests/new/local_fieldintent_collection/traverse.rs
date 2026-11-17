@@ -8,8 +8,8 @@ use indoc::indoc;
 use skg::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
 use skg::types::errors::HeadlineName;
 use skg::from_text::local_fieldintent_collection::types::{
-  CollectedFieldIntents, FieldIntentsForOneId, MemberAsSuchTextClaim,
-  ForkeeVisibility, ForkerVisibility };
+  CollectedFieldIntents, FieldIntentsForOneId, MemberAsSuch,
+  MemberAsSuchTextClaim, MemberAsSuchVisibility };
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::tree::forest::ViewForest;
@@ -118,9 +118,10 @@ fn forkee_as_such_emits_claim_and_visibility () {
     assert!( e . text_claims . is_empty () ); }
   { let forker : &FieldIntentsForOneId = entry (&collected, "forker");
     assert_eq!(
-      forker . forkee_visibility,
-      vec![ ForkeeVisibility {
-        forkee     : ID::from ("e"),
+      forker . member_as_such_visibility,
+      vec![ MemberAsSuchVisibility {
+        member     : ID::from ("e"),
+        role       : MemberAsSuch::Forkee,
         visible    : vec![ID::from ("visible")],
         in_integratedElsewhere_or_hiddenIn_folder : vec![] } ]);
     assert_eq!( forker . forks,
@@ -152,9 +153,10 @@ fn foreign_forkee_as_such_emits_a_text_claim () {
       body     : Some ("Forkee body" . to_string()),
       headline : HeadlineName::of ( None, Some (&ID::from ("e")), "e" ) } ]);
   assert_eq!(
-    entry (&collected, "forker") . forkee_visibility,
-    vec![ ForkeeVisibility {
-      forkee     : ID::from ("e"),
+    entry (&collected, "forker") . member_as_such_visibility,
+    vec![ MemberAsSuchVisibility {
+      member     : ID::from ("e"),
+      role       : MemberAsSuch::Forkee,
       visible    : vec![ID::from ("visible")],
       in_integratedElsewhere_or_hiddenIn_folder : vec![] } ]); }
 
@@ -218,12 +220,12 @@ fn forker_as_such_emits_its_text_and_visibility_but_no_contains () {
   { let recorder : &FieldIntentsForOneId = entry (&collected, "recorder");
     assert_eq!( recorder . contains, Some (vec![]) );
     assert_eq!( recorder . forks, Some (vec![]) );
-    assert_eq!( recorder . forker_visibility,
-                vec![ ForkerVisibility {
-                  forker_as_such : ID::from ("forker"),
+    assert_eq!( recorder . member_as_such_visibility,
+                vec![ MemberAsSuchVisibility {
+                  member : ID::from ("forker"),
+                  role   : MemberAsSuch::Forker,
                   visible : vec![ID::from ("forker-child")],
-                  in_integratedElsewhere_or_hiddenIn_folder : vec![] } ]);
-    assert!( recorder . forkee_visibility . is_empty () ); }
+                  in_integratedElsewhere_or_hiddenIn_folder : vec![] } ]); }
   { // Its editable children emit their own instructions.
     let child : &FieldIntentsForOneId = entry (&collected, "forker-child");
     assert!( child . title_and_body . is_some() ); }}
@@ -319,7 +321,7 @@ fn writeProtected_forkee_as_such_emits_nothing () {
       **** (skg node (gnid under) (skgRepos (nodeRepo main)) writeProtected) under
       "} );
   assert!( collected . by_pid . get (&ID::from ("e")) . is_none() );
-  assert_eq!( entry (&collected, "forker") . forkee_visibility, vec![] ); }
+  assert_eq!( entry (&collected, "forker") . member_as_such_visibility, vec![] ); }
 
 #[test]
 fn editable_forkee_under_writeProtected_forker_claims_without_visibility () {

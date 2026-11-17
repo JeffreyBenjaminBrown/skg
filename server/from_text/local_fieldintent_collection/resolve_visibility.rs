@@ -1,5 +1,6 @@
 //! This file defines visibility resolution, which consumes the
-//! 'ForkeeVisibility' signals that collection put in the map.
+//! visibility signals ('MemberAsSuchVisibility') that collection put
+//! in the map.
 //! It is async because it consults disk.
 //! .
 //! The policy of the forkee-visibility step, for forker R
@@ -33,7 +34,7 @@
 //! .
 //! A forker F shown as such in the forks folder of a note N (a
 //! forker-only or an indirect member, claiming nothing) gives a
-//! signal of its own ('ForkerVisibility'), read by the
+//! visibility signal too, read by the
 //! forker-visibility step ('resolve_forker_visibility'): F shows its
 //! content less what N contains or hides and what an owned note but F
 //! contains, so a child absent there is never removed from F. A child
@@ -68,7 +69,7 @@ use crate::refresh::goal::{
   forks_folder_members_shown, forker_only_members, owned_notes_containing};
 use crate::from_text::local_fieldintent_collection::lower::LoweredNodeIntents;
 use crate::from_text::local_fieldintent_collection::types::{
-  ForksFolderMembers, HiddenOutsideEdit, ForkeeVisibility, ForkerVisibility };
+  ForksFolderMembers, HiddenOutsideEdit, MemberAsSuch, MemberAsSuchVisibility };
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, members_of};
@@ -79,16 +80,14 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::slice::from_ref;
 
-/// The 'forkee_visibility' pairs are (forker, signal), and the
-/// 'forker_visibility' pairs (the note whose forks folder shows the
-/// forker, signal), as 'lower_collected_fieldIntents' extracted them
-/// from the map. 'is_diff_view' says whether the saved buffer is one
+/// The 'member_as_such_visibility' pairs are (the note whose forks
+/// folder shows the member, signal), as 'lower_collected_fieldIntents'
+/// extracted them from the map. 'is_diff_view' says whether the saved buffer is one
 /// of the diff view's, whose forks folders hold a note's direct fork
 /// partners only ('resolve_forks_folder_removals').
 pub fn resolve_visibility (
   mut lowered : LoweredNodeIntents,
-  forkee_visibility : &[(ID, ForkeeVisibility)],
-  forker_visibility : &[(ID, ForkerVisibility)],
+  member_as_such_visibility : &[(ID, MemberAsSuchVisibility)],
   hidden_outside : &[(ID, HiddenOutsideEdit)],
   forks_folder_members : &[(ID, ForksFolderMembers)],
   graph       : &InRustGraph,
@@ -97,24 +96,25 @@ pub fn resolve_visibility (
   is_diff_view : bool,
 ) -> Result<(LoweredNodeIntents, Vec<PostSkgsaveCommitNoticeCandidate>), Box<dyn Error>> {
   validate_no_overlapping_forkee_hiderel_conflicts (
-    forkee_visibility, forker_visibility, graph, config, skgrepo_restriction ) ?;
+    member_as_such_visibility, graph, config, skgrepo_restriction ) ?;
   infer_hides_from_contains_removals (
     // Before the signal loops below, so that an explicit
     // member-as-such gesture about the same child wins.
-    &mut lowered, forkee_visibility, forker_visibility, graph, config,
+    &mut lowered, member_as_such_visibility, graph, config,
     skgrepo_restriction ) ?;
   add_children_placed_under_members_as_such (
     // Before the signal loops, so that a child moved from one member
     // as such to an owned one in the same save counts as contained
     // there after the save, whichever signal comes first.
-    &mut lowered, forkee_visibility, forker_visibility, graph, config,
+    &mut lowered, member_as_such_visibility, graph, config,
     skgrepo_restriction ) ?;
-  for (forker, signal) in forkee_visibility {
+  for (forker, signal) in signals_of_role (
+    member_as_such_visibility, MemberAsSuch::Forkee ) {
     let Some (forkee_from_disk) =
       opt_graphnode_by_gnid (
-        graph, config, &signal . forkee ) ?
+        graph, config, &signal . member ) ?
     else { lowered . set_contains_of_new_member_as_such (
-             &signal . forkee, &signal . visible );
+             &signal . member, &signal . visible );
            continue; };
     let Some (forker_from_disk) =
       opt_graphnode_by_gnid (
@@ -172,8 +172,9 @@ pub fn resolve_visibility (
       &inferred_hides,
       &inferred_unhides ); }
   resolve_forker_visibility (
-    &mut lowered, forker_visibility, graph, config,
-    skgrepo_restriction ) ?;
+    &mut lowered,
+    signals_of_role ( member_as_such_visibility, MemberAsSuch::Forker ),
+    graph, config, skgrepo_restriction ) ?;
   resolve_forks_folder_removals (
     &mut lowered, forks_folder_members, graph, config,
     skgrepo_restriction, is_diff_view ) ?;
@@ -201,49 +202,23 @@ fn refusal_to_change_what_a_foreign_note_hides (
     note . pid, note . title, member . pid, member . title,
     member_as_such . as_named_beside_the_note (), note . pid, what_only_a_note_of_your_own_can_do ) }
 
-/// Which role in 'forks' a member as such of a note's forks folder
-/// plays there: a forkee as such (it claims: the note forks it) or a
-/// forker as such (it claims nothing there: a forker-only or an
-/// indirect member).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum MemberAsSuch { Forkee, Forker }
-
-impl MemberAsSuch {
-  /// What a refusal calls a member in this role, after "shown as a".
-  fn word (
-    self,
-  ) -> &'static str {
-    match self { MemberAsSuch::Forkee => "forkee",
-                 MemberAsSuch::Forker => "member claiming nothing", } }
-
-  /// What a refusal calls a member in this role of the note's forks
-  /// folder, after the member's name.
-  fn as_named_beside_the_note (
-    self,
-  ) -> &'static str {
-    match self { MemberAsSuch::Forkee => "its forkee",
-                 MemberAsSuch::Forker => "a member of its forks folder claiming nothing", } }}
-
-/// Each child placed under a member as such, of either signal, joins
+/// Each child placed under a member as such, of either role, joins
 /// its content ('add_children_placed_under_member_as_such'). A signal
 /// whose member, or whose note, the graph lacks places nothing here:
 /// a member the graph lacks has no list ('set_contains_of_new_member_as_such').
 fn add_children_placed_under_members_as_such (
   lowered             : &mut LoweredNodeIntents,
-  forkee_visibility   : &[(ID, ForkeeVisibility)],
-  forker_visibility   : &[(ID, ForkerVisibility)],
+  member_as_such_visibility : &[(ID, MemberAsSuchVisibility)],
   graph               : &InRustGraph,
   config              : &SkgConfig,
   skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
   let signals : Vec<(&ID, &ID, MemberAsSuch, &[ID])> =
-    forkee_visibility . iter ()
-    . map ( |(forker, signal)|
-            ( forker, &signal . forkee, MemberAsSuch::Forkee, signal . visible . as_slice () ))
-    . chain ( forker_visibility . iter ()
-              . map ( |(note, signal)|
-                      ( note, &signal . forker_as_such, MemberAsSuch::Forker,
-                        signal . visible . as_slice () )) )
+    // the forkees' signals, then the forkers'
+    signals_of_role ( member_as_such_visibility, MemberAsSuch::Forkee )
+    . chain ( signals_of_role ( member_as_such_visibility, MemberAsSuch::Forker ))
+    . map ( |(note, signal)|
+            ( note, &signal . member, signal . role, signal . visible . as_slice () ))
     . collect ();
   for (note, member, member_as_such, visible) in signals {
     let Some (member_from_disk) : Option<Graphnode> =
@@ -379,18 +354,18 @@ fn add_children_placed_under_member_as_such (
 /// no list to lose: what it shows is its contains
 /// ('set_contains_of_new_member_as_such'), as for a forkee typed
 /// there.
-fn resolve_forker_visibility (
+fn resolve_forker_visibility<'a> (
   lowered             : &mut LoweredNodeIntents,
-  signals             : &[(ID, ForkerVisibility)],
+  signals             : impl Iterator<Item = &'a (ID, MemberAsSuchVisibility)>,
   graph               : &InRustGraph,
   config              : &SkgConfig,
   skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
   for (note, signal) in signals {
     let Some (forker_from_disk) : Option<Graphnode> =
-      opt_graphnode_by_gnid (graph, config, &signal . forker_as_such) ?
+      opt_graphnode_by_gnid (graph, config, &signal . member) ?
       else { lowered . set_contains_of_new_member_as_such (
-               &signal . forker_as_such, &signal . visible );
+               &signal . member, &signal . visible );
              continue; };
     let Some (note_from_disk) : Option<Graphnode> =
       opt_graphnode_by_gnid (graph, config, note) ?
@@ -684,8 +659,7 @@ fn apply_hiddenoutside_edits (
 ///   note records no hide.
 fn infer_hides_from_contains_removals (
   lowered                : &mut LoweredNodeIntents,
-  forkee_visibility      : &[(ID, ForkeeVisibility)],
-  forker_visibility      : &[(ID, ForkerVisibility)],
+  member_as_such_visibility : &[(ID, MemberAsSuchVisibility)],
   graph                  : &InRustGraph,
   config                 : &SkgConfig,
   skgrepo_restriction    : &SkgrepoRestriction,
@@ -709,12 +683,9 @@ fn infer_hides_from_contains_removals (
       let new_contains_set : HashSet<&ID> =
         new_contains . iter () . collect ();
       let signal_visible : HashSet<&ID> = // children the same save explicitly shows through a member as such of this forker's forks folder
-        forkee_visibility . iter ()
+        member_as_such_visibility . iter ()
         . filter ( |(pid, _)| *pid == hider_pid )
         . flat_map ( |(_, signal)| signal . visible . iter () )
-        . chain ( forker_visibility . iter ()
-                  . filter ( |(pid, _)| *pid == hider_pid )
-                  . flat_map ( |(_, signal)| signal . visible . iter () ))
         . collect ();
       hider_contains . iter ()
         . filter ( |gnid| ! new_contains_set . contains (gnid) )
@@ -827,8 +798,7 @@ pub(crate) fn member_it_stands_for (
 /// forker as such under the same note says only "show it", of each
 /// child of its own it shows: a child absent there is no hide.
 fn validate_no_overlapping_forkee_hiderel_conflicts (
-  forkee_visibility   : &[(ID, ForkeeVisibility)],
-  forker_visibility   : &[(ID, ForkerVisibility)],
+  member_as_such_visibility : &[(ID, MemberAsSuchVisibility)],
   graph               : &InRustGraph,
   config              : &SkgConfig,
   skgrepo_restriction : &SkgrepoRestriction,
@@ -837,18 +807,20 @@ fn validate_no_overlapping_forkee_hiderel_conflicts (
   // because the conflict is per forker/forkee-content pair,
   // not just per viewchild shown in the buffer.
   let mut seen : HashMap<(ID, ID), bool> = HashMap::new();
-  for (note, signal) in forker_visibility {
+  for (note, signal) in signals_of_role (
+    member_as_such_visibility, MemberAsSuch::Forker ) {
     let Some (forker_from_disk) : Option<Graphnode> =
-      opt_graphnode_by_gnid (graph, config, &signal . forker_as_such) ?
+      opt_graphnode_by_gnid (graph, config, &signal . member) ?
       else { continue; };
     for content_gnid in members_with_visible_records (
       &forker_from_disk . contains, skgrepo_restriction ) {
       if signal . visible . contains (&content_gnid) {
         seen . insert ((note . clone (), content_gnid), true); }}}
-  for (forker, signal) in forkee_visibility {
+  for (forker, signal) in signals_of_role (
+    member_as_such_visibility, MemberAsSuch::Forkee ) {
     let forkee_from_disk : Graphnode =
       match opt_graphnode_by_gnid (
-        graph, config, &signal . forkee ) ?
+        graph, config, &signal . member ) ?
       { Some (forkee_from_disk) => forkee_from_disk,
         None                        => continue, };
     let visible_content : HashSet<ID> =
@@ -873,3 +845,10 @@ fn validate_no_overlapping_forkee_hiderel_conflicts (
         None => {}, }
       seen . insert (key, visible); }}
   Ok (( )) }
+
+/// The visibility signals whose member plays 'role', in their order.
+fn signals_of_role (
+  signals : &[(ID, MemberAsSuchVisibility)],
+  role    : MemberAsSuch,
+) -> impl Iterator<Item = &(ID, MemberAsSuchVisibility)> {
+  signals . iter () . filter ( move |(_, signal)| signal . role == role ) }

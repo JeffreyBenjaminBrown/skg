@@ -3,7 +3,7 @@
 
 use skg::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, FieldIntentsForOneId, FieldIntent,
-  MemberAsSuchTextClaim, ForkeeVisibility };
+  MemberAsSuch, MemberAsSuchTextClaim, MemberAsSuchVisibility };
 use skg::types::errors::HeadlineName;
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::viewnode::ViewnodeId;
@@ -119,9 +119,10 @@ fn combineable_intents_always_combine () {
   for forkee in ["e1", "e2", "e1"] {
     acc . instructionMerge_fieldIntent (
       &emitter (), ID::from ("forker"),
-      FieldIntent::ForkeeVisibility (
-        ForkeeVisibility {
-          forkee     : ID::from (forkee),
+      FieldIntent::MemberAsSuchVisibility (
+        MemberAsSuchVisibility {
+          member     : ID::from (forkee),
+          role       : MemberAsSuch::Forkee,
           visible    : vec![],
           in_integratedElsewhere_or_hiddenIn_folder : vec![] } )) . unwrap(); }
   acc . instructionMerge_fieldIntent (
@@ -133,7 +134,7 @@ fn combineable_intents_always_combine () {
         headline : emitter () } )) . unwrap();
   let entry : &FieldIntentsForOneId =
     acc . by_pid . get (&ID::from ("forker")) . unwrap();
-  assert_eq!( entry . forkee_visibility . len(), 3 );
+  assert_eq!( entry . member_as_such_visibility . len(), 3 );
   assert_eq!( entry . text_claims . len(), 1 ); }
 
 #[test]

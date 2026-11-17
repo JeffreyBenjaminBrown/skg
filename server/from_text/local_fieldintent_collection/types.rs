@@ -24,10 +24,7 @@ pub enum LocalContext {
     parent_if_editable : Option<ID>, }, // This is Some iff the parent is save-eligible.
   UnderDefiningFolder ( // The node is inside an aliasFolder or a forksFolder.
     DefiningFolderRecorder ),
-  ForkeeAsSuchPosition { // The node is a claiming direct child of a forksFolder: a forkee as such.
-    forker                   : ID,
-    forker_is_editable       : bool, },
-  ForkerAsSuchPosition { // The node is a direct child of a forksFolder claiming nothing: a forker as such.
+  MemberAsSuchPosition { // The node is a direct child of a forksFolder, but its hidden-outside folder: a member as such, if an occurrence. Its claim says which ('MemberAsSuch').
     note                     : ID,
     note_is_editable         : bool, },
   HiddenOutsidePosition { // The one derived-but-editable compound partner folder under a forksFolder.
@@ -53,7 +50,7 @@ pub struct DefiningFolderRecorder {
 /// pairs one of these with a target ID, and the pair is
 /// instructionMerged into the accumulator.
 /// The first seven kinds are exclusive (at most one per ID); the
-/// last five are combineable (any number per ID). That distinction is
+/// last four are combineable (any number per ID). That distinction is
 /// the shape of 'FieldIntentsForOneId': each exclusive kind gets an
 /// Option slot there, and each combineable kind gets a Vec slot.
 /// .
@@ -83,8 +80,7 @@ pub enum FieldIntent {
   NodeMerge       { acquiree : ID },
   SetFlag     { flag : Flag, value : bool },
   // The remaining kinds are combineable.
-  ForkeeVisibility (ForkeeVisibility),
-  ForkerVisibility (ForkerVisibility),
+  MemberAsSuchVisibility (MemberAsSuchVisibility),
   HiddenOutsideEdit  (HiddenOutsideEdit),
   MemberAsSuchTextClaim (MemberAsSuchTextClaim),
   ForksFolderMembers (ForksFolderMembers),
@@ -103,33 +99,50 @@ pub struct ForksFolderMembers {
 }
 
 /// This is an unresolved signal: the buffer presents 'visible' as
-/// the visible content of 'forkee', under some forker.
-/// Resolution into hides/unhides edits on the forker needs disk
-/// and the forker's own post-save contains, so it happens
-/// downstream of collection.
+/// the visible content of 'member', a member as such of the forks
+/// folder of a note, in the role 'role'. Resolution into edits of
+/// the note needs disk and the note's own post-save contains, so it
+/// happens downstream of collection.
+/// - A forkee as such: the note hides what the view drew under it
+///   and 'visible' omits ('resolve_visibility').
+/// - A forker as such ('docs/glossary.org', "forker as such"): its
+///   content is shown in part (less what the note contains or hides,
+///   and what an owned note but the forker contains), so it is never
+///   read as the forker's whole list: a child typed there joins it, a
+///   child the note hides shown there is unhidden, and a child cut
+///   from it makes the note fork the forker, and hide the child
+///   unless the note, or an owned note but the forker, contains it
+///   after the save ('resolve_forker_visibility').
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ForkeeVisibility {
-  pub forkee     : ID,
-  pub visible    : Vec<ID>, // These are the nodes *not* to hide.
-  pub in_integratedElsewhere_or_hiddenIn_folder : Vec<ID>, // what the buffer shows in the forkee's folder of what the user keeps elsewhere, or of what the forker hides in it: set aside there, not cut
+pub struct MemberAsSuchVisibility {
+  pub member     : ID,
+  pub role       : MemberAsSuch,
+  pub visible    : Vec<ID>, // These are the nodes *not* to hide (of a forkee) or *not* cut (of a forker).
+  pub in_integratedElsewhere_or_hiddenIn_folder : Vec<ID>, // what the buffer shows in the member's folder of what the user keeps elsewhere, or of what the note hides in it: set aside there, not cut
 }
 
-/// This is an unresolved signal: the buffer presents 'visible' as
-/// the visible content of 'forker_as_such', a member of the forks
-/// folder of a note claiming nothing there ('docs/glossary.org',
-/// "forker as such"). That content is shown in part (less what the
-/// note contains or hides, and what an owned note but the forker
-/// contains), so it is never read as the forker's whole list: a child
-/// typed there joins it, a child the note hides shown there is
-/// unhidden, and a child cut from it makes the note fork the forker,
-/// and hide the child unless the note, or an owned note but the
-/// forker, contains it after the save ('resolve_forker_visibility').
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ForkerVisibility {
-  pub forker_as_such : ID,
-  pub visible    : Vec<ID>, // These are the nodes *not* cut.
-  pub in_integratedElsewhere_or_hiddenIn_folder : Vec<ID>, // what the buffer shows in the forker's folder of what the user keeps elsewhere, or of what the note hides in it: set aside there, not cut
-}
+/// Which role in 'forks' a member as such of a note's forks folder
+/// plays there: a forkee as such (it claims: the note forks it) or a
+/// forker as such (it claims nothing there: a forker-only or an
+/// indirect member).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MemberAsSuch { Forkee, Forker }
+
+impl MemberAsSuch {
+  /// What a refusal calls a member in this role, after "shown as a".
+  pub(crate) fn word (
+    self,
+  ) -> &'static str {
+    match self { MemberAsSuch::Forkee => "forkee",
+                 MemberAsSuch::Forker => "member claiming nothing", } }
+
+  /// What a refusal calls a member in this role of the note's forks
+  /// folder, after the member's name.
+  pub(crate) fn as_named_beside_the_note (
+    self,
+  ) -> &'static str {
+    match self { MemberAsSuch::Forkee => "its forkee",
+                 MemberAsSuch::Forker => "a member of its forks folder claiming nothing", } }}
 
 /// The explicitly submitted visible-outside subset for one hider.
 /// Unlike direct relationship sets it carries no skgrepo request: hide
@@ -167,8 +180,7 @@ pub struct FieldIntentsForOneId {
   pub delete         : bool,
   pub node_merge     : Option<ID>, // This holds the acquiree.
   pub flag       : Option<(Flag, bool)>,
-  pub forkee_visibility : Vec<ForkeeVisibility>,  // This slot is combineable.
-  pub forker_visibility : Vec<ForkerVisibility>, // This slot is combineable.
+  pub member_as_such_visibility : Vec<MemberAsSuchVisibility>, // This slot is combineable.
   pub hidden_outside : Vec<HiddenOutsideEdit>,     // This slot is combineable.
   pub forks_folder_members : Vec<ForksFolderMembers>, // This slot is combineable.
   pub text_claims    : Vec<MemberAsSuchTextClaim>,   // This slot is combineable, and is consumed only by validation.
@@ -229,8 +241,7 @@ impl CollectedFieldIntents {
     intent  : FieldIntent,
   ) -> Result<(), String> {
     if ! matches! ( intent,
-                    FieldIntent::ForkeeVisibility (_)
-                    | FieldIntent::ForkerVisibility (_)
+                    FieldIntent::MemberAsSuchVisibility (_)
                     | FieldIntent::HiddenOutsideEdit (_)
                     | FieldIntent::MemberAsSuchTextClaim (_)
                     | FieldIntent::ForksFolderMembers (_) )
@@ -249,11 +260,8 @@ impl CollectedFieldIntents {
       self . by_pid . entry (target . clone())
         . or_default() };
     match intent {
-      FieldIntent::ForkeeVisibility (v) => {
-        entry . forkee_visibility . push (v);
-        Ok (( )) },
-      FieldIntent::ForkerVisibility (v) => {
-        entry . forker_visibility . push (v);
+      FieldIntent::MemberAsSuchVisibility (v) => {
+        entry . member_as_such_visibility . push (v);
         Ok (( )) },
       FieldIntent::HiddenOutsideEdit (edit) => {
         entry . hidden_outside . push (edit);
@@ -319,8 +327,7 @@ impl CollectedFieldIntents {
               &mut entry . flag, (flag, value),
               "flag", &target, emitters) },
           FieldIntent::Delete { .. }
-            | FieldIntent::ForkeeVisibility (_)
-            | FieldIntent::ForkerVisibility (_)
+            | FieldIntent::MemberAsSuchVisibility (_)
             | FieldIntent::HiddenOutsideEdit (_)
             | FieldIntent::MemberAsSuchTextClaim (_)
             | FieldIntent::ForksFolderMembers (_) =>

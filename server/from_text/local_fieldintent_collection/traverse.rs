@@ -57,8 +57,8 @@ use crate::from_text::local_fieldintent_collection::predicates::{
   member_counts_for_partnerFolder };
 use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, DefiningFolderRecorder, LocalContext, FieldIntent,
-  ForksFolderMembers, HiddenOutsideEdit, MemberAsSuchTextClaim,
-  ForkeeVisibility, ForkerVisibility };
+  ForksFolderMembers, HiddenOutsideEdit, MemberAsSuch, MemberAsSuchTextClaim,
+  MemberAsSuchVisibility };
 use crate::types::errors::HeadlineName;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
@@ -142,16 +142,6 @@ fn visit (
       recurse_with_uniform_context (
         node_ref, &LocalContext::UnderWriteProtectedFolder, collected, owned), }}
 
-/// What a member as such of a forks folder knows of the note whose
-/// folder holds it (the folder's recorder): its ID, whether it is
-/// editable, and whether the member claims (a forkee as such: the
-/// note forks it) or not (a forker as such).
-struct MemberAsSuchContext<'a> {
-  note             : &'a ID,
-  note_is_editable : bool,
-  member_claims    : bool,
-}
-
 fn visit_occurrence (
   node_ref  : NodeRef<Viewnode>,
   t         : &Occurrence,
@@ -159,22 +149,11 @@ fn visit_occurrence (
   collected : &mut CollectedFieldIntents,
   owned     : IsOwned,
 ) -> Result<(), String> {
-  let member_as_such_context : Option<MemberAsSuchContext> =
+  let member_as_such_of : Option<(&ID, bool)> = // the note whose forks folder holds it, and whether that note is editable
     match context {
-      LocalContext::ForkeeAsSuchPosition {
-        forker, forker_is_editable }
-        if t . claimsMembership =>
-        Some ( MemberAsSuchContext {
-          note             : forker,
-          note_is_editable : *forker_is_editable,
-          member_claims    : true } ),
-      LocalContext::ForkerAsSuchPosition {
-        note, note_is_editable }
-        if ! t . claimsMembership =>
-        Some ( MemberAsSuchContext {
-          note,
-          note_is_editable : *note_is_editable,
-          member_claims    : false } ),
+      LocalContext::MemberAsSuchPosition {
+        note, note_is_editable } =>
+        Some (( note, *note_is_editable )),
       _ => None };
   let is_editable : bool =
     ! t . is_writeProtected();
@@ -184,13 +163,13 @@ fn visit_occurrence (
   let is_saveEligible : bool =
     is_editable
     && ! has_delete_request
-    && member_as_such_context . is_none();
+    && member_as_such_of . is_none();
   let headline : HeadlineName = node_ref . value () . headline_name ();
   if is_editable {
     // Emission happens only inside this block, because an
     // write-protected vognode emits nothing.
-    match member_as_such_context {
-      Some (MemberAsSuchContext { note, note_is_editable, member_claims }) => {
+    match member_as_such_of {
+      Some (( note, note_is_editable )) => {
         if owned (& t . home_skgrepo) {
           // An owned member as such saves its own title and body,
           // and nothing else of itself: what it shows of its
@@ -226,16 +205,12 @@ fn visit_occurrence (
           collected . instructionMerge_fieldIntent (
             &headline,
             note . clone(),
-            if member_claims {
-              FieldIntent::ForkeeVisibility (
-                ForkeeVisibility {
-                  forkee : t . gnid . clone(),
-                  visible, in_integratedElsewhere_or_hiddenIn_folder } )
-            } else {
-              FieldIntent::ForkerVisibility (
-                ForkerVisibility {
-                  forker_as_such : t . gnid . clone(),
-                  visible, in_integratedElsewhere_or_hiddenIn_folder } ) } ) ?; }
+            FieldIntent::MemberAsSuchVisibility (
+              MemberAsSuchVisibility {
+                member : t . gnid . clone(),
+                role   : if t . claimsMembership { MemberAsSuch::Forkee }
+                         else { MemberAsSuch::Forker },
+                visible, in_integratedElsewhere_or_hiddenIn_folder } )) ?; }
         // Delete, NodeMerge and flag edit requests here are
         // ignored: a member as such can affect only its own title
         // and body (when owned), what the note hides, and, by a
@@ -403,18 +378,13 @@ fn visit_forks_folder (
               LocalContext::HiddenOutsidePosition {
                 hider           : recorder . gnid . clone(),
                 is_saveEligible : recorder . is_saveEligible },
-            ViewnodeKind::Vognode (Vognode::Occurrence (t))
-              if ! t . claimsMembership =>
-              LocalContext::ForkerAsSuchPosition {
-                note             : recorder . gnid . clone(),
-                note_is_editable : recorder . is_editable },
             _ =>
-              // The forker's identity is passed even when the recorder is
+              // The note's identity is passed even when the recorder is
               // not save-eligible, because text claims outlive the
               // visibility guard.
-              LocalContext::ForkeeAsSuchPosition {
-                forker                   : recorder . gnid . clone(),
-                forker_is_editable : recorder . is_editable }, };
+              LocalContext::MemberAsSuchPosition {
+                note             : recorder . gnid . clone(),
+                note_is_editable : recorder . is_editable }, };
         visit (child, &child_context, collected, owned) ?; }
       Ok (( )) },
     _ =>

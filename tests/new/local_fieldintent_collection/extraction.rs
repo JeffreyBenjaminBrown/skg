@@ -16,7 +16,8 @@ use skg::from_text::local_fieldintent_collection::extract_nonmergeSavePlan_local
 use skg::from_text::local_fieldintent_collection::lower::{
   lower_collected_fieldIntents, LoweringOutput, NodeIntent };
 use skg::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
-use skg::from_text::local_fieldintent_collection::types::ForkeeVisibility;
+use skg::from_text::local_fieldintent_collection::types::{
+  MemberAsSuch, MemberAsSuchVisibility };
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
 use skg::test_utils::extract_graphnode_if_save_else_error;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config, graph_from_config};
@@ -67,20 +68,22 @@ fn nodeInstructions_from_tree (
     . collect() }
 
 /// This returns the (forker, visibility-signal) pairs that
-/// collection emits.
+/// collection emits for forkees as such.
 fn visibility_pairs_from_tree (
   viewforest : Tree<Viewnode>,
-) -> Vec<(ID, ForkeeVisibility)> {
+) -> Vec<(ID, MemberAsSuchVisibility)> {
   let forest : ViewForest =
     ViewForest::from_internal_tree (viewforest);
-  let LoweringOutput { forkee_visibility, .. } =
+  let LoweringOutput { member_as_such_visibility, .. } =
     lower_collected_fieldIntents (
       collect_instructions_locally (&forest, &|_| true) . unwrap() ) . unwrap();
-  forkee_visibility }
+  member_as_such_visibility . into_iter ()
+    . filter ( |(_, signal)| signal . role == MemberAsSuch::Forkee )
+    . collect () }
 
 fn visibility_pairs_from_org (
   input : &str,
-) -> Vec<(ID, ForkeeVisibility)> {
+) -> Vec<(ID, MemberAsSuchVisibility)> {
   visibility_pairs_from_tree (
     viewnode_tree_as_written (input) ) }
 
@@ -469,8 +472,9 @@ fn forkee_hiderel_intent_collects_visible_content (
   assert_eq!(
     visibility_pairs_from_org (input),
     vec![(ID::from ("forker"),
-       ForkeeVisibility {
-         forkee     : ID::from ("forkee"),
+       MemberAsSuchVisibility {
+         member     : ID::from ("forkee"),
+         role       : MemberAsSuch::Forkee,
          visible    : vec![ID::from ("a"), ID::from ("b")],
          in_integratedElsewhere_or_hiddenIn_folder : vec![],
        })]); }
@@ -492,14 +496,16 @@ fn forkee_hiderel_intents_preserve_forkee_tree_order (
     visibility_pairs_from_org (input),
     vec![
       (ID::from ("forker"),
-         ForkeeVisibility {
-           forkee     : ID::from ("first"),
+         MemberAsSuchVisibility {
+           member     : ID::from ("first"),
+           role       : MemberAsSuch::Forkee,
            visible    : vec![ID::from ("first-child")],
            in_integratedElsewhere_or_hiddenIn_folder : vec![],
          }),
       (ID::from ("forker"),
-         ForkeeVisibility {
-           forkee     : ID::from ("second"),
+         MemberAsSuchVisibility {
+           member     : ID::from ("second"),
+           role       : MemberAsSuch::Forkee,
            visible    : vec![ID::from ("second-child")],
            in_integratedElsewhere_or_hiddenIn_folder : vec![],
          })]); }
@@ -519,8 +525,9 @@ fn forkee_hiderel_intent_uses_only_children (
   assert_eq!(
     visibility_pairs_from_org (input),
     vec![(ID::from ("forker"),
-       ForkeeVisibility {
-         forkee     : ID::from ("forkee"),
+       MemberAsSuchVisibility {
+         member     : ID::from ("forkee"),
+         role       : MemberAsSuch::Forkee,
          visible    : vec![ID::from ("child")],
          in_integratedElsewhere_or_hiddenIn_folder : vec![],
        })]); }
@@ -537,7 +544,7 @@ fn forkee_hiderel_intent_ignores_writeProtected_forkee (
 
   assert_eq!(
     visibility_pairs_from_org (input),
-    Vec::<(ID, ForkeeVisibility)>::new()); }
+    Vec::<(ID, MemberAsSuchVisibility)>::new()); }
 
 #[test]
 fn forkee_hiderel_intent_ignores_writeProtected_forker (
@@ -557,7 +564,7 @@ fn forkee_hiderel_intent_ignores_writeProtected_forker (
 
   assert_eq!(
     visibility_pairs_from_org (input),
-    Vec::<(ID, ForkeeVisibility)>::new()); }
+    Vec::<(ID, MemberAsSuchVisibility)>::new()); }
 
 #[test]
 fn forkee_hiderel_intent_excludes_non_content_delete_and_ghost_children (
@@ -574,14 +581,15 @@ fn forkee_hiderel_intent_excludes_non_content_delete_and_ghost_children (
             "};
   let viewforest : Tree<Viewnode> =
     viewnode_tree_as_written (input);
-  let intents : Vec<(ID, ForkeeVisibility)> =
+  let intents : Vec<(ID, MemberAsSuchVisibility)> =
     visibility_pairs_from_tree (viewforest);
 
   assert_eq!(
     intents,
     vec![(ID::from ("forker"),
-       ForkeeVisibility {
-         forkee     : ID::from ("forkee"),
+       MemberAsSuchVisibility {
+         member     : ID::from ("forkee"),
+         role       : MemberAsSuch::Forkee,
          visible    : vec![ID::from ("keep")],
          in_integratedElsewhere_or_hiddenIn_folder : vec![],
        })]); }
@@ -609,8 +617,9 @@ fn forkee_hiderel_intent_ignores_hidden_folder_contents (
   assert_eq!(
     visibility_pairs_from_org (input),
     vec![(ID::from ("forker"),
-       ForkeeVisibility {
-         forkee     : ID::from ("forkee"),
+       MemberAsSuchVisibility {
+         member     : ID::from ("forkee"),
+         role       : MemberAsSuch::Forkee,
          visible    : vec![ID::from ("visible")],
          in_integratedElsewhere_or_hiddenIn_folder : vec![ID::from ("kept"), ID::from ("hidden-in")],
        })]); }

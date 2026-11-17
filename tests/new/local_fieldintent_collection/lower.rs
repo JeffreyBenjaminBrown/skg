@@ -10,7 +10,8 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::from_text::local_fieldintent_collection::lower::{
   lower_collected_fieldIntents, nodeMerge_pairs, LoweringOutput };
 use skg::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
-use skg::from_text::local_fieldintent_collection::types::CollectedFieldIntents;
+use skg::from_text::local_fieldintent_collection::types::{
+  CollectedFieldIntents, MemberAsSuch };
 use skg::types::viewnode::{
   Viewnode };
 use skg::types::misc::{ID, MSV, members_of, members_msv};
@@ -43,13 +44,14 @@ fn lowering_produces_ordered_nodeInstructions_and_signals () {
       **** (skg node (gnid visible) (skgRepos (nodeRepo main))) visible
       * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
       "} );
-  let LoweringOutput { intents, forkee_visibility, .. } =
+  let LoweringOutput { intents, member_as_such_visibility, .. } =
     lower_collected_fieldIntents (collected) . unwrap();
   { // There is one visibility pair, aimed at the forker.
-    assert_eq!( forkee_visibility . len(), 1 );
-    let (forker, signal) = &forkee_visibility [0];
+    assert_eq!( member_as_such_visibility . len(), 1 );
+    let (forker, signal) = &member_as_such_visibility [0];
     assert_eq!( forker, &ID::from ("root") );
-    assert_eq!( signal . forkee, ID::from ("e") );
+    assert_eq!( signal . member, ID::from ("e") );
+    assert_eq!( signal . role, MemberAsSuch::Forkee );
     assert_eq!( signal . visible, vec![ID::from ("visible")] ); }
   let nodeInstructions : Vec<NodeInstruction> =
     intents . into_ordered_intents()
