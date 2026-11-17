@@ -4631,3 +4631,60 @@ None.
 *** Unfinished
 Nothing.
 *** DONE
+
+** Slice 3: the refresh's goal helpers that restate one another
+*** Commits
+- d6e983a4 every-mirror plan 4 slice 3: the refresh's goal helpers
+  that restate one another
+- (the commit carrying this record) every-mirror plan 4 slice 3:
+  record, DONE
+*** Suites
+Logs under 'tests/results/every-mirror/slice3-plan4/'.
+- 'cargo nextest run -E "test(refresh)"': 157 of 157.
+- 'cargo nextest run --test grouped_forks': 38 of 38.
+- 'cargo nextest run -E "test(herald)"': 30 of 30.
+- 'bash/nextest.sh': 1276 of 1276.
+- 'cargo build --bin skg', then the AI tool's tests: PASS.
+- 'bash/integration-tests.sh': 39 of 39.
+- 'bash/all-tests.sh': all pass: Emacs 503 of 503, Neovim pass,
+  nextest 1276 of 1276, doctests, team tools, AI reader, integration
+  78 of 78.
+No failure to classify.
+*** Names removed or changed
+Removed: 'content_goal_gnids', 'unintegrated_content_gnids',
+'hidden_by_forker', 'goal_list_for_hiddenInForkPartner_folder',
+'goal_list_for_hiddenOutsideOfForkPartners_folder',
+'note_of_forker_as_such' ('server/refresh/goal.rs'); 'occurrence_pid'
+('server/refresh/visit.rs'). 'what_the_member_shows' is now
+'pub(crate)'. The citations of removed names in 'goal.rs',
+'viewnodestats.rs' and 'resolve_visibility.rs' cite
+'what_the_member_shows' and 'hidden_outside_of_fork_partners'. No
+other hit outside 'TODO/'.
+*** Lines
+Before: slice 2's after. After: d6e983a4.
+| what                  | before total / code / comments | after total / code / comments | change total / code / comments |
+|-----------------------+--------------------------------+-------------------------------+--------------------------------|
+| server/*.rs           | 54,244 / 43,573 / 10,671       | 54,149 / 43,504 / 10,645      | -95 / -69 / -26                |
+| elisp, nvim, tools, tests | as after slice 2           | unchanged                     | 0                              |
+*** Put back, would change behavior
+Nothing.
+*** Deviations
+- 'what_the_member_shows' took the two sentences of
+  'content_goal_gnids''s doc that its own did not say (the restricted
+  members drawn as Restricted vognodes; the stats pass counting from
+  it) and 'unintegrated_content_gnids''s sentence on raw and extra
+  IDs, since those were the only statements of them.
+- 'hidden_in_fork_partner' and 'hidden_outside_of_fork_partners'
+  resolve the hides list first and filter after; the inlined helpers
+  filtered by resolved ID and then resolved. Same list.
+- In the merged folder arm, the hidden-by folder's guard is read
+  before the parties' pids, as before, so a hidden-by folder failing
+  its guard still has an empty goal, not none.
+- Of the stats pass's comment, the sentence that went with the 'if'
+  went (an indirect member stands in neither fork role but counts its
+  content too); the rest stays, since it states what is counted.
+*** Fixtures changed
+None.
+*** Unfinished
+Nothing.
+*** DONE

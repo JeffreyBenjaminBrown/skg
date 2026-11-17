@@ -425,7 +425,7 @@ speak of.
   - 'bash/nextest.sh';
   - 'cargo build --bin skg', then the AI tool's tests.
 
-** TODO Slice 3: the refresh's goal helpers that restate one another
+** DONE Slice 3: the refresh's goal helpers that restate one another
 Expected: server about 100 lines (comments about 40).
 All in 'server/refresh/', each change verified at 2ddc0ff8 by its
 callers:
