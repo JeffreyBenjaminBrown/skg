@@ -4744,3 +4744,58 @@ None.
 *** Unfinished
 Nothing.
 *** DONE
+
+** Slice 5: the forks tests use the shared helpers
+*** Commits
+- be1538ac every-mirror plan 4 slice 5: the forks tests use the shared
+  helpers
+- (the commit carrying this record) every-mirror plan 4 slice 5:
+  record, DONE
+*** Suites
+Logs under 'tests/results/every-mirror/slice5-plan4/'.
+- 'cargo build --tests': no warning.
+- 'cargo nextest run --test grouped_forks --test grouped_saves --test
+  grouped_views': 267 of 267, as at the base (no test vanished).
+- 'bash/nextest.sh': 1276 of 1276.
+- 'bash/integration-tests.sh': 39 of 39.
+- 'bash/all-tests.sh': all pass: Emacs 503 of 503, Neovim pass,
+  nextest 1276 of 1276, doctests, team tools, AI reader, integration
+  78 of 78.
+No failure to classify.
+*** Names removed or changed
+- Removed local copies, each now the shared one of
+  'tests/shared/view_and_save_helpers.rs': in 'tests/forks_folder.rs'
+  'view_of_n', 'line_of', 'node', 'forks_of', 'hides_of', 'ids',
+  'skg_files'; in 'tests/hides_apply_to_every_fork_partner.rs'
+  'view_of_n', 'depth', 'line_of', 'hides_of', 'ids'; 'is_a_fixpoint'
+  in 'flat_forks_folders.rs', 'forks_meet.rs' and
+  'hides_by_integration.rs'; 'hides_of', 'forks_of', 'contains_of' in
+  'hides_by_integration.rs'; 'skg_files' in
+  'members_as_such_and_stale_buffers.rs'; 'node_from_disk' in
+  'tests/fork.rs' and 'tests/hidden_from_forks.rs'. 'new_connection'
+  in 'tests/reload_config.rs' and 'tests/repo_watch.rs' is
+  'save_handler_helpers::new_connection'.
+- New in the shared module: 'is_a_fixpoint', 'node_from_disk',
+  'hides_of', 'forks_of', 'contains_of'. It is declared in
+  'tests/grouped_views.rs' too, and its header names the three targets
+  that declare it.
+- 'forks_folder.rs' keeps 'save' (a wrapper of the shared one, keeping
+  its 'assert!'); 'hides_apply_to_every_fork_partner.rs' keeps
+  'save_cleanly' (likewise, keeping its failure message).
+*** Lines
+Before: slice 4's after. After: be1538ac.
+| what                  | before total / code / comments | after total / code / comments | change total / code / comments |
+|-----------------------+--------------------------------+-------------------------------+--------------------------------|
+| tests/*.rs            | 57,334 / 50,814 / 6,520        | 57,160 / 50,647 / 6,513       | -174 / -167 / -7               |
+| server, elisp, nvim, tools, tests' el and lua | as after slice 4 | unchanged              | 0                              |
+*** Put back, would change behavior
+Nothing.
+*** Deviations
+- 'forks_folder.rs' imports the shared 'save' as 'save_as_view_of',
+  since its own wrapper keeps the name 'save' its nine callers use.
+- 'node_from_disk' got a one-line doc in the shared module.
+*** Fixtures changed
+None.
+*** Unfinished
+Nothing.
+*** DONE

@@ -510,7 +510,7 @@ reworded.
   - 'bash/nextest.sh';
   - 'cargo build --bin skg', then the AI tool's tests.
 
-** TODO Slice 5: the forks tests use the shared helpers
+** DONE Slice 5: the forks tests use the shared helpers
 Expected: tests about 170 '.rs' lines, all code but their doc
 comments; no expectation changes. Every helper named here was
 compared with 'diff' against the shared one at 2ddc0ff8.
