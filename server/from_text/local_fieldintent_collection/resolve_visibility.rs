@@ -32,6 +32,11 @@
 //! - An E the graph lacks (typed there) has no list to lose: what it
 //!   shows is its contains ('set_contains_of_new_member_as_such').
 //! .
+//! Each step compares children by pid ('InRustGraph::pid_else_raw_id'):
+//! a list may name a child by an extra ID (after a nodeMerge), and the
+//! buffer shows it by its pid. A hide is written, and an unhide found,
+//! as the list it comes from names the child.
+//! .
 //! A forker shown as such in a forks folder gives a visibility signal
 //! too, read by the forker-visibility step ('resolve_forker_visibility').
 //! .
@@ -113,9 +118,9 @@ pub fn resolve_visibility (
       &|gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
     let forker_contains : HashSet<ID> =
       lowered . note_contains_after_save (
-        &forker_from_disk );
+        &forker_from_disk ) . iter () . map (key) . collect ();
     let visible_content : HashSet<ID> =
-      signal . visible . iter() . cloned() . collect();
+      signal . visible . iter () . map (key) . collect ();
     let forkee_contains : Vec<ID> = // what the buffer could show of the forkee's content
       members_with_visible_records (
         &forkee_from_disk . contains, skgrepo_restriction );
@@ -138,18 +143,20 @@ pub fn resolve_visibility (
         . cloned () . collect () };
     let inferred_hides : Vec<ID> =
       drawn_before . iter()
-      . filter ( |gnid| ! visible_content . contains (*gnid) )
-      . filter ( |gnid| ! forker_contains . contains (*gnid) )
+      . filter ( |gnid| ! visible_content . contains (&key (gnid)) )
+      . filter ( |gnid| ! forker_contains . contains (&key (gnid)) )
       . filter ( |gnid| owned_notes_containing_after_save (
                           &lowered, gnid, &forkee_from_disk . pid,
                           graph, config, skgrepo_restriction ) . is_empty () )
       . cloned()
       . collect();
-    let inferred_unhides : Vec<ID> =
-      forkee_contains . iter()
-      . filter ( |gnid| visible_content . contains (*gnid) )
-      . filter ( |gnid| forker_hides . contains (*gnid) )
-      . cloned() . collect();
+    let inferred_unhides : Vec<ID> = { // as the forker's hides name them
+      let forkee_contains_keys : HashSet<ID> =
+        forkee_contains . iter () . map (key) . collect ();
+      forker_hides . iter ()
+        . filter ( |gnid| visible_content . contains (&key (gnid))
+                          && forkee_contains_keys . contains (&key (gnid)) )
+        . cloned () . collect () };
     if inferred_hides . is_empty() && inferred_unhides . is_empty()
       { continue; }
     if ! config . skgrepo_is_owned (&forker_from_disk . home_skgrepo) {
@@ -766,6 +773,7 @@ pub(crate) fn member_it_stands_for (
 /// hides in it. A
 /// forker as such under the same note says only "show it", of each
 /// child of its own it shows: a child absent there is no hide.
+/// Children are compared by pid, whichever ID a list names them by.
 fn validate_no_overlapping_forkee_hiderel_conflicts (
   member_as_such_visibility : &[(ID, MemberAsSuchVisibility)],
   graph               : &InRustGraph,
@@ -775,16 +783,20 @@ fn validate_no_overlapping_forkee_hiderel_conflicts (
   // This needs the visibility signals plus disk contains lists,
   // because the conflict is per forker/forkee-content pair,
   // not just per viewchild shown in the buffer.
+  let pid_key : &dyn Fn (&ID) -> ID =
+    &|gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
   let mut seen : HashMap<(ID, ID), bool> = HashMap::new();
   for (note, signal) in signals_of_role (
     member_as_such_visibility, MemberAsSuch::Forker ) {
     let Some (forker_from_disk) : Option<Graphnode> =
       opt_graphnode_by_gnid (graph, config, &signal . member) ?
       else { continue; };
+    let visible_content : HashSet<ID> =
+      signal . visible . iter () . map (pid_key) . collect ();
     for content_gnid in members_with_visible_records (
       &forker_from_disk . contains, skgrepo_restriction ) {
-      if signal . visible . contains (&content_gnid) {
-        seen . insert ((note . clone (), content_gnid), true); }}}
+      if visible_content . contains (&pid_key (&content_gnid)) {
+        seen . insert ((note . clone (), pid_key (&content_gnid)), true); }}}
   for (forker, signal) in signals_of_role (
     member_as_such_visibility, MemberAsSuch::Forkee ) {
     let forkee_from_disk : Graphnode =
@@ -793,13 +805,16 @@ fn validate_no_overlapping_forkee_hiderel_conflicts (
       { Some (forkee_from_disk) => forkee_from_disk,
         None                        => continue, };
     let visible_content : HashSet<ID> =
-      signal . visible . iter() . cloned() . collect();
+      signal . visible . iter () . map (pid_key) . collect ();
+    let set_aside : HashSet<ID> =
+      signal . in_integratedElsewhere_or_hiddenIn_folder . iter ()
+      . map (pid_key) . collect ();
     for content_gnid in members_with_visible_records (
       &forkee_from_disk . contains, skgrepo_restriction ) {
-      let content_gnid : ID = content_gnid;
+      let content_gnid : ID = pid_key (&content_gnid);
       if kept_elsewhere_before_save (
            graph, config, skgrepo_restriction, &content_gnid, &forkee_from_disk . pid )
-         || signal . in_integratedElsewhere_or_hiddenIn_folder . contains (&content_gnid)
+         || set_aside . contains (&content_gnid)
       { continue; }
       let key : (ID, ID) =
         (forker . clone(), content_gnid . clone());

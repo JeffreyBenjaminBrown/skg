@@ -864,7 +864,10 @@ It reads the forkee's content and the forker's hides by the
 records the skgrepo restriction shows, as the view drew them, so a
 hide recorded in a restricted section is neither removed nor moved,
 and no hide is written of a member that only a restricted record
-explains. Only a forker the user owns records hides: a save whose
+explains. It compares children by pid, as the forker-visibility step
+does: a child the forkee's list names by an extra ID (after a
+nodeMerge) is the child the view shows by its pid, and a hide is
+written as the list names it. Only a forker the user owns records hides: a save whose
 step would hide or unhide anything in a foreign forker is refused,
 naming the forker ('refusal_to_change_what_a_foreign_note_hides').
 
