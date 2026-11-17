@@ -820,17 +820,20 @@ would make N fork F while N contains F is refused. The step reads F's
 content and N's hides and content by the records the skgrepo
 restriction shows, as the view drew them: F shows its content less
 what N contains or hides and what the user keeps elsewhere, by the
-graph before the save, wherever it is a mirror of N under the
-restriction ('is_mirror_of'), as an indirect member is. A forker the
-graph lacks (typed there) has no list to lose: what it shows is its
-contains.
+graph before the save, where the forks folder showed F before the
+save. An F typed into the folder in the save had nothing drawn under
+it, so nothing is cut from it: N neither forks it nor hides anything
+for it ('docs/forks.org', "Typing a note into the folder"). A forker
+the graph lacks (typed there) has no list to lose: what it shows is
+its contains.
 
 *** cut
 
 To *cut* a child from a member as such (a forkee or forker as such) is
 to delete its headline from under the member and save, whether or not
 it is pasted elsewhere. A cut child is one the member's list names,
-and the view showed there, that the buffer no longer shows claiming
+and the view showed there (under a member typed into the folder in
+the same save, it showed none), that the buffer no longer shows claiming
 under it, nor in the member's folder of what the user keeps elsewhere
 or of what the note hides in it: a stale buffer may still show a child
 there after another view stopped keeping it, or unhid it, and the
@@ -856,7 +859,8 @@ the forkee's content and rewrites the forker's hides to match: content shown the
 claiming, is unhidden, and content the view drew there (what the
 forker neither hid nor integrated before the save, by the graph, and
 the buffer does not show in the forkee's folder of what the user
-keeps elsewhere or of what the forker hides in it) and no longer
+keeps elsewhere or of what the forker hides in it; nothing, under a
+forkee typed into the folder in the save) and no longer
 shows, which neither the forker nor an owned note but the forkee
 contains after the save, is hidden ('resolve_visibility' in
 'server/from_text/local_fieldintent_collection/resolve_visibility.rs').

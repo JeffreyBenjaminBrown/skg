@@ -61,6 +61,8 @@ mod cuts_from_forkers;
 mod forks_meet;
 #[path = "forkee_content_named_by_an_extra_id.rs"]
 mod forkee_content_named_by_an_extra_id;
+#[path = "members_typed_into_a_forks_folder.rs"]
+mod members_typed_into_a_forks_folder;
 
 #[path = "hides_apply_to_every_fork_partner.rs"]
 mod hides_apply_to_every_fork_partner;

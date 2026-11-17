@@ -10,7 +10,8 @@
 //!   and E has a viewchild with ID N and claimsMembership,
 //!   then N is intended to be visible through this fork,
 //!   so it is removed from the hides of forker R.
-//! - If N is graph-content of E that the view drew under E (R
+//! - If N is graph-content of E that the view drew under E (the
+//!   folder showed E before the save, 'forks_folder_members_drawn'; R
 //!   neither hid nor contained it, nor did the user keep it in an
 //!   owned note but E, before the save, by the graph:
 //!   'docs/glossary.org', "what a member shows"; nor does the buffer
@@ -31,6 +32,10 @@
 //!   anything in R is refused ('refusal_to_change_what_a_foreign_note_hides').
 //! - An E the graph lacks (typed there) has no list to lose: what it
 //!   shows is its contains ('set_contains_of_new_member_as_such').
+//! - An E the folder did not show before the save (typed there in
+//!   this save) had nothing drawn under it, so nothing is hidden for
+//!   it: R forks it, as its claim says, and a child typed under it
+//!   joins its content, as above.
 //! .
 //! Each step compares children by pid ('InRustGraph::pid_else_raw_id'):
 //! a list may name a child by an extra ID (after a nodeMerge), and the
@@ -57,7 +62,7 @@
 //! elsewhere in the same map.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::mirrors::{Mirrors, is_mirror_of, mirrors_of};
+use crate::dbs::in_rust_graph::mirrors::{Mirrors, mirrors_of};
 use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::refresh::goal::{
   forks_folder_members_shown, forker_only_members, owned_notes_containing};
@@ -90,7 +95,8 @@ pub fn resolve_visibility (
   is_diff_view : bool,
 ) -> Result<(LoweredNodeIntents, Vec<PostSkgsaveCommitNoticeCandidate>), Box<dyn Error>> {
   validate_no_overlapping_forkee_hiderel_conflicts (
-    member_as_such_visibility, graph, config, skgrepo_restriction ) ?;
+    member_as_such_visibility, graph, config, skgrepo_restriction,
+    is_diff_view ) ?;
   infer_hides_from_contains_removals (
     // Before the signal loops below, so that an explicit
     // member-as-such gesture about the same child wins.
@@ -128,19 +134,24 @@ pub fn resolve_visibility (
       members_with_visible_records (
         forker_from_disk . hides . or_default (),
         skgrepo_restriction );
-    let drawn_before : Vec<ID> = { // what the view drew under the forkee
-      let hidden_contained_or_set_aside : HashSet<ID> =
-        forker_hides . iter ()
-        . chain ( members_with_visible_records (
-                    &forker_from_disk . contains, skgrepo_restriction ) . iter () )
-        . chain ( signal . in_integratedElsewhere_or_hiddenIn_folder . iter () )
-        . map (key) . collect ();
-      forkee_contains . iter ()
-        . filter ( |gnid| ! hidden_contained_or_set_aside . contains (&key (gnid))
-                          && ! kept_elsewhere_before_save (
-                                 graph, config, skgrepo_restriction, gnid,
-                                 &forkee_from_disk . pid ) )
-        . cloned () . collect () };
+    let shown_before : bool = // false for a member typed into the folder in this save
+      forks_folder_members_drawn (
+        graph, skgrepo_restriction, &forker_from_disk, is_diff_view )
+      . contains (&key (&signal . member));
+    let drawn_before : Vec<ID> = // what the view drew under the forkee
+      if ! shown_before { Vec::new () } else {
+        let hidden_contained_or_set_aside : HashSet<ID> =
+          forker_hides . iter ()
+          . chain ( members_with_visible_records (
+                      &forker_from_disk . contains, skgrepo_restriction ) . iter () )
+          . chain ( signal . in_integratedElsewhere_or_hiddenIn_folder . iter () )
+          . map (key) . collect ();
+        forkee_contains . iter ()
+          . filter ( |gnid| ! hidden_contained_or_set_aside . contains (&key (gnid))
+                            && ! kept_elsewhere_before_save (
+                                   graph, config, skgrepo_restriction, gnid,
+                                   &forkee_from_disk . pid ) )
+          . cloned () . collect () };
     let inferred_hides : Vec<ID> =
       drawn_before . iter()
       . filter ( |gnid| ! visible_content . contains (&key (gnid)) )
@@ -170,7 +181,7 @@ pub fn resolve_visibility (
   resolve_forker_visibility (
     &mut lowered,
     signals_of_role ( member_as_such_visibility, MemberAsSuch::Forker ),
-    graph, config, skgrepo_restriction ) ?;
+    graph, config, skgrepo_restriction, is_diff_view ) ?;
   resolve_forks_folder_removals (
     &mut lowered, forks_folder_members, graph, config,
     skgrepo_restriction, is_diff_view ) ?;
@@ -308,11 +319,13 @@ fn add_children_placed_under_member_as_such (
 /// The forker-visibility step ('docs/forks.org', "Cutting from a
 /// forker"), for a forker F shown as such in the forks folder of a
 /// note N (it forks N, or it is an indirect member, or N forked it and
-/// the user detached it there). Where F is a mirror of N under the
-/// skgrepo restriction ('is_mirror_of'), the view drew F's content as
-/// 'what_the_member_shows' ('server/refresh/goal.rs') gives it, and
-/// otherwise all of it; either way by the records the skgrepo
-/// restriction shows (the graph before the save). So:
+/// the user detached it there). Where the folder showed F before the
+/// save ('forks_folder_members_drawn'), the view drew F's content as
+/// 'what_the_member_shows' ('server/refresh/goal.rs') gives it, by
+/// the records the skgrepo restriction shows (the graph before the
+/// save). Where it did not, F was typed into the folder in this save,
+/// and the view drew nothing under it, so nothing is cut from it: N
+/// neither forks F nor hides anything for it. So:
 /// - a child of F that N hides, shown claiming under F (moved out of
 ///   F's folder of what N hides in it), is unhidden in N, as under a
 ///   forkee;
@@ -337,6 +350,7 @@ fn resolve_forker_visibility<'a> (
   graph               : &InRustGraph,
   config              : &SkgConfig,
   skgrepo_restriction : &SkgrepoRestriction,
+  is_diff_view        : bool,
 ) -> Result<(), Box<dyn Error>> {
   for (note, signal) in signals {
     let Some (forker_from_disk) : Option<Graphnode> =
@@ -357,10 +371,13 @@ fn resolve_forker_visibility<'a> (
     let note_hides : Vec<ID> = // a restricted hide the buffer could not show, so no save removes it
       members_with_visible_records (
         note_from_disk . hides . or_default (), skgrepo_restriction );
+    let shown_before : bool = // false for a member typed into the folder in this save
+      forks_folder_members_drawn (
+        graph, skgrepo_restriction, &note_from_disk, is_diff_view )
+      . contains (&forker_from_disk . pid);
     let drawn_before : Vec<ID> = // what the view drew under the forker
-      if is_mirror_of (
-           graph, skgrepo_restriction, &note_from_disk . pid, &forker_from_disk . pid )
-      { let hidden_or_contained_by_the_note : HashSet<ID> =
+      if ! shown_before { Vec::new () } else {
+        let hidden_or_contained_by_the_note : HashSet<ID> =
           note_hides . iter ()
           . chain ( members_with_visible_records (
                       &note_from_disk . contains, skgrepo_restriction ) . iter () )
@@ -370,8 +387,7 @@ fn resolve_forker_visibility<'a> (
                             && ! kept_elsewhere_before_save (
                                    graph, config, skgrepo_restriction, gnid,
                                    &forker_from_disk . pid ) )
-          . cloned () . collect ()
-      } else { forker_contains . clone () };
+          . cloned () . collect () };
     let cut : Vec<ID> = {
       let set_aside : HashSet<ID> = // shown in F's folder of what the user keeps elsewhere, or of what N hides in it
         signal . in_integratedElsewhere_or_hiddenIn_folder . iter () . map (key) . collect ();
@@ -420,17 +436,15 @@ fn resolve_forker_visibility<'a> (
 /// it in N, so that it leaves the folder (where a member N hides is
 /// not drawn) for the folder of what N hides outside its fork
 /// partners, whence removing it unhides it. So each member of the
-/// folder as the view drew it ('forks_folder_members_shown', with N's
-/// forkees by the graph) that would stand in it claiming nothing
+/// folder as the view drew it ('forks_folder_members_drawn') that
+/// would stand in it claiming nothing
 /// after the save (with N's forkees as the save leaves them: a deleted
 /// mutual's fork the same save ends), that the folder no longer
 /// shows, and that N does not hide already, joins N's hides. A forkee
 /// the deletion unforks is no member after the save, unless another
-/// mirror still joins it to N; nor is what only it joined to N. A
-/// forks folder of the diff view holds N's direct fork partners only
-/// ('diff_view::forks_folder_goal'), so there an indirect member was
-/// never drawn, and none is hidden. A
-/// member whose record the restriction keeps out was never drawn, and
+/// mirror still joins it to N; nor is what only it joined to N. In
+/// the diff view an indirect member was never drawn, so none is
+/// hidden. A member whose record the restriction keeps out was never drawn, and
 /// one whose node it keeps out stood as a restricted viewnode, whose
 /// line edits no relationship, so neither is hidden here. Only an
 /// owned N is written. This runs before the edits of the
@@ -458,18 +472,9 @@ fn resolve_forks_folder_removals (
     let hidden : HashSet<ID> =
       lowered . note_hides_after_resolution (&note_from_disk) . iter ()
       . map (key) . collect ();
-    let drawn : HashSet<ID> = { // the folder's members as the view drew them
-      let forkees : Vec<ID> = members_with_visible_records (
-        note_from_disk . forks . or_default (), skgrepo_restriction );
-      if is_diff_view {
-        forkees . iter () . map (key)
-          . chain ( forker_only_members (
-            graph, skgrepo_restriction, &note_from_disk . pid, &forkees ))
-          . collect ()
-      } else {
-        forks_folder_members_shown (
-          graph, skgrepo_restriction, &note_from_disk . pid, &forkees )
-          . into_iter () . collect () }};
+    let drawn : HashSet<ID> =
+      forks_folder_members_drawn (
+        graph, skgrepo_restriction, &note_from_disk, is_diff_view );
     let deleted : Vec<ID> =
       forks_folder_members_shown (
         graph, skgrepo_restriction, &note_from_disk . pid,
@@ -485,6 +490,32 @@ fn resolve_forks_folder_removals (
       lowered . apply_hiderel_delta_to_hider (
         note_from_disk, &deleted, &[] ); }}
   Ok (( )) }
+
+/// The members of the forks folder of 'note' as the view drew them,
+/// each by its pid: by the graph before the save, with the note's
+/// forkees by the records the skgrepo restriction shows
+/// ('forks_folder_members_shown'). A forks folder of the diff view
+/// holds the note's direct fork partners only
+/// ('diff_view::forks_folder_goal'). The graph, not the buffer's
+/// baseline, which a save need not carry: a member absent from it was
+/// typed into the folder in this save.
+fn forks_folder_members_drawn (
+  graph               : &InRustGraph,
+  skgrepo_restriction : &SkgrepoRestriction,
+  note_from_disk      : &Graphnode,
+  is_diff_view        : bool,
+) -> HashSet<ID> {
+  let forkees : Vec<ID> = members_with_visible_records (
+    note_from_disk . forks . or_default (), skgrepo_restriction );
+  if is_diff_view {
+    forkees . iter () . map ( |forkee| graph . pid_else_raw_id (forkee) )
+      . chain ( forker_only_members (
+        graph, skgrepo_restriction, &note_from_disk . pid, &forkees ))
+      . collect ()
+  } else {
+    forks_folder_members_shown (
+      graph, skgrepo_restriction, &note_from_disk . pid, &forkees )
+      . into_iter () . collect () }}
 
 /// The members of 'list' whose records the skgrepo restriction shows
 /// ('SkgrepoRestriction::record_is_visible'), as written.
@@ -772,13 +803,16 @@ pub(crate) fn member_it_stands_for (
 /// buffer shows in that folder or in the folder of what the forker
 /// hides in it. A
 /// forker as such under the same note says only "show it", of each
-/// child of its own it shows: a child absent there is no hide.
+/// child of its own it shows: a child absent there is no hide. So
+/// does a forkee typed into the folder in this save, under which the
+/// view drew nothing ('forks_folder_members_drawn').
 /// Children are compared by pid, whichever ID a list names them by.
 fn validate_no_overlapping_forkee_hiderel_conflicts (
   member_as_such_visibility : &[(ID, MemberAsSuchVisibility)],
   graph               : &InRustGraph,
   config              : &SkgConfig,
   skgrepo_restriction : &SkgrepoRestriction,
+  is_diff_view        : bool,
 ) -> Result<(), Box<dyn Error>> {
   // This needs the visibility signals plus disk contains lists,
   // because the conflict is per forker/forkee-content pair,
@@ -809,12 +843,20 @@ fn validate_no_overlapping_forkee_hiderel_conflicts (
     let set_aside : HashSet<ID> =
       signal . in_integratedElsewhere_or_hiddenIn_folder . iter ()
       . map (pid_key) . collect ();
+    let shown_before : bool =
+      match opt_graphnode_by_gnid (graph, config, forker) ? {
+        Some (forker_from_disk) =>
+          forks_folder_members_drawn (
+            graph, skgrepo_restriction, &forker_from_disk, is_diff_view )
+          . contains (&forkee_from_disk . pid),
+        None => false, };
     for content_gnid in members_with_visible_records (
       &forkee_from_disk . contains, skgrepo_restriction ) {
       let content_gnid : ID = pid_key (&content_gnid);
       if kept_elsewhere_before_save (
            graph, config, skgrepo_restriction, &content_gnid, &forkee_from_disk . pid )
          || set_aside . contains (&content_gnid)
+         || ( ! shown_before && ! visible_content . contains (&content_gnid) )
       { continue; }
       let key : (ID, ID) =
         (forker . clone(), content_gnid . clone());
