@@ -593,7 +593,7 @@ relRepo of each unknown or restricted one; then its forker-only
 members (=forker_only_members=): the notes that fork N, less those N
 forks or hides, by the declaration order of their home skgrepos
 ('SkgConfig::declaration_rank'), then pid; then its indirect members
-(=indirect_members=): the mirrors of N ('mirrors_of_note_with_forkees',
+(=indirect_members=): the mirrors of N ('mirrors_of',
 N forking what its list names) less N, its fork partners and what N
 hides, nearest first, then by the declaration order of their homes,
 then pid; the members of both tails unclaimable

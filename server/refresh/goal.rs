@@ -30,7 +30,7 @@
 //! too.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::mirrors::{Mirror, mirrors_of_note_with_forkees};
+use crate::dbs::in_rust_graph::mirrors::{Mirror, mirrors_of};
 use crate::dbs::in_rust_graph::relation_accessors::{GnidPresence, NodeRelation, RelationRole};
 use crate::graph_straddle::types::Partner;
 use crate::refresh::Walk;
@@ -647,7 +647,7 @@ pub(crate) fn forker_only_members (
 /// The indirect members of the forks folder describing 'described'
 /// ('docs/glossary.org', "the forks folder"): its
 /// mirrors under the skgrepo restriction, were the notes it forks
-/// those 'forkees' names ('mirrors_of_note_with_forkees'), less itself,
+/// those 'forkees' names ('mirrors_of'), less itself,
 /// its fork partners (those 'forkees' names and those forking it) and
 /// those it hides by records the skgrepo restriction shows, nearest
 /// first. A mirror reached only through a note it hides is still one:
@@ -669,7 +669,7 @@ pub(crate) fn indirect_members (
       graph ))
     . chain ( once (described_pid) )
     . collect ();
-  mirrors_of_note_with_forkees (graph, restriction, described, forkees)
+  mirrors_of (graph, restriction, described, Some (forkees))
     . members . into_iter ()
     . filter ( |mirror| ! left_out . contains (&mirror . pid) )
     . collect () }

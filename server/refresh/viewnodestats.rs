@@ -1,5 +1,5 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::mirrors::{MIRROR_RELATION, side_of_mirror_shown};
+use crate::dbs::in_rust_graph::mirrors::side_of_mirror_shown;
 use crate::dbs::in_rust_graph::stats::mentioner_is_substantive;
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelRepoLookup, RelationRole };
@@ -416,11 +416,11 @@ fn birth_facts (
           None => birth_facts_for_folder (tree, folder, *folder_treeid), },
         ParentKind::Other => Vec::new (), }}};
   if let Some (side) = side_of_mirror {
-    if ! facts . iter () . any ( |fact| fact . relation == MIRROR_RELATION ) {
+    if ! facts . iter () . any ( |fact| fact . relation == NodeRelation::Forks ) {
       // A mirror shown in place of another is born of the forks
       // between them: it leads with their herald, like every other
       // birth relation. The original is not an ancestor.
-      facts . insert ( 0, BirthFact::new ( MIRROR_RELATION, side, None ) ); }}
+      facts . insert ( 0, BirthFact::new ( NodeRelation::Forks, side, None ) ); }}
   facts }
 
 /// A forks folder member's birth facts: '(forks in 2)' where it stands

@@ -234,7 +234,7 @@ fn a_restricted_middle_note_cuts_the_path () {
   assert_eq! ( shown (&notes, &unrestricted (), "your-y", "n"), ID::from ("d") );
   assert_eq! ( shown (&notes, &restricted, "your-y", "n"), ID::from ("n") );
   let graph : InRustGraph = InRustGraph::from_graphnodes (&notes);
-  assert_eq! ( mirrors_of (&graph, &restricted, &ID::from ("n")) . pids (),
+  assert_eq! ( mirrors_of (&graph, &restricted, &ID::from ("n"), None) . pids (),
                vec! [ ID::from ("n") ] ); }
 
 /// A relationship whose relRepo the restriction keeps out joins no

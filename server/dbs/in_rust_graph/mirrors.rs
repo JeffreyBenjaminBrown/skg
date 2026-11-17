@@ -1,8 +1,8 @@
 //! Mirrors, and which of a note's mirrors stands in its place
 //! ('docs/mirrors.org', "Mirror substitution").
 //!
-//! A *fork* of a note N is a note that records a relationship of
-//! 'MIRROR_RELATION' to N: the forker forks the forkee. The *mirrors*
+//! A *fork* of a note N is a note that records a 'forks'
+//! relationship to N: the forker forks the forkee. The *mirrors*
 //! of N are N and every note joined to N by a path of such
 //! relationships, followed in either direction, every relationship and
 //! every note on the path visible under the skgrepo restriction (the
@@ -42,10 +42,6 @@ use crate::types::views_state::Perspective;
 use ego_tree::NodeRef;
 use std::collections::{HashSet, VecDeque};
 use std::iter::once;
-
-/// The relation whose relationships join a note to its mirrors: a
-/// note that records one of it to N forks N.
-pub const MIRROR_RELATION : NodeRelation = NodeRelation::Forks;
 
 /// One mirror of a note N.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -95,7 +91,7 @@ pub fn mirror_shown (
   let original : ID = graph . pid_else_raw_id (gnid);
   mirror_shown_among (
     config, skgrepo, &original,
-    &mirrors_of (graph, restriction, &original) ) }
+    &mirrors_of (graph, restriction, &original, None) ) }
 
 /// Which of 'mirrors', the mirrors of 'original', stands in its place
 /// from the perspective of 'skgrepo': the first by its skgrepo list,
@@ -160,33 +156,16 @@ pub fn is_mirror_of (
   original    : &ID,
   candidate   : &ID,
 ) -> bool {
-  mirrors_of (graph, restriction, original)
+  mirrors_of (graph, restriction, original, None)
     . contains ( &graph . pid_else_raw_id (candidate) ) }
 
 /// The mirrors of the note 'gnid' names, under 'restriction'
-/// (breadth-first, so each member's distance is its least).
+/// (breadth-first, so each member's distance is its least). Where
+/// 'start_forkees' is given, they are the notes that note forks
+/// (visible records, as a view drew them or a save leaves them)
+/// rather than those its list names; every other note's
+/// relationships are the graph's.
 pub fn mirrors_of (
-  graph       : &InRustGraph,
-  restriction : &SkgrepoRestriction,
-  gnid        : &ID,
-) -> Mirrors {
-  mirrors_reached (graph, restriction, gnid, None) }
-
-/// The mirrors of the note 'note' names, under 'restriction', were
-/// the notes it forks those 'forkees' names (visible records, as a
-/// view drew them or a save leaves them) rather than those its list
-/// names. Every other note's relationships are the graph's.
-pub fn mirrors_of_note_with_forkees (
-  graph       : &InRustGraph,
-  restriction : &SkgrepoRestriction,
-  note        : &ID,
-  forkees     : &[ID],
-) -> Mirrors {
-  mirrors_reached (graph, restriction, note, Some (forkees)) }
-
-/// The breadth-first walk of 'mirrors_of' from the note 'gnid' names,
-/// its own forkees 'start_forkees' where given, else its list's.
-fn mirrors_reached (
   graph         : &InRustGraph,
   restriction   : &SkgrepoRestriction,
   gnid          : &ID,
@@ -241,11 +220,11 @@ fn visible_fork_relationships_of (
   pid         : &ID,
 ) -> Vec<(ID, (ID, ID))> {
   let forkees : Vec<(ID, (ID, ID))> = graph . outbound_pids_for_relation_gated (
-    pid, MIRROR_RELATION, restriction ) . into_iter ()
+    pid, NodeRelation::Forks, restriction ) . into_iter ()
     . map ( |forkee| ( forkee . clone (), ( pid . clone (), forkee ) ))
     . collect ();
   let forkers : Vec<(ID, (ID, ID))> = graph . inbound_pids_for_relation_gated (
-    pid, MIRROR_RELATION, restriction ) . into_iter ()
+    pid, NodeRelation::Forks, restriction ) . into_iter ()
     . map ( |forker| ( forker . clone (), ( forker, pid . clone () ) ))
     . collect ();
   forkees . into_iter () . chain (forkers)
@@ -262,8 +241,8 @@ pub fn mirror_pids_ignoring_restriction (
   let mut seen : HashSet<ID> = seeds . clone ();
   let mut pending : Vec<ID> = seeds . iter () . cloned () . collect ();
   while let Some (pid) = pending . pop () {
-    for partner in graph . outbound_pids_for_relation (&pid, MIRROR_RELATION) . into_iter ()
-      . chain ( graph . inbound_pids_for_relation (&pid, MIRROR_RELATION) )
+    for partner in graph . outbound_pids_for_relation (&pid, NodeRelation::Forks) . into_iter ()
+      . chain ( graph . inbound_pids_for_relation (&pid, NodeRelation::Forks) )
     { if seen . insert ( partner . clone () ) { pending . push (partner); }} }
   seen }
 
@@ -299,7 +278,7 @@ fn reaches_forkeeward (
   let mut pending : Vec<ID> = vec! [ from . clone () ];
   while let Some (pid) = pending . pop () {
     for forkee in graph . outbound_pids_for_relation_gated (
-      &pid, MIRROR_RELATION, restriction ) {
+      &pid, NodeRelation::Forks, restriction ) {
       if ! graph . node_is_shown (&forkee, restriction) { continue; }
       if &forkee == to { return true; }
       if seen . insert ( forkee . clone () ) { pending . push (forkee); }} }

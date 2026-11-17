@@ -777,7 +777,7 @@ pub(crate) fn member_it_stands_for (
   members     : &HashSet<ID>,
 ) -> Option<ID> {
   if members . contains (gnid) { return Some (gnid . clone ()); }
-  let mirrors : Mirrors = mirrors_of (graph, restriction, gnid);
+  let mirrors : Mirrors = mirrors_of (graph, restriction, gnid, None);
   members . iter ()
     . filter_map ( |member| mirrors . members . iter ()
       . find ( |mirror| mirror . pid == graph . pid_else_raw_id (member) )

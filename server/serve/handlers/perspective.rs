@@ -245,7 +245,7 @@ fn candidate_skgrepos (
   for node in forest . nodes () {
     let Some (original) : Option<ID> = original_at_substitution_position (graph, node)
       else { continue; };
-    for Mirror { home, .. } in mirrors_of (graph, restriction, &original) . members {
+    for Mirror { home, .. } in mirrors_of (graph, restriction, &original, None) . members {
       if ! skgrepos . contains (&home) { skgrepos . push (home); }} }
   skgrepos }
 

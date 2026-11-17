@@ -87,7 +87,7 @@ pub fn owned_head_identity (
 ) -> Result<String, String> {
   let mut parts : Vec<String> =
     Vec::new ();
-  for skgrepo_name in config . owned_skgrepos_in_declaration_order () {
+  for skgrepo_name in config . privacy_ladder () {
     let skgrepo : &Skgrepo =
       config . skgrepos . get (&skgrepo_name) . ok_or_else ( || format! (
         "Repo '{}' not found in config", skgrepo_name )) ?;

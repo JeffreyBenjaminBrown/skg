@@ -11,9 +11,10 @@
 //! in the save handler.
 
 use crate::dbs::in_rust_graph::mirrors::{
-  MIRROR_RELATION, Mirror, Mirrors, mirror_shown_among, mirrors_of,
+  Mirror, Mirrors, mirror_shown_among, mirrors_of,
   perspective_skgrepo_of_tree_containing};
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::org_to_text::skgRepos_form;
 use crate::skgrepo_sets::SkgrepoRestriction;
@@ -374,7 +375,7 @@ pub fn existing_owned_fork_of (
   original : &ID,
 ) -> Option<ID> {
   let pid : ID = graph . pid_else_raw_id (original);
-  graph . inbound_pids_for_relation (&pid, MIRROR_RELATION) . into_iter ()
+  graph . inbound_pids_for_relation (&pid, NodeRelation::Forks) . into_iter ()
     . find ( |forker| graph . nodes . get (forker) . is_some_and (
       |node| config . skgrepo_is_owned (&node . home_skgrepo) )) }
 
@@ -549,7 +550,7 @@ fn mirror_shown_once_cloned (
   spec        : &ForkSpec,
 ) -> ID {
   let clone : &Graphnode = &spec . clone . 0;
-  let mut mirrors : Mirrors = mirrors_of (graph, restriction, &spec . original_gnid);
+  let mut mirrors : Mirrors = mirrors_of (graph, restriction, &spec . original_gnid, None);
   mirrors . members . push ( Mirror {
     pid : clone . pid . clone (), home : clone . home_skgrepo . clone (), distance : 1 } );
   mirrors . forks . insert (( clone . pid . clone (), spec . original_gnid . clone () ));

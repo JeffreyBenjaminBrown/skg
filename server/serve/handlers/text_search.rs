@@ -570,7 +570,7 @@ fn hits_among_mirrors_of (
   hit             : &ID,
   matches_by_gnid : &MatchGroups,
 ) -> Mirrors {
-  let mirrors : Mirrors = mirrors_of (graph, restriction, hit);
+  let mirrors : Mirrors = mirrors_of (graph, restriction, hit, None);
   let members : Vec<Mirror> = mirrors . members . into_iter ()
     . filter ( |mirror| matches_by_gnid . contains_key (&mirror . pid) )
     . collect ();

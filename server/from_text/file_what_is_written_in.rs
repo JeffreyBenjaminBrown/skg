@@ -205,7 +205,7 @@ fn file_in_forker (
       Some (node) => node,
       None => return false, }, };
   let member : ID = graph . pid_else_raw_id (member);
-  let member_mirrors : Mirrors = mirrors_of (graph, restriction, &member);
+  let member_mirrors : Mirrors = mirrors_of (graph, restriction, &member, None);
   let stands_for_member = |gnid : &ID| -> bool {
     let pid : ID = graph . pid_else_raw_id (gnid);
     pid == member || member_mirrors . contains (&pid) };

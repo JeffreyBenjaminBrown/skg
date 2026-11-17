@@ -227,7 +227,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     // skgrepo at all (the genuine "activate one first" case), and
     // ForkRepoUnresolved only when the user owns no skgrepo at all.
     let owned_in_order : Vec<SkgrepoName> =
-      config . owned_skgrepos_in_declaration_order ();
+      config . privacy_ladder ();
     let unrestricted_owned : Option<SkgrepoName> =
       owned_in_order . iter ()
       . find ( |name| skgrepo_restriction . contains_skgrepo (name) )

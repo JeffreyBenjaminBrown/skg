@@ -46,7 +46,7 @@ pub fn changed_skg_paths_by_stem (
   config : &SkgConfig,
 ) -> Result<BTreeMap<ID, Vec<ChangedSkgPath>>, String> {
   let mut by_stem : BTreeMap<ID, Vec<ChangedSkgPath>> = BTreeMap::new ();
-  for skgrepo_name in config . owned_skgrepos_in_declaration_order () {
+  for skgrepo_name in config . privacy_ladder () {
     let skgrepo : &Skgrepo = config . skgrepos . get (&skgrepo_name)
       . ok_or_else ( || format! ( "Repo '{}' not found in config", skgrepo_name )) ?;
     let in_skgrepo = |e : String| -> String {
@@ -177,7 +177,7 @@ pub fn prepare_commits (
 ) -> Result<PreparedCommits, String> {
   let mut prepared : PreparedCommits = PreparedCommits::default ();
   let mut tree_of_gitrepo : HashMap<PathBuf, Oid> = HashMap::new ();
-  let owned : Vec<SkgrepoName> = config . owned_skgrepos_in_declaration_order ();
+  let owned : Vec<SkgrepoName> = config . privacy_ladder ();
   let mut gitrepo_of : HashMap<SkgrepoName, PathBuf> = HashMap::new ();
   for skgrepo_name in &owned {
     let in_skgrepo = |e : String| -> String {
