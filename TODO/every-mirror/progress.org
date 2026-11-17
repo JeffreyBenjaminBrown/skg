@@ -5102,3 +5102,165 @@ module-doc lines.
 *** Unfinished
 Nothing.
 *** DONE
+
+** Two save faults the P2 probe found
+The probe of P2 (transcripts under '/tmp/claude-1000/p2-probe/') found
+two faults of the save's visibility steps. The orchestrator assigned
+both fixes on 2026-11-17, and decided the second's rule: only what the
+view drew under a member before the save can be cut from it. The two
+steps stay two.
+*** Commits
+- 2d4bf385 every-mirror: the forkee-visibility step compares children
+  by pid
+- 054ef4d4 every-mirror: a note typed into a forks folder hides none
+  of its content
+- (the commit carrying this record) every-mirror: two save faults the
+  P2 probe found, record
+*** Fault 1: a forkee's child named by an extra ID
+N forks F; F's list names m; a nodeMerge folded m into k, so N's view
+shows k under F. The forkee loop of 'resolve_visibility' compared the
+buffer's IDs (k) with F's list (m) and N's hides letter for letter, so
+an unchanged save hid m, and moving k back out of F's hidden-in folder
+unhid nothing. Now the loop compares by 'pid_else_raw_id' throughout,
+as 'resolve_forker_visibility' did: N's contains after the save, the
+buffer's visible children, and the unhides, which it finds as N's
+hides name them (so 'apply_hiderel_delta' removes the hide as
+written). A hide is still written as F's list names the child (m).
+'validate_no_overlapping_forkee_hiderel_conflicts' compared the same
+way, and was driven: in Q's view, k2 under F2 (whose list says m2) and
+under G2 (whose list says k2), cut from G2 alone, passed the check on
+the old code and is now refused as conflicting, as the same cut of a
+child both lists name alike always was.
+*** Fault 2: a note typed into the forks folder
+Typing an existing note E into N's forks folder, claiming or marked
+'noClaim', with some or none of its children retyped, hid every child
+not retyped, though the view never drew them. Now a member the folder
+did not show before the save contributes no cut: both steps read a
+member's content as drawn only where 'forks_folder_members_drawn'
+holds it.
+**** What tells a member shown before
+'forks_folder_members_drawn' ('resolve_visibility.rs', extracted from
+'resolve_forks_folder_removals', which already read "the folder's
+members as the view drew them" so): 'forks_folder_members_shown' by
+the graph before the save, with N's forkees by the records the
+restriction shows; in the diff view, the forkees and forker-only
+members alone. The buffer's baseline was not used: a save need not
+carry one (the tests' saves carry none), and it
+records occurrences and writes, not which members a forks folder held.
+Its one blind spot is a stale buffer: a note another view made a
+member after this buffer was drawn, typed into this buffer's folder,
+is read as shown before, as today. The other direction (a member the
+graph has since dropped, saved unchanged in a stale buffer) now hides
+nothing, the safe side.
+**** Readings, by the probe's runs
+Driven end to end (below) and pinned by
+'tests/members_typed_into_a_forks_folder.rs':
+- 2a, E typed claiming with some children and a new one: N forks E,
+  hides nothing; the new child joins E's content.
+- 2b, E typed claiming with no children: N forks E, hides nothing.
+- 2c, E typed claiming with some children, one of E's children cut
+  from an owned note O in the same save: N forks E, hides nothing (as
+  before: the child was kept in O before the save).
+- 2e, E typed 'noClaim' with some children and a new one: N neither
+  forks E nor hides anything; the new child joins E's content; E is
+  redrawn unwarranted, claiming nothing.
+- 2f, E typed 'noClaim' with no children: nothing is written.
+- 2g, as 2c but 'noClaim': N neither forks E nor hides anything.
+- A member shown before (N forked E before the save): a cut from it is
+  hidden, as before.
+- The validator: a forkee typed in this save says only "show it". With
+  N forking H, which shows h, E2 (which contains h too) typed with
+  nothing under it was refused as conflicting on the old code; it now
+  saves, hiding nothing.
+A child of a typed member that N hides, typed under it, is still
+unhidden: the unhide reads what the buffer shows, not what the view
+drew.
+*** Suites
+Logs under 'tests/results/every-mirror/save-faults-fix/'.
+- 'cargo build --bin skg' and 'cargo build --tests': no warning.
+- After fault 1: 'cargo nextest run --test grouped_forks --test
+  grouped_saves --test grouped_views': 268 of 268;
+  'cargo nextest run -E "test(local_fieldintent_collection)"': 61 of
+  61; 'bash/nextest.sh': 1277 of 1277.
+- After fault 2: the three groups 269 of 269; local collection 61 of
+  61; 'bash/nextest.sh': 1278 of 1278.
+- 'bash/integration-tests.sh': 39 of 39.
+- 'bash/all-tests.sh': all pass: Emacs 503 of 503, Neovim pass,
+  nextest 1278 of 1278, doctests, team tools, AI reader, integration
+  78 of 78.
+No failure to classify.
+*** Tests added, and why
+No existing test's expectation changed.
+- 'tests/forkee_content_named_by_an_extra_id.rs' (fixture beside it),
+  each case for a foreign forkee (N, F, k named m) and an owned one (O,
+  P, l named n): an unchanged save hides nothing and writes nothing; a
+  cut of the sibling hides the sibling alone, and a cut of the child
+  hides it as the list names it; a hide of the child moved out of the
+  hidden-in folder is removed. And the conflict case above. Run one by
+  one against the old 'resolve_visibility.rs', all seven fail; the
+  conflict case fails too with the fixed loop and the old validator.
+- 'tests/members_typed_into_a_forks_folder.rs' (fixture beside it):
+  the eight readings above. Against the fault-1 tree, six fail: 2a,
+  2b, 2e, 2f, 2g and the validator case (which fails too with the
+  fixed steps and the old validator). Two pass there by design: 2c,
+  which the old code already read right (its cut child was kept
+  elsewhere before the save), and the cut from a member shown before,
+  which guards the reading that stays.
+- 'tests/idempotence.rs' draws every node of both new fixtures too.
+*** Deviations
+- The orchestrator wrote that a typed member's save "forks E (as
+  today)". For a member typed claiming, it does (its claim). For one
+  typed 'noClaim', the old code forked E only because a cut from a
+  forker forks it; with no cut, it forks nothing, and E stands
+  unwarranted, claiming nothing. 'tests/partner_folder_matrix.rs'
+  ("forksFolder/forker-only/insert") pins exactly that for a note
+  placed in the folder claiming nothing with nothing cut, so no
+  expectation changed. In the probe's 2e and 2f, then, N no longer
+  forks E. A first version that forked such a member failed that test,
+  and was dropped.
+- In the end-to-end drive of case 1, moving an owned child k4 out of
+  F4's hidden-in folder without its own child ("MERGED: m4", which
+  that folder does not draw) read as an edit of k4 that emptied it,
+  and so filed k4 into N4 ("Writing in an unintegrated child
+  integrates it"). That is the drive's buffer, not the fix: moved
+  with its child, it unhid as intended. Noted as a hazard of the
+  hidden-in folder, not touched: it draws a hidden child folded, with
+  its containers, not its content.
+*** Do the two steps now read every case alike?
+Every reading of a member's content is now alike: both compare by pid;
+both read what the view drew only where the folder showed the member
+before the save, and there as 'what_the_member_shows' gives it (the
+forker step's other reading, all of a non-mirror's content, is gone,
+since a member shown before is a mirror); both read a cut as drawn,
+less what the buffer shows claiming or sets aside; both hide a cut
+child that neither N nor an owned note but the member contains after
+the save; both unhide what N hides that the buffer shows claiming
+under the member. So of the pitfall "The two visibility steps differ"
+the first two differences are gone. Merging them would still not be
+pure deletion; these differ by role:
+- A cut from a forker as such makes N fork it, unless N already forks
+  it (a detached mutual); a forkee is forked already.
+- So under a foreign N the forker step refuses any cut, even one that
+  hides nothing (a child pasted into N), since it would record a fork;
+  the forkee loop refuses only a hide or an unhide.
+- The refusal's wording ('MemberAsSuch::as_named_beside_the_note').
+- The conflict check: a forkee as such says "hide it" of what it drew
+  and the buffer omits; a forker as such says only "show it".
+*** End-to-end drives
+Against a 'target/debug/skg' on scratch data under
+'/tmp/claude-1000/save-faults-fix/' (ports 28131 and 28132), stopped
+and deleted after.
+- Case 1: N1 forks foreign F1 (m, j1; k has the extra ID m); F2
+  (foreign) forks N2 and contains m; N3 forks owned F3 (m3; k3 has
+  m3); N4 forks owned F4 (m4), and a nodeMerge through the server made
+  k4 acquire m4. Each of N1 to N4 saved unchanged wrote nothing. Cut,
+  k hid m in N1 and k4 hid m4 in N4; moved back out, each unhid
+  ("Stops hiding ...").
+- Case 2: the probe's buffers 2a, 2b, 2c, 2e, 2f and 2g, replayed on
+  the probe's data: no save hid anything; N, N2 and N3 fork E, E2 and
+  E3; N5, N6 and N7 fork no E; the typed children joined E and E5.
+  Then E2, now shown in N2's folder, had q cut: N2 hides q. N's view
+  saved unchanged wrote nothing.
+*** Unfinished
+Nothing.
+*** DONE
