@@ -341,7 +341,7 @@ Every slice runs its suites in this order, one at a time:
 None of these slices changes what the server writes into a buffer.
 The integration run is there to prove that.
 
-** TODO Slice 1: functions and files nothing uses
+** DONE Slice 1: functions and files nothing uses
 Expected: server about 134 lines (code 110, comments 24); elisp 3;
 tests about 50 '.rs' lines, plus 14 fixture files (about 90 lines)
 that no test reads.

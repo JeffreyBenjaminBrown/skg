@@ -4496,3 +4496,65 @@ Every folder label now ('server/heralds.rs'), for Jeff to reword:
 
 * Plan 4
 Started 2026-11-17 01:35 UTC; Jeff asked for it; no open questions.
+
+** Slice 1: functions and files nothing uses
+*** Commits
+- 3a11d47a every-mirror plan 4 slice 1: functions and files nothing
+  uses
+- (the commit carrying this record) every-mirror plan 4 slice 1:
+  record, DONE
+*** Suites
+Logs under 'tests/results/every-mirror/slice1-plan4/'.
+- 'cargo build --bin skg' and 'cargo build --tests': no warning but
+  the two unused imports the deletions left, then none.
+- 'bash/nextest.sh': 1276 of 1276.
+- 'bash/emacs-tests.sh': 503 of 503.
+- 'bash/integration-tests.sh': 39 of 39.
+- 'bash/all-tests.sh': all pass: Emacs 503 of 503, Neovim pass,
+  nextest 1276 of 1276, doctests, team tools, AI reader, integration
+  78 of 78.
+No failure to classify.
+*** Names removed or changed
+Removed: 'read_recently_modified_skgfiles_from_skgrepos',
+'delete_all_nodes_from_fs' ('multiple_nodes.rs'),
+'report_all_telescope_violations' ('telescope/invariants.rs'),
+'find_children_by_gnids' ('types/tree/viewnode_graphnode.rs'),
+'VognodeKind::what_a_headline_becomes' (the whole 'impl VognodeKind',
+which held only it), 'TestEnv::reset_with_skgrepo_path'
+('server/test_utils.rs'), 'full_containerward_role_tree_from_inRustGraph',
+'skg--repo-dir' ('elisp/skg-config.el'), 'assert_line_order'
+('tests/hidden_from_forks.rs'); the files 'tests/unit/scheduled_audit.rs',
+'tests/override_menu/fixtures-multi/' (12 files) and
+'tests/org-to-sexp/fixtures/' (2 files). The imports they alone used:
+'record_own_removal' in 'multiple_nodes.rs'; 'HashMap' and 'HashSet'
+in 'viewnode_graphnode.rs'. 'git grep -n -w' found no other hit of any
+of them outside 'TODO/'.
+*** Lines
+Measured with the plan's 'measure', before (a6fc7e7f, whose code is
+2ddc0ff8's) and after (3a11d47a):
+| what                  | before total / code / comments | after total / code / comments | change total / code / comments |
+|-----------------------+--------------------------------+-------------------------------+--------------------------------|
+| server/*.rs           | 54,450 / 43,752 / 10,698       | 54,299 / 43,628 / 10,671      | -151 / -124 / -27              |
+| elisp/*.el            | 14,147 / 13,138 / 1,009        | 14,143 / 13,134 / 1,009       | -4 / -4 / 0                    |
+| nvim/*.lua            | 15,027 / 10,841 / 4,186        | unchanged                     | 0                              |
+| tools/skg-for-ai/*.py | 10,220 / 9,802 / 418           | unchanged                     | 0                              |
+| tests/*.rs            | 57,386 / 50,865 / 6,521        | 57,320 / 50,800 / 6,520       | -66 / -65 / -1                 |
+| tests/*.el            | 17,653 / 16,570 / 1,083        | 17,626 / 16,543 / 1,083       | -27 / -27 / 0                  |
+| tests/*.lua           | 15,542 / 13,865 / 1,677        | unchanged                     | 0                              |
+Not counted by 'measure': the fixtures' '.skg' and '.toml' files (50
+lines) and 'tests/org-to-sexp/fixtures/1.org' (13). The '-27' of
+'tests/*.el' is that folder's '1.el'.
+*** Put back, would change behavior
+Nothing.
+*** Deviations
+- 'assert_line_order' in 'tests/hidden_from_forks.rs' was not in the
+  plan's list. 'cargo build --tests' warned that nothing calls it, and
+  'git grep' agreed; it is of the kind this slice deletes. (16 lines.)
+- 'VognodeKind::what_a_headline_becomes' was the only member of its
+  'impl' block, so the block went with it (3 lines more than the
+  plan's 13).
+*** Fixtures changed
+Only the two deleted folders.
+*** Unfinished
+Nothing.
+*** DONE
