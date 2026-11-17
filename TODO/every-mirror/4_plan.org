@@ -371,7 +371,7 @@ that no test reads.
 - Narrow suites: 'cargo build --bin skg', then 'bash/nextest.sh', then
   'bash/emacs-tests.sh'.
 
-** TODO Slice 2: one member-as-such position and one visibility signal in the save
+** DONE Slice 2: one member-as-such position and one visibility signal in the save
 Expected: server about 85 lines (code about 70); tests: the four
 unit-test files take the new names, with no change in line count to
 speak of.

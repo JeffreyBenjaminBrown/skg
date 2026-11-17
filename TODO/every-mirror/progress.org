@@ -4558,3 +4558,76 @@ Only the two deleted folders.
 *** Unfinished
 Nothing.
 *** DONE
+
+** Slice 2: one member-as-such position and one visibility signal in the save
+*** Commits
+- 197772f1 every-mirror plan 4 slice 2: one member-as-such position
+  and one visibility signal in the save
+- (the commit carrying this record) every-mirror plan 4 slice 2:
+  record, DONE
+*** Suites
+Logs under 'tests/results/every-mirror/slice2-plan4/'.
+- 'cargo nextest run -E "test(local_fieldintent_collection)"': 61 of
+  61, on the first run after the tests took the new names.
+- 'cargo nextest run --test grouped_forks': 38 of 38;
+  '--test grouped_saves': 203 of 203.
+- 'bash/nextest.sh': 1276 of 1276.
+- 'cargo build --bin skg', then the AI tool's tests: PASS.
+- 'bash/integration-tests.sh': 39 of 39.
+- 'bash/all-tests.sh': all pass: Emacs 503 of 503, Neovim pass,
+  nextest 1276 of 1276, doctests, team tools, AI reader, integration
+  78 of 78.
+No failure to classify.
+*** Names removed or changed
+- 'LocalContext::ForkeeAsSuchPosition { forker, forker_is_editable }'
+  and 'ForkerAsSuchPosition { note, note_is_editable }' are
+  'LocalContext::MemberAsSuchPosition { note, note_is_editable }'.
+- 'struct MemberAsSuchContext' ('traverse.rs') is gone; a pair
+  '(note, note_is_editable)' stands in 'visit_occurrence'.
+- 'ForkeeVisibility { forkee, .. }' and 'ForkerVisibility {
+  forker_as_such, .. }' are 'MemberAsSuchVisibility { member, role,
+  visible, in_integratedElsewhere_or_hiddenIn_folder }'; the variants
+  'FieldIntent::ForkeeVisibility' and 'ForkerVisibility' are
+  'FieldIntent::MemberAsSuchVisibility'; the slots
+  'FieldIntentsForOneId::forkee_visibility' and 'forker_visibility'
+  are 'member_as_such_visibility'; the lists
+  'LoweringOutput::forkee_visibility' and 'forker_visibility' are
+  'member_as_such_visibility'; so are the parameters of
+  'resolve_visibility' and its readers.
+- 'MemberAsSuch' moved from 'resolve_visibility.rs' to 'types.rs'.
+- New: 'each_entrys_slot_in_order' ('lower.rs'), 'signals_of_role'
+  ('resolve_visibility.rs').
+*** Lines
+Before: slice 1's after. After: 197772f1.
+| what                  | before total / code / comments | after total / code / comments | change total / code / comments |
+|-----------------------+--------------------------------+-------------------------------+--------------------------------|
+| server/*.rs           | 54,299 / 43,628 / 10,671       | 54,244 / 43,573 / 10,671      | -55 / -55 / 0                  |
+| elisp/*.el            | 14,143 / 13,134 / 1,009        | unchanged                     | 0                              |
+| nvim/*.lua            | 15,027 / 10,841 / 4,186        | unchanged                     | 0                              |
+| tools/skg-for-ai/*.py | 10,220 / 9,802 / 418           | unchanged                     | 0                              |
+| tests/*.rs            | 57,320 / 50,800 / 6,520        | 57,334 / 50,814 / 6,520       | +14 / +14 / 0                  |
+| tests/*.el            | 17,626 / 16,543 / 1,083        | unchanged                     | 0                              |
+| tests/*.lua           | 15,542 / 13,865 / 1,677        | unchanged                     | 0                              |
+The server saved 55 lines, not the plan's estimate of 85: the merged
+struct's doc keeps both roles' rules, 'MemberAsSuch' kept its two
+methods, and the helpers are new lines. The tests grew by the 'role'
+line each literal signal now carries.
+*** Put back, would change behavior
+Nothing.
+*** Deviations
+- 'MemberAsSuch' is 'pub', not 'pub(crate)': the unit tests, in
+  another crate, build signals with it. Its two methods are
+  'pub(crate)'.
+- 'infer_hides_from_contains_removals' reads all the note's signals
+  at once, not filtered by role and chained: they go into a set, so
+  the order does not matter.
+- The test helper 'visibility_pairs_from_tree' ('extraction.rs')
+  filters the list to the forkees' signals, which is what it returned
+  before. One traverse test's two assertions (the forker signal, and
+  no forkee signal) became one assertion of the whole list, and the
+  lower test asserts the role the old type implied.
+*** Fixtures changed
+None.
+*** Unfinished
+Nothing.
+*** DONE
