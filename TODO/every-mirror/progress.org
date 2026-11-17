@@ -5018,3 +5018,87 @@ The review of 'coding-advice/plans.org' ("After each plan"): one agent
 reading the plan's whole diff, which the plan schedules after this
 slice.
 *** DONE
+
+** P1: the mirrors' tie, after "the note itself", the least pid
+Jeff approved P1 ("yes") on 2026-11-17. Unlike the slices, it changes
+what a user sees, so two test expectations changed.
+*** Commits
+- f8ed0957 every-mirror plan 4: P1, the mirrors' tie goes to the note
+  itself, else the least pid
+- (the commit carrying this record) every-mirror plan 4: P1, record,
+  DONE
+*** The rule now
+Where the deciding skgrepo holds several mirrors of a note N, N itself
+stands if homed there; else the mirror with the least pid
+('mirror_shown_among'). The search has no N among its hits, so its
+tie ('hit_standing_among') is the least pid alone. 'docs/mirrors.org',
+"Which mirror stands", now has two rules where it had four, and
+says that a fork made in the skgrepo of the mirror shown there
+stands in its place or not by chance (a clone's pid is a random
+UUID), the save saying so where it does not.
+*** Suites
+Logs under 'tests/results/every-mirror/p1-plan4/'.
+- 'cargo build --bin skg' and 'cargo build --tests': no warning.
+- 'cargo nextest run' of the mirror, fork and search-hit tests: 33 of
+  33.
+- 'bash/nextest.sh': 1276 of 1276.
+- 'bash/integration-tests.sh': 39 of 39.
+- 'bash/all-tests.sh': all pass: Emacs 503 of 503, Neovim pass,
+  nextest 1276 of 1276, doctests, team tools, AI reader, integration
+  78 of 78.
+No failure to classify.
+*** Tests whose expectations changed
+Both in 'tests/dbs/in_rust_graph/mirrors.rs', as the plan foresaw. No
+other test's expectation changed: no other fixture holds two mirrors
+of a note, neither of them the note, in one skgrepo.
+- 'rule_three_the_one_no_other_there_forks_stands' is
+  'a_chain_kept_outside_the_notes_skgrepo_shows_its_least_pid': D
+  forks C forks N, C and D in 'my-x', N in 'your-x'; asked of N from
+  'my-x', C stands (the least pid), not D (the one no other there
+  forks). Asked of C or D, each stands as itself, as before.
+- 'rule_four_the_nearest_then_the_least_pid_stands' is
+  'the_least_pid_stands_however_far_from_the_note': of a, b and c in
+  'my-x' (b and c fork N, a forks b), a stands (the least pid), not b
+  (the nearest, then the least).
+*** Names removed or changed
+- Removed: 'the_only_one_forked_by_none_of_the_others', the field
+  'Mirrors::forks' and its writers ('mirrors_of' and
+  'mirror_shown_once_cloned' in 'fork.rs'), the fork filtering of
+  'hits_among_mirrors_of', the distance comparison and both
+  'tied . len () == 1' branches. 'mirrors_of''s walk collects partners
+  only; the relationship it filters by stays.
+- Renamed tests: the two above, and, since the doc's rules are
+  renumbered, 'rule_one_a_mirror_alone_in_the_first_skgrepo_stands'
+  is 'a_mirror_alone_in_the_first_skgrepo_stands' (a consequence of
+  the least pid now, not a rule) and
+  'rule_two_the_note_itself_stands_among_a_tie' is
+  'the_note_itself_stands_among_a_tie'. Their expectations stand.
+- Test comments citing "rule 2" ('tests/content_view.rs' twice,
+  'tests/mirror_substitution.rs' twice) cite rule 1; the comment of
+  'an_owned_mutual_pair_both_matching_shows_one_hit'
+  ('tests/forks_under_search_hits.rs') no longer says that each forks
+  the other.
+- Docs: 'docs/mirrors.org' ("Which mirror stands", and the search's
+  tie in "Mirror substitution"), 'docs/api-and-formats.org' (the
+  search's tie, and the paragraph on mirror substitution, which said
+  a chain kept in one skgrepo shows D), 'docs/glossary.org' ("mirror
+  substitution", which said the same). 'docs/forks.org''s chain
+  example stands: there D is alone in its skgrepo.
+*** Lines
+Before: slice 7's after (61976174). After: f8ed0957.
+| what                  | before total / code / comments | after total / code / comments | change total / code / comments |
+|-----------------------+--------------------------------+-------------------------------+--------------------------------|
+| server/*.rs           | 53,922 / 43,478 / 10,444       | 53,886 / 43,448 / 10,438      | -36 / -30 / -6                 |
+| tests/*.rs            | 57,160 / 50,647 / 6,513        | 57,158 / 50,647 / 6,511       | -2 / 0 / -2                    |
+| elisp, nvim, tools, tests/*.el, tests/*.lua | as after slice 7 | unchanged          | 0                              |
+By file ('server/'): 'mirrors.rs' -26, 'text_search.rs' -9, 'fork.rs'
+-1. The plan's estimate was about 39 once slice 6 had taken the six
+module-doc lines.
+*** Deviations
+- The search's rule is the least pid alone: its hits have no "note
+  itself".
+- 'rule_one_' and 'rule_two_' were renamed too, as above, since their
+  numbers named the doc's old rules.
+*** Unfinished
+Nothing.
+*** DONE

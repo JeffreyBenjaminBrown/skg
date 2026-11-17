@@ -629,7 +629,9 @@ names which do not exist (correcting a name changes no line count):
 Each of these would delete code, but would change what a user sees or
 what the server writes. The figures are the survey's, at 2ddc0ff8. No
 slice touches them.
-** P1. The mirrors' tie: after "the note itself", the least pid
+** DONE P1. The mirrors' tie: after "the note itself", the least pid
+Executed 2026-11-17, Jeff having approved it ("yes"); its record is
+'progress.org', "* Plan 4", "** P1". What follows is as proposed.
 Today, where the deciding skgrepo holds several of a note N's mirrors
 ('mirror_shown_among', 'mirrors.rs' 100-120), four rules apply in
 turn:
