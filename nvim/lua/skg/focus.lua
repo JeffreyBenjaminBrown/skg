@@ -1,6 +1,7 @@
 -- PURPOSE: Read, edit and act on (by moving the cursor to the focused
 -- headline) 'focused' metadata. This is how point survives the
--- save/rerender round-trip. The Lua port of elisp/skg-focus.el.
+-- save/rerender round-trip. The Emacs client does this in
+-- elisp/skg-request-save.el.
 
 local compare = require('skg.sexpr.compare')
 local metadata = require('skg.metadata')

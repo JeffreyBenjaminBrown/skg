@@ -1,3 +1,22 @@
+* A whole redraw rewrote every folded headline line of the live buffer (noted 2026-11-19; fixed 2026-11-19)
+  Found measuring slow forks. When a save's answer, or any redraw,
+  replaces the whole buffer ('skg-replace-buffer-with-new-content',
+  as a fork's approving save often does),
+  'skg-remove-folded-metadata' strips the 'folded' atom from each
+  headline line in place, each rewrite running every modification
+  hook (heralds' folder refresh, the org-element cache, link
+  annotations), and then unfolds and refolds the buffer. In batch
+  Emacs, on a 2,500-line view with 550 hidden headlines (the size of
+  Jeff's view rooted at 7642d4d5), that is about 0.5 s of a fork's
+  approved save; interactively it is likely more. Planned fix, as for
+  the outbound snapshot ('skg--buffer-snapshot-with-save-metadata'):
+  read the fold and focus atoms from the text, strip them from the
+  string before inserting it, then fold by what was read.
+  Fixed so: 'skg-replace-buffer-with-new-content' inserts the stripped
+  form of the text in one piece and folds by the atoms the stripping
+  removed ('skg--stripped-text-and-atom-headlines',
+  'skg-fold-headlines-by-atoms'). It also no longer leaves a space
+  after the metadata of a title-less headline that had an atom.
 * A buffer that shows a forker as claiming nothing can undo a fork another view made (noted 2026-11-16; fixed 2026-11-16)
   Fixed by the review of every-mirror plan 2 (its probes 36 and 37):
   every view the refresh draws gives each member of a forks folder the

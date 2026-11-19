@@ -5,7 +5,6 @@
 (require 'skg-log)
 (require 'skg-length-prefix)
 (require 'skg-org-fold)
-(require 'skg-focus)
 (require 'skg-metadata)
 (require 'skg-buffer)
 (require 'skg-lock-buffers)
@@ -1393,33 +1392,34 @@ SAVE-POINT-POSITION."
                                                       &optional
                                                       save-point-position)
   "Replace the current buffer contents with NEW-CONTENT from Rust.
-After inserting content, folds marked headlines, removes fold atoms,
-moves point to focused headline, and removes focus atom."
-  (let ((inhibit-read-only t)
-        (skg--inhibit-dirty-view-confirmation t))
+The buffer gets NEW-CONTENT's stripped form, in one insertion, so that
+the modification hooks run once rather than once per atom; the fold
+atoms the stripping removed become org folds
+\(`skg-fold-headlines-by-atoms'), and point goes to the headline that
+held the focus atom (else to the buffer's start), then by
+SAVE-POINT-POSITION."
+  (let* ((inhibit-read-only t)
+         (skg--inhibit-dirty-view-confirmation t)
+         (stripped-and-atom-headlines
+          (skg--stripped-text-and-atom-headlines new-content)))
     (erase-buffer)
-    (insert new-content)
+    (insert (car stripped-and-atom-headlines))
     (;; PITFALL: `erase-buffer' does not remove overlays — they collapse
      ;; but persist at the buffer boundaries. Fold overlays left over
      ;; from the previous save cycle will re-expand over freshly inserted
      ;; text, making some headlines already folded here. We MUST unfold
-     ;; before any metadata edit, or `skg-edit-metadata-at-point' will
-     ;; call `delete-region' on a folded headline line, and org-fold's
-     ;; `org-fold-core--fix-folded-region' will expand the deletion to
-     ;; cover the hidden subtree — clobbering the root.
+     ;; before folding by the atoms.
      org-fold-show-all)
-    (progn
-      ;; Process focus atom before fold atoms, while the buffer is
-      ;; guaranteed unfolded by the `org-fold-show-all' above.
-      (skg-goto-focused-headline)
-      (skg-remove-focused-metadata))
-    (save-excursion
-      ;; Process folding atoms (now safe — all metadata edits done).
-      ;; Wrap in `save-excursion' because `skg-fold-marked-headlines'
-      ;; leaves point on the last parent it folded; we need point to
-      ;; stay on the focused headline set just above.
-      (skg-fold-marked-headlines)
-      (skg-remove-folded-metadata))
+    (let ((atom-headlines
+           (mapcar (lambda (headline)
+                     (cons (+ (point-min) (car headline)) (cdr headline)))
+                   (cdr stripped-and-atom-headlines))))
+      (skg-fold-headlines-by-atoms atom-headlines)
+      (goto-char (or (car (cl-find-if
+                           (lambda (headline)
+                             (member "focused" (cdr headline)))
+                           atom-headlines))
+                     (point-min))))
     (skg--restore-save-point-position save-point-position)
     (set-buffer-modified-p nil)
     (skg--capture-clean-baseline)

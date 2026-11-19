@@ -9,7 +9,8 @@
 (require 'skg-request-save)
 
 (ert-deftest test-skg-fold-round-trip ()
-  "Test folding and unfolding with metadata atoms."
+  "A whole redraw folds by the atoms and strips them; a save writes the
+same atoms back."
   (let* ((imaginary-from-rust "* 1
 1 body
 ** 11
@@ -24,13 +25,10 @@
          (buf (generate-new-buffer "*test-fold-round-trip*")))
     (with-current-buffer buf
       (org-mode)
-      (insert imaginary-from-rust)
-      (skg-fold-marked-headlines)
+      (skg-replace-buffer-with-new-content nil imaginary-from-rust)
       (should ;; There should be 5 visible lines.
        (= (count-visible-nonempty-lines)
           5))
-
-      (skg-remove-folded-metadata)
       (goto-char (point-min))
       (let*
           ((expected
@@ -87,27 +85,15 @@ and no change to it runs a modification hook."
       (search-forward "*** 121")
       (should-not (invisible-p (line-beginning-position))))))
 
-(ert-deftest test-skg-fold-marked-headlines-ends-on-a-top-level-folded-headline ()
+(ert-deftest test-whole-redraw-leaves-a-top-level-folded-headline-visible ()
   "A top-level headline marked `folded' has no parent to fold, so it
-stays visible. The search must skip it once found rather than find it
-again forever; the other `folded' headlines still fold their parents.
-The count of parent lookups turns a regression into an error, not a hang."
+stays visible; the other `folded' headlines still fold their parents."
   (with-temp-buffer
     (org-mode)
-    (insert "* (skg folded) 1
+    (skg-replace-buffer-with-new-content nil "* (skg folded) 1
 ** (skg folded) 11
 * 2
 ** (skg folded) 21")
-    (let ((parent-lookups 0)
-          (original-org-up-heading-safe
-           (symbol-function 'org-up-heading-safe)))
-      (cl-letf (((symbol-function 'org-up-heading-safe)
-                 (lambda ()
-                   (setq parent-lookups (1+ parent-lookups))
-                   (when (> parent-lookups 100)
-                     (error "skg-fold-marked-headlines does not end"))
-                   (funcall original-org-up-heading-safe))))
-        (skg-fold-marked-headlines)))
     (should (= (count-visible-nonempty-lines)
                2))
     (goto-char (point-min))
@@ -115,27 +101,50 @@ The count of parent lookups turns a regression into an error, not a hang."
     (search-forward "* 2")
     (should-not (invisible-p (line-beginning-position)))))
 
-(ert-deftest test-skg-remove-folded-metadata ()
-  "Test that skg-remove-folded-metadata handles all cases correctly."
-  (let ((buf (generate-new-buffer "*test-remove-folded*")))
-    (with-current-buffer buf
-      (org-mode)
-      (insert "* (skg folded) only folded
+(ert-deftest test-whole-redraw-strips-fold-atoms ()
+  "A whole redraw removes each 'folded' and 'bodyFolded' atom, with the
+space before it, and nothing else: a headline with no title keeps no
+space after its metadata."
+  (with-temp-buffer
+    (org-mode)
+    (skg-replace-buffer-with-new-content nil "* (skg folded) only folded
 * (skg folded other) folded first
 Body text.
 * (skg folded (key value)) folded last
 * (skg folded (k v) other) folded middle
+** (skg folded forksFolder)
+** (skg bodyFolded node) body folded
 * (skg other) no folded")
-      (skg-remove-folded-metadata)
-      (should (equal (buffer-substring-no-properties (point-min)
-                                                     (point-max))
-                     "* (skg) only folded
+    (should (equal (buffer-substring-no-properties (point-min)
+                                                   (point-max))
+                   "* (skg) only folded
 * (skg other) folded first
 Body text.
 * (skg (key value)) folded last
 * (skg (k v) other) folded middle
-* (skg other) no folded")))
-    (kill-buffer buf)))
+** (skg forksFolder)
+** (skg node) body folded
+* (skg other) no folded"))))
+
+(ert-deftest test-whole-redraw-edits-the-buffer-once ()
+  "A whole redraw of a mostly folded view runs the modification hooks
+once to erase the old text and once to insert the new, however many
+atoms it strips."
+  (with-temp-buffer
+    (org-mode)
+    (insert "* old\nold body\n")
+    (let ((changes 0))
+      (add-hook 'after-change-functions
+                (lambda (&rest _) (setq changes (1+ changes))) nil t)
+      (skg-replace-buffer-with-new-content
+       nil (concat "* (skg focused) root\n"
+                   (mapconcat
+                    (lambda (n)
+                      (format "** (skg folded) %d\n*** (skg folded) %d.1\n"
+                              n n))
+                    (number-sequence 1 20) "")))
+      (should (= changes 2))
+      (should (= (count-visible-nonempty-lines) 1)))))
 
 (defun count-visible-nonempty-lines ()
   "Count the number of visible non-empty lines in the current buffer."

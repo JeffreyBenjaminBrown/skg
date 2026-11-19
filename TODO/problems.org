@@ -6,20 +6,6 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
-* A whole redraw rewrites every folded headline line of the live buffer (2026-11-19)
-  Found measuring slow forks. When a save's answer, or any redraw,
-  replaces the whole buffer ('skg-replace-buffer-with-new-content',
-  as a fork's approving save often does),
-  'skg-remove-folded-metadata' strips the 'folded' atom from each
-  headline line in place, each rewrite running every modification
-  hook (heralds' folder refresh, the org-element cache, link
-  annotations), and then unfolds and refolds the buffer. In batch
-  Emacs, on a 2,500-line view with 550 hidden headlines (the size of
-  Jeff's view rooted at 7642d4d5), that is about 0.5 s of a fork's
-  approved save; interactively it is likely more. Planned fix, as for
-  the outbound snapshot ('skg--buffer-snapshot-with-save-metadata'):
-  read the fold and focus atoms from the text, strip them from the
-  string before inserting it, then fold by what was read.
 * IDs compared letter for letter outside every-mirror's diff (2026-11-17)
   Seen during "IDs compared as equivalence classes"
   (TODO/every-mirror/progress.org, plan 4), on lines the branch did

@@ -1,34 +1,17 @@
 ;;; test-skg-save-response-folded-root.el --- Repro for "root vanishes" bug
 
-;; Reproduces the bug where a single-root content view, saved while
-;; fully folded (org-startup-folded behavior), comes back with the
-;; root headline missing from the buffer text.
-;;
-;; The server round-trip preserves the root, so the suspect is
-;; `skg-replace-buffer-with-new-content' and the client-side fold/unfold +
-;; focus processing it runs.
-;;
-;; ROOT CAUSE (exposed by the failing test below):
-;; After `skg-fold-marked-headlines' + `skg-remove-folded-metadata'
-;; run, the root headline is folded (its subtree hidden by an
-;; org-fold overlay). Then `skg-remove-focused-metadata' finds the
-;; root, and `skg-edit-metadata-at-point' calls
-;; `skg-replace-current-line', which issues a
-;; `delete-region' on (line-beginning-position . line-end-position).
-;; Because that region starts at the beginning of a folded headline,
-;; org-fold's `org-fold-core--fix-folded-region' expands the delete
-;; to cover the entire hidden subtree. The root line (and its
-;; children's text) is clobbered, and only the reformatted line is
-;; re-inserted at point. The test that has `focused' on the root
-;; fails; the test without `focused' passes — confirming the trigger
-;; is the focus-removal step operating on a folded headline.
+;; A single-root content view, saved while fully folded
+;; (org-startup-folded behavior), must come back with its root headline
+;; in the buffer text. The server round-trip preserves the root, so
+;; these tests drive `skg-replace-buffer-with-new-content' directly, on
+;; answers whose root holds the focus atom and whose children are
+;; folded.
 
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
                              (file-name-directory load-file-name)))
 (require 'ert)
 (require 'org)
 (require 'skg-org-fold)
-(require 'skg-focus)
 (require 'skg-request-save)
 
 (defun skg-test--buffer-text ()

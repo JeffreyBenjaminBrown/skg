@@ -1,6 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
 ;;
-;; PURPOSE: Read, act on, and edit 'folded' metadata.
+;; PURPOSE: Read and restore org-fold state, and the 'folded' and
+;; 'bodyFolded' atoms that carry it to and from the server.
 ;;
 ;; BACKGROUND:
 ;; If a node's branches are folded,
@@ -46,9 +47,13 @@ with a message, unless its children need to be revealed."
       (org-fold-show-entry))
      (t (org-fold-hide-entry)))))
 
-(defun skg-fold-marked-headlines ()
+(defun skg-fold-headlines-by-atoms (atom-headlines)
   "PURPOSE:
-Restore the user's fold state from per-headline metadata atoms.
+Restore the user's fold state from the fold atoms the server drew.
+ATOM-HEADLINES lists, in buffer order, each headline that had atoms,
+as (START . ATOMS): START where the headline starts in the current
+buffer and ATOMS its atoms, as strings
+\(`skg--stripped-text-and-atom-headlines').
 .
 Two atoms are recognised:
 - 'folded'      : this headline is hidden inside a folded ancestor.
@@ -57,105 +62,27 @@ Two atoms are recognised:
                   (e.g. via `org-fold-hide-entry'). We restore that
                   by hiding this headline's entry directly.
 .
-METHOD, in order:
-- Unfold everything.
-- Hide the entries of the `bodyFolded' headlines: find every headline
-  with `bodyFolded' and hide its entry
-  (`skg--fold-bodies-of-bodyfolded-headlines').
-- Fold the parents of the `folded' headlines: repeatedly find a
-  visible `folded'-marked headline and fold its parent, until none is
-  visible. We loop because folding a parent makes more `folded'
-  headlines invisible, removing them from the search. A top-level
-  `folded' headline has no parent to fold and stays visible, so the
-  search skips it once found; otherwise it would find it forever."
-  (org-fold-show-all)
-  (skg--fold-bodies-of-bodyfolded-headlines)
-  (goto-char (point-min))
-  (let ((found t)
-        (positions-of-folded-headlines-without-parent '()))
-    (while found
-      (setq found nil)
-      (save-excursion
-        ;; Search for visible headline with 'folded' in metadata.
-        (goto-char (point-min))
-        (while (and (not found) (not (eobp)))
-          (beginning-of-line)
-          (when (and (looking-at org-heading-regexp)
-                     (not (invisible-p (point)))
-                     (not (memq (point)
-                                positions-of-folded-headlines-without-parent))
-                     (skg-headline-has-folded-in-view-p))
-            (setq found (point)))
-          (forward-line 1)))
-      (when found
-        ;; If we found one, go to its parent and fold.
-        (goto-char found)
-        (if (org-up-heading-safe)
-            (org-cycle)
-          (push found positions-of-folded-headlines-without-parent)) )) ))
-
-(defun skg--fold-bodies-of-bodyfolded-headlines ()
-  "Hide the entry of every headline tagged `bodyFolded' in metadata.
-Assumes the buffer is currently fully shown — we only need to add the
-fold; we don't have to undo any prior fold."
-  (save-excursion
-    (goto-char (point-min))
-    (while (not (eobp))
-      (beginning-of-line)
-      (when (and (org-at-heading-p)
-                 (skg-headline-has-bodyfolded-in-view-p))
-        (org-fold-hide-entry))
-      (forward-line 1))))
-
-(defun skg-remove-folded-metadata ()
-  "Remove 'folded' and 'bodyFolded' atoms from all (skg ...) metadata.
-Re-folds headlines that had folded children using org-mode functions,
-and re-hides entries that had `bodyFolded'."
-  (save-excursion
-    (let ((inhibit-read-only t)
-          (parent-markers
-           ;; This processes the entire buffer.
-           (skg-collect-parent-markers-of-folded-headlines))
-          (bodyfolded-markers
-           (skg-collect-markers-of-bodyfolded-headlines)))
-      (org-fold-show-all) ;; so that text editing works
-      (progn ;; Remove "folded" from metadata using DELETE operation.
-        ;; This also processes the entire buffer.
-        (goto-char (point-min))
-        (while (not (eobp))
-          (beginning-of-line)
-          (when (org-at-heading-p)
-            (when (skg-headline-has-folded-in-view-p)
-              (skg-edit-metadata-at-point '(skg (DELETE folded))))
-            (when (skg-headline-has-bodyfolded-in-view-p)
-              (skg-edit-metadata-at-point '(skg (DELETE bodyFolded)))))
-          (forward-line 1)))
-      (progn ;; Re-hide entries that had `bodyFolded'.
-        (dolist (m bodyfolded-markers)
-          (goto-char m)
-          (when (org-at-heading-p)
-            (org-fold-hide-entry))
-          (set-marker m nil)))
-      (progn ;; Fold the parents of the `folded' headlines.
-        (dolist (parent-marker parent-markers)
-          (goto-char parent-marker)
-          (when (org-at-heading-p)
-            (org-fold-hide-subtree))
-          (set-marker parent-marker nil))))))
-
-(defun skg-collect-markers-of-bodyfolded-headlines ()
-  "Collect markers pointing to each headline tagged `bodyFolded'.
-Caller must `set-marker' each to nil when done."
-  (let ((markers '()))
+Hides the entries first, the last in the buffer first, and then the
+parents' subtrees, each parent once, the last-found first. A top-level
+`folded' headline has no parent to fold, and stays visible.
+Assumes no fold hides anything yet."
+  (let ((parent-starts nil) ;; the last-found first
+        (parent-start-set (make-hash-table)))
     (save-excursion
-      (goto-char (point-min))
-      (while (not (eobp))
-        (beginning-of-line)
-        (when (and (org-at-heading-p)
-                   (skg-headline-has-bodyfolded-in-view-p))
-          (push (point-marker) markers))
-        (forward-line 1)))
-    markers))
+      (dolist (headline atom-headlines)
+        (when (member "folded" (cdr headline))
+          (goto-char (car headline))
+          (when (and (org-up-heading-safe)
+                     (not (gethash (point) parent-start-set)))
+            (puthash (point) t parent-start-set)
+            (push (point) parent-starts))))
+      (dolist (headline (reverse atom-headlines))
+        (when (member "bodyFolded" (cdr headline))
+          (goto-char (car headline))
+          (org-fold-hide-entry)))
+      (dolist (parent-start parent-starts)
+        (goto-char parent-start)
+        (org-fold-hide-subtree)))))
 
 (defun skg--fold-state-of-headline-at-point ()
   "The fold state of the headline at point, which point is at the start
@@ -194,66 +121,5 @@ Operationally:
                     (point)))))
            (or (null next-headline)
                (not (invisible-p next-headline)))))))
-
-(defun skg-collect-parent-markers-of-folded-headlines ()
-  "Collect markers for parent headlines of all headlines with folded atoms.
-Returns a list of markers pointing to parent headlines.
-Duplicates are removed - each parent appears only once in the list.
-Caller is responsible for freeing the markers with set-marker."
-  (let ((parent-markers '()))
-    (save-excursion
-      (goto-char (point-min))
-      (while (not (eobp))
-        (beginning-of-line)
-        (when (and (org-at-heading-p)
-                   (skg-headline-has-folded-in-view-p))
-          ;; This headline has the "folded" atom, so record its parent
-          (save-excursion
-            (when (org-up-heading-safe)
-              (let ((parent-pos (point)))
-                ;; Check if already in list by position (deduplicate)
-                (unless (cl-some (lambda (m) (= (marker-position m) parent-pos))
-                                 parent-markers)
-                  (push (point-marker) parent-markers))))))
-        (forward-line 1)))
-    parent-markers))
-
-(defun skg-headline-has-folded-in-view-p ()
-  "Return t if the current headline has 'folded' in its metadata.
-Assumes point is at the beginning of a headline.
-Verifies the structure is (skg ... folded ...)."
-  (skg--headline-has-bare-atom-p 'folded))
-
-(defun skg-headline-has-bodyfolded-in-view-p ()
-  "Return t if the current headline has 'bodyFolded' in its metadata.
-Assumes point is at the beginning of a headline.
-Verifies the structure is (skg ... bodyFolded ...)."
-  (skg--headline-has-bare-atom-p 'bodyFolded))
-
-(defun skg--headline-has-bare-atom-p (atom)
-  "Return t if the current headline's metadata contains the bare atom ATOM.
-Assumes point is at the beginning of a headline.
-Parses the metadata only if ATOM's name is on the line
-(`skg--line-names-symbol-p'), since most lines carry no such atom."
-  (when (and (org-at-heading-p)
-             (skg--line-names-symbol-p atom))
-    (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
-      (and metadata-sexp
-           (skg-sexp-subtree-p metadata-sexp (list 'skg atom))))))
-
-(defun skg--line-names-symbol-p (symbol)
-  "Non-nil if SYMBOL's name appears as a whole symbol on the line at point.
-A necessary condition for the line's metadata to read as containing
-SYMBOL, and far cheaper than reading it. Symbol boundaries come from
-the Emacs Lisp syntax table, so they fall where the reader's do;
-in Org's own table an apostrophe is a word constituent, which would
-hide the 'focused' in '(skg focused'x)'. Case matters, as to the reader."
-  (save-excursion
-    (beginning-of-line)
-    (let ((case-fold-search nil))
-      (with-syntax-table emacs-lisp-mode-syntax-table
-        (re-search-forward
-         (concat "\\_<" (regexp-quote (symbol-name symbol)) "\\_>")
-         (line-end-position) t)))))
 
 (provide 'skg-org-fold)

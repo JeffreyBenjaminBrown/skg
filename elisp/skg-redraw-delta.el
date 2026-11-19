@@ -245,20 +245,44 @@ at point begin."
 (defun skg--stripped-text (text)
   "The stripped form of TEXT: each headline line stripped, the other
 lines kept."
-  (mapconcat #'skg--stripped-line (split-string text "\n") "\n"))
+  (car (skg--stripped-text-and-atom-headlines text)))
+
+(defun skg--stripped-text-and-atom-headlines (text)
+  "The stripped form of TEXT, and what its stripping removed, as
+\(STRIPPED . ATOM-HEADLINES). ATOM-HEADLINES lists, in text order, each
+headline line that lost atoms, as (OFFSET . ATOMS): OFFSET is where the
+line starts in STRIPPED, counting from 0, and ATOMS are the atoms it
+lost, as strings, in the order they stood."
+  (let ((offset 0)
+        (stripped-lines nil)
+        (atom-headlines nil))
+    (dolist (line (split-string text "\n"))
+      (let ((stripped-and-atoms (skg--stripped-line-and-atoms line)))
+        (when (cdr stripped-and-atoms)
+          (push (cons offset (cdr stripped-and-atoms)) atom-headlines))
+        (push (car stripped-and-atoms) stripped-lines)
+        (setq offset (+ offset (length (car stripped-and-atoms)) 1))))
+    (cons (mapconcat #'identity (nreverse stripped-lines) "\n")
+          (nreverse atom-headlines))))
 
 (defun skg--stripped-line (line)
   "The stripped form of LINE: a headline line without the fold and focus
 atoms at depth 1 of its '(skg ...)' form, each removed with the one
 space before it. Any other line is its own stripped form."
+  (car (skg--stripped-line-and-atoms line)))
+
+(defun skg--stripped-line-and-atoms (line)
+  "The stripped form of LINE (`skg--stripped-line'), and the atoms its
+stripping removed, as (STRIPPED . ATOMS), ATOMS strings in the order
+they stood."
   (let* ((case-fold-search nil)
          (form-start
           (and (string-match-p "focused\\|olded" line) ; most lines hold none
                (string-match "\\`\\*+ \\((skg\\)[ )]" line)
                (match-beginning 1))))
     (if form-start
-        (skg--without-fold-and-focus-atoms line form-start)
-      line)))
+        (skg--fold-and-focus-atoms-split-from-line line form-start)
+      (list line))))
 
 (defun skg--without-fold-and-focus-atoms (line form-start &optional atoms)
   "LINE without each fold and focus atom, and the space before it, at
@@ -266,7 +290,15 @@ depth 1 of the form starting at FORM-START. Depth counts the parentheses
 outside string literals. The text after the form is kept as it is.
 ATOMS, when given, names the atoms to remove instead
 \(default `skg--fold-and-focus-atoms')."
+  (car (skg--fold-and-focus-atoms-split-from-line line form-start atoms)))
+
+(defun skg--fold-and-focus-atoms-split-from-line (line form-start
+                                                       &optional atoms)
+  "`skg--without-fold-and-focus-atoms' of LINE, FORM-START and ATOMS,
+and the atoms it removed, as (LINE-WITHOUT-THEM . REMOVED-ATOMS),
+REMOVED-ATOMS strings in the order they stood."
   (let ((atoms (or atoms skg--fold-and-focus-atoms))
+        (removed-atoms nil)
         (line-length (length line))
         (kept-pieces nil)
         (copied-up-to 0)
@@ -291,12 +323,14 @@ ATOMS, when given, names the atoms to remove instead
             (if (member (substring line (1+ i) atom-end)
                         atoms)
                 (progn (push (substring line copied-up-to i) kept-pieces)
+                       (push (substring line (1+ i) atom-end) removed-atoms)
                        (setq copied-up-to atom-end
                              i atom-end))
               (setq i (1+ i)))))
          (t (setq i (1+ i))))))
     (push (substring line copied-up-to) kept-pieces)
-    (apply #'concat (nreverse kept-pieces))))
+    (cons (apply #'concat (nreverse kept-pieces))
+          (nreverse removed-atoms))))
 
 (defun skg--end-of-string-literal (line quote)
   "The index just past the string literal of LINE whose opening quote is

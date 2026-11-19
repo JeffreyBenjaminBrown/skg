@@ -66,7 +66,7 @@ describe('skg.folds', function ()
   end)
 
   it('removes folded atoms of every metadata shape', function ()
-    -- Mirrors test-skg-remove-folded-metadata.
+    -- Mirrors test-whole-redraw-strips-fold-atoms.
     buffer_with(table.concat({
       '* (skg folded) only folded',
       '* (skg folded other) folded first',

@@ -108,6 +108,26 @@ changed, b's subtree folded and focused.")
     (skg-replace-buffer-with-new-content nil content)
     (buffer-substring-no-properties (point-min) (point-max))))
 
+(ert-deftest test-skg-redraw-delta-strip-reports-what-it-removed ()
+  "Stripping a text says where each headline line that lost atoms starts
+in the stripped text, and which atoms it lost, in the order they stood."
+  (let* ((text (concat "preamble folded\n"
+                       "* (skg (vnid a) focused node (gnid a)) a\n"
+                       "body (skg folded)\n"
+                       "** (skg (vnid b) folded bodyFolded node) b\n"
+                       "** (skg (vnid c) node) c"))
+         (stripped-and-atom-headlines
+          (skg--stripped-text-and-atom-headlines text))
+         (stripped (car stripped-and-atom-headlines)))
+    (should (equal stripped (skg--stripped-text text)))
+    (should (equal (mapcar (lambda (headline)
+                             (cons (substring stripped (car headline)
+                                              (+ (car headline) 8))
+                                   (cdr headline)))
+                           (cdr stripped-and-atom-headlines))
+                   '(("* (skg (" "focused")
+                     ("** (skg " "folded" "bodyFolded"))))))
+
 (ert-deftest test-skg-redraw-delta-a-patch-keeps-folds-and-point ()
   "A save-result naming b rewrites b's line alone: the buffer equals
 the stripped new text, b's folded subtree stays folded while b's

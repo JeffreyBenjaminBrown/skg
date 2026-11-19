@@ -107,7 +107,6 @@ rather than via `unload-feature'."
          '( skg-client
             skg-compare-sexpr
             skg-config
-            skg-focus
             skg-id-search
             skg-length-prefix
             skg-lens

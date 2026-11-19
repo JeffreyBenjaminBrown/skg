@@ -227,14 +227,14 @@ end
 
 ---@param line_number integer
 ---@return boolean does the headline carry the bare 'folded' atom?
----Mirrors skg-headline-has-folded-in-view-p.
+---Mirrors the stripped form's test for 'folded' (skg--stripped-line-and-atoms).
 function M.headline_has_folded_in_view_p (line_number)
   return M.headline_has_bare_atom_p(line_number, 'folded')
 end
 
 ---@param line_number integer
 ---@return boolean does the headline carry the bare 'bodyFolded' atom?
----Mirrors skg-headline-has-bodyfolded-in-view-p.
+---Mirrors the stripped form's test for 'bodyFolded' (skg--stripped-line-and-atoms).
 function M.headline_has_bodyfolded_in_view_p (line_number)
   return M.headline_has_bare_atom_p(line_number, 'bodyFolded')
 end
