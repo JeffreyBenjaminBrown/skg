@@ -96,6 +96,76 @@ the old one open beside the one it makes on its next request."
         (setq heralds--skgrepo-labels skgrepo-labels))))
   (message "skg: all modules reloaded"))
 
+(defconst skg--reload-unloaded-features
+  '( skg-client
+     skg-compare-sexpr
+     skg-config
+     skg-id-search
+     skg-length-prefix
+     skg-lens
+     skg-lock-buffers
+     skg-metadata
+     skg-modify-graph
+     skg-view-new-empty
+     skg-org-fold
+     skg-redraw-delta
+     skg-recovery
+     skg-request-file-path
+     skg-request-herald-rules
+     skg-request-investigate-unknown-node
+     skg-request-delete-references-to-absent-node
+     skg-request-relRepo-info
+     skg-request-flag-state
+     skg-request-export-org
+     skg-request-import-md-and-org
+     skg-request-diff-view
+     skg-processed
+     skg-request-rebuild-session-lifetime-stores
+     skg-request-rerender-all-views
+     skg-request-save
+     skg-request-server-warnings
+     skg-repo-files-reloaded
+     skg-request-single-root-content-view
+     skg-request-repo-sets
+     skg-request-perspective
+     skg-request-extend-diff-view
+     skg-request-stage-and-commit
+     skg-request-strip-body-whitespace
+     skg-request-text-search
+     skg-request-verify-connection
+     skg-search-make-link
+     skg-request-views
+     skg-sexpr-dsl-for-edits
+     skg-sexpr-cycling
+     skg-sexpr-edit
+     skg-sexpr-org-bijection
+     skg-sexpr-search
+     skg-shared
+     skg-metadata-fields
+     skg-state
+     skg-test-utils
+     skg-readable-ids
+     skg-link-annotations
+     skg-file-minor-mode
+     skg-zippy-mode
+     skg-view-ancestry
+     heralds-minor-mode )
+  "The features `skg--reload-modules' unloads, so that requiring them
+again loads the files on disk. A feature left out stays as it was first
+loaded: requiring it is a no-op, so its old definitions outlive every
+reload, and a function that moved into its file since is void (this is
+how `skg-redraw-delta' kept whole redraws of saved buffers from
+happening). Every feature the client's files provide is here, but for
+those `skg-reload' reloads by hand or keeps on purpose,
+`skg--reload-kept-features'.")
+
+(defconst skg--reload-kept-features
+  '( skg-buffer               ; reloaded by `load-file'; see `skg-reload'
+     skg-keymaps-and-aliases  ; reloaded by `load-file'; see `skg-reload'
+     skg-reload               ; the code running the reload
+     skg-log )                ; keeps the user's log settings
+  "The client features `skg--reload-modules' does not unload.")
+
 (defun skg--reload-modules (elisp-dir)
   "Unload every skg feature and reload the client from ELISP-DIR.
 The destructive half of `skg-reload', kept separate so the
@@ -103,63 +173,11 @@ herald-table preservation in `skg-reload' can be exercised without
 actually unloading the world.  See `skg-reload' for why
 `skg-buffer' and `skg-keymaps-and-aliases' are reloaded by hand
 rather than via `unload-feature'."
-  (let ((skg-features
-         '( skg-client
-            skg-compare-sexpr
-            skg-config
-            skg-id-search
-            skg-length-prefix
-            skg-lens
-            skg-lock-buffers
-            skg-metadata
-            skg-modify-graph
-            skg-view-new-empty
-            skg-org-fold
-            skg-request-file-path
-            skg-request-herald-rules
-            skg-request-investigate-unknown-node
-            skg-request-delete-references-to-absent-node
-            skg-request-relRepo-info
-            skg-request-flag-state
-            skg-request-export-org
-            skg-request-import-md-and-org
-            skg-request-diff-view
-            skg-processed
-            skg-request-rebuild-session-lifetime-stores
-            skg-request-rerender-all-views
-            skg-request-save
-            skg-request-server-warnings
-            skg-repo-files-reloaded
-            skg-request-single-root-content-view
-            skg-request-repo-sets
-            skg-request-perspective
-            skg-request-extend-diff-view
-            skg-request-stage-and-commit
-            skg-request-strip-body-whitespace
-            skg-request-text-search
-            skg-request-verify-connection
-            skg-search-make-link
-            skg-request-views
-            skg-sexpr-dsl-for-edits
-            skg-sexpr-cycling
-            skg-sexpr-edit
-            skg-sexpr-org-bijection
-            skg-sexpr-search
-            skg-shared
-            skg-metadata-fields
-            skg-state
-            skg-test-utils
-            skg-readable-ids
-            skg-link-annotations
-            skg-file-minor-mode
-            skg-zippy-mode
-            skg-view-ancestry
-            heralds-minor-mode )))
-    (dolist (feat skg-features)
-      (when (featurep feat)
-        (unload-feature feat t)))
-    (load-file (expand-file-name "skg-keymaps-and-aliases.el" elisp-dir))
-    (load-file (expand-file-name "skg-init.el"                elisp-dir))
-    (load-file (expand-file-name "skg-buffer.el"              elisp-dir))))
+  (dolist (feat skg--reload-unloaded-features)
+    (when (featurep feat)
+      (unload-feature feat t)))
+  (load-file (expand-file-name "skg-keymaps-and-aliases.el" elisp-dir))
+  (load-file (expand-file-name "skg-init.el"                elisp-dir))
+  (load-file (expand-file-name "skg-buffer.el"              elisp-dir)))
 
 (provide 'skg-reload)

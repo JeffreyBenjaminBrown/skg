@@ -68,4 +68,37 @@ signals."
         (should (equal skg-config-dir "/x/"))
         (should (equal skg-linkstack '(("id1" "title 1"))))))))
 
+(ert-deftest test-skg-reload-unloads-every-client-feature ()
+  "`skg-reload' must unload every feature the client's files provide,
+but for those it keeps on purpose.
+
+Regression guard: `skg-redraw-delta' was missing from the unload list,
+so a reload kept the definitions it was first loaded with, requiring
+it again being a no-op. When `skg--stripped-text-and-atom-headlines'
+moved into that file, a reloaded `skg-request-save' called it void;
+the save-result handler logged the error and redrew nothing, so every
+save whose answer was not a headline-only delta (one that adds a
+folder, say) left the buffer as it was, saying nothing."
+  (let* ((elisp-dir
+          (file-name-directory (symbol-file 'skg-reload 'defun)))
+         (directories ;; those `skg-init' puts on the load path
+          (mapcar (lambda (subdirectory)
+                    (expand-file-name subdirectory elisp-dir))
+                  '("." "skg-sexpr" "skg-request-save" "skg-sexpr-edit")))
+         (provided nil))
+    (dolist (directory directories)
+      (dolist (file (directory-files directory t "\\.el\\'"))
+        (with-temp-buffer
+          (insert-file-contents file)
+          (while (re-search-forward
+                  "^(provide '\\([a-zA-Z0-9-]+\\))" nil t)
+            (push (intern (match-string 1)) provided)))))
+    (should (memq 'skg-redraw-delta provided))
+    (should (equal
+             (cl-remove-if (lambda (feature)
+                             (or (memq feature skg--reload-unloaded-features)
+                                 (memq feature skg--reload-kept-features)))
+                           provided)
+             nil))))
+
 (provide 'test-skg-reload)
