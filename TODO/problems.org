@@ -6,6 +6,27 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* A request's 'skg-lp-reset' can drop another request's reply (2026-11-19)
+  Seen measuring saves: a link-status request sent while views were
+  being opened never got its reply handled, and stayed in
+  'skg-link-annotations--requests' (its buffer unpainted, and
+  'skg-lp--pending-count' one too high). Each view, search and save
+  request calls 'skg-lp-reset' before sending, which empties
+  'skg-lp--buf'; a reply already partly read into it is lost, and the
+  rest of it is then read as a header. Link-status requests go out
+  after every save and every redraw, so they are the replies most
+  often in flight.
+* A save's remaining client cost, after the redraw fixes (2026-11-19)
+  Measured in 'emacs -nw' (a real frame, -Q, compiled), saving a
+  265 KB view of Jeff's data whose save redraws four other mostly
+  folded views: about 0.6 s, half of it garbage collection at the
+  default 'gc-cons-threshold'. The largest parts: heralds computed for
+  every line of each view redrawn whole, folded or not (about 110 ms
+  for a 2,500-line view, before its share of collection); the collateral
+  views' whole redraws themselves, which 'TODO/general-fast-diffView/1_3_plan.org'
+  slice 5 would turn into patches; and the outbound buffer snapshot
+  (60-75 ms, twice per fork), whose atoms are merged by a metadata
+  edit per headline in a temporary buffer.
 * IDs compared letter for letter outside every-mirror's diff (2026-11-17)
   Seen during "IDs compared as equivalence classes"
   (TODO/every-mirror/progress.org, plan 4), on lines the branch did
