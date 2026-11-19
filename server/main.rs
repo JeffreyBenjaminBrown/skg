@@ -6,6 +6,9 @@
 //! Subcommand: import-org-roam <org-dir> <skg-output-dir> <repo-name>
 //! Converts org-roam .org files to .skg files.
 
+use skg::attribution::{
+  attribution_problems, forked_original_at_fork_time, owned_attributed_files,
+  owned_attributions, rewrite_attributions};
 use skg::consts::{BUSYSIGNAL_POLL_INTERVAL_MS, BUSYSIGNAL_READ_TIMEOUT_MS};
 use skg::prominence::{compute_and_store_prominence_sources, MapToContent, MapToContainers};
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
@@ -53,6 +56,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         . unwrap_or_else ( |_| tracing_subscriber::EnvFilter::new ("info") ) )
       . init ();
     return run_export_org (&args); }
+
+  if args . len() > 1 && [ "check-attributions", "fix-attributions",
+                           "show-forked-original" ]
+                         . contains (&args[1] . as_str ()) {
+    return run_attribution_command (&args); }
 
   if args . len() > 1 && args[1] == "check-config" {
     // Pre-flight used by bash/start-servers.sh: run the same
@@ -159,6 +167,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     { let _span : tracing::span::EnteredSpan = tracing::info_span! (
         "initialize_dbs") . entered ();
       initialize_dbs (&config) };
+  let attribution_warnings : Vec<String> =
+    attribution_problems ( &config, owned_attributions (&config, &nodes) );
+  for warning in &attribution_warnings {
+    tracing::warn! ("{}", warning); }
   drop (nodes); // 'initialize_dbs' checked and used them; nothing here needs them.
   for warning in &fork_rule_warnings {
     tracing::warn! ("{}", warning); }
@@ -181,7 +193,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     tracing::warn! ("{}", warning); }
   env . runtime . record_startup_warnings (
     config_warnings . into_iter () . chain (fork_rule_warnings)
-      . chain (manifest_warnings) . chain (watcher_warnings) . collect () );
+      . chain (manifest_warnings) . chain (watcher_warnings)
+      . chain (attribution_warnings) . collect () );
 
   init_done . store (true, Ordering::Release);
   busysignal_handle . join ()
@@ -195,6 +208,45 @@ fn main() -> Result<(), Box<dyn Error>> {
     . map_err ( |e| Box::new (e)
                  as Box<dyn Error>) ?;
   Ok (( )) }
+
+/// The attribution subcommands ('docs/forks.org', "Attribution"):
+///   check-attributions CONFIG
+///     prints what is doubtful in the owned skgrepos' attributions;
+///   fix-attributions CONFIG OLD SKGREPO
+///     rewrites each attribution whose remote hash or skgrepo name is
+///     OLD to name SKGREPO as it is now;
+///   show-forked-original CONFIG FORK_ID
+///     prints the original's home file at the commit the fork records.
+fn run_attribution_command (
+  args : &[String],
+) -> Result<(), Box<dyn Error>> {
+  let usage : &str = "Usage: skg check-attributions CONFIG | \
+                      skg fix-attributions CONFIG OLD SKGREPO | \
+                      skg show-forked-original CONFIG FORK_ID";
+  let config_path : &str = args . get (2) . ok_or (usage) ?;
+  let (config, _warnings) : (SkgConfig, Vec<String>) =
+    match load_config (config_path) {
+      Ok (loaded) => loaded,
+      Err (e)     => die_bad_config (config_path, e) };
+  match ( args[1] . as_str (), args . len () ) {
+    ("check-attributions", 3) => {
+      let files = owned_attributed_files (&config) ?;
+      let problems : Vec<String> = attribution_problems (
+        &config, files . iter () . filter_map ( |(_, _, node_fs)| node_fs . attribution . as_ref () ));
+      println! ( "{} attributed forks in the owned skgrepos.", files . len () );
+      for problem in &problems { println! ("{}", problem); }
+      Ok (( )) },
+    ("fix-attributions", 5) => {
+      let rewritten = rewrite_attributions (
+        &config, &args[3], &SkgrepoName::from (args[4] . as_str ()) ) ?;
+      for path in &rewritten { println! ("Rewrote {}", path . display ()); }
+      println! ( "{} files rewritten.", rewritten . len () );
+      Ok (( )) },
+    ("show-forked-original", 4) => {
+      print! ( "{}", forked_original_at_fork_time (
+        &config, &ID::from (args[3] . as_str ()) ) ? );
+      Ok (( )) },
+    _ => Err (usage . into ()), }}
 
 /// Report a config-load failure and exit(1). Bold red when stderr is a
 /// terminal; plain text otherwise (e.g. the start script's log), so the
