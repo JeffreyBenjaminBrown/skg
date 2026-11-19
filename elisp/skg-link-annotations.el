@@ -75,34 +75,42 @@ does on the server. tests/shared/literal-link-cases.txt holds the cases
 this, the server and the Neovim client must agree on."
   (let ((ranges nil)
         (open-start nil)
-        (closing nil))
+        (closing nil)
+        (case-fold-search t))
     (save-excursion
       (goto-char (point-min))
       (while (not (eobp))
-        (let* ((bol (line-beginning-position))
-               (eol (line-end-position))
-               (line (buffer-substring-no-properties bol eol))
-               (trimmed (downcase (string-trim-left line))))
-          (when (and open-start (string-match-p "\\`\\*+ " line))
+        (let ((bol (point))
+              (eol (line-end-position)))
+          (when (and open-start (looking-at "\\*+ "))
             (push (cons open-start bol) ranges)
             (setq open-start nil))
+          (skip-chars-forward " \t\r" eol) ;; what `string-trim-left' trims
           (cond
            (open-start
-            (when (string-prefix-p closing trimmed)
+            (when (looking-at (regexp-quote closing))
               (push (cons open-start eol) ranges)
               (setq open-start nil)))
-           ((string-prefix-p "#+begin_" trimmed)
+           ((looking-at "#\\+begin_")
+            (goto-char (match-end 0))
+            (skip-chars-forward " \f\t\r\v" eol)
             (setq open-start bol
                   closing (concat "#+end_"
-                                  (car (split-string
-                                        (substring trimmed 8))))))
-           ((string-prefix-p "```" trimmed)
+                                  (downcase
+                                   (buffer-substring-no-properties
+                                    (point)
+                                    (progn (skip-chars-forward
+                                            "^ \f\t\r\v" eol)
+                                           (point)))))))
+           ((looking-at "```")
             (setq open-start bol
                   closing "```"))
-           ((or (string= trimmed ":") (string-prefix-p ": " trimmed))
+           ((looking-at ":\\( \\|$\\)")
             (push (cons bol eol) ranges))
-           (t
-            (dolist (span (skg-link-annotations--inline-verbatim-spans line))
+           ((progn (skip-chars-forward "^=~" eol) ;; no marker, no span
+                   (< (point) eol))
+            (dolist (span (skg-link-annotations--inline-verbatim-spans
+                           (buffer-substring-no-properties bol eol)))
               (push (cons (+ bol (car span)) (+ bol (cdr span)))
                     ranges)))))
         (forward-line 1))
