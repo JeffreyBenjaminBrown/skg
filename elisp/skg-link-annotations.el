@@ -13,7 +13,8 @@
 (defvar skg-link-annotations--cache (make-hash-table :test 'equal)
   "Status by literal ID for the current graph and skgrepo restriction.")
 (defvar skg-link-annotations--requests (make-hash-table :test 'equal)
-  "Outstanding request ID to (buffer buffer-generation tick epoch ids).")
+  "Outstanding request ID to (buffer buffer-generation tick epoch ids
+positions), positions those `skg-link-annotations--scan' found.")
 (defvar skg-link-annotations--next-request 0)
 (defvar skg-link-annotations--epoch 0)
 
@@ -191,19 +192,23 @@ character."
                               collect gnid))))
       (skg-link-annotations--paint positions)
       (when unknown
-        (skg-link-annotations--request unknown buffer-generation tick)))))
+        (skg-link-annotations--request
+         unknown positions buffer-generation tick)))))
 
-(defun skg-link-annotations--request (gnids buffer-generation tick)
-  "Request the status of IDS for this buffer's BUFFER-GENERATION and TICK."
+(defun skg-link-annotations--request (gnids positions buffer-generation tick)
+  "Request the status of GNIDS for this buffer's BUFFER-GENERATION and
+TICK. POSITIONS are the links that scan of the buffer found
+\(`skg-link-annotations--scan'), which the reply paints: a reply is
+used only while the buffer's text is the scanned text."
   (let ((process (and (boundp 'skg-rust-tcp-proc) skg-rust-tcp-proc)))
     (if (not (and process (process-live-p process)))
         (progn
           (dolist (gnid gnids)
             (puthash gnid '(lookup-failed) skg-link-annotations--cache))
-          (skg-link-annotations--paint (skg-link-annotations--scan)))
+          (skg-link-annotations--paint positions))
       (let* ((request-id (format "links-%s" (cl-incf skg-link-annotations--next-request)))
              (entry (list (current-buffer) buffer-generation tick
-                          skg-link-annotations--epoch gnids))
+                          skg-link-annotations--epoch gnids positions))
              (request (concat (prin1-to-string
                                `((request . "link statuses")
                                  (request-id . ,request-id)
@@ -219,7 +224,7 @@ character."
            (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count)))
            (dolist (gnid gnids)
              (puthash gnid '(lookup-failed) skg-link-annotations--cache))
-           (skg-link-annotations--paint (skg-link-annotations--scan))))))))
+           (skg-link-annotations--paint positions)))))))
 
 (defun skg-link-annotations--handle-response (_process payload)
   "Accept a response only for its live buffer, text, and graph epoch."
@@ -229,7 +234,8 @@ character."
     (when entry
       (remhash request-id skg-link-annotations--requests)
       (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count)))
-      (pcase-let ((`(,buffer ,buffer-generation ,tick ,epoch ,ids) entry))
+      (pcase-let ((`(,buffer ,buffer-generation ,tick ,epoch ,ids ,positions)
+                   entry))
         (when (and (= epoch skg-link-annotations--epoch)
                    (buffer-live-p buffer))
           (with-current-buffer buffer
@@ -247,8 +253,7 @@ character."
                                ('missing '(missing))
                                (_ '(lookup-failed)))
                              skg-link-annotations--cache))))
-              (skg-link-annotations--paint
-               (skg-link-annotations--scan)))))))))
+              (skg-link-annotations--paint positions))))))))
 
 (defun skg-link-annotations-invalidate-all ()
   "Expire lookup results after a change of the graph or of the skgrepo restriction."

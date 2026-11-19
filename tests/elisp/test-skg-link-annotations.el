@@ -68,7 +68,8 @@
             (insert "edited"))
           (with-current-buffer second
             (puthash "right" (list second skg-link-annotations--buffer-generation
-                                   (buffer-chars-modified-tick) 20 '("node"))
+                                   (buffer-chars-modified-tick) 20 '("node")
+                                   (skg-link-annotations--scan))
                      skg-link-annotations--requests))
           (clrhash skg-link-annotations--cache)
           (skg-link-annotations--handle-response
@@ -111,6 +112,36 @@
                                skg-link-annotations--requests)))
       (kill-buffer first)
       (kill-buffer second))))
+
+(ert-deftest test-skg-link-annotations-a-reply-paints-the-links-its-request-found ()
+  "A reply paints the links that the scan behind its request found: it
+is used only while the buffer's text is the scanned text, so the
+buffer is not scanned again."
+  (let ((skg-link-annotations--cache (make-hash-table :test 'equal))
+        (skg-link-annotations--requests (make-hash-table :test 'equal))
+        (skg-link-annotations--epoch 30))
+    (with-temp-buffer
+      (insert "* [[id:gone][gone]] and [[id:here][here]]\n")
+      (skg-content-view-mode)
+      (skg-link-annotations-mode 1)
+      (puthash "scanned"
+               (list (current-buffer) skg-link-annotations--buffer-generation
+                     (buffer-chars-modified-tick) 30 '("gone" "here")
+                     (skg-link-annotations--scan))
+               skg-link-annotations--requests)
+      (cl-letf (((symbol-function 'skg-link-annotations--scan)
+                 (lambda () (error "The buffer was scanned again"))))
+        (skg-link-annotations--handle-response
+         nil (concat "((request-id \"scanned\") (results ((\"gone\" missing)"
+                     " (\"here\" resolved \"here\" \"main\"))))")))
+      (should (equal (mapcar (lambda (overlay)
+                               (buffer-substring-no-properties
+                                (overlay-start overlay) (overlay-end overlay)))
+                             (cl-remove-if-not
+                              (lambda (overlay)
+                                (overlay-get overlay 'skg-link-annotation))
+                              (overlays-in (point-min) (point-max))))
+                     '("gone"))))))
 
 ;; (NAME TEXT LIVE-IDS) for each case in the file, which the Rust and
 ;; Neovim tests read too.
