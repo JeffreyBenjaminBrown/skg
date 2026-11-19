@@ -2305,7 +2305,7 @@ def check_marking_a_subtree_processed (context):
   require_output (
     run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
     diff_report_head () +
-    "Error: ⟨0b⟩ on line 15 of the compact view carries 'processed rel', but "
+    "Error: ⟨0b⟩ on line 16 of the compact view carries 'processed rel', but "
     "its relationship to its viewparent has no change to mark here.\n",
     expected_returncode = 1, ignoring_view_ids = True )
   edit_compact ( folder, [ ( "M processed rel subtree⟩", "M processed both subtree⟩" ) ],
@@ -2390,6 +2390,7 @@ EXPECTED_DIFF_COMPACT = (
   "# the '(vnid ID)' of its metadata in the full view, and HERALDS what a\n"
   "# client shows for it, but a bare 'aC' (only the parent contains it);\n"
   "# 'folded' marks a headline a client shows collapsed.\n"
+  "# What the heralds mean: \"Start here\" in tools/skg-for-ai/README.org.\n"
   "# Headlines 11, node occurrences 6, distinct nodes 6, changesetMarker "
   "content 2, ghost 2, oldText title 1.\n"
   "# Skgrepos: main (owned) 6.\n"

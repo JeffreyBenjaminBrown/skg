@@ -3,6 +3,7 @@
 # the '(vnid ID)' of its metadata in the full view, and HERALDS what a
 # client shows for it, but a bare 'aC' (only the parent contains it);
 # 'folded' marks a headline a client shows collapsed.
+# What the heralds mean: "Start here" in tools/skg-for-ai/README.org.
 # Headlines 14, node occurrences 9, distinct nodes 6, folders 5.
 # Skgrepos: fred (foreign) 4, main (owned) 5.
 # Foreign 4, write-protected 7, folded 2.

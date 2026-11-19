@@ -18,9 +18,51 @@ writes. 'daemon --stop --out-dir DIR' ends it.
 
 To read, view a node: 'view ID --out-dir DIR' writes 'view_ID.full.org'
 (the view exactly as the server drew it), 'view_ID.compact.org' (the
-same tree, each headline ending in a short handle such as '⟨0d aC1⟩')
-and a sidecar, 'view_ID.view.json'. Read the compact file. Following
-a link is 'view' again on the link's ID; 'search WORDS' finds nodes.
+same tree, each headline ending in a handle) and a sidecar,
+'view_ID.view.json'. Read the compact file. Following a link is
+'view' again on the link's ID; 'search WORDS' finds nodes.
+
+A handle is '⟨ID HERALDS⟩'. ID names the headline, not its node; the
+heralds are short codes, mostly counts of the notes related to it.
+Take '⟨4w ☮B 1C9b 3/L ⌂:claude-public folded⟩': it is write-protected
+here (☮) and has a body not shown here (B); one note contains it and
+it contains nine, among them 'b', the headline two levels up (1C9b);
+three notes link to it, all substantive (3/L); its home skgrepo is
+'claude-public'; an editor would show it collapsed. Most common first:
+- 'C', 'L', 'K', 'H': contains, links to, forks, hides. A count
+  before the letter counts the notes that do it to this one, one after
+  it those this one does it to: '2C3', two contain it, it contains
+  three; 'C3', nothing contains it. Only a token that would read just
+  'aC' (the parent alone contains it, the ordinary case) is left out.
+- 'a', 'b', ...: a headline above, 'a' the parent, 'b' its parent,
+  and so on; a folder is a headline, so under one 'a' is the folder.
+  '2aC', two contain it, the parent one of them; 'Ca', it contains its
+  parent; letters without a count are the whole side ('bdC').
+- '/': the count before it is the part worth a look, and nothing
+  after it means all. '3/7L', seven notes link to it, three of them
+  substantive (with a body, content, or links to other notes too);
+  '3/L', three, all substantive; '3L', none. On a member of a forks
+  folder, 'C2/8', two of eight contents are new to you (neither the
+  folder's note nor another of yours holds or hides them); 'C1/', all.
+- '☮': write-protected here, whoever owns it (a teammate's note may
+  be editable): it is editable elsewhere in the view, or stands under
+  a '☮' folder, say. A save refuses an edit to it; 'editable' in its
+  handle moves the editing here. 'B': view it to read its body.
+  '⌂:REPO': its home skgrepo, on a root and where it differs from the
+  node above. 'A2 I1 F1': two aliases, an extra ID, a true flag ('no
+  search matching', say). 'Kĥ': it stands in the place of a note
+  joined to it by forks; its parent contains that note, not this one.
+A headline whose handle holds a sentence is a folder. 'These also
+contain it.' and 'These link to it.' list notes, each with its own
+containers under it, so there nesting reads upward. In 'It forks
+these, or these fork it, ...', 'bK' marks a note the folder's note
+forks, 'Kb' one that forks it. So a count before C beyond 'a' says
+the note is filed elsewhere too ('contains ID'), one before L who
+cites it ('links-here ID'), 'K' that it forks or is forked ('forest
+forks ID'), '1H' that a note hides it, so that its forks folder no
+longer shows it. That ID is the node's: the '(gnid ID)' on the line
+that 'grep "(vnid 4w)"' finds in the full view. "The heralds in the
+handle" explains the rarer heralds.
 
 To change the graph, edit the compact file in place. Change a title
 or a body by editing its text. Add a node by writing a new headline,
@@ -71,17 +113,13 @@ that needs a node whose changes are not, and prints what it left and
 why. 'commit "MESSAGE" --all --yes' commits every change, marked or
 not.
 
-The rest of this file is reference. "Running it" lists every command
-and option; "The files it writes" explains the compact view, its
-handles and heralds, and its summary; "The daemon" says what the
-daemon does and what its log means; "Writing" covers saving in
-detail, the report, the words a handle takes, "Retyped headlines",
-placing an existing node and forking; "The skgrepo restriction and
-overPrivateText" says what a restriction changes; "Reviewing and committing" covers the diff view,
-processed marks and the commit; "What the tool covers of COMMANDS.org"
-says, command by command, what the tool does of what Emacs does. The
-protocol is in 'docs/api-and-formats.org', and the diff view in
-'docs/diff-view.org'.
+The rest of this file is reference: "Running it" (every command and
+option), "The files it writes" (the compact view, every herald, the
+summary), "The daemon", "Writing" (the report, the words a handle
+takes, retyped headlines, placing and forking), "The skgrepo
+restriction and overPrivateText", "Reviewing and committing" and
+"What the tool covers of COMMANDS.org". The protocol is in
+'docs/api-and-formats.org', and the diff view in 'docs/diff-view.org'.
 
 * What it is for
 A client such as Emacs shows a skg view as a tree of headlines, each
@@ -412,15 +450,43 @@ client shows them, the heralds are:
 The relationship heralds are rendered as the clients render them;
 'docs/heralds.org', "Relationship heralds", explains them. In display
 order: 'C' contains, 'L' links to, 'K' forks (the K of forK; 'F' is
-the flags count), 'H' hides (from its forks). A count before a letter counts the
-nodes on the relation's in-side ("two nodes contain this"), a count
-after it the out-side ("this contains three"). A lowercase letter is
-an ancestor in this view: 'a' the viewparent, 'b' the grandparent, and
-so on; it replaces the count when ancestors make up the whole side. A
-fraction marks a subset: '1/5L', five nodes link here and one of them
-is substantive; 'C2/8', eight contents, two not yet integrated by the
-forker above. 'ĥ' after 'K' says this occurrence stands in for a
-node it is a mirror of. The property counts 'A' (aliases), 'I' (extra IDs)
+the flags count), 'H' hides (the hider keeps the hidden node out of
+what it shows of the members of its forks folder). A count before a
+letter counts the nodes on the relation's in-side ("two nodes contain
+this"), a count after it the out-side ("this contains three").
+Missing sides and empty relations are left out.
+
+A lowercase letter is an ancestor in this view: 'a' the viewparent,
+'b' the grandparent, and so on, each headline above counting as one
+generation, a folder included (after 'z', '{27}' and so on). Under a
+folder, then, 'a' is the folder and 'b' the node whose folder it is.
+Letters replace the count when ancestors make up the whole side, and
+follow it when they do not: '2aC' is two containers, the viewparent
+one of them; 'Kb', it forks the grandparent and nothing else; 'K2b',
+it forks the grandparent and one more. In a forks folder the
+grandparent is the note whose folder it is, so a forkee shows 'bK', a
+note that forks it 'Kb', a mutual 'bKb', and an indirect member,
+joined to it only through other forks, neither 'b'.
+
+A fraction marks a subset, on two sides. Before 'L' the numerator
+counts the substantive mentioners: those with a nonblank body, a
+visible content, or links to more than one distinct visible target
+('mentioner_is_substantive' in 'server/dbs/in_rust_graph/stats.rs').
+'1/5L', five nodes link here and one of them is substantive. After
+'C', on a member of a forks folder, the numerator counts what the
+member shows, its unintegrated content: its contents that the
+folder's note neither contains nor hides, and that no owned note but
+the member contains ('docs/glossary.org', "what a member shows"); in
+the diff view, it counts those an owned note contains too. 'C2/8',
+eight contents, two of them unintegrated. A numerator equal to the
+whole side drops the denominator: '5/L', five mentioners, all
+substantive; 'C1/', one content, unintegrated. A numerator of none
+drops the slash: '5L', no mentioner substantive; 'C8', nothing
+unintegrated. An ancestor stands once, before the slash
+if it is in the subset ('2b/L3'). 'ĥ' after 'K' says this occurrence
+stands in the place of one of its mirrors, a node joined to it by
+forks, which its parent's list names ('docs/mirrors.org', "The
+inPlaceOf part"). The property counts 'A' (aliases), 'I' (extra IDs)
 and 'F' (true flags) follow. So '⟨0h 2aC3⟩' has two containers, one
 of them the viewparent, and three contents.
 
@@ -494,7 +560,8 @@ it; the annotation is never saved, so the node's title is unchanged.
 *** The summary
 Unless '--no-summary' is given, the compact view starts with a few Org
 comment lines ('# ...') before the tree. They name the full view and
-the view ID, then count, from the same metadata: the headlines, node
+the view ID, say what a handle holds and that "Start here" explains
+the heralds, then count, from the same metadata: the headlines, node
 occurrences, distinct nodes, folders and other kinds; the node
 occurrences in each skgrepo, owned or foreign; the occurrences in
 foreign skgrepos, the write-protected and the folded headlines; those
