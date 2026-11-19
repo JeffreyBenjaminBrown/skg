@@ -1,0 +1,129 @@
+#+title: One-time: record an attribution in each existing fork (November 2026)
+* What changed, and why this tool exists
+A fork is a note made by copying someone else's note into your own
+skgrepo; its file lists the original under 'forks'. The fork
+operation now also records, in the fork's home section (the '.skg'
+file that carries 'title'), an 'attribution': which note was forked,
+and where that note lives. The herald '⌂:<forker/original>' is drawn
+from it ('docs/forks.org', "Attribution"). It is written once, at
+fork time, and never derived
+from 'forks' afterward, so it outlives the original's deletion, a
+nodeMerge, or the original's skgrepo not being loaded.
+
+A fork made before the change has no attribution, so it shows no such
+herald. This tool backfills one for each such fork. Each owner runs
+it once, on their own config. Nobody runs it on another owner's
+config.
+
+* What it writes
+In each home section of an owned skgrepo that has no 'attribution'
+and forks something, it appends, as the file's last key:
+#+begin_src yaml
+attribution:
+  original: <the pid of the note forked>
+  skgrepo: <that note's home skgrepo, by the name your config gives it>
+  remote_hash: <the hash of that skgrepo's git remote>
+#+end_src
+That is the form the server's serializer writes ('Attribution' in
+'server/types/nodes/attribution.rs'), minus two fields:
+** No 'commit'
+The server records the HEAD commit of the original's gitrepo at fork
+time, so that the original's text then can be read back. That commit
+is unknown now, so the tool writes none. ('uncommitted', which
+qualifies the commit, is left out with it.)
+** 'remote_hash' only where the original's skgrepo has its own remote
+Only when the original's home skgrepo directory is itself a gitrepo's
+top level (it holds '.git'), with a remote: the one named 'origin',
+else the alphabetically first. A skgrepo directory merely inside an
+enclosing gitrepo has no remote of its own, as the server sees it. The
+hash is the git blob hash of the remote's URL, normalised so that the
+ssh and https URLs of one repository agree ('normalised_remote_url'
+in 'server/attribution.rs'). The cases in
+'tests/shared/remote-hash-cases.txt' hold for both the server and this
+tool, and both are tested against them.
+
+* How it finds the original, and the limit of that
+The original is taken to be the first member (not an anchor) of the
+home section's own 'forks' list, since that is where the fork
+operation records it. That ID (a pid or an extra ID) is resolved to
+its pid, and its home skgrepo is the skgrepo whose section of that
+pid carries 'title'.
+
+The limit: a note can come to fork something other than by the fork
+operation, by a cut or an attach in a forks folder. Such a note gets
+an attribution too, naming whatever it forks first. To remove one,
+put point on the note in Emacs, run 'skg-strip-attribution', and save
+('docs/COMMANDS.org').
+
+* What it skips, and what it refuses
+It skips, and counts, a home section:
+** Already attributed
+It holds an 'attribution' key, right or wrong; the tool never changes
+one.
+** Whose original is not in any configured skgrepo
+The original's ID names no note the config loads.
+** Whose original's home is the fork's own home skgrepo
+A fork within one skgrepo needs no attribution.
+** Whose original has no single home section
+No section of the original's pid carries 'title', or several do.
+
+It refuses a file (leaves it unchanged, lists it, and exits 1) when a
+value it would write needs YAML quoting: anything but letters, digits
+and '_./-' (not starting with '-'), or a YAML special ('true', 'on',
+'null' and the like), or a number. A skgrepo named 'true', say. The
+tool does not guess at quoting. It also refuses a fork whose 'forks'
+list is not in block style.
+
+Only owned skgrepos ('foreign' absent or false) are written. Foreign
+ones are read, to find originals. Only the '*.skg' files directly in
+each skgrepo directory are read, not those in its subfolders.
+
+* How to run it
+From the root of the skg repository, with your own config:
+#+begin_src sh
+python3 tools/migrate-attributions-2026-11/migrate.py --dry-run CONFIG
+python3 tools/migrate-attributions-2026-11/migrate.py CONFIG
+#+end_src
+The dry run writes nothing and reports the same counts: the files
+attributed per owned skgrepo, and each skip reason. Then, for each
+changed skgrepo that is a gitrepo's top level, the tool prints the
+line to commit it, of this form:
+#+begin_src sh
+git -C SKGREPO commit -am 'Record fork attributions'
+#+end_src
+'-am' commits every tracked change in the gitrepo, so commit any
+unrelated work there first.
+
+A second run changes nothing: every file the first attributed now
+holds an 'attribution'.
+
+A running server built with attributions reloads the changed files
+itself (its watcher of the skgrepo directories), and draws the new
+heralds at the next redraw.
+** Jeff's
+'data/jeff/skgconfig.toml' owns six skgrepos; Claude's and the team's
+are foreign there, and are only read.
+#+begin_src sh
+python3 tools/migrate-attributions-2026-11/migrate.py --dry-run \
+  data/jeff/skgconfig.toml
+python3 tools/migrate-attributions-2026-11/migrate.py \
+  data/jeff/skgconfig.toml
+#+end_src
+Then the commit lines it prints.
+** Claude's
+'data/claude/skgconfig.toml' owns Claude's 'public', 'private' and the
+team skgrepos; Jeff's are foreign there, and are only read.
+#+begin_src sh
+python3 tools/migrate-attributions-2026-11/migrate.py --dry-run \
+  data/claude/skgconfig.toml
+python3 tools/migrate-attributions-2026-11/migrate.py \
+  data/claude/skgconfig.toml
+#+end_src
+Then the commit lines it prints.
+
+* Tests
+'test_migrate.py', over temporary directories. One-time, like the
+tool, so no suite runs it:
+#+begin_src sh
+python3 tools/migrate-attributions-2026-11/test_migrate.py
+#+end_src
