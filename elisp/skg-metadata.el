@@ -42,6 +42,18 @@ call `skg-request-save-buffer' afterward."
         (outline-next-heading))))
   (message "This change will only be applied when you save the buffer."))
 
+(defun skg-strip-attribution ()
+  "Ask the next save to remove the attribution of the node at point: the
+record a fork keeps of the note it was forked from, which its herald
+shows as \"⌂:<HOME/ORIGINAL>\" ('docs/forks.org', \"Attribution\").
+Writes `stripAttribution' as the headline's edit request. Does not
+save; call `skg-request-save-buffer' afterward."
+  (interactive)
+  (unless (org-at-heading-p)
+    (user-error "Not on a headline"))
+  (skg--write-edit-request 'stripAttribution 'node)
+  (message "The attribution goes when you save the buffer."))
+
 ;;; Detach and attach
 ;;; Under a parent that reads claims, to detach a child is to write
 ;;; 'noClaim' on it, so that the next save takes it out of the

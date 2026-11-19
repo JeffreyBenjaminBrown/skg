@@ -45,7 +45,8 @@ In order, it:
   placed write-protected; refused placements), refuses an edit of a
   write-protected foreign node, makes it editable with 'editable',
   forks a placed foreign node by adding a child to it (declined
-  without '--yes', approved with it: the clone forks it), forks an owned node with 'fork' (refused beside
+  without '--yes', approved with it: the clone forks it, and records
+  its attribution, which 'stripAttribution' removes), forks an owned node with 'fork' (refused beside
   another edit, then approved), and forks and hides by editing a
   forks folder;
 - on a fourth scratch server, writes the words of a handle:
@@ -1388,7 +1389,8 @@ def compact_line_starting (folder, start, base_name = ROOT_BASE_NAME):
 # under others with '⟨node:ID⟩', a placed foreign node is forked by an
 # edit (declined, then approved), a write-protected foreign node is
 # made editable with 'editable', and an owned node is forked with
-# 'fork'. The cases run in order on one server.
+# 'fork', and a fork's attribution is stripped with 'stripAttribution'.
+# The cases run in order on one server.
 # ============================================================
 
 FORK_INTO_MAIN = (
@@ -1403,7 +1405,8 @@ def failures_of_placing_and_forking (scratch, data_root):
                 check_placing_a_node_twice, check_placement_errors,
                 check_write_protected_foreign_edit_refused,
                 check_making_a_foreign_node_editable, check_implicit_fork_declined,
-                check_implicit_fork_approved, check_explicit_fork,
+                check_implicit_fork_approved, check_stripping_an_attribution,
+                check_explicit_fork,
                 check_forking_and_hiding_by_placing ]:
     try:
       case (context)
@@ -1650,8 +1653,31 @@ def check_implicit_fork_approved (context):
   require_equal ( "the container's content after the fork",
                   skg_list (context, "child-a-id", "contains"),
                   [ "fred-detail-id", "elsewhere-id", "fred-aside-id", "shared-id" ] )
-  require_in_compact ( folder, "*** An aside of Fred's ⟨0h C1 Kĥ1⟩\n"
+  require_in_compact ( folder, "*** An aside of Fred's ⟨0h C1 Kĥ1 ⌂:<main/fred>⟩\n"
                                "**** My note on it ⟨0v⟩\n" )
+  clone_text = read_file ( os . path . join ( context [ "main_repo" ], clone_id + ".skg" ))
+  if "attribution:\n  original: fred-aside-id\n  skgrepo: fred\n" not in clone_text:
+    raise CaseFailure ( f"the clone records no attribution to Fred's note:\n{clone_text}" )
+  context [ "clone_id" ] = clone_id
+
+def check_stripping_an_attribution (context):
+  """'stripAttribution' in the clone's handle, as the clients'
+  'skg-strip-attribution' writes it, removes the clone's record of
+  where it was forked from: its file loses the attribution, and its
+  herald, standing under a note of its own skgrepo, goes."""
+  folder = context [ "fork_folder" ]
+  clone = compact_line_starting (folder, "*** An aside of Fred's ⟨0h ")
+  edit_compact ( folder, [ ( clone, clone . replace ( "⟩", " stripAttribution⟩" )) ])
+  require_output (
+    run_save (folder, "--yes"),
+    REPORT_HEAD +
+    "Strip attribution: ⟨0h⟩ 'An aside of Fred's': it no longer records "
+    "the note it was forked from.\n" + saved_line (0) + written_paths (folder) )
+  clone_text = read_file ( os . path . join (
+    context [ "main_repo" ], context [ "clone_id" ] + ".skg" ))
+  if "attribution:" in clone_text:
+    raise CaseFailure ( f"the clone still records an attribution:\n{clone_text}" )
+  require_in_compact ( folder, "*** An aside of Fred's ⟨0h C1 Kĥ1⟩\n" )
 
 def check_explicit_fork (context):
   """'fork' on an owned node, as the clients' 'skg-fork-node' marks

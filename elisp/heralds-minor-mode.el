@@ -324,20 +324,32 @@ Returns nil if METADATA-SEXP doesn't parse as an `(skg ...)' form."
   "SEXP, a headline's metadata, with the atom `repoBoundary' in its
 `(view ...)' replaced by `(repoBoundary LABEL)': LABEL is the label
 `heralds--skgrepo-labels' gives the nodeRepo of its `(skgRepos ...)',
-or that nodeRepo when the table lacks it. A headline naming no
+or that nodeRepo when the table lacks it. On an attributed fork, whose
+`(view ...)' holds `(attribution NAME [unverified])', LABEL is
+\"<HOME/ORIGINAL>\": HOME that label, ORIGINAL NAME's label, followed
+by \"?\" when unverified ('docs/heralds.org'). A headline naming no
 nodeRepo keeps the bare atom, which renders \"⌂\" alone."
   (let ((node-repo (car (skg-sexp-cdr-at-path sexp '(skg skgRepos nodeRepo)))))
     (if (not node-repo)
         sexp
-      (let* ((repo (format "%s" node-repo))
-             (label (or (cdr (assoc repo heralds--skgrepo-labels)) repo)))
+      (let* ((label-of (lambda (repo)
+                         (let ((repo (format "%s" repo)))
+                           (or (cdr (assoc repo heralds--skgrepo-labels)) repo))))
+             (home-label (funcall label-of node-repo)))
         (mapcar (lambda (part)
                   (if (eq (car-safe part) 'view)
-                      (mapcar (lambda (fact)
-                                (if (eq fact 'repoBoundary)
-                                    (list 'repoBoundary label)
-                                  fact))
-                              part)
+                      (let* ((attribution (assq 'attribution (cdr part)))
+                             (label
+                              (if attribution
+                                  (format "<%s/%s%s>" home-label
+                                          (funcall label-of (cadr attribution))
+                                          (if (memq 'unverified (cddr attribution)) "?" ""))
+                                home-label)))
+                        (mapcar (lambda (fact)
+                                  (if (eq fact 'repoBoundary)
+                                      (list 'repoBoundary label)
+                                    fact))
+                                part))
                     part))
                 sexp)))))
 

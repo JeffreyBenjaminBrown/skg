@@ -1152,6 +1152,14 @@ The clone forks the node, and the original
 keeps its own (owned) content. A node may have at most one clone
 you own; forking an already-forked node is rejected, naming the
 existing clone. See =docs/forks.org=.
+*** M-x skg-strip-attribution
+On a fork, asks the next save to remove its attribution: the record
+of the note it was forked from, which its herald shows as
+=⌂:<HOME/ORIGINAL>=. Writes the request =stripAttribution= in the
+headline's metadata (herald =request:strip attribution=); does not
+save. A note you mean as your own, an evergreen note say, need not
+keep one; a reply in a dialog should. See =docs/forks.org=,
+"Attribution".
 *** C-c m l : skg-replace-content-with-link
 Replace the branch at point with a link to the node that used to
 be there, then save the buffer.

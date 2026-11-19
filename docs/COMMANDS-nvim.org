@@ -183,6 +183,10 @@ of the node at point. Descendent headlines that are not occurrences
 Its own binding, not a prefix-arg variant -- nvim has no prefix-arg
 protocol to reuse here the way Emacs's C-u did. Call it directly as
 <localleader>dR, or as ':SkgDeleteRecursive'.
+*** :SkgStripAttribution
+On a fork, asks the next save to remove its attribution, as
+skg-strip-attribution does in Emacs ('docs/forks.org',
+"Attribution"). No binding; does not save.
 *** <localleader>da : :SkgDeleteReferencesToAbsentNode
 On an unknown viewnode, remove that exact raw ID from owned structured
 relationships throughout retained telescopes, then refresh only views which

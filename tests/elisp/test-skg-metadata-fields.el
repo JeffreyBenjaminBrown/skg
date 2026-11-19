@@ -525,7 +525,7 @@ member, is left out elsewhere."
                  '("none (default)" "relRepo")))
   (should (equal (skg-metadata-fields-cycle-values
                   test--node-kind "editRequest" t t)
-                 '("none (default)" "delete" "merge" "relRepo" "flag"
+                 '("none (default)" "delete" "merge" "relRepo" "flag" "stripAttribution"
                    "restoreRel")))
   (should (equal (skg-metadata-fields-cycle-values
                   test--node-kind "writeProtected" nil nil)

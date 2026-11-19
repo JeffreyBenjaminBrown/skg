@@ -605,6 +605,14 @@ function M.delete ()
     'This change will only be applied when you save the buffer.')
 end
 
+---Ask the next save to remove the attribution of the node at point:
+---'stripAttribution' becomes its edit request (M.write_edit_request).
+---Does not save. Mirrors skg-strip-attribution.
+function M.strip_attribution ()
+  M.write_edit_request(sexpr.symbol('stripAttribution'), 'node')
+  vim.notify('The attribution goes when you save the buffer.')
+end
+
 -- ── detach and attach ──────────────────────────────────────────────
 -- Under a parent that reads claims, to detach a child is to write
 -- 'noClaim' on it, so that the next save takes it out of the parent's

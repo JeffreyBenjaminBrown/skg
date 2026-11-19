@@ -268,6 +268,18 @@
 (skg node (gnid x) (skgRepos (nodeRepo priv)) (view repoBoundary))
 ---- text: ⌂:priv
 ---- styles: normal*6
+==== node: an attributed fork names its home and the skgrepo forked from
+(skg node (gnid x) (skgRepos (nodeRepo pub)) (view (attribution priv) repoBoundary))
+---- text: ⌂:<public/priv>
+---- styles: normal*15
+==== node: an unverified attribution marks the recorded name
+(skg node (gnid x) (skgRepos (nodeRepo pub)) (view (attribution oldname unverified) repoBoundary))
+---- text: ⌂:<public/oldname?>
+---- styles: normal*19
+==== node: a strip-attribution request
+(skg node (gnid x) (editRequest stripAttribution))
+---- text: request:strip attribution
+---- styles: nonstandard*25
 ==== node: a repo boundary on a node naming no nodeRepo
 (skg node (gnid x) (view repoBoundary))
 ---- text: ⌂

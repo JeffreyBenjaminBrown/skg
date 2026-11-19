@@ -64,11 +64,11 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 |                      | crucial     | =☮= write-protected, =⊥= unwarranted, =ĥ= in place of another (=inPlaceOf=)   |
 |                      | high        | =B= omitted body                                                              |
 |                      | medium      | =⟳= cycle                                                                     |
-| home skgrepo heralds | normal      | =⌂:LABEL=                                                                     |
+| home skgrepo heralds | normal      | =⌂:LABEL=, and =⌂:<LABEL/ORIGINAL>= on an attributed fork                     |
 |                      | ugly        | =~NAME=, a relRepo more private than the default                              |
 | labels               | message     | folder labels, =alias=, =ID=, flag rows                                       |
 |                      | high        | the hiding note's ancestor letter in two folder labels; see below            |
-| requests             | nonstandard | =delete=, =merge:...=, =detach=, =restore node=, =restore membership=, =request:~NAME=, =request:...= flags, =req:...= views, =request:processed...= |
+| requests             | nonstandard | =delete=, =merge:...=, =request:strip attribution=, =detach=, =restore node=, =restore membership=, =request:~NAME=, =request:...= flags, =req:...= views, =request:processed...= |
 | change facts         | nonstandard | =∃+ ∃- M ~+ ~-=, =+ -= on a leaf, ~Δ⌂=a~                                        |
 |                      | go          | =✓= processed                                                                 |
 |                      | normal      | the skgrepo names in =⌂ -OLD +NEW= and =relationship moved from OLD to NEW=   |
@@ -236,7 +236,14 @@ detaching writes only the =noClaim= atom, and the save reads that as
 it reads any claim.
 
 =⌂:LABEL= marks a node's home skgrepo boundary (the atom
-=repoBoundary= in =(view ...)=). LABEL is the skgrepo's skgrepo label,
+=repoBoundary= in =(view ...)=): a root, or a node whose home skgrepo
+differs from its nearest node above. A fork that records where it was
+forked from (its attribution, =(attribution NAME [unverified])= in
+=(view ...)=; =docs/forks.org=, "Attribution") is a boundary wherever
+it stands, and reads =⌂:<LABEL/ORIGINAL>=: ORIGINAL is the label of
+the skgrepo it was forked from, followed by =?= when no loaded
+skgrepo is known to be the one recorded, its recorded name then
+shown. LABEL is the skgrepo's skgrepo label,
 its =abbreviation= in the config or else its name, from the label
 table the server sends beside the herald rules. A =~NAME= immediately
 before it reports a relationship stored at a more private relRepo than
@@ -250,7 +257,7 @@ positions. The flags folder spells out =had ID before import=, =was
 overloaded during org-roam import=, and =no search matching= when true.
 =req:folder:...=, =req:flags=, =req:editable=,
 =req:write-protected= and =req:write-protected-subtree= request a view.
-=delete=, =merge:...=, =request:no search matching=
+=delete=, =merge:...=, =request:strip attribution=, =request:no search matching=
 or =request:search matching=, and in the diff view =restore membership=
 and =restore node=, are save requests.
 
@@ -361,7 +368,10 @@ the lens or in its place:
 - =(repoBoundary LABEL)=: the client replaces the atom =repoBoundary=
   in =(view ...)= with this form, LABEL looked up in the label table by
   the headline's =nodeRepo= (the =nodeRepo= itself when the table
-  lacks it), and the rule renders it "⌂:LABEL". A headline naming no
+  lacks it), and the rule renders it "⌂:LABEL". Where =(view ...)=
+  holds =(attribution NAME [unverified])=, LABEL is "<HOME/ORIGINAL>",
+  HOME that label and ORIGINAL NAME's, then "?" when unverified; the
+  attribution form itself renders nothing. A headline naming no
   =nodeRepo= keeps the bare atom, which renders "⌂".
 - =pendingDetachment=: the client adds this atom to a headline that
   carries =noClaim=, is warranted by the graph (no =noWarrant=, no

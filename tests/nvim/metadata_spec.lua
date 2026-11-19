@@ -59,6 +59,15 @@ describe('skg.metadata commands', function ()
       '(skg node (editRequest delete))'))
   end)
 
+  it('strip_attribution asks the save to remove the attribution', function ()
+    buffer_with('* (skg node (gnid 1) (editRequest delete)) title')
+    metadata.strip_attribution()
+    assert.is_true(subtree_p(first_metadata_sexp(),
+      '(skg node (editRequest stripAttribution))'))
+    assert.is_false(subtree_p(first_metadata_sexp(),
+      '(skg node (editRequest delete))'))
+  end)
+
   it('delete moves the cursor to the next line, as skg-delete does',
      function ()
     buffer_with({ '* (skg node (gnid 1)) one', 'body', '* (skg node (gnid 2)) two' })
@@ -510,13 +519,13 @@ describe('skg.metadata commands', function ()
       { '* (skg node (gnid x) (skgRepos (nodeRepo main))) x',
         { writeProtected = atom_values, noClaim = atom_values,
           editRequest = { 'none (default)', 'delete', 'merge',
-                          'relRepo', 'flag' },
+                          'relRepo', 'flag', 'stripAttribution' },
           viewRequests = view_requests } },
       { '* (skg node (gnid x) (skgRepos (nodeRepo main)) writeProtected) x',
         { editRequest = { 'none (default)', 'relRepo' } } },
       { '* (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (diff (rel removed))) x',
         { editRequest = { 'none (default)', 'delete', 'merge',
-                          'relRepo', 'flag', 'restoreRel' } } },
+                          'relRepo', 'flag', 'stripAttribution', 'restoreRel' } } },
       { '* (skg ghost (gnid g) (skgRepos (nodeRepo main))'
           .. ' (diff (node removed))) g',
         { editRequest = { 'none (default)', 'restoreNode' } } },

@@ -30,8 +30,8 @@ prints the changes it would make, and with '--yes' saves it and
 writes the server's re-rendered view over the three files. Words in a
 handle ask for edit requests: 'delete', 'processed' or 'unprocessed'
 with 'node', 'rel' or 'both' (and 'outward' for the clients' C-u C-u),
-'restoreNode', 'restoreRel', 'merge:ID', 'relRepo:NAME',
-'noSearchMatching', 'searchMatching'; for view requests: 'editable',
+'restoreNode', 'restoreRel', 'stripAttribution', 'merge:ID',
+'relRepo:NAME', 'noSearchMatching', 'searchMatching'; for view requests: 'editable',
 'fork', 'write-protect'; 'detach' and 'attach' write or remove
 'noClaim'; 'repo:NAME' moves the node; 'subtree' asks for the
 clients' prefix-argument forms. A headline ending in '⟨node:ID⟩'
@@ -2200,12 +2200,23 @@ def changed_folder_herald_text (folder, processed):
 def metadata_with_repoBoundary_label (metadata, skgrepo_labels):
   """METADATA with the atom 'repoBoundary' in its '(view ...)'
   replaced by '(repoBoundary LABEL)', LABEL the label SKGREPO_LABELS
-  gives its nodeRepo, or that nodeRepo when the table lacks it. A
-  headline naming no nodeRepo keeps the bare atom, which renders "⌂"."""
+  gives its nodeRepo, or that nodeRepo when the table lacks it. On an
+  attributed fork, whose '(view ...)' holds '(attribution NAME
+  [unverified])', LABEL is "<HOME/ORIGINAL>": HOME that label,
+  ORIGINAL NAME's label, followed by "?" when unverified. A headline
+  naming no nodeRepo keeps the bare atom, which renders "⌂"."""
   repo = headline_node_repo (metadata)
   if repo is None:
     return metadata
   label = skgrepo_labels . get (repo, repo)
+  for part in metadata:
+    if is_list_headed_by (part, "view"):
+      for fact in part:
+        if is_list_headed_by (fact, "attribution") and len (fact) > 1:
+          original = str (fact [1])
+          unverified = any ( is_symbol_named (x, "unverified") for x in fact [2:] )
+          label = ( "<" + label + "/" + skgrepo_labels . get (original, original)
+                    + ( "?" if unverified else "" ) + ">" )
   return [ [ [ Symbol ("repoBoundary"), label ]
              if is_symbol_named (fact, "repoBoundary") else fact
              for fact in part ]
@@ -2730,10 +2741,12 @@ def side_count (metadata, relation_name, side_name):
 COMPACT_HANDLE_PATTERN = re . compile (
   r'^(.*?) ?⟨([0-9a-z]+)((?: [^⟨⟩]*)?)⟩\s*$' )
 # The handle tokens that ask for edit requests. The rebuild writes
-# them into the headline's '(editRequest ...)': one of the first three,
+# them into the headline's '(editRequest ...)': one of these
+# ('stripAttribution' the clients' 'skg-strip-attribution', which
+# removes a fork's attribution),
 # the request of that name, and after it one processed request,
 # '(processed OBJECT...)' or '(unprocessed OBJECT...)'.
-EDIT_REQUEST_TOKENS = [ "delete", "restoreNode", "restoreRel" ]
+EDIT_REQUEST_TOKENS = [ "delete", "restoreNode", "restoreRel", "stripAttribution" ]
 PROCESSED_TOKENS = [ "processed", "unprocessed" ]
 # With 'processed' or 'unprocessed', one of these says what it marks,
 # as the clients' 'C-c m n', 'C-c m r' and 'C-c m b' do: each word with
@@ -3137,7 +3150,7 @@ def placed_node_shape_error_lines (edited, index):
 
 def is_edit_request_word (word):
   """Whether WORD asks for an edit request: 'delete', 'restoreNode',
-  'restoreRel', 'merge:ID', 'relRepo:NAME', 'noSearchMatching',
+  'restoreRel', 'stripAttribution', 'merge:ID', 'relRepo:NAME', 'noSearchMatching',
   'searchMatching'."""
   return ( word in EDIT_REQUEST_TOKENS or word in SEARCH_MATCHING_TOKENS
            or word . startswith (MERGE_WORD_PREFIX)
@@ -3199,7 +3212,8 @@ def request_token_problems (headline, view_line):
   only_on_a_node = (
     headline . view_request_words () + headline . repo_words () +
     [ word for word in headline . edit_request_words ()
-      if word . startswith (MERGE_WORD_PREFIX) or word in SEARCH_MATCHING_TOKENS ] )
+      if word . startswith (MERGE_WORD_PREFIX) or word in SEARCH_MATCHING_TOKENS
+      or word == "stripAttribution" ] )
   if only_on_a_node and kind != "node":
     problems . append (
       f"carries {quoted_words (only_on_a_node)}, but is not a node "
@@ -4180,7 +4194,9 @@ def request_report_lines (edited, headline_of_handle, described):
   for word, label, suffix in [
       ( "delete", "Delete", ", from the graph" ),
       ( "restoreNode", "Restore node", ", as HEAD has it" ),
-      ( "restoreRel", "Restore membership", ", as HEAD has it" ) ]:
+      ( "restoreRel", "Restore membership", ", as HEAD has it" ),
+      ( "stripAttribution", "Strip attribution",
+        ": it no longer records the note it was forked from" ) ]:
     lines += [ label + ": " + described (headline . handle) + suffix + "."
                for headline in with_word (word) ]
   for headline, word in with_word_prefix (MERGE_WORD_PREFIX):

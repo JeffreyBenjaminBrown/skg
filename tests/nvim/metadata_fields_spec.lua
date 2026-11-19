@@ -375,7 +375,7 @@ describe('skg.sexpr.metadata_fields other kinds, arguments, conditions', functio
     assert.are.same({ 'none (default)', 'relRepo' },
       fields.cycle_values(node_kind, 'editRequest', false, false))
     assert.are.same(
-      { 'none (default)', 'delete', 'merge', 'relRepo', 'flag',
+      { 'none (default)', 'delete', 'merge', 'relRepo', 'flag', 'stripAttribution',
         'restoreRel' },
       fields.cycle_values(node_kind, 'editRequest', true, true))
     assert.are.same({ 'false (default)', 'true' },

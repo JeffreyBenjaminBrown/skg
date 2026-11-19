@@ -30,6 +30,8 @@ M.commands = {
              desc = 'Mark the node at point for deletion' },
   DeleteRecursive = { module = 'skg.metadata', fn = 'delete_recursive',
                       desc = 'Mark the node and its descendants for deletion' },
+  StripAttribution = { module = 'skg.metadata', fn = 'strip_attribution',
+                       desc = 'Ask the next save to remove the attribution of the fork at point' },
   DeleteReferencesToAbsentNode = { module = 'skg.delete_references_to_absent_node',
                                    fn = 'delete_references_to_absent_node',
                                    desc = 'Remove owned references to the unknown viewnode at point' },

@@ -257,6 +257,20 @@ its herald, as they were: the save recomputes them."
                    result
                    '(skg node (editRequest delete)))))))
 
+;; skg-strip-attribution asks the next save to remove the fork's
+;; attribution, as its edit request, in place of any other.
+(ert-deftest test-skg-strip-attribution-writes-its-request ()
+  (with-temp-buffer
+    (org-mode)
+    (insert "* (skg node (gnid fork) (skgRepos (nodeRepo public)) (editRequest delete) (view (attribution theirs) repoBoundary)) title")
+    (goto-char (point-min))
+    (skg-strip-attribution)
+    (let ((result (test-skg--extract-metadata-sexp)))
+      (should (skg-sexp-subtree-p
+               result '(skg node (editRequest stripAttribution))))
+      (should-not (skg-sexp-subtree-p
+                   result '(skg node (editRequest delete)))))))
+
 (ert-deftest test-skg-install-linkstack-minibuffer-bindings ()
   "Test merge-request prompts install linkstack bindings."
   (with-temp-buffer
@@ -763,13 +777,13 @@ unchanged."
                 ("writeProtected" . ,atom-values)
                 ("noClaim" . ,atom-values)
                 ("editRequest" . ("none (default)" "delete" "merge"
-                                  "relRepo" "flag"))
+                                  "relRepo" "flag" "stripAttribution"))
                 ("viewRequests" . ,view-requests))
                ("* (skg node (gnid x) (skgRepos (nodeRepo main)) writeProtected) x"
                 ("editRequest" . ("none (default)" "relRepo")))
                ("* (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (diff (rel removed))) x"
                 ("editRequest" . ("none (default)" "delete" "merge"
-                                  "relRepo" "flag" "restoreRel")))
+                                  "relRepo" "flag" "stripAttribution" "restoreRel")))
                ("* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed))) g"
                 ("editRequest" . ("none (default)" "restoreNode")))
                ("* (skg unknown (gnid u))"

@@ -532,8 +532,11 @@ end
 ---A copy of SEXP, a headline's metadata, with the atom 'repoBoundary'
 ---in its '(view ...)' replaced by '(repoBoundary LABEL)': LABEL is the
 ---label skg.herald_rules.get_skgrepo_labels gives the nodeRepo of its
----'(skgRepos ...)', or that nodeRepo when the table lacks it. A
----headline naming no nodeRepo keeps the bare atom, which renders "⌂"
+---'(skgRepos ...)', or that nodeRepo when the table lacks it. On an
+---attributed fork, whose '(view ...)' holds '(attribution NAME
+---[unverified])', LABEL is "<HOME/ORIGINAL>": HOME that label, ORIGINAL
+---NAME's label, followed by "?" when unverified ('docs/heralds.org').
+---A headline naming no nodeRepo keeps the bare atom, which renders "⌂"
 ---alone.
 ---@param sexp any
 ---@return any
@@ -541,11 +544,17 @@ function M.with_repoBoundary_label (sexp)
   local node_repo_form = assq(assq(sexp, 'skgRepos'), 'nodeRepo')
   local node_repo = node_repo_form and node_repo_form[2] ~= nil
     and sexpr.atom_text(node_repo_form[2])
-  local label = node_repo
-    and (herald_rules.get_skgrepo_labels()[node_repo] or node_repo)
+  local labels = herald_rules.get_skgrepo_labels()
+  local label = node_repo and (labels[node_repo] or node_repo)
   local result = {}
   for _, part in ipairs(sexp) do
     if label and sexpr.is_list(part) and part[1] == sexpr.symbol('view') then
+      local attribution = assq(part, 'attribution')
+      if attribution and attribution[2] ~= nil then
+        local original = sexpr.atom_text(attribution[2])
+        local unverified = attribution[3] == sexpr.symbol('unverified')
+        label = '<' .. label .. '/' .. (labels[original] or original)
+          .. (unverified and '?' or '') .. '>' end
       local labeled_view = {}
       for _, fact in ipairs(part) do
         table.insert(labeled_view,
