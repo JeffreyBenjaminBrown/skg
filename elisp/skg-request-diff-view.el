@@ -104,6 +104,8 @@ summary, as a save does, and any errors and warnings. Returns
               (t 'empty)))
     (error
      (skg-log 'error 'view "parsing diff view response: %S" err)
+     (skg-tell-answer-not-applied
+      "diff-view" err "the diff view was not shown")
      'failed)))
 
 (provide 'skg-request-diff-view)

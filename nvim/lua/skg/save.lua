@@ -8,6 +8,7 @@ local buffer = require('skg.buffer')
 local client = require('skg.client')
 local focus = require('skg.focus')
 local folds = require('skg.folds')
+local length_prefix = require('skg.length_prefix')
 local lock = require('skg.lock')
 local log = require('skg.log')
 local messages = require('skg.messages')
@@ -365,6 +366,8 @@ function M.broad_save_lock_handler (response)
     -- A malformed acknowledgement cannot safely authorize any unlock.
     log.log('error', 'save', 'broad save-lock handler error: %s',
             tostring(err))
+    length_prefix.tell_answer_not_applied(
+      'save-lock', err, 'views stay locked until the save ends')
   end
 end
 
@@ -384,6 +387,8 @@ function M.save_relax_lock_handler (saved_view_id, response)
     -- Retain every lock when the keep-set cannot be trusted.
     log.log('error', 'save', 'save-relax-lock handler error: %s',
             tostring(err))
+    length_prefix.tell_answer_not_applied(
+      'save-relax-lock', err, 'views stay locked until the save ends')
   end
 end
 
@@ -417,6 +422,11 @@ function M.apply_streamed_view_update (_payload_text, response,
   if not ok then
     log.log('error', log_category, '%s handler error: %s',
             handler_name, tostring(err))
+    length_prefix.tell_answer_not_applied(
+      handler_name, err,
+      log_category == 'save'
+        and 'the server may have saved, but a view was not redrawn'
+        or 'a view was not redrawn')
   end
 end
 
@@ -694,6 +704,7 @@ function M.save_result_handler (save_buf, response)
   if not ok then
     log.log('error', 'save', 'parsing save response: %s',
             tostring(err))
+    length_prefix.tell_answer_not_applied('save-result', err)
   end
 end
 
@@ -929,6 +940,9 @@ function M.fork_confirmation_handler (save_buf, response, strandeds_review,
   if not ok then
     log.log('error', 'save', 'fork-confirmation handler error: %s',
             tostring(err))
+    length_prefix.tell_answer_not_applied(
+      'fork-confirmation', err,
+      'nothing was saved, and the fork confirmation was not shown')
     return
   end
   if confirm_buf and #vim.api.nvim_list_uis() > 0 then
@@ -999,6 +1013,8 @@ function M.telescope_hoist_confirmation_handler (
     log.log('error', 'save',
             'telescope-hoist-confirmation handler error: %s',
             tostring(err))
+    length_prefix.tell_answer_not_applied(
+      'telescope-hoist-confirmation', err, 'the save stopped for a confirmation, which failed, so it may not have saved')
   end
 end
 
@@ -1048,6 +1064,8 @@ function M.delete_from_confirmation_handler (
   if not ok then
     log.log('error', 'save', 'delete-from-confirmation handler error: %s',
             tostring(err))
+    length_prefix.tell_answer_not_applied(
+      'delete-from-confirmation', err, 'the save stopped for a confirmation, which failed, so it may not have saved')
   end
 end
 
@@ -1111,6 +1129,8 @@ function M.strandeds_confirmation_handler (
   if not ok then
     log.log('error', 'save', 'strandeds-confirmation handler error: %s',
             tostring(err))
+    length_prefix.tell_answer_not_applied(
+      'strandeds-confirmation', err, 'the save stopped for a confirmation, which failed, so it may not have saved')
   end
 end
 

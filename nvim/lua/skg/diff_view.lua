@@ -7,6 +7,7 @@
 
 local buffer = require('skg.buffer')
 local client = require('skg.client')
+local length_prefix = require('skg.length_prefix')
 local log = require('skg.log')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
@@ -100,6 +101,8 @@ function M.handle_diffView_response (response, buffer_name, view_id)
   if not ok then
     log.log('error', 'view', 'parsing diff view response: %s',
             tostring(outcome))
+    length_prefix.tell_answer_not_applied(
+      'diff-view', outcome, 'the diff view was not shown')
     return 'failed' end
   return outcome
 end

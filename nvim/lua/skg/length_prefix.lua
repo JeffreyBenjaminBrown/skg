@@ -17,6 +17,27 @@ local sexpr = require('skg.sexpr.parse')
 
 local M = {}
 
+---What tell_answer_not_applied says happened, unless told otherwise.
+M.answer_not_applied_default_consequence =
+  'the server may have saved, but the buffer was not updated'
+
+---Say (vim.notify) that applying the server's ANSWER (its response
+---type) failed with ERR, and what that means: CONSEQUENCE, by default
+---M.answer_not_applied_default_consequence. A handler that catches an
+---error while applying an answer calls this as well as log.log, which
+---is off by default (log.log_file): an error only logged leaves the
+---user thinking the command did nothing.
+---@param answer string
+---@param err any
+---@param consequence string|nil
+function M.tell_answer_not_applied (answer, err, consequence)
+  vim.notify(string.format(
+               "skg: %s: applying the server's %s answer failed (%s)",
+               consequence or M.answer_not_applied_default_consequence,
+               answer, tostring(err)),
+             vim.log.levels.ERROR)
+end
+
 ---Consume the message stream in chunks: accumulate CHUNK's bytes,
 ---then step the LP machine until it must wait or finishes a message;
 ---each completed message dispatches by response-type. Continues while
@@ -85,6 +106,11 @@ function M.dispatch_by_type (payload)
   if not ok then
     log.log('error', 'dispatch', 'dispatch error: %s for payload: %s',
             tostring(err), payload:sub(1, 80))
+    local read_ok, response = pcall(sexpr.read, payload)
+    M.tell_answer_not_applied(
+      (read_ok and M.response_type_of(response)) or 'unreadable', err,
+      'the server may have acted (saved, say), but the client did not'
+        .. ' finish handling its answer')
   end
 end
 

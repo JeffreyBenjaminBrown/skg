@@ -9,6 +9,26 @@
 (require 'skg-log)
 (require 'skg-state)
 
+(defconst skg-answer-not-applied-default-consequence
+  "the server may have saved, but the buffer was not updated"
+  "What `skg-tell-answer-not-applied' says happened, unless told otherwise.")
+
+(defun skg-tell-answer-not-applied (answer err &optional consequence)
+  "Say in the echo area that applying the server's ANSWER (its
+response type) failed with ERR, and what that means: CONSEQUENCE, by
+default `skg-answer-not-applied-default-consequence'.
+A handler that catches an error while applying an answer calls this as
+well as `skg-log', which is off by default (`skg-log-file'): an error
+only logged leaves the user thinking the command did nothing.
+This lives here, not in skg-log.el, because `skg-reload' keeps
+`skg-log' as first loaded, so a function new to that file would be
+void until Emacs restarts."
+  (message "%s"
+           (format "skg: %s: applying the server's %s answer failed (%s)"
+                   (or consequence skg-answer-not-applied-default-consequence)
+                   answer
+                   (error-message-string err))))
+
 (defun skg-lp-handle-generic-chunk (tcp-proc chunk)
   "Consumes the message stream in chunks. When a message is completed, dispatches it and continues for the remaining chunks. In more detail:
 .
@@ -88,7 +108,13 @@ because the sexp crate emits simple strings unquoted."
                 ) ))) ))
     (error
      (skg-log 'error 'dispatch "dispatch error: %S for payload: %s"
-              err (substring payload 0 (min 80 (length payload)))) )))
+              err (substring payload 0 (min 80 (length payload))))
+     (skg-tell-answer-not-applied
+      (or (ignore-errors
+            (cadr (assoc 'response-type (read payload))))
+          "unreadable")
+      err
+      "the server may have acted (saved, say), but the client did not finish handling its answer") )))
 
 (defun skg-lp-step (buf bytes-left)
   "One pure(ish) step of the LP machine.

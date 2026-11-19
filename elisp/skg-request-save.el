@@ -378,7 +378,9 @@ WHY: A character offset from buffer start is not stable enough: saving can make 
           (error "Malformed broad save-lock payload")))
     (error
      ;; A malformed acknowledgement cannot safely authorize any unlock.
-     (skg-log 'error 'save "broad save-lock handler error: %S" err)) ))
+     (skg-log 'error 'save "broad save-lock handler error: %S" err)
+     (skg-tell-answer-not-applied
+      "save-lock" err "views stay locked until the save ends")) ))
 
 (defun skg--save-relax-lock-handler (saved-view-id payload)
   "Narrow broad save locks to SAVED-VIEW-ID and the view IDs in PAYLOAD."
@@ -397,7 +399,9 @@ WHY: A character offset from buffer start is not stable enough: saving can make 
     (error
      ;; Retain every lock: an incomplete or malformed keep-set cannot safely
      ;; identify a buffer whose checked contents are no longer needed.
-     (skg-log 'error 'save "save-relax-lock handler error: %S" err)) ))
+     (skg-log 'error 'save "save-relax-lock handler error: %S" err)
+     (skg-tell-answer-not-applied
+      "save-relax-lock" err "views stay locked until the save ends")) ))
 
 (defun skg--apply-streamed-view-update (
          payload log-category handler-name &optional keep-unsaved-edits)
@@ -420,7 +424,12 @@ as it is, and named in the echo area."
               (skg--replace-buffer-keeping-viewnode-points-and-folds
                content)))))
     (error (skg-log 'error log-category
-                    "%s handler error: %S" handler-name err))))
+                    "%s handler error: %S" handler-name err)
+           (skg-tell-answer-not-applied
+            handler-name err
+            (if (eq log-category 'save)
+                "the server may have saved, but a view was not redrawn"
+              "a view was not redrawn")))))
 
 (defun skg--replace-buffer-keeping-viewnode-points-and-folds (new-content)
   "Replace the current buffer with NEW-CONTENT, a redraw the user did
@@ -833,6 +842,9 @@ re-save carries again."
                buf)
            (error
             (skg-log 'error 'save "fork-confirmation handler error: %S" err)
+            (skg-tell-answer-not-applied
+             "fork-confirmation" err
+             "nothing was saved, and the fork confirmation was not shown")
             nil))))
     (when (and confirm-buf (not noninteractive))
       ;; In batch (tests) the caller drives skg-approve-fork /
@@ -892,7 +904,10 @@ choice, carrying the other approvals along. Cancel saves nothing."
                  approved-forks fork-skgrepos approved-hoist-pids
                  strandeds-review delete-from))))))
     (error
-     (skg-log 'error 'save "delete-from-confirmation handler error: %S" err))))
+     (skg-log 'error 'save "delete-from-confirmation handler error: %S" err)
+     (skg-tell-answer-not-applied
+      "delete-from-confirmation" err
+      "the save stopped for a confirmation, which failed, so it may not have saved"))))
 
 (defun skg--delete-from-of-choice (choice)
   "The delete-from field's value for CHOICE, a key of the delete-from
@@ -951,7 +966,10 @@ same save with that review, carrying the other approvals along."
                  approved-forks fork-skgrepos approved-hoist-pids
                  review delete-from))))))
     (error
-     (skg-log 'error 'save "strandeds-confirmation handler error: %S" err))))
+     (skg-log 'error 'save "strandeds-confirmation handler error: %S" err)
+     (skg-tell-answer-not-applied
+      "strandeds-confirmation" err
+      "the save stopped for a confirmation, which failed, so it may not have saved"))))
 
 (defun skg--strandeds-from-response (response)
   "The stranded relationships in a strandeds-confirmation RESPONSE, each a
@@ -1060,7 +1078,10 @@ if it had already been reviewed, and DELETE-FROM if it had been chosen."
              "Hoist aborted; nothing was saved. Repair the .skg sections manually."))))
     (error
      (skg-log 'error 'save
-              "telescope-hoist-confirmation handler error: %S" err))))
+              "telescope-hoist-confirmation handler error: %S" err)
+     (skg-tell-answer-not-applied
+      "telescope-hoist-confirmation" err
+      "the save stopped for a confirmation, which failed, so it may not have saved"))))
 
 (defun skg--save-text-release-confirmation-handler (payload)
   "Handle a save-rerender text release challenge, the terminal message
@@ -1105,7 +1126,10 @@ Declining leaves the buffers as they are."
              "Save succeeded; protected rerender text remains withheld and buffers are unchanged."))))
     (error
      (skg-log 'error 'save
-              "save text-release confirmation handler error: %S" err))))
+              "save text-release confirmation handler error: %S" err)
+     (skg-tell-answer-not-applied
+      "overPrivateText-telescope-confirmation" err
+      "the server saved, but the views it withheld were not redrawn"))))
 
 (defun skg--fork-suggested-repo-above-point ()
   "Return the suggested repo named by the comment directly above the
@@ -1326,7 +1350,8 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
             (message "%s" (skg--save-hides-message
                            hides (current-message))))))
     (error (skg-log 'error 'save "parsing save response: %S" err)
-           (skg-log 'error 'save "sexp string was: %S" sexp-string))))
+           (skg-log 'error 'save "sexp string was: %S" sexp-string)
+           (skg-tell-answer-not-applied "save-result" err))))
 
 (defun skg--save-hides-message (hides &optional shown)
   "The echo-area text after a save whose answer's '(hides ...)' is

@@ -196,7 +196,10 @@ response a rerender stream follows."
               (cadr lock-entry))))
        (error
         (skg--unlock-all-save-locked)
-        (skg-log 'error 'rerender "rerender-lock handler error: %S" err))))
+        (skg-log 'error 'rerender "rerender-lock handler error: %S" err)
+        (skg-tell-answer-not-applied
+         "rerender-lock" err
+         "every view was unlocked before the rerender redrew it"))))
    t)
   (skg-register-response-handler
    ;; 2. Per-view update: unlock and update each buffer.

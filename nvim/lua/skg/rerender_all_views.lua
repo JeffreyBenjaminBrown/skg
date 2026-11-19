@@ -7,6 +7,7 @@
 -- The Lua port of elisp/skg-request-rerender-all-views.el.
 
 local client = require('skg.client')
+local length_prefix = require('skg.length_prefix')
 local lock = require('skg.lock')
 local log = require('skg.log')
 local messages = require('skg.messages')
@@ -222,6 +223,9 @@ function M.register_rerender_stream_handlers ()
         lock.unlock_all_save_locked()
         log.log('error', 'rerender',
                 'rerender-lock handler error: %s', tostring(err))
+        length_prefix.tell_answer_not_applied(
+          'rerender-lock', err,
+          'every view was unlocked before the rerender redrew it')
       end
     end, true)
   state.register_response_handler('rerender-view',
