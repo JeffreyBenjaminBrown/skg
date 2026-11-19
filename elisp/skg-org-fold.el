@@ -157,27 +157,6 @@ Caller must `set-marker' each to nil when done."
         (forward-line 1)))
     markers))
 
-(defun skg-add-folded-metadata ()
-  "Annotate the headline at each fold-relevant position.
-- For each *invisible* headline (hidden inside a folded ancestor),
-  merge `(skg folded)' into its metadata.
-- For each *visible* headline whose body content is hidden (e.g.
-  via `org-fold-hide-entry'), merge `(skg bodyFolded)' instead.
-The two flags are mutually exclusive in this pass — a hidden
-headline doesn't get to record its own body state, since it's
-already covered by the ancestor's subtree fold."
-  (save-excursion
-    (goto-char (point-min))
-    (while (not (eobp))
-      (beginning-of-line)
-      (when (org-at-heading-p)
-        (cond
-         ((invisible-p (point))
-          (skg-edit-metadata-at-point '(skg folded)))
-         ((skg-headline-body-hidden-p)
-          (skg-edit-metadata-at-point '(skg bodyFolded)))))
-      (forward-line 1))))
-
 (defun skg--fold-state-of-headline-at-point ()
   "The fold state of the headline at point, which point is at the start
 of: `hidden' inside a folded ancestor; `collapsed', its children hidden

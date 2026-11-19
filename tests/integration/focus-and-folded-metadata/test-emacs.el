@@ -104,13 +104,11 @@
 
       (setq integration-test-phase "ready-to-save")
 
-      ;; Debug: Manually test skg-add-folded-metadata
-      (message "=== Testing skg-add-folded-metadata ===")
-      (skg-add-folded-metadata)
-      (let ((after-folded-metadata (buffer-substring-no-properties (point-min) (point-max))))
+      ;; Debug: the text the save will send, with its fold and focus atoms
+      (let ((after-folded-metadata (skg--buffer-snapshot-with-save-metadata)))
         (with-temp-file "after-folded-metadata.log"
           (insert after-folded-metadata))
-        (message "Buffer after skg-add-folded-metadata:\n%s" after-folded-metadata))
+        (message "Text the save will send:\n%s" after-folded-metadata))
 
       ;; Save the buffer
       (message "=== PHASE 2: Saving buffer ===")

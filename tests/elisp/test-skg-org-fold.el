@@ -6,6 +6,7 @@
 (require 'cl-lib)
 (require 'org)
 (require 'skg-org-fold)
+(require 'skg-request-save)
 
 (ert-deftest test-skg-fold-round-trip ()
   "Test folding and unfolding with metadata atoms."
@@ -30,13 +31,14 @@
           5))
 
       (skg-remove-folded-metadata)
-      (skg-add-folded-metadata)
+      (goto-char (point-min))
       (let*
           ((expected
             ;; Every sibling of a folded node should be folded.
             ;; 'folded' is a top-level bare atom, written where the
-            ;; server writes it: before the kind atom.
-            "* 1
+            ;; server writes it: before the kind atom. The headline
+            ;; holding point is 'focused'.
+            "* (skg focused) 1
 1 body
 ** 11
 *** (skg folded node (gnid 1)) 111
@@ -47,11 +49,43 @@
 121 body
 *** (skg folded) 122
 ** 13")
-           (actual (buffer-substring-no-properties (point-min)
-                                                   (point-max))))
+           (actual (skg--buffer-snapshot-with-save-metadata)))
         (should (equal actual
                        expected))))
     (kill-buffer buf)))
+
+(ert-deftest test-save-snapshot-leaves-the-buffer-untouched ()
+  "The text a save sends carries 'folded' on each hidden headline,
+'bodyFolded' on one whose entry alone is hidden, and 'focused' on the
+headline holding point; the buffer keeps its text, its folds and point,
+and no change to it runs a modification hook."
+  (with-temp-buffer
+    (org-mode)
+    (insert "* (skg node (gnid 1)) 1\n1 body\n** 11\n*** 111\n** 12\n12 body\n*** 121\n")
+    (goto-char (point-min))
+    (search-forward "** 11")
+    (org-fold-hide-subtree)
+    (search-forward "** 12")
+    (org-fold-hide-entry)
+    (let ((text (buffer-substring-no-properties (point-min) (point-max)))
+          (start (point))
+          (changes 0))
+      (add-hook 'after-change-functions
+                (lambda (&rest _) (setq changes (1+ changes))) nil t)
+      (should
+       (equal (skg--buffer-snapshot-with-save-metadata)
+              "* (skg node (gnid 1)) 1\n1 body\n** 11\n*** (skg folded) 111\n** (skg focused bodyFolded) 12\n12 body\n*** 121\n"))
+      (should (= changes 0))
+      (should (= (point) start))
+      (should (equal (buffer-substring-no-properties (point-min) (point-max))
+                     text))
+      (goto-char (point-min))
+      (search-forward "*** 111")
+      (should (invisible-p (line-beginning-position)))
+      (search-forward "12 body")
+      (should (invisible-p (line-beginning-position)))
+      (search-forward "*** 121")
+      (should-not (invisible-p (line-beginning-position))))))
 
 (ert-deftest test-skg-fold-marked-headlines-ends-on-a-top-level-folded-headline ()
   "A top-level headline marked `folded' has no parent to fold, so it

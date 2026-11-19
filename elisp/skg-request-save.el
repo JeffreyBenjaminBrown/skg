@@ -69,17 +69,13 @@ the buffers are locked."
     ;; Rather than complain, save as if point were at the first headline.
     (goto-char (point-min))
     (outline-next-heading))
-  (let ((focused-had-metadata ;; Whether the focused headline already has metadata. Storing this lets us clean up the bare (skg) that removal leaves behind.
-         (save-excursion
-           (org-back-to-heading t)
-           (looking-at "\\*+ (skg")))
-        (save-point-position
+  (let ((save-point-position
          (skg--current-save-point-position)))
     (let* ((tcp-proc (skg-tcp-connect-to-rust))
            (save-buffer (current-buffer))
            (saved-view-id skg-view-id)
            (buffer-contents
-            (skg--buffer-snapshot-with-save-metadata focused-had-metadata))
+            (skg--buffer-snapshot-with-save-metadata))
            (baseline (skg--saved-buffer-baseline))
            (other-view-buffer-snapshots
             (skg--other-view-buffer-snapshots save-buffer))
@@ -213,33 +209,50 @@ the Rust server."
        "()")
      "))")))
 
-(defun skg--buffer-snapshot-with-save-metadata (focused-had-metadata)
-  "Return current text with transient save atoms, restoring the buffer.
-FOCUSED-HAD-METADATA records whether atom removal can leave a bare skg
-form.  The saved buffer's lock is suspended only during this synchronous
-internal edit; it is restored before any request is sent."
-  (let ((was-save-locked skg--save-lock-overlay)
-        (skg--inhibit-dirty-view-confirmation t)
-        buffer-snapshot)
-    (when was-save-locked
-      (skg--unlock-after-save))
-    (unwind-protect
-        (progn
-          (skg-add-folded-metadata)
-          (skg-add-focused-metadata)
-          ;; Text properties are an Emacs presentation concern.  If retained,
-          ;; `prin1-to-string' emits #("..." ...) syntax, which is not part of
-          ;; the shared S-expression protocol and is parsed as extra fields by
-          ;; the Rust reader.
-          (setq buffer-snapshot
-                (buffer-substring-no-properties (point-min) (point-max))))
-      (skg-remove-focused-metadata)
-      (skg-remove-folded-metadata)
-      (unless focused-had-metadata
-        (skg-strip-bare-skg-at-focused-headline))
-      (when was-save-locked
-        (skg--lock-for-save)))
-    buffer-snapshot))
+(defun skg--transient-save-atoms ()
+  "The atoms a save writes into the current buffer's headline metadata,
+as a list of (POSITION ATOM...), one per headline that gets any, last
+headline first: `(skg folded)' on a headline hidden inside a folded
+ancestor, else `(skg bodyFolded)' on one whose entry alone is hidden
+\(`skg-headline-body-hidden-p'), and then `(skg focused)' on the
+headline holding point."
+  (let ((focused (save-excursion (org-back-to-heading t) (point)))
+        (headline-atoms nil))
+    (save-excursion
+      (goto-char (point-min))
+      (while (not (eobp))
+        (when (org-at-heading-p)
+          (let ((atoms
+                 (append (cond ((invisible-p (point)) '((skg folded)))
+                               ((skg-headline-body-hidden-p)
+                                '((skg bodyFolded))))
+                         (when (= (point) focused) '((skg focused))))))
+            (when atoms
+              (push (cons (point) atoms) headline-atoms))))
+        (forward-line 1)))
+    headline-atoms))
+
+(defun skg--buffer-snapshot-with-save-metadata ()
+  "Return the current buffer's text, without text properties, with the
+transient save atoms (`skg--transient-save-atoms') merged into its
+headlines' metadata.  The atoms are written into a copy, so the buffer
+itself, its folds, and its modification hooks are untouched.  Text
+properties are an Emacs presentation concern: `prin1-to-string' would
+emit them as #(\"...\" ...) syntax, which the Rust reader does not
+accept."
+  (let ((headline-atoms (skg--transient-save-atoms))
+        (headline-regexp outline-regexp)
+        (text (buffer-substring-no-properties (point-min) (point-max))))
+    (with-temp-buffer
+      (insert text)
+      (setq-local outline-regexp headline-regexp)
+      ;; Last headline first, so that each rewrite leaves the positions
+      ;; of the headlines above it valid.
+      (dolist (entry headline-atoms)
+        (goto-char (car entry))
+        (dolist (atom (cdr entry))
+          (skg-edit-metadata-at-point atom)))
+      (buffer-substring-no-properties (point-min) (point-max)))))
 
 (defun skg--other-view-buffer-snapshots (saved-buffer)
   "Return the structured states of every live view except SAVED-BUFFER."
@@ -356,15 +369,6 @@ WHY: A character offset from buffer start is not stable enough: saving can make 
                     nil
                     window))
             0))))
-
-(defun skg-strip-bare-skg-at-focused-headline ()
-  "Remove bare (skg) from the current headline if that is its only metadata.
-Used after atom removal to clean up headlines that had no metadata
-before the add/remove cycle."
-  (save-excursion
-    (org-back-to-heading t)
-    (when (looking-at "\\(\\*+ \\)(skg) ")
-      (replace-match "\\1"))))
 
 (defun skg--broad-save-lock-handler (payload)
   "Validate a broad save-lock acknowledgement without narrowing locks."

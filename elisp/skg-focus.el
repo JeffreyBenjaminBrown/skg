@@ -8,15 +8,6 @@
 (require 'skg-org-fold)
 (require 'skg-sexpr-search)
 
-(defun skg-add-focused-metadata ()
-  "Add 'focused' to metadata of the current headline.
-If point is in a headline body, navigates to the owning headline.
-Merges '(skg focused)' into existing metadata.
-If metadata already contains 'focused', no change."
-  (save-excursion
-    (org-back-to-heading t)
-    (skg-edit-metadata-at-point '(skg focused))))
-
 (defun skg-goto-focused-headline ()
   "Move point to the first headline with 'focused' in its (view ...) metadata.
 If no focused headline is found, move point to the beginning of buffer.
