@@ -115,6 +115,7 @@ fn node_for_section (
     flags : if section . explicit_id . is_some () {
       vec![Flag::Had_ID_Before_Import]
     } else { Vec::new () },
+    attribution : None,
   }
 }
 

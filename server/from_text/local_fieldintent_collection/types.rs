@@ -79,6 +79,7 @@ pub enum FieldIntent {
   Delete          { skgrepo : SkgrepoName },
   NodeMerge       { acquiree : ID },
   SetFlag     { flag : Flag, value : bool },
+  StripAttribution,
   // The remaining kinds are combineable.
   MemberAsSuchVisibility (MemberAsSuchVisibility),
   HiddenOutsideEdit  (HiddenOutsideEdit),
@@ -180,6 +181,7 @@ pub struct FieldIntentsForOneId {
   pub delete         : bool,
   pub node_merge     : Option<ID>, // This holds the acquiree.
   pub flag       : Option<(Flag, bool)>,
+  pub strip_attribution : bool,
   pub member_as_such_visibility : Vec<MemberAsSuchVisibility>, // This slot is combineable.
   pub hidden_outside : Vec<HiddenOutsideEdit>,     // This slot is combineable.
   pub forks_folder_members : Vec<ForksFolderMembers>, // This slot is combineable.
@@ -206,7 +208,8 @@ impl FieldIntentsForOneId {
       || self . aliases       . is_some()
       || self . forks . is_some()
       || self . node_merge    . is_some()
-      || self . flag      . is_some() }}
+      || self . flag      . is_some()
+      || self . strip_attribution }}
 
 impl CollectedFieldIntents {
   pub fn new (
@@ -326,6 +329,9 @@ impl CollectedFieldIntents {
             fill_exclusive_slot (
               &mut entry . flag, (flag, value),
               "flag", &target, emitters) },
+          FieldIntent::StripAttribution => {
+            entry . strip_attribution = true;
+            Ok (( )) },
           FieldIntent::Delete { .. }
             | FieldIntent::MemberAsSuchVisibility (_)
             | FieldIntent::HiddenOutsideEdit (_)

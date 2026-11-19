@@ -33,6 +33,9 @@ mod collateral_new_link;
 #[path = "fork.rs"]
 mod fork;
 
+#[path = "fork_attribution.rs"]
+mod fork_attribution;
+
 #[path = "what_the_refresh_keeps.rs"]
 mod what_the_refresh_keeps;
 

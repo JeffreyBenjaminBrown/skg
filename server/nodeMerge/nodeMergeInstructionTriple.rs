@@ -288,6 +288,7 @@ fn create_acquiree_text_preserver(acquiree: &Graphnode) -> Graphnode {
       &acquiree . flags, Flag::NoSearchMatching)
       { vec![Flag::NoSearchMatching] }
       else { Vec::new () },
+    attribution                  : None,
   }}
 
 #[cfg(test)]

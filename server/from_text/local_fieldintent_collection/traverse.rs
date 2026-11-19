@@ -250,7 +250,13 @@ fn visit_occurrence (
               &headline,
               t . gnid . clone(),
               FieldIntent::SetFlag {
-                flag : *flag, value : *value } ) ?; }}},}}
+                flag : *flag, value : *value } ) ?; }
+          if let Some (NodeEditRequest::StripAttribution) =
+            t . edit_request()
+          { collected . instructionMerge_fieldIntent (
+              &headline,
+              t . gnid . clone(),
+              FieldIntent::StripAttribution ) ?; }}},}}
   recurse_under_vognode (
     node_ref,
     Some ( DefiningFolderRecorder {

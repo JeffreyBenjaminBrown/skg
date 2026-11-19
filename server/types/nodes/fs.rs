@@ -29,6 +29,7 @@ use crate::telescope::types::{ListItem, SectionSlices};
 use crate::types::misc::{ID, MSV, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::complete::Flag;
+use crate::types::nodes::attribution::Attribution;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct GraphnodeOnDisk {
@@ -65,6 +66,9 @@ pub struct GraphnodeOnDisk {
 
   #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "misc")]
   pub flags: Vec<Flag>,
+
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub attribution: Option<Attribution>, // home section only, like flags
 }
 
 impl GraphnodeOnDisk {
@@ -127,6 +131,7 @@ impl GraphnodeOnDisk {
         &skgrepo,
         msv_gnids ( self . hides ) ),
       flags                         : self . flags,
+      attribution                   : self . attribution,
       home_skgrepo: skgrepo,
     }}
 
@@ -179,9 +184,10 @@ impl GraphnodeOnDisk {
 pub fn graphnode_on_disk_from_section (
   pid       : &ID,
   extra_ids : &[ID],
-  flags     : &[Flag],
-  is_home   : bool,
-  slices    : SectionSlices,
+  flags       : &[Flag],
+  attribution : Option<&Attribution>,
+  is_home     : bool,
+  slices      : SectionSlices,
 ) -> GraphnodeOnDisk {
   GraphnodeOnDisk {
     title                        : slices . title,
@@ -200,7 +206,9 @@ pub fn graphnode_on_disk_from_section (
     hides                        :
       slices . hides . unwrap_or_default (),
     flags                        :
-      if is_home { flags . to_vec () } else { Vec::new () }, }}
+      if is_home { flags . to_vec () } else { Vec::new () },
+    attribution                  :
+      if is_home { attribution . cloned () } else { None }, }}
 
 /// Render BODY as a YAML block-literal key-value of the form
 /// `body: |2…\n  line\n  line\n`. Returns Some only when the result

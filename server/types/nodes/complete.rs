@@ -15,6 +15,7 @@
 
 use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName};
 use crate::skgrepo_sets::SkgrepoRestriction;
+use crate::types::nodes::attribution::Attribution;
 
 use std::collections::HashSet;
 
@@ -105,6 +106,10 @@ pub struct Graphnode {
   pub hides                        : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.
 
   pub flags: Vec<Flag>,
+
+  /// What a fork records of the note it was forked from; see
+  /// [[./attribution.rs]].
+  pub attribution: Option<Attribution>,
 }
 
 impl Graphnode {
@@ -178,6 +183,7 @@ pub fn empty_graphnode () -> Graphnode {
     forks                        : MSV::Unspecified,
     hides                        : MSV::Unspecified,
     flags                        : Vec::new (),
+    attribution                  : None,
   }}
 
 #[cfg(test)]

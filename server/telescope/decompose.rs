@@ -17,6 +17,7 @@ use crate::types::misc::{
   ID, RelPartner, SkgConfig, SkgrepoName,
 };
 use crate::types::nodes::complete::Flag;
+use crate::types::nodes::attribution::Attribution;
 use crate::types::nodes::fs::{GraphnodeOnDisk, graphnode_on_disk_from_section};
 
 use std::collections::HashMap;
@@ -27,6 +28,7 @@ pub struct DecompositionInput<'a> {
   pub pid                          : &'a ID,
   pub extra_ids                    : &'a [ID],
   pub flags                        : &'a [Flag],
+  pub attribution                  : Option<&'a Attribution>,
   pub title                        : Option<&'a str>,
   pub body                         : Option<&'a str>,
   pub home                         : &'a SkgrepoName,
@@ -166,7 +168,7 @@ pub fn decompose_node (
       let is_home : bool = skgrepo == * input . home;
       let node_fs : GraphnodeOnDisk = graphnode_on_disk_from_section (
         input . pid, input . extra_ids, input . flags,
-        is_home, slices );
+        input . attribution, is_home, slices );
       (skgrepo, node_fs) } )
     . collect ();
   DecomposedTelescope::try_new (

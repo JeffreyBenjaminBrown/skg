@@ -326,7 +326,8 @@ fn graphnode_from_section_tree (
     flags                        :
       if tree . section . had_id {
         vec![Flag::Had_ID_Before_Import] }
-      else { Vec::new () }, }}
+      else { Vec::new () },
+    attribution                  : None, }}
 
 fn collect_body (
   lines : &[String],

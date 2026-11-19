@@ -5,6 +5,7 @@
 //! GraphnodeInRust construction time.
 
 use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName, members_msv};
+use crate::types::nodes::attribution::Attribution;
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::links::links_from_node;
 use crate::skgrepo_sets::SkgrepoRestriction;
@@ -22,6 +23,7 @@ pub struct GraphnodeInRust {
   pub forks                        : MSV<RelPartner<ID>>,
   pub hides                        : MSV<RelPartner<ID>>,
   pub flags                        : Vec<Flag>,
+  pub attribution                  : Option<Attribution>,
   // PITFALL: derived from the text.
   // Parsed from title+body via 'links_from_node' during
   // construction; never read from disk.
@@ -48,6 +50,7 @@ impl From<&Graphnode> for GraphnodeInRust {
       forks                        : c . forks . clone (),
       hides                        : c . hides . clone (),
       flags                        : c . flags . clone (),
+      attribution                  : c . attribution . clone (),
       linksTo,
     }
   }

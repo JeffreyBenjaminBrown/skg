@@ -1,4 +1,5 @@
 pub mod telescope;
+pub mod attribution;
 pub mod consts;
 pub mod prominence;
 pub mod delete_references_to_absent_node;

@@ -598,6 +598,7 @@ pub(crate) fn graphnode_from_graphnodeInRust (
     forks                        : rust . forks . clone (),
     hides                        : rust . hides . clone (),
     flags                        : rust . flags . clone (),
+    attribution                  : rust . attribution . clone (),
   }}
 
 pub fn update_fs_from_nodeInstructions (

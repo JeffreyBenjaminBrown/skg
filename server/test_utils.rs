@@ -878,7 +878,8 @@ It better be okay with newlines."# . to_string() ),
                              ID::new ("12"),
                              ID::new ("13")])),
     hides: MSV::Unspecified,
-    flags: Vec::new (), }}
+    flags: Vec::new (),
+    attribution: None, }}
 
 /// Extract Graphnode from Save variant; panics on Delete.
 pub fn extract_graphnode_if_save_else_error(

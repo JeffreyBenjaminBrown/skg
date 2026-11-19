@@ -1,4 +1,5 @@
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::attribution::{AttributedSkgrepo, attributed_skgrepo};
 use crate::dbs::in_rust_graph::mirrors::side_of_mirror_shown;
 use crate::dbs::in_rust_graph::stats::mentioner_is_substantive;
 use crate::dbs::in_rust_graph::relation_accessors::{
@@ -76,6 +77,7 @@ fn set_viewnodestats_recursive (
         tree, treeid, &node_pid, ancestor_gnids );
       if multi_skgrepo {
         set_skgrepo_at_boundary (tree, treeid); }
+      set_attribution (tree, treeid, &node_pid, graph, config);
       let fork_roles : Option<ForksFolderMemberRoles> =
         forks_folder_member_roles (tree, treeid, graph, restriction, relRepos);
       let stands_as_member_here : bool = match &fork_roles {
@@ -724,6 +726,26 @@ mod relationship_default_tests {
         member ); }
   }
 }
+
+/// Sets the attribution of the occurrence at treeid, from its node's,
+/// and with it its repoBoundary: an attributed fork shows whose note it
+/// forked wherever it is drawn, even under a parent of its own skgrepo.
+fn set_attribution (
+  tree     : &mut Tree<Viewnode>,
+  treeid   : NodeId,
+  node_pid : &ID,
+  graph    : &InRustGraph,
+  config   : &SkgConfig,
+) {
+  let Some (attribution) = graph . pid_of (node_pid)
+    . and_then ( |pid| graph . nodes . get (&pid) )
+    . and_then ( |node| node . attribution . as_ref () )
+    else { return; };
+  let attributed : AttributedSkgrepo = attributed_skgrepo (config, attribution);
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
+    &mut tree . get_mut (treeid) . unwrap () . value () . kind
+  { t . viewStats . attribution = Some (attributed);
+    t . viewStats . repoBoundary = true; }}
 
 /// Sets repoBoundary on the occurrence at treeid.
 /// True if no occurrence ancestor exists (i.e. a root),

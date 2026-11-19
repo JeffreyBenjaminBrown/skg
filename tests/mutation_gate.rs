@@ -51,6 +51,7 @@ fn complete_from_rust (node : &GraphnodeInRust) -> Graphnode {
     forks : node . forks . clone (),
     hides : node . hides . clone (),
     flags : node . flags . clone (),
+    attribution : node . attribution . clone (),
   } }
 
 fn swap_in_from_snapshot (

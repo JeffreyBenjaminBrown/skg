@@ -1,3 +1,4 @@
+pub mod attribution;
 pub mod complete;
 pub mod fs;
 pub mod rust;

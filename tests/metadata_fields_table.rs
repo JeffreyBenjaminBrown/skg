@@ -115,7 +115,8 @@ fn edit_request_wire_name (
   match request {
     NodeEditRequest::NodeMerge (_)   => "merge",
     NodeEditRequest::Delete          => "delete",
-    NodeEditRequest::SetFlag { .. }  => "flag", } }
+    NodeEditRequest::SetFlag { .. }  => "flag",
+    NodeEditRequest::StripAttribution => "stripAttribution", } }
 
 /// The wire name of each request about a relationship. The match
 /// makes a new variant a compile error here until it is named.
@@ -141,7 +142,8 @@ fn every_edit_request (
   vec! [ NodeEditRequest::NodeMerge ( ID::from ("b") ),
          NodeEditRequest::Delete,
          NodeEditRequest::SetFlag { flag : Flag::NoSearchMatching,
-                                    value : true } ] }
+                                    value : true },
+         NodeEditRequest::StripAttribution ] }
 
 fn every_relationship_edit_request (
 ) -> Vec<RelationshipEditRequest> {

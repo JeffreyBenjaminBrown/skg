@@ -117,6 +117,11 @@ fn supplement_nodeSaveIntent_from_disk (
 ) -> Result<NodeInstruction_with_Opt_Repomove, Box<dyn Error>> {
   let pid : ID =
     from_buffer . pid . clone();
+  if from_buffer . strip_attribution
+    && ! config . skgrepo_is_owned (&from_buffer . home_skgrepo) {
+    return Err ( format! (
+      "Cannot strip the attribution of '{}': its skgrepo '{}' is not yours.",
+      from_buffer . title, from_buffer . home_skgrepo ) . into () ); }
   let from_disk : Option<Graphnode> =
     opt_graphnode_by_gnid (
       graph, config, &pid) ?;
@@ -132,8 +137,10 @@ fn supplement_nodeSaveIntent_from_disk (
       let requested_relRepos : RequestedRelRepos =
         from_buffer . requested_relRepos ();
       let flag_request = from_buffer . flag_request;
+      let strip_attribution : bool = from_buffer . strip_attribution;
       let mut supplemented : Graphnode =
         from_buffer . into_graphnode ();
+      if strip_attribution { supplemented . attribution = None; }
       if let Some ((flag, value)) = flag_request {
         set_flag (&mut supplemented . flags, flag, value); }
       let empty_disk : Graphnode = Graphnode {
@@ -156,6 +163,7 @@ fn supplement_nodeSaveIntent_from_disk (
       let requested_relRepos : RequestedRelRepos =
         from_buffer . requested_relRepos ();
       let flag_request = from_buffer . flag_request;
+      let strip_attribution : bool = from_buffer . strip_attribution;
       let from_buffer : Graphnode =
         from_buffer . into_graphnode();
       let canonicalized : Graphnode =
@@ -170,6 +178,7 @@ fn supplement_nodeSaveIntent_from_disk (
             canonicalized, &disk_node);
         if let Some ((flag, value)) = flag_request {
           set_flag (&mut supplemented . flags, flag, value); }
+        if strip_attribution { supplemented . attribution = None; }
         let supplemented : Graphnode =
           if skgrepo_restriction . is_unrestricted () { supplemented }
           else { preserve_invisible_members (
@@ -651,6 +660,8 @@ pub fn supplement_unspecified_fields_from_disk (
       disk_node . hides . clone(); }
   if from_buffer . flags . is_empty() {
     from_buffer . flags = disk_node . flags . clone(); }
+  if from_buffer . attribution . is_none() {
+    from_buffer . attribution = disk_node . attribution . clone(); }
   from_buffer }
 
 #[cfg(test)]

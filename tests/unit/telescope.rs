@@ -104,6 +104,7 @@ fn decompose_then_compose (
         pid      : &ID::new ("p"),
         extra_ids : &[],
         flags    : &[],
+        attribution : None,
         title    : composed . title . as_deref (),
         body     : composed . body . as_deref (),
         home     : &home,
@@ -127,7 +128,7 @@ fn flags_write_at_home_and_compose_defensively_from_all_sections () {
   let contains = vec![RelPartner::at_relRepo (
     private . clone (), ID::from ("child"))];
   let mut sections = decompose_node (&DecompositionInput {
-    pid: &ID::from ("p"), extra_ids: &[], flags: &misc,
+    pid: &ID::from ("p"), extra_ids: &[], flags: &misc, attribution: None,
     title: Some ("title"), body: None, home: &home,
     aliases: &[], contains: &contains, forks: &[],
     hides: &[],
@@ -210,7 +211,7 @@ proptest! {
     let sections_once : Vec<(SkgrepoName, SectionSlices)> =
       decompose_sections (
         & DecompositionInput {
-          pid : &ID::new ("p"), extra_ids : &[], flags : &[],
+          pid : &ID::new ("p"), extra_ids : &[], flags : &[], attribution : None,
           title : composed . title . as_deref (),
           body : None, home : &home,
           aliases : &[], contains : &composed . contains,
@@ -219,7 +220,7 @@ proptest! {
     let sections_twice : Vec<(SkgrepoName, SectionSlices)> =
       decompose_sections (
         & DecompositionInput {
-          pid : &ID::new ("p"), extra_ids : &[], flags : &[],
+          pid : &ID::new ("p"), extra_ids : &[], flags : &[], attribution : None,
           title : recomposed . title . as_deref (),
           body : None, home : &home,
           aliases : &[], contains : &recomposed . contains,
@@ -427,7 +428,7 @@ fn text_node (
 ) -> (crate::types::nodes::complete::Graphnode, Vec<CompositionWarning>) {
   let (composed, warnings) = compose_sections (&sections, &identity_resolve);
   let node = graphnode_from_composition (
-    ID::new ("text-node"), Vec::new (), Vec::new (), composed )
+    ID::new ("text-node"), Vec::new (), Vec::new (), None, composed )
     .expect ("test cases carry a title");
   (node, warnings) }
 

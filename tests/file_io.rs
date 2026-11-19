@@ -183,6 +183,7 @@ pub fn reverse_some_of_node(node: &Graphnode) -> Graphnode {
     hides             :
       node . hides        . clone(),
     flags             : node . flags              . clone(),
+    attribution       : node . attribution        . clone(),
   }}
 
 #[test]

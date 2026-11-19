@@ -10,6 +10,7 @@
 //! and builds C's SaveNode. The confirmation-gating and the skgsave-commit live
 //! in the save handler.
 
+use crate::attribution::attribution_at_fork;
 use crate::dbs::in_rust_graph::mirrors::{
   Mirror, Mirrors, mirror_shown_among, mirrors_of,
   perspective_skgrepo_of_tree_containing};
@@ -396,7 +397,9 @@ pub fn validate_fork_specs (
 /// edited buffer values -- N is already disk-supplemented, so no disk
 /// fetch is needed, unlike nodeMerge whose acquiree is only an ID
 /// reference), forks = [N], a
-/// fresh pid, and the owned skgrepo. C's hides are the children the
+/// fresh pid, and the owned skgrepo, and C's attribution: N's home
+/// skgrepo, its remote and commit ('attribution_at_fork'), where that
+/// is not C's. C's hides are the children the
 /// forking edit deleted (disk_contains minus the edited contains):
 /// the user dismissed them, so they must not reappear as
 /// unintegrated forked content. (Children the clone keeps need no
@@ -458,6 +461,8 @@ pub fn build_fork_clone (
       &buffer_node . flags, Flag::NoSearchMatching)
       { vec![Flag::NoSearchMatching] }
       else { Vec::new () },
+    attribution    : attribution_at_fork (
+      config, &buffer_node . pid, &buffer_node . home_skgrepo, &clone_skgrepo ),
     home_skgrepo        : clone_skgrepo,
   };
   ForkSpec {

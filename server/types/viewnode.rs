@@ -6,6 +6,7 @@
 //! Others encode information about neighboring tree nodes, such as
 //! aliases, IDs, and partner folders.
 
+use crate::attribution::AttributedSkgrepo;
 use super::errors::HeadlineName;
 use super::misc::{ID, SkgrepoChange, SkgrepoName};
 use super::nodes::complete::Flag;
@@ -510,6 +511,13 @@ pub struct ViewnodeStats {
   /// Herald: red "~NAME" immediately before the ⌂ of repoBoundary
   /// (server/heralds.rs).
   pub relRepo            : Option<SkgrepoName>,
+  /// The skgrepo the node's attribution names, when it has one: the
+  /// note is a fork that records where it was forked from
+  /// ('docs/forks.org', "Attribution"). Written '(view (attribution
+  /// NAME))', or '(view (attribution NAME unverified))' where no loaded
+  /// skgrepo is known to be the one recorded; it makes the node's
+  /// 'repoBoundary' true wherever it is drawn. Herald "⌂:<HOME/NAME>".
+  pub attribution        : Option<AttributedSkgrepo>,
 }
 
 /// A member of a property folder: one alias, extra ID or true flag
@@ -631,6 +639,7 @@ pub enum NodeEditRequest {
   NodeMerge (ID), // The node with this request is the acquirer. The node with the ID that this request specifies is the acquiree.
   Delete, // request to delete this node
   SetFlag { flag : Flag, value : bool },
+  StripAttribution, // request to remove the node's attribution ('docs/forks.org', "Attribution")
 }
 
 /// A request about the relationship that binds a viewnode to its
@@ -1410,6 +1419,7 @@ impl fmt::Display for NodeEditRequest {
       NodeEditRequest::Delete    => write!(f, "toDelete"),
       NodeEditRequest::SetFlag { flag, value } => write! (
         f, "(flag {} {})", flag . wire_name (), value),
+      NodeEditRequest::StripAttribution => write! (f, "stripAttribution"),
     }} }
 
 impl FromStr for NodeEditRequest {
@@ -1463,6 +1473,7 @@ impl Default for ViewnodeStats {
       rel_heralds       : RelationshipHeralds::default (),
       omitted_body      : false,
       relRepo        : None,
+      attribution    : None,
     }} }
 
 //

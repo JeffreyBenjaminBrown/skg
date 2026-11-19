@@ -544,7 +544,8 @@ impl WrittenEditRequest {
         OccurrenceEditRequest::OfTheNode (request) ) => match request {
           NodeEditRequest::Delete         => "delete",
           NodeEditRequest::NodeMerge (_)  => "merge",
-          NodeEditRequest::SetFlag { .. } => "flag", },
+          NodeEditRequest::SetFlag { .. } => "flag",
+          NodeEditRequest::StripAttribution => "stripAttribution", },
       WrittenEditRequest::ForAnOccurrence (
         OccurrenceEditRequest::OfTheRelationship (request) ) => match request {
           RelationshipEditRequest::RelRepo (_) => "relRepo",
@@ -1036,6 +1037,7 @@ fn parse_one_edit_request (
         atom_to_string (element) ?;
       match bare_value . as_str () {
         "delete"      => Ok ( of_the_node (NodeEditRequest::Delete) ),
+        "stripAttribution" => Ok ( of_the_node (NodeEditRequest::StripAttribution) ),
         "restoreNode" => Ok (WrittenEditRequest::RestoreNode),
         "restoreRel"  => Ok ( of_the_relationship (RelationshipEditRequest::RestoreRel) ),
         _ => Err ( format! ( "Unknown editRequest value: {}",

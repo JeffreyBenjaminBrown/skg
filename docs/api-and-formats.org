@@ -1851,7 +1851,7 @@ it saves, after its graph edits; a save that stops for a confirmation
 or fails leaves them in the buffer. A headline carries at most one,
 beside at most one processed request, =(processed ...)= or =(unprocessed
 ...)= (see "Metadata of the diff view"), written after it. The
-heralds are nonstandard. The five requests on a node, and the
+heralds are nonstandard. The six requests on a node, and the
 one on a ghost:
 
 - =delete= — delete the node. Herald "delete". Written by =skg-delete=
@@ -1886,6 +1886,11 @@ one on a ghost:
   the request; a failed save leaves it in the buffer. Herald view presents the
   request as one red semantic state: =request:no search matching= for =true=,
   or =request:search matching= for =false=.
+- =stripAttribution= — remove the node's attribution (see "The .skg
+  file format"; =docs/forks.org=, "Attribution"). Herald "request:strip
+  attribution". Written by =skg-strip-attribution=. Only an editable
+  occurrence carries it, and the save refuses it on a node of a
+  skgrepo the user does not own.
 - =restoreRel= — in the diff view, re-add the relationship this headline
   stands for, as HEAD recorded it: on a removed member, its content
   relationship to its viewparent; on a member of a partner folder carrying
@@ -1929,10 +1934,19 @@ is never written. On a node, in the order written:
   does not contain the node above. A root is always warranted.
   Herald "⊥". Independent of =noClaim=.
 - =cycle= — this position repeats an ancestor's ID. Herald "⟳".
-- =repoBoundary= — the node sits at a skgrepo boundary: a root, or a
+- =(attribution NAME)= or =(attribution NAME unverified)= — the node
+  is a fork with an attribution (=docs/forks.org=, "Attribution").
+  NAME is the configured skgrepo whose git remote has the recorded
+  remote hash, or, where none was recorded, the configured skgrepo of
+  the recorded name, which has no remote either; else the recorded
+  name, with =unverified=. It shows nothing itself: the client folds
+  it into the home skgrepo herald, "⌂:<HOME/NAME>", "?" after NAME
+  when unverified.
+- =repoBoundary= — the node sits at a skgrepo boundary: a root, a
   node whose home skgrepo differs from its nearest occurrence
-  ancestor's. Written only when the config has more than one skgrepo.
-  Herald "⌂".
+  ancestor's, or a node with an attribution, wherever it stands.
+  Written only when the config has more than one skgrepo, but always
+  with an attribution. Herald "⌂".
 
 On an alias, an ID or a flag member, =(view ...)= holds at most one
 atom: =noWarrant= when the node above its folder lacks it, or
@@ -2467,6 +2481,30 @@ Fields:
   =hides_from_its_subscriptions=, still loads.
 - =flags=: See "Node flags". The key used before October 2026, =misc=,
   still loads.
+- =attribution=: Optional, home section only, written last. What a
+  fork records of the note it was forked from, when the fork
+  operation made it and that note's home skgrepo was not the fork's
+  ('docs/forks.org', "Attribution"; 'Attribution' in
+  =server/types/nodes/attribution.rs=). A mapping:
+  #+begin_example
+  attribution:
+    original: 0a1b2c3d-1111-2222-3333-444455556666
+    skgrepo: claude-public
+    remote_hash: d1b916a3aef4c6f971a1a0306e9a03529823e5e7
+    commit: 9f8e7d6c5b4a39281706f5e4d3c2b1a098765432
+    uncommitted: true
+  #+end_example
+  =original= is the pid of the note forked; =skgrepo= its home
+  skgrepo's name in the forker's config then; =remote_hash= the
+  identity of that skgrepo's git remote (=origin=, else the first),
+  the git blob hash of its URL normalised ('normalised_remote_url' in
+  =server/attribution.rs=; =tests/shared/remote-hash-cases.txt=), left
+  out when it had none; =commit= the HEAD commit of the gitrepo
+  holding that skgrepo, left out when there was none; =uncommitted=,
+  written only when true, says the original's file differed from that
+  commit. A binary older than the field reads such a file and ignores
+  the field, since 'GraphnodeOnDisk' denies no unknown field; its next
+  save of the node drops it, as it would any field it does not know.
 
 The keys retired in November 2026 -- =subscribesTo=, =overrides=,
 =hidesFromSubs=, and the October 2026 names of the first two,

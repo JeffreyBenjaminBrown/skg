@@ -23,6 +23,7 @@ fn node_with_body (
     forks                        : vec! [],
     hides                        : vec! [],
     flags                        : vec! [],
+    attribution                  : None,
   } }
 
 fn assert_roundtrip (
@@ -97,6 +98,7 @@ fn field_order_places_body_between_extra_ids_and_contains () {
     forks                        : vec! [],
     hides                        : vec! [],
     flags                        : vec! [],
+    attribution                  : None,
   };
   let yaml : String = node . to_yaml () . unwrap ();
   let extra_ids_pos : usize =

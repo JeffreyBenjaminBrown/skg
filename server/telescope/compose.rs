@@ -21,6 +21,7 @@
 use crate::telescope::types::{CompositionWarning, ListItem, SectionSlices, Telescope};
 use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName};
 use crate::types::nodes::complete::{Flag, Graphnode};
+use crate::types::nodes::attribution::Attribution;
 
 use std::collections::HashMap;
 use std::io;
@@ -59,10 +60,11 @@ pub fn compose_telescope_collecting_warnings (
   let pid       : ID                = telescope . pid () . clone ();
   let extra_ids : Vec<ID>           = telescope . extra_ids ();
   let flags     : Vec<Flag> = telescope . flags ();
+  let attribution : Option<Attribution> = telescope . attribution ();
   let (composed, warnings) : (ComposedNode, Vec<CompositionWarning>) =
     compose_sections ( & telescope . into_slices (), resolve );
   let mut node : Graphnode = graphnode_from_composition (
-    pid . clone (), extra_ids, flags, composed )
+    pid . clone (), extra_ids, flags, attribution, composed )
     . ok_or_else ( || io::Error::new (
       io::ErrorKind::InvalidData,
       format! ("Telescope '{}' has no title in any section.",
@@ -92,7 +94,8 @@ pub fn compose_telescope (
 pub fn graphnode_from_composition (
   pid       : ID,
   extra_ids : Vec<ID>,
-  flags     : Vec<Flag>,
+  flags       : Vec<Flag>,
+  attribution : Option<Attribution>,
   composed    : ComposedNode,
 ) -> Option<Graphnode> {
   let home                      : SkgrepoName = composed . home ?;
@@ -120,7 +123,8 @@ pub fn graphnode_from_composition (
     forks                        : msv ( composed . forks ),
     hides                        :
       msv ( composed . hides ),
-    flags, } ) }
+    flags,
+    attribution, } ) }
 
 /// Compose sections (already in fold order, most public first -- the
 /// caller orders them via 'SkgConfig::ordered_skgrepos') into effective

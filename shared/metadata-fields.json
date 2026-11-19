@@ -24,6 +24,7 @@
             { "value": "flag", "when": "editable",
               "arguments": [ { "one_of": [ "noSearchMatching" ] },
                              { "one_of": [ "true", "false" ] } ] },
+            { "value": "stripAttribution", "when": "editable" },
             { "value": "restoreRel", "when": "removedMember" } ] },
         { "name": "viewRequests", "shape": "some", "default": "none",
           "values": [

@@ -1,0 +1,16 @@
+# Remote URLs and the identity skg records for each: the normalised
+# URL, then its git blob hash ('printf %s NORMALISED | git hash-object
+# --stdin'). Rust ('normalised_remote_url' and 'remote_hash_of_url' in
+# server/attribution.rs; tests/unit/attribution.rs) and the migration
+# tool (tools/migrate-attributions-2026-11/) are each tested against
+# these. Format: one case per line, URL TAB NORMALISED TAB HASH; lines
+# starting with '#' are comments.
+git@github.com:Jeff/notes.git	github.com/Jeff/notes	d1b916a3aef4c6f971a1a0306e9a03529823e5e7
+https://github.com/Jeff/notes.git	github.com/Jeff/notes	d1b916a3aef4c6f971a1a0306e9a03529823e5e7
+https://github.com/Jeff/notes	github.com/Jeff/notes	d1b916a3aef4c6f971a1a0306e9a03529823e5e7
+ssh://git@GitHub.com:22/Jeff/notes/	github.com/Jeff/notes	d1b916a3aef4c6f971a1a0306e9a03529823e5e7
+https://jeff:token@github.com/Jeff/notes.git/	github.com/Jeff/notes	d1b916a3aef4c6f971a1a0306e9a03529823e5e7
+git://example.org/team/x.git	example.org/team/x	3240397f562dc9596d9ef7fa125383e6f81008b4
+/home/jeff/repos/notes.git	/home/jeff/repos/notes	6bf5921ea6c91931d67b07d1b8104e73e62a7113
+file:///home/jeff/repos/notes	/home/jeff/repos/notes	6bf5921ea6c91931d67b07d1b8104e73e62a7113
+../sibling/notes	../sibling/notes	2e88a66c60d299ed5e43babee41ba977c9a9d7ff

@@ -60,6 +60,7 @@
     "merge":                           "nonstandard",
     "restoreNode":                     "nonstandard",
     "restoreRel":                      "nonstandard",
+    "stripAttribution":                "nonstandard",
     "editRequest_relRepo":             "nonstandard",
     "editRequest_flag":                "nonstandard",
     "viewRequests":                    "nonstandard",

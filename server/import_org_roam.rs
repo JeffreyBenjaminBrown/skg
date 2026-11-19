@@ -207,6 +207,7 @@ fn write_graphnode_to_dir (
           pid      : & node . pid,
           extra_ids : & node . extra_ids,
           flags    : & node . flags,
+          attribution : node . attribution . as_ref (),
           title    : Some ( & node . title ),
           body     : node . body . as_deref (),
           home     : & node . home_skgrepo,

@@ -285,11 +285,13 @@ pub(crate) fn buffernode_differs_from_disknode(
   let contains_matches: bool =
     buffer_node . contains == disk_node . contains;
   let flags_match: bool = buffer_node . flags == disk_node . flags;
+  let attribution_matches: bool = buffer_node . attribution == disk_node . attribution;
   !( title_matches
      && body_matches
      && skgrepo_matches
      && contains_matches
      && flags_match
+     && attribution_matches
      && fields_match( &buffer_node . aliases,
                       &disk_node . aliases)
      && fields_match( &buffer_node . forks,

@@ -591,7 +591,11 @@ pub fn herald_rule_table () -> HeraldRule {
           // the lens '(repoBoundary LABEL)', LABEL from the skgrepo
           // label table ('skgrepo_labels_sexp'), for "⌂:LABEL"; the
           // bare atom, which it keeps when the node names no
-          // nodeRepo, shows "⌂".
+          // nodeRepo, shows "⌂". On an attributed fork the client
+          // makes LABEL "<HOME/ORIGINAL>" from '(attribution NAME
+          // [unverified])', ORIGINAL NAME's label, followed by "?"
+          // when unverified; the form itself shows nothing.
+          vac ("attribution"),
           crule ("repoBoundary", vec! [ any (vec! [ s ("⌂"), RuleChild::It ]) ]),
           leaf ("repoBoundary", "⌂") ]),
         rule ("diff", vec! [
@@ -611,6 +615,7 @@ pub fn herald_rule_table () -> HeraldRule {
           crule ("merge", vec! [
             any ( vec! [ s ("merge:"), RuleChild::It ] ) ]),
           leaf ("restoreRel", "restore membership"),
+          leaf ("stripAttribution", "request:strip attribution"),
           crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]),
           crule_styled_as ("editRequest_flag", "flag", vec! [
@@ -881,7 +886,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     // NodeEditRequest atoms. The flag form's name and desired value
     // are matched literally so its herald can describe the complete state
     // change rather than echoing two context-free arguments.
-    "delete", "merge", "flag", "true", "false",
+    "delete", "merge", "flag", "true", "false", "stripAttribution",
     // The diff view's restore requests, on a ghost and on
     // a removed membership.
     "restoreNode", "restoreRel",
@@ -1011,10 +1016,14 @@ fn viewstats_atoms () -> Vec<&'static str> {
       rel_heralds : _,      // -> the rels, props and birth forms
       omitted_body : _,     // -> the omittedBody atom
       relRepo : _,          // -> the relRepo atom and herald
+      attribution : _,      // -> the attribution form, folded into repoBoundary's herald
     } = v; }
   let _ = guard;
   vec! [ "cycle", "repoBoundary", "noWarrant", "omittedBody",
          "inPlaceOf", "relRepo",
+         // The attribution form; its 'unverified' rides inside it,
+         // which the form's rule consumes whole.
+         "attribution",
          // A ghost warrant ('Warrant::ByHead').
          "ghostWarrant" ] }
 

@@ -241,6 +241,7 @@ pub(crate) fn prepare_graphnode_telescope (
         pid      : pid,
         extra_ids : & graphnode . extra_ids,
         flags    : & graphnode . flags,
+        attribution : graphnode . attribution . as_ref (),
         title    : Some ( & graphnode . title ),
         body     : graphnode . body . as_deref (),
         home     : & graphnode . home_skgrepo,

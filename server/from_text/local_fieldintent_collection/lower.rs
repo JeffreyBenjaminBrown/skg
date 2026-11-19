@@ -26,6 +26,7 @@ use crate::types::misc::{
   ID, MSV, RelPartner, SkgrepoName, members_msv, members_of,
   rel_partners_at_relRepo, rel_partners_at_relRepo_msv };
 use crate::types::nodes::complete::{Flag, Graphnode};
+use crate::types::nodes::attribution::Attribution;
 use crate::types::save::{NodeInstruction, SaveNode, DeleteNode};
 
 use std::collections::{HashMap, HashSet};
@@ -59,6 +60,8 @@ pub struct NodeSaveIntent {
   pub hides             : MSV<ID>,
   pub flags              : Vec<Flag>,
   pub flag_request  : Option<(Flag, bool)>,
+  pub attribution        : Option<Attribution>, // None from a buffer, which never shows it; the save supplements it from disk
+  pub strip_attribution  : bool, // the '(editRequest stripAttribution)' request
 }
 
 /// Repos the buffer explicitly requested via '(editRequest
@@ -162,6 +165,8 @@ impl NodeIntent {
         members_msv (&node . hides),
       flags                         : node . flags,
       flag_request             : None,
+      attribution                   : node . attribution,
+      strip_attribution             : false,
     }) }
 
   pub fn save_intent (
@@ -247,6 +252,7 @@ impl NodeSaveIntent {
       hides                        :
         rel_partners_at_relRepo_msv (&skgrepo, self . hides),
       flags                         : self . flags,
+      attribution                   : self . attribution,
     };
     node . normalize_gnids ();
     node }
@@ -339,6 +345,7 @@ pub fn lower_collected_fieldIntents (
       || leftover . forks . is_some()
       || leftover . node_merge    . is_some()
       || leftover . flag      . is_some()
+      || leftover . strip_attribution
     { return Err ( format!(
         "lower_collected_fieldIntents: entry for {} has field intents but no title/body",
         pid )); }}
@@ -394,6 +401,8 @@ fn lower_one_entry (
         hides                        : MSV::Unspecified,
         flags                    : Vec::new(),
         flag_request             : entry . flag,
+        attribution              : None,
+        strip_attribution        : entry . strip_attribution,
       })) }} }
 
 fn msv_from_slot<T> (

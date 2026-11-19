@@ -18,6 +18,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, SkgrepoOwner};
 use crate::types::nodes::complete::Flag;
+use crate::types::nodes::attribution::Attribution;
 use crate::types::nodes::fs::GraphnodeOnDisk;
 
 use std::collections::{HashMap, HashSet};
@@ -269,6 +270,14 @@ impl Telescope {
           flags . push ( m . clone () ); }} }
     flags }
 
+  /// The attribution the first section carrying one holds: the home's,
+  /// where it is written, by convention.
+  pub fn attribution (
+    &self,
+  ) -> Option<Attribution> {
+    self . sections . iter ()
+      . find_map ( |(_, node_fs)| node_fs . attribution . clone () ) }
+
   /// The sections in the form the composition consumes, order preserved.
   pub fn into_slices (
     self,
@@ -465,7 +474,8 @@ mod telescope_construction_tests {
       contains                     : Vec::new (),
       forks                        : Vec::new (),
       hides                        : Vec::new (),
-      flags                        : Vec::new (), } }
+      flags                        : Vec::new (),
+      attribution                  : None, } }
 
   fn config () -> SkgConfig {
     let ordered : Vec<SkgrepoName> =

@@ -1,4 +1,5 @@
 use crate::refresh::ancestry::parent_reads_claims;
+use crate::attribution::AttributedSkgrepo;
 use crate::serve::util::sexp_to_client_string;
 use crate::types::misc::SkgrepoName;
 use crate::types::tree::forest::ViewForest;
@@ -416,7 +417,8 @@ fn diff_form (
 ///   (skgRepos (nodeRepo R) [(relRepo R)]) [noClaim] [writeProtected]
 ///   [contentInPart] [(inPlaceOf X)] [(editRequest ...)] [(viewRequests ...)]
 ///   [(view [omittedBody] [(rels ...)] [(props ...)] [(birth ...)]
-///          [noWarrant] [cycle] [repoBoundary])]
+///          [noWarrant] [cycle] [(attribution NAME [unverified])]
+///          [repoBoundary])]
 ///   [(diff ...)]
 fn occurrence_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
@@ -451,8 +453,14 @@ fn occurrence_metadata_to_string (
         stats . rel_heralds . forms () . cloned () . collect (),
         atoms ( vec! [ ( stats . warrant == Warrant::ByHead, "ghostWarrant" ),
                        ( stats . warrant == Warrant::No, "noWarrant" ),
-                       ( stats . cycle,                       "cycle" ),
-                       ( stats . repoBoundary,                "repoBoundary" ) ] ) ]
+                       ( stats . cycle,                       "cycle" ) ] ),
+        stats . attribution . iter () . map ( |attributed| match attributed {
+          AttributedSkgrepo::Loaded (name) => format! (
+            "(attribution {})", metadata_value_atom (&name . 0) ),
+          AttributedSkgrepo::Unverified (name) => format! (
+            "(attribution {} unverified)", metadata_value_atom (&name . 0) ), } )
+          . collect (),
+        atoms ( vec! [ ( stats . repoBoundary,                "repoBoundary" ) ] ) ]
         . concat () }
     fn edit_request ( occurrence : & Occurrence
                     ) -> Option < String > {
@@ -464,7 +472,9 @@ fn occurrence_metadata_to_string (
           NodeEditRequest::Delete => "delete" . to_string (),
           NodeEditRequest::SetFlag { flag, value } =>
             format! ( "(flag {} {})",
-              flag . wire_name (), value ) } } ) }
+              flag . wire_name (), value ),
+          NodeEditRequest::StripAttribution =>
+            "stripAttribution" . to_string () } } ) }
     fn view_requests ( occurrence : & Occurrence
                      ) -> Option < String > {
       if occurrence . view_requests . is_empty () { return None; }
