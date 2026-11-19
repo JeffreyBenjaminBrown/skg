@@ -695,9 +695,10 @@ carried, which `skg-approve-fork' carries again.")
 carried, for `skg-approve-fork' to carry again.")
 
 (defvar-local skg--pending-fork-result nil
-  "On a fork's source buffer, (RESULT-BUFFER . FORK-COUNT) while the
-approved re-save is pending.  The save-result handler turns that buffer
-into a durable success/failure message.")
+  "On a fork's source buffer, while the approved re-save is pending, the
+alist ((N . SKGREPO) ...) it carries: each forked node's ID and the
+owned skgrepo its clone goes into.  The save-result handler reports the
+save's outcome against them.")
 
 (defun skg--fork-confirmation-on-kill ()
   "`kill-buffer-hook' for a fork-confirmation buffer: dismissing it
@@ -712,77 +713,66 @@ idempotent, so a redundant call after a decline is a harmless no-op."
       (with-current-buffer skg--fork-source-buffer
         (skg-strip-fork-requests-in-buffer)))))
 
-(defun skg--write-fork-result (buffer headline &optional details)
-  "Write HEADLINE and optional DETAILS into read-only org BUFFER."
-  (when (buffer-live-p buffer)
-    (with-current-buffer buffer
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (insert "* " headline "\n")
-        (when details
-          (insert details)
-          (unless (string-suffix-p "\n" details) (insert "\n")))
-        (skg--org-mode-with-options)
-        (goto-char (point-min))
-        (set-buffer-modified-p nil)
-        (read-only-mode 1)))))
+(defun skg--forks-phrase (fork-skgrepos)
+  "Describe FORK-SKGREPOS, an alist ((N . SKGREPO) ...), as in
+\"1 node into skgrepo A\" or \"2 nodes into skgrepos A, B\"."
+  (let ((count (length fork-skgrepos))
+        (skgrepos (delete-dups (mapcar #'cdr fork-skgrepos))))
+    (format "%d %s into %s %s"
+            count (if (= count 1) "node" "nodes")
+            (if (cdr skgrepos) "skgrepos" "skgrepo")
+            (string-join skgrepos ", "))))
 
-(defun skg--replace-fork-confirmation-with-result
-    (confirmation source fork-count)
-  "Replace every window showing CONFIRMATION with a pending result buffer.
-Record that buffer and FORK-COUNT on ORIGIN, then kill CONFIRMATION."
-  (let* ((result (get-buffer-create "*SKG Fork Result*"))
-         (noun (if (= fork-count 1) "Fork" "Forks"))
-         (windows (get-buffer-window-list confirmation nil t)))
-    (skg--write-fork-result
-     result (format "%s confirmed; saving..." noun))
-    (dolist (window windows)
-      (when (window-live-p window)
-        (set-window-buffer window result)))
-    (with-current-buffer source
-      (setq skg--pending-fork-result (cons result fork-count)))
-    (let ((kill-buffer-query-functions nil))
-      (kill-buffer confirmation))
-    result))
+(defun skg--close-fork-confirmation (confirmation source fork-skgrepos)
+  "Close CONFIRMATION once its forks are approved, and record
+FORK-SKGREPOS on SOURCE as its pending fork result.  Each window
+showing CONFIRMATION is quit as by `quit-window': a window
+`display-buffer' made for it is deleted, and one it borrowed shows
+its earlier buffer again, so no split is left unexplained.  The echo
+area says the save is under way."
+  (dolist (window (get-buffer-window-list confirmation nil t))
+    (when (window-live-p window)
+      (quit-restore-window window)))
+  (with-current-buffer source
+    (setq skg--pending-fork-result fork-skgrepos))
+  (let ((kill-buffer-query-functions nil))
+    (kill-buffer confirmation))
+  (message "Fork approved; saving %s..." (skg--forks-phrase fork-skgrepos)))
 
 (defun skg--finish-pending-fork-result (save-buffer payload)
-  "Update SAVE-BUFFER's pending fork-result pane from save-result PAYLOAD."
+  "Report the outcome of SAVE-BUFFER's approved fork save, from its
+save-result PAYLOAD.  Success goes to the echo area, followed by any
+hides the save reports.  A failure says so there too; its errors, and
+any warnings, are in the buffer `skg-handle-save-sexp' showed.  A result
+that cannot be read gets a buffer of its own."
   (when (buffer-live-p save-buffer)
-    (let ((pending
+    (let ((fork-skgrepos
            (buffer-local-value 'skg--pending-fork-result save-buffer)))
-      (when pending
+      (when fork-skgrepos
         (with-current-buffer save-buffer
           (setq skg--pending-fork-result nil))
-        (let* ((result (car pending))
-               (fork-count (cdr pending))
-               (noun (if (= fork-count 1) "Fork" "Forks")))
-          (when (buffer-live-p result)
-            (condition-case err
-                (let* ((response (read payload))
-                       (errors (cadr (assoc 'errors response)))
-                       (warnings (cadr (assoc 'warnings response))))
-                  (cond
-                   ((skg--message-list-nonempty-p errors)
-                    (skg--write-fork-result
-                     result (format "%s confirmed; save failed." noun)
-                     (skg-errors-and-warnings-to-org-string
-                      errors warnings)))
-                   ((skg--message-list-nonempty-p warnings)
-                    (skg--write-fork-result
-                     result
-                     (format "%s confirmed; save successful with warnings."
-                             noun)
-                     (skg-errors-and-warnings-to-org-string nil warnings)))
-                   (t
-                    (skg--write-fork-result
-                     result
-                     (format "%s confirmed; save successful." noun)))))
-              (error
-               (skg--write-fork-result
-                result
-                (format "%s confirmed; could not read the save result."
-                        noun)
-                (format "%S" err))))))))))
+        (let ((forks (skg--forks-phrase fork-skgrepos)))
+          (condition-case err
+              (let* ((response (read payload))
+                     (errors (cadr (assoc 'errors response)))
+                     (warnings (cadr (assoc 'warnings response)))
+                     (hides (cadr (assq 'hides response))))
+                (if (skg--message-list-nonempty-p errors)
+                    (message "Forking %s failed; the errors are shown in their own buffer."
+                             forks)
+                  (message "%s"
+                           (skg--save-hides-message
+                            hides
+                            (format "Forked %s%s." forks
+                                    (if (skg--message-list-nonempty-p warnings)
+                                        ", with warnings (shown in their own buffer)"
+                                      ""))))))
+            (error
+             (skg-big-nonfatal-message
+              "*SKG Fork Result*"
+              (format "Forking %s: could not read the save result." forks)
+              (format "* Forking %s: could not read the save result.\n%S\n"
+                      forks err)))))))))
 
 (defun skg--fork-confirmation-handler (save-buffer payload &optional strandeds-review
                                                      delete-from)
@@ -1235,10 +1225,11 @@ child's id N -- the key by which the server applies the chosen repo."
 
 (defun skg-approve-fork ()
   "Approve the fork operations listed in this *SKG Fork Confirmation* buffer:
-extract each clone's chosen repo, re-save the source buffer with
-the fork operations approved (carrying those repos), and replace the confirmation
-pane with a result buffer.  The result changes from \"saving\" to the
-server-confirmed success or failure when the approved save finishes.
+extract each clone's chosen repo, close the confirmation, and re-save
+the source buffer with the fork operations approved (carrying those
+repos).  When the approved save finishes, the echo area says where the
+forks went, or that the save failed
+\(`skg--finish-pending-fork-result').
 
 Interactively, first prompts for any clone repo still at
 `skg-fork-repo-placeholder' (as the confirmation handler already did
@@ -1263,8 +1254,7 @@ hand (C-c s s)."
     ;; The atom must survive to the re-save (which skgsave-commits the fork; the
     ;; server then drops it on re-render), so suppress the kill-hook strip.
     (setq skg--fork-suppress-strip-on-kill t)
-    (skg--replace-fork-confirmation-with-result
-     (current-buffer) source (length fork-skgrepos))
+    (skg--close-fork-confirmation (current-buffer) source fork-skgrepos)
     (with-current-buffer source
       (skg-request-save-buffer t fork-skgrepos nil strandeds-review
                                delete-from))))

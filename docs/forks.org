@@ -50,6 +50,9 @@ default skgrepo.
 
 - *Approve* (=C-c C-c= in that buffer, or answering the prompt)
   skgsave-commits the forks into the skgrepos you chose and completes the save.
+  The confirmation buffer closes, and the echo area says how many
+  nodes were forked into which skgrepos; a save that fails shows its
+  errors in a buffer, as any save does.
 - *Decline* (=C-c C-k=, or just leave the buffer) aborts the /whole/
   save — nothing is written. The confirmation buffer stays open, so you
   can still search it for the IDs involved.

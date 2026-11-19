@@ -107,28 +107,22 @@
 
     ;; 4. Approval must finish cleanly.  In particular, the checked
     ;; telescope writer must not reject N with a home/first-section mismatch.
-    (let ((result-buf
-           (skg-test-wait-for
-            (lambda ()
-              (let ((buf (get-buffer "*SKG Fork Result*")))
-                (and buf
-                     (with-current-buffer buf
-                       (and (string-match-p "save \\(successful\\|failed\\)"
-                                            (buffer-string))
-                            buf)))))
-            10)))
-      (unless result-buf
-        (test-fail "fork approval produced no terminal result"))
-      (with-current-buffer result-buf
-        (unless (string-match-p "Fork confirmed; save successful\\."
-                                (buffer-string))
-          (test-fail "Emacs received a failed structural-fork save:\n%s"
-                     (buffer-string))))
-      (let ((error-buf
-             (get-buffer "*SKG Save Errors - Inconsistencies Found*")))
-        (when error-buf
-          (test-fail "Emacs displayed a save-error buffer:\n%s"
-                     (with-current-buffer error-buf (buffer-string))))))
+    ;; Success is reported in the echo area; no buffer is opened for it.
+    (unless (skg-test-wait-for
+             (lambda ()
+               (with-current-buffer fork-buffer
+                 (null skg--pending-fork-result)))
+             10)
+      (test-fail "fork approval produced no terminal result"))
+    (when (get-buffer "*SKG Fork Result*")
+      (test-fail "Emacs opened a fork-result buffer"))
+    (when (get-buffer "*SKG Fork Confirmation*")
+      (test-fail "the fork-confirmation buffer survived approval"))
+    (let ((error-buf
+           (get-buffer "*SKG Save Errors - Inconsistencies Found*")))
+      (when error-buf
+        (test-fail "Emacs displayed a save-error buffer:\n%s"
+                   (with-current-buffer error-buf (buffer-string)))))
 
     ;; 5. The exact buffer used for the gesture is immediately re-rooted at
     ;; K, which stands for nothing (no inPlaceOf).  K contains N, and N

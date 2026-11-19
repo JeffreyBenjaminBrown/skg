@@ -181,44 +181,78 @@ ordinary-save refusal on C-x C-s."
             (kill-buffer buf)))
       (when (buffer-live-p source) (kill-buffer source)))))
 
-(ert-deftest test-approve-fork-replaces-confirmation-pane-with-result ()
-  "Approval leaves the confirmation window showing a truthful result buffer."
+(ert-deftest test-approve-fork-closes-confirmation-and-reports-in-echo-area ()
+  "Approval deletes the window `display-buffer' made for the
+confirmation, opens no other buffer, and reports the save's outcome in
+the echo area, naming the skgrepo the fork went into."
   (let ((source (generate-new-buffer "*fork-result-origin*"))
-        (result-name "*SKG Fork Result*")
-        confirm confirm-window called)
+        confirm confirm-window called messages)
     (unwind-protect
         (save-window-excursion
-          (when (get-buffer result-name) (kill-buffer result-name))
+          (delete-other-windows)
+          (switch-to-buffer source)
           (setq confirm
                 (skg--show-fork-confirmation
                  "* (skg node (skgRepos (nodeRepo owned))) N-edited\n** (skg node (gnid N) (skgRepos (nodeRepo foreign)) writeProtected) N-original\n"
                  source))
           (setq confirm-window (get-buffer-window confirm t))
           (should (window-live-p confirm-window))
+          (should (= (length (window-list)) 2))
           (cl-letf (((symbol-function 'skg-request-save-buffer)
-                     (lambda (&rest args) (setq called args))))
+                     (lambda (&rest args) (setq called args)))
+                    ((symbol-function 'message)
+                     (lambda (format-string &rest args)
+                       (push (apply #'format format-string args) messages))))
             (with-current-buffer confirm
               (let ((noninteractive t))
-                (skg-approve-fork))))
-          (let ((result (get-buffer result-name)))
+                (skg-approve-fork)))
             (should-not (buffer-live-p confirm))
-            (should (buffer-live-p result))
-            (should (eq (window-buffer confirm-window) result))
-            (with-current-buffer result
-              (should (string-match-p
-                       "Fork confirmed; saving\\.\\.\\."
-                       (buffer-string))))
+            (should-not (window-live-p confirm-window))
+            (should (equal (mapcar #'window-buffer (window-list))
+                           (list source)))
+            (should (equal (car messages)
+                           "Fork approved; saving 1 node into skgrepo owned..."))
             (should (equal called '(t (("N" . "owned")) nil nil nil)))
             (skg--finish-pending-fork-result
              source "((content \"saved\") (errors ()) (warnings ()))")
-            (with-current-buffer result
-              (should (string-match-p
-                       "Fork confirmed; save successful\\."
-                       (buffer-string))))
+            (should (equal (car messages)
+                           "Forked 1 node into skgrepo owned."))
+            (should (equal (mapcar #'window-buffer (window-list))
+                           (list source)))
             (with-current-buffer source
               (should-not skg--pending-fork-result))))
       (when (buffer-live-p confirm) (kill-buffer confirm))
-      (when (get-buffer result-name) (kill-buffer result-name))
+      (when (buffer-live-p source) (kill-buffer source)))))
+
+(ert-deftest test-finish-pending-fork-result-reports-failure-and-warnings ()
+  "A failed fork save says so in the echo area (its errors are in the
+save-errors buffer); a successful one with warnings or hides says so
+too, naming every skgrepo once.  The pending fork is cleared."
+  (let ((source (generate-new-buffer "*fork-result-failure*"))
+        (forks '(("A" . "owned") ("B" . "owned2") ("C" . "owned")))
+        messages)
+    (unwind-protect
+        (cl-letf (((symbol-function 'message)
+                   (lambda (format-string &rest args)
+                     (push (apply #'format format-string args) messages))))
+          (with-current-buffer source
+            (setq skg--pending-fork-result forks))
+          (skg--finish-pending-fork-result
+           source "((content nil) (errors (\"bad\")) (warnings ()))")
+          (should (equal (car messages)
+                         "Forking 3 nodes into skgrepos owned, owned2 failed; the errors are shown in their own buffer."))
+          (with-current-buffer source
+            (should-not skg--pending-fork-result)
+            (setq skg--pending-fork-result forks))
+          (skg--finish-pending-fork-result
+           source "((content \"saved\") (errors ()) (warnings (\"w\")) (hides (\"Hid X.\")))")
+          (should (equal (car messages)
+                         "Forked 3 nodes into skgrepos owned, owned2, with warnings (shown in their own buffer).\nHid X."))
+          ;; With nothing pending, a save result reports nothing.
+          (setq messages nil)
+          (skg--finish-pending-fork-result
+           source "((content \"saved\") (errors ()) (warnings ()))")
+          (should-not messages))
       (when (buffer-live-p source) (kill-buffer source)))))
 
 (ert-deftest test-fork-confirmation-does-not-mutate-shared-mode-map ()
