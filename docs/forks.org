@@ -641,6 +641,81 @@ takes =N= out of the list =C= stood in, as removing any child does.
 Under someone else's note that is an edit of their note, so it forks
 it, and the save asks first.
 
+** Attribution
+A reply is often made by forking someone's note and writing under the
+fork. Read later, the fork would look like the forker's own words. So
+the fork operation records, in the clone's file, where the clone came
+from: its *attribution*. Its herald then reads
+=⌂:<FORKER/ORIGINAL>=, the labels of the clone's home skgrepo and of
+the skgrepo it was forked from, wherever the clone is drawn, even
+under a note of its own skgrepo, where no other node shows its home
+skgrepo. A fork of Claude's note into Jeff's skgrepo =jeff-decid=
+reads =⌂:<jeff-decid/claude-public>=.
+
+*** What is recorded, and when
+Only the fork operation writes it, once, when it makes the clone, and
+only when the original's home skgrepo is not the clone's: a fork
+within one skgrepo has nothing to attribute. It records the note
+actually forked: forking a fork records the fork, and its skgrepo,
+not the note that fork came from. It is a record, not a view of the
+=forks= relation, so it outlives the original's deletion, a nodeMerge
+that acquires it, and its skgrepo not being loaded. The fields
+('docs/api-and-formats.org', "The .skg file format"):
+- the original's pid;
+- its home skgrepo's name in the forker's config then: a local alias,
+  so only the fallback;
+- the hash of that skgrepo's git remote ('origin', else the first),
+  its URL normalised so that the ssh and https spellings of one
+  repository agree: the skgrepo's identity, whatever anyone's config
+  calls it. Hashed, so that a private remote's URL never appears in a
+  public note. Left out when the skgrepo has no remote;
+- the HEAD commit of the gitrepo holding that skgrepo, so that what
+  the original said can be read back; left out when it is no gitrepo;
+- =uncommitted: true= when the original's file differed from that
+  commit: the commit then lacks the text forked, which only the
+  clone's own first version holds (its first git commit, if the
+  forker commits before editing).
+
+*** Which skgrepo the herald names
+The herald shows the current name of the loaded skgrepo whose remote
+has the recorded hash, so renaming that skgrepo in a config renames
+the herald too. Where no remote was recorded, it shows the recorded
+name if a skgrepo of that name, with no remote either, is loaded.
+Otherwise it shows the recorded name followed by =?=:
+=⌂:<jeff-decid/claude-public?>= says no loaded skgrepo is known to
+be the one recorded.
+
+*** Removing it
+=skg-strip-attribution= (Emacs, on the headline; =:SkgStripAttribution=
+in Neovim; the word =stripAttribution= in a handle of skg-for-ai)
+writes the request =stripAttribution=; the next save removes the
+attribution. A note meant as your own words, an evergreen note say,
+need not keep one; a reply in a dialog should.
+
+*** Checking and fixing them
+At startup the server warns of doubtful attributions among the notes
+of your skgrepos, counted by kind: a recorded remote no loaded skgrepo
+has (perhaps only not loaded, or its remote changed); a recorded name
+now naming a skgrepo with another remote; with no remote recorded, a
+name the config lacks, or one that has a remote now. Each warning says
+how to fix it. =skg check-attributions CONFIG= prints the same
+without starting a server. =skg fix-attributions CONFIG OLD SKGREPO=
+rewrites every attribution in your skgrepos whose remote hash or
+recorded name is OLD to name SKGREPO as it is now, its name and its
+remote's hash; the original and the commit stay. (Run them as
+=cargo run --bin skg -- check-attributions CONFIG=, and so on.)
+
+*** What the original said
+=skg show-forked-original CONFIG FORK_ID= prints the original's file
+as it was at the recorded commit, read from the gitrepo of the loaded
+skgrepo the attribution names, with a warning first when the
+attribution says the file was uncommitted then.
+
+*** Forks made before attributions
+=tools/migrate-attributions-2026-11/= gives the forks you own an
+attribution from the first note each one's file lists under =forks=,
+with no commit, since that is not known. Its =README.org= says how.
+
 ** Once forked: the fork operation's guard
 
 If you try to fork something you already fork, the save is rejected

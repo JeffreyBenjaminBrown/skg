@@ -6,6 +6,18 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* The diff view does not see a change of attribution alone (2026-11-19)
+  A fork's 'attribution' ('docs/forks.org', "Attribution") is no
+  change fact of the diff view: 'node_changes_between' in
+  'server/graph_straddle/union_walk.rs' compares title, body, aliases,
+  extra IDs, flags and home, not it. So a save that only strips one
+  ('skg-strip-attribution'), and a file 'skg fix-attributions' or
+  'tools/migrate-attributions-2026-11/' rewrote, show no change there,
+  and stage-and-commit has no leaf to mark processed for it; commit
+  such files with git ('git -C SKGREPO commit'). Not checked: whether
+  stage-and-commit writes a new fork's file with its attribution. The
+  fix: an attribution leaf (or a property leaf) of the node, drawn as
+  'M'.
 * A request's 'skg-lp-reset' can drop another request's reply (2026-11-19)
   Seen measuring saves: a link-status request sent while views were
   being opened never got its reply handled, and stayed in
