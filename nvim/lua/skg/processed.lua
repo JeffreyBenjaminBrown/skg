@@ -151,7 +151,8 @@ end
 ---The letter object naming the one leaf of a headline that names one:
 ---'rel' for a relRepo move and for an unknown or restricted viewnode,
 ---which shows no node, only its relationship to its viewparent; else
----'node'. (skg--processed-single-leaf-kind)
+---'node' (an alias, extra ID or flag, an old text, a home skgrepo move,
+---a node's other changes). (skg--processed-single-leaf-kind)
 ---@param metadata_sexp any
 ---@return string
 function M.single_leaf_kind (metadata_sexp)

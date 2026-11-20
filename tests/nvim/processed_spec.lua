@@ -79,6 +79,15 @@ describe('skg.processed', function ()
           processed.mark_rel_processed))
     refused({ '** (skg (relRepoMove (old pub) (new priv)) (diff (leaves 1)))' }, 1,
             processed.mark_node_processed)
+    -- A node's other changes, a reorder among them, are the node's own.
+    assert.are.same(
+      { '** (skg (otherChanges contentOrder) (editRequest (processed)) (diff (leaves 1))) ',
+        'The order of its content (- at HEAD, + now):', '+b', ' a', '-b' },
+      run({ '** (skg (otherChanges contentOrder) (diff (leaves 1)))',
+            'The order of its content (- at HEAD, + now):', '+b', ' a', '-b' }, 1,
+          processed.mark_node_processed))
+    refused({ '** (skg (otherChanges attributionChange) (diff (leaves 1)))' }, 1,
+            processed.mark_rel_processed)
     -- An unknown viewnode shows no node, only its relationship.
     assert.are.same(
       { '** (skg unknown (gnid k) (editRequest (processed)) (diff (rel added) (leaves 1))) k' },

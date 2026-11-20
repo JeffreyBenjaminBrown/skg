@@ -70,6 +70,22 @@ node's own."
   (test-skg-processed--refused
    '("** (skg (relRepoMove (old pub) (new priv)) (diff (leaves 1)))")
    1 #'skg-mark-node-processed)
+  ;; A node's other changes, a reorder among them, are the node's own.
+  (should (equal (test-skg-processed--run
+                  '("** (skg (otherChanges contentOrder) (diff (leaves 1)))"
+                    "The order of its content (- at HEAD, + now):"
+                    "+b"
+                    " a"
+                    "-b")
+                  1 #'skg-mark-node-processed)
+                 '("** (skg (otherChanges contentOrder) (editRequest (processed)) (diff (leaves 1))) "
+                   "The order of its content (- at HEAD, + now):"
+                   "+b"
+                   " a"
+                   "-b")))
+  (test-skg-processed--refused
+   '("** (skg (otherChanges attributionChange) (diff (leaves 1)))")
+   1 #'skg-mark-rel-processed)
   ;; An unknown viewnode shows no node, only its relationship.
   (should (equal (test-skg-processed--run
                   '("** (skg unknown (gnid k) (diff (rel added) (leaves 1))) k")

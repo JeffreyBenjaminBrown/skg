@@ -190,7 +190,7 @@ them under their own headlines."
 `rel' for a relRepo move and for an unknown or restricted viewnode,
 which shows no node, only its relationship to its viewparent; else
 `node' (an alias, extra ID or flag of its folder's viewparent, an old
-text, a home skgrepo move)."
+text, a home skgrepo move, a node's other changes)."
   (if (or (assq 'relRepoMove (cdr metadata-sexp))
           (memq 'unknown (cdr metadata-sexp))
           (memq 'restricted (cdr metadata-sexp)))
