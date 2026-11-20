@@ -158,6 +158,7 @@ def main (argv):
   failures = []
   failures += failures_of_title_matching ()
   failures += failures_of_save_envelope ()
+  failures += failures_of_commit_result_text ()
   failures += failures_of_preview_support ()
   failures += failures_of_no_default_port ()
   failures += failures_of_link_annotation_round_trip ()
@@ -270,6 +271,23 @@ def failures_of_save_envelope ():
                '(baseline "* drawn \\"λ\\"\n") (other-views ()))' )
   return ( [] if envelope == expected
            else [ f"the save envelope is {envelope!r}, not {expected!r}" ] )
+
+def failures_of_commit_result_text ():
+  """A commit's line names each node left because it changed in a way
+  no mark covers, with how, and says what can commit it."""
+  response = skg_for_ai . parse_sexp (
+    '((commits (("main" "9c1e40d2"))) (committed-nodes 1) (left-nodes 2)'
+    ' (waiting ()) (unmarkable (("h" "H" ("its text moved between a private and a public section"))'
+    ' ("t" "T" ("its attribution changed" "the order of its content changed"))))'
+    ' (errors ()) (warnings ()))' )
+  text = skg_for_ai . commit_result_text (response)
+  expected = ( "Committed 1 node, in main (9c1e40d2). 2 changed nodes are left;"
+               " 2 of them changed in ways no mark covers, which 'commit --all'"
+               " or Git can commit: 'H' (its text moved between a private and a"
+               " public section); 'T' (its attribution changed, the order of its"
+               " content changed)." )
+  return ( [] if text == expected
+           else [ f"the commit's line is {text!r}, not {expected!r}" ] )
 
 def failures_of_preview_support ():
   """A dry run previews a save only on a server whose answer to "verify

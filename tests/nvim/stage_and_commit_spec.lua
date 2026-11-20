@@ -288,4 +288,28 @@ describe('skg stage and commit', function ()
         '((commits (("public" "9c1e40d2"))) (committed-nodes 3) (left-nodes 1)'
         .. ' (waiting ()) (errors ("skgrepo private: git commit failed")) (warnings ()))')))
   end)
+
+  it('names each node left because it changed in a way no mark covers', function ()
+    local read = require('skg.sexpr.parse').read
+    assert.are.equal(
+      "Committed 1 node, in public (9c1e40d). 3 changed nodes are left; 1 of"
+      .. " them is processed but waits: 'X' is deleted, but 'Y', which does not"
+      .. " go in, still names it; 2 of them changed in ways no mark covers,"
+      .. " which <localleader>rC or Git can commit: 'H' (its text moved between"
+      .. " a private and a public section); 'T' (its attribution changed, the"
+      .. " order of its content changed).",
+      stage_and_commit.result_message(read(
+        '((commits (("public" "9c1e40d2"))) (committed-nodes 1) (left-nodes 3)'
+        .. ' (waiting (("x" "X" still-named "y" "Y")))'
+        .. ' (unmarkable (("h" "H" ("its text moved between a private and a public section"))'
+        .. ' ("t" "T" ("its attribution changed" "the order of its content changed"))))'
+        .. ' (errors ()) (warnings ()))')))
+    assert.are.equal(
+      "Nothing was committed. 1 changed node is left; 1 of them changed in a"
+      .. " way no mark covers, which <localleader>rC or Git can commit: 'S' (its"
+      .. " attribution changed).",
+      stage_and_commit.result_message(read(
+        '((commits ()) (committed-nodes 0) (left-nodes 1) (waiting ())'
+        .. ' (unmarkable (("s" "S" ("its attribution changed")))) (errors ()) (warnings ()))')))
+  end)
 end)

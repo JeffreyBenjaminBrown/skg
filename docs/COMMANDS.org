@@ -929,6 +929,15 @@ node that does not go in: it names a new node that does not, it is
 deleted and a node that does not go in still names it, or it is part
 of a merge whose other parts do not all go in.
 
+A node whose files changed in a way no mark covers is not processed,
+so C-c r c leaves it out, however many of its marks are set: its text
+moved between a private and a public section, its attribution
+changed, an alias moved to another skgrepo, the order of one of its
+lists changed, or its file changed in a way the diff view does not
+show (formatting, say). The diff view shows none of these as a change
+to mark, so for now such a node goes in only with C-c r C, or with
+Git.
+
 It opens the buffer "*skg commit message*", in which you write the
 commit message, as in magit. There C-c C-c commits with that message,
 and C-c C-k cancels and kills the buffer; either one restores its
@@ -940,8 +949,12 @@ and what is left, and names each processed node that waits and what
 it waits for: "Committed 2 nodes, in public (9c1e40d), private
 (41aa07f). 2 changed nodes are left; 1 of them is processed but waits:
 'Plans for spring' names 'Seed order', which is new and does not go
-in." When nothing is processed it says "Nothing is processed, so
-nothing was committed; C-c r C commits everything."
+in." It names each node left because it changed in a way no mark
+covers, and how: "...; 1 of them changed in a way no mark covers,
+which C-c r C or Git can commit: 'Spring' (its text moved between a
+private and a public section)." When nothing is processed it says
+"Nothing is processed, so nothing was committed; C-c r C commits
+everything."
 
 After C-c C-c the buffer keeps the message until it is moot: once
 something is committed, or nothing had changed and nothing failed,
@@ -1032,10 +1045,10 @@ minibuffer shows the processed summary, in nodes, the unit C-c r c
 commits: "12 of 14 changed nodes are processed (1 of them waits)", or
 "Commit ready. All 14 of 14 changed nodes are processed." "Commit
 ready" means C-c r c would commit every changed node. A changed node
-counts as processed when every change it records is marked; a node
-whose only change is the order of a list counts as processed without
-marks; a processed node waits when C-c r c would hold it back (see C-c
-r c). The summary adds how many changes are not editable in this view
+counts as processed when every change it records is marked and its
+files changed in no way a mark cannot cover (see C-c r c), so a node
+whose only change is the order of a list is never processed; a
+processed node waits when C-c r c would hold it back (see C-c r c). The summary adds how many changes are not editable in this view
 (C-c r u extends the diff view to them) and how many nodes changed in
 foreign skgrepos.
 
@@ -1283,8 +1296,9 @@ nodes that record a relationship whose relRepo changed, each with all
 of its changes; a moved node's
 heralds read "-OLD +NEW", followed by "Δ⌂=a" when its nearest moved
 ancestor (a, the viewparent; b, the grandparent; ...) moved the same
-way. The order-only buffer lists the nodes whose only change is the
-order of a list, each with its content in the new order.
+way. The order-only buffer lists the nodes whose files changed in
+ways no mark covers and in no other way (the order of a list, mostly),
+each with its content in the new order; C-c r c leaves them out.
 *** C-c v e : skg-view-new-empty
 Opens a blank Skg content view in which to create new nodes.
 **** why

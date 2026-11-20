@@ -1674,7 +1674,8 @@ member stands where it stood, marked '~-'. The handles carry the
 change facts (see "Change facts, in the diff view"). There are up to
 four buffers, written in this order when not empty: all changes, the
 nodeMerges, the moves between skgrepos, and the nodes whose only
-change is the order of a list. Each is a view like any other: it can
+changes are ones no mark covers (the order of a list, mostly; see
+"Committing"). Each is a view like any other: it can
 be edited and saved, and its save answers with the processed summary.
 After any save, 'diff' again for a fresh rendering; a save of a diff
 buffer rewrites that buffer's files.
@@ -1769,10 +1770,25 @@ and why each processed node left waits:
 Committed 2 nodes, in public (9c1e40d2...), private (41aa07fe...). 2 changed nodes are left; 1 of them is processed but waits: 'Plans for spring' names 'Seed order', which is new and does not go in.
 #+end_example
 When nothing is processed it prints "Nothing is processed, so nothing
-was committed; 'commit --all' commits everything." A file that differs
-from HEAD only in bytes the parser does not read (another field
-order, say) goes in with any commit and is counted, so a commit can
-take more nodes than the summary counted changed.
+was committed; 'commit --all' commits everything."
+
+A node whose files changed in a way no mark covers is not processed,
+however many of its marks are set, and 'commit' leaves it out: its
+text moved between a private and a public section (a Hoist), its
+attribution changed, an alias moved to another skgrepo, the order of
+one of its lists changed, or one of its files changed in a way the
+diff view does not show, because that file, at HEAD or now, is not
+byte for byte what skg writes (another field order, say; a file only
+so changed counts as left too). The diff view shows none of these as
+a change to mark ('docs/diff-view.org', "Changes no mark covers"), so
+such a node goes in only with 'commit --all', or with Git. The tool
+names each, with how it changed:
+#+begin_example
+Nothing was committed. 1 changed node is left; 1 of them changed in a way no mark covers, which 'commit --all' or Git can commit: 'Spring' (its text moved between a private and a public section).
+#+end_example
+'commit --all' takes them, and a file that differs from HEAD only in
+bytes the parser does not read, which it counts, so it can take more
+nodes than the summary counted changed.
 
 'commit MESSAGE --all' commits every changed node, by the same
 commit. When some is not processed the server asks first: the tool

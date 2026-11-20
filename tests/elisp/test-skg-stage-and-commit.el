@@ -343,6 +343,16 @@ stream in progress; either says nothing was committed."
                   (read "((commits ((\"public\" \"9c1e40d2\"))) (committed-nodes 3) (left-nodes 1) (waiting ()) (errors (\"skgrepo private: git commit failed\")) (warnings ()))"))
                  "Committed 3 nodes, in public (9c1e40d). 1 changed node is left. Errors: skgrepo private: git commit failed")))
 
+(ert-deftest test-stage-and-commit-result-message-says-what-no-mark-covers ()
+  "A node left because it changed in a way no mark covers is named,
+with how it changed, and the line says what can commit it."
+  (should (equal (skg--stage-and-commit-result-message
+                  (read "((commits ((\"public\" \"9c1e40d2\"))) (committed-nodes 1) (left-nodes 3) (waiting ((\"x\" \"X\" still-named \"y\" \"Y\"))) (unmarkable ((\"h\" \"H\" (\"its text moved between a private and a public section\")) (\"t\" \"T\" (\"its attribution changed\" \"the order of its content changed\")))) (errors ()) (warnings ()))"))
+                 "Committed 1 node, in public (9c1e40d). 3 changed nodes are left; 1 of them is processed but waits: 'X' is deleted, but 'Y', which does not go in, still names it; 2 of them changed in ways no mark covers, which C-c r C or Git can commit: 'H' (its text moved between a private and a public section); 'T' (its attribution changed, the order of its content changed)."))
+  (should (equal (skg--stage-and-commit-result-message
+                  (read "((commits ()) (committed-nodes 0) (left-nodes 1) (waiting ()) (unmarkable ((\"s\" \"S\" (\"its attribution changed\")))) (errors ()) (warnings ()))"))
+                 "Nothing was committed. 1 changed node is left; 1 of them changed in a way no mark covers, which C-c r C or Git can commit: 'S' (its attribution changed).")))
+
 (ert-deftest test-stage-and-commit-rerenders-an-emptied-view ()
   "The server writes an empty view as '(content \"\")'; it empties the buffer."
   (with-temp-buffer

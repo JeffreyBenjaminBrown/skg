@@ -221,13 +221,16 @@ non-nil iff the user types exactly \"yes\"."
 (defun skg--stage-and-commit-result-message (response)
   "The line shown for RESPONSE, a result, '((commits ((SKGREPO
 COMMIT-ID) ...)) (committed-nodes N) (left-nodes L) (waiting ((PID
-TITLE REASON PID TITLE) ...)) (errors (...)) (warnings (...)))': what
-went in, how many changed nodes are left, and for each processed node
-that waits, what it waits for."
+TITLE REASON PID TITLE) ...)) (unmarkable ((PID TITLE (CHANGE ...))
+...)) (errors (...)) (warnings (...)))': what went in, how many
+changed nodes are left, for each processed node that waits, what it
+waits for, and for each node left because it changed in a way no mark
+covers, how."
   (let* ((commits (cadr (assq 'commits response)))
          (committed (cadr (assq 'committed-nodes response)))
          (left (or (cadr (assq 'left-nodes response)) 0))
          (waiting (cadr (assq 'waiting response)))
+         (unmarkable (cadr (assq 'unmarkable response)))
          (errors-line (skg--response-errors-line response)))
     (concat
      (cond (commits
@@ -241,10 +244,10 @@ that waits, what it waits for."
                          (format "%s (%s)" (car commit)
                                  (substring commit-id 0 (min 7 (length commit-id))))))
                      commits ", ")))
-           ((or errors-line waiting) "Nothing was committed.")
+           ((or errors-line waiting unmarkable) "Nothing was committed.")
            ((= left 0) "Nothing has changed, so nothing was committed.")
            (t "Nothing is processed, so nothing was committed; C-c r C commits everything."))
-     (if (and (> left 0) (or commits waiting))
+     (if (and (> left 0) (or commits waiting unmarkable))
          (concat " "
                  (skg--count-phrase left "changed node")
                  (if (= left 1) " is left" " are left")
@@ -256,6 +259,13 @@ that waits, what it waits for."
                                "are processed but wait")
                              (mapconcat #'skg--stage-and-commit-waiting-clause
                                         waiting "; "))
+                   "")
+                 (if unmarkable
+                     (format "; %d of them changed in %s no mark covers, which C-c r C or Git can commit: %s"
+                             (length unmarkable)
+                             (if (= 1 (length unmarkable)) "a way" "ways")
+                             (mapconcat #'skg--stage-and-commit-unmarkable-clause
+                                        unmarkable "; "))
                    "")
                  ".")
        "")
@@ -278,5 +288,10 @@ that waits, what it waits for."
        (format "'%s' is part of a merge with '%s', which does not go in"
                title other-title))
       (_ (format "'%s' waits for '%s' (%s)" title other-title reason)))))
+
+(defun skg--stage-and-commit-unmarkable-clause (entry)
+  "ENTRY, '(PID TITLE (CHANGE ...))' from a result's 'unmarkable': the
+node's title, and how it changed, in the server's words."
+  (format "'%s' (%s)" (nth 1 entry) (mapconcat #'identity (nth 2 entry) ", ")))
 
 (provide 'skg-request-stage-and-commit)

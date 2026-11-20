@@ -867,6 +867,15 @@ it needs a node that does not go in: it names a new node that does
 not, it is deleted and a node that does not go in still names it, or
 it is part of a merge whose other parts do not all go in.
 
+A node whose files changed in a way no mark covers is not processed,
+so <localleader>rc leaves it out, however many of its marks are set:
+its text moved between a private and a public section, its
+attribution changed, an alias moved to another skgrepo, the order of
+one of its lists changed, or its file changed in a way the diff view
+does not show (formatting, say). The diff view shows none of these as
+a change to mark, so for now such a node goes in only with
+<localleader>rC, or with Git.
+
 It opens the buffer 'skg://commit-message' in a split, in which you
 write the commit message. There ':w' or '<localleader>cc' commits
 with that message and closes the split; '<localleader>ck' cancels and
@@ -878,9 +887,12 @@ notification afterward says what went in and what is left, and names
 each processed node that waits and what it waits for: "Committed 2
 nodes, in public (9c1e40d), private (41aa07f). 2 changed nodes are
 left; 1 of them is processed but waits: 'Plans for spring' names 'Seed
-order', which is new and does not go in." When nothing is processed
-it says "Nothing is processed, so nothing was committed;
-<localleader>rC commits everything."
+order', which is new and does not go in." It names each node left
+because it changed in a way no mark covers, and how: "...; 1 of them
+changed in a way no mark covers, which <localleader>rC or Git can
+commit: 'Spring' (its text moved between a private and a public
+section)." When nothing is processed it says "Nothing is processed,
+so nothing was committed; <localleader>rC commits everything."
 
 After sending, the buffer keeps the message until it is moot: once
 something is committed, or nothing had changed and nothing failed,
@@ -976,9 +988,10 @@ notification shows the processed summary, in nodes, the unit
 them waits)", or "Commit ready. All 14 of 14 changed nodes are
 processed." "Commit ready" means <localleader>rc would commit every
 changed node. A changed node counts as processed when every change it
-records is marked; a node whose only change is the order of a list
-counts as processed without marks; a processed node waits when
-<localleader>rc would hold it back (see <localleader>rc). The summary
+records is marked and its files changed in no way a mark cannot cover
+(see <localleader>rc), so a node whose only change is the order of a
+list is never processed; a processed node waits when <localleader>rc
+would hold it back (see <localleader>rc). The summary
 adds how many changes are not editable in this view (<localleader>ru
 extends the diff view to them) and how many nodes changed in foreign
 skgrepos.
@@ -1208,8 +1221,10 @@ nodes that record a relationship whose relRepo changed, each with all
 of its changes; a moved node's
 heralds read "-OLD +NEW", followed by "Δ⌂=a" when its nearest moved
 ancestor (a, the viewparent; b, the grandparent; ...) moved the same
-way. The order-only buffer lists the nodes whose only change is the
-order of a list, each with its content in the new order.
+way. The order-only buffer lists the nodes whose files changed in
+ways no mark covers and in no other way (the order of a list, mostly),
+each with its content in the new order; <localleader>rc leaves them
+out.
 *** <localleader>ve : :SkgViewNewEmpty
 Opens a blank Skg content view in which to create new nodes.
 **** why

@@ -296,11 +296,39 @@ function M.waiting_clause (entry)
                        entry.title, entry.other_title, entry.reason)
 end
 
+---The entries of RESPONSE's 'unmarkable', each '(PID TITLE (CHANGE
+---...))', as tables { title, changes }.
+---@param response any
+---@return table[]
+function M.unmarkable_entries (response)
+  local entries = {}
+  local unmarkable = payload.field(response, 'unmarkable')
+  if unmarkable == nil or not sexpr.is_list(unmarkable) then return entries end
+  for _, entry in ipairs(unmarkable) do
+    if sexpr.is_list(entry) and #entry >= 3 and sexpr.is_list(entry[3]) then
+      local changes = {}
+      for _, change in ipairs(entry[3]) do
+        table.insert(changes, sexpr.atom_text(change)) end
+      table.insert(entries, { title = sexpr.atom_text(entry[2]),
+                              changes = changes }) end
+  end
+  return entries
+end
+
+---ENTRY, as M.unmarkable_entries gives it: the node's title, and how
+---it changed, in the server's words.
+---@param entry table
+---@return string
+function M.unmarkable_clause (entry)
+  return string.format("'%s' (%s)", entry.title, table.concat(entry.changes, ', '))
+end
+
 ---The line shown for a result, '((commits ((SKGREPO COMMIT-ID) ...))
 ---(committed-nodes N) (left-nodes L) (waiting ((PID TITLE REASON PID
----TITLE) ...)) (errors (...)) (warnings (...)))': what went in, how
----many changed nodes are left, and for each processed node that waits,
----what it waits for.
+---TITLE) ...)) (unmarkable ((PID TITLE (CHANGE ...)) ...)) (errors
+---(...)) (warnings (...)))': what went in, how many changed nodes are
+---left, for each processed node that waits, what it waits for, and for
+---each node left because it changed in a way no mark covers, how.
 ---@param response any
 ---@return string
 function M.result_message (response)
@@ -317,20 +345,21 @@ function M.result_message (response)
   local committed_nodes = count_field(response, 'committed-nodes')
   local left = count_field(response, 'left-nodes') or 0
   local waiting = M.waiting_entries(response)
+  local unmarkable = M.unmarkable_entries(response)
   local errors_line = rerender.response_errors_line(response)
   local parts = {}
   if #committed > 0 then
     table.insert(parts, 'Committed '
       .. (committed_nodes and M.count_phrase(committed_nodes, 'node') .. ', ' or '')
       .. 'in ' .. table.concat(committed, ', ') .. '.')
-  elseif errors_line or #waiting > 0 then
+  elseif errors_line or #waiting > 0 or #unmarkable > 0 then
     table.insert(parts, 'Nothing was committed.')
   elseif left == 0 then
     table.insert(parts, 'Nothing has changed, so nothing was committed.')
   else
     table.insert(parts, 'Nothing is processed, so nothing was committed;'
       .. ' <localleader>rC commits everything.') end
-  if left > 0 and (#committed > 0 or #waiting > 0) then
+  if left > 0 and (#committed > 0 or #waiting > 0 or #unmarkable > 0) then
     table.insert(parts, ' ' .. M.count_phrase(left, 'changed node')
       .. (left == 1 and ' is left' or ' are left'))
     if #waiting > 0 then
@@ -339,6 +368,14 @@ function M.result_message (response)
         table.insert(clauses, M.waiting_clause(entry)) end
       table.insert(parts, string.format('; %d of them %s: %s', #waiting,
         #waiting == 1 and 'is processed but waits' or 'are processed but wait',
+        table.concat(clauses, '; '))) end
+    if #unmarkable > 0 then
+      local clauses = {}
+      for _, entry in ipairs(unmarkable) do
+        table.insert(clauses, M.unmarkable_clause(entry)) end
+      table.insert(parts, string.format(
+        '; %d of them changed in %s no mark covers, which <localleader>rC or Git can commit: %s',
+        #unmarkable, #unmarkable == 1 and 'a way' or 'ways',
         table.concat(clauses, '; '))) end
     table.insert(parts, '.') end
   if errors_line then

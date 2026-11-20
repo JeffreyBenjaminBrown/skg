@@ -1144,12 +1144,15 @@ def commit_result_text (response):
   """What a commit's RESPONSE says, as the clients say it
   ('skg--stage-and-commit-result-message' in
   'elisp/skg-request-stage-and-commit.el'): what went in, how many
-  changed nodes are left, and for each processed node that waits, what
-  it waits for. The commit IDs are whole. Errors are printed apart."""
+  changed nodes are left, for each processed node that waits, what it
+  waits for, and for each node left because it changed in a way no
+  mark covers, how. The commit IDs are whole. Errors are printed
+  apart."""
   commits = response_field (response, "commits") or []
   committed_nodes = response_field (response, "committed-nodes")
   left = response_field (response, "left-nodes") or 0
   waiting = response_field (response, "waiting") or []
+  unmarkable = response_field (response, "unmarkable") or []
   errors = response_field (response, "errors") or []
   if commits:
     text = ( "Committed " +
@@ -1158,14 +1161,14 @@ def commit_result_text (response):
              "in " + ", " . join (
                sexp_to_text ( commit [0] ) + " (" + sexp_to_text ( commit [1] ) + ")"
                for commit in commits ) + "." )
-  elif errors or waiting:
+  elif errors or waiting or unmarkable:
     text = "Nothing was committed."
   elif left == 0:
     text = "Nothing has changed, so nothing was committed."
   else:
     text = ( "Nothing is processed, so nothing was committed; "
              "'commit --all' commits everything." )
-  if left > 0 and ( commits or waiting ):
+  if left > 0 and ( commits or waiting or unmarkable ):
     text += ( " " + count_phrase (left, "changed node") +
               ( " is left" if left == 1 else " are left" ) )
     if waiting:
@@ -1173,8 +1176,19 @@ def commit_result_text (response):
                 ( "is processed but waits" if len (waiting) == 1
                   else "are processed but wait" ) + ": " +
                 "; " . join ( waiting_clause (entry) for entry in waiting ))
+    if unmarkable:
+      text += ( f"; {len (unmarkable)} of them changed in " +
+                ( "a way" if len (unmarkable) == 1 else "ways" ) +
+                " no mark covers, which 'commit --all' or Git can commit: " +
+                "; " . join ( unmarkable_clause (entry) for entry in unmarkable ))
     text += "."
   return text
+
+def unmarkable_clause (entry):
+  """ENTRY, '(PID TITLE (CHANGE ...))' from a commit's 'unmarkable':
+  the node's title, and how it changed, in the server's words."""
+  return ( f"'{sexp_to_text ( entry [1] )}' (" +
+           ", " . join ( sexp_to_text (change) for change in entry [2] ) + ")" )
 
 def count_phrase (count, noun):
   """COUNT and NOUN, made plural by an "s" unless COUNT is 1."""
