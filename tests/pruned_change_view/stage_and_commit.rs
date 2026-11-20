@@ -139,10 +139,12 @@ fn a_confirmed_request_commits_every_owned_skgrepo_with_one_message (
               "{}", response );
     Ok (( )) }) }
 
-/// When every changed file is processed no confirmation is needed, and
-/// the commit lapses every mark.
+/// With every leaf marked, the summary is still incomplete while ord,
+/// whose content was reordered, changed in a way no mark covers, so a
+/// commit of everything asks; confirmed, it commits everything and
+/// lapses every mark.
 #[test]
-fn a_complete_summary_commits_without_confirmation_and_lapses_the_marks (
+fn a_reorder_keeps_the_summary_incomplete_and_the_commit_lapses_the_marks (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &SKGREPOS, |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
@@ -150,6 +152,12 @@ fn a_complete_summary_commits_without_confirmation_and_lapses_the_marks (
     mark_every_leaf (f, &env) ?;
     let answer : StageAndCommitAnswer = stage_and_commit (
       &env, &mut f . views_state, &all_skgrepos, "all processed", UNCONFIRMED );
+    let StageAndCommitAnswer::NeedsConfirmation { summary } = &answer
+      else { panic! ("expected a question, got {:?}", answer) };
+    assert_eq! ( ( summary . changed_nodes - summary . processed_nodes,
+                   summary . order_only_nodes ), (1, 1), "{:?}", summary );
+    let answer : StageAndCommitAnswer = stage_and_commit (
+      &env, &mut f . views_state, &all_skgrepos, "all processed", CONFIRMED );
     assert! ( matches! (answer, StageAndCommitAnswer::Committed (_)),
               "{:?}", answer );
     assert_everything_committed (f, "all processed") ?;
@@ -229,7 +237,7 @@ fn a_request_without_changes_commits_nothing (
     let answer : StageAndCommitAnswer = stage_and_commit (
       &env, &mut f . views_state, &all_skgrepos, "second", UNCONFIRMED );
     assert_eq! ( stage_and_commit_response_sexp (&answer),
-                 "((commits ()) (committed-nodes 0) (left-nodes 0) (waiting ()) (errors ()) (warnings ()))" );
+                 "((commits ()) (committed-nodes 0) (left-nodes 0) (waiting ()) (unmarkable ()) (errors ()) (warnings ()))" );
     for (i, skgrepo) in SKGREPOS . iter () . enumerate () {
       assert_eq! ( head_id (f, skgrepo) ?, heads [i], "skgrepo {}", skgrepo ); }
     Ok (( )) }) }

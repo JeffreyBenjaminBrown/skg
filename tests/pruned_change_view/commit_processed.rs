@@ -113,7 +113,7 @@ fn yaml (
   title    : &str,
   contains : &[&str],
 ) -> String {
-  let mut text : String = format! ( "pid: {}\ntitle: {}\n", pid, title );
+  let mut text : String = format! ( "title: {}\npid: {}\n", title, pid );
   if ! contains . is_empty () {
     text . push_str ("contains:\n");
     for member in contains { text . push_str ( &format! ("- {}\n", member) ); }}
@@ -298,7 +298,7 @@ fn when_nothing_is_processed_nothing_is_committed () -> TestResult {
       let before = snapshot (f, &["main"]) ?;
       let answer : StageAndCommitAnswer = commit_processed (f, env);
       assert_eq! ( stage_and_commit_response_sexp (&answer),
-                   "((commits ()) (committed-nodes 0) (left-nodes 1) (waiting ()) (errors ()) (warnings ()))" );
+                   "((commits ()) (committed-nodes 0) (left-nodes 1) (waiting ()) (unmarkable ()) (errors ()) (warnings ()))" );
       assert_eq! ( snapshot (f, &["main"]) ?, before );
       Ok (( )) }) }
 
@@ -310,7 +310,7 @@ fn when_nothing_has_changed_nothing_is_committed () -> TestResult {
       let before = snapshot (f, &["main"]) ?;
       let answer : StageAndCommitAnswer = commit_processed (f, env);
       assert_eq! ( stage_and_commit_response_sexp (&answer),
-                   "((commits ()) (committed-nodes 0) (left-nodes 0) (waiting ()) (errors ()) (warnings ()))" );
+                   "((commits ()) (committed-nodes 0) (left-nodes 0) (waiting ()) (unmarkable ()) (errors ()) (warnings ()))" );
       assert_eq! ( snapshot (f, &["main"]) ?, before );
       Ok (( )) }) }
 
@@ -376,7 +376,7 @@ fn a_node_naming_a_new_node_that_does_not_go_in_waits () -> TestResult {
       let before = snapshot (f, &["main"]) ?;
       let answer : StageAndCommitAnswer = commit_processed (f, env);
       assert_eq! ( stage_and_commit_response_sexp (&answer),
-                   "((commits ()) (committed-nodes 0) (left-nodes 2) (waiting ((\"r\" \"Plans\" names-new \"n\" \"Seed order\"))) (errors ()) (warnings ()))" );
+                   "((commits ()) (committed-nodes 0) (left-nodes 2) (waiting ((\"r\" \"Plans\" names-new \"n\" \"Seed order\"))) (unmarkable ()) (errors ()) (warnings ()))" );
       assert_eq! ( snapshot (f, &["main"]) ?, before );
       assert_eq! ( marked_keys (env), marks, "a waiting node keeps its marks" );
       Ok (( )) }) }
@@ -432,7 +432,7 @@ fn a_chain_of_two_waits_and_then_all_go_in () -> TestResult {
 fn merge_files () -> Vec<(String, Option<String>, Option<String>)> {
   vec! [
     ( "acq" . into (), Some ( yaml ("acq", "acq", &[]) ),
-      Some ( "pid: acq\ntitle: acq\nextra_ids:\n- acqd\n" . into () )),
+      Some ( "title: acq\npid: acq\nextra_ids:\n- acqd\n" . into () )),
     ( "acqd" . into (), Some ( yaml ("acqd", "acqd", &[]) ), None ),
     ( "c" . into (), Some ( yaml ("c", "c", &["acqd"]) ), Some ( yaml ("c", "c", &["acqd"]) )), ] }
 
@@ -494,7 +494,7 @@ fn a_merge_wholly_processed_goes_in () -> TestResult {
 fn a_commit_leaving_a_note_containing_its_forker_is_refused () -> TestResult {
   with_scratch ( MAIN, &[
     ("main", "n", Some (&yaml ("n", "n", &[])), Some (&yaml ("n", "n", &["r"]))),
-    ("main", "r", Some ("pid: r\ntitle: r\nforks:\n- n\n"), Some (&yaml ("r", "r", &[]))), ],
+    ("main", "r", Some ("title: r\npid: r\nforks:\n- n\n"), Some (&yaml ("r", "r", &[]))), ],
     |f, env| {
       mark_nodes (f, env, &["n"]) ?;
       let marks : HashSet<LeafKey> = marked_keys (env);
@@ -542,8 +542,10 @@ fn a_mismatch_in_the_check_commits_nothing () -> TestResult {
       let before = snapshot (f, &["main"]) ?;
       let straddle : GraphStraddle = graph_straddle (f) ?;
       let a : BTreeSet<ID> = BTreeSet::from ([ ID::from ("a") ]);
+      let paths_by_stem = changed_skg_paths_by_stem (&f . config) ?;
       let answer : StageAndCommitAnswer = commit_nodes (
-        &f . config, &straddle, &a, &a, &[], "the message" );
+        &f . config, &straddle, &paths_by_stem, &a, &a, &[], &[], &BTreeSet::new (),
+        "the message" );
       assert! ( matches! ( &answer, StageAndCommitAnswer::Refused (e)
                            if e . starts_with ("Nothing was committed: the commit would not leave exactly the changes of the nodes left out.") ),
                 "{:?}", answer );
@@ -553,21 +555,83 @@ fn a_mismatch_in_the_check_commits_nothing () -> TestResult {
       Ok (( )) }) }
 
 /// x's alias moves from its public section to a private one, and
-/// nothing else changes. That is no leaf, so x counts as processed, and
-/// both of its files go in.
+/// nothing else changes. No leaf records that, so no mark covers it: a
+/// commit of the processed leaves x out and says why, and a commit of
+/// everything takes both of its files.
 #[test]
-fn an_alias_moved_between_sections_goes_in_with_both_files () -> TestResult {
+fn an_alias_moved_between_sections_waits_for_a_commit_of_everything () -> TestResult {
   let public_x : String = yaml ("x", "x", &[]);
-  let private_x : &str = "pid: x\naliases:\n- al\n";
+  let private_x : &str = "aliases:\n- al\npid: x\n";
   with_scratch ( TWO_GITREPOS, &[
-    ("public",  "x", Some ("pid: x\ntitle: x\naliases:\n- al\n"), Some (&public_x)),
+    ("public",  "x", Some ("title: x\naliases:\n- al\npid: x\n"), Some (&public_x)),
     ("private", "x", None, Some (private_x)),
     ("public",  "k", Some (&yaml ("k", "k", &[])), Some (&yaml ("k", "k", &[]))), ],
     |f, env| {
+      let before = snapshot (f, &["public", "private"]) ?;
       let answer : StageAndCommitAnswer = commit_processed (f, env);
+      assert_eq! ( stage_and_commit_response_sexp (&answer),
+                   "((commits ()) (committed-nodes 0) (left-nodes 1) (waiting ()) (unmarkable ((\"x\" \"x\" (\"an alias moved to another skgrepo\")))) (errors ()) (warnings ()))" );
+      assert_eq! ( snapshot (f, &["public", "private"]) ?, before );
+      let answer : StageAndCommitAnswer =
+        commit (f, env, CommitScope::Everything { confirmed : true });
       assert_eq! ( report (&answer) . committed_nodes, 1, "{:?}", answer );
       assert_eq! ( head_files (f, "public") ? ["x.skg"], public_x );
       assert_eq! ( head_files (f, "private") ? . get ("x.skg") . map ( String::as_str ), Some (private_x) );
+      assert! ( statuses (f, "public") ? . is_empty () && statuses (f, "private") ? . is_empty () );
+      Ok (( )) }) }
+
+/// The pids and the changes, in the user's words, of the nodes a
+/// commit left out because their files changed in a way no mark covers.
+fn unmarkable_of (
+  report : &CommitReport,
+) -> Vec<(String, Vec<&'static str>)> {
+  report . unmarkable . iter ()
+    . map ( |(pid, _, changes)| ( pid . 0 . clone (),
+                                  changes . iter () . map ( |c| c . in_words () ) . collect () ))
+    . collect () }
+
+/// Each node below changed in a way no leaf records, and a commit of
+/// the processed leaves it out, saying how, while a, whose only change
+/// is marked, goes in: h's text moved from its private section up to
+/// its public home (a Hoist); s lost its attribution; r's content was
+/// reordered; t's title changed, which is marked, and its attribution
+/// did too; k's file changed only in its formatting, which the graph
+/// does not see; and u's title changed, which is marked, and its file
+/// is formatted otherwise than skg writes it. A commit of everything
+/// then takes the six left.
+#[test]
+fn a_change_no_mark_covers_leaves_its_node_out () -> TestResult {
+  let attributed = |pid : &str, title : &str| -> String {
+    format! ( "title: {}\npid: {}\nattribution:\n  original: o\n  skgrepo: theirs\n", title, pid ) };
+  with_scratch ( TWO_GITREPOS, &[
+    ("public",  "a", Some (&yaml ("a", "a", &[])), Some (&yaml ("a", "a2", &[]))),
+    ("public",  "h", Some ("aliases:\n- h\npid: h\n"), Some ("title: h\naliases:\n- h\npid: h\n")),
+    ("private", "h", Some ("title: h\npid: h\n"), None),
+    ("public",  "s", Some (&attributed ("s", "s")), Some (&yaml ("s", "s", &[]))),
+    ("public",  "r", Some (&yaml ("r", "r", &["a", "k"])), Some (&yaml ("r", "r", &["k", "a"]))),
+    ("public",  "t", Some (&attributed ("t", "t")), Some (&yaml ("t", "t2", &[]))),
+    ("public",  "k", Some (&yaml ("k", "k", &[])), Some ("pid: k\ntitle: k\n")),
+    ("public",  "u", Some (&yaml ("u", "u", &[])), Some ("pid: u\ntitle: u2\n")), ],
+    |f, env| {
+      mark_nodes (f, env, &["a", "t", "u"]) ?;
+      let before = snapshot (f, &["private"]) ?;
+      let answer : StageAndCommitAnswer = commit_processed (f, env);
+      let left : &CommitReport = report (&answer);
+      assert_eq! ( ( left . committed_nodes, left . left_nodes ), (1, 6), "{:?}", left );
+      assert_eq! ( unmarkable_of (left), vec! [
+        ( "h" . to_string (), vec! [ "its text moved between a private and a public section" ] ),
+        ( "k" . to_string (), vec! [ "its file changed in a way the diff view does not show (formatting, say)" ] ),
+        ( "r" . to_string (), vec! [ "the order of its content changed" ] ),
+        ( "s" . to_string (), vec! [ "its attribution changed" ] ),
+        ( "t" . to_string (), vec! [ "its attribution changed" ] ),
+        ( "u" . to_string (), vec! [ "its file changed in a way the diff view does not show (formatting, say)" ] ), ] );
+      assert_eq! ( statuses (f, "public") ? . keys () . collect::<Vec<_>> (),
+                   vec! [ "h.skg", "k.skg", "r.skg", "s.skg", "t.skg", "u.skg" ] );
+      assert_eq! ( snapshot (f, &["private"]) ?, before );
+      let answer : StageAndCommitAnswer =
+        commit (f, env, CommitScope::Everything { confirmed : true });
+      assert_eq! ( ( report (&answer) . committed_nodes, report (&answer) . left_nodes ), (6, 0),
+                   "{:?}", answer );
       assert! ( statuses (f, "public") ? . is_empty () && statuses (f, "private") ? . is_empty () );
       Ok (( )) }) }
 
@@ -634,7 +698,7 @@ fn line_endings_git_normalizes_are_no_change () -> TestResult {
   let a_new : String = yaml ("a", "a2", &[]);
   with_scratch ( MAIN, &[
     ("main", "a", Some (&yaml ("a", "a", &[])), Some (&a_new)),
-    ("main", "k", Some (&yaml ("k", "k", &[])), Some ("pid: k\r\ntitle: k\r\n")), ],
+    ("main", "k", Some (&yaml ("k", "k", &[])), Some ("title: k\r\npid: k\r\n")), ],
     |f, env| {
       gitrepo (f, "main") ? . config () ? . set_bool ("core.autocrlf", true) ?;
       mark_nodes (f, env, &["a"]) ?;
@@ -716,7 +780,7 @@ fn a_foreign_lister_of_a_pending_merge_holds_nothing_back () -> TestResult {
   let f : String = yaml ("f", "f", &["acqd"]);
   with_scratch ( &[ ("main", "main"), ("theirs", "theirs") ], &[
     ("main", "a", Some (&yaml ("a", "a", &[])), Some (&a_new)),
-    ("main", "acq", Some (&yaml ("acq", "acq", &[])), Some ("pid: acq\ntitle: acq\nextra_ids:\n- acqd\n")),
+    ("main", "acq", Some (&yaml ("acq", "acq", &[])), Some ("title: acq\npid: acq\nextra_ids:\n- acqd\n")),
     ("main", "acqd", Some (&yaml ("acqd", "acqd", &[])), None),
     ("theirs", "f", Some (&f), Some (&f)), ],
     |f, env| {

@@ -1,7 +1,11 @@
 //! The "stage and commit" request ('docs/diff-view.org', "Stage and
 //! commit"). With '(processed-only . t)' it commits the processed
 //! nodes, less those that must wait for a node that does not go in
-//! ('processed_commit_choice'), and asks nothing. Without it, it
+//! ('processed_commit_choice'), and asks nothing. A node whose files
+//! changed in a way no mark covers ('server/diff_view/unmarkable_changes.rs')
+//! is not processed, and a file Git lists as changed whose node did
+//! not change in the graph goes in only when it is what skg writes,
+//! which it is not. Without it, it
 //! commits every changed node by the same commit, and first asks for
 //! confirmation, unless the request carries '(confirmed . t)', when
 //! some changed node is not processed.
@@ -29,6 +33,8 @@ use crate::diff_view::change_leaves::{
   processed_response_trailing_entries, processed_summary,
   title_in_straddle, whole_commit_choice};
 use crate::diff_view::processed_store::ProcessedStore;
+use crate::diff_view::unmarkable_changes::{
+  UnmarkableChange, files_hold_more_than_their_node};
 use crate::git_ops::git_snapshot::read_candidate_graph_snapshot;
 use crate::git_ops::git_snapshot_types::GraphSnapshot;
 use crate::git_ops::stage_and_commit::{
@@ -86,13 +92,17 @@ pub enum StageAndCommitAnswer {
 /// What a commit did: the git-commit of each skgrepo committed, how
 /// many changed nodes went in and how many did not, the processed
 /// nodes held back (each with its title, and the title of what it
-/// waits for), and any error met during or after the git-commits.
+/// waits for), the nodes left out because their files changed in a
+/// way no mark covers though every mark is set (each with its title
+/// and those changes), and any error met during or after the
+/// git-commits.
 #[derive(Debug, Default)]
 pub struct CommitReport {
   pub commits         : Vec<(SkgrepoName, Oid)>,
   pub committed_nodes : usize,
   pub left_nodes      : usize,
   pub waiting         : Vec<(WaitingNode, String, String)>,
+  pub unmarkable      : Vec<(ID, String, Vec<UnmarkableChange>)>,
   pub errors          : Vec<String>,
 }
 
@@ -182,12 +192,21 @@ pub fn stage_and_commit (
     Ok (straddle) => straddle,
     Err (e) => return StageAndCommitAnswer::Refused ( format! (
       "Cannot stage and commit: {}", e )), };
+  let paths_by_stem : BTreeMap<ID, Vec<ChangedSkgPath>> =
+    match changed_skg_paths_by_stem (&runtime . config) {
+      Ok (paths) => paths,
+      Err (e) => return StageAndCommitAnswer::Refused ( format! (
+        "Nothing was committed: {}", e )), };
+  let files_not_as_skg_writes_them : BTreeSet<ID> = match scope {
+    CommitScope::ProcessedOnly => stems_whose_files_are_not_as_skg_writes_them (
+      &runtime . config, &straddle, &paths_by_stem ),
+    CommitScope::Everything { .. } => BTreeSet::new (), };
   let (choice, summary) : (CommitChoice, ProcessedSummary) = {
     let store : MutexGuard<ProcessedStore> =
       env . runtime . lock_processed_store ();
     ( match scope {
-        CommitScope::ProcessedOnly =>
-          processed_commit_choice (&runtime . config, &straddle, &store),
+        CommitScope::ProcessedOnly => processed_commit_choice (
+          &runtime . config, &straddle, &store, &files_not_as_skg_writes_them ),
         CommitScope::Everything { .. } =>
           whole_commit_choice (&runtime . config, &straddle, &store), },
       processed_summary (&runtime . config, &straddle, &store) ) };
@@ -196,8 +215,8 @@ pub fn stage_and_commit (
       return StageAndCommitAnswer::NeedsConfirmation { summary }; }}
   let left_out : BTreeSet<ID> = choice . left_out ();
   let answer : StageAndCommitAnswer = commit_nodes (
-    &runtime . config, &straddle, &choice . going_in, &left_out,
-    &choice . waiting, message );
+    &runtime . config, &straddle, &paths_by_stem, &choice . going_in, &left_out,
+    &choice . waiting, &choice . unmarkable, &files_not_as_skg_writes_them, message );
   drop (mutation_guard);
   match answer {
     StageAndCommitAnswer::Committed (mut report) => {
@@ -209,49 +228,83 @@ pub fn stage_and_commit (
       StageAndCommitAnswer::Committed (report) },
     other => other, }}
 
+/// The stems among 'paths_by_stem' that name a node of either graph
+/// some changed file of which is not what skg writes for it, at HEAD or
+/// in the worktree ('files_hold_more_than_their_node').
+pub fn stems_whose_files_are_not_as_skg_writes_them (
+  config        : &SkgConfig,
+  straddle      : &GraphStraddle,
+  paths_by_stem : &BTreeMap<ID, Vec<ChangedSkgPath>>,
+) -> BTreeSet<ID> {
+  paths_by_stem . iter ()
+    . filter ( |(stem, paths)| {
+      let (before, after) = ( straddle . before . get (stem), straddle . after . get (stem) );
+      ( before . is_some () || after . is_some () )
+        && files_hold_more_than_their_node (config, before, after, paths) } )
+    . map ( |(stem, _)| stem . clone () )
+    . collect () }
+
 /// Commit the nodes 'going_in', and with them every owned node of the
-/// live graph whose files Git lists as changed but which 'going_in',
-/// 'left_out' and the changed nodes all lack: it changed only in bytes
-/// the parser does not read. A stem Git lists that names no owned node
-/// (a section of a foreign node in an owned skgrepo, which the graph
-/// sets apart as an illegal edit) never goes in. 'left_out' are
-/// the changed nodes that do not go in: the commit is checked to leave
-/// exactly their changes ('check_candidate'), and nothing is committed
-/// otherwise. 'waiting' are reported as they are. The caller holds the
+/// live graph whose files Git lists as changed ('paths_by_stem') but
+/// which 'going_in', 'left_out' and the changed nodes all lack: it
+/// changed only in bytes the parser does not read. Such a node among
+/// 'withheld' (whose files are not what skg writes for it, which a
+/// commit of the processed withholds) does not go in: it is reported
+/// among 'unmarkable', and counted among the nodes left. A stem Git
+/// lists that names no owned node (a section of a foreign node in an
+/// owned skgrepo, which the graph sets apart as an illegal edit) never
+/// goes in. 'left_out' are the changed nodes that do not go in: the
+/// commit is checked to leave exactly their changes
+/// ('check_candidate'), and nothing is committed otherwise. 'waiting'
+/// and 'unmarkable' are reported as they are. The caller holds the
 /// mutation gate, and 'straddle' is current.
 pub fn commit_nodes (
-  config   : &SkgConfig,
-  straddle : &GraphStraddle,
-  going_in : &BTreeSet<ID>,
-  left_out : &BTreeSet<ID>,
-  waiting  : &[WaitingNode],
-  message  : &str,
+  config        : &SkgConfig,
+  straddle      : &GraphStraddle,
+  paths_by_stem : &BTreeMap<ID, Vec<ChangedSkgPath>>,
+  going_in      : &BTreeSet<ID>,
+  left_out      : &BTreeSet<ID>,
+  waiting       : &[WaitingNode],
+  unmarkable    : &[(ID, Vec<UnmarkableChange>)],
+  withheld      : &BTreeSet<ID>,
+  message       : &str,
 ) -> StageAndCommitAnswer {
-  let paths_by_stem : BTreeMap<ID, Vec<ChangedSkgPath>> =
-    match changed_skg_paths_by_stem (config) {
-      Ok (paths) => paths,
-      Err (e) => return StageAndCommitAnswer::Refused ( format! (
-        "Nothing was committed: {}", e )), };
   let changed : BTreeSet<ID> = straddle . change_leaves () . changed_nodes (config);
   let byte_only = |stem : &ID| -> bool { // see the doc comment
     ! going_in . contains (stem) && ! left_out . contains (stem)
       && ! changed . contains (stem)
       && straddle . after . get (stem) . is_some_and (
         |node| config . skgrepo_is_owned (&node . home_skgrepo) ) };
+  let byte_only_withheld : Vec<ID> = paths_by_stem . keys ()
+    . filter ( |stem| byte_only (stem) && withheld . contains (*stem) )
+    . cloned () . collect ();
   let committed : BTreeSet<ID> = going_in . iter () . cloned ()
-    . chain ( paths_by_stem . keys () . filter ( |stem| byte_only (stem) ) . cloned () )
+    . chain ( paths_by_stem . keys ()
+              . filter ( |stem| byte_only (stem) && ! withheld . contains (*stem) )
+              . cloned () )
     . collect ();
   let paths : Vec<ChangedSkgPath> = committed . iter ()
     . filter_map ( |pid| paths_by_stem . get (pid) )
     . flatten () . cloned () . collect ();
   let mut report : CommitReport = CommitReport {
     committed_nodes : committed . len (),
-    left_nodes      : left_out . len (),
+    left_nodes      : left_out . len () + byte_only_withheld . len (),
     waiting         : waiting . iter ()
       . map ( |node| ( node . clone (),
                        title_in_straddle (straddle, &node . pid),
                        title_in_straddle (straddle, &node . waits_for) ))
       . collect (),
+    unmarkable      : {
+      let mut unmarkable : Vec<(ID, String, Vec<UnmarkableChange>)> =
+        unmarkable . iter () . cloned ()
+        . chain ( byte_only_withheld . into_iter () . map ( |stem|
+          ( stem, vec! [ UnmarkableChange::FileNotAsSkgWritesIt ] )) )
+        . map ( |(pid, changes)| {
+          let title : String = title_in_straddle (straddle, &pid);
+          (pid, title, changes) } )
+        . collect ();
+      unmarkable . sort_by ( |a, b| a . 0 . cmp (&b . 0) );
+      unmarkable },
     .. CommitReport::default () };
   let prepared : PreparedCommits = match prepare_commits (config, &paths) {
     Ok (prepared) => prepared,
@@ -393,7 +446,10 @@ fn rebuild_straddle_and_drop_committed_marks (
 ///   ((needs-confirmation . t) (processed-summary ...) (errors ()) (warnings ()))
 ///   ((commits (("SKGREPO" "COMMIT-ID") ...)) (committed-nodes N)
 ///    (left-nodes L) (waiting (("PID" "TITLE" REASON "PID" "TITLE") ...))
+///    (unmarkable (("PID" "TITLE" ("CHANGE" ...)) ...))
 ///    (errors (...)) (warnings ()))
+/// Each CHANGE is an unmarkable change in the user's words
+/// ('UnmarkableChange::in_words').
 /// The processed summary has the save response's form, with a
 /// not-editable count of 0. 'commits' lists the skgrepos
 /// git-committed. Printed by hand, each string through
@@ -430,11 +486,18 @@ pub fn stage_and_commit_response_sexp (
           quoted (&node . pid . 0), quoted (title), node . reason . wire_name (),
           quoted (&node . waits_for . 0), quoted (waits_for_title) ))
         . collect ();
+      let unmarkable : Vec<String> = report . unmarkable . iter ()
+        . map ( |(pid, title, changes)| format! (
+          "({} {} ({}))",
+          quoted (&pid . 0), quoted (title),
+          changes . iter () . map ( |change| quoted ( change . in_words () ))
+            . collect::<Vec<String>> () . join (" ") ))
+        . collect ();
       let trailing : Vec<String> =
         [ format_string_list_sexp ("errors", &report . errors),
           format_string_list_sexp ("warnings", &[]) ]
         . iter () . map (sexp_to_client_string) . collect ();
       format! (
-        "((commits ({})) (committed-nodes {}) (left-nodes {}) (waiting ({})) {})",
+        "((commits ({})) (committed-nodes {}) (left-nodes {}) (waiting ({})) (unmarkable ({})) {})",
         commits . join (" "), report . committed_nodes, report . left_nodes,
-        waiting . join (" "), trailing . join (" ") ) }, }}
+        waiting . join (" "), unmarkable . join (" "), trailing . join (" ") ) }, }}

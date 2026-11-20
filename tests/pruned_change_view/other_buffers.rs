@@ -188,7 +188,8 @@ fn the_order_only_buffer_is_a_flat_list_with_markers (
   assert_eq! ( roots (&text) . len (), 1, "{}", text );
   assert! ( without_viewnode_ids (lines [0]) . starts_with ("* (skg bodyFolded node (gnid ord)"),
             "{}", text );
-  assert_eq! ( lines [1], "** (skg (changesetMarker orderOnly) (diff (processed)))" );
+  assert_eq! ( lines [1], "** (skg (changesetMarker orderOnly))",
+               "no mark covers a reorder, so the marker is never processed" );
   assert! ( lines [2] . contains ("node (gnid o2) (skgRepos (nodeRepo public)) writeProtected")
             && lines [3] . contains ("node (gnid o1) (skgRepos (nodeRepo public)) writeProtected"),
             "the content is shown in its new order, as leaves:\n{}", text );

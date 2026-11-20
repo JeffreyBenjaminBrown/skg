@@ -583,7 +583,7 @@ pub enum ChangeViewnode {
 pub enum ChangesetMarkerKind {
   Content,   // "its content changed": the ~ change-forest leaves of its content
   RelRepo,   // "some content relationships changed skgrepo"
-  OrderOnly, // "order-only change", always processed
+  OrderOnly, // "order-only change", never processed: no leaf records it
 }
 
 /// A viewnode grouping the children of one kind of relationship of

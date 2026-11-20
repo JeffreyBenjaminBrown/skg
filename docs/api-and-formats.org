@@ -1011,22 +1011,29 @@ keeps them as text ('TODO/problems.org').
       processed. The summary has the save response's form, with
       =(notEditable 0)=. Nothing changes, and the rerender stream is
       empty.
-    - =((commits (("SKGREPO" "COMMIT-ID") ...)) (committed-nodes N) (left-nodes L) (waiting (("PID" "TITLE" REASON "PID" "TITLE") ...)) (errors (...)) (warnings ()))=
+    - =((commits (("SKGREPO" "COMMIT-ID") ...)) (committed-nodes N) (left-nodes L) (waiting (("PID" "TITLE" REASON "PID" "TITLE") ...)) (unmarkable (("PID" "TITLE" ("CHANGE" ...)) ...)) (errors (...)) (warnings ()))=
       otherwise. =commits= lists each owned skgrepo git-committed, in
       declaration order, one commit each, by its gitrepo's configured user,
       with MESSAGE; a skgrepo with nothing to commit is not listed. N
-      counts the nodes that went in (a node whose file changed only in
-      bytes the parser does not read included); L the changed nodes that
-      did not (=docs/diff-view.org=, "The unit is the node"), a container
-      of a merge whose file is unchanged among them. Each =waiting= entry
+      counts the nodes that went in (for a commit of everything, a node
+      whose file changed only in bytes the parser does not read
+      included); L the changed nodes that did not (=docs/diff-view.org=,
+      "The unit is the node"), a container of a merge whose file is
+      unchanged among them, and, for a commit of the processed, each
+      node whose file changed only in such bytes. Each =waiting= entry
       is a processed node held back, its title, the reason
       (=names-new=, =still-named= or =merge=), and the node it waits for,
       with its title; titles are sent whole, since the connection is
-      unrestricted. For a commit of everything =waiting= is empty and L
-      is 0. When nothing is processed, or nothing changed, =commits= is
-      empty and N is 0 (unless some file changed only in bytes the
-      parser does not read: that goes in unmarked), e.g.
-      =((commits ()) (committed-nodes 0) (left-nodes 5) (waiting ()) (errors ()) (warnings ()))=.
+      unrestricted. Each =unmarkable= entry is a node left out because
+      its files changed in a way no mark covers, though every mark it
+      can take is set (=docs/diff-view.org=, "Changes no mark covers"),
+      its title, and each such change, in the user's words ("its
+      attribution changed", say). For a commit of everything =waiting=
+      and =unmarkable= are empty and L is 0. When nothing is processed,
+      or nothing changed, =commits= is empty and N is 0 (for a commit
+      of everything, unless some file changed only in bytes the parser
+      does not read: that goes in unmarked), e.g.
+      =((commits ()) (committed-nodes 0) (left-nodes 5) (waiting ()) (unmarkable ()) (errors ()) (warnings ()))=.
       A commit's tree is HEAD's with the committed nodes' =.skg= files
       taken from the worktree, not the git index; afterwards only those
       paths' git index entries change, to the commit's. An error here
@@ -2765,8 +2772,9 @@ their requests and to count the leaves an unmark touches.
 **** =(processed OBJECT...)= -- the diff objects whose change-forest leaves are all marked processed
 The objects are those of =(leaves ...)= that are processed. A bare
 =(processed)= marks a headline that lists no object (one naming a
-single leaf), and the order-only changeset marker, which names no
-leaf and is always processed. Absent when nothing is processed. A
+single leaf). The order-only changeset marker names no leaf, and is
+never processed: no mark covers the change it stands for. Absent
+when nothing is processed. A
 headline is processed when its =(processed ...)= names every object its
 =(leaves ...)= lists.
 **** =(homeSkgrepoMove (old OLD) (new NEW))=, =(movedLikeAncestor LETTER)= -- a node's home skgrepo moved

@@ -451,7 +451,7 @@ fn leaves_named_at (
           let aspect : RelationshipAspect = match kind {
             ChangesetMarkerKind::Content   => RelationshipAspect::Existence,
             ChangesetMarkerKind::RelRepo   => RelationshipAspect::RelRepo,
-            ChangesetMarkerKind::OrderOnly => return Some (named), }; // always processed
+            ChangesetMarkerKind::OrderOnly => return Some (named), }; // no leaf records an order
           let pid : ID = parent_pid () ?;
           if objects . is_empty () || objects . contains (&DiffObject::Rel) {
             named . push ( NamedLeafSet::ContentRelationshipsOf (
@@ -524,7 +524,8 @@ fn keys_in_forest (
 /// leaf of 'forest' and every leaf it names is marked at its current
 /// fingerprint ('store'). On a vognode or a changeset marker,
 /// '(processed ...)' names the objects of its '(leaves ...)' that are
-/// processed; the order-only changeset marker is always processed; any
+/// processed; the order-only changeset marker never is, since no leaf
+/// records the change it stands for ('UnmarkableChange'); any
 /// other processed viewnode has a single object, and writes it bare,
 /// '(processed)'. The '(leaves ...)' fact is 'leaves_fact_at'.
 /// A modified node's 'M' ('(properties changed)') stands for what
@@ -564,8 +565,7 @@ pub fn set_processed_facts_in_viewforest (
           ViewnodeKind::Vognode (Vognode::GnidOnly (_)) =>
             object_is_processed (node, &[]) . then (BTreeSet::new),
           ViewnodeKind::ChangeViewnode ( ChangeViewnode::ChangesetMarker {
-            kind : ChangesetMarkerKind::OrderOnly } ) =>
-            Some ( BTreeSet::new () ),
+            kind : ChangesetMarkerKind::OrderOnly } ) => None,
           ViewnodeKind::ChangeViewnode ( ChangeViewnode::ChangesetMarker { .. } ) =>
             processed_among (node, &leaves),
           ViewnodeKind::PropertyMember (_) =>

@@ -39,10 +39,14 @@ ALPHA="$DATA/owned/alpha"
 BETA="$DATA/owned/beta"
 GAMMA="$DATA/foreign/gamma"
 
+# Each file is written as skg writes it (its fields in the order
+# 'GraphnodeOnDisk' declares them): a commit of the processed leaves
+# out a node whose file is not ('docs/diff-view.org', "Changes no mark
+# covers").
 node () { # node FILE PID TITLE [CONTAINED...]
     local file="$1" pid="$2" title="$3"; shift 3
-    { echo "pid: $pid"
-      echo "title: $title"
+    { echo "title: $title"
+      echo "pid: $pid"
       if [ $# -gt 0 ]; then
           echo "contains:"
           for c in "$@"; do echo "- $c"; done
@@ -84,10 +88,10 @@ set_up_test_data () {
     node "$ALPHA/n2.skg" n2 "new child" n3
     node "$ALPHA/n3.skg" n3 "new grandchild"
     rm "$ALPHA/y.skg"
-    { echo "pid: x"
+    { echo "title: the acquirer"
+      echo "pid: x"
       echo "extra_ids:"
       echo "- y"
-      echo "title: the acquirer"
     } > "$ALPHA/x.skg"
     node "$GAMMA/g.skg" g "a foreign node, edited"
     echo "✓ Test data ready"

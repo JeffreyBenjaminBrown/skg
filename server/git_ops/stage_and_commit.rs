@@ -102,6 +102,31 @@ pub fn skg_paths_differing_from_head (
     if changed { differing . push (( path . clone (), in_worktree )); }}
   Ok (differing) }
 
+/// The blob 'path' has at HEAD, and the blob its worktree file would
+/// be stored as (through the gitrepo's filters, as 'git add' would
+/// store it, which writes it to the object database); None where it is
+/// absent.
+pub fn blobs_at_head_and_in_worktree (
+  config : &SkgConfig,
+  path   : &ChangedSkgPath,
+) -> Result<(Option<Oid>, Option<Oid>), String> {
+  let skgrepo : &Skgrepo = config . skgrepos . get (&path . skgrepo)
+    . ok_or_else ( || format! ( "Repo '{}' not found in config", path . skgrepo )) ?;
+  let gitrepo : Repository = open_gitrepo ( Path::new (&skgrepo . path) )
+    . ok_or_else ( || format! ( "skgrepo {} is not in a git repository", path . skgrepo )) ?;
+  let at_head : Option<Oid> = gitrepo . head ()
+    . and_then ( |head| head . peel_to_tree () ) . ok ()
+    . and_then ( |tree| tree . get_path (&path . path) . ok () )
+    . map ( |entry| entry . id () );
+  let in_worktree : Option<Oid> =
+    if ! path . in_worktree { None }
+    else {
+      let workdir : &Path = gitrepo . workdir ()
+        . ok_or_else ( || "its gitrepo has no worktree" . to_string () ) ?;
+      Some ( gitrepo . blob_path ( &workdir . join (&path . path) )
+             . map_err ( |e| format! ( "hashing {:?}: {}", path . path, e . message () )) ? ) };
+  Ok (( at_head, in_worktree )) }
+
 /// Whether 'path' is a '.skg' file directly in the folder 'prefix'.
 fn is_skg_directly_in (
   path   : &Path,

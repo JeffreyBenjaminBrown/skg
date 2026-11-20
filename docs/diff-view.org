@@ -55,10 +55,11 @@ the nearest moved vognode ancestor (a, the viewparent; b, the
 grandparent; ...) moved the same way ('set_homeSkgrepoMove_facts_in_viewforest').
 ** "diff-view: order-only changes"
 A flat list, in ID order, of the nodes whose file changed but which
-record no change-forest leaf: only the order of some list changed.
+record no change-forest leaf: they changed only in ways no mark covers
+("Changes no mark covers"), the order of some list, mostly.
 Each is shown with its content in the new order, as write-protected
 members shown without their content, and with an order-only changeset
-marker, which is always processed. Its sets are empty: it renders no pruned change view.
+marker, which is never processed. Its sets are empty: it renders no pruned change view.
 ** Refusals
 Every buffer is refused, and the client stops, unless the
 connection is unrestricted, and when the graph straddle cannot be built: an
@@ -480,8 +481,9 @@ home skgrepo, an alias, an extra ID, a flag), or a relationship (a
 relation, its recorder, its member) and an aspect of it (existence,
 relRepo). The recorder of a leaf is the node whose file records it; a
 relationship's leaf lives under its recorder, and seen from either
-end it is the same leaf. A node's existence leaf covers its own
-content when it is new or deleted.
+end it is the same leaf. A node's existence leaf covers everything its
+files hold when it is new or deleted, the order and skgrepos of its
+lists among it.
 
 The builder compares only the nodes that one graph lacks or holds
 unequal, and the nodes that list a member whose ID the two graphs
@@ -496,7 +498,9 @@ A mark says that one leaf is processed. The processed store
 the change it approved, a hash of the leaf's before and after values.
 A mark whose fingerprint no longer matches the change counts as
 absent: editing a marked change unmarks it, and nothing signals that
-an earlier version was approved. The store lives on the server, is
+an earlier version was approved. The fingerprint of a new or removed
+membership, and of a new or removed alias, holds the skgrepo that
+records it, so moving it to another skgrepo unmarks it too. The store lives on the server, is
 written to its file after every change, and is read at startup; a
 missing or unreadable file is an empty store. The file is the
 config's 'processed_marks_file', or else
@@ -514,9 +518,46 @@ that can be processed is processed. An unchanged membership has no leaf and is
 never asked. The content changeset marker gathers the
 content relationship leaves of its node; a member's existence leaf
 belongs to the member itself. A node is processed when every leaf it
-records is: its own aspects and the relationships it records
-('ChangeLeaves::node_is_processed'). A node whose only change is order
-records no leaf and is processed. A headline's ✓ after ∃ or M says that
+records is, its own aspects and the relationships it records, and its
+files changed in no way a mark cannot cover
+('ChangeLeaves::node_is_processed'; "Changes no mark covers"). A node
+whose only change is order records no leaf and is never processed.
+** Changes no mark covers
+A node's files can change in ways no leaf records, so that no mark
+covers them ('UnmarkableChange', 'server/diff_view/unmarkable_changes.rs').
+The rule: a node is not ready to commit while its files
+changed in a way not marked, whether or not it could be marked. The
+change-forest finds, for each node in both graphs that differs between
+them, what the leaves leave out ('unmarkable_changes_between',
+which names every field of the node, so a new field must be placed
+there):
+- its title or body moved between its home and a more private
+  section: it gained or lost overPrivateText (a Hoist does this);
+- its attribution changed (a strip, say);
+- an alias it has in both graphs moved to another skgrepo;
+- the members both graphs give one of its six lists (content, forks,
+  hidden, aliases, extra IDs, flags) stand in another order;
+- something else the graph holds changed: a list names a member by
+  another of its IDs, or became an empty list from none.
+A new or deleted node has none: its existence leaf covers its files.
+A commit of the processed adds one more, from Git
+('files_hold_more_than_their_node'): a node some changed '.skg' file
+of which, at HEAD or in the worktree, is not byte for byte what skg
+writes for the node as that side's graph holds it (its decomposition,
+each section serialized as the writer does). When both sides are what
+skg writes, the files differ only as the two graphs' nodes do, which
+the leaves and the list above cover; when one is not, the files may
+hold a change no graph shows (formatting, a comment, text in a section
+below its home). Skg writes every file it saves this way, so the check
+flags only files edited or written by hand. It is made only for a
+commit, since it reads each changed file.
+Such a node is not processed. A commit of the processed leaves it
+out, and its answer names it, with each such change in the user's
+words ("Stage and commit"); a commit of everything takes it. The diff
+view draws none of these changes as a change to mark (the order-only
+buffer shows the nodes that changed only so, with a marker that is
+never processed); a markable change viewnode for them is a planned
+extension ('TODO/problems.org'). A headline's ✓ after ∃ or M says that
 the leaves 'node' names there are marked, and after ~ that the one
 'rel' names is ("What a request names").
 ** Change facts on the wire
@@ -768,7 +809,9 @@ changed nodes of the owned skgrepos, never the foreign ones: with
 and asking nothing; without it every changed node, by the same
 commit, asking first when some is not processed. The rule a user
 holds: "C-c r c commits every node whose changes are all processed,
-except one that needs a node whose changes are not." C-c r c sends
+except one that needs a node whose changes are not", and a node whose
+files changed in a way no mark covers is not processed ("Changes no
+mark covers"). C-c r c sends
 '(processed-only . t)'; C-c r C (Neovim '<localleader>rC', the AI
 reader's 'commit --all') sends the request without it. The decisions
 behind it, and the alternatives rejected, are in Vic's plan "commit
@@ -798,9 +841,11 @@ file's stem, its node's pid ('changed_skg_paths_by_stem',
 'server/git_ops/stage_and_commit.rs'). A leaf's 'files' are not exact
 enough to stage from: an alias leaf names the home file wherever the
 alias is recorded. A stem Git lists that the straddle does not count
-changed differs only in bytes the parser does not read; it goes in
-with any commit, as a processed order-only node does, and is counted
-in 'committed-nodes'. A stem that names no owned node of the graph
+changed differs only in bytes the parser does not read. It goes in
+with a commit of everything, and is counted in 'committed-nodes'; a
+commit of the processed leaves it out, since its file is not what skg
+writes ("Changes no mark covers"), counts it in 'left-nodes', and
+names it among 'unmarkable'. A stem that names no owned node of the graph
 (a section of a foreign node in an owned skgrepo, which the graph
 sets apart as an illegal edit) never goes in. A path is changed when its contents, as Git
 would store them (through the gitrepo's filters, line endings among

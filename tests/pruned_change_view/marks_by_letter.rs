@@ -447,8 +447,8 @@ fn only_the_root (
 /// is reached by some mark without a prefix: in each fixture's buffer,
 /// one save marking every headline that lists leaves, on the objects
 /// it lists (bare where it lists none), leaves every changed file
-/// processed. A reordering is no leaf: an order-only file counts as
-/// processed ('buffers' has one).
+/// processed, but for an order-only node ('buffers' has one): a
+/// reordering is no leaf, so no mark covers it.
 #[test]
 fn marking_every_headline_on_its_listed_objects_marks_every_change (
 ) -> Result<(), Box<dyn Error>> {
@@ -468,7 +468,8 @@ fn marking_every_headline_on_its_listed_objects_marks_every_change (
       let summary : BufferProcessedSummary = response . processed_summary
         . expect ("a save of a diff-view buffer reports the processed summary");
       assert_eq! ( summary . changes_not_editable_here, 0, "{}: {:?}", fixture, summary );
-      assert_eq! ( summary . summary . processed_nodes, summary . summary . changed_nodes,
+      assert_eq! ( summary . summary . processed_nodes,
+                   summary . summary . changed_nodes - summary . summary . order_only_nodes,
                    "{}: {:?}\n{}", fixture, summary, response . saved_view );
       Ok (( )) }) ?; }
   Ok (( )) }

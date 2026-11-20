@@ -1914,7 +1914,9 @@ stands for a set of changes recorded in its parent's file, and carries
 their derived processed state. There are three kinds: the content changeset
 marker ("its content changed"), the relRepo changeset marker ("some
 content relationships changed skgrepo") and the order-only changeset marker
-("order-only change", which is always processed).
+("order-only change", which is never processed, since no mark covers
+the change it stands for; see "Changes no mark covers" in
+'docs/diff-view.org').
 
 **** removed member, former member
 

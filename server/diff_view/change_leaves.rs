@@ -20,6 +20,8 @@ use crate::dbs::in_rust_graph::relation_accessors::{
 use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner};
 use crate::graph_straddle::union_walk::ROLES_OF_LISTED_MEMBERS;
 use crate::diff_view::processed_store::ProcessedStore;
+use crate::diff_view::unmarkable_changes::{
+  UnmarkableChange, unmarkable_changes_between};
 use crate::serve::util::format_string_list_sexp;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Flag;
@@ -192,6 +194,9 @@ pub struct ChangeLeaves {
   /// changes with its mentioner's text, which is the mentioner's
   /// leaf. C reads it ('GraphStraddle::changed_pids').
   mentioner_sets_changed : BTreeSet<ID>,
+  /// The nodes in both graphs whose files changed in a way no leaf
+  /// records, with those changes ('unmarkable_changes_between').
+  unmarkable_by_node    : BTreeMap<ID, Vec<UnmarkableChange>>,
 }
 
 impl ChangeLeaves {
@@ -230,6 +235,14 @@ impl ChangeLeaves {
             index_by_member . entry ( relationship . member . clone () )
               . or_default () . push (( recorder . clone (), position )); }} }
       index_by_member };
+    let unmarkable_by_node : BTreeMap<ID, Vec<UnmarkableChange>> =
+      differing . iter ()
+      . filter_map ( |pid| {
+        let (before, after) = ( straddle . before . get (pid) ?, straddle . after . get (pid) ? );
+        let changes : Vec<UnmarkableChange> = unmarkable_changes_between (
+          &straddle . before, &straddle . after, before, after );
+        ( ! changes . is_empty () ) . then ( || (pid . clone (), changes) ) } )
+      . collect ();
     let order_only_pids : BTreeSet<ID> =
       differing . into_iter ()
       . filter ( |pid|
@@ -253,7 +266,7 @@ impl ChangeLeaves {
     ChangeLeaves { leaves_by_recorder, index, index_by_member, order_only_pids,
                    new_pids,
                    foreign_changed_nodes : straddle . foreign_changed_nodes,
-                   mentioner_sets_changed } }
+                   mentioner_sets_changed, unmarkable_by_node } }
 
   /// The nodes that record a leaf (the forest's roots).
   pub fn recorders (
@@ -384,15 +397,36 @@ impl ChangeLeaves {
       . any ( |file| config . skgrepo_is_owned (&file . skgrepo) ) }
 
   /// Whether every leaf 'pid' records is marked at its current
-  /// fingerprint. A node that records none, as an order-only node, is
-  /// processed.
+  /// fingerprint, and its files changed in no way a leaf does not
+  /// record ('unmarkable_changes'). An order-only node records no leaf
+  /// but changed in such a way, so it is never processed.
   pub fn node_is_processed (
+    &self,
+    store : &ProcessedStore,
+    pid   : &ID,
+  ) -> bool {
+    self . leaves_all_marked (store, pid)
+      && self . unmarkable_changes (pid) . is_empty () }
+
+  /// Whether every leaf 'pid' records is marked at its current
+  /// fingerprint; true when it records none.
+  pub fn leaves_all_marked (
     &self,
     store : &ProcessedStore,
     pid   : &ID,
   ) -> bool {
     self . leaves_under (pid) . iter ()
       . all ( |leaf| store . is_processed (&leaf . key, leaf . fingerprint) ) }
+
+  /// How the files of 'pid', a node in both graphs, changed in ways no
+  /// leaf records, as the two graphs show it; empty when in none.
+  pub fn unmarkable_changes (
+    &self,
+    pid : &ID,
+  ) -> &[UnmarkableChange] {
+    self . unmarkable_by_node . get (pid)
+      . map ( |changes| changes . as_slice () )
+      . unwrap_or (&[]) }
 
   /// The leaves the nodes 'pids' record, each once.
   pub fn leaves_recorded_by_nodes<'a> (
@@ -439,7 +473,8 @@ pub fn processed_summary (
   straddle : &GraphStraddle,
   store    : &ProcessedStore,
 ) -> ProcessedSummary {
-  let choice : CommitChoice = processed_commit_choice (config, straddle, store);
+  let choice : CommitChoice =
+    processed_commit_choice (config, straddle, store, &BTreeSet::new ());
   ProcessedSummary {
     processed_nodes       : choice . processed . len (),
     changed_nodes         : choice . changed . len (),
@@ -512,6 +547,10 @@ pub struct CommitChoice {
   pub going_in : BTreeSet<ID>,
   /// The processed nodes held back, in pid order.
   pub waiting  : Vec<WaitingNode>,
+  /// Those of 'changed' whose every leaf is marked but whose files
+  /// changed in a way no leaf records, with those changes, in pid
+  /// order: not processed, and so not going in.
+  pub unmarkable : Vec<(ID, Vec<UnmarkableChange>)>,
 }
 
 impl CommitChoice {
@@ -523,20 +562,45 @@ impl CommitChoice {
 }
 
 /// The commit of the processed nodes: every processed changed node,
-/// less those that wait ('hold_back_waiting_nodes').
+/// less those that wait ('hold_back_waiting_nodes'). A node among
+/// 'files_not_as_skg_writes_them' ('files_hold_more_than_their_node')
+/// is not processed either, as if it changed in a way no leaf records.
 pub fn processed_commit_choice (
-  config   : &SkgConfig,
-  straddle : &GraphStraddle,
-  store    : &ProcessedStore,
+  config                      : &SkgConfig,
+  straddle                    : &GraphStraddle,
+  store                       : &ProcessedStore,
+  files_not_as_skg_writes_them : &BTreeSet<ID>,
 ) -> CommitChoice {
   let leaves : &ChangeLeaves = straddle . change_leaves ();
   let changed : BTreeSet<ID> = leaves . changed_nodes (config);
+  let unmarkable : Vec<(ID, Vec<UnmarkableChange>)> = changed . iter ()
+    . filter ( |pid| leaves . leaves_all_marked (store, pid) )
+    . filter_map ( |pid| {
+      let changes : Vec<UnmarkableChange> =
+        unmarkable_changes_of ( leaves, files_not_as_skg_writes_them, pid );
+      ( ! changes . is_empty () ) . then ( || (pid . clone (), changes) ) } )
+    . collect ();
   let processed : BTreeSet<ID> = changed . iter ()
-    . filter ( |pid| leaves . node_is_processed (store, pid) )
+    . filter ( |pid| leaves . leaves_all_marked (store, pid)
+                     && ! unmarkable . iter () . any ( |(other, _)| other == *pid ) )
     . cloned () . collect ();
   let (going_in, waiting) : (BTreeSet<ID>, Vec<WaitingNode>) =
     hold_back_waiting_nodes (straddle, &changed, processed . clone ());
-  CommitChoice { changed, processed, going_in, waiting } }
+  CommitChoice { changed, processed, going_in, waiting, unmarkable } }
+
+/// How the files of 'pid' changed in ways no leaf records: as the two
+/// graphs show it, else, when its files are not what skg writes for it
+/// ('files_not_as_skg_writes_them'), that.
+pub fn unmarkable_changes_of (
+  leaves                       : &ChangeLeaves,
+  files_not_as_skg_writes_them : &BTreeSet<ID>,
+  pid                          : &ID,
+) -> Vec<UnmarkableChange> {
+  let in_graph : &[UnmarkableChange] = leaves . unmarkable_changes (pid);
+  if ! in_graph . is_empty () { in_graph . to_vec () }
+  else if files_not_as_skg_writes_them . contains (pid) {
+    vec! [ UnmarkableChange::FileNotAsSkgWritesIt ] }
+  else { Vec::new () }}
 
 /// The commit of every changed node, processed or not. Nothing waits:
 /// whatever a node could need goes in with it.
@@ -553,7 +617,8 @@ pub fn whole_commit_choice (
       . cloned () . collect (),
     going_in  : changed . clone (),
     changed,
-    waiting   : Vec::new (), } }
+    waiting   : Vec::new (),
+    unmarkable : Vec::new (), } }
 
 /// Of 'candidates', those that go in, and those held back because they
 /// need a node that does not: one of 'changed' outside the set going
@@ -849,7 +914,8 @@ fn leaves_recorded_by (
         . chain ( changes . aliases_lost . iter () . map ( |a| (false, a) ))
       { leaves . push ( node_leaf (
           NodeAspect::Alias (alias . clone ()),
-          fingerprint_of (&( ! gained, gained )),
+          fingerprint_of (&( ! gained, gained,
+                             alias_relRepos ( if gained { after } else { before }, alias ) )),
           home_file (after) )); }
       for (gained, extra_id) in
         changes . extra_ids_gained . iter () . map ( |i| (true, i) )
@@ -867,14 +933,14 @@ fn leaves_recorded_by (
           home_file (after) )); }},
     (before, after) => {
       // A new or deleted node: its existence is one leaf, whose
-      // fingerprint covers its own (non-relationship) content.
+      // fingerprint covers everything its files hold, the order and
+      // skgrepos of its lists among it.
       let existing : &GraphnodeInRust =
         after . or (before)
         . expect ("a changed node is in one graph or the other");
       leaves . push ( node_leaf (
         NodeAspect::Existence,
-        fingerprint_of (&( before . map (own_content_of),
-                           after  . map (own_content_of) )),
+        fingerprint_of (&( before, after )),
         home_file (existing) )); }}
   for role in ROLES_OF_LISTED_MEMBERS {
     for partner in straddle . partners (pid, role) {
@@ -904,8 +970,8 @@ fn relationship_leaves (
       . expect ("a partner is in one graph or the other");
     vec! [ ChangeLeaf {
       key         : key (RelationshipAspect::Existence),
-      fingerprint : fingerprint_of (&( partner . relRepo_before . is_some (),
-                                       partner . relRepo_after  . is_some () )),
+      fingerprint : fingerprint_of (&( &partner . relRepo_before,
+                                       &partner . relRepo_after )),
       files       : vec! [ file_in (relRepo) ], } ]
   } else if partner . relRepo_moved () {
     vec! [ ChangeLeaf {
@@ -916,18 +982,15 @@ fn relationship_leaves (
                     . into_iter () . flatten () . map (file_in) . collect (), } ]
   } else { Vec::new () }}
 
-/// A node's own content, without its relationships: what a new or
-/// deleted node's existence leaf approves.
-fn own_content_of (
-  node : &GraphnodeInRust,
-) -> ( &String, &Option<String>, Vec<String>, &Vec<ID>,
-       &Vec<Flag>, &SkgrepoName ) {
-  ( &node . title,
-    &node . body,
-    node . alias_texts (),
-    &node . extra_ids,
-    &node . flags,
-    &node . home_skgrepo ) }
+/// The skgrepos 'node' records the alias 'text' in.
+fn alias_relRepos<'a> (
+  node : &'a GraphnodeInRust,
+  text : &str,
+) -> Vec<&'a SkgrepoName> {
+  node . aliases . or_default () . iter ()
+    . filter ( |alias| alias . member == text )
+    . map ( |alias| &alias . relRepo )
+    . collect () }
 
 /// The fingerprint of a leaf's before and after values.
 fn fingerprint_of<T : Hash> (
