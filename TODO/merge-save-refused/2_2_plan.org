@@ -14,7 +14,7 @@ under a headline naming this plan and the slice.
 
 Before writing code, read 'coding-advice/names.org',
 'formatting.org', 'ai-agents.org', 'no-legacy-support.org' and
-'common-gotchas.md'. A slice that touches a client also reads
+'common-gotchas.org'. A slice that touches a client also reads
 'coding-advice/pitfall_bytes-vs-characters.org'.
 * Commits
 One commit per slice, or a few if a slice divides naturally. Each

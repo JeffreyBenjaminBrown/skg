@@ -14,7 +14,7 @@ under a headline naming this plan and the slice.
 
 Before writing code, read 'coding-advice/names.org',
 'formatting.org', 'ai-agents.org', 'no-legacy-support.org' and
-'common-gotchas.md'.
+'common-gotchas.org'.
 * Commits
 One commit per slice. Each message names this plan
 ('TODO/merge-save-refused/5_plan.org') and the slice, and follows

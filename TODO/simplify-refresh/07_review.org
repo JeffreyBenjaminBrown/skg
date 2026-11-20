@@ -208,7 +208,7 @@ retry once, give the folders the process ID; ten runs passed,
 *** the fixpoint helper lives in 'server/test_utils.rs'
 The refresh's unit tests are in the library.
 *** the plan-number rule also keeps '04_1'
-*** a sentence went into 'coding-advice/common-gotchas.md'
+*** a sentence went into 'coding-advice/common-gotchas.org'
 ** Slice 6: the search in one phase
 *** the 'overPrivateText' exclusion stays after the refresh
 Excluding before it would release the text of folder members
@@ -251,7 +251,7 @@ As slice 1 decided for tombstones.
 For a restricted container with a visible record.
 *** two fixtures record their omitted members in private sections
 So that the tests go on testing omission.
-*** 'docs/override.org' and 'architecture.md' updated
+*** 'docs/override.org' and 'architecture.org' updated
 They were stale.
 ** Slice 10: the user docs and the glossary
 *** "claimant" and "herald label" renamed, not defined

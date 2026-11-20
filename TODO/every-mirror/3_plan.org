@@ -64,7 +64,7 @@ read but where a pitfall below cites them.
 An agent executes one slice per launch ('coding-advice/orchestration.org').
 Read, before the first edit: 'coding-advice/names.org',
 'coding-advice/formatting.org', 'coding-advice/ai-agents.org',
-'coding-advice/no-legacy-support.org', 'coding-advice/common-gotchas.md',
+'coding-advice/no-legacy-support.org', 'coding-advice/common-gotchas.org',
 'coding-advice/when-to-stop.org', 'coding-advice/commit-messages.org'.
 Every name cited in the present tense is the code's at 0d2d650e (the
 last commit of plan 2's review); a slice that renames something

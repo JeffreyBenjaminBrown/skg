@@ -193,7 +193,7 @@ fold-preservation and others), and
 40-41); scope-reducer.rs 85-96; introspect/call-graph 560,
 677; introspect/change-forest 637, 660;
 reformat_parens_and_dot_in_rust.py 238, 312.
-'coding-advice/common-gotchas.md':2 states the rule.
+'coding-advice/common-gotchas.org':2 states the rule.
 ** Connections named by number
 'tests/save_stale_buffers.rs':546, 614-615, 640 add
 "Connection one/two" (199 is older): the same rule, mildly.

@@ -3528,7 +3528,7 @@ The vocabulary reviewer left a lead for the tests reviewer
 that the tests reviewer never saw, since they ran at once. The
 synthesis step should collect such leads and run a throwaway
 test for each before the review is written, as this one does.
-** tests/USAGE.md or common-gotchas.md: the process-ID helpers
+** tests/USAGE.md or common-gotchas.org: the process-ID helpers
 Slice 7 suggested that the advice on race conditions name
 'index_folder_for_this_process' and 'IndexFolderForThisProcess'
 as the way to give a test its own index folder.

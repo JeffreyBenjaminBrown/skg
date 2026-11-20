@@ -14,8 +14,8 @@ and this document differ, this document wins.
 
 Read [[file:../../coding-advice/ORIENTATION.org][the
 orientation]] and its code-change advice ('names.org',
-'formatting.org', 'ai-agents.org', 'common-gotchas.md',
-'when-to-stop.org'), 'architecture.md', and
+'formatting.org', 'ai-agents.org', 'common-gotchas.org',
+'when-to-stop.org'), 'architecture.org', and
 'commit-messages.org', before starting. Preserve unrelated
 edits. Do not change branches or git configuration. Finish
 each slice and its verification without stopping for routine
@@ -790,7 +790,7 @@ requests", "Edit requests", "Stats metadata", "Content view",
 "Herald rules"), 'docs/diff-view.org' ("Rendering a buffer",
 "Completion over the straddle", "The per-visit step"),
 'docs/heralds.org', 'docs/data-model_technical.org',
-'coding-advice/architecture.md' where it names the walk.
+'coding-advice/architecture.org' where it names the walk.
 
 * Implementation sequence
 Each slice ends with the tests it names and leaves every
@@ -1133,7 +1133,7 @@ placeholder, the reconciler vocabulary),
 slices 4 to 6), 'docs/diff-view.org' ("Rendering a buffer"
 onward),
 'docs/heralds.org', 'docs/data-model_technical.org' and
-'coding-advice/architecture.md' describe the refresh as
+'coding-advice/architecture.org' describe the refresh as
 built. 'metadata-format.org' and 'glossary.org' under
 'TODO/simplify-refresh/' are Jeff's notes and are left alone.
 Then the check of 'plans.org': what terms did this plan's code

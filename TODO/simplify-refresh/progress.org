@@ -1527,7 +1527,7 @@ type names from 58 comments. No code correction.
   the restoreRel paragraph, the property folders' members.
 - 'docs/heralds.org': a section "What the server serves, and what
   the clients add"; the readiness request's place.
-- 'coding-advice/architecture.md': the refresh, and the viewnode
+- 'coding-advice/architecture.org': the refresh, and the viewnode
   grammar as built. 'docs/README.org' points at the new section.
 - Beyond the slice's list, for grep B and for the facts: both
   COMMANDS files, 'sharing-model.org', 'override.org' (which
@@ -2525,7 +2525,7 @@ An integration test's notes say refresh, not completion.
 The many-kinds and many-changes buffers pin their outlines; it
 carries this record, the two problems entries moved to
 'TODO/DONE/problems.org', a sentence in
-'coding-advice/common-gotchas.md', and the slice's DONE.
+'coding-advice/common-gotchas.org', and the slice's DONE.
 *** The suites
 **** cargo check --all-targets
 Clean, no warnings.
@@ -2585,7 +2585,7 @@ shared session's index folder carries the process ID too,
 'cleanup_test_tantivy' uses the one retry in place of its 20, and
 the two tests that removed an index folder themselves
 ('serve_text_search_test.rs', 'subscribee_folder.rs') use
-'remove_test_dir'. 'coding-advice/common-gotchas.md' says so beside
+'remove_test_dir'. 'coding-advice/common-gotchas.org' says so beside
 its Tantivy note.
 **** the fixpoint helper lives in the library
 'refresh_reaches_fixpoint' is in 'server/test_utils.rs', since the
@@ -2673,7 +2673,7 @@ once, and gives the folders the process ID; ten runs of the
 Rust suite passed, 980 of 980 each. The other deviations are
 sound; the fixpoint helper lives in 'server/test_utils.rs'
 because the refresh's unit tests are in the library. The
-agent added a sentence to 'coding-advice/common-gotchas.md'
+agent added a sentence to 'coding-advice/common-gotchas.org'
 on the watcher thread, in a slice commit; kept. Suites: nextest
 980 of 980, Emacs 412, Neovim 399, integration 34 of 35 with
 the pre-existing failure, and 'bash/all-tests.sh' once, which
@@ -3143,7 +3143,7 @@ table regenerated.
 **** this record's commit
 Both clients treat a Restricted vognode as they treat an unknown;
 the docs (glossary, technical data model, API, heralds, the commands
-docs, override.org, coding-advice/architecture.md); the problems
+docs, override.org, coding-advice/architecture.org); the problems
 entry moved; this record; the slice's DONE.
 *** The suites
 **** cargo check --all-targets
@@ -3255,7 +3255,7 @@ also changed), the vognode predicates, and Emacs's relRepo commands
 ('skg--gnid-only-vognode-p'). Neovim has no relRepo command.
 **** docs beyond the plan's list
 'docs/override.org' (the override folders under a restriction) and
-'coding-advice/architecture.md' (its vognode grammar) were stale.
+'coding-advice/architecture.org' (its vognode grammar) were stale.
 *** Fixtures changed
 'tests/repo_sets/fixtures': root and ovr-owner record private-a and
 ovr-inactive in new private sections, so that the tests of omission
@@ -5387,7 +5387,7 @@ claim and warrant, the rungs), 'docs/api-and-formats.org' (the
 switch, "Restricted-skgrepo nodes", the override substitute,
 the write-protect requests), 'docs/diff-view.org',
 'docs/sharing-model.org', 'docs/nvim-client-deviations.org'
-and 'coding-advice/architecture.md'. The glossary's entry
+and 'coding-advice/architecture.org'. The glossary's entry
 "vanish" says that the word is unrelated to
 'server/git_ops/vanished.rs'.
 *** Fixtures changed
@@ -5449,7 +5449,7 @@ children to the result's own visit; the original is drawn
 before the overrider vanishes; one 'entombstone'; the integrate
 request picks its roots before its one refresh; the docs reach
 'sharing-model.org', 'nvim-client-deviations.org' and
-'coding-advice/architecture.md', whose sentences on 'noClaim'
+'coding-advice/architecture.org', whose sentences on 'noClaim'
 and tombstones were false after the slice. One consequence for
 Jeff, not a stop: a headline typed where its parent cannot
 contain it (under a ghost whose node is back, under a

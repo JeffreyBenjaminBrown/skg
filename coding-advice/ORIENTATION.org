@@ -55,8 +55,8 @@ when the task reaches that area; this guide is not permission to skip
 relevant instructions or source code.
 ** Code changes
 Read [[file:names.org]], [[file:formatting.org]], [[file:ai-agents.org]],
-[[file:no-legacy-support.org]], and [[file:common-gotchas.md]]. For execution,
-also read [[file:when-to-stop.org]]. Consult [[file:architecture.md]] when the
+[[file:no-legacy-support.org]], and [[file:common-gotchas.org]]. For execution,
+also read [[file:when-to-stop.org]]. Consult [[file:architecture.org]] when the
 change crosses graph, storage, server, or client boundaries.
 ** Reviews and plans
 Read [[file:plans.org]] before writing an execution plan for an unattended
@@ -65,11 +65,11 @@ work, and [[file:orchestration.org]] before running a plan slice by
 slice; [[file:jeff-should-do.org]] holds the habits directed at Jeff.
 Read [[file:org-discussions.org]] for how discussions in Org files mark
 authorship and what needs attention.
-Read [[file:architecture.md]] for architectural work and [[file:when-to-stop.org]]
+Read [[file:architecture.org]] for architectural work and [[file:when-to-stop.org]]
 when deciding which implementation choices need Jeff's input. Read the
 code-change advice when reviewing or specifying the corresponding details.
 ** Tests and debugging
-Read [[file:common-gotchas.md]]. Consult [[file:consider-experimenting.org]] for
+Read [[file:common-gotchas.org]]. Consult [[file:consider-experimenting.org]] for
 an uncertain algorithm or implementation technique, and
 [[file:pitfall_bytes-vs-characters.org]] for text offsets, slicing, or framing.
 ** Containers, dependencies, and isolated server instances

@@ -366,7 +366,7 @@ are quoted under "Agreed behavior".
 An agent executes one slice per launch ('coding-advice/orchestration.org').
 Read, before the first edit: 'coding-advice/names.org',
 'coding-advice/formatting.org', 'coding-advice/ai-agents.org',
-'coding-advice/no-legacy-support.org', 'coding-advice/common-gotchas.md',
+'coding-advice/no-legacy-support.org', 'coding-advice/common-gotchas.org',
 'coding-advice/when-to-stop.org', 'coding-advice/commit-messages.org'.
 
 Function and file names cited in the present tense are today's,

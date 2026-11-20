@@ -178,7 +178,7 @@ result's own visit; the original is drawn before its overrider
 vanishes; one 'entombstone'; the integrate request picks its
 roots before its one refresh. The docs reached
 'docs/sharing-model.org', 'docs/nvim-client-deviations.org'
-and 'coding-advice/architecture.md', whose sentences on
+and 'coding-advice/architecture.org', whose sentences on
 'noClaim' and tombstones were false after the slice. A
 headline typed where its parent cannot contain it (under a
 ghost whose node is back; under a subscribee shown under its
@@ -576,7 +576,7 @@ raises.
 WHY-CLAUDE: Decide 17.
 *** DONE-CLAUDE 10. Smaller, and the stale doc comments
 WHY-CLAUDE: Decide 14 (the comments, the citations with no
-heading, 'architecture.md') and 17.
+heading, 'architecture.org') and 17.
 ** User documentation ('user-docs.org')
 Every Emacs key and every Neovim key and Ex command is
 documented under its binding and each of the 26 requests has
@@ -1363,7 +1363,7 @@ paragraph that never names hides. It lacks "restricted section",
 The clients' save stream "ends in save-result or fork-
 confirmation" (six terminal answers now); a module said to be
 "async" that is not; three test citations pointing at headings
-that do not exist; 'coding-advice/architecture.md' saying "an
+that do not exist; 'coding-advice/architecture.org' saying "an
 unknown" and "a Restricted vognode"; 'coding-advice/code-
 reviews.org' saying "a repo-set switch" ('skg-restrict-repo-set',
 'C-c v l') and "a merge of siblings".

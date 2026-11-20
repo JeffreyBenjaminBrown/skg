@@ -114,7 +114,7 @@
 *** What I changed
     - 'coding-advice/ai-agents.org' pointed readers at
       'coding-advice/good-refactors.md', which does not exist; the real
-      file is 'coding-advice/some-good-refactors.md'. Corrected the
+      file is 'coding-advice/some-good-refactors.org'. Corrected the
       reference.
     - A code comment in server/types/viewnode.rs (on the Deleted view
       node) still described a deleted function

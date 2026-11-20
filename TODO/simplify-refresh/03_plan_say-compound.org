@@ -13,7 +13,7 @@ this document wins.
 
 Read [[file:../../coding-advice/ORIENTATION.org][the
 orientation]] and its code-change advice ('names.org',
-'formatting.org', 'ai-agents.org', 'common-gotchas.md',
+'formatting.org', 'ai-agents.org', 'common-gotchas.org',
 'when-to-stop.org'), and 'commit-messages.org', before
 starting. Preserve unrelated edits. Do not change branches or
 git configuration. Finish the work and its verification without

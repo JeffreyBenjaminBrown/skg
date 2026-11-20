@@ -20,9 +20,9 @@ this document differ, this document wins.
 
 Read [[file:../../coding-advice/ORIENTATION.org][the
 orientation]] and its code-change advice ('names.org',
-'formatting.org', 'ai-agents.org', 'common-gotchas.md',
+'formatting.org', 'ai-agents.org', 'common-gotchas.org',
 'when-to-stop.org'),
-'architecture.md', and 'commit-messages.org', before starting.
+'architecture.org', and 'commit-messages.org', before starting.
 Preserve unrelated edits. Do not change branches or git
 configuration. Finish each slice and its verification without
 stopping for routine choices; stopping to ask is for the rare

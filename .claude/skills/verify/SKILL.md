@@ -142,7 +142,7 @@ scenario from a script file that records `$!`.
 
 ## Gotchas
 
-- Tantivy commits lag saves (see coding-advice/common-gotchas.md);
+- Tantivy commits lag saves (see coding-advice/common-gotchas.org);
   direct index reads right after a save race the background writer.
 - If Jeff's server runs with `--hot-reload`, editing `server/` makes
   cargo-watch rebuild its binary (`target/release/skg`, or
