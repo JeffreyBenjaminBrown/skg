@@ -553,9 +553,11 @@ node, so a new field must be placed there):
 - the members both graphs give one of its six lists (content, forks,
   hidden, aliases, extra IDs, flags) stand in another order;
 - something else the graph holds changed: a list names a member by
-  another of its IDs, or became an empty list from none. A node that
-  differs between the graphs in a way nothing else finds has this
-  one, so every node that changed records a leaf.
+  another of its IDs. A node that differs between the graphs in a way
+  nothing else finds has this one, so every node that changed records
+  a leaf. Each graph holds a node as its files read back, an empty
+  list as none, since no file writes an empty list: a node a save put
+  in the graph equals the one a reload of its files makes.
 Together they are one leaf of the node, its other changes
 ('NodeAspect::OtherChanges'), recorded in its home file and drawn as
 one change viewnode ("What each kind of change looks like"). Its
