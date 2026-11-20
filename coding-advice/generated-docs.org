@@ -1,0 +1,52 @@
+* The docs are generated from 'skg-system/'
+The '.org' files under 'docs/' and 'coding-advice/' are exported from
+the notes of 'skg-system/', a skgrepo at the top of this repository,
+tracked by the same Git. Never edit those files by hand: edit the
+notes, then export. Each file begins with a comment naming the note it
+was exported from. 'bash/check-docs-exported.sh', which
+'bash/all-tests.sh' runs, fails if a committed file differs from a
+fresh export, or if no note exports it.
+'docs/troubleshooting/check-rlibs.py' is not a note; edit it as code.
+* Export
+'bash/export-docs.sh' writes every document 'skg-system/' marks for
+export into the top of the repository. It needs no server: it runs
+'skg export-org' with 'bash/skg-system.skgconfig.toml', a config that
+owns 'skg-system/' alone, so other skgrepos' export markers never
+count. It overwrites files and deletes none: when a document is
+removed or renamed, delete its old file.
+A new document is a note with an export marker
+(see [[file:../docs/COMMANDS.org::*choosing what to export: export markers][how to mark a note for export]]).
+* How an agent edits them
+Only in your own worktree: in '/home/ubuntu/host', Jeff's server owns
+'skg-system/'.
+** Start a server that owns your worktree's 'skg-system/'
+From the top of the worktree, in the background (the Bash tool's
+'run_in_background'), on a free port, never 1730, 1731 or 1761:
+: bash/docs-server.sh PORT --deb
+It writes '.skg-system-server/skgconfig.toml', which Git ignores: a
+copy of 'bash/skg-system.skgconfig.toml' on PORT. Then it runs
+'bash/start-servers.sh' on it. Wait for "Server ready." in the newest
+'.skg-system-server/skgconfig.toml.running/*/server-to-user.log'.
+Stop it with
+: bash/stop-servers.sh "$PWD/.skg-system-server/skgconfig.toml"
+** Edit through skg-for-ai
+'python3 tools/skg-for-ai/skg_for_ai.py search WORDS --port PORT'
+finds a note; 'view ID', edit the compact view it writes, then 'save
+VIEW --port PORT --yes'. 'tools/skg-for-ai/README.org' says more.
+** Export and commit
+Run 'bash/export-docs.sh', read 'git diff', and run
+'bash/check-docs-exported.sh'. Commit the notes and the exported files
+together, with Git: 'git add skg-system docs coding-advice'. Skg's own
+commit would commit the notes alone.
+* How Jeff edits them
+His server owns '/home/ubuntu/host/skg-system/' (a skgrepo of
+'data/jeff/skgconfig.toml'). He edits the notes as any others, runs
+'bash/export-docs.sh', and commits notes and exports together. A
+commit from Skg ('C-c r c') commits only notes, and only to whatever
+branch the code repository has checked out; the exports then need a
+commit of their own.
+** After a merge
+The server watches its skgrepos' folders and reloads '.skg' files
+that change on disk, so a merge or fast-forward that changes
+'skg-system/' needs no restart. A buffer with unsaved edits is checked
+when saved, like any other.

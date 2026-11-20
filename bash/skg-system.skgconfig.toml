@@ -1,0 +1,16 @@
+# The config that owns only 'skg-system/', the skgrepo of this code
+# repository, from which 'docs/' and 'coding-advice/' are exported
+# ('coding-advice/generated-docs.org'). bash/export-docs.sh exports
+# with it, so only the export markers of skg-system count.
+# bash/docs-server.sh PORT serves a copy of it, with PORT, from
+# '.skg-system-server/'. Paths are relative to this file's folder,
+# 'bash/', which is also where the copy's are resolved: both folders
+# sit at the top of the repository.
+tantivy_folder = "../.skg-system-server/.index.tantivy"
+port = 1799
+timing_log = false
+beep_when_server_becomes_available = false
+
+[[repos]]
+name = "skg-system"
+path = "../skg-system"

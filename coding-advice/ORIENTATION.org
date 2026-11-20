@@ -1,4 +1,6 @@
 * Start here
+The files of 'docs/' and 'coding-advice/' are generated from notes;
+change them only as [[file:generated-docs.org]] says.
 Read this file and [[file:to-save-tokens.org][the default token-conservation advice]] once at the
 start of a task. Then use the reading guide below for the work actually in
 scope. Do not reread unchanged advice for every follow-up in the same task.

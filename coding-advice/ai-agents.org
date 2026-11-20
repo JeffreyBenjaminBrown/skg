@@ -27,6 +27,11 @@ look for similar-looking ("quasi-duplicate") code,
 and try to deduplicate it.
 If you can't, report the quasi-duplication.
 
+* Edit the docs through their notes
+
+The files of 'docs/' and 'coding-advice/' are exported from the
+notes of 'skg-system/'. To change one, follow [[file:generated-docs.org]].
+
 * Don't change Git state unless I explicitly ask.
 
 That includes my credentials (which, as the git history reveals,

@@ -59,3 +59,8 @@ tools/introspect/profile-with-org-report/result.org
 tools/md-to-org/.org-id-db.json
 
 export/
+# bash/docs-server.sh: its config, index and logs
+/.skg-system-server/
+# skg rewrites it at each start, from the config of the server
+# that owns skg-system/, which differs between servers
+/skg-system/OTHER_SKGREPO_DEPENDENCIES.toml
