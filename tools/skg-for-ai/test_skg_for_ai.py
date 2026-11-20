@@ -1670,8 +1670,10 @@ def check_implicit_fork_approved (context):
   require_equal ( "the container's content after the fork",
                   skg_list (context, "child-a-id", "contains"),
                   [ "fred-detail-id", "elsewhere-id", "fred-aside-id", "shared-id" ] )
+  # The reply, in main with no attribution, speaks in another voice
+  # than its parent, the attributed clone: it says its home.
   require_in_compact ( folder, "*** An aside of Fred's ⟨0h C1 Kĥ1 ⌂:<main/fred>⟩\n"
-                               "**** My note on it ⟨0v⟩\n" )
+                               "**** My note on it ⟨0v ⌂:main⟩\n" )
   clone_text = read_file ( os . path . join ( context [ "main_repo" ], clone_id + ".skg" ))
   if "attribution:\n  original: fred-aside-id\n  skgrepo: fred\n" not in clone_text:
     raise CaseFailure ( f"the clone records no attribution to Fred's note:\n{clone_text}" )

@@ -48,10 +48,11 @@ three notes link to it, all substantive (3/L); its home skgrepo is
   be editable): it is editable elsewhere in the view, or stands under
   a '☮' folder, say. A save refuses an edit to it; 'editable' in its
   handle moves the editing here. 'B': view it to read its body.
-  '⌂:REPO': its home skgrepo, on a root and where it differs from the
-  node above. '⌂:<MINE/THEIRS>': a fork, in MINE, of a note of THEIRS,
-  wherever it stands; 'THEIRS?' means no loaded skgrepo is known to be
-  the one recorded. 'A2 I1 F1': two aliases, an extra ID, a true flag ('no
+  '⌂:REPO': its home skgrepo, on a root and where the voice differs
+  from the node above. '⌂:<MINE/THEIRS>': a fork, in MINE, of a note
+  of THEIRS; 'THEIRS?' means no loaded skgrepo is known to be the one
+  recorded. No '⌂': it says what the node above says, attribution
+  included. 'A2 I1 F1': two aliases, an extra ID, a true flag ('no
   search matching', say). 'Kĥ': it stands in the place of a note
   joined to it by forks; its parent contains that note, not this one.
 A headline whose handle holds a sentence is a folder. 'These also
@@ -498,17 +499,19 @@ ordinary case in a content tree, so most handles would carry it;
 '⟨0c aC L1⟩' is written '⟨0c L1⟩', and '⟨0e aC⟩' just '⟨0e⟩'. Every
 other form, 'aC10' or '2aC' among them, stays.
 *** The skgrepo boundary
-A headline whose home skgrepo differs from its nearest node
-occurrence above it, or a root, carries '⌂:LABEL' after its
-relationship heralds, LABEL the skgrepo's label from the table the
-server sends beside its herald rules: '⟨0h ☮ C1 1/L bK ⌂:fred⟩' is a
-note of the 'fred' skgrepo under a node of another. Every other
-headline shares its skgrepo with the nearest node above it, but a
-fork that records where it was forked from (an attribution, see
-"Forking") carries '⌂:<MINE/THEIRS>' wherever it stands: its home
+A headline whose home skgrepo herald would say something other than
+what its nearest node occurrence above it says, or a root, carries
+'⌂:LABEL' after its relationship heralds, LABEL the skgrepo's label
+from the table the server sends beside its herald rules: '⟨0h ☮ C1
+1/L bK ⌂:fred⟩' is a note of the 'fred' skgrepo under a node of
+another. A fork that records where it was forked from (an
+attribution, see "Forking") says '⌂:<MINE/THEIRS>': its home
 skgrepo's label, then the label of the skgrepo it was forked from, or
 that skgrepo's recorded name followed by '?' when no loaded skgrepo is
-known to be it.
+known to be it. The whole herald is compared, so under
+'⌂:<MINE/THEIRS>' a plain note of MINE says '⌂:MINE' (the voice is
+MINE again), and only a fork from the same THEIRS says nothing. A
+headline without '⌂' speaks in the same voice as the node above it.
 *** Change facts, in the diff view
 A headline of the diff view that shows a change carries, after the
 skgrepo boundary, the change facts the clients show ('docs/heralds.org',
@@ -1573,7 +1576,7 @@ one clone you own; forking it again is refused, naming the clone.
 The clone also records where it was forked from, its attribution
 ('docs/forks.org', "Attribution"), so that a reply in a dialog does
 not read as the forker's own words: its handle carries
-'⌂:<MINE/THEIRS>' wherever it stands. 'stripAttribution' in its
+'⌂:<MINE/THEIRS>' wherever the node above does not say the same. 'stripAttribution' in its
 handle removes the record, as the clients' 'skg-strip-attribution'
 does.
 *** Forking a node you own

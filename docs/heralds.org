@@ -236,14 +236,20 @@ detaching writes only the =noClaim= atom, and the save reads that as
 it reads any claim.
 
 =⌂:LABEL= marks a node's home skgrepo boundary (the atom
-=repoBoundary= in =(view ...)=): a root, or a node whose home skgrepo
-differs from its nearest node above. A fork that records where it was
-forked from (its attribution, =(attribution NAME [unverified])= in
-=(view ...)=; =docs/forks.org=, "Attribution") is a boundary wherever
-it stands, and reads =⌂:<LABEL/ORIGINAL>=: ORIGINAL is the label of
+=repoBoundary= in =(view ...)=): a root, or a node whose home herald
+would say something other than what the nearest node above it says.
+A fork that records where it was forked from (its attribution,
+=(attribution NAME [unverified])= in =(view ...)=; =docs/forks.org=,
+"Attribution") reads =⌂:<LABEL/ORIGINAL>=: ORIGINAL is the label of
 the skgrepo it was forked from, followed by =?= when no loaded
 skgrepo is known to be the one recorded, its recorded name then
-shown. LABEL is the skgrepo's skgrepo label,
+shown. The comparison is of the whole herald, so a herald appears
+wherever the voice changes: under =⌂:<jeff/claude>=, a note of
+=jeff= with no attribution reads =⌂:jeff=, one forked from another
+skgrepo reads its own =⌂:<jeff/OTHER>=, and only a fork from the same
+=claude= says nothing; an attributed fork under a plain note of its
+own skgrepo reads =⌂:<jeff/claude>=. Folders between them do not
+count: the node above is the nearest node occurrence. LABEL is the skgrepo's skgrepo label,
 its =abbreviation= in the config or else its name, from the label
 table the server sends beside the herald rules. A =~NAME= immediately
 before it reports a relationship stored at a more private relRepo than

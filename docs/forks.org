@@ -649,7 +649,10 @@ from: its *attribution*. Its herald then reads
 =⌂:<FORKER/ORIGINAL>=, the labels of the clone's home skgrepo and of
 the skgrepo it was forked from, wherever the clone is drawn, even
 under a note of its own skgrepo, where no other node shows its home
-skgrepo. A fork of Claude's note into Jeff's skgrepo =jeff-decid=
+skgrepo, unless the note above it says the same. A note of its home
+drawn under it, with no attribution of the same skgrepo, says its own
+=⌂:FORKER=, so the herald marks where the voice switches back
+('docs/heralds.org', "Other heralds"). A fork of Claude's note into Jeff's skgrepo =jeff-decid=
 reads =⌂:<jeff-decid/claude-public>=.
 
 *** What is recorded, and when

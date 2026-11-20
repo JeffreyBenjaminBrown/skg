@@ -49,6 +49,9 @@ fn all_tests
       s . reset ("a_fork_of_a_fork_records_the_note_it_forked", fixtures) ?;
       a_fork_of_a_fork_records_the_note_it_forked (
         &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_plain_child_of_an_attributed_fork_says_its_home", fixtures) ?;
+      a_plain_child_of_an_attributed_fork_says_its_home (
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("stripping_an_attribution_removes_it_and_its_herald", fixtures) ?;
       stripping_an_attribution_removes_it_and_its_herald (
         &s . config, &mut s . tantivy ) . await ?;
@@ -137,6 +140,32 @@ async fn a_fork_of_a_fork_records_the_note_it_forked (
   assert_eq! ( fork_of (config, "N") ? . attribution . map ( |a| a . skgrepo ),
                Some ( SkgrepoName::from ("foreign") ),
                "the first fork keeps its own attribution" );
+  Ok (( )) }
+
+/// A child typed under the clone, in the clone's skgrepo 'owned' but
+/// with no attribution, speaks in another voice than its parent's
+/// "⌂:<owned/foreign>": it shows its own "⌂:owned".
+async fn a_plain_child_of_an_attributed_fork_says_its_home (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let clone : Graphnode = fork_n (config, tantivy, &graph) . await ?;
+  let (p_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("P")) ?;
+  let clone_line : &str = line_naming (&p_view, &clone . pid);
+  let buffer : String = p_view . replacen (
+    clone_line, &format! ( "{}\n*** plain child", clone_line ), 1 );
+  let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+  let response = update_from_and_rerender_buffer (
+    &mut stream, &buffer, config, tantivy, &graph,
+    &Err ( String::new () ), &mut fresh_views_state () ) . await ?;
+  assert! ( response . errors . is_empty (), "the child must save: {:?}", response . errors );
+  let child_line : &str = response . saved_view . lines ()
+    . find ( |line| line . ends_with (" plain child") )
+    . unwrap_or_else ( || panic! ( "no child:\n{}", response . saved_view ));
+  assert! ( child_line . contains ("(nodeRepo owned)") && child_line . contains ("repoBoundary"),
+    "the plain child of the attributed clone stands at a boundary:\n{}", response . saved_view );
+  assert! ( ! child_line . contains ("attribution"), "{}", child_line );
   Ok (( )) }
 
 /// A view of the clone, its headline carrying 'stripAttribution', saved:

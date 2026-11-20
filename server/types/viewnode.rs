@@ -471,8 +471,10 @@ pub enum Warrant {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewnodeStats {
   pub cycle                 : bool,
-  /// True if a root or if skgrepo differs from skgrepo of nearest
-  /// occurrence ancestor. Written '(view repoBoundary)'.
+  /// True if a root or if its home voice (home skgrepo and
+  /// attribution) differs from that of the nearest occurrence
+  /// ancestor ('set_skgrepo_at_boundary' in
+  /// 'server/refresh/viewnodestats.rs'). Written '(view repoBoundary)'.
   pub repoBoundary          : bool,
   /// Set by the refresh ('set_warrants' in 'server/refresh/'); written
   /// as '(view noWarrant)' when 'Warrant::No'. A derived fact: the
@@ -516,7 +518,8 @@ pub struct ViewnodeStats {
   /// ('docs/forks.org', "Attribution"). Written '(view (attribution
   /// NAME))', or '(view (attribution NAME unverified))' where no loaded
   /// skgrepo is known to be the one recorded; it makes the node's
-  /// 'repoBoundary' true wherever it is drawn. Herald "⌂:<HOME/NAME>".
+  /// 'repoBoundary' true wherever the node above it says otherwise.
+  /// Herald "⌂:<HOME/NAME>".
   pub attribution        : Option<AttributedSkgrepo>,
 }
 

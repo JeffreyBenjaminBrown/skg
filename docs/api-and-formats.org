@@ -1962,9 +1962,10 @@ is never written. On a node, in the order written:
   when unverified.
 - =repoBoundary= — the node sits at a skgrepo boundary: a root, a
   node whose home skgrepo differs from its nearest occurrence
-  ancestor's, or a node with an attribution, wherever it stands.
-  Written only when the config has more than one skgrepo, but always
-  with an attribution. Herald "⌂".
+  ancestor's, or whose attribution differs from that ancestor's
+  (one of the two attributed, or both, naming different skgrepos).
+  Written only when the config has more than one skgrepo, or an
+  attribution is on either side. Herald "⌂".
 
 On an alias, an ID or a flag member, =(view ...)= holds at most one
 atom: =noWarrant= when the node above its folder lacks it, or

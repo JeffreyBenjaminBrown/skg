@@ -75,9 +75,8 @@ fn set_viewnodestats_recursive (
     { let node_pid : ID = t . gnid . clone ();
       detect_and_mark_cycle (
         tree, treeid, &node_pid, ancestor_gnids );
-      if multi_skgrepo {
-        set_skgrepo_at_boundary (tree, treeid); }
       set_attribution (tree, treeid, &node_pid, graph, config);
+      set_skgrepo_at_boundary (tree, treeid, multi_skgrepo);
       let fork_roles : Option<ForksFolderMemberRoles> =
         forks_folder_member_roles (tree, treeid, graph, restriction, relRepos);
       let stands_as_member_here : bool = match &fork_roles {
@@ -727,9 +726,7 @@ mod relationship_default_tests {
   }
 }
 
-/// Sets the attribution of the occurrence at treeid, from its node's,
-/// and with it its repoBoundary: an attributed fork shows whose note it
-/// forked wherever it is drawn, even under a parent of its own skgrepo.
+/// Sets the attribution of the occurrence at treeid, from its node's.
 fn set_attribution (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
@@ -737,51 +734,63 @@ fn set_attribution (
   graph    : &InRustGraph,
   config   : &SkgConfig,
 ) {
-  let Some (attribution) = graph . pid_of (node_pid)
+  let attributed : Option<AttributedSkgrepo> = graph . pid_of (node_pid)
     . and_then ( |pid| graph . nodes . get (&pid) )
     . and_then ( |node| node . attribution . as_ref () )
-    else { return; };
-  let attributed : AttributedSkgrepo = attributed_skgrepo (config, attribution);
+    . map ( |attribution| attributed_skgrepo (config, attribution) );
   if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
-  { t . viewStats . attribution = Some (attributed);
-    t . viewStats . repoBoundary = true; }}
+  { t . viewStats . attribution = attributed; }}
 
-/// Sets repoBoundary on the occurrence at treeid.
-/// True if no occurrence ancestor exists (i.e. a root),
-/// or if the nearest occurrence ancestor has a different skgrepo.
+/// Whose voice a node's home skgrepo herald names: its home skgrepo,
+/// and, for an attributed fork, the skgrepo it was forked from. The
+/// herald draws exactly this, "⌂:HOME" or "⌂:<HOME/ORIGINAL>".
+type HomeVoice = (SkgrepoName, Option<AttributedSkgrepo>);
+
+/// Sets repoBoundary on the occurrence at treeid: true where its home
+/// voice ('HomeVoice') differs from that of the nearest occurrence
+/// above it, or where none is above it (a root). So a child of
+/// "⌂:<a/b>" in 'a' shows "⌂:a", and an attributed fork under a note
+/// of its own skgrepo shows its "⌂:<a/b>"; only a child that would say
+/// exactly what the node above it says says nothing. Where only one
+/// skgrepo is configured, only a boundary an attribution makes, on
+/// either side, is drawn.
 fn set_skgrepo_at_boundary (
-  tree   : &mut Tree<Viewnode>,
-  treeid : NodeId,
+  tree          : &mut Tree<Viewnode>,
+  treeid        : NodeId,
+  multi_skgrepo : bool,
 ) {
-  let node_skgrepo : SkgrepoName = {
+  let node_voice : HomeVoice = {
     let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
-    t . home_skgrepo . clone () };
-  let ancestor_skgrepo : Option<SkgrepoName> =
-    nearest_occurrence_ancestor_skgrepo (tree, treeid);
+    ( t . home_skgrepo . clone (), t . viewStats . attribution . clone () ) };
+  let ancestor_voice : Option<HomeVoice> =
+    nearest_occurrence_ancestor_voice (tree, treeid);
+  let attribution_involved : bool =
+    node_voice . 1 . is_some ()
+    || ancestor_voice . as_ref () . is_some_and ( |voice| voice . 1 . is_some () );
   let at_boundary : bool =
-    match ancestor_skgrepo {
-      None => true,
-      Some (s) => s != node_skgrepo };
+    ( multi_skgrepo || attribution_involved )
+    && ancestor_voice . as_ref () != Some (&node_voice);
   if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . repoBoundary = at_boundary; }}
 
 /// Walk rootward from treeid (exclusive) to find
-/// the nearest occurrence ancestor's skgrepo.
-fn nearest_occurrence_ancestor_skgrepo (
+/// the nearest occurrence ancestor's home voice ('HomeVoice').
+fn nearest_occurrence_ancestor_voice (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
-) -> Option<SkgrepoName> {
+) -> Option<HomeVoice> {
   let mut current : NodeId = treeid;
   while let Some (parent_ref)
     = tree . get (current) . unwrap () . parent ()
     { current = parent_ref . id ();
       if let ViewnodeKind::Vognode (Vognode::Occurrence (t))
         = & parent_ref . value () . kind
-        { return Some ( t . home_skgrepo . clone () ); }}
+        { return Some (( t . home_skgrepo . clone (),
+                         t . viewStats . attribution . clone () )); }}
   None }
 
 /// The node's 'cycle' field becomes equal to
@@ -795,3 +804,108 @@ fn detect_and_mark_cycle (
   if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . cycle = ancestor_gnids . contains (node_pid); } }
+
+/// The home skgrepo herald is drawn wherever what it would say differs
+/// from what the node above says ('set_skgrepo_at_boundary').
+#[cfg(test)]
+mod home_voice_tests {
+  use super::*;
+  use crate::types::misc::Skgrepo;
+  use crate::types::nodes::attribution::Attribution;
+  use crate::types::nodes::complete::{empty_graphnode, Graphnode};
+  use crate::types::viewnode::{
+    mk_editable_viewnode, viewforest_root_viewnode, viewnode_of};
+  use std::path::PathBuf;
+
+  /// A config of the owned skgrepos 'a' and 'z' ('a' alone when not
+  /// 'multi'); no attribution names a configured skgrepo, so each is
+  /// unverified, which changes nothing here.
+  fn config (
+    multi : bool,
+  ) -> SkgConfig {
+    let names : Vec<&str> = if multi { vec! ["a", "z"] } else { vec! ["a"] };
+    let skgrepos : HashMap<SkgrepoName, Skgrepo> = names . iter ()
+      . map ( |name| ( SkgrepoName::from (*name),
+                       Skgrepo { name         : SkgrepoName::from (*name),
+                                 abbreviation : None,
+                                 path         : PathBuf::from (name),
+                                 owned        : true, } ))
+      . collect ();
+    SkgConfig::dummyFromSkgrepos (skgrepos) }
+
+  /// A node of 'home', forked from a note of 'forked_from' if any.
+  fn node (
+    pid         : &str,
+    home        : &str,
+    forked_from : Option<&str>,
+  ) -> Graphnode {
+    let mut node : Graphnode = empty_graphnode ();
+    node . pid = ID::new (pid);
+    node . title = pid . to_string ();
+    node . home_skgrepo = SkgrepoName::from (home);
+    node . attribution = forked_from . map ( |skgrepo| Attribution {
+      original : ID::new ("original"), skgrepo : SkgrepoName::from (skgrepo),
+      remote_hash : None, commit : None, uncommitted : false } );
+    node }
+
+  /// Whether each node of the chain, drawn each under the one before
+  /// (with a folder between the first two when 'folder_between'),
+  /// stands at a home skgrepo boundary.
+  fn boundaries (
+    chain          : &[Graphnode],
+    multi          : bool,
+    folder_between : bool,
+  ) -> Vec<bool> {
+    let config : SkgConfig = config (multi);
+    let graph : InRustGraph = InRustGraph::from_graphnodes (chain);
+    let mut tree : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
+    let mut parent : NodeId = tree . root () . id ();
+    let mut treeids : Vec<NodeId> = Vec::new ();
+    for (index, node) in chain . iter () . enumerate () {
+      if index == 1 && folder_between {
+        parent = tree . get_mut (parent) . unwrap ()
+          . append ( viewnode_of ( ViewnodeKind::Folder (Folder::flags ()) )) . id (); }
+      let treeid : NodeId = tree . get_mut (parent) . unwrap ()
+        . append ( mk_editable_viewnode (
+          node . pid . clone (), node . home_skgrepo . clone (),
+          node . title . clone (), None )) . id ();
+      set_attribution (&mut tree, treeid, &node . pid, &graph, &config);
+      set_skgrepo_at_boundary (&mut tree, treeid, multi);
+      treeids . push (treeid);
+      parent = treeid; }
+    treeids . iter () . map ( |treeid| {
+      let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
+        & tree . get (*treeid) . unwrap () . value () . kind
+      else { panic! ("an occurrence") };
+      t . viewStats . repoBoundary } ) . collect () }
+
+  #[test]
+  fn a_child_says_its_home_unless_the_node_above_says_the_same () {
+    for (multi, folder_between) in
+      [ (true, false), (true, true), (false, false), (false, true) ] {
+      let case : String = format! ( "multi {}, folder between {}", multi, folder_between );
+      assert_eq! ( boundaries ( &[ node ("p", "a", Some ("b")), node ("c", "a", None) ],
+                                multi, folder_between ),
+                   vec! [ true, true ],
+                   "a plain child of <a/b> in a says ⌂:a ({})", case );
+      assert_eq! ( boundaries ( &[ node ("p", "a", Some ("b")), node ("c", "a", Some ("b")) ],
+                                multi, folder_between ),
+                   vec! [ true, false ],
+                   "a child of <a/b> that would say <a/b> says nothing ({})", case );
+      assert_eq! ( boundaries ( &[ node ("p", "a", Some ("b")), node ("c", "a", Some ("c")) ],
+                                multi, folder_between ),
+                   vec! [ true, true ],
+                   "a child <a/c> of <a/b> says <a/c> ({})", case );
+      assert_eq! ( boundaries ( &[ node ("p", "a", None), node ("c", "a", Some ("b")) ],
+                                multi, folder_between ),
+                   vec! [ multi, true ],
+                   "an attributed child of a plain note of its home says <a/b> ({})", case );
+      assert_eq! ( boundaries ( &[ node ("p", "a", None), node ("c", "a", None) ],
+                                multi, folder_between ),
+                   vec! [ multi, false ],
+                   "a plain child of a plain note of its home says nothing ({})", case ); }
+    assert_eq! ( boundaries ( &[ node ("p", "a", None), node ("c", "z", None) ],
+                              true, false ),
+                 vec! [ true, true ],
+                 "a child of another home says its home" ); }
+}
