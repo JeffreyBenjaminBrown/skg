@@ -1600,7 +1600,11 @@ The operation creates file-root and headline nodes,
 which correspond 1-to-1 to sections of the imported data.
 A document whose only top-level headline has nothing before it
 is that headline, so the headline is its file root;
-otherwise the file root is titled after the document.
+otherwise the file root is titled after the document
+(its =#+title=, else its filename), its body is the text
+before the first headline, and its export marker says
+=root_headline = false=, so that the document exports
+with its original outline.
 It also creates two kinds of nodes that do not so correspond:
 - a single import-record node with links to all file roots,
   so you can see everything you just imported in one place.
@@ -1832,6 +1836,10 @@ make N contain a child node, called an /export marker/, such that:
   Quote the path if it contains whitespace
   (=target_filepath = "my notes/setup"=).
   The path cannot be absolute or contain =.= or =..= components.
+- Optionally, the body also contains the line
+  : root_headline = false
+  N's title is then not a headline in the file: N's body is the file's
+  opening text, and N's content nodes are its top-level headlines.
 
 N is then written to =<output-dir>/<target_filepath>.org= as a
 recursive content view: N's title and body,

@@ -122,8 +122,15 @@ impl ExportReport {
 //
 
 struct ExportRoot {
-  root_pid : ID,
-  target   : String, // relative, no extension, e.g. "docs/setup"
+  root_pid      : ID,
+  target        : String, // relative, no extension, e.g. "docs/setup"
+  root_headline : bool, // see 'parse_root_headline'
+}
+
+/// What an export marker's body says.
+struct MarkerInstructions {
+  target        : String,
+  root_headline : bool,
 }
 
 /// A 'search' is the org search option addressing a heading within
@@ -322,13 +329,23 @@ fn discover_roots (
   sorted . sort_by ( |a, b| a . pid . cmp (&b . pid) );
 
   let mut marker_pids   : HashSet<ID> = HashSet::new ();
-  let mut marker_target : HashMap<ID, String> = HashMap::new ();
+  let mut marker_instructions : HashMap<ID, MarkerInstructions> =
+    HashMap::new ();
   for n in &sorted {
     if ! title_links_to (n, &marker_gnid, alias_to_pid) { continue; }
     match parse_target_filepath (n . body . as_deref ()) {
-      Ok (Some (t)) => {
+      Ok (Some (target)) => {
+        let root_headline : bool =
+          parse_root_headline (n . body . as_deref ())
+          . unwrap_or_else ( |e| {
+            warnings . push ( format! (
+              "export marker {}: {}; the root's title will be a \
+               headline", n . pid, e ) );
+            true } );
         marker_pids . insert (n . pid . clone ());
-        marker_target . insert (n . pid . clone (), t); },
+        marker_instructions . insert (
+          n . pid . clone (),
+          MarkerInstructions { target, root_headline } ); },
       Ok (None) => {}, // links to the instruction node, but is content
       Err (e) => {
         marker_pids . insert (n . pid . clone ());
@@ -341,17 +358,18 @@ fn discover_roots (
   let mut roots : HashMap<ID, ExportRoot> = HashMap::new ();
   let mut target_owner : HashMap<String, ID> = HashMap::new ();
   for parent in &sorted {
-    let marker_children : Vec<String> =
+    let marker_children : Vec<&MarkerInstructions> =
       parent . contains . iter ()
       . filter ( |m| SkgrepoRestriction::record_is_visible (restriction, &m . relRepo) )
       . map ( |m| &m . member )
       . filter_map ( |cid|
-        marker_target . get (
-          &resolve_pid (cid, alias_to_pid)) . cloned () )
+        marker_instructions . get (
+          &resolve_pid (cid, alias_to_pid)) )
       . collect ();
-    let target : String = match marker_children . first () {
-      Some (t) => t . clone (),
-      None     => continue, };
+    let (target, root_headline) : (String, bool) =
+      match marker_children . first () {
+        Some (m) => (m . target . clone (), m . root_headline),
+        None     => continue, };
     if marker_children . len () > 1 {
       warnings . push ( format! (
         "node {} has more than one export-marker child; using the \
@@ -374,7 +392,8 @@ fn discover_roots (
       parent . pid . clone (),
       ExportRoot {
         root_pid : parent . pid . clone (),
-        target, } ); }
+        target,
+        root_headline, } ); }
   (roots, marker_pids) }
 
 /// True if any link in `node`'s title points (after alias
@@ -433,6 +452,26 @@ fn parse_target_filepath (
           value ) ); }}
     return Ok ( Some ( value . to_string () ) ); }
   Ok (None) }
+
+/// Whether the export root's title is its file's top headline. A
+/// marker body line 'root_headline = false' says no: the root's body
+/// is then the file's opening text, and its children are the file's
+/// top-level headlines. The Markdown/Org importer writes that line for
+/// a document whose root it titled after the file, so such a document
+/// exports with its original outline. Absent, it is true.
+fn parse_root_headline (
+  body : Option<&str>,
+) -> Result<bool, String> {
+  for line in body . unwrap_or ("") . lines () {
+    let Some ((key, value)) = line . trim () . split_once ('=')
+      else { continue; };
+    if key . trim () != "root_headline" { continue; }
+    return match value . trim () {
+      "true"  => Ok (true),
+      "false" => Ok (false),
+      other   => Err ( format! (
+        "root_headline value {:?} is neither true nor false", other )), }; }
+  Ok (true) }
 
 //
 // Event collection (one DFS used for homes and rendering)
@@ -501,8 +540,8 @@ fn build_homes (
   // A node that is itself a root always homes to its own file.
   for r in roots {
     let search : String = match by_pid . get (&r . root_pid) {
-      Some (n) => org_search_for_heading (n),
-      None     => String::new (), };
+      Some (n) if r . root_headline => org_search_for_heading (n),
+      _ => String::new (), }; // no headline to search for
     homes . insert (
       r . root_pid . clone (),
       Home { target : r . target . clone (),
@@ -554,8 +593,11 @@ fn custom_id_link_targets (
         EvKind::LinkLeaf => linked . push (ev . pid . clone ()),
         EvKind::Normal => {
           let Some (node) = by_pid . get (&ev . pid) else { continue; };
-          let texts : [&str; 2] =
-            [ &node . title, node . body . as_deref () . unwrap_or ("") ];
+          let title_is_shown : bool =
+            root . root_headline || ev . pid != root . root_pid;
+          let texts : [&str; 2] = [
+            if title_is_shown { &node . title } else { "" },
+            node . body . as_deref () . unwrap_or ("") ];
           for text in texts {
             for link in links_from_text (text) {
               let pid : ID = resolve_pid (&link . gnid, alias_to_pid);
@@ -584,7 +626,9 @@ fn render_root (
     let node : &Graphnode = match by_pid . get (&ev . pid) {
       Some (n) => n,
       None     => continue, };
-    let stars : String = "*" . repeat (ev . depth);
+    let depth : usize = // the root, at depth 1, may have no headline
+      if root . root_headline { ev . depth } else { ev . depth - 1 };
+    let stars : String = "*" . repeat (depth);
     let label : String = anchor_text (node);
     match ev . kind {
       EvKind::LinkLeaf => {
@@ -593,13 +637,14 @@ fn render_root (
           None        => label, }; // unreachable: link-leaf targets are homed
         out . push_str ( & format! ("{} {}\n", stars, link) ); },
       EvKind::Normal => {
-        let headline : String = // keeps its links, rewritten like body links
-          rewrite_links ( &node . title, target, homes,
-                          alias_to_pid, broken, warnings );
-        out . push_str ( & format! ("{} {}\n", stars, headline . trim ()) );
-        if custom_id_targets . contains (&node . pid) {
-          out . push_str ( & format! (
-            ":PROPERTIES:\n:CUSTOM_ID: {}\n:END:\n", node . pid ) ); }
+        if depth > 0 {
+          let headline : String = // keeps its links, rewritten like body links
+            rewrite_links ( &node . title, target, homes,
+                            alias_to_pid, broken, warnings );
+          out . push_str ( & format! ("{} {}\n", stars, headline . trim ()) );
+          if custom_id_targets . contains (&node . pid) {
+            out . push_str ( & format! (
+              ":PROPERTIES:\n:CUSTOM_ID: {}\n:END:\n", node . pid ) ); }}
         if let Some (body) = node . body . as_deref () {
           if ! body . trim () . is_empty () {
             let body : String = defuse_headline_lines (
@@ -655,10 +700,10 @@ fn org_link_for_home (
   let same : bool = home . target == current_target;
   match &home . kind {
     HomeKind::Root { search } =>
-      if same { format! ("[[{}][{}]]", search, label) }
-      else    { format! ("[[{}][{}]]",
-                         relpath (current_target, &home . target),
-                         label) },
+      if same && ! search . is_empty () { format! ("[[{}][{}]]", search, label) }
+      else { format! ("[[{}][{}]]",
+                      relpath (current_target, &home . target),
+                      label) },
     HomeKind::Content { search } =>
       if same { format! ("[[{}][{}]]", search, label) }
       else    { format! ("[[{}::{}][{}]]",

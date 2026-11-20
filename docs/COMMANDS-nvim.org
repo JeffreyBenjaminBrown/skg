@@ -1572,7 +1572,10 @@ The import is additive: it creates file-root and headline nodes, an import
 record, and an Org export marker under each file root. The import result
 buffer links to the record; follow it with =<localleader>gg=. A document whose
 only top-level headline has nothing before it uses that headline as its
-file root. It does not replace
+file root; otherwise the file root, titled after the document, holds the
+text before the first headline, and its export marker's
+=root_headline = false= makes the document export with its original
+outline. It does not replace
 existing =.skg= files, copy attachments, synchronize later changes, or export
 automatically. Most original markup remains text; Markdown hard breaks become
 Org's two-backslash form so save-time trailing-whitespace cleanup remains.
@@ -1627,7 +1630,10 @@ linking to the export instruction node and a body giving a
 =target_filepath= (TOML-ish: =target_filepath = docs/setup=,
 quoted if it contains whitespace). That parent is written to
 =<output-dir>/<target_filepath>.org= as a recursive content view,
-stripped of skg metadata. The export marker is omitted.
+stripped of skg metadata. The export marker is omitted. If the
+marker's body also says =root_headline = false=, the parent's title is
+not a headline: its body opens the file, and its children are the
+top-level headlines.
 
 Links are rewritten to relative org links, except examples in text
 Org shows literally (verbatim, code, fixed-width lines, blocks and

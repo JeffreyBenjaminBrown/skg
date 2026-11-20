@@ -48,7 +48,10 @@ pub fn build_document (
     outline [parent] . children . push (index);
     ancestors . push (index); }
   group_super_indentation (0, &mut outline, skgrepo, new_id);
-  let marker       : Graphnode = export_marker (&export_target, skgrepo, new_id)?;
+  let root_is_a_heading : bool = // else the root is titled after the file
+    ! document . sections [0] . heading . is_empty ();
+  let marker       : Graphnode = export_marker (
+    &export_target, root_is_a_heading, skgrepo, new_id)?;
   let marker_index : usize = outline . len ();
   outline . push (OutlineNode {
     node : marker,
@@ -184,8 +187,12 @@ fn synthetic_node (
   node
 }
 
+/// A root titled after its file, rather than taken from a heading, is
+/// not a headline in the file; its marker says so, so that the file
+/// exports with its original outline.
 fn export_marker (
   target : &str,
+  root_is_a_heading : bool,
   skgrepo : &SkgrepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> Result<Graphnode, String> {
@@ -196,7 +203,8 @@ fn export_marker (
   let mut node : Graphnode = crate::types::nodes::complete::empty_graphnode ();
   node . pid = new_id ();
   node . title = format! ("[[id:{}][Skg exports this document to org.]]", EXPORT_MARKER_ID);
-  node . body = Some (format! ("target_filepath = {}{}{}", quote, target, quote));
+  node . body = Some (format! ("target_filepath = {}{}{}{}", quote, target, quote,
+    if root_is_a_heading { "" } else { "\nroot_headline = false" }));
   node . home_skgrepo = skgrepo . clone ();
   Ok (node)
 }
@@ -241,6 +249,28 @@ mod tests {
     assert! (built . nodes [0] . contains . iter () . any (|child|
       built . nodes . iter () . any (|node|
         node . pid == child . member && node . title . contains ("Skg exports this document to org."))));
+  }
+
+  #[test]
+  fn the_marker_says_whether_the_root_is_a_headline () {
+    // A root titled after its file is not a headline in it.
+    let marker_body = |path : &str, text : &str| -> String {
+      let document : ParsedDocument =
+        parse_document (Path::new (path), text . to_string ());
+      let skgrepo : SkgrepoName = SkgrepoName::from ("owned");
+      let mut next = || ID::new (&uuid::Uuid::new_v4 () . to_string ());
+      let built : BuiltDocument =
+        build_document (&document, &skgrepo, &mut next) . unwrap ();
+      built . nodes . iter ()
+        . find (|node| node . title . contains (EXPORT_MARKER_ID))
+        . and_then (|node| node . body . clone ()) . unwrap () };
+    assert_eq! (marker_body ("doc.org", "* Only\nbody\n"),
+      "target_filepath = \"doc\"");
+    for text in ["Preamble\n* One\n", "* One\n* Two\n", "No headings\n", ""] {
+      assert_eq! (marker_body ("doc.org", text),
+        "target_filepath = \"doc\"\nroot_headline = false", "{:?}", text); }
+    assert_eq! (marker_body ("doc.md", "Intro\n# One\n"),
+      "target_filepath = \"doc\"\nroot_headline = false");
   }
 
   #[test]

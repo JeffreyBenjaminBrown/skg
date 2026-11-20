@@ -78,6 +78,17 @@ fn parse_target_filepath_cases () {
   assert! (parse_target_filepath (Some ("target_filepath = a/../b")) . is_err ());
 }
 
+#[test]
+fn parse_root_headline_cases () {
+  assert_eq! (parse_root_headline (None), Ok (true));
+  assert_eq! (parse_root_headline (Some ("target_filepath = a")), Ok (true));
+  assert_eq! (
+    parse_root_headline (Some ("target_filepath = a\nroot_headline = false")),
+    Ok (false) );
+  assert_eq! (parse_root_headline (Some ("root_headline=true")), Ok (true));
+  assert! (parse_root_headline (Some ("root_headline = no")) . is_err ());
+}
+
 //
 // end-to-end export
 //
@@ -404,4 +415,51 @@ fn headline_like_body_lines_are_defused () {
 #+title: kept
 ");
   assert! (report . warnings . is_empty (), "{:?}", report . warnings);
+}
+
+#[test]
+fn a_root_without_headline_opens_its_file_with_its_body () {
+  // 'root_headline = false': the root's body is the file's opening
+  // text, its children are top-level headlines, and a same-file link
+  // to the root, having no headline to search for, names the file.
+  let nodes : Vec<Graphnode> = vec! [
+    node ("a", "a", Some ("#+title: Ay\nPreamble [[id:b][to bee]]."),
+          &["ma", "b", "c"]),
+    node ("ma", &format! ("[[id:{}][how]]", MAGIC),
+          Some ("target_filepath = a\nroot_headline = false"), &[]),
+    node ("b", "Bee", Some ("back to [[id:a][the top]]"), &["d"]),
+    node ("c", "Cee", None, &[]),
+    node ("d", "Dee", None, &[]),
+  ];
+  let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  let report : ExportReport =
+    export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
+  let a : String =
+    fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
+  assert_eq! (&a [export_header_length (&a) ..], "\
+#+title: Ay
+Preamble [[*Bee][to bee]].
+* Bee
+back to [[./a.org][the top]]
+** Dee
+* Cee
+");
+  assert! (report . warnings . is_empty (), "{:?}", report . warnings);
+}
+
+#[test]
+fn an_unreadable_root_headline_value_is_a_warning () {
+  let nodes : Vec<Graphnode> = vec! [
+    node ("a", "Root A", None, &["ma"]),
+    node ("ma", &format! ("[[id:{}][how]]", MAGIC),
+          Some ("target_filepath = a\nroot_headline = maybe"), &[]),
+  ];
+  let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  let report : ExportReport =
+    export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
+  let a : String =
+    fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
+  assert_eq! (&a [export_header_length (&a) ..], "* Root A\n");
+  assert_eq! (report . warnings . len (), 1, "{:?}", report . warnings);
+  assert! (report . warnings [0] . contains ("maybe"));
 }

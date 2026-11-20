@@ -1309,6 +1309,11 @@ one automatically.
     =3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f= and a body yielding a
     =target_filepath= (a tolerant ~key = value~ parse; the value may
     be bare or quoted, but a bare value with whitespace is refused).
+    A body line =root_headline = false= omits the root's headline:
+    its body opens the file and its children are top-level
+    headlines (any other value is a warning, and the headline stays).
+    The Markdown/Org importer writes it for a root titled after its
+    document.
     The export marker is omitted from output. A nested export root is
     rendered as a link to its own file, not inlined. Links whose
     dest is not exported under =NAME= point to the export of
