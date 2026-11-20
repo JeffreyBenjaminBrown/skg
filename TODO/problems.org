@@ -18,18 +18,27 @@
   'LINK_PATTERN' match them would change what counts as a link
   everywhere, and the Neovim client's patterns would need the same
   change.
-* The diff view does not see a change of attribution alone (2026-11-19)
-  A fork's 'attribution' ('docs/forks.org', "Attribution") is no
-  change fact of the diff view: 'node_changes_between' in
-  'server/graph_straddle/union_walk.rs' compares title, body, aliases,
-  extra IDs, flags and home, not it. So a save that only strips one
-  ('skg-strip-attribution'), and a file 'skg fix-attributions' or
-  'tools/migrate-attributions-2026-11/' rewrote, show no change there,
-  and stage-and-commit has no leaf to mark processed for it; commit
-  such files with git ('git -C SKGREPO commit'). Not checked: whether
-  stage-and-commit writes a new fork's file with its attribution. The
-  fix: an attribution leaf (or a property leaf) of the node, drawn as
-  'M'.
+* The diff view cannot mark a change no leaf records (2026-11-20)
+  A node's files can change in ways no change-forest leaf records: its
+  text moved between a private and a public section (a Hoist), its
+  attribution changed (a strip, 'skg fix-attributions'), an alias
+  moved to another skgrepo, a list was reordered, or a file is not
+  what skg writes (hand-formatted, say) ('docs/diff-view.org',
+  "Changes no mark covers"; 'server/diff_view/unmarkable_changes.rs').
+  A commit of the processed leaves such a node out and names it, with
+  how it changed; only a commit of everything, or Git, takes it. The
+  diff view draws none of these as a change to mark: a node changed
+  only so stands in the order-only buffer, under a marker that is
+  never processed, and one with other changes too shows nothing of it.
+  The fix: one more leaf per node, "other changes to its file", keyed
+  by the node, its fingerprint the two graphs' 'unmarkable_changes_between'
+  values, drawn as a change viewnode under the node in every buffer
+  (like the home skgrepo move: an atom carrying the kinds, a herald
+  naming them, parse and print, 'leaves_named_at', 'ChangedAspects'),
+  replacing the order-only marker and leaving the order-only buffer
+  the nodes whose only leaf it is. The file check stays a commit's
+  only, since it reads the files from Git; a node failing it could
+  carry that leaf only once the straddle reads changed files.
 * A request's 'skg-lp-reset' can drop another request's reply (2026-11-19)
   Seen measuring saves: a link-status request sent while views were
   being opened never got its reply handled, and stayed in
