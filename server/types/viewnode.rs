@@ -613,8 +613,8 @@ pub enum OtherChange {
   /// order.
   Order (OrderedList),
   /// Something else the graph holds of it changed: an ID in a list
-  /// replaced by another ID of the same node, or a list written empty
-  /// where none was, or the reverse.
+  /// replaced by another ID of the same node, or anything else no
+  /// other leaf records.
   OtherInGraph,
 }
 

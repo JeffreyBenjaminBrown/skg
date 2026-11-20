@@ -1,12 +1,15 @@
 // The "stage and commit" request ('docs/diff-view.org', "Stage and
 // commit"), over the 'buffers' fixture, whose
 // owned skgrepos public and private both have changes, deletions
-// among them.
+// among them, and over the 'foreign' fixture, with forks of notes of
+// dirty foreign skgrepos.
 
 use crate::git_fixture::{Fixture, graph_straddle};
+use crate::git_fixture_helpers::setup_gitrepo_with_fixtures;
 use crate::pruned_change_view::common::{
   all_changes_buffer, open_all_changes_buffer, rerendered_view_content,
-  send_stage_and_commit_request, viewforest_id_of, with_fixture};
+  retitle_in_a_content_view, send_stage_and_commit_request, viewforest_id_of,
+  with_fixture, with_fixture_and_foreign};
 
 use skg::diff_view::change_leaves::{ChangeLeaves, LeafKey, ProcessedSummary, processed_summary};
 use skg::graph_straddle::types::GraphStraddle;
@@ -15,8 +18,9 @@ use skg::serve::handlers::stage_and_commit::{
   CommitReport, CommitScope, StageAndCommitAnswer, stage_and_commit,
   stage_and_commit_response_sexp};
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::skg_env_from_parts;
+use skg::test_utils::{graph_handle_from_config, skg_env_from_parts};
 use skg::types::env::SkgEnv;
+use skg::types::misc::{Skgrepo, SkgrepoName};
 use skg::types::views_state::DiffViewBufferKind;
 
 use git2::{Index, Oid, Repository, Status, StatusOptions, Tree};
@@ -323,3 +327,107 @@ fn a_request_is_refused_under_a_skgrepo_restriction (
               "{:?}", answer );
     assert_eq! ( head_id (f, "public") ?, head );
     Ok (( )) }) }
+
+/// The 'foreign' fixture (the owned skgrepo main, which retitles m; the
+/// foreign skgrepo foreign, a gitrepo, which retitles f and deletes
+/// g), with the foreign skgrepo nested too: the folder 'notes' of the
+/// gitrepo 'code', as a code repository can hold a skgrepo, which
+/// retitles n and changes a file outside the skgrepo and holds an
+/// untracked one. f and n are forked into main, each by a save of a
+/// content view that retitles it. Runs 'body' with the statuses of
+/// the two foreign gitrepos then.
+fn with_forks_of_dirty_foreign_notes (
+  body : impl FnOnce (&mut Fixture, &[(String, Vec<(String, Status)>)])
+              -> Result<(), Box<dyn Error>>,
+) -> Result<(), Box<dyn Error>> {
+  with_fixture_and_foreign ("foreign", &["main"], &["foreign"], |f| {
+    let code : &Path = &f . root . path () . join ("code");
+    let fixtures : &Path = Path::new ("tests/pruned_change_view/fixtures/foreign/code");
+    setup_gitrepo_with_fixtures (
+      code,
+      fixtures . join ("head") . to_str () . unwrap (),
+      fixtures . join ("worktree") . to_str () . unwrap () ) ?;
+    f . config . skgrepos . insert ( SkgrepoName::from ("nested"), Skgrepo {
+      name : SkgrepoName::from ("nested"), abbreviation : None,
+      path : code . join ("notes"), owned : false } );
+    f . config . skgrepo_order . push ( SkgrepoName::from ("nested") );
+    f . graph = graph_handle_from_config (&f . config) ?;
+    retitle_in_a_content_view (f, "f", "forked", "") ?;
+    retitle_in_a_content_view (f, "n", "forked", "") ?;
+    let foreign_statuses : Vec<(String, Vec<(String, Status)>)> =
+      [ "foreign", "code" ] . iter ()
+      . map ( |gitrepo| Ok (( gitrepo . to_string (), statuses (f, gitrepo) ? )) )
+      . collect::<Result<_, Box<dyn Error>>> () ?;
+    assert! ( foreign_statuses . iter () . all ( |(_, statuses)| ! statuses . is_empty () ),
+              "both foreign gitrepos are dirty: {:?}", foreign_statuses );
+    body (f, &foreign_statuses) }) }
+
+/// Every path of the gitrepo '<root>/<gitrepo>' that differs from HEAD
+/// or is untracked, with its status.
+fn statuses (
+  f       : &Fixture,
+  gitrepo : &str,
+) -> Result<Vec<(String, Status)>, Box<dyn Error>> {
+  let gitrepo : Repository = Repository::open ( f . root . path () . join (gitrepo) ) ?;
+  let mut options : StatusOptions = StatusOptions::new ();
+  options . include_untracked (true);
+  Ok ( gitrepo . statuses ( Some (&mut options) ) ? . iter ()
+       . map ( |entry| ( entry . path () . unwrap_or ("") . to_string (),
+                         entry . status () ))
+       . collect () ) }
+
+/// main is committed with 'message', the two forks and, unless
+/// 'm_left_out', m; and the foreign gitrepos are as they were: their
+/// changes stay uncommitted and unstaged.
+fn assert_only_main_committed (
+  f                : &Fixture,
+  answer           : &StageAndCommitAnswer,
+  message          : &str,
+  m_left_out       : bool,
+  foreign_statuses : &[(String, Vec<(String, Status)>)],
+) -> Result<(), Box<dyn Error>> {
+  let StageAndCommitAnswer::Committed (CommitReport {
+    commits, committed_nodes, left_nodes, unmarkable, errors, .. }) = answer
+    else { panic! ("expected commits, got {:?}", answer) };
+  assert! ( errors . is_empty (), "{:?}", errors );
+  assert_eq! ( commits . iter () . map ( |(skgrepo, _)| skgrepo . to_string () )
+               . collect::<Vec<String>> (), vec! ["main"] );
+  let left : usize = usize::from (m_left_out);
+  assert_eq! ( (*committed_nodes, *left_nodes), (3 - left, left), "{:?}", answer );
+  assert_eq! ( unmarkable . iter () . map ( |(pid, _)| pid . 0 . as_str () )
+               . collect::<Vec<&str>> (),
+               if m_left_out { vec! ["m"] } else { vec! [] } );
+  assert_eq! ( gitrepo (f, "main") ? . head () ? . peel_to_commit () ? . message () . ok (),
+               Some (message) );
+  assert_eq! ( changed_skg_files (f, "main") ?, left );
+  for (gitrepo, before) in foreign_statuses {
+    assert_eq! ( &statuses (f, gitrepo) ?, before, "gitrepo {}", gitrepo ); }
+  Ok (( )) }
+
+/// A confirmed commit of everything, while foreign skgrepos are dirty
+/// and new forks of their notes are among the changes, commits exactly
+/// the owned changes.
+#[test]
+fn a_commit_of_everything_with_dirty_foreign_skgrepos_commits_the_owned_changes (
+) -> Result<(), Box<dyn Error>> {
+  with_forks_of_dirty_foreign_notes ( |f, foreign_statuses| {
+    let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+    let all_skgrepos : SkgrepoRestriction = all (f) ?;
+    let answer : StageAndCommitAnswer = stage_and_commit (
+      &env, &mut f . views_state, &all_skgrepos, "everything", CONFIRMED );
+    assert_only_main_committed (f, &answer, "everything", false, foreign_statuses) }) }
+
+/// The same, every leaf marked, by a commit of the processed, which
+/// leaves m out: its file is not what skg writes for it (the fixture
+/// writes its title after its ID).
+#[test]
+fn a_commit_of_the_processed_with_dirty_foreign_skgrepos_commits_the_owned_changes (
+) -> Result<(), Box<dyn Error>> {
+  with_forks_of_dirty_foreign_notes ( |f, foreign_statuses| {
+    let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+    let all_skgrepos : SkgrepoRestriction = all (f) ?;
+    mark_every_leaf (f, &env) ?;
+    let answer : StageAndCommitAnswer = stage_and_commit (
+      &env, &mut f . views_state, &all_skgrepos, "processed",
+      CommitScope::ProcessedOnly );
+    assert_only_main_committed (f, &answer, "processed", true, foreign_statuses) }) }

@@ -23,7 +23,7 @@ use crate::git_ops::stage_and_commit::{
   ChangedSkgPath, blob_text, blobs_at_head_and_in_worktree};
 use crate::telescope::decompose::{
   DecomposedTelescope, DecompositionInput, decompose_node};
-use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName};
+use crate::types::misc::{ID, RelPartner, SkgConfig, SkgrepoName};
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{OrderedList, OtherChange};
@@ -82,27 +82,22 @@ pub fn other_changes_between (
     if order_of_common_members_differs (&texts (old), &texts (new)) {
       changes . insert ( OtherChange::Order (OrderedList::Aliases) ); }
     if relRepos_of_common_members_differ (old, new) {
-      changes . insert (OtherChange::AliasSkgrepo); }
-    if specified_differs (aliases_before, aliases_after) && old == new {
-      changes . insert (OtherChange::OtherInGraph); }}
+      changes . insert (OtherChange::AliasSkgrepo); }}
   if order_of_common_members_differs (extra_ids_before, extra_ids_after) {
     changes . insert ( OtherChange::Order (OrderedList::ExtraIds) ); }
   if order_of_common_members_differs (flags_before, flags_after) {
     changes . insert ( OtherChange::Order (OrderedList::Flags) ); }
   for (old, new, list) in [
-    ( MSV::Specified ( contains_before . clone () ),
-      MSV::Specified ( contains_after . clone () ), OrderedList::Content ),
-    ( forks_before . clone (), forks_after . clone (), OrderedList::Forks ),
-    ( hides_before . clone (), hides_after . clone (), OrderedList::Hidden ), ] {
+    ( contains_before . as_slice (), contains_after . as_slice (), OrderedList::Content ),
+    ( forks_before . or_default (), forks_after . or_default (), OrderedList::Forks ),
+    ( hides_before . or_default (), hides_after . or_default (), OrderedList::Hidden ), ] {
     let (old_members, new_members) : (Vec<ID>, Vec<ID>) = (
-      old . or_default () . iter () . map ( |m| m . member . clone () ) . collect (),
-      new . or_default () . iter () . map ( |m| m . member . clone () ) . collect () );
+      old . iter () . map ( |m| m . member . clone () ) . collect (),
+      new . iter () . map ( |m| m . member . clone () ) . collect () );
     if order_of_common_members_differs (&old_members, &new_members) {
       changes . insert ( OtherChange::Order (list) ); }
     if ids_replaced_by_ids_of_the_same_node (
-      before_graph, after_graph, &old_members, &new_members )
-      || ( specified_differs (&old, &new)
-           && old . or_default () == new . or_default () ) {
+      before_graph, after_graph, &old_members, &new_members ) {
       changes . insert (OtherChange::OtherInGraph); }}
   changes . into_iter () . collect () }
 
@@ -210,12 +205,6 @@ fn relRepos_of_common_members_differ<T : Eq + Hash + Clone + Ord> (
   let (old_by_member, new_by_member) = ( relRepos_by_member (old), relRepos_by_member (new) );
   old_by_member . iter () . any ( |(member, relRepos)|
     new_by_member . get (member) . is_some_and ( |other| other != relRepos )) }
-
-fn specified_differs<T> (
-  old : &MSV<T>,
-  new : &MSV<T>,
-) -> bool {
-  matches! (old, MSV::Specified (_)) != matches! (new, MSV::Specified (_)) }
 
 /// Whether a list lost an ID whose node it still names by another ID,
 /// or gained one naming a node it named already: no relationship

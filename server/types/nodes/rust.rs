@@ -3,6 +3,11 @@
 //! Wide enough to match everything Graphnode carries (except
 //! derived fields), plus linksTo — derived from body parsing at
 //! GraphnodeInRust construction time.
+//!
+//! It holds a node as its files read back: an empty list is
+//! 'MSV::Unspecified', since no file writes an empty list
+//! ('GraphnodeOnDisk'), so a node a save put in the graph equals the
+//! one a reload of its files would.
 
 use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName, members_msv};
 use crate::types::nodes::attribution::Attribution;
@@ -31,7 +36,8 @@ pub struct GraphnodeInRust {
 }
 
 impl From<&Graphnode> for GraphnodeInRust {
-  /// Derive 'linksTo' by parsing title+body; copy everything else.
+  /// Derive 'linksTo' by parsing title+body; copy everything else, an
+  /// empty list as 'MSV::Unspecified' (see the module comment).
   fn from (c: &Graphnode) -> Self {
     let linksTo : Vec<ID> =
       links_from_node (c)
@@ -44,17 +50,25 @@ impl From<&Graphnode> for GraphnodeInRust {
       extra_ids                    : c . normalized_extra_ids (),
       title                        : c . title . clone (),
       overPrivateText_telescope               : c . overPrivateText_telescope,
-      aliases                      : c . aliases . clone (),
+      aliases                      : unspecified_if_empty (&c . aliases),
       body                         : c . body . clone (),
       contains                     : c . contains . clone (),
-      forks                        : c . forks . clone (),
-      hides                        : c . hides . clone (),
+      forks                        : unspecified_if_empty (&c . forks),
+      hides                        : unspecified_if_empty (&c . hides),
       flags                        : c . flags . clone (),
       attribution                  : c . attribution . clone (),
       linksTo,
     }
   }
 }
+
+/// 'list', or 'MSV::Unspecified' if it is empty.
+fn unspecified_if_empty<T : Clone> (
+  list : &MSV<T>,
+) -> MSV<T> {
+  match list {
+    MSV::Specified (members) if members . is_empty () => MSV::Unspecified,
+    _ => list . clone (), }}
 
 impl GraphnodeInRust {
   /// The texts of the node's aliases, without their relRepos; empty
