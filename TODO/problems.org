@@ -6,6 +6,27 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* 'detach' can show where no save would detach anything (2026-11-20)
+  The clients draw =detach= ('pendingDetachment', 'docs/heralds.org')
+  from a headline's own metadata and its parent's, so it can be wrong
+  where that metadata is stale or the parent reads claims only for
+  the clients. Found reading the code, none reproduced:
+  - 'shared/herald-styles.json' does not list 'idFolder' as
+    write-protected, so the clients let =C-c s t= write 'noClaim' on an
+    ID and show =detach=, but the server reads no claims there
+    ('server/types/viewnode.rs' ~871), and the save ignores it.
+  - A headline carrying 'noClaim' where it was drawn (a forker-only
+    member of a forks folder, say) and then moved under an editable
+    node keeps its old warrant, so it shows =detach= though the new
+    parent's list never named it.
+  - A rerender of a stored view can leave a member of a forks or alias
+    folder 'noClaim' after its occurrence turns editable again:
+    'ensure_editableOccurrences_exist'
+    ('server/diff_view/buffer_rerender.rs' ~262) resets only direct
+    children, 'merge_editability' ('server/refresh/editability.rs'
+    ~465) and a ghost turned occurrence ('server/refresh/id_rule.rs'
+    ~228) reset nothing; the next save would then delete that alias or
+    end that fork.
 * Skg does not count a link whose label wraps across lines (2026-11-20)
   Org reads =[[id:X][a label\nthat wraps]]= as a link (a blank line
   ends it), and filling a paragraph makes such links. The server's

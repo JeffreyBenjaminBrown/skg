@@ -233,7 +233,13 @@ detachment is only a member whose =(rels (forks (in ...)))= names
 ancestor generation 2, which its grandparent still forks. =detach= is
 styled as a request, and listed with them above, but it is none:
 detaching writes only the =noClaim= atom, and the save reads that as
-it reads any claim.
+it reads any claim. =C-c s t= ('skg-detach'; =:SkgDetach= in Neovim)
+makes one; nothing in a view the server draws is one, since every
+save consumes it. So =detach= means the next save removes that
+headline from its parent's list (in a forks folder, ends the fork),
+leaving the node itself and the headline in the buffer, shown =⊥=.
+To keep it in the list, =C-c s a= ('skg-attach'; =:SkgAttach=)
+cancels the detachment before the save.
 
 =⌂:LABEL= marks a node's home skgrepo boundary (the atom
 =repoBoundary= in =(view ...)=): a root, or a node whose home herald
