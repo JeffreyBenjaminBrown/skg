@@ -1,0 +1,5 @@
+Las letras de Skg significan "Conocimiento Compartible en Grafo".
+
+Un grafo es una geometría para inforación.
+Las ideas se conectan de formas uno puede describr con relaciones,
+cuyas etiquetas pueden referirse a las mismas entidades.
