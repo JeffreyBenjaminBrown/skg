@@ -355,7 +355,7 @@ mod tests {
   use crate::dbs::in_rust_graph::InRustGraph;
   use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
   use crate::dbs::tantivy::search::{SearchOptions, search_index};
-  use crate::export_org::export_to_org;
+  use crate::export_org::{export_header_length, export_to_org};
   use crate::skgrepo_sets::SkgrepoRestriction;
   use crate::types::misc::Skgrepo;
   use std::fs;
@@ -553,6 +553,50 @@ mod tests {
     assert_eq! (fs::read_to_string (input . join ("nested/guide.md")) . unwrap (),
       markdown);
     assert_eq! (fs::read_to_string (input . join ("details.org")) . unwrap (), org);
+    wait_for_tantivy_writes_idle ();
+  }
+
+  #[test]
+  fn org_documents_export_back_byte_for_byte () {
+    // Outlines whose root is titled after the file, wrapped and
+    // unlabeled links, a CUSTOM_ID search and a link to source code all
+    // come back as written. (Blank lines next to headlines would not:
+    // a body keeps none at its ends.)
+    let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+    let input : PathBuf = temp . path () . join ("input");
+    let skgrepo : PathBuf = temp . path () . join ("repo");
+    let output : PathBuf = temp . path () . join ("output");
+    fs::create_dir_all (input . join ("sub")) . unwrap ();
+    fs::create_dir (&skgrepo) . unwrap ();
+    let documents : [(&str, &str); 4] = [
+      ("a.org", "#+title: Ay\nPreamble, [[./sub/b.org][a link\nthat wraps]] and [[file:sub/b.org]].\n* One\nSee [[./sub/b.org::#target][the target]] and [[../code/x.rs][code]].\n** Deeper\n* Two\n"),
+      ("sub/b.org", "* Bee\nback to [[../a.org::*Two][two]]\n** Target\n:PROPERTIES:\n:CUSTOM_ID: target\n:END:\nText\n"),
+      ("sub/c.org", "Only text, no headlines.\n"),
+      ("sub/d.org", "* First\n* Second\n"),
+    ];
+    for (path, text) in documents {
+      fs::write (input . join (path), text) . unwrap (); }
+    let env      : SkgEnv = environment (&skgrepo, true);
+    let prepared : PreparedImportBatch = match prepare_import_batch (
+      &input, &SkgrepoName::from ("notes"), None, false, &env).unwrap () {
+      ImportPreparation::Prepared (prepared) => prepared,
+      ImportPreparation::HostMappingNeeded => panic! ("unexpected host prompt"),
+    };
+    let gate = env . mutation_gate ();
+    let _guard = futures::executor::block_on (gate . lock ());
+    prepared . apply_under_mutation_gate (&env) . unwrap ();
+    drop (_guard);
+    let config = env . runtime_snapshot () . config . clone ();
+    let nodes : Vec<Graphnode> =
+      read_all_skg_files_from_skgrepos_read_only (&config) . unwrap ();
+    let restriction : SkgrepoRestriction =
+      SkgrepoRestriction::unrestricted (&config);
+    export_to_org (&restriction, &nodes, &output) . unwrap ();
+    for (path, text) in documents {
+      let exported : String =
+        fs::read_to_string (output . join (path)) . unwrap ();
+      assert_eq! (&exported [export_header_length (&exported) ..], text,
+        "{}", path); }
     wait_for_tantivy_writes_idle ();
   }
 }

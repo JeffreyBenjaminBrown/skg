@@ -66,3 +66,21 @@ Link syntax in literal text is neither rewritten nor counted as broken.
 *** Headline-like body lines are defused
 Indented two spaces, or comma-escaped inside a =#+begin_= block, instead of
 being warned about.
+** A document's own outline survives export
+Driven by a trial round trip of docs/ and coding-advice/.
+*** A root titled after its document is not a headline
+Its export marker also says =root_headline = false=, and the exporter
+then writes the root's body as the file's opening text and its
+children as top-level headlines, instead of adding a headline named
+after the file and demoting every other one.
+*** Org links to non-documents stay as written
+Unless a host mapping changes the path, rather than gaining =file:=.
+*** The exporter keeps more of the original spelling
+A link whose label is a link to the same place (the label the
+importer gives an unlabeled link) exports unlabeled; a headline's own
+=CUSTOM_ID= drawer addresses it; labels may wrap across lines; a
+title's leading spaces are kept.
+*** Still not round-tripped
+Blank lines next to headlines (a body keeps none at its ends), the
+spelling of labeled file links (=file:x.org= and =x.org= become
+=./x.org=), and Markdown, which still exports as Org.
