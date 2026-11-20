@@ -18,27 +18,20 @@
   'LINK_PATTERN' match them would change what counts as a link
   everywhere, and the Neovim client's patterns would need the same
   change.
-* The diff view cannot mark a change no leaf records (2026-11-20)
-  A node's files can change in ways no change-forest leaf records: its
-  text moved between a private and a public section (a Hoist), its
-  attribution changed (a strip, 'skg fix-attributions'), an alias
-  moved to another skgrepo, a list was reordered, or a file is not
-  what skg writes (hand-formatted, say) ('docs/diff-view.org',
-  "Changes no mark covers"; 'server/diff_view/unmarkable_changes.rs').
-  A commit of the processed leaves such a node out and names it, with
-  how it changed; only a commit of everything, or Git, takes it. The
-  diff view draws none of these as a change to mark: a node changed
-  only so stands in the order-only buffer, under a marker that is
-  never processed, and one with other changes too shows nothing of it.
-  The fix: one more leaf per node, "other changes to its file", keyed
-  by the node, its fingerprint the two graphs' 'unmarkable_changes_between'
-  values, drawn as a change viewnode under the node in every buffer
-  (like the home skgrepo move: an atom carrying the kinds, a herald
-  naming them, parse and print, 'leaves_named_at', 'ChangedAspects'),
-  replacing the order-only marker and leaving the order-only buffer
-  the nodes whose only leaf it is. The file check stays a commit's
-  only, since it reads the files from Git; a node failing it could
-  carry that leaf only once the straddle reads changed files.
+* The diff view cannot mark a change only the files show (2026-11-20)
+  A commit of the processed leaves out a node one of whose files, at
+  HEAD or in the worktree, is not byte for byte what skg writes for it
+  ('files_hold_more_than_their_node' in 'server/diff_view/other_changes.rs';
+  'docs/diff-view.org', "Changes no mark covers"): a hand-formatted
+  file, say, or one an older skg wrote with another field order. The
+  diff view does not show that change, since finding it reads each
+  changed file from Git, which the straddle does not; only a commit of
+  everything, or Git, takes such a node. A file that differs from HEAD
+  only in bytes the parser does not read is no changed node of the
+  straddle at all. Both could be one more kind of the node's other
+  changes ('OtherChange'), its fingerprint the two blobs, once the
+  straddle reads the changed files of the nodes that differ (and Git's
+  list of changed files, for the second), at each re-pairing.
 * A request's 'skg-lp-reset' can drop another request's reply (2026-11-19)
   Seen measuring saves: a link-status request sent while views were
   being opened never got its reply handled, and stayed in
