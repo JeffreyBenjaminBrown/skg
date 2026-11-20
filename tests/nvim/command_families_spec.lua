@@ -96,6 +96,30 @@ describe('skg.modify_graph replacements', function ()
     assert.are.equal(1, saved_count)
   end)
 
+  it('asks, with context, before linking a title that holds a link',
+     function ()
+    buffer_with(table.concat({
+      '* (skg node (gnid parent) (skgRepos (nodeRepo public))) container',
+      '** (skg node (gnid child) (skgRepos (nodeRepo public)))'
+      .. ' see [[id:x][X]]' }, '\n'))
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+    local asked
+    local original_list_uis = vim.api.nvim_list_uis
+    local original_confirm = vim.fn.confirm
+    vim.api.nvim_list_uis = function () return { {} } end
+    vim.fn.confirm = function (question) asked = question; return 2 end
+    local ok, err = pcall(modify_graph.replace_content_with_link)
+    vim.api.nvim_list_uis = original_list_uis
+    vim.fn.confirm = original_confirm
+    assert.is_false(ok)
+    assert.is_truthy(tostring(err):find('Canceled', 1, true))
+    assert.are.equal(
+      "Are you sure you want to make that title, which contains a link,"
+      .. " into a link? (There's nothing wrong with that, and sometimes"
+      .. " it's appropriate, but it can be confusing.)", asked)
+    assert.are.equal(0, saved_count)
+  end)
+
   it('rejects a node with no id', function ()
     buffer_with(table.concat({
       '* (skg node (gnid parent) (skgRepos (nodeRepo public))) container',

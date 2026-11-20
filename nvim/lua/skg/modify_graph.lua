@@ -145,6 +145,11 @@ end
 
 -- ── replace content with link ──────────────────────────────────────
 
+---What M.replace_content_with_link asks before replacing a branch
+---whose root's title already contains a link.
+M.link_title_into_link_question =
+  "Are you sure you want to make that title, which contains a link, into a link? (There's nothing wrong with that, and sometimes it's appropriate, but it can be confusing.)"
+
 ---Replace the branch at point with a link to its former root, then
 ---save. The root must be an existing occurrence with an ID; its
 ---viewparent must be an editable, owned occurrence. Asks before
@@ -166,7 +171,8 @@ function M.replace_content_with_link ()
     metadata.line_text(line))
   if split.title:find(M.headline_org_link_pattern) then
     if #vim.api.nvim_list_uis() > 0
-       and vim.fn.confirm('Are you sure?', '&Yes\n&No', 2) ~= 1 then
+       and vim.fn.confirm(M.link_title_into_link_question,
+                         '&Yes\n&No', 2) ~= 1 then
       error('Canceled') end
   end
   local label = M.read_link_label(

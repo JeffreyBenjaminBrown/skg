@@ -386,7 +386,7 @@ its herald, as they were: the save recomputes them."
                  (lambda () (setq save-count (1+ save-count))))
                 ((symbol-function 'y-or-n-p)
                  (lambda (prompt)
-                   (should (equal prompt "Are you sure? "))
+                   (should (equal prompt "Are you sure you want to make that title, which contains a link, into a link? (There's nothing wrong with that, and sometimes it's appropriate, but it can be confusing.) "))
                    t)))
         (skg-replace-content-with-link))
       (should (= save-count 1))

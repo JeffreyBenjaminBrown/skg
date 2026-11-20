@@ -106,6 +106,11 @@ outline heuristic, not a precise graph-content query."
       (org-back-to-heading t)
     (error (user-error "Not in an org headline or body"))))
 
+(defconst skg--link-title-into-link-question
+  "Are you sure you want to make that title, which contains a link, into a link? (There's nothing wrong with that, and sometimes it's appropriate, but it can be confusing.) "
+  "What `skg-replace-content-with-link' asks before replacing a branch
+whose root's title already contains a link.")
+
 (defun skg-replace-content-with-link ()
   "Replace the branch at point with a link to its former root.
 Point may be on the headline or in its body.  The root must be an
@@ -119,7 +124,7 @@ org id link to the former root, then the buffer is saved."
          (container (skg--content-link-replacement-container-data)))
     (skg--check-content-link-replacement-container container)
     (when (and (skg--headline-title-has-link-p (plist-get node :title))
-               (not (y-or-n-p "Are you sure? ")))
+               (not (y-or-n-p skg--link-title-into-link-question)))
       (user-error "Canceled"))
     (skg--replace-current-subtree-with-link-headline
      (plist-get node :id)

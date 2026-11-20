@@ -1199,7 +1199,7 @@ are removed from the view and replaced by a same-level headline
 whose title is an =[[id:...][...]]= link to the original node.
 
 If the original headline title already contains a link, the
-command asks "Are you sure?" before proceeding.
+command asks before proceeding: "Are you sure you want to make that title, which contains a link, into a link? (There's nothing wrong with that, and sometimes it's appropriate, but it can be confusing.)"
 ** C-c v : view changes, local (to a specific node)
 *** C-c v b : skg-org-body-toggle
 Toggles the visibility of the body of the headline at point without
