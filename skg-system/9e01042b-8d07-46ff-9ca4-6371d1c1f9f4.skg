@@ -1,0 +1,31 @@
+title: 'The two systems: bytes vs characters'
+pid: 9e01042b-8d07-46ff-9ca4-6371d1c1f9f4
+body: |2-
+  A character like =a= is one byte (0x61). A character like =⌂=
+  is three bytes (0xE2 0x8C 0x82). Both are one character.
+
+  UTF-8 is a variable-width encoding: ASCII characters (U+0000 to
+  U+007F) use 1 byte; others use 2, 3, or 4 bytes. The number of
+  bytes is determined by the leading bits of the first byte:
+
+  | First byte pattern | Bytes | Range                       |
+  |--------------------+-------+-----------------------------|
+  |           0xxxxxxx |     1 | ASCII                       |
+  |           110xxxxx |     2 | Latin, Greek, Cyrillic, ... |
+  |           1110xxxx |     3 | CJK, most symbols, ⌂, ⤊, ↻  |
+  |           11110xxx |     4 | Emoji, rare scripts         |
+
+  Continuation bytes always start with =10xxxxxx=. This is how
+  the decoder knows where characters start and end.
+
+  A "char boundary" is a byte position where a character begins.
+  In the string ="hi⌂ok"=:
+
+  | Byte index     | 0   | 1   | 2        | 3        | 4        | 5   | 6   |
+  |----------------+-----+-----+----------+----------+----------+-----+-----|
+  | Content        | h   | i   | ⌂        | ⌂        | ⌂        | o   | k   |
+  |                |     |     | (byte 1) | (byte 2) | (byte 3) |     |     |
+  | Char boundary? | yes | yes | yes      | NO       | NO       | yes | yes |
+
+  Byte indices 3 and 4 are NOT char boundaries -- they land in the
+  middle of =⌂=.

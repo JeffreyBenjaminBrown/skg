@@ -1,0 +1,9 @@
+title: After the commit
+pid: 70dd90b4-8625-4168-8483-97a278e95f47
+body: |2-
+  The straddle is rebuilt over the new HEAD, the store keeps only the
+  marks whose leaves still exist, and each open buffer of the diff view
+  is refreshed as any rerender is: its roots and what it made editable
+  stay, and what was committed loses its change viewnodes. The marks of
+  the nodes left out stay, since the check proved their leaves
+  unchanged.

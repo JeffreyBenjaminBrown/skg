@@ -1,0 +1,18 @@
+title: Some TypeDB data must be calculated from these.
+pid: f3f2330b-5877-4259-8d66-cf0c46c2c2fc
+body: |2-
+  Each time the server starts,
+  the "in-relationships" (for all relations)
+  and the out-links (for links specifically)
+  must be computed for each node.
+
+  That's because .skg files record relationships
+    in at most one direction:
+    what the node contains, but not what contains it;
+    what it subscribes to, but not what subscribes to it; etc.
+  And one kind of relationship, links,
+    is not recorded explicitly in either direction;
+    rather, link targets (sourced from this node)
+      are parsed from any links in the text in the title and body,
+    and mentioners (that link to this node)
+      are similarly inferred from other files.

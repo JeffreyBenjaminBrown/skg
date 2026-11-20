@@ -1,0 +1,16 @@
+title: The privacy order
+pid: babdc358-4721-49e6-9482-ef0d9e155579
+body: |2-
+  Your =skgconfig.toml= lists the skgrepos you own in privacy order,
+  most public first (see =api-and-formats.org=). That order is the
+  ladder of *privacy levels*. Foreign skgrepos have no level: privacy
+  is about what you share and withhold, and a foreign skgrepo is not
+  yours to share or withhold, so they form an unordered set beside the
+  ladder and may be listed anywhere. A *skgrepo-set* is a prefix of
+  the ladder — choosing one is answering "what is the most private
+  skgrepo I want visible right now?" — and the most private skgrepo's
+  set is the whole ladder. Apart from that, the foreign skgrepos are
+  shown or hidden, all at once; they are shown unless you hide them.
+  The whole ladder with the foreign skgrepos shown is no skgrepo
+  restriction. Screen-sharing with a colleague, you might switch to
+  the =public= prefix; alone, back to the most private skgrepo.

@@ -1,0 +1,5 @@
+title: 'C-c O l : skg-pop-link'
+pid: 60d933f6-d45c-4c93-a21b-bb023ecce8dd
+body: |2-
+  Like skg-paste-link,
+  but also removes the node from the stack.

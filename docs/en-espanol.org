@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 3e38b379-d6a6-45a6-846a-8ed6282938ef
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 Las letras de Skg significan "Conocimiento Compartible en Grafo".
 
 Un grafo es una geometría para inforación.

@@ -1,0 +1,15 @@
+title: 'bash/import-org-roam.sh : host-side Docker and Git wrapper'
+pid: f8d20ae3-fb90-4314-83e5-1a3e79cb23dc
+body: |2-
+  [[file:../bash/import-org-roam.sh][This script]] accepts 'REPO DEST NICKNAME' and prompts for a Docker
+  container. Unlike the Cargo command, it offers to remove the destination's
+  '.git' directory as well as its '.skg' files, then runs the importer,
+  initializes Git, stages the destination, and opens an editor for a commit.
+  Declining its cleanup prompt does not prevent the underlying importer from
+  deleting existing '.skg' files.
+
+  It also offers to request a server rebuild, reading the port from 'SKG_CONFIG'
+  (default 'data/jeff/skgconfig.toml'). Its Docker working directory is hard-coded
+  to '/home/ubuntu', while host-side paths use the shell's working directory.
+  Check that the mounts and paths identify the intended directories on both
+  sides. Use the Cargo command directly when you do not want Git operations.

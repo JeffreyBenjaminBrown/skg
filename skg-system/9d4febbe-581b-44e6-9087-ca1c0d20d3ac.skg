@@ -1,0 +1,12 @@
+title: Vocabulary and reification
+pid: 9d4febbe-581b-44e6-9087-ca1c0d20d3ac
+body: |2-
+  Which terms did the work introduce? For each: did the codebase
+  already have a word for it; is it used with one meaning everywhere;
+  is it confusible with an existing term or with ordinary English
+  (words with two meanings; one thing with several names; words the
+  glossary has rules against). What does the work talk about without a
+  name? Then both directions of reification: concepts reconstructed
+  from tuples, strings or repeated matches that deserve a type or a
+  function; and types, wrappers or modules with one use or in the
+  wrong place.

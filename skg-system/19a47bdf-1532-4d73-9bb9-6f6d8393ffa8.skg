@@ -1,0 +1,9 @@
+title: 'C-u C-c <backspace> : skg-delete-recursive'
+pid: 19a47bdf-1532-4d73-9bb9-6f6d8393ffa8
+body: |2-
+  Same as skg-delete, but also marks every occurrence viewdescendant
+  of the node at point. Descendent headlines that are not occurrences
+  (ghosts, unknown viewnodes, aliasFolder, idFolder, etc.) are skipped.
+
+  Prefix-arg variant of skg-delete; callable directly via M-x
+  as skg-delete-recursive.

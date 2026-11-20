@@ -1,0 +1,14 @@
+title: A node of U is editable, with its whole content list
+pid: 3593475c-0bf1-424e-a6d2-c65fb90434bb
+body: |2-
+  An occurrence the refresh draws in editable content is editable when
+  its node is in U and has no editable occurrence yet, and its whole
+  content list is drawn; a member outside U is a write-protected member
+  shown without its content. No size cap applies: the node budget never
+  refuses a node of U, though each one's extension charges it, as every
+  extension does. A removed member in content position is
+  an occurrence like any other here: a node whose first drawn
+  occurrence is a removed member (one its only container dropped, say,
+  or one first reached through a container that dropped it) is
+  editable there ("Removed members"). An occurrence the buffer holds
+  keeps its editability.

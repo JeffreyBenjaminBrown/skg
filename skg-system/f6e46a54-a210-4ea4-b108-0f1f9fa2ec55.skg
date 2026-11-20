@@ -1,0 +1,21 @@
+title: What leaks, and what repair fixes
+pid: f6e46a54-a210-4ea4-b108-0f1f9fa2ec55
+body: |2-
+  A leak is data you intend to share revealing data you intend not to
+  share, so only your own files can leak: an owned skgrepo naming a node
+  whose home is a more private owned skgrepo is a "leak-shaped
+  membership", while nothing a foreign skgrepo records is a leak, whatever
+  it names, and neither is an owned skgrepo naming a foreign node. A
+  leak-shaped membership can arrive from a hand edit or a pull, and it is what
+  this model exists to prevent. The server warns about these
+  (=telescope-warnings.org= in your data root) rather than erroring: a
+  pull must never brick a skgrepo. Repair one with
+  =skg-set-relRepo= (=C-c s r=), which moves the
+  membership into the right section. What no repair can fix: if a
+  public skgrepo ever /committed/ a leaked ID, its git history still holds
+  it; rewriting history is manual.
+
+  (A wholesale migration, =skg-migrate-to-telescopes=, existed while
+  pre-telescope data did. It is buried in
+  =_burying/not_using/obsolete/migrate-to-telescopes/=; every user now
+  starts with telescopes in place.)

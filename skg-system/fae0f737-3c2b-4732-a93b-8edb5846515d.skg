@@ -1,0 +1,152 @@
+title: 'Stats metadata: the view facts, =(view ...)='
+pid: fae0f737-3c2b-4732-a93b-8edb5846515d
+body: |2-
+  The derived facts of a headline's position stand in one form,
+  =(view FACT...)=, after its declared parts and before its =(diff
+  ...)=. The server computes them at every rendering (the stats pass,
+  =server/refresh/viewnodestats.rs=); nobody reads them back:
+  the parser skips =(view ...)= whole, so editing them changes
+  nothing. A headline with none carries no =(view ...)=, and =(view)=
+  is never written. On a node, in the order written:
+
+  - =omittedBody= — on a write-protected node whose graphnode has a
+    body, one the rendering hides. Herald "B", hugging the ☮.
+  - =(rels ...)=, =(props ...)=, =(birth ...)= — the relationship
+    facts, below.
+  - =noWarrant= — the graph does not relate the node to its viewparent
+    as its position implies: its parent does not contain it, the
+    folder's relation does not hold for it, or, on a chain node, it
+    does not contain the node above. A root is always warranted.
+    Herald "⊥". Independent of =noClaim=.
+  - =cycle= — this position repeats an ancestor's ID. Herald "⟳".
+  - =(attribution NAME)= or =(attribution NAME unverified)= — the node
+    is a fork with an attribution (=docs/forks.org=, "Attribution").
+    NAME is the configured skgrepo whose git remote has the recorded
+    remote hash, or, where none was recorded, the configured skgrepo of
+    the recorded name, which has no remote either; else the recorded
+    name, with =unverified=. It shows nothing itself: the client folds
+    it into the home skgrepo herald, "⌂:<HOME/NAME>", "?" after NAME
+    when unverified.
+  - =repoBoundary= — the node sits at a skgrepo boundary: a root, a
+    node whose home skgrepo differs from its nearest occurrence
+    ancestor's, or whose attribution differs from that ancestor's
+    (one of the two attributed, or both, naming different skgrepos).
+    Written only when the config has more than one skgrepo, or an
+    attribution is on either side. Herald "⌂".
+
+  On an alias, an ID or a flag member, =(view ...)= holds at most one
+  atom: =noWarrant= when the node above its folder lacks it, or
+  =ghostWarrant= when HEAD alone warrants it (in the diff view, one
+  the worktree lost since HEAD, which also carries =(diff (rel
+  removed))=).
+
+  =server/herald_tokens.rs= assembles graph counts and occurrence facts
+  into the three semantic forms. Clients render them; the wire contains
+  no assembled glyphs, omitted numerals or colors. For example:
+
+  #+begin_example
+  (view
+    (rels
+      (contains (in 2 (ancestors 1))
+                (out 8 (ancestors 2) (unintegrated 3 (ancestors 2))))
+      (linksTo (in 5 (ancestors 1 2)
+                     (substantive 2 (ancestors 1)))
+               (out 3 (ancestors 2)))
+      (forks (out 1 (ancestors 1))))
+    (props (aliases 2) (extraIds 1) (flags 3))
+    (birth (contains in 1)))
+  #+end_example
+
+  Each relation side in =(rels ...)= is =(in COUNT (ancestors GEN...))=
+  or =(out COUNT (ancestors GEN...))=. Empty sides are generally
+  omitted, and =(rels ...)= is absent when no relation has anything to
+  say; =COUNT= is the complete distinct visible node count even when
+  ancestor flags let the client omit its numeral. =GEN= is an ancestor
+  generation: 1 is the viewparent, 2 the grandparent, counting
+  non-vognode levels. Relation keys are =contains=, =linksTo=,
+  =forks=, and =hides=. The =linksTo=
+  incoming side adds =(substantive COUNT (ancestors GEN...))= for the
+  subset whose skgrepo has a nonempty body, visible direct content, or
+  more than one distinct visible resolved target. Its outgoing side
+  counts distinct visible resolved targets. An applicable
+  member-as-such =contains= outgoing side (a forkee or forker as such)
+  adds =(unintegrated COUNT (ancestors GEN...))=, including when both
+  counts are zero; absence of that subform means the role does not
+  apply. The numerator counts members not already directly contained
+  or hidden by the note whose forks folder holds the occurrence, nor
+  contained by another note the user owns: what the member shows. Subset counts cannot exceed their side's
+  total. The ancestors counted are the viewparent, or, for a folder
+  member, the vognodes of the folder's required ancestry. A child
+  claiming nothing under a member as such -- content the note hides,
+  which the refresh keeps there, unwarranted, while it holds a subtree
+  or the user keeps it -- also counts the note, three generations up,
+  on its =hides= incoming side, as a =hiddenInForkPartnerFolder=
+  member does.
+
+  =(props (aliases K) (extraIds K) (flags K))= holds the property
+  counts, each present only when nonzero; =(props ...)= is absent when
+  all are zero.
+
+  =(birth (RELNAME SIDE [GEN])...)= identifies the relation(s) behind
+  this occurrence, read from where it stands: for each, the side of
+  this node it is on (=in= or =out=) and the ancestor generation it
+  accounts for. =GEN= is omitted when no ancestor accounts for it, as
+  for a node shown in place of a node it forks, which carries
+  =(forks out)=. An occurrence that does not stand as a member of its
+  viewparent carries none: where the viewparent's claims are read, one
+  claiming nothing; in a write-protected folder, one the folder's
+  relation does not warrant; under a write-protected occurrence, every
+  child ('stands_as_member' in =server/refresh/viewnodestats.rs=). A
+  member of a forks folder stands in each role of 'forks' it plays
+  ('forks_folder_member_roles'): as a forkee where it claims (where the
+  folder reads no claims, where the graph says the folder's viewparent
+  forks it), and as a forker where the graph's warrant and a visible
+  record say it forks the viewparent, whatever it claims. A mutual
+  stands in both, and carries both facts; a detached forkee and an
+  indirect member (a mirror of the viewparent joined to it only
+  through others) in neither, and carry none.
+
+  | Birth                            | Facts                                                        |
+  |----------------------------------+--------------------------------------------------------------|
+  | ordinary content                 | =(contains in 1)=                                            |
+  | forks-folder forkee (claiming)   | =(forks in 2)=                                               |
+  | forks-folder forker              | =(forks out 2)=                                              |
+  | forks-folder mutual              | =(forks in 2) (forks out 2)=                                 |
+  | forks-folder indirect member     | none                                                         |
+  | hidden-folder member             | =(hides in 2)=                                |
+  | hider-folder member              | =(hides out 2)=                               |
+  | container-folder member          | =(contains out 2)=                            |
+  | mentioner-folder member          | =(linksTo out 2)=                             |
+  | integrated-elsewhere member      | =(contains in 2)=                             |
+  | hidden-in-fork-partner member    | =(hides in 4) (contains in 2)=                |
+  | hidden-by-fork-partner member    | =(hides in 2) (contains in 4)=                |
+  | hidden-outside member            | =(hides in 3)=                                |
+  | mirror shown (inPlaceOf)     | =(forks out)= or =(forks in)=                                |
+  A member of an acquisition folder carries none: a nodeMerge is no
+  relation. In a forks folder the relationship heralds tell the sides
+  apart: a forkee shows =bK= (its viewparent's viewparent, 'b', forks
+  it), a forker =Kb=, a mutual =bKb=, an indirect member neither 'b'
+  flag ('docs/heralds.org').
+  See [[id:ef1f3f60-2e51-4584-8e5d-7dd6f6214cd2][heralds.org]] for the rendered notation and styles.
+
+  The graph counts fold into these forms (=forks= / =hides=
+  become the =K= / =H= tokens; =aliasing= / =extraIDs= /
+  true flags become the =Ak= / =Ik= / =Fk= property tokens), and the
+  per-relation view-position flags are the ancestor-lettered tokens.
+
+  Two facts of a headline's relationship to its viewparent are not view
+  facts. The skgrepo recording it, when its privacy was deliberately
+  raised above the relationship's default, is the =(relRepo NAME)= of
+  the headline's =(skgRepos ...)= (the =contains= relationship to a
+  content child, or the folder's relation for a partner folder member;
+  for a member of a forks folder, its viewparent's record of the fork
+  where it claims, else its own record of forking the viewparent, on
+  which a relRepo request is refused);
+  ugly herald "~NAME", shown immediately before the ⌂. A relationship
+  recorded in a foreign skgrepo never carries it: a foreign skgrepo has
+  no privacy rank, and only its own node records the relationship. It is recomputed
+  at every rendering, and the save never reads it as a request, which
+  is =(editRequest (relRepo NAME))=. And =(inPlaceOf N)=, crucial
+  =ĥ= immediately after the =K= token, is a load-bearing declared part,
+  documented in "Mirror substitution and the inPlaceOf part"
+  below.

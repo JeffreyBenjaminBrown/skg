@@ -1,0 +1,8 @@
+title: '"What stays" names the user-visible defaults'
+pid: 9987bacc-6a2d-4755-a2ac-eb43b6c82493
+body: |2-
+  The "What stays as it is" section also enumerates the behaviors
+  a user sees without asking for them (default folders, override
+  substitution, the fold state of new members), each marked kept
+  or changed. Plan 04.1 never mentioned default folders, and the
+  rewritten module drew none until a correction restored them.

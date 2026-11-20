@@ -1,0 +1,9 @@
+title: C, R, U and D
+pid: cb7842a5-2f77-4ec8-bc0a-d3b054cd82fa
+body: |2-
+  These sets define the pruned change view a buffer renders
+  ('PrunedChangeViewSets').
+contains:
+- 68370d2d-6fc9-4d76-8299-12a24f5a33fc
+- d197abf4-caec-4997-81cb-e85001b83e71
+- 1866c306-fb00-4ddc-ad52-39539a79001c

@@ -1,0 +1,17 @@
+title: The four buffers
+pid: bd3dab90-4460-4ede-bfed-3287c7e081de
+body: |2-
+  One command opens up to four buffers, in this order, and skips any
+  that would be empty. The client sends one "diff view" request per
+  buffer; the server answers each with a buffer, or with '(empty . t)',
+  which the client does not open. Each buffer is registered like any
+  view, under a client-generated view ID, with its buffer kind
+  ('DiffViewBufferKind'), so saves and collateral rerenders reach it.
+contains:
+- 69c6cc05-eeb3-4864-b4e8-181cb277428a
+- 4562fb59-a57d-4868-880b-2ac2b72f585c
+- c84bbaed-dcf2-4c87-9f06-a5d42d1f7c02
+- 9b99374a-1b10-40fb-8054-88e3f7891db2
+- 7c525270-8b54-4bda-ab07-81e0ea224c5a
+- d9272984-4554-4803-9f53-a09c2b4595cc
+- de17e879-1b0a-4b8f-a7e6-9d6eef1e72e7

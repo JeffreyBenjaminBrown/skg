@@ -1,0 +1,22 @@
+title: '''(editRequest restoreRel)'': a removed membership'
+pid: e6b76f92-6d17-4782-90f8-6541b8acc866
+body: |2-
+  C-c s l ('skg-restore-removed-membership'; Neovim '<localleader>sl',
+  ':SkgRestoreRemovedMembership') writes it into an occurrence
+  carrying '(rel removed)' that stands where it may: a removed member in
+  content position (a child claiming nothing under a vognode that is no
+  node of the containerward chain), or a member of a partner folder whose
+  relationship to the folder's viewparent was removed, editable or
+  write-protected (herald "restore membership"). The command and the
+  save both refuse it anywhere else, by where the headline stands, with
+  "Only a removed membership can be restored". On a ghost it refuses with "This
+  node is deleted; restore it first (skg-restore-deleted-node)". The save
+  re-adds the relationship the headline stands for (the processed
+  requests' 'relationships_to_viewparent' names it; under a forks
+  folder, each side of 'forks' HEAD records), as HEAD recorded it:
+  at its index in the recorder's list at HEAD, clamped, in the skgrepo
+  that recorded it. A request whose headline stands for no relationship
+  (as under an acquisition folder), whose relationship is a link, has a
+  deleted node at either end, or is not recorded at HEAD, is dropped with
+  a warning naming the headline (=docs/api-and-formats.org=, "How a
+  message names a headline").

@@ -1,0 +1,6 @@
+title: The 'client' is what the user uses to see and change the graph.
+pid: 8ccbeb9f-28c5-4771-9596-b420f0683044
+body: |2-
+  Skg has an Emacs client and a Neovim client.
+  I hope to make a web client soon.
+  You only need to use one of them at a time.

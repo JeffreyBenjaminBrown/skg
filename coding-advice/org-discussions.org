@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 221eef80-d448-4564-9304-07397872bdfa
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * Discussing plans and reviews in Org files
 Jeff and Claude discuss plans, reviews and design questions
 asynchronously, inside Org files under 'TODO/<topic>/' (for instance
@@ -47,7 +51,7 @@ answer added once it is answered. A question that is also discussed
 in a section links there.
 ** Form
 Prefer headlines to bullets, and let the tree be as irregular as the
-content; see [[file:ORIENTATION.org][ORIENTATION]]. Prefer an org subtree to a table: a
+content; see [[./ORIENTATION.org][ORIENTATION]]. Prefer an org subtree to a table: a
 table with long cells is unreadable in Emacs. No line is longer than
 65 characters; a headline that would be longer moves its tail into
 the first sentence of its body. Use single apostrophes around code

@@ -1,0 +1,25 @@
+title: 'C-c z : skg-zippy-mode, typing without C-c'
+pid: efd2d81e-af20-4ae1-b9eb-0f167bc4a9e4
+body: |2-
+  In zippy mode, typing a key sequence K runs what C-c K runs, and
+  typing inserts no text: 'r r' cycles the processed mark, 'v d' opens the
+  diff view, 'C-u r r' or '4 r r' passes a prefix argument. 'z' leaves
+  zippy (skg-zippy-exit).
+
+  The mode is global: C-c z turns it on in every skg buffer at once
+  (content views, reports, buffers visiting .skg files, and those
+  opened later), z turns it off in all of them, and other buffers are
+  never affected. While it is on, those buffers show " Zippy" in the
+  mode line, and while the selected window shows one of them the
+  cursor is green (the variable 'skg-zippy-cursor-color'; the cursor
+  keeps its shape and blinking, and elsewhere, and when zippy is off, its
+  usual colour).
+
+  Each buffer uses its own kind's C-c keymap itself, so a key later
+  bound under C-c works in zippy too. Only skg's C-c keys count; org's
+  are left out. Digits and - give a prefix argument, any other printable
+  key that C-c does not bind just says so, and every other key (C-c
+  itself, so C-c C-c and C-c v d still work, C-x, M-x, motion, C-g)
+  works as usual. Control keys bound under C-c are zippy keys too: C-o
+  follows a link (C-c C-o), and <backspace> marks a node for deletion
+  (C-c <backspace>).

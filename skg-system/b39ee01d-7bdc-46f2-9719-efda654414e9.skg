@@ -1,0 +1,12 @@
+title: Does it use plaintext? Is it interoperable with Emacs org-mode?
+pid: b39ee01d-7bdc-46f2-9719-efda654414e9
+body: |2-
+  Yes and yes.
+
+  I hope to create an isomorphism from Skg into [[https://github.com/CategoricalData/hydra/tree/main][Dragon]], whereupon it can easily be converted back and forth into anything else for which such an isomorphism has been written. Anything expressible in Skg and not the other system, or vice-versa, can (but needn't be) preserved as comments -- that is part of Hydra's magic.
+
+  Skg uses Org text to manipulate data, but stores it as YAML in =.skg= files. Skg files are valid YAML, but most YAML is not valid Skg. See the [[id:02708898-2d66-49cf-ba60-ecc1eb0bbe81][file-format reference]] and [[file:../server/types/nodes/fs.rs][on-disk node types]].
+
+  Skg can import ordinary Org and Markdown into an existing owned skgrepo after a preview and explicit approval; see the [[id:9faccef0-1ce2-404c-b824-beeed2c1858b][command reference]]. It also has a separate Org-roam importer, which replaces existing =.skg= files in its destination; use a fresh staging directory for that older command. Skg exports selected content to plain Org.
+
+  Export is for readable documents, not lossless backup or synchronization with Org-roam. It omits identities and relationships needed to reconstruct the graph. See [[id:b778e2a3-8aa2-43e7-a160-1bf648569b39][returning imported data to Org]] for the limitations.

@@ -1,0 +1,14 @@
+title: how a message names a headline
+pid: b85e26c1-6e1e-4843-a4fa-ae06d3b56144
+body: |2-
+  A message from the server -- an error, a warning, a refused save --
+  names each headline it concerns as an org subheadline of its own,
+  below the message's own lines: the headline's title, or
+  '(untitled)' (a folder, say); then '- graphnode ID: X' when the
+  headline carries one; then '- viewnode ID: X. To find it: C-c g v X'
+  (in Neovim, '<localleader>gv X'), or '- not yet saved' for a
+  headline typed or copied since the last render, which has none.
+  =C-c g v= ('skg-goto-viewnode-id') puts point on the headline with
+  that viewnode ID and opens the folds around it. In code it is
+  'HeadlineName' ('server/types/errors.rs'); see
+  'docs/api-and-formats.org', "How a message names a headline".

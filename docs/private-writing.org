@@ -1,6 +1,9 @@
-* Private writing is important.
+# This file was generated from the skg node with this ID:
+# 6305389e-733a-4534-acdf-7aafe774904a
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+* Private writing is important.
 The argument is short:
 
-- [[file:./wise-people-say-write.org][Writing expands the writer's ability to think.]]
+- [[./wise-people-say-write.org][Writing expands the writer's ability to think.]]
 - For most of us, there are things we will not write about if we think someone else will see it.

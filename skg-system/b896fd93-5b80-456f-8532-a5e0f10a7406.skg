@@ -1,0 +1,6 @@
+title: Integrate your linked forest with others'.
+pid: b896fd93-5b80-456f-8532-a5e0f10a7406
+body: |2-
+  Hopefully some people will share some of their trees (documents, knowledge), and you will find some trees by other people interesting. If so, Skg will let you do what *feels like* editing their data -- reordering branches, hiding branches, plugging branches from their tree into branches of your own trees. You're not actually changing their data; you're creating a fork of it. When the original author edits those branches, you'll receive their changes.
+
+  If someone integrates your data into theirs, and they share the* context they integrated it into, and you look, you might learn more about the topic. You can thereby both learn from each other, without either having to teach -- just reading and writing for understanding.

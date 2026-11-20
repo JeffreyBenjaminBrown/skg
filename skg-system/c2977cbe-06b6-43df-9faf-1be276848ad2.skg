@@ -1,0 +1,6 @@
+title: Discussing plans and reviews in Org files
+pid: c2977cbe-06b6-43df-9faf-1be276848ad2
+body: |2-
+  Jeff and Claude discuss plans, reviews and design questions
+  asynchronously, inside Org files under 'TODO/<topic>/' (for instance
+  '1_discussion.org', '2_plan.org'). Jeff reads and answers in Emacs.

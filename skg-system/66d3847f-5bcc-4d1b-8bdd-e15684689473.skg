@@ -1,0 +1,5 @@
+title: =(node added)=, =(node removed)= -- the node's existence
+pid: 66d3847f-5bcc-4d1b-8bdd-e15684689473
+body: |2-
+  The node HEAD lacks (=added=) or the worktree lacks (=removed=). On a
+  member, a removed member, a folder member, a root, and a ghost.

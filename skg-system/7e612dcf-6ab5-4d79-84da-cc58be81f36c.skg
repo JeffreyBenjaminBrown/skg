@@ -1,0 +1,13 @@
+title: The report shape
+pid: 7e612dcf-6ab5-4d79-84da-cc58be81f36c
+body: |2-
+  The agent ends with a report of fixed shape, and the same shape
+  goes into 'progress.org' under a headline per slice:
+  - the commits, hash and one line each;
+  - the suites run, with counts, and every failure classified:
+    expected fixture adaptation, pre-existing, unrelated flake, or
+    new;
+  - deviations from the plan's "how", each with its reason;
+  - fixtures changed, and why;
+  - what was left unfinished;
+  - whether the slice's headline is DONE.

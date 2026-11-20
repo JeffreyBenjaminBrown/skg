@@ -1,0 +1,9 @@
+title: 'C-c g v   : skg-goto-viewnode-id'
+pid: 55ffa6be-3e6a-4505-a01c-e18c65a44fc3
+body: |2-
+  Moves point to the headline carrying a viewnode ID, read from the
+  minibuffer. A message names each headline it concerns by its
+  viewnode ID, with this command: "To find it: C-c g v X". It finds
+  the headline while heralds stand in for its metadata, and opens the folds
+  around it. See =docs/api-and-formats.org=, "How a message names a
+  headline".

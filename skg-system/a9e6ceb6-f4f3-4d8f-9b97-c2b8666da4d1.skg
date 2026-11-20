@@ -1,0 +1,4 @@
+title: across functions
+pid: a9e6ceb6-f4f3-4d8f-9b97-c2b8666da4d1
+body: |2-
+    If they are in the same module, put callers before callees.

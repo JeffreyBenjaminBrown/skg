@@ -1,13 +1,14 @@
-* Skg clarifies diffs
+# This file was generated from the skg node with this ID:
+# f6b72e10-5d7e-49e6-b044-a06bfe752329
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+* Skg clarifies diffs
 For the data structure that makes this possible, see the
-[[file:./data-model_technical.org][technical data model]] and the
-[[file:./data-model-skg-extensions.org][Skg extensions]].
+[[./data-model_technical.org][technical data model]] and the
+[[./data-model-skg-extensions.org][Skg extensions]].
 
 Suppose file F contains two branches A and B, and both are big, and you swapped their order. In a system that represents F with a single file, the resulting diff is very large, and it takes some effort to determine that all you did was change the order of the two branches. In Skg, by contrast, F's representation on disk contains only two nodes, so the diff could not be simpler: The order of the two nodes in F changed. Their content is in separate files, and because it has not changed, it does not clutter the diff with irrelevant noise.
-
 ** A concrete example
-
 Suppose you start with a file titled =1=:
 #+begin_example
   * 1

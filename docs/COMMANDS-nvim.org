@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 98a220ae-8089-4bac-9ec1-c05a541c7cec
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 # This file is generated to mirror docs/COMMANDS.org (the Emacs-client
 # command reference), translated to Neovim keybindings and :Skg*
 # Ex commands. nvim/lua/skg/keymaps.lua is the authoritative source
@@ -200,7 +204,6 @@ history knows of the ID.
 Under a skgrepo restriction it refuses ("Deleting the references to an
 absent ID requires no skgrepo restriction"), since it rewrites every
 owned recorder, those the skgrepo restriction keeps out included.
-
 ** <localleader>f : text search
 The 'f' is for 'find'.
 *** <localleader>ff : :SkgSearch
@@ -1253,11 +1256,11 @@ This toggles whether, at the start of every node,
 metadata is shown in its full plain-text glory,
 or is instead summarized via brief 'heralds'.
 It is turned on at every view by default.
-See [[file:heralds.org][the herald legend]] for the tokens and styles.
+See [[./heralds.org][the herald legend]] for the tokens and styles.
 *** <localleader>vL : :SkgToggleRepoOverlayOnLinks
 Toggle display-only home skgrepo suffixes on Skg links in this buffer.
 The suffixes start off. Links confirmed missing are ugly and underlined
-even with suffixes off. See [[file:heralds.org::*Link annotations][link annotations]].
+even with suffixes off. See [[./heralds.org::*Link annotations][link annotations]].
 *** <localleader>vl : :SkgRestrictRepoSet
 Switches the skgrepo restriction of display and search for this
 Neovim connection. The skgrepo restriction is two things: a
@@ -1613,7 +1616,6 @@ Org. A line that looks like an Org headline inside a block or fence stops the
 import, with nothing written; close the block, or escape the line with a
 leading comma (=,* ...=). The Emacs command reference explains both in more
 detail.
-
 ** exporting to org
 *** :SkgExportToOrg
 Exports Skg data to plain =.org= files, so the data can be read

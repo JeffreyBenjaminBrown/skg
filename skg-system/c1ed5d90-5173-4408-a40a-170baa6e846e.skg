@@ -1,0 +1,8 @@
+title: interleaved diff
+pid: c1ed5d90-5173-4408-a40a-170baa6e846e
+body: |2-
+  The order in which a buffer of the diff view shows a list that
+  changed: the worktree's list, each member HEAD alone had placed
+  before the next member of HEAD's order that the worktree kept, or
+  last ('interleaved_diff_without_reorders'). A reorder alone adds or
+  removes no member there; it is its recorder's other changes.

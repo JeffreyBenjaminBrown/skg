@@ -1,0 +1,12 @@
+title: flags folder and Flag
+pid: 00c7c6c0-4b97-45ec-b552-c21edb4d330c
+body: |2-
+  =flagsFolder= is a generated, write-protected non-vognode under a graphnode. Its
+  =(flag FLAG)= leaves list the node's true flags in canonical
+  order. Each leaf is titleless because its herald supplies the visible label.
+  The folder stays visible when empty. Edits within a retained folder are
+  rejected before save, but deleting the entire folder safely dismisses the
+  optional viewbranch and changes no flag. =noSearchMatching= is changed
+  through the dedicated setter, while the two org-roam import provenance
+  flags have no setter. A node with =n= true flags has the low-styled =Fn=
+  herald; no flag herald is shown at zero.

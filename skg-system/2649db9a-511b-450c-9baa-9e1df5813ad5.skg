@@ -1,0 +1,28 @@
+title: A tree can show more than the contains relation.
+pid: 2649db9a-511b-450c-9baa-9e1df5813ad5
+body: |2-
+  Usually, probably, most nodes in the view will correspond to nodes in the graph, but not always. It thus helps to distinguish viewnodes from graphnodes.
+
+  When a view is first created, each viewnode represents a graphnode. Here's some example data -- probably private -- representing an initial view of a node called 'Go to the dentist.':
+  #+begin_example
+    * Go to the dentist.
+    ** Tooth #5 hurt when I drank lemonade.
+    *** Is lemon bad for teeth?
+    ** Retrieve the hat I left there.
+  #+end_example
+  (Each of those nodes has a title and no body, which is valid.)
+
+  Each parent-child relationship in an initial view like the one above is the 'contains' relationship. However, the user can request information about other relationships. For instance, they might say 'show me everything that links to the first node', causing three new nodes to be added to the view::
+  #+begin_example
+    * go to the dentist
+    ** <<< these link to it >>>                                   # NEW
+    *** I promised _name_redacted_ I would [[go to the dentist]]      # NEW
+    *** I am allowed to drink beer again once I [[go to the dentist]] # NEW
+    ** tooth #5 hurt when I drank lemonade
+    *** Is lemon bad for teeth?
+    ** retrieve the hat I left there
+  #+end_example
+
+  The third and fourth viewnodes represent graphnodes that link to the first. The second viewnode *does not represent a graphnode* at all; it just introduces the 'hyperlinks' relationships from nodes 3 and 4 to node 1.
+
+  It bears repeating that in the graph, there is no concept of parent or child. There are instead explicit relationships: the contains relation from container to content, the linksTo relation from mentioner to mentioned, etc. Parent and child only mean something in a tree view. The relationship from parent to child is containment unless otherwise indicated.

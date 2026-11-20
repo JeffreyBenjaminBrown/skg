@@ -1,0 +1,13 @@
+title: After each plan, before the next
+pid: 327204f2-c749-4cda-92c7-a770f5cdf465
+body: |2-
+  Run a short review with two questions, by one agent: what terms did
+  this plan's code coin or reuse, and does its code cite anything under
+  'TODO/'. Run, by a second agent in parallel, a probe pass: each
+  behavior of the plan's "Agreed behavior", driven end to end against
+  an isolated server (the verify skill says how), with what was sent
+  and received recorded. In plan 04.1 and again in plan 2_2 the one
+  regression every suite missed was found by a probe. Vocabulary drift ("drawn", "fresh", "leaf") and plan
+  citations in code each entered through one plan and spread through
+  the next; both are cheap to catch per plan and expensive to catch at
+  the end. The full post-mortem method is in 'code-reviews.org'.

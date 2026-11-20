@@ -1,0 +1,5 @@
+title: A node should subscribe to anything it overrides.
+pid: 0ef59ee5-cb57-4680-a47f-dd2e7dadd99a
+contains:
+- ca0913f6-18e2-4dde-aa7b-05b15d754517
+- 775c5c1c-9915-4409-b286-0e71d89942c1

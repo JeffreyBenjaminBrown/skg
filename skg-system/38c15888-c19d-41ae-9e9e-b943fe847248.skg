@@ -1,0 +1,74 @@
+title: What a save reads there
+pid: 38c15888-c19d-41ae-9e9e-b943fe847248
+body: |2-
+  The save's traversal (=visit_forks_folder= in
+  =server/from_text/local_fieldintent_collection/traverse.rs=) reads
+  the folder's claiming members as N's 'forks', and visits a claiming
+  member as a forkee as such and one claiming nothing as a forker as
+  such; neither is save-eligible, so neither's partial content is ever
+  read as its whole list. It also emits a signal,
+  =FieldIntent::ForksFolderMembers=, listing every vognode the folder
+  shows, claiming or not, but those marked for deletion. Visibility
+  resolution then hides in N each member of the folder as the view
+  drew it ('forks_folder_members_shown' with N's forkees on disk; in the diff
+  view, whose forks folders hold direct partners only, N's forkees and
+  forker-only members) that would stand in it claiming nothing after
+  the save (with N's forkees as the save leaves them), that the folder
+  no longer shows, and that N does not hide already
+  (=resolve_forks_folder_removals= in =resolve_visibility.rs=), before
+  the edits of the hidden-outside folder, which run last. So a forkee
+  whose deletion ends N's fork of it is hidden only where another
+  mirror still joins it to N, and an indirect member only that forkee
+  joined to N is not hidden. So:
+  - typing a member there, claiming, makes N fork it;
+  - deleting a forkee ends N's fork of it;
+  - deleting a forker-only or an indirect member hides it in N, and
+    it leaves the forks folder for the hidden-outside folder; removing
+    it there unhides it, and it is drawn in the forks folder again;
+  - deleting a mutual ends N's fork of it and hides it;
+  - detaching a mutual ends N's fork of it only: it stands as a
+    forker, claiming nothing;
+  - attaching a forker-only member makes N fork it: a mutual;
+    attaching an indirect member makes N fork it;
+  - in a forkee as such E, drawn editable: E's title and body are saved
+    when the user owns E, and refused (a text claim) when it is foreign;
+    cutting one of E's children (one the view drew there, by the graph
+    before the save, that the buffer shows neither under E nor in E's
+    folder of what the user keeps elsewhere or of what N hides in it)
+    hides it in N unless N, or a note the user owns
+    but E, contains it after the save, and a child N hides,
+    shown claiming under E, is unhidden (the forkee-visibility step), a
+    save that would hide or unhide anything in a foreign N being
+    refused; a child placed under E that E's list does not name (a
+    headline typed there, or a node moved there) joins E's content,
+    after the sibling it follows, when the user owns E, and is refused
+    otherwise;
+  - in a forker as such F, drawn editable: F's title and body are saved
+    or refused as E's are, and a child placed under F joins F's
+    content as under E; a child N hides, shown claiming under F, is
+    unhidden; a child F showed that the buffer no longer shows under
+    F, nor in F's folder of what the user keeps elsewhere or of what N
+    hides in it, was cut from it (what F showed is read as its content less what
+    N contains or hides and what the user kept elsewhere, wherever F is
+    a mirror of N, 'is_mirror_of', an indirect member included), which
+    makes N fork F (a mutual now, where F forks N) and hides the child
+    in N unless N, or a note the user owns but F, contains it after the
+    save (the
+    forker-visibility step, 'resolve_forker_visibility'); the view
+    the save redraws gives F's headline its claim, as every refresh
+    gives each member of a forks folder the claim the graph gives it
+    ('claim_forks_folder_members_as_the_graph_does'); under a
+    foreign N such a save is refused, as under E; a cut from a mutual
+    whose claim the same save removes only hides;
+  - deleting a restricted viewnode (a member whose node the skgrepo
+    restriction keeps out), from the forks folder or the hidden-outside
+    folder, changes no relationship to the note it stands for: the
+    save leaves the forks and hides involving it as they are, and the
+    rerender draws it again ('preserve_invisible_members' in
+    'supplement_from_disk.rs', and the two steps above).
+  The hidden-outside folder holds N's hides that no member the forks
+  folder shows contains, forkee, forker or indirect
+  ('hidden_outside_of_fork_partners'); its edits are read against the
+  same members ('apply_hiddenoutside_edits'), so a hide of what only a
+  forker contains, unhidden under that forker as such, is not hidden
+  again by a buffer that keeps the hidden-outside folder.

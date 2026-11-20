@@ -1,0 +1,16 @@
+title: 'C-c s a : skg-attach'
+pid: 9e209e80-8793-42a5-9665-94488c24269f
+body: |2-
+  The reverse of C-c s t: removes 'noClaim' from the headline at point.
+  On a pending detachment, a headline the graph puts in the parent's
+  list and that shows =detach=, it cancels the detachment: =detach=
+  goes at once, and the next save keeps the headline in the list
+  ("Attached: the detachment is cancelled; the next save keeps this
+  headline in its parent's list."). On any other headline, one shown
+  =⊥= because the graph does not put it there, the next save puts it
+  in the parent's list ("Attached: the next save puts this headline in
+  its parent's list."), and the headline keeps its =⊥= until the save.
+  It refuses where C-c s t does, with the same messages, and on a
+  headline that claims membership already it says so and changes
+  nothing. It does not save. The metadata editor (C-c v m) offers
+  'noClaim' as well.

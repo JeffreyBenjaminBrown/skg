@@ -1,0 +1,6 @@
+title: mark, processed
+pid: 3737b559-7ce4-4430-aa82-1dd93f7fdf65
+body: |2-
+  A *mark* says that one change-forest leaf is processed; the
+  processed gestures set and clear marks. Editing a marked change
+  unmarks it. A leaf is *processed* when it is marked, and *unprocessed* otherwise.

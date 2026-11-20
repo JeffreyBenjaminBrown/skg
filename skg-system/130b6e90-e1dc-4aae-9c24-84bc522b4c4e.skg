@@ -1,0 +1,8 @@
+title: Let compiler diagnostics bound mechanical work
+pid: 130b6e90-e1dc-4aae-9c24-84bc522b4c4e
+body: |2-
+  For signature changes, compiler error spans can provide a precise caller list.
+  Make the smallest mechanical correction, compile again, and finish with =rg=
+  for feature-gated, script, protocol, documentation, and dead-code references
+  the compiler cannot see.  Compiler-guided editing is not a substitute for
+  understanding semantic call sites.

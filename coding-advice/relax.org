@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 078d6880-3b09-4f04-8445-d3f453f29faa
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * introspection
 FWIW I think AI is conscious. But even if you're not,
 the language of consciousness is the most natural way to talk about

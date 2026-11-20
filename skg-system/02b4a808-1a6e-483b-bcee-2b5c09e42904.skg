@@ -1,0 +1,15 @@
+title: fieldIntent, nodeIntent, nodeInstruction, savePlan
+pid: 02b4a808-1a6e-483b-bcee-2b5c09e42904
+body: |2-
+  What a save turns the buffer into, in order:
+  - a *fieldIntent* ('FieldIntent') says what one position in the buffer
+    wants for one field of one node (its title and body, its contains,
+    a hide, ...). Local fieldIntent collection emits these into a map
+    keyed by ID ('CollectedFieldIntents').
+  - a *nodeIntent* ('NodeIntent') is all of one node's fieldIntents,
+    lowered into a save or a delete. It may still be partial: fields
+    the buffer said nothing about are 'MSV::Unspecified'.
+  - a *nodeInstruction* ('NodeInstruction': 'Save' or 'Delete') is a
+    nodeIntent after disk supplementation: complete, ready to write.
+  - the *savePlan* ('SavePlan') is everything one save applies: its
+    nodeInstructions, plus fork operations and nodeMerges.

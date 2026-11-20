@@ -1,0 +1,5 @@
+title: 'C-c r p c : skg-diffView-goto-previous-change'
+pid: 678cdf1c-8520-4d08-9157-c5a97be3a99e
+body: |2-
+  Like C-c r n c, backward: moves point to the previous headline with change facts
+  before point. Before the first one it says "No earlier change".

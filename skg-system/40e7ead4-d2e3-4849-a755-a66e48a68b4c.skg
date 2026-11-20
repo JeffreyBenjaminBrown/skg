@@ -1,0 +1,35 @@
+title: The save-buffer pipeline
+pid: 40e7ead4-d2e3-4849-a755-a66e48a68b4c
+body: |2-
+    The canonical definition of step 5, "local fieldIntent
+    collection", lives in 'docs/glossary.org'; this section lists the
+    surrounding stages and links there rather than re-explaining
+    extraction.
+
+    The central pipeline. When Emacs saves a buffer, the server:
+
+    1. Parses buffer text -> Viewnode tree ('org_to_uninterpreted_nodes')
+    2. Enriches with missing IDs/repos ('add_missing_info_to_forest')
+       - New nodes get UUIDs; repoless nodes inherit parent's Skg repo
+    3. Validates tree structure ('find_buffer_errors_for_saving')
+    4. Converts to placed types ('maybePlaced_to_placed_tree')
+    5. Extracts save intents via local fieldIntent collection
+       ('extract_nonmergeSavePlan_locally' in
+       'server/from_text/local_fieldintent_collection/'): one pure DFS
+       preorder in which each buffer position reads only itself and its
+       direct children plus a downward-flowing 'LocalContext', emitting
+       per-field intents into a map keyed by PID. Downstream stages
+       consume the map, in order: text-claim validation, lowering to
+       NodeIntents, visibility resolution (subscribee-as-such signals
+       -> subscriber hides/unhides), disk supplementation, the noop
+       filter.
+    6. Validates foreign nodes ('validate_and_filter_foreign_instructions')
+    7. Builds nodeMerge instructions from the same map's
+       (acquirer, acquiree) pairs ('nodeMerge_instructions_from_pairs')
+    8. Updates graph ('update_graph_minus_nodeMerges'):
+       validate first, write authoritative files, publish one graph generation,
+       then enqueue the Tantivy delta
+    9. Re-renders saved view and collateral views ('update_views_after_save')
+
+    Key entry point: 'handle_save_buffer_request' in server/serve/handlers/save_buffer.rs.
+    Key data flow: buffer text -> MpViewnode -> Viewnode -> CollectedIntents -> NodeIntent -> DefineNode (Save|Delete) -> filesystem/graph/Tantivy.

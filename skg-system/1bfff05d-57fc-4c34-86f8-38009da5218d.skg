@@ -1,0 +1,5 @@
+title: '<localleader>mbp : :SkgMarkBothProcessed'
+pid: 1bfff05d-57fc-4c34-86f8-38009da5218d
+body: |2-
+  Marks processed both the node at point and its relationship to the
+  headline above it, then saves: everything the headline shows. (Emacs: C-c m b p.)

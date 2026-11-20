@@ -1,0 +1,7 @@
+title: Export and commit
+pid: 5ba3c06d-f87c-43ec-b593-16660098e258
+body: |2-
+  Run 'bash/export-docs.sh', read 'git diff', and run
+  'bash/check-docs-exported.sh'. Commit the notes and the exported files
+  together, with Git: 'git add skg-system docs coding-advice'. Skg's own
+  commit would commit the notes alone.

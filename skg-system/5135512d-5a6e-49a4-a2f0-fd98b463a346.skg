@@ -1,0 +1,12 @@
+title: change viewnode
+pid: 5135512d-5a6e-49a4-a2f0-fd98b463a346
+body: |2-
+  A headline the diff view adds to describe a change
+  ('ChangeViewnode'): a node's old text, with its body diff; its home
+  skgrepo move; its changeset markers; its other changes; and, under a
+  member, the relRepo move of the member's relationship. At each refresh an occurrence's
+  change viewnodes are recomputed in place from the straddle: kept
+  while the change exists, drawn when missing, entombstoned when the
+  change is gone, the tombstone keeping what the user drew under it
+  ('server/refresh/diff_view.rs'). The acquisition folders and the
+  changed folders are drawn the same way.

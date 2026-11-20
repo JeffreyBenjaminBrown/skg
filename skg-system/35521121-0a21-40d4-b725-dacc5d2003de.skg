@@ -1,0 +1,12 @@
+title: Files Jeff is editing during a run
+pid: 35521121-0a21-40d4-b725-dacc5d2003de
+body: |2-
+  Jeff reads and annotates the plan and the review while a run is
+  on, so the plan file, the review and the glossary are often dirty
+  with his edits when an agent starts. The brief names them, and the
+  agent commits only its own hunks of such a file: it writes a copy
+  of HEAD's version plus its own edits and puts that copy in the
+  index ('git update-index' with the blob, or 'git apply --cached'
+  with a patch against HEAD), leaving Jeff's hunks unstaged in the
+  working tree. This worked for every slice of plan 4. If a hunk
+  cannot be separated, the agent leaves that edit out and says so.

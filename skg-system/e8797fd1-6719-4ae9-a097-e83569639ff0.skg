@@ -1,0 +1,7 @@
+title: retired keys
+pid: e8797fd1-6719-4ae9-a097-e83569639ff0
+body: |2-
+  The *retired keys* are the '.skg' keys a server refuses to read since
+  November 2026: 'subscribesTo', 'overrides' and 'hidesFromSubs', and
+  the October 2026 names of the first two ('RETIRED_SKG_KEYS';
+  'docs/api-and-formats.org', "The .skg file format").

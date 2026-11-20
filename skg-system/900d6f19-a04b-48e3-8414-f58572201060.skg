@@ -1,0 +1,16 @@
+title: What Rust does (and what Emacs Lisp doesn't)
+pid: 900d6f19-a04b-48e3-8414-f58572201060
+body: |2-
+  Rust strings (=&str=, =String=) are UTF-8 byte sequences. When
+  you write =&s[0..5]=, those are BYTE indices. If byte 5 is in
+  the middle of a multi-byte character, Rust panics rather than
+  produce an invalid string.
+
+  Emacs Lisp is different: =substring= takes CHARACTER indices.
+  =(substring "hi⌂ok" 0 3)= returns ="hi⌂"=, not a panic. Emacs
+  handles the byte arithmetic internally. So this class of bug
+  cannot happen in Emacs Lisp.
+
+  (Emacs does have unibyte strings for raw byte manipulation, which
+  is what the LP receiver uses. But those are treated as opaque
+  byte buffers, not as text with characters.)

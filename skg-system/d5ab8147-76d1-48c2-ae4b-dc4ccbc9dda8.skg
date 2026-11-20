@@ -1,0 +1,9 @@
+title: text
+pid: d5ab8147-76d1-48c2-ae4b-dc4ccbc9dda8
+body: |2-
+  A changed title or body adds an old text under the node, a change
+  viewnode labelled "old title and body", "old title" or "old body"
+  (its headline the old title, its body the old body), with a "body
+  diff" change viewnode under it holding the line diff when the body
+  changed. The text change is one
+  leaf, marked on the old-text headline.

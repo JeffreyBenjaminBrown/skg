@@ -1,0 +1,6 @@
+title: prominent
+pid: 46544668-b6e7-44ed-a22a-ce4c721abeb0
+body: |2-
+  Search ranks *prominent* nodes higher: a root, a member of a cycle,
+  a node linked to, a node that had an ID before import, or a
+  multiply contained node. Most nodes are not prominent.

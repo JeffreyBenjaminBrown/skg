@@ -1,0 +1,5 @@
+title: '<localleader>rnp : :SkgDiffViewGotoNextProcessedChange'
+pid: 79415dd9-c238-4c99-8ea7-21a9993d4135
+body: |2-
+  The same, visiting only processed headlines with change facts. Past the last one it
+  says "No further processed change".

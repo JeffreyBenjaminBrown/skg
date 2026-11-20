@@ -1,0 +1,7 @@
+title: Testing Dependencies
+pid: 5e4fb62a-5af1-40ce-bc7d-3d0950c9d51e
+body: |2-
+  `bash/all-tests.sh --no-sound` manages the server instances needed by the
+  integration tests. Rust tests do not require an external database service.
+  Config files such as `data/skgconfig.toml` select distinct TCP ports, Skg repo
+  folders, and Tantivy folders for concurrently running Skg instances.

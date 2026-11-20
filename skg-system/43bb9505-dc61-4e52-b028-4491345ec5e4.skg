@@ -1,0 +1,7 @@
+title: 3. Tantivy
+pid: 43bb9505-dc61-4e52-b028-4491345ec5e4
+body: |2-
+  Tantivy is not given the =RepoMove= list at all. Skgrepo moves are
+  applied implicitly: the search-index update is "delete every doc by ID,
+  then re-add docs for every save," and the =SaveNode= carries the
+  new =repo= field, so the re-added document has the correct skgrepo.

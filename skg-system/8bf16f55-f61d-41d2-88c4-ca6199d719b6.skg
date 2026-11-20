@@ -1,0 +1,42 @@
+title: Cutting from a forker
+pid: 8bf16f55-f61d-41d2-88c4-ca6199d719b6
+body: |2-
+  A note that forks yours stands in your note's forks folder too, as a
+  /forker as such/, claiming nothing, showing what it adds to your
+  note: its content less what yours contains or hides, and less what
+  another note of yours contains; so does an indirect member (see "Every mirror, flat"). Cutting a child
+  from it (deleting the child's headline there, whether or not you
+  paste it elsewhere) makes your note fork it: a forker as such that a
+  cut is made from becomes a forkee too. Your note hides
+  the child unless it, or another note of yours, contains it after the
+  save, as a cut from a forkee does (see "What you keep elsewhere").
+  Before:
+
+  #+begin_example
+  ,* x                    (yours, editable)
+  ,** forksFolder
+  ,*** x                  (theirs, Kb: it forks your x)
+  ,**** y                 -- cut this, and paste it under your x
+  ,**** z
+  #+end_example
+
+  After the save, your x forks theirs, contains =y=, and hides
+  nothing; theirs is a mutual, claiming, among the forkees:
+
+  #+begin_example
+  ,* x                    (yours, editable)
+  ,** forksFolder
+  ,*** x                  (theirs, bKb)
+  ,**** ☮ It contains these, and you keep them elsewhere.
+  ,***** y                (folded)
+  ,**** z
+  ,** y
+  #+end_example
+
+  Cut without the paste, =y= is hidden in your x, and stands under
+  theirs, in its folder of what your x hides in it. The fork is
+  recorded in your note's file, so where your note is foreign (you are
+  reading another's note) the save is refused, as a cut from a forkee
+  there is. The view the save redraws gives the forker's headline its
+  claim, as every view the server draws does (see "Claims in a redrawn
+  view").

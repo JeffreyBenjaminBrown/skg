@@ -1,0 +1,4 @@
+title: '"Single use" isn''t always required.'
+pid: c5408a13-65bd-4b9a-95a2-0f05e38b9f53
+body: |2-
+  Even variables used multiple times within one logical block can be nested if all uses are contained.

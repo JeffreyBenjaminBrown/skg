@@ -1,0 +1,58 @@
+title: Hard validation constraints
+pid: 40660f33-92b3-404f-ae8e-bd2f4501c14d
+body: |2-
+  =validate_complete_graph= runs before the startup/rebuild swap-in.  Saves
+  preserve the same constraints incrementally: while holding the mutation gate,
+  they derive an exact persistent candidate from the current valid graph snapshot,
+  validate the identities and relationships whose truth can change, and check
+  the affected recorderward-relmap entries before any file mutation.  A candidate is
+  rejected when any of these conditions holds:
+
+  1. A primary ID identifies more than one composed node.
+  2. An extra ID belongs to more than one node.
+  3. An ID is both a primary ID and an extra ID.
+  4. A node's home skgrepo is absent from the current configuration.
+  5. An owned note forks itself, contains itself or hides itself.  A link to
+     itself is fine.
+  6. An owned note both forks and contains one note, contains a note that
+     forks it, or forks a note that contains it.  A dangling ID, naming no
+     note, breaks no such pair.
+  7. Any stored graph index differs from an independently recomputed
+     one.
+
+  The complete validator makes one exception to rule 6: a pair in which a
+  foreign note takes part (a foreign note forking an owned note that
+  contains it, or an owned note forking a foreign note that contains it)
+  is a warning there, not an error, since only a hand edit of the owned
+  note could otherwise mend what the foreign author did.  Startup and
+  rebuild report it among the startup warnings, naming both notes and
+  which is foreign ('foreign_note_taking_part' in
+  'server/dbs/in_rust_graph/fork_rules.rs'), and proceed.  A save
+  that leaves such a pair is still refused, so a save of the owned note
+  succeeds only once it ends the pair.
+
+  Any number of notes, owned or not, may fork one note, and forks may form
+  cycles: mirror substitution ([[id:e6bc021f-1cb8-4ab0-9a5f-53874e60e14b][mirrors.org]], "Mirror
+  substitution") ranks a note's mirrors and has no cycle case.
+
+  Relationship roles are enforced by distinct Rust fields.  A node has exactly
+  one =home_repo= in its composed representation.  Telescope validation also
+  checks privacy/provenance rules.  Telescope violations are deterministic
+  warnings rather than hard graph-construction errors; callers surface them for
+  repair while retaining readable data.
+
+  The incremental proof relies on induction: startup or rebuild establishes a
+  valid base (but for the warned pairs above, which a save touching their
+  owned note must end), and each serialized save proves that its delta preserves validity.
+  Which node carries each ID is evaluated as one simultaneous final-state overlay;
+  the checks of forks, contents and hides cover the touched notes, the notes
+  they contain or fork or that contain or fork them, and untouched notes whose
+  contents or forks name an ID that canonicalization re-keys.  Local graph-index checks compare
+  only keys that could change.  The complete validator remains an independent
+  startup/rebuild gate and test oracle.
+
+  The shared mutation gate serializes candidate construction, filesystem
+  mutation, graph swap-in, and Tantivy enqueue so two writers cannot validate
+  against the same stale graph snapshot.  Filesystem preflight and graph validation
+  produce tokens tied to that exact graph snapshot; skgsave-commit consumes those prepared
+  values rather than recomputing them after writes begin.

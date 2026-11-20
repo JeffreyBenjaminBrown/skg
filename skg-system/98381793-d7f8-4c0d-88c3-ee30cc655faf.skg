@@ -1,0 +1,12 @@
+title: '"index" is always qualified: search, git or graph index'
+pid: 98381793-d7f8-4c0d-88c3-ee30cc655faf
+body: |2-
+  The /search index/ is Tantivy's. The /git index/ is git's staging
+  area; next to HEAD and worktree it needs no qualifier ("HEAD vs
+  index"). A /graph index/ is a derived map inside the in-Rust graph:
+  the /recorderward relmaps/ ('contained_by', 'forkers_of', ...), plus
+  'extra_id_to_pid'. A recorderward relmap maps each member of one
+  relation to the recorders that list it. (Not "inverse": today every
+  relationship is recorded by its first member, but the data model may
+  someday let the second member record one; 'RecorderwardRelmap' in
+  'server/dbs/in_rust_graph.rs' says more.)

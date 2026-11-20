@@ -1,0 +1,44 @@
+title: Rerender all views
+pid: 193fdd65-fc55-444a-8b3a-076ddbed9697
+body: |2-
+    - Request: =((request . "rerender all views")
+      (approved-overPrivateText-pids "PID" ...))=.
+    - Response: Multiple length-prefixed messages, sent sequentially:
+      1. Lock message:
+         =Content-Length: N\r\n\r\n((response-type rerender-lock) (lock-views ("view ID1" "view ID2" ...)))=
+         Lists all view IDs that will be re-rendered. Emacs locks those buffers.
+      2. Zero or more per-view messages (one per view, streamed as each finishes):
+         =Content-Length: N\r\n\r\n((response-type rerender-view) (view-id "VIEW_ID") (content "..."))=
+         Emacs unlocks and updates each buffer as it arrives, and keeps
+         its text as the buffer's baseline. As with a collateral view
+         ("Save buffer"), an update keeps point and the folds of the
+         headlines the buffer already showed.
+      3. Done message:
+         =Content-Length: N\r\n\r\n((response-type rerender-done) (errors ("..." ...)) (warnings ("..." ...)))=
+         Emacs removes the rerender-view handler and unlocks any remaining buffers.
+         Every rerender stream ends with this message.
+    - Behavior: Re-renders every open view from server memory, each a
+      refresh of what it holds; a buffer of the diff view is refreshed
+      over the graph straddle, and one a "Repo files reloaded" message
+      named is also extended, as "Extend diff view" would extend it.
+      The server draws each view from what it last rendered or saved, so
+      a client excludes every view with unsaved edits, whose text the
+      rerender would replace.
+      Does not save or modify the graph. Refreshes all views without
+      requiring a save. The optional =(exclude-view-ids "VIEW_ID" ...)=
+      leaves the views it names as they are: the clients name their
+      dirty views after an import and on the explicit command, and,
+      after a "Repo files reloaded" message, every view but the clean
+      ones it names.
+    - All view text is prepared in memory before the release decision.
+      Under a restricted set, overPrivateText content without exact approval returns
+      LP =overPrivateText-telescope-confirmation= with
+      =(operation rerender-all-views)= and
+      the exact PIDs, followed by an empty rerender stream
+      (=rerender-lock= with no view IDs, then clean =rerender-done=). No view
+      text is sent and no open-view registry entry changes. A retry adds
+      =approved-overPrivateText-pids=; an unrestricted connection instead
+      adds the shared warning to =rerender-done=.
+    - =server/serve/rerender_stream.rs= prepares, authorizes and streams
+      the rerenders; every request answered by a rerender stream shares
+      it.

@@ -1,0 +1,34 @@
+title: Fractions
+pid: 9d77a364-9fcb-4afd-8555-b4bf842d371d
+body: |2-
+  Two sides can show a subset with a tier of its own, as a fraction.
+
+  On the linksTo in-side, the numerator counts substantive mentioners. A
+  mentioner is substantive if it has nonempty body text, visible direct
+  content, or links to more than one distinct visible target. In =2/5L3=,
+  five visible nodes link here, two are substantive, and this node links
+  to three distinct visible targets. Whitespace-only bodies, repeated
+  links and alternate IDs for the same target do not count. =5L= has no
+  resolved outgoing target. A self-link counts when visible.
+
+  On a member as such of a forks folder (a forkee, a forker-only or an
+  indirect member shown in the note's forks folder), the contains
+  out-side counts the contents the note has neither directly included
+  nor hidden, and the user keeps in no other owned note: what the
+  member shows ('docs/glossary.org', "what a member shows"). In the
+  diff view, which draws no folder of what the user keeps elsewhere, it
+  counts those too.
+  =C2/8= means eight visible direct contents, two of them unintegrated.
+  =C8= means none is unintegrated; =C8/= means all eight are. The count
+  belongs to that occurrence: another forker can give the same
+  forkee a different numerator.
+
+  The numerator gets its own carrier, chosen the same way from its
+  glyphs; the side's carrier is chosen from the denominator's. The slash
+  shows the side's tier. =1/5aL= shows the 1 high, the 5 medium and the
+  'a' low. =a/5L= shows the 'a' high, because it carries the subset's
+  tier, and the 5 medium. In =5/L= the denominator shows nothing, so only
+  the slash shows the side's tier. An ancestor appears once: before the
+  slash if it belongs to the numerator, otherwise after the denominator's
+  numeral. =a/bL= says both ancestors link here and only 'a' is
+  substantive.

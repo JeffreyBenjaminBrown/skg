@@ -1,0 +1,39 @@
+title: The quiet test wrapper
+pid: d7d2d905-3279-4515-aa7e-8ebde26466ec
+body: |2-
+  =bash/quiet-test.sh= runs an arbitrary command, captures its complete output,
+  and prints only a one-line result on success.  On failure it prints a bounded
+  diagnostic and points to the full log.  It does not retry, clean state, widen
+  the command, or use =eval=.
+
+  Basic use:
+
+  #+begin_src sh
+  bash/quiet-test.sh --label cargo-check -- cargo check --all-targets
+  bash/quiet-test.sh --label save-tests -- \
+    cargo nextest run --test grouped_saves
+  #+end_src
+
+  The =--= is required.  Everything after it is passed as an argument array, so
+  quoted arguments remain quoted.  The command runs in the caller's current
+  directory, while logs always go beneath:
+
+  #+begin_example
+  target/test-logs/graph-only/
+  #+end_example
+
+  That directory name is historical; the wrapper is otherwise general-purpose.
+  Each run writes a =.log= containing all stdout/stderr and a sibling =.meta=
+  containing:
+
+  - command and working directory;
+  - start/end time, duration, and exit status;
+  - HEAD and a worktree fingerprint;
+  - fingerprint scopes; and
+  - included and excluded untracked files.
+
+  On failure, read the bounded diagnostic first.  Open the full log only as far
+  as needed to diagnose the first actionable failure.  Do not blindly rerun a
+  failed expensive suite.
+contains:
+- 61396efa-c48f-490f-a206-cc2cd9dafc05

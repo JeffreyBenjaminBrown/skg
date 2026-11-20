@@ -1,0 +1,32 @@
+title: Change facts on the wire
+pid: 63da2ba0-d6e6-4551-a429-d9ec9fa5c7b4
+body: |2-
+  A headline's change facts form one form, '(diff (node added|removed)
+  (rel added|removed) (properties changed) (leaves N OBJECT...) (processed
+  OBJECT...))', and in the skgrepo-changes buffer its home skgrepo move
+  after them, each part present only when it has something to say, the
+  first three only when true ('diff_form' in 'server/org_to_text.rs';
+  the grammar is in 'docs/api-and-formats.org', "Metadata of the diff
+  view"). Like every part of a headline it stands at the top level of
+  the metadata, last; the parser skips it whole. A folder carries none:
+  each client computes a changed folder's label and whether it is processed from its
+  members ("changed folder" in 'docs/glossary.org'). A processed
+  request is no change fact; it rides in the headline's '(editRequest
+  ...)' (below).
+
+  The part '(processed OBJECT...)' is a derived fact the server sets in the
+  tail of the refresh ('set_processed_facts_in_viewforest'): the objects
+  of '(leaves ...)' whose leaves are all marked; a bare '(processed)' on
+  a headline that names one leaf, which lists no object. Nothing reads it at
+  save.
+
+  Before it, a headline that names leaves
+  carries the part '(leaves N OBJECT...)': N is the number of distinct
+  leaves a request naming every listed object would touch, and the
+  OBJECTs are those of 'node' and 'rel' that name some leaf there, 'rel'
+  alone on a changeset marker; none on a headline that names exactly
+  one leaf, which a bare request marks. The same tail clears '(properties
+  changed)' where 'node' names no leaf.
+  The server's 'leaves_named_at' is the single rule; the change fact
+  is display-only, and the clients read it instead of keeping tables of
+  headline kinds.

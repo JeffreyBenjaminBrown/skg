@@ -1,0 +1,10 @@
+title: =(rel added)=, =(rel removed)= -- the existence of the relationship to the viewparent
+pid: 8d2495b2-bc52-43c4-bee9-fe3860bafcca
+body: |2-
+  The relationship that HEAD lacks (=added=) or the worktree lacks
+  (=removed=). Under a vognode it is the viewparent's content; in a partner
+  folder it is the relationship, of the folder's kind, between the
+  member and the folder's viewparent (the three compound partner folders
+  carry none). On an alias, id or flag member, the single diff object
+  is written =(rel added)= or =(rel removed)=: the member's existence
+  in its list. A removed alias or ID (below) carries =(rel removed)=.

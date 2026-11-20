@@ -1,0 +1,29 @@
+title: What happened with the 'guitar' graphnode
+pid: 26d3433a-0366-43e7-9840-b8e43ea068ee
+body: |2-
+  The server renders a content view as an org-mode string, wraps it
+  in a sexp, and sends it over TCP. Before sending, there's a debug
+  log that previews the first 200 bytes:
+
+  #+begin_src rust
+    let preview_len : usize = payload . len () . min (200);
+    let preview : &str = &response [..preview_len];
+    tracing::debug!("Sending response ({} bytes): {}", payload.len(), preview);
+  #+end_src
+
+  For the guitar node, the rendered org text contained
+  =homeRepoHerald ⌂:public=. The =⌂= character (3 bytes) happened
+  to sit at byte positions 198-200. Slicing at byte 200 landed
+  inside the character:
+
+  : bytes: ... 0xE2 0x8C | 0x82 ...
+  :                       ^
+  :                 byte 200 -- not a char boundary -- PANIC
+
+  The thread panicked, which closed the TCP connection. The
+  response was never sent. Emacs received zero bytes, saw the
+  connection close, and silently did nothing.
+
+  For other nodes (like "microtonal guitar"), the =⌂= fell at a
+  different offset, so byte 200 was a clean boundary and it worked
+  fine.

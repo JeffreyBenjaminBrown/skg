@@ -1,0 +1,16 @@
+title: '<localleader>vr : :SkgReadableIdsToggle'
+pid: b62f9551-7678-43e3-9e8a-700bae7c273e
+body: |2-
+  This changes how node IDs are displayed.
+  The ID itself is a kind of special random gibberish called UUID v4.
+  When ReadableIdsToggle is on,
+  only the first 8 characters of the ID are shown (the rest is
+  concealed to an ellipsis, though the underlying text -- and
+  copy-paste -- still has the full ID),
+  and they are followed by the title of the node with that ID,
+  if Skg can figure it out. It works in .skg file buffers and in
+  git-status / git-diff buffers alike, but the key is bound only in
+  content views: elsewhere, run ':SkgReadableIdsToggle'. A .skg file
+  buffer starts with it on.
+  (It doesn't yet know how to read the git history
+  to find titles for deleted files.)

@@ -1,0 +1,20 @@
+title: Claims in a redrawn view
+pid: 28d3942e-cec3-4a20-b9e0-32b53eefe26c
+body: |2-
+  In a forks folder a member claims exactly when your note forks it;
+  taking its claim away (a detachment) and saving ends the fork. So
+  every view the server draws gives each member the claim the graph
+  gives it: after any save, in the view saved, in each other view the
+  save redraws, and in any view another client saves, a member your
+  note now forks claims, and a forker-only member claims nothing
+  ('claim_forks_folder_members_as_the_graph_does' in
+  'server/refresh/visit.rs'). A view the server redraws holds no
+  gesture of yours still to be saved: it is one the server drew, or
+  one whose gestures the save just carried out. Without this, a view
+  drawn before another view made your note fork a forker (by a cut
+  from it, say) would show that forker claiming nothing, a detachment
+  nobody wrote, which the next save of that view would carry out.
+
+  What the server cannot tell from a detachment is text you send back
+  yourself: undoing past a save and saving the old text again, where
+  the forker claimed nothing, ends the fork, as any detachment does.

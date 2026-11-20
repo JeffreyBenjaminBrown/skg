@@ -1,0 +1,16 @@
+title: unknown graphnode, dangling ID
+pid: 51edf79b-10ba-4de3-8b35-5bebad99475a
+body: |2-
+  An *unknown graphnode* (a term of plan 10) is the graphnode an ID
+  names that the graph does not have: the ID is one that some node's
+  contains, forks or hides list names but
+  that no graphnode answers to, as primary or extra ID; such an ID is
+  *dangling*. A view shows it as an unknown viewnode (see "ghost,
+  unknown viewnode"), which claims membership, since removing it would
+  edit the list. A *dangling partner* is a member of a list whose ID is
+  dangling; in the diff view, one the worktree lost is an unknown
+  viewnode carrying '(rel removed)'. The command
+  'skg-investigate-unknown-node' (=C-c t r=; =<localleader>tr= in
+  Neovim) says what git history knows of an unknown graphnode, and
+  'skg-delete-references-to-absent-node' (=C-c d a=; =<localleader>da=)
+  removes the references to it.

@@ -1,0 +1,46 @@
+title: 'Editing the clone: deletions become hides'
+pid: 08da29f9-f36a-48de-8689-2468e86f32ad
+body: |2-
+  Suppose the clone =C= and the original =N= both contain a child =X=,
+  and you delete =X= from =C= (or move it out of your notes). Without more, =X=
+  would immediately resurface under =C= as unintegrated forked
+  content — you removed it, =N= still contains it. So the save records a
+  hide: =C= now =hides= =X=, and the forks folder
+  stays quiet about it. Putting =X= back among =C='s contents removes
+  the hide again. (This is the same rule the forking edit itself
+  follows: children of =N= you deleted /while/ forking are born hidden.
+  And it holds for any owned note that forks something, not just
+  clones.) Moving =X= into another note of yours instead records no
+  hide: you keep it there, so =N= does not show it (see "What you keep
+  elsewhere"), and the save says "Hides nothing: 'X' left 'C', but 'D'
+  keeps it." Hides are symmetric: the same holds of a note that forks
+  yours. If =F= forks =C= and contains =X=, =C='s forks folder shows
+  =F= with what it adds to =C='s content, so removing =X= from =C=
+  hides =X= there too ("Hides 'X' from 'C', as content of 'F'."), and
+  =X= then stands under =F=, in its folder of what =C= hides in it,
+  not in the folder of what =C= hides outside its fork partners. A
+  forker =C= hides is drawn nowhere, so it explains no hide; the floor
+  of a hide's privacy still counts its records, since a reader of the
+  hide sees them all the same ('docs/glossary.org', "hides" under
+  "relation, relationship, member, membership, partner").
+
+  A removed child stands for the member of =N='s contents that is its
+  mirror (=docs/mirrors.org=, "Mirrors"). If =N= contains =X= and
+  someone forked =X= into =X'= (=X'= forks =X=), =N='s contents
+  still name =X=, as every container's do; =X'= is shown in its place
+  only where the perspective ranks it first. So removing =X'= from
+  =C= hides =X=, just as removing =X= would, unless =C=, or another
+  note of yours, contains =X= after the save. That is how you dismiss the author's reply under a note of yours:
+  the reply is the author's fork of your note, so place it in =C=,
+  save, remove it and save again. Containing =X'= does not integrate
+  =X=, though: while =C= holds =X'=, =X= still shows as unintegrated, and
+  placing =X'= drops no hide of =X=.
+
+  Each save says what it hid and stopped hiding, since no edit shows a
+  hide: "Hides 'X' from 'C', as content of 'N'." And a child that left
+  a forker without hiding anything earns "Hides nothing:", with the
+  rule that held, most often that the child is no content of =N= and
+  a mirror of none of it. Emacs shows the lines in the echo area after the
+  save, Neovim notifies them, and skg-for-ai prints them in the report
+  before the save as well as after it ('docs/api-and-formats.org', "Save
+  buffer").

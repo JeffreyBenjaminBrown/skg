@@ -1,0 +1,9 @@
+title: old text
+pid: 40e26add-b8c6-41a0-bcbc-09a00ed36742
+body: |2-
+  The change viewnode ('(oldText ASPECT)') under a node whose title or
+  body changed since HEAD: labelled "old title and body", "old title" or
+  "old body", its headline is the old title and its body the old body.
+  When the body changed, a "body diff" change viewnode under it holds
+  the line diff. The text change is one change-forest leaf, marked on the old
+  text.

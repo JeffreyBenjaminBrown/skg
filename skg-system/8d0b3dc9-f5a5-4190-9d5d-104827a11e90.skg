@@ -1,0 +1,10 @@
+title: A save makes nothing editable and appends no root
+pid: 8d0b3dc9-f5a5-4190-9d5d-104827a11e90
+body: |2-
+  After a save, a buffer's sets are recomputed, and the refresh extends
+  by the recomputed U wherever it draws something new. Nothing the buffer
+  holds editable is write-protected again by the server. But the server
+  makes no occurrence editable and appends no root on its own: a change
+  recorded by a node the buffer holds no editable occurrence of is not
+  editable in this view, and the processed summary counts it, until the
+  buffer is extended (below).

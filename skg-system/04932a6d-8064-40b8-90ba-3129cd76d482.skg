@@ -1,0 +1,13 @@
+title: The ancestry table
+pid: 04932a6d-8064-40b8-90ba-3129cd76d482
+body: |2-
+  =required_ancestry= (=server/refresh/ancestry.rs=) gives each kind of
+  descriptor the ancestors it may stand under, nearest first: a folder
+  under an occurrence (the acquired-by folder under a ghost; the
+  hidden-outside folder in a forks folder; the integrated-elsewhere,
+  hidden-in and hidden-by folders under a member of a forks folder); a
+  property member in its
+  property folder; a change viewnode under an occurrence or a ghost,
+  and a body diff under an old text. A descriptor whose ancestors are
+  not those is unsayable. A vognode has no row: an occurrence is never
+  unsayable.

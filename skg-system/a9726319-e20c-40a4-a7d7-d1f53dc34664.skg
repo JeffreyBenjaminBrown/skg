@@ -1,0 +1,6 @@
+title: Conserve tokens
+pid: a9726319-e20c-40a4-a7d7-d1f53dc34664
+body: |2-
+  Before a tool call, identify the unresolved question it will settle. Work one
+  narrow, tested slice at a time; use focused reads and tests; do not duplicate
+  an investigation that another agent owns.

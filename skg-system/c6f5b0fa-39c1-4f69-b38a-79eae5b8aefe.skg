@@ -1,0 +1,4 @@
+title: skg-connection-end
+pid: c6f5b0fa-39c1-4f69-b38a-79eae5b8aefe
+body: |2-
+  Closes the TCP connection to the Rust server.

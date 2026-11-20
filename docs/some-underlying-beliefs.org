@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 47d9f002-f658-4475-b59c-c8a7d3d3d84e
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * why Skg
 Skg is the result of a few beliefs about knowledge:
 

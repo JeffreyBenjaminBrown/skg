@@ -1,0 +1,24 @@
+title: ghost, unknown viewnode
+pid: d56b3762-4c31-4ffc-813c-af32dff10fc0
+body: |2-
+  The two headlines that stand for a gnid the graph has no graphnode
+  for (in the implementation, two vognodes: see "gnid-only vognode").
+  A *ghost*, drawn only in the diff view, stands for a node HEAD has
+  and the worktree lacks, write-protected, with HEAD's title and body
+  (=ghost (gnid ID) (skgRepos (nodeRepo REPO))=); it accepts
+  =restoreNode= and no view request, and is shown until it is
+  restored or its deletion is committed ('docs/diff-view.org', "deleted
+  and new nodes"). A ghost claims
+  membership only where its viewparent's list in the worktree still
+  names its gnid, a dangling reference to a node HEAD has, and the save
+  then keeps that gnid in the list, as it keeps an unknown viewnode's;
+  anywhere else it claims nothing. An *unknown viewnode* (a term of
+  plan 10; the wire's atom =unknown=, herald "Reference to unknown
+  node.") is the headline standing for an unknown graphnode, a gnid its
+  viewparent's list names and no graphnode answers to (see "unknown
+  graphnode, dangling ID"). In a content view an occurrence whose
+  graphnode a save deleted becomes an unknown viewnode where its
+  viewparent's list still names the gnid, and otherwise vanishes (see
+  "vanish"); in the diff view it becomes its ghost. In a content view
+  a ghost is re-kinded by the ID rule: an unknown viewnode where the
+  list names it, else a tombstone.

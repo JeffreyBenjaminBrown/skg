@@ -1,0 +1,17 @@
+title: Adding new content under a foreign node
+pid: d92ef8d3-fdb4-4753-9608-6b377cada2ad
+body: |2-
+  Appending a *new* headline under a foreign node is also just an
+  edit: it changes the foreign node's child list, so it forks it. The
+  new node itself needs an owned skgrepo too:
+
+  - A *bare* new headline (no metadata) rides the fork: it lands in
+    the same skgrepo as the clone — whatever the confirmation flow
+    settles on — just as a new node under an owned parent lands in that
+    parent's skgrepo.
+  - A new headline whose metadata *names an owned skgrepo* (e.g.
+    =(skg node (skgRepos (nodeRepo my-notes)))=) both places the new node there and
+    /specifies/ the clone's skgrepo (when all such new children agree),
+    so the confirmation flow asks nothing beyond the approve.
+  - A new headline that explicitly names a *foreign* skgrepo is an
+    error, as ever: foreign skgrepos cannot be written.

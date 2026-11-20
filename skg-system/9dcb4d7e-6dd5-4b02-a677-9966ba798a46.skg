@@ -1,0 +1,23 @@
+title: What each member shows
+pid: 9dcb4d7e-6dd5-4b02-a677-9966ba798a46
+body: |2-
+  A member as such -- a forkee as such, or a forker-only or an
+  indirect member (a forker as such) -- shows its content less what N
+  contains or hides and less what a note the user owns, but the
+  member, contains (=owned_notes_containing=), and, drawn editable, its
+  own folders but a forks folder, the folders of what the user keeps
+  elsewhere, of what N hides in it and, under a forker of N, of what it
+  hides of N's content among them.
+  The birth facts follow the roles in which the member stands
+  (=forks_folder_member_roles= in =server/refresh/viewnodestats.rs=):
+  =(forks in 2)= where it claims (where the folder reads no claims,
+  where the graph says N forks it), =(forks out 2)= where the graph's
+  warrant and a visible record say it forks N; a mutual carries both,
+  a detached forkee and an indirect member neither (so an indirect
+  member's heralds show no 'b' flag toward N). Its relRepo fact is N's
+  record of the fork where it claims, else its own record of forking
+  N; an indirect member has none. A relRepo request
+  on a member claiming nothing is refused at validation
+  (=is_forks_folder_member_claiming_nothing= in
+  =server/from_text/buffer_to_viewnodes/validate_tree.rs=): its record
+  is in its own file, or it has none with N.

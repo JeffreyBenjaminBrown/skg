@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 67303941-2ccd-4309-9e5f-d00e8809f449
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * if you are exceedingly clever
 An algebra for graph operations would be beautiful,
 and might make skg safer.

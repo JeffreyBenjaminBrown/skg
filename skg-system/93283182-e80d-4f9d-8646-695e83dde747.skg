@@ -1,0 +1,11 @@
+title: the folder's viewparent
+pid: 93283182-e80d-4f9d-8646-695e83dde747
+body: |2-
+  A folder's *viewparent* is the headline the folder stands under: the
+  node whose relationships the folder lists. A gesture on a member of
+  the folder that edits the member's relationship (the relRepo
+  gesture, 'skg-set-relRepo', =C-c s r=; =<localleader>sr= in Neovim)
+  edits the relationship between the member and the folder's
+  viewparent, and refuses where the folder's viewparent is
+  write-protected. Say "the folder's viewparent", never "the folder's
+  anchor" ("anchor" is reserved; see "placement, more public anchor").

@@ -1,0 +1,22 @@
+title: '<localleader>lf : :SkgShowFolderOfForks'
+pid: 14a65c2f-401e-4885-9d05-33fa7fd997c8
+body: |2-
+  The forksFolder, editable and shown even when empty: first the nodes
+  this node forks, in its list's order, each claiming membership (=bK=;
+  a mutual, which also forks this node, =bKb=); then the nodes that fork
+  this one and that it neither forks nor hides, each claiming nothing
+  (=Kb=), by the order of their home skgrepos in your config; then
+  every other mirror of this node that it does not hide (a fork of
+  what it forks, say), each claiming nothing, nearest first, with no
+  'b' flag; last, the folder of what this node hides outside its fork
+  partners, when it hides any: what no member of the forks folder,
+  forkee, forker or other mirror, contains (a hide a member contains stands under
+  that member instead, in its folder of what this node hides in it).
+  The folder is flat: no member shows a forks folder of its own unless
+  asked (this command, on the member). Typing a member in, or attaching a
+  forker (<localleader>sa), makes this node fork it. Deleting a member
+  it forks stops the fork; detaching a mutual stops only the fork;
+  deleting a mutual, a forker or another mirror also hides it, so that it moves to the
+  hidden-outside folder, whence deleting it unhides it. Deleting a
+  "restricted" member (one the skgrepo restriction keeps out), in
+  either folder, changes nothing, and it is drawn again.

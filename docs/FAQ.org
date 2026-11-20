@@ -1,19 +1,16 @@
+# This file was generated from the skg node with this ID:
+# 7d09cb7f-076d-4319-9416-d549ccd06d07
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * FAQ
-
 ** How it works
-
-- [[file:./plaintext-and-interoperability.org][Does it use plaintext? Is it interoperable with Emacs org-mode?]]
+- [[./plaintext-and-interoperability.org][Does it use plaintext? Is it interoperable with Emacs org-mode?]]
   Yes and yes.
-
 ** How to do things
 There are keyboard shortcuts for all commands mentioned here;
-see [[file:./COMMANDS.org][COMMANDS]].
-
-*** How to [[file:./merging.org][merge two nodes]]
-
-*** How to [[file:./moving-nodes-across-repos.org][move a node]] to a different skgrepo
-
+see [[./COMMANDS.org][COMMANDS]].
+*** How to [[./merging.org][merge two nodes]]
+*** How to [[./moving-nodes-across-repos.org][move a node]] to a different skgrepo
 ** Context
-
-*** [[file:./networking-and-scale.org][How will it network and scale?]]
+*** [[./networking-and-scale.org][How will it network and scale?]]
   Even with no internet you could collaborate with ten thousand people. With internet, no limit.

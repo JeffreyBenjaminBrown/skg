@@ -1,0 +1,12 @@
+title: What cannot be expressed
+pid: d5cc7526-753d-4c39-8009-d4d1a24530e7
+body: |2-
+  Two things are documented inexpressibles, by design:
+
+  - *Private links.* A link lives in the body, and the body
+    lives in the home section. A link in a public body is public;
+    there is no per-link relRepo. Keep the sentence in a
+    private child instead.
+  - *Moving a relationship more public than its default.* As above:
+    a relationship may move to a more-private skgrepo, never to one
+    more public than its default.

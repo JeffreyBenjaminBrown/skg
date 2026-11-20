@@ -1,0 +1,11 @@
+title: architecture
+pid: de5dcb74-4e1e-49cb-ac34-ead7542aaee6
+body: |2-
+  See also the [[id:02708898-2d66-49cf-ba60-ecc1eb0bbe81][API]], the
+  [[id:82e3cf6d-2e55-41bb-9fcd-2efd2309db7e][technical data model]], and the
+  [[id:d5c0a61c-878d-46cf-8ad7-5d56827d44a1][glossary]].
+
+  Note that the above documents, this document, and any other documentation might be obsolete. The definitive source of truth is the code, not the docs.
+contains:
+- 7ca4f910-6a2a-4fe8-99ed-65fd16d532f2
+- cd629397-a5af-4ac2-b09d-79a7fce0a997

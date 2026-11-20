@@ -1,0 +1,5 @@
+title: Every let and let-else statement should have a type signature.
+pid: 1718362b-d9e5-4e18-b7bf-904493b19657
+body: |2-
+     The fancier ones -- if let, let while --
+     make that hard to do, so don't worry about those.

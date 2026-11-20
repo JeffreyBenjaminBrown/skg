@@ -1,0 +1,8 @@
+title: Keep edits and review surfaces small
+pid: 9bfb2817-7878-428b-93af-8f242f7bbf1c
+body: |2-
+  At each checkpoint, inspect the diff for the files in that slice.  Do not mix
+  formatting cleanup, unrelated test repair, design notes, and behavioral
+  changes in one review surface unless they are necessary to make the behavior
+  testable.  Commit only when Jeff has requested it, following the repository's
+  commit guidance.

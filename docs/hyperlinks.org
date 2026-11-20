@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 28b3ff10-72e0-44cc-aa45-616702cbf24c
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * Links can point to any part of a document.
 Links point to nodes (or, equivalently, to branches).
 

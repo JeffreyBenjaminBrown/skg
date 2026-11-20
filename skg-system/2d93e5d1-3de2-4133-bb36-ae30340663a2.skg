@@ -1,0 +1,5 @@
+title: Cost
+pid: 2d93e5d1-3de2-4133-bb36-ae30340663a2
+body: |2-
+  Hours of the human's time per round, estimated from the timestamps
+  of reviews and commits, so that the next effort can be budgeted.

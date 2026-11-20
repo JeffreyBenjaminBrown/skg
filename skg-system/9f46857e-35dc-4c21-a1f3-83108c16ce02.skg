@@ -1,0 +1,106 @@
+title: ':w : :SkgSave'
+pid: 9f46857e-35dc-4c21-a1f3-83108c16ce02
+body: |2-
+  Each time you save, your view is rebuilt.
+  This is because you can put 'requests' into your view,
+  in which you request more data,
+  such as a node's ancestors, or the nodes that link to it.
+  Since views can overlap,
+  saving one open view can change another
+  (see "what a save does to other views" below).
+  You may edit several views at once, but Neovim asks when an edit
+  first dirties a view while another view already has unsaved edits;
+  choosing Cancel restores the view's last clean text. On save, Skg checks the other dirty
+  views' last clean text and current text against every graph identity the
+  prepared save can affect, except through a link: a node that only links
+  to a saved node, or that a saved node only links to, does not count, since
+  a link holds no copy of its target. A conflict is a hard refusal before any write;
+  the error names the views and IDs. Missing or malformed baseline data is
+  also refused conservatively. There is no "save anyway" choice.
+
+  Each view also keeps the text the server last drew for it, its
+  baseline, and sends it with every save. A save is refused, before any
+  write, if a node you edited or deleted in the view has changed since
+  the server drew the view: by a save from another client or from
+  'tools/skg-for-ai', which this client's views do not follow, or by
+  another writer of the '.skg' files (a second server over the same
+  data, a 'git pull', an editor), which the server reloads as the files
+  change. The server compares the view's copy of each node with the
+  graph, so only real changes count: a node the view shows as the graph
+  has it is not written, however old the view; and a restart, a rebuild
+  or a whitespace strip makes no view stale by itself. A node that
+  changed but that you did not edit, which the view still shows as the
+  server drew it, refuses nothing: the save leaves it as the graph has
+  it, writes the rest, and warns "Left as the graph has it: TITLE (ID),
+  which changed after this buffer was rendered and which this buffer did
+  not edit." (or "which was deleted after ..." for a node the graph no
+  longer has); the redrawn view shows the graph's version. A node the
+  view writes without having been drawn in it (pasted in by ID, or typed
+  into a new empty view) is not checked.
+  The error names each such node, the view's headlines for it, and what
+  changed in it since the view was drawn: the title (old and new), the
+  body (with its changed lines, then against now), the content (the IDs
+  gained and lost), the home skgrepo (old and new), or by name its
+  aliases, extra IDs, flags, forks or hides; or that
+  the node was deleted. Your edits stay in the view: archive them if
+  needed (:SkgShowUnsavedChanges), open a fresh view, and reapply them.
+
+  Only a changed node you edited or deleted refuses a save, and the
+  refusal is whole: nothing the buffer asks is written, not even its
+  edits of nodes nobody else changed. Recovering is a reconciliation
+  by hand of two diffs from one common base, the text the server last drew:
+  the recovery document holds your edits as a diff against that text,
+  and the error holds the graph's change against the same text. To
+  recover a view, keeping all of its roots:
+  - Copy the buffer's text aside: ':SkgShowUnsavedChanges' writes it,
+    with a diff against the text the server last drew, to a file.
+  - Discard the buffer's edits and redraw it: mark it unmodified
+    (':set nomodified'), then ':SkgRerenderAllViews', which redraws
+    every open view without unsaved edits from the graph as it now is,
+    with all of its roots. It never redraws a buffer that still has
+    unsaved edits: it leaves that buffer as it is and names it in a
+    notification, so marking the buffer unmodified is what lets it go.
+  - Reapply your diff by hand over the new text, where it still
+    applies; where the graph changed the same lines (the error shows
+    how), decide what the text should say.
+  (Emacs: the same, with M-~ and M-x skg-request-rerender-all-views.)
+
+  When the server reloads files changed on disk, it says so in a
+  notification, naming each skgrepo and how many of its files it
+  reloaded ("skg: reloaded 2 files from repo first"), and rerenders
+  every open view showing a changed node that holds no unsaved edits.
+  A buffer of the diff view so rerendered is also extended to the
+  changes it did not show, as <localleader>ru would extend it.
+  When something could not be reloaded (a file it could not read,
+  say), the whole notice goes instead to the server-warnings buffer
+  (=skg://messages/server-warnings=), under "Repo changes", which is
+  shown. A view with unsaved edits keeps them, and its save
+  is refused if you edited a changed node in it. No rebuild is needed after
+  a 'git pull'. A changed config still needs one (':SkgRebuildSessionLifetimeStores').
+
+  ':w' is the BufWriteCmd on every skg view buffer, so plain saving
+  works as expected; ':SkgSave' does the same thing as an explicit
+  Ex command.
+
+  If the current files for anything being saved select a title or body
+  from below that node's home, Skg stops before every write and offers
+  *Hoist* or *Abort*. Hoist moves the selected text to home, removes
+  lower title/body copies, and preserves lower relationships and aliases;
+  the exact approved PIDs are reread and rechecked as one batch before the
+  save proceeds. Abort leaves every file byte-for-byte unchanged. Scripts
+  and maintenance writers have no prompt and refuse this repair.
+
+  That disk-publication choice is separate from displaying the result. If
+  a successful save under a skgrepo restriction would rerender text from
+  an overPrivateText telescope, Skg asks for a second, request-scoped approval. Approve
+  and Skg asks the server for the rerender it withheld, of the saved view
+  and the other views the save changed; the save is not sent again. Decline
+  leaves the save skgsave-committed and the buffers as they were: the saved
+  buffer still holds what was saved, unrendered. Do not save it again:
+  the save would apply a second time. Its edits of existing nodes would
+  write nothing, but a new node it put under a container would make that
+  container stale and edited, refusing the save, and a new root of the view would be
+  created twice. Reopen the view to go on.
+contains:
+- 714d4d50-e76a-467a-b6fb-b289c87c071f
+- cd8b7917-9830-4358-868d-be9cb5b19048

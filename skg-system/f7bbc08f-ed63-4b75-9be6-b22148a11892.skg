@@ -1,0 +1,28 @@
+title: Making the imported data available in Skg
+pid: f7bbc08f-ed63-4b75-9be6-b22148a11892
+body: |2-
+  The command writes one 'ID.skg' file per resulting node. It does not edit
+  configuration, start the server, or refresh a running server's graph and
+  search index. 'REPO_NAME' labels the skgrepo during conversion; the permanent
+  skgrepo association comes from the configured directory, not a skgrepo field
+  inside each file.
+
+  After reviewing the output, place it in the intended owned skgrepo directory
+  and configure that skgrepo with the intended name and privacy order. See
+  [[id:02708898-2d66-49cf-ba60-ecc1eb0bbe81][the configuration reference]]. Check for ID collisions with existing skgrepos
+  before loading: the importer itself does not check them.
+
+  For a first setup, configure the skgrepo before starting Skg. When replacing
+  existing data, save and close the open views and stop the server before
+  changing the files in its skgrepos, then restart it. If files in an already configured
+  skgrepo change while the server runs, the server reloads them as they
+  change, and rerenders the clean views that show them.
+  'M-x skg-rebuild-session-lifetime-stores' reloads an edited config, a new
+  skgrepo included.
+
+  The Cargo command prints a reminder to commit the imported files so Git
+  diff views have a baseline; it does not run Git. Reimporting replaces the
+  destination and gives ID-less headlines new IDs, so it is not an incremental
+  update workflow. Keep your originals and a backup of Skg edits you want to
+  retain. [[id:b778e2a3-8aa2-43e7-a160-1bf648569b39][Exporting back to Org]] does not restore the original files or all graph
+  semantics.

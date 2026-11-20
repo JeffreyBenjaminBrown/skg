@@ -1,0 +1,38 @@
+title: foldering, the containerward chain, chain node
+pid: 669a75ce-2c75-4a31-b5e9-7406506653af
+body: |2-
+  To *folder* a role tree is to draw every partner as a member of a
+  partner folder of its role, never directly under the node. Every
+  role tree but the contentward one is foldered, and is
+  write-protected throughout. A folder request ('(folder containers)'
+  and its siblings, the =C-c l= commands) draws one; a fresh content
+  view draws a containers folder on each root; the search enrichment
+  (what a text search draws under each hit, in the one message that
+  answers it) draws a containers folder under each hit, its
+  forks folder when it has fork partners, and its
+  alias folder when an alias of its node matched.
+
+  The *containerward chain* is the one tree that goes on below a
+  folder. Under each member of a partner folder, of any kind but the
+  diff view's two acquisition folders, hang that member's containers,
+  as write-protected occurrences claiming nothing; under each of
+  those, its containers;
+  and so on to the roots, or to the config's 'max_roleTree_depth'. A
+  container met again on the way is drawn once more, as a leaf. The
+  nodes of a chain are *chain nodes*. A member of the forks folder is
+  the exception, outside the diff view: its chain is itself foldered.
+  Under it the refresh draws a containers folder, drawn folded (only
+  its headline shows), which leaves out the member's view-ancestors,
+  and each member of that folder carries its chain; a repeat (see
+  "editability rule") gets none, and shows nothing. So a fork
+  partner's containers never look like its content. A buffer drawn
+  before this rule holds chain nodes directly under such a member,
+  which the refresh reads as its content (unwarranted under a
+  write-protected member); reopening the view redraws it. Nothing hangs under a ghost
+  member, nor under a property member, and the member's
+  partners in the folder's own role are not drawn below it: a folder
+  request on the member draws them. No request extends a chain; a
+  folder request on a chain node draws a folder under it. A chain node
+  carries no change facts and takes no processed marker; a
+  folder's member does both. Nothing in a chain node's metadata says
+  that it is one: it is known by where it stands.

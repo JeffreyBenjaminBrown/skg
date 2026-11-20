@@ -1,0 +1,11 @@
+title: what <localleader>sr refuses
+pid: bdd59653-1eb7-41b0-857f-d43dff802ba1
+body: |2-
+  It writes nothing, and says why, where the headline at point
+  represents no relationship it can set. The messages are those of
+  the Emacs client's C-c s r ('skg-set-relRepo').
+contains:
+- b3e28de0-c2a3-4e80-92b7-154721769013
+- bcdfda2b-3e5b-4259-8c60-f1c825a5a571
+- 0db9331f-f2dd-4ccb-ae76-802fe8b0c54d
+- 3568256e-c7ad-418c-ace4-6e273eeccaa9

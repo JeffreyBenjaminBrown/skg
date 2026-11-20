@@ -1,0 +1,9 @@
+title: 'C-c m b p : skg-mark-both-processed'
+pid: 1c86373f-3113-43d1-9051-4f5afccad764
+body: |2-
+  Marks processed both the node at point and its relationship to the
+  headline above it, then saves: everything the headline shows. With
+  C-u (or C-u C-u), everything in the subtree, as above. Below a new
+  node only the server's walk marks, and it reaches new nodes alone: an
+  existing node drawn there keeps its own changes unmarked until marked
+  where it stands.

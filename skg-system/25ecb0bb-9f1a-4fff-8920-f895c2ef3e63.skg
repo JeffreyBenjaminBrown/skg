@@ -1,0 +1,34 @@
+title: '<localleader>vm : :SkgViewMetadata'
+pid: 25ecb0bb-9f1a-4fff-8920-f895c2ef3e63
+body: |2-
+  When called from a node in a view of the graph,
+  this switches to a view of the metadata of that node,
+  with one field per org branch. ':w' (or <localleader>cc) applies
+  the edited tree back into the source headline; ':bd!' cancels;
+  S-Left / S-Right cycle a field's value (writeProtected, noClaim,
+  editRequest, viewRequests, nodeRepo, ...).
+  Each field a user may set on the headline's kind is shown,
+  at its default when it is absent, and cycles through the values
+  that kind takes, as 'shared/metadata-fields.json' lists them:
+  a write-protected node is offered no delete, nodeMerge or flag request,
+  a removed member is also offered restoreRel,
+  a ghost restoreNode.
+  A value that needs more (a nodeMerge's target, relRepo's skgrepo,
+  a flag and its value, a folder's relation) prompts for it.
+  A field left at its default is dropped when the edit is applied.
+  A processed request the diff view's gestures wrote
+  (see <localleader>m) is shown in the edit request field, beside
+  the other request; deleting it there clears it.
+  After each headline, in parentheses, is the herald that field or
+  value gives a headline in a view, colored as there (once the server
+  has sent its herald rules); the hint is not text, and shows what
+  the editor opened with, not what cycling a value makes.
+  Metadata edited by hand, here or in the view itself, is checked
+  against the metadata grammar when you save: a headline whose metadata
+  breaks it refuses the save, and the refusal names the part that
+  breaks it.
+  It's easy to edit this way.
+  Note that some properties don't make sense to edit,
+  like the count of how many contents it has.
+  (If you want to change how much content a node has,
+  don't change the node's metadata; change its children in the view.)

@@ -1,0 +1,16 @@
+title: '<localleader>sa : :SkgAttach'
+pid: 0833d54e-3f56-480d-be8d-e23b351fe3ad
+body: |2-
+  The reverse of <localleader>st: removes 'noClaim' from the headline
+  at point. On a pending detachment, a headline the graph puts in the
+  parent's list and that shows =detach=, it cancels the detachment:
+  =detach= goes at once, and the next save keeps the headline in the
+  list ("Attached: the detachment is cancelled; the next save keeps
+  this headline in its parent's list."). On any other headline, one
+  shown =⊥= because the graph does not put it there, the next save puts
+  it in the parent's list ("Attached: the next save puts this headline
+  in its parent's list."), and the headline keeps its =⊥= until the
+  save. It refuses where <localleader>st does, with the same messages,
+  and on a headline that claims membership already it says so and
+  changes nothing. It does not save. The metadata editor (<localleader>vm) offers
+  'noClaim' as well.

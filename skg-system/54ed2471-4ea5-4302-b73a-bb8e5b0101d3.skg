@@ -1,0 +1,6 @@
+title: 2. In-memory graph (=apply_definenodes=)
+pid: 54ed2471-4ea5-4302-b73a-bb8e5b0101d3
+body: |2-
+  The new skgrepo is reflected in the in-memory =GraphnodeInRust= via the
+  ordinary =SaveNode=, which carries the new skgrepo field. There is
+  no separate move step in memory — the save is sufficient.

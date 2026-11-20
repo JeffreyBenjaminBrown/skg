@@ -1,0 +1,23 @@
+title: cut
+pid: 9d4daaba-77d2-4e3f-b4ee-b2ec9406b593
+body: |2-
+  To *cut* a child from a member as such (a forkee or forker as such) is
+  to delete its headline from under the member and save, whether or not
+  it is pasted elsewhere. A cut child is one the member's list names,
+  and the view showed there (under a member typed into the folder in
+  the same save, it showed none), that the buffer no longer shows claiming
+  under it, nor in the member's folder of what the user keeps elsewhere
+  or of what the note hides in it: a stale buffer may still show a child
+  there after another view stopped keeping it, or unhid it, and the
+  save reads that child as *set aside*, not cut. The member's own list
+  never changes: a cut edits the note
+  whose forks folder holds the member. A cut from a forkee hides the
+  child in the note unless the note, or a note of the user's graph but
+  the member, contains it after the save (see "integrated" and "the
+  forkee-visibility step"): a note the save writes by its contains as
+  the save leaves them, any other by the graph. A cut from a forker
+  does that too, and makes the note fork the forker (see "the
+  forker-visibility step"). Removing a child from the note while a
+  member contains it hides it by the same rule: only where some member
+  containing it would show it after the save
+  ('infer_hides_from_contains_removals').

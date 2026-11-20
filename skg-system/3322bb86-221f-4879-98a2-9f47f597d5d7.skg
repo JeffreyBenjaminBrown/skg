@@ -1,0 +1,16 @@
+title: what a save does to other views
+pid: 3322bb86-221f-4879-98a2-9f47f597d5d7
+body: |2-
+  A save rerenders every other open view that shows what it changed,
+  and brings it up to date with the graph, saying nothing of what it
+  changed there. A child the graph no longer relates to its parent
+  vanishes from that view, with everything under it, wherever its
+  parent reads claims: one that another view's save removed from its
+  parent's content, say. A member that one view's save added is drawn
+  into every other view that shows its list, as a fresh view draws its
+  members: editable where no other occurrence of its node is and the
+  node budget allows, and then, unless it is a member of a forks
+  folder, with its forks folder when it has a fork partner, either way, the skgrepo restriction shows. A headline
+  standing for a node the save deleted vanishes from every content
+  view, with whatever stood under it; in the diff view it becomes the
+  node's ghost.

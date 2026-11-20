@@ -1,0 +1,5 @@
+title: Commits
+pid: 390aefc0-cfdf-4589-a91d-b31b63554f37
+body: |2-
+  When Jeff has requested commits, read [[id:00dc10f8-3cc8-4c08-bf60-0cc59479f88f][file:commit-messages.org]]. The advice
+  does not itself authorize changing Git state.

@@ -1,0 +1,15 @@
+title: '<localleader>da : :SkgDeleteReferencesToAbsentNode'
+pid: e7bdb4ef-5466-4053-affc-749ab4abb016
+body: |2-
+  On an unknown viewnode, remove that exact raw ID from owned structured
+  relationships throughout retained telescopes, then refresh only views which
+  show a changed recorder or that exact raw ID.
+  The command refuses while a view is dirty.  Text links are reported but left
+  unchanged, and require confirmation before the structural cleanup.  If the
+  scan changes before confirmation, the command refuses the stale approval;
+  run it again to rescan.  The warning ends by naming
+  ':SkgInvestigateUnknownNode' (<localleader>tr), which shows what git
+  history knows of the ID.
+  Under a skgrepo restriction it refuses ("Deleting the references to an
+  absent ID requires no skgrepo restriction"), since it rewrites every
+  owned recorder, those the skgrepo restriction keeps out included.

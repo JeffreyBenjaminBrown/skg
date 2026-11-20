@@ -1,0 +1,7 @@
+title: Go to the other node, and add a merge request to its metadata.
+pid: 16c38d20-19ff-41d8-924d-b0f64e7e3825
+body: |2-
+  We call this other node the 'acquirer'.
+contains:
+- 90bc6838-cd68-4df2-b983-222032c7ea21
+- cc3096e8-3d2d-4e49-a842-7bcef80160c8

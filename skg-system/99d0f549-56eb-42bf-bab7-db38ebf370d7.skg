@@ -1,0 +1,5 @@
+title: Document
+pid: 99d0f549-56eb-42bf-bab7-db38ebf370d7
+body: |2-
+  A Tantivy association. In my case, from a title or alias to an ID.
+  (Each ID can have multiple such associations.)

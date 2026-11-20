@@ -1,0 +1,10 @@
+title: '=alias noClaim (view ghostWarrant)=, =id (view ghostWarrant)= with =(rel removed)= -- in an alias or ID folder: an alias or extra ID that HEAD has and the worktree lacks'
+pid: 02798f07-8808-4a2d-ac2a-594d62c2ab1d
+body: |2-
+  Its headline is the alias or the ID: a member with a ghost warrant,
+  which claims no membership. Saving reads no alias from it, and the
+  ID folder, whose claims the save never reads, carries no =noClaim=;
+  the save's check of an ID folder refuses only one lacking an ID of
+  the node. A dangling partner the worktree lost, an unknown viewnode carrying
+  =(rel removed)=, likewise carries =noClaim= where its folder reads
+  claims.

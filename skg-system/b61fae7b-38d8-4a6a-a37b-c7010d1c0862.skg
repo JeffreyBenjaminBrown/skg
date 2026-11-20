@@ -1,0 +1,6 @@
+title: Scope it by commits
+pid: b61fae7b-38d8-4a6a-a37b-c7010d1c0862
+body: |2-
+  Name the commit range (the merge base with 'main' to HEAD, or one
+  plan's commits) and the files it touched. Every agent gets the same
+  range, so the reports agree about what "the work" is.

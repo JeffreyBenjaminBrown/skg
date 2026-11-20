@@ -1,0 +1,10 @@
+title: 'Buffer locking (necessary: nvim has no overlay modification hooks)'
+pid: 5f339ea2-2f3e-47a1-ab75-a0664be3e2e0
+body: |2-
+  - A buffer locked during a save/rerender stream rejects edits with
+    vim's generic "E21: Cannot make changes, 'modifiable' is off"
+    instead of Emacs's custom "skg: buffer locked -- save in progress".
+  - Consequently a second save attempted mid-stream is refused by the
+    lock (E21) rather than by the stream-in-progress guard's message;
+    the guard still exists as the second line of defense, exactly as
+    in Emacs.

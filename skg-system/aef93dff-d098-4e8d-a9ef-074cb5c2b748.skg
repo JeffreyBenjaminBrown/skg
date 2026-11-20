@@ -1,0 +1,21 @@
+title: the three kinds of change
+pid: aef93dff-d098-4e8d-a9ef-074cb5c2b748
+body: |2-
+  The first three parts of a headline's '(diff ...)' form, each written
+  only when true ('DiffChange'): the node's existence, '(node added)'
+  or '(node removed)' (herald ∃+, ∃-), when only the after-graph or
+  only the before-graph has it ('GraphStraddle::node_existence'); the
+  existence of its relationship to its viewparent, '(rel added)' or
+  '(rel removed)' (herald ~+, ~-); and the node's other properties,
+  '(properties changed)' (herald M, "modified"), on a node in both
+  graphs that records at least one change-forest leaf
+  ('GraphStraddle::node_properties_changed') that the object 'node'
+  names on that headline: one neither its own 'rel' nor a headline
+  under it shows. The two existences are
+  'Existence { Added, Removed }'. A member, a removed member, a folder's
+  member and a root carry the node's two; a ghost never carries
+  '(properties changed)'. The relationship is the viewparent's content
+  under a vognode, and, in a partner folder, the relationship of the folder's kind between
+  the member and the folder's viewparent; the two compound partner
+  folders' members carry none. On an alias, ID or flag member, '(rel
+  ...)' is the member's existence in its list.

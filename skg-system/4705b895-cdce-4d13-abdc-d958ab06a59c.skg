@@ -1,0 +1,9 @@
+title: declaration order
+pid: 4705b895-cdce-4d13-abdc-d958ab06a59c
+body: |2-
+  The *declaration order* is the order in which the config lists every
+  skgrepo, owned and foreign ('SkgConfig::skgrepos_in_declaration_order',
+  'SkgConfig::declaration_rank'). Its owned entries are the privacy
+  order (see "privacy order and relRepo"), and the fold order of a
+  foreign node permutes its foreign ones. A user's *first-declared*
+  owned skgrepo is the first owned one in it, the most public.

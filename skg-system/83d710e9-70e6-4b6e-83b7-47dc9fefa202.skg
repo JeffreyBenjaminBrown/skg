@@ -1,0 +1,17 @@
+title: '<localleader>sw : :SkgRequestWriteProtected'
+pid: 83d710e9-70e6-4b6e-83b7-47dc9fefa202
+body: |2-
+  Requests that this occurrence become write-protected,
+  as described above. It does not save.
+  At the next save, edits the occurrence carries are saved first;
+  then the server makes it write-protected,
+  resyncing its title from the graph;
+  its children then claim nothing,
+  so that edits to its title, body or children no longer affect it
+    (although edits to its children still affect those children:
+    they keep their own editability, and their own content).
+  On an occurrence that is already write-protected, it does nothing.
+  In one save with <localleader>se on another occurrence of the same
+  node, it moves editability there.
+  The two requests on the same occurrence contradict each other,
+  and the save is refused.

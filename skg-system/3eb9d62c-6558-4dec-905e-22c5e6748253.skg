@@ -1,0 +1,9 @@
+title: 'C-c f : text search'
+pid: 3eb9d62c-6558-4dec-905e-22c5e6748253
+body: |2-
+  The 'f' is for 'find'.
+contains:
+- 445fd344-ec3b-4107-942d-7923980f2b18
+- fb6d5697-c196-401d-ac02-543711ad146b
+- d513adcd-cbed-4c71-9d29-d6b29a075c85
+- ece55f5a-d1e0-4556-a298-00f18d03d964

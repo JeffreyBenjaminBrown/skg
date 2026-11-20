@@ -1,0 +1,8 @@
+title: '<localleader>gi : :SkgGotoById'
+pid: cd070097-ec4c-4788-8d67-1047273b2fa1
+body: |2-
+  'Goto' is usually more convenient.
+
+  This requires a literal v4 UUID string, like
+  3861db2c-7f16-4814-b403-52b5e05d5e0a
+  It can be useful going from git to skg.

@@ -1,0 +1,24 @@
+title: diff object, diff aspect
+pid: f3d41116-8f9f-4189-b10b-c250ef7b9a16
+body: |2-
+  A *diff object* is what a part of a '(diff ...)' form or a processed request
+  names on a headline: the node itself ('node'), or the node's
+  relationship to its viewparent ('rel'; in a partner folder, to the
+  folder's viewparent). There are exactly these two.
+  A change-forest leaf about a relationship has the relationship as its
+  object, never the member. 'node' names every leaf the node records but
+  the relationships shown on it or under it (its own 'rel', and those of
+  the members drawn under it), so a mark marks what its headline shows
+  ('docs/diff-view.org', "What a request names"). On a changeset marker
+  'rel' names the relationships it gathers and 'node' their members' own
+  leaves. A request alone may also say 'newContent' or 'newOutward',
+  shorthand: each names leaves of the new nodes reached from the
+  headline's node through new nodes only, as the change forest says,
+  whatever the buffer shows, filtered by the letters beside it ('node'
+  their existence, 'rel' their relationships, neither both). 'newContent' follows content relationships
+  and names each new node's existence (which covers its text) and its
+  content relationships; 'newOutward' follows every relationship in its
+  recorded direction ("out") and names every leaf each new node
+  records. A *diff aspect* is what a
+  change-forest leaf is about: existence, text, home skgrepo, an alias,
+  an extra ID, a flag, other changes, or relRepo.

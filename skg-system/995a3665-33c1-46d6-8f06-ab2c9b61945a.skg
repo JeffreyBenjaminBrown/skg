@@ -1,0 +1,20 @@
+title: 'Running a plan: the orchestrator''s habits'
+pid: 995a3665-33c1-46d6-8f06-ab2c9b61945a
+body: |2-
+  #+title: Running a plan: the orchestrator's habits
+
+  How Claude runs an execution plan slice by slice, one agent per
+  slice, as it did for plans 17 and 19 of the total diff view and
+  plan 04.1 of the refresh rewrite (October 2026). The plan's own
+  form is in 'plans.org'; this is what happens once it is written.
+contains:
+- 2b60a179-60a8-4099-982d-ad9d513e9ac7
+- 7e612dcf-6ab5-4d79-84da-cc58be81f36c
+- 4fafc235-635a-4d40-8551-6326d1ed7ca1
+- 35521121-0a21-40d4-b725-dacc5d2003de
+- 97981d60-3fda-4624-b243-276cdebb1896
+- 8e37a5bd-1000-4dfb-851f-ca12c15602a0
+- 69532fcd-4eda-46be-8a46-dfaf266a090c
+- 8bd0b2ca-30e5-4e04-bce9-b17212ed6673
+- fc6c8f32-fdc9-461a-8f5f-c2b3ccaad859
+- 5ddd2040-0a6d-468e-8fa0-46dcb2132c1b

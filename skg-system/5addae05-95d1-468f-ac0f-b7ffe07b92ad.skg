@@ -1,0 +1,9 @@
+title: Mark planned fixes in TODO/problems.org
+pid: 5addae05-95d1-468f-ac0f-b7ffe07b92ad
+body: |2-
+  When a plan, or a settled discussion that a plan will follow,
+  decides how an entry of 'TODO/problems.org' will be fixed, prefix
+  the entry's headline with 'FIX PLANNED: ' and leave it in place;
+  when the fix lands, move the entry to 'TODO/DONE/problems.org' as
+  that file's header says. The prefix tells a reader which problems
+  are already spoken for.

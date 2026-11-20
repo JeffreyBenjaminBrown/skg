@@ -1,0 +1,9 @@
+title: 'C-c v R : skg-readable-ids-refresh'
+pid: 28f67f51-60ad-41a8-bc7c-bb91f9afb83b
+body: |2-
+  Empties the session's ID-to-title cache (see =C-c v r=) and
+  re-annotates the current buffer. Use it after anything that changes
+  what titles the server would answer with: a node retitled, or a
+  skgrepo widening (IDs restricted under the old skgrepo restriction
+  were cached as unresolvable). Both keys are bound in content views only;
+  in a magit or raw .skg buffer, use M-x.

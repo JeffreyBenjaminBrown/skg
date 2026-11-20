@@ -1,0 +1,26 @@
+title: Herald kinds and their styles
+pid: 9d5c26de-509f-490a-89c9-a74b283670ac
+body: |2-
+  | Kind                 | Style       | Glyphs                                                                        |
+  |----------------------+-------------+-------------------------------------------------------------------------------|
+  | relationship letters | normal      | =C L K H=                                                                     |
+  | the birth letter     | low         | the letter of a relation that put this occurrence here                       |
+  | relationship sides   | their tier  | counts and ancestor flags; see [[id:8df96460-1785-4df5-bc3b-c814c9fe266d][Relationship heralds]]                     |
+  | property counts      | boring      | =A3= aliases, =I1= extra IDs, =F2= true flags                                 |
+  | position glyphs      | ghost       | =ᗣ= a ghost, or what HEAD alone warrants                                      |
+  |                      | crucial     | =☮= write-protected, =⊥= unwarranted, =ĥ= in place of another (=inPlaceOf=)   |
+  |                      | high        | =B= omitted body                                                              |
+  |                      | medium      | =⟳= cycle                                                                     |
+  | home skgrepo heralds | normal      | =⌂:LABEL=, and =⌂:<LABEL/ORIGINAL>= on an attributed fork                     |
+  |                      | ugly        | =~NAME=, a relRepo more private than the default                              |
+  | labels               | message     | folder labels, =alias=, =ID=, flag rows                                       |
+  |                      | high        | the hiding note's ancestor letter in two folder labels; see below            |
+  | requests             | nonstandard | =delete=, =merge:...=, =request:strip attribution=, =detach=, =restore node=, =restore membership=, =request:~NAME=, =request:...= flags, =req:...= views, =request:processed...= |
+  | change facts         | nonstandard | =∃+ ∃- M ~+ ~-=, =+ -= on a leaf, ~Δ⌂=a~                                        |
+  |                      | go          | =✓= processed                                                                 |
+  |                      | normal      | the skgrepo names in =⌂ -OLD +NEW= and =relationship moved from OLD to NEW=   |
+  | diff labels          | message     | =old title=, =body diff=, =its content changed=, =its X changed (this file)=  |
+  | titleless headlines  | message     | =Reference to unknown node.=, =restricted=, =something stood here=            |
+  | illegal edits        | message     | =ILLEGAL EDIT TO FOREIGN NODE=                                                |
+  | link annotations     | normal      | a resolved target's =[⌂:pub]=                                                 |
+  |                      | ugly        | =[⌂:restricted]=, =[⌂:…]=, =[⌂:lookup failed]=, a dangling link's label           |

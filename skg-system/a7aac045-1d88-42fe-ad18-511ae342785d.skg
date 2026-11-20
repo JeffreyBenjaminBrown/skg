@@ -1,0 +1,7 @@
+title: =acquiredByFolder=, =acquiredFolder= are write-protected and derived
+pid: a7aac045-1d88-42fe-ad18-511ae342785d
+body: |2-
+  Under a ghost, an =acquiredByFolder= holds the node that acquired it
+  by a nodeMerge; under an acquirer, an =acquiredFolder= holds the
+  ghosts of the nodes it acquired. An =acquiredFolder= also accepts a
+  child the user puts there, which claims nothing.

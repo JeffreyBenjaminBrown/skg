@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 6158f4c3-1180-4198-b0de-fdfeb5d39c72
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * the Skg data model
 ** It's not very strange.
 Using skg is much like ordinary reading and writing. You read something you want to keep. You add it to your data. (Although unusually, edits to that thing will propogate into your data.) You write text. You divide, subdivide, organize, make links. You make some things public and others private (although with unusual granularity). You might learn someone enjoyed some of your public knowledge (although unusually, the way you would learn this is through their revelation of how it fit into their knowledge).

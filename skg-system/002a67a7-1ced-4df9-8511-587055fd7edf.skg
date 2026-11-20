@@ -1,0 +1,29 @@
+title: Other relationships
+pid: 002a67a7-1ced-4df9-8511-587055fd7edf
+body: |2-
+  Initial construction of the default =forksFolder= also asks the
+  relRepo-gated accessors, in both directions, whether the note has a
+  fork partner ('has_a_fork_partner') before drawing the folder.  A private =forks= relationship between
+  two public nodes therefore creates neither a member nor an empty default
+  folder in a public-only view.  An explicitly requested editable folder may
+  still be created empty, as intended.
+
+  The other relationship-driven presentation paths do not have the same
+  problem:
+
+  - =contains= memberships are relRepo-gated before the refresh computes a
+    content goal, including what a member as such of a forks folder
+    shows (its content less what the note contains or hides, and less
+    what the user keeps elsewhere);
+  - =hides= and the containment memberships used to
+    derive the hidden-in and hidden-outside folders are gated in the
+    refresh's goals;
+  - ordinary relationship folders, the containerward chain, herald counts, and
+    ancestor heralds use the generic gated accessors for every stored
+    node-to-node relationship;
+  - =linksTo= has no independently movable relationship skgrepo: it is
+    derived from the skgrepo node's title and body, so its effective relRepo is
+    that node's home skgrepo.
+
+  Raw relationship reads in save, merge, deletion, and invariant-checking code
+  are intentionally full-graph operations rather than skgrepo-set presentation.

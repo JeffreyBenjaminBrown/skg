@@ -1,0 +1,20 @@
+title: '<localleader>gg : :SkgGoto'
+pid: 1853d245-dc1a-44e3-8aeb-69e754eb9c27
+body: |2-
+  Calling this when the cursor is on a link, a node's metadata,
+  a bare UUID, or a .skg filename
+  will open a new view from the ID it finds there,
+  or go to the content view of it that was already open if that exists
+  (a buffer of the diff view does not count: the node gets a new view).
+
+  The requested node itself is the root, as itself: a fresh view is
+  drawn from the root homes, where the root's own skgrepo decides. A
+  perspective switch (=<localleader>vo=) may show another mirror there.
+  Content below it substitutes. Fork facts remain
+  visible in its heralds (the K token).
+
+  If you're not sure whether the cursor is on something visitable
+  (a link or a node's metadata),
+  use IdNext and IdPrev (the ]i / [i motions, or <localleader>in /
+  <localleader>ip)
+  to identify where those are.

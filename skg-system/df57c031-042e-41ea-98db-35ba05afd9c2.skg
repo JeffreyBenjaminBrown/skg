@@ -1,0 +1,11 @@
+title: buffer mechanics with no Emacs-chord counterpart
+pid: df57c031-042e-41ea-98db-35ba05afd9c2
+body: |2-
+  These are defined directly in =attach_content_view=
+  (nvim/lua/skg/keymaps.lua) rather than translated from a =C-c=
+  chord: they ride keys nvim already gives special meaning to.
+contains:
+- 6ebdc9f5-7cd8-4f79-b0f9-1bacbca5aaea
+- 3a6250eb-63a2-4ae2-b2f3-4e6537a619a6
+- f33106be-303a-4e07-a5c0-4cecba31aeed
+- 5c462687-39e0-48e5-b4e6-e016b172bc98

@@ -1,0 +1,7 @@
+title: Mark your replies so the planner can find them, and expect the same back
+pid: b05691be-60b8-4634-853f-24f0c7d5a59c
+body: |2-
+  Your rule, which works: a reply of yours gets a keyword; a reply of
+  the planner's under an item of yours is marked TODO so you can find
+  it; where you merely agree, the planner changes your TODO to DONE
+  without replying.

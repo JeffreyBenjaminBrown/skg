@@ -1,0 +1,104 @@
+title: The .skg file format
+pid: c636eeb2-dc38-4c49-af7d-d2f753106f07
+body: |2-
+  It is a specialization of YAML -- every .skg file is valid YAML,
+  although not vice versa. The definitive source of truth is
+  =server/types/nodes/fs.rs= (=GraphnodeOnDisk=).
+
+  Each file is one *telescope section*: the slice of one node
+  recorded at one privacy level (see =docs/telescopes.org=). One node =
+  one ID = same-ID =.skg= files across skgrepos, at most one per
+  skgrepo; the filename is the node's primary ID followed by =.skg= in
+  every skgrepo. The node's *home* is its most public section, and
+  that section carries the =title= — an invariant, not a search rule.
+  A titleless section more public than the title still loads (the
+  composition reports it) but cannot be rewritten by a save. A field a
+  section omits is a field that section has no opinion about.
+  Pre-telescope single-file nodes parse unchanged (one section, title
+  present, no anchors).
+
+  Fields:
+
+  - =title=: A string, no newlines. Present in the home section only.
+  - =pid=: The node's primary ID. Must equal the filename stem. Present
+    in every section.
+  - =extra_ids=: Optional list of additional IDs (from nodeMerges).
+    Home section only, by convention.
+  - =body=: An optional string, perhaps with newlines. Home only.
+  - =aliases=: Optional list of strings. Each section may contribute
+    aliases; an alias's relRepo is its section's skgrepo.
+  - =contains=, =forks=: Ordered relations, =forks= written after
+    =contains=. One flat YAML sequence per relation, one entry per line:
+    - =- ID= — a member recorded at this section's skgrepo. Identical
+      syntax in every section, so a membership moving between skgrepos
+      diffs as a clean one-line delete/add pair.
+    - =- anchor: ID= — a placement anchor: the members after it (until
+      the next anchor) insert immediately after the anchored ID, which
+      lives in a more public section. Members before the first anchor
+      prepend to the front of the more public list. Anchors are derived
+      on save from the in-memory order; hand-written anchors are
+      honored on load (a dangling anchor's run falls back with a
+      warning, and duplicate anchors concatenate in file order).
+  - =hides=: The relation =hides=, unordered; a plain list of
+    IDs. The effective list is the union across sections; each entry's
+    relRepo is its section's skgrepo. The key used before October 2026,
+    =hides_from_its_subscriptions=, still loads.
+  - =flags=: See "Node flags". The key used before October 2026, =misc=,
+    still loads.
+  - =attribution=: Optional, home section only, written last. What a
+    fork records of the note it was forked from, when the fork
+    operation made it and that note's home skgrepo was not the fork's
+    ('docs/forks.org', "Attribution"; 'Attribution' in
+    =server/types/nodes/attribution.rs=). A mapping:
+    #+begin_example
+    attribution:
+      original: 0a1b2c3d-1111-2222-3333-444455556666
+      skgrepo: claude-public
+      remote_hash: d1b916a3aef4c6f971a1a0306e9a03529823e5e7
+      commit: 9f8e7d6c5b4a39281706f5e4d3c2b1a098765432
+      uncommitted: true
+    #+end_example
+    =original= is the pid of the note forked; =skgrepo= its home
+    skgrepo's name in the forker's config then; =remote_hash= the
+    identity of that skgrepo's git remote (=origin=, else the first),
+    the git blob hash of its URL normalised ('normalised_remote_url' in
+    =server/attribution.rs=; =tests/shared/remote-hash-cases.txt=), left
+    out when it had none; =commit= the HEAD commit of the gitrepo
+    holding that skgrepo, left out when there was none; =uncommitted=,
+    written only when true, says the original's file differed from that
+    commit. A binary older than the field reads such a file and ignores
+    the field, since 'GraphnodeOnDisk' denies no unknown field; its next
+    save of the node drops it, as it would any field it does not know.
+
+  The keys retired in November 2026 -- =subscribesTo=, =overrides=,
+  =hidesFromSubs=, and the October 2026 names of the first two,
+  =subscribes_to= and =overrides_view_of= -- are refused, never read
+  ('RETIRED_SKG_KEYS' in =server/dbs/filesystem/retired_keys.rs=), since
+  a key the format does not know would be dropped silently and erased
+  by the next save:
+  - A worktree file holding one is unreadable, so the server refuses
+    to start. The startup report
+    =DATA_ROOT/initialization-error_unreadable-skg-files.org= names
+    every such file of each skgrepo, by path, the keys it holds, and
+    what to do: for an owned skgrepo, run
+    =tools/migrate-forks-2026-11/migrate.py= over your skgrepos (its
+    =README.org= says how) and commit each; for a foreign one, its owner
+    should, and until then you may remove it from =skgconfig.toml=. A
+    file holding an October 2026 key names
+    =tools/migrate-skg-keys-2026-10/migrate.py= first, since the
+    November tool refuses such a file.
+  - A git tree holding one -- HEAD, or the tree stage-and-commit would
+    commit -- refuses the diff view and stage-and-commit, naming, for
+    every skgrepo whose tree holds one, the files and the commit of the
+    migration (=git -C PATH commit -am 'Migrate to forks'=).
+  - The diff's per-file blob reader treats such a blob as absent, with a
+    warning in the server log.
+  - The vanished-node search ("Investigate unknown node") still reads
+    historical blobs holding them, ignoring those keys, so that such a
+    blob reads as having no forks.
+
+  The composition of all same-pid sections (in fold order: an owned
+  node's most public first) yields the
+  node; saving decomposes the node back into sections, byte-stably, so
+  untouched sections do not change on disk. An owned section emptied
+  by a save is deleted; foreign sections are never touched.

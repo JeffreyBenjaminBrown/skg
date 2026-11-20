@@ -1,0 +1,10 @@
+title: extend, rerender, refresh
+pid: 69ab4192-0503-4231-b1c0-1e3a9ebaf157
+body: |2-
+  The server *extends* a view when it draws more of it: the content of
+  a node shown editable, or a viewbranch a view request asks for. A
+  *rerender* redraws a view, after a save or a request: it is a
+  *refresh* of what the view holds (see "the refresh" among the terms
+  of the implementation), which keeps what the user put in it. Org
+  folding keeps the words "fold" and "unfold"; drawing more of a view
+  is not called unfolding.

@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 9184bed5-2e38-41be-b6c5-f06fe7def415
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * Integrate your public and private writing.
 This only recently became possible! ([[https://github.com/synchrony/smsn][Semantic Synchrony]] is the first and, to my knowledge, only other app to permit it.)
 
@@ -5,4 +9,4 @@ Public and private writing both matter, but strictly separating your public and 
 
 Skg will allow you to organize your public and private thoughts in the same space. This maximizes your notes' utility to yourself and others, while maintaining your privacy.
 
-You can, of course, still choose to make everything private. But sharing enables others to help you process your shared topics -- even if that's not their intent, and even if they disagree completely (see [[file:./skg-enables-deep-sharing.org::*Learn from how others use your ideas.][Learn from how others integrate your notes into theirs]]).
+You can, of course, still choose to make everything private. But sharing enables others to help you process your shared topics -- even if that's not their intent, and even if they disagree completely (see [[./skg-enables-deep-sharing.org::*Learn from how others use your ideas.][Learn from how others integrate your notes into theirs]]).

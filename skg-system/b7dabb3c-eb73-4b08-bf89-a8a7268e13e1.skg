@@ -1,0 +1,23 @@
+title: How this relates to TCP
+pid: b7dabb3c-eb73-4b08-bf89-a8a7268e13e1
+body: |2-
+  TCP is a byte stream. The server writes bytes, the client reads
+  bytes. TCP knows nothing about character encoding -- it just
+  delivers bytes in order.
+
+  The bug had nothing to do with TCP itself. The server panicked
+  while PREPARING the bytes to send (in the debug log line), before
+  any bytes reached the wire. But it's worth understanding the full
+  path:
+
+  1. Server: Rust =String= (UTF-8 bytes in memory)
+  2. Server: =stream.write_all(string.as_bytes())= -- writes raw bytes to TCP
+  3. TCP: bytes travel over the wire (loopback in this case)
+  4. Client: Emacs =process-filter= receives chunks of raw bytes
+  5. Client: LP machine accumulates bytes until Content-Length is met
+  6. Client: =decode-coding-string ... 'utf-8= converts bytes back to Emacs characters
+  7. Client: =(read payload)= parses the sexp, which contains the org text
+
+  The character encoding matters at steps 1 and 6. In between, it's
+  just bytes. The bug was at step 1 -- the server panicked before
+  even reaching step 2.

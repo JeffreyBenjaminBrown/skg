@@ -1,0 +1,8 @@
+title: Order slices so a rule lands with the mechanism it depends on
+pid: 8b3c74ae-6836-40e8-a74c-10b23ab7afe6
+body: |2-
+  Plan 08 put "a member child under a write-protected occurrence is
+  refused" in slice 0 and "the server leaves no member under what it
+  write-protects" in slice 1. After slice 0 alone, every save after a
+  move of editability was refused, and the agent had to pull slice 1's
+  half forward. When a rule depends on a mechanism, they are one slice.

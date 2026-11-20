@@ -1,0 +1,9 @@
+title: Readability and arrangement
+pid: 11e2aff2-8d61-4b77-9586-3757de04ab39
+body: |2-
+  Is every algorithm described in a place a coder would find from the
+  code that implements it? Is the code arranged where its file names
+  suggest (a feature with no module of its own; render files that
+  render nothing; a handler file with no handler)? Are the calls
+  readable (positional booleans)? Sample the doc comments against the
+  code and list the stale ones. Are the clients parallel?

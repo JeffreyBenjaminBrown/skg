@@ -1,0 +1,6 @@
+title: 'C-c v L : skg-toggle-repo-overlay-on-links'
+pid: fc008198-c094-4a82-ba4b-3de7a17f1342
+body: |2-
+  Toggle display-only home skgrepo suffixes on Skg links in this buffer.
+  The suffixes start off. Links confirmed missing are ugly and underlined
+  even with suffixes off. See [[id:153fccea-bf16-4d02-af31-7b1d214b6fff][link annotations]].

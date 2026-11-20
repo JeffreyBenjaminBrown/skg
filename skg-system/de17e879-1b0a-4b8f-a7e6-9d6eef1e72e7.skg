@@ -1,0 +1,6 @@
+title: No stages
+pid: de17e879-1b0a-4b8f-a7e6-9d6eef1e72e7
+body: |2-
+  The diff view compares HEAD with the worktree. The git index never
+  enters it: no fact carries a stage, and a commit is built from HEAD's
+  tree and the worktree, not from the git index ("Stage and commit").

@@ -1,0 +1,34 @@
+title: Extend diff view
+pid: 2d1738f1-bf13-46e2-bdf8-9002a7de5fb3
+body: |2-
+    - Request: =((request . "extend diff view") (view-id . "VIEW_ID"))=,
+      where VIEW_ID names a buffer of the diff view. The client
+      sends it only for a buffer with no unsaved changes, since the
+      server works on the viewforest it registered at the last rerender.
+    - Response: LP response-type "extend-diff-view", then a rerender
+      stream (rerender-lock, rerender-view*, rerender-done). The
+      response is one of:
+      - =((processed-summary ...) (errors ()) (warnings ()))=, the save
+        response's form, for the buffer as rerendered; the rerender
+        stream carries that buffer.
+      - =((errors ("REFUSAL")) (warnings ()))= when the
+        connection has a skgrepo restriction, VIEW_ID is not a buffer of the
+        diff view, or the rerender fails. The rerender stream is empty.
+    - Logic: the graph straddle is brought up to date, and the buffer's
+      pruned change view sets recomputed. Each node of U without an editable
+      occurrence becomes editable at its first content occurrence in
+      level order, its children claiming as the buffer read back would; a
+      node shown only as a write-protected folder member counts as shown
+      nowhere, since the extension makes no folder member editable (an
+      editable-view request, C-c s e, can, and its node then counts as
+      shown there). The buffer
+      then gains, as roots at the end in ID order, the origins of D it
+      makes editable nowhere; R is deduplicated with the buffer's roots
+      pinned, so that a changed cycle that already has a root gains no
+      second one. Last, the buffer is refreshed once, as after a save,
+      which gives each node made editable its body and draws its content
+      list and the content of each appended root.
+      =server/serve/handlers/extend_diff_view.rs=, =server/diff_view/buffer_rerender.rs=
+      ('ensure_editableOccurrences_exist',
+      'contentOrigins_missing_from_buffer'), and 'refresh_view' in
+      =server/rerender_pass.rs=.

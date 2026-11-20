@@ -1,0 +1,12 @@
+title: You are coding skg inside a Docker container
+pid: 6e295a40-000e-494a-969f-7e6864906dbd
+body: |2-
+    The skg working tree is bind-mounted at =/home/ubuntu/host= (your
+    primary working dir). The mount is live and bidirectional: files you
+    write there are visible on the host and vice-versa.
+
+    The image is =jeffreybbrown/hode=, built with Nix from
+    =other-projects/docker-typedb-rust/docker.nix= (there is no Dockerfile).
+    The container runs with =--network host= (so container ports are host
+    ports) and bind-mounts the host's =/nix/store= read-only (so the image's
+    store references resolve against the host store at runtime).

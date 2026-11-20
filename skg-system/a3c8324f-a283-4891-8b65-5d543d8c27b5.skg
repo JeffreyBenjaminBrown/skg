@@ -1,0 +1,4 @@
+title: 'C-c r n P : skg-diffView-goto-next-processed-change-anywhere'
+pid: a3c8324f-a283-4891-8b65-5d543d8c27b5
+body: |2-
+  Like C-c r n p, skipping nothing.

@@ -1,0 +1,11 @@
+title: How Jeff edits them
+pid: d41fcea8-8f4b-494b-ae20-194abb317504
+body: |2-
+  His server owns '/home/ubuntu/host/skg-system/' (a skgrepo of
+  'data/jeff/skgconfig.toml'). He edits the notes as any others, runs
+  'bash/export-docs.sh', and commits notes and exports together. A
+  commit from Skg ('C-c r c') commits only notes, and only to whatever
+  branch the code repository has checked out; the exports then need a
+  commit of their own.
+contains:
+- 2e851af4-52c8-4b1d-aaa4-b924eced4160

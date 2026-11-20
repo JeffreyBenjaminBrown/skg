@@ -1,0 +1,11 @@
+title: Foreign skgrepos are rejected on either end
+pid: e73a3a7a-1e76-4ea2-b2d9-a5cf6b0d78b0
+body: |2-
+  Foreign skgrepos (repos whose config entry says =foreign = true=,
+  forked in via =forks= relationships) are write-protected. Trying to move a node *into* or *out
+  of* a foreign skgrepo produces
+  =BufferValidationError::CannotMoveToOrFromForeignRepo=
+  (=server/from_text/supplement_from_disk.rs:56=). The buffer save
+  fails entirely, and nothing is written. If you need data from a
+  foreign skgrepo in a skgrepo you own, the model is to fork, not
+  move.

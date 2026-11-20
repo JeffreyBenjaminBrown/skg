@@ -1,0 +1,6 @@
+title: col
+pid: efae4494-af01-40b8-8870-c76f6a0e2229
+body: |2-
+  *Col* was the old name for a folder viewnode (short for
+  "collection"). It has been expunged from production code, but may still
+  appear in old documentation, plans, or the knowledge graph.

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# all-tests.sh — Run emacs, nvim, nextest, doctests, team tool, AI reader
-# and integration tests politely.
+# all-tests.sh — Run emacs, nvim, nextest, doctests, team tool, AI reader,
+# generated docs and integration tests politely.
 #
 # Results are written here:
 # - tests/results/ALL.org: a plain-text org-mode summary
@@ -25,7 +25,7 @@ usage () {
 Usage: $0 [--no-sound]
 
 Runs Emacs, Neovim, nextest, doctests, team tool, AI reader
-(tools/skg-for-ai/) and integration tests sequentially with
+(tools/skg-for-ai/), generated docs and integration tests sequentially with
 conservative internal concurrency. Integration tests run once per
 client (emacs, then nvim), labeled CLIENT/DIRECTORY in the output.
 
@@ -214,6 +214,23 @@ else
 fi
 ELAPSED_AI_READER=$((SECONDS - T_AI_READER))
 
+T_DOCS=$SECONDS
+echo -n "  Generated docs ... "
+if (
+  cd "$PROJECT_ROOT"
+  # docs/ and coding-advice/ must be what skg-system/ exports
+  # (coding-advice/generated-docs.org), with the binary of phase 1.
+  SKG_BIN="$PROJECT_ROOT/target/debug/skg" \
+    skg_low_priority bash/check-docs-exported.sh
+) >"$RESULTS_DIR/generated-docs.log" 2>&1; then
+  EXIT_DOCS=0
+  echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - T_DOCS))s)${NC}"
+else
+  EXIT_DOCS=$?
+  echo -e "${RED}FAIL${NC} ${DIM}($((SECONDS - T_DOCS))s)${NC}"
+fi
+ELAPSED_DOCS=$((SECONDS - T_DOCS))
+
 INTEGRATION_DIR="$PROJECT_ROOT/tests/integration"
 INTEGRATION_NAMES=()   # each entry is "CLIENT/DIR-NAME"
 INTEGRATION_STARTED=()
@@ -348,6 +365,13 @@ else
   overall=1
 fi
 
+if [ $EXIT_DOCS -eq 0 ]; then
+  echo -e "  ${GREEN}PASS${NC}  Generated docs"
+else
+  echo -e "  ${RED}FAIL${NC}  Generated docs (see generated-docs.log)"
+  overall=1
+fi
+
 n_total=${#INTEGRATION_NAMES[@]}
 n_failed=${#INTEGRATION_FAILED[@]}
 n_real=${#RETRY_STILL_FAILING[@]}
@@ -432,6 +456,13 @@ ORG="$RESULTS_DIR/ALL.org"
     echo "** PASS : AI reader tests (${ELAPSED_AI_READER}s) [[file:ai-reader.log]]"
   else
     echo "** FAIL : AI reader tests (${ELAPSED_AI_READER}s) [[file:ai-reader.log]]"
+  fi
+
+  # Generated docs
+  if [ $EXIT_DOCS -eq 0 ]; then
+    echo "** PASS : Generated docs (${ELAPSED_DOCS}s) [[file:generated-docs.log]]"
+  else
+    echo "** FAIL : Generated docs (${ELAPSED_DOCS}s) [[file:generated-docs.log]]"
   fi
 
   # Integration

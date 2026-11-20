@@ -1,0 +1,4 @@
+title: title != headline
+pid: faba15c9-98c4-4a47-92cb-24e32313376b
+body: |2-
+  Headline is a term from org-mode. It refers to a line that begins with some asterisks, followed by at least one whitespace, followed by at least one non-whitespace. The text after the first chunk of adjacent whitespace is what I'm calling the 'title'.

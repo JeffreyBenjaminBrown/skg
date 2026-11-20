@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 3337a84c-3f15-4878-90c0-2b44116c6c56
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * Skg is software for manipulating and sharing knowledge.
 (Yes, we already do those things, but poorly; please keep reading.)
 

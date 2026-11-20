@@ -1,0 +1,7 @@
+title: already-staged entry
+pid: f302f1bd-2cd2-4c56-8f18-e91d0e9722df
+body: |2-
+  An entry git's index holds when stage-and-commit runs, staged by hand
+  or by another tool. No commit takes it: a commit's tree is HEAD's
+  plus the committed nodes' files, and afterward only those paths' index
+  entries change, so the entry stays staged.

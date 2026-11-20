@@ -1,0 +1,8 @@
+title: root homes
+pid: 66caa6b8-b718-4461-b0ee-51f24f4cd9b2
+body: |2-
+  The default perspective ('Perspective::RootHomes', on the wire "root
+  homes"): each top-level tree of a view is drawn from the perspective
+  of its root's home skgrepo, the root standing for its '(inPlaceOf N)'
+  else itself ('perspective_skgrepo_of_tree_containing'). See
+  "perspective".

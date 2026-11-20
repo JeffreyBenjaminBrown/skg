@@ -1,0 +1,26 @@
+title: '<localleader>fl : :SkgSearchMakeLink'
+pid: 7c01b1f7-bc63-45d1-a8ca-57076204d2b1
+body: |2-
+  Search-then-link: pick a result, return here, get a link.
+
+  Like ':SkgSearch' but tailored for inserting a link to a node
+  you don't yet know the ID of. The buffer and cursor position you
+  called it from are remembered. The same conservative search
+  defaults as ':SkgSearch' apply.
+
+  As in the Emacs client, the source buffer is not saved before
+  the search runs -- only its position is recorded. (Saving first
+  can let the server's rerender collapse a freshly typed blank
+  line, leaving the remembered position dangling on the next
+  headline, so the inserted link would glue itself to the wrong
+  spot.) Save your own edits first if you want them preserved
+  before detouring into the search.
+
+  In the resulting search buffer, find the result you want and
+  press <CR> (or <localleader>cc). The search buffer closes; you
+  return to the buffer you started in, at the position you were at;
+  and a =[[id:X][LABEL]]= link is inserted at point.
+
+  The label is the result's title with any inline links inside
+  it reduced to their labels (so the new link's label is plain
+  text, never another link inside a link).

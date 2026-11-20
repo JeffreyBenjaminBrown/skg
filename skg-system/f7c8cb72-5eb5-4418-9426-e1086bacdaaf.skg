@@ -1,0 +1,11 @@
+title: A slice that changes what the server writes into a buffer runs the integration tests
+pid: f7c8cb72-5eb5-4418-9426-e1086bacdaaf
+body: |2-
+  The unit suites do not read a buffer as a client does. Slice 15 of
+  plan 13 added one metadata atom to every buffer and broke three
+  integration tests, in both clients' versions; slice 16 found them,
+  because the plan ran 'bash/integration-tests.sh' only after slices 9
+  and 16. So a slice that changes what the server writes into a buffer
+  (a fact, an atom, a label, a buffer name) runs the integration suite
+  before it ends, whatever the plan's verification section says, and
+  the plan says so in that slice.

@@ -1,0 +1,18 @@
+title: What was not damaged (so don't go breaking it)
+pid: cd80b87b-f360-4d3b-91d7-a02adce79fd8
+body: |2-
+  In the 2026-07-14 incident the power loss damaged *only* build
+  artifacts. Specifically intact were:
+
+  - The Tantivy index (=data/.index.tantivy=). Incremental init
+    succeeded; no reindex was needed.
+  - The git working tree and the skgrepo.
+
+  So resist the urge to "fix" this by deleting databases or reindexing.
+  The one thing a power loss reliably corrupts is whatever was being
+  written at the time -- and during =start-servers.sh=, that is
+  =target/=.
+
+  Note that the log files (=data/logs/*=) *were* left with a tail of NUL
+  padding, which is the same crash artifact showing up harmlessly. It is
+  cosmetic; ignore it.

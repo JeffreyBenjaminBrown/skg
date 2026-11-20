@@ -1,0 +1,4 @@
+title: If a node appears more than once in a view, its contents are only shown the first time.
+pid: fd05cf85-8b53-48f7-90f2-c7adc2479c50
+body: |2-
+  This prevents infinite loops.

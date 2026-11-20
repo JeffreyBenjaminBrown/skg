@@ -1,0 +1,8 @@
+title: Keep raw output out of the conversation
+pid: 16790c81-cf5e-42b5-94d8-6cd645adaeef
+body: |2-
+  Keep ordinary test output unless Jeff has agreed to the optional captured-log
+  workflow. When using that workflow, retain complete output in an ignored log
+  and report the command, result, duration/counts, first useful failure, and log
+  path. Bound exploratory output without hiding failures. Do not paste thousands
+  of passing lines into the conversation or a planning document.

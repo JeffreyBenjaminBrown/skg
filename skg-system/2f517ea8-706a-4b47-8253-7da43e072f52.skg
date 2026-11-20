@@ -1,0 +1,31 @@
+title: Hoist, the Hoist confirmation, Abort
+pid: 2f517ea8-706a-4b47-8253-7da43e072f52
+body: |2-
+  *Hoist* is the save's repair of overPrivateText: it moves the
+  selected title and body of a privacy telescope up to its home
+  section, removes the lower copies of the title and body, and keeps
+  the lower sections' relationships and aliases where they are. The
+  name is the docs' and the wire's (=telescope-hoist-confirmation=,
+  =approved-hoist-pids=); the code is
+  =server/serve/handlers/telescope_hoist.rs=.
+
+  The *Hoist confirmation* is how a save offers the repair. After
+  validation and before any write, the save rereads every telescope it
+  would write; if one currently selects a title or body from below its
+  home, nothing is skgsave-committed and the client is asked to choose
+  *Hoist* or *Abort*, with the IDs and homes of the telescopes
+  concerned and no text. Hoist re-issues the same save carrying the
+  exact IDs the user approved; the server rereads and reclassifies them
+  as one batch on that retry, and a telescope that has become dirty in
+  the meantime raises a new confirmation. Abort writes nothing and
+  leaves every file as it was; the repair is then a hand edit of the
+  =.skg= sections. Among the save's confirmations the Hoist
+  confirmation comes after the delete-from and strandeds confirmations
+  and before the fork confirmation. Scripts and maintenance writers
+  have no answer to give and refuse the save instead.
+
+  Approving a Hoist publishes text on disk; it does not authorize
+  showing overPrivateText in a view, which is the text-release
+  approval's separate question (see "overPrivateText"). See
+  [[id:ae1f8c25-d6a4-490f-bad5-aa04279daf72][privacy telescopes]] for the invariant the
+  repair restores.

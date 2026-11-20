@@ -1,0 +1,24 @@
+title: tombstone, entombstone
+pid: 114f3950-71ac-421b-ad85-82e52bda5898
+body: |2-
+  A *tombstone* is a viewnode with no title, no ID and no change facts,
+  shown as "something stood here", left where a headline stood that can
+  stand there for nothing, and holding that headline's children. The
+  refresh *entombstones* a headline (makes it one) when, in the diff
+  view, its gnid names nothing the view may show (a node HEAD lacks
+  too, or a restricted node that no record the skgrepo restriction
+  shows names; in a content view such an occurrence vanishes instead,
+  see "vanish"), when it describes its viewparent from where it cannot (see
+  "the refresh's rungs, unsayable" among the terms of the implementation), when
+  the change it described is gone, and when it is a folder left with
+  nothing in it that the save does not read and that is not the flags
+  folder. A text search leaves one where it excludes an
+  overPrivateText node (see "text search, search view, enrichment").
+  The refresh prunes a childless tombstone before the buffer is
+  rendered, a root included, so a user sees one only where it
+  holds something. The save discards anything typed on its line, and no
+  child of a tombstone claims membership (a headline typed under one,
+  taking the skgrepo of the nearest occurrence above, is saved as an
+  orphan graphnode; see "claims membership"); every folder accepts one
+  among its children. In code the kind is 'ViewnodeKind::Tombstone',
+  and on the wire the atom =tombstone=.

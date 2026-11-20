@@ -1,0 +1,24 @@
+title: record, restricted, visible
+pid: 7919f5fb-639d-40df-9193-9ad4427f68e5
+body: |2-
+  A *record* (a term of plan 06, as are *restricted* and *visible*
+  here) is a relationship as one node's file states it, in one
+  skgrepo's section (see "recorder, carrier" and "privacy order and
+  relRepo"); its skgrepo is its relRepo. A record is *restricted* when
+  the skgrepo restriction keeps its relRepo out, and *visible*
+  otherwise. A node is *restricted* when the skgrepo restriction keeps
+  its home skgrepo out; in the diff view its home is the worktree's, or
+  HEAD's when the worktree lacks the node. A member of a goal is
+  visible when its record and its node's home are both unrestricted.
+  The code asks the two questions by
+  'SkgrepoRestriction::record_is_visible' and
+  'SkgrepoRestriction::node_is_restricted' ('server/skgrepo_sets.rs'),
+  which share one body, and by nothing else: the records of a list it
+  shows are 'SkgrepoRestriction::visible_records'; whether the graph
+  shows the node a gnid names, 'InRustGraph::gnid_presence_gated' and
+  'InRustGraph::node_is_shown' answer by the second question; and
+  whether a connection is unrestricted,
+  'SkgrepoRestriction::is_unrestricted'. With no skgrepo restriction every skgrepo is
+  shown; under any skgrepo restriction a record whose relRepo the
+  config does not name is visible, and a node whose home skgrepo the
+  config does not name is unrestricted.

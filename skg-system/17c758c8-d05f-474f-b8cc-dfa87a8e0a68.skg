@@ -1,0 +1,8 @@
+title: pruned change view
+pid: 17c758c8-d05f-474f-b8cc-dfa87a8e0a68
+body: |2-
+  The viewforest the "all changes" buffer renders, defined by the sets
+  C, R, U and D (below; 'server/diff_view/pruned_change_view.rs',
+  functions 'prunedChangeView_...'). The merges and skgrepo-changes
+  buffers render pruned change views over subsets of the changes: the
+  nodeMerges, and the home skgrepo and relRepo moves.

@@ -1,0 +1,12 @@
+title: other changes
+pid: 6f2af2f7-705e-485d-be71-107611036151
+body: |2-
+  What a node's files changed that no other change-forest leaf records,
+  all of it one leaf of the node, drawn as one change viewnode
+  ('(otherChanges KIND...)'): its text moved between a private and a
+  public section, its attribution changed, an alias moved to another
+  skgrepo, one of its lists was reordered, or something else in its file
+  changed. Its herald names each in those words, and its body shows the
+  old order of a reordered list against the new. Its mark covers the
+  state it was made on: a later change of the same kind unmarks it
+  ('docs/diff-view.org', "Other changes to a node's file").

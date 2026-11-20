@@ -1,0 +1,5 @@
+title: 'C-c r n p : skg-diffView-goto-next-processed-change'
+pid: d2fdb9b9-1de8-47ed-910a-9bbf2bf768c2
+body: |2-
+  The same, visiting only processed headlines with change facts. Past the last one it
+  says "No further processed change".

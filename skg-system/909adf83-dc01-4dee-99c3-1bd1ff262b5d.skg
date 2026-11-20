@@ -1,0 +1,7 @@
+title: Ask for the vocabulary check after each plan
+pid: 909adf83-dc01-4dee-99c3-1bd1ff262b5d
+body: |2-
+  The two-question check in 'plans.org' ("what terms did this plan
+  coin; what does its code cite") costs one agent and ten minutes. Ask
+  for it when a plan finishes, before the review, so that a confusing
+  word is caught before the next plan spreads it.

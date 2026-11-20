@@ -1,0 +1,7 @@
+title: 'C-c m n p : skg-mark-node-processed'
+pid: 2041efdb-936d-4cf3-817c-555535747245
+body: |2-
+  Marks the node at point processed, then saves: the changes of the node
+  itself, not its relationship to the headline above it. With C-u, the
+  node of every headline in the subtree; with C-u C-u, the same, the
+  server walking outward from new nodes (see the preamble).

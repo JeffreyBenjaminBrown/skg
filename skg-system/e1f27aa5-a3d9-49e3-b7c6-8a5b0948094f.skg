@@ -1,0 +1,14 @@
+title: The budget bounds only requests outside U
+pid: e1f27aa5-a3d9-49e3-b7c6-8a5b0948094f
+body: |2-
+  An editable-view request (C-c s e) behaves as in any view: it makes
+  its occurrence the editable one, write-protecting the other (whose
+  content keeps its own editability), and passes on to its content:
+  each member it shows or draws whose node has no editable occurrence
+  is editable while the budget allows, and passes it on in turn. Every
+  extension charges 'initial_node_limit', the nodes of U included, but
+  the budget refuses only a node outside U that a request reached: a
+  node of U is editable whether the rule above or a request reached
+  it. Charging U overcounts, which the budget can afford: it exists to
+  stop an explosion, not to count. A request adds no default folders,
+  since the diff view draws none.

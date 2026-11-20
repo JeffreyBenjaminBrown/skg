@@ -1,0 +1,10 @@
+title: Check a plan's words before the run
+pid: e232eced-f24a-4310-81a6-6ee9c1ece0ee
+body: |2-
+  A plan's vocabulary section lists the words it uses. Before the
+  run, check each against the glossary and the code. "Hidden",
+  "ladder", "merge" and "extent" were coined or overloaded in plan
+  04.1's own text, and the agents followed it; the two-question
+  check after a plan cannot undo a plan's word. Coining a word is
+  fine when the plan says so at first use; reusing one that means
+  something else is not.

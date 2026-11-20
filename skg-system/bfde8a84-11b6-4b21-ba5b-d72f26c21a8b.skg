@@ -1,0 +1,4 @@
+title: Everything is contained in at most one container.
+pid: bfde8a84-11b6-4b21-ba5b-d72f26c21a8b
+body: |2-
+  The ones that aren't are (document) 'roots'.

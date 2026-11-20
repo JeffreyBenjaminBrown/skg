@@ -1,0 +1,33 @@
+title: clone, and the fork operation
+pid: 413f93e1-c770-4c80-955b-fc376afba184
+body: |2-
+  To *fork* a node N is to turn it into an editable *clone* C in a
+  skgrepo you own. C copies N's title, body, and child-list (the child IDs
+  only — shallow), and =forks= N, once (so N's later additions surface
+  to C as unintegrated forked content, and mirror substitution shows C
+  wherever N would appear, from the perspective of C's skgrepo, or of
+  one that holds no mirror of N where C's is declared first). Children of N
+  that the forking edit deleted become C's
+  =hides=, and thereafter any child removed from
+  an owned note's contains that some member its forks folder shows
+  still contains (a forkee, a forker it does not hide, or an indirect
+  member) is hidden likewise on save, so that it does not come back
+  under that member, unless another note of yours keeps it then (see
+  "integrated"; re-adding it unhides). The fork operation
+  refuses to fork a node you already fork, naming your fork of it:
+  silently making a second clone would more often be an accident. A
+  deliberate second fork is made by having another note of yours fork
+  N, which nothing refuses: any number of notes may fork one note.
+
+  Forking spans two gestures, foreign and owned:
+
+  - /implicit/ (foreign N): make N editable (=C-c s e=), edit it, and
+    save; any real change to a foreign node is read as a fork request, and
+    the save asks you to confirm. N is left untouched on disk.
+  - /explicit/ (owned N): =skg-fork-node= (=C-c m f=), for a node you
+    already own — used to deepen a fork chain (D forks C forks
+    N, all owned). N keeps its own content; only the clone is added. The
+    clone is built from N's saved state, so the command refuses a dirty
+    buffer.
+
+  See =docs/forks.org= and =docs/sharing-model.org=.

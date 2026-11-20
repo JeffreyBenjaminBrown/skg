@@ -1,0 +1,15 @@
+title: removed member, former member
+pid: 9b2b5f4a-3e86-43e0-9745-76284a764a3c
+body: |2-
+  A *removed member* is an occurrence with the change fact '(rel
+  removed)': its node survives, but its relationship to its viewparent
+  exists in the before-graph only. It carries a ghost warrant ('(view
+  ghostWarrant)') and, where its viewparent's claims are read, claims
+  nothing ('noClaim'), so a save leaves the relationship removed. It is
+  encoded so in content, in a partner folder and in a ghost's old
+  content alike. In content position it follows the editability rule
+  as any occurrence the refresh draws: editable at its node's first
+  occurrence in level order, write-protected at a later one. A *former
+  member* is any viewnode standing for such a before-only relationship,
+  ghosts included. The phrase, like "new member", names the node by its
+  membership's fate.

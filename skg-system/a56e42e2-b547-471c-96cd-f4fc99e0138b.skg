@@ -1,0 +1,52 @@
+title: Diff heralds
+pid: a56e42e2-b547-471c-96cd-f4fc99e0138b
+body: |2-
+  In the diff view (see the glossary's "Terms a user meets in the
+  diff view"), the heralds show the three kinds of change: a vognode's =∃+=
+  or =∃-= says that HEAD lacks it or the worktree does (its node's
+  existence), its =M= ("modified") that both have it and its file
+  records a change (its other properties), and =~+= or =~-= that HEAD
+  or the worktree lacks its relationship to its viewparent. =M= stands
+  where =∃= stands: a node is new, deleted or modified, never two of
+  those. A folder member shows them as a content member does, so a
+  modified write-protected member reads =☮ M=; its =~+= or =~-= is its
+  relationship, of the folder's kind, to the folder's viewparent. On an alias, ID or
+  flag member, which has one diff object, the same change facts read =+= and
+  =-=, and the one object of an unknown viewnode or a restricted viewnode reads =~+= or =~-=. A =✓= after a diff object's change facts says its
+  changes are marked processed, so =∃+✓ ~+= is a new node, approved,
+  in a new relationship that is not; =M✓= is a modified node whose
+  changes that neither its =~= nor a headline under it shows are marked
+  (what =node= names there, 'docs/diff-view.org', "What a request names"). A processed aggregate (a
+  folder or changeset marker) shows a =✓= when everything under it is processed. =request:processed= and
+  =request:unprocessed=, with =:node=, =:rel=, =:newContent= or =:newOutward=, are pending processed
+  requests, consumed by the next save.
+
+  These heralds render the headline's one =(diff ...)= form (see
+  'docs/api-and-formats.org', "Metadata of the diff view"): =∃+= and =∃-=
+  come from its =(node added)= and =(node removed)= parts, =M= from
+  =(properties changed)=, =~+= and =~-= from =(rel added)= and =(rel
+  removed)= (the style keys 'existence' and 'properties' in
+  'shared/herald-styles.json'), each =✓= from its =(processed ...)= part
+  (=M='s, like =∃='s, from =node= there), and the pending processed request from the
+  =(processed ...)= or =(unprocessed ...)= in the headline's =(editRequest ...)=;
+  its =(leaves ...)= part shows nothing. The rules match the processed part once
+  per diff object, so a =✓= follows its own object whatever the raw
+  order of the parts.
+
+  A ghost (a node the worktree lacks, shown with HEAD's
+  text) reads =ᗣ☮=. The change viewnodes the view adds are labels: =old title
+  and body= (or =old title=, =old body=) with its =body diff=, =⌂ -OLD
+  +NEW= for a home skgrepo move, =relationship moved from OLD to NEW=, the
+  changeset markers =its content changed= and =some content relationships
+  changed skgrepo=, and a node's other changes, each in words, joined by
+  "; " (=its content was reordered; its attribution changed=). A folder shown because its
+  membership changed reads =its X changed (this file)= or =(other files)=
+  (the forks folder, of both sides, =its forks changed=), with =✓= when every changed membership is processed; the server writes the
+  folder as its bare atom, and the client sees the change in its
+  members and draws that label, from 'folder_heralds' in
+  'shared/herald-styles.json', in place of the folder's own. The
+  nodeMerge folders read =it was acquired by= and =it acquired=.
+
+  In the skgrepo-changes buffer a moved node's own heralds add =-OLD
+  +NEW=, and ~Δ⌂=a~ when the nearest moved ancestor (here the parent, a)
+  moved the same way.

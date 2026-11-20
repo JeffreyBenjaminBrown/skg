@@ -1,0 +1,7 @@
+title: One can request an 'aliases view' at an orgnode.
+pid: de9c75cf-fdb6-4e32-aaa3-3801f1f4801a
+body: |2-
+  Call that orgnode N.
+  Doing this inserts into N a child entitled 'aliases',
+  whose children (so N's grandchildren) are the aliases of N.
+  This permits the user to edit the aliases of N.

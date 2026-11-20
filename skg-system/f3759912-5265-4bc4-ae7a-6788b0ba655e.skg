@@ -1,0 +1,5 @@
+title: '<localleader>rpp : :SkgDiffViewGotoPreviousProcessedChange'
+pid: f3759912-5265-4bc4-ae7a-6788b0ba655e
+body: |2-
+  Like <localleader>rnp, backward. Before the first one it says "No
+  earlier processed change".

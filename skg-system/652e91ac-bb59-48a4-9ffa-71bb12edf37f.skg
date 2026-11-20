@@ -1,0 +1,9 @@
+title: Key Project Context
+pid: 652e91ac-bb59-48a4-9ffa-71bb12edf37f
+body: |2-
+  This is the **skg** project - a knowledge graph manipulation system with:
+  - **Rust server** (`server/`) handling the in-memory graph and Tantivy index
+  - **Emacs client** (`elisp/`) providing org-mode interface
+  - **YAML data storage** in `.skg` files
+  - **TCP communication** between components:
+    - Port 1730 (default): Rust-Emacs API communication (configurable)

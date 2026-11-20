@@ -1,0 +1,11 @@
+title: The churn ledger
+pid: e82036e3-a24b-488a-9881-5096d05d2a4f
+body: |2-
+  What was built in one plan and removed or rewritten in a later one:
+  commit hashes, lines, elapsed time, the stated reason quoted from the
+  review that decided it, and a cause class: a requirement the plan
+  got wrong; a requirement the human changed with new information; a
+  design the executing agent chose and the reviewer rejected; a
+  mechanism built on a false belief about the existing code; naming or
+  housekeeping. Totals by plan and by cause. This is the one report
+  the planner must read in full, because the lessons are in it.

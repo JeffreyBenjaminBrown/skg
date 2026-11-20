@@ -1,0 +1,94 @@
+title: Content view
+pid: 7efefb2a-8f15-4932-9c73-940f619b68fd
+body: |2-
+  Rust sends the entire text document to Emacs, org-bullets and all.
+  Each org-bullet is followed by a space, some metadata, a space,
+  and then headline text.
+
+  The metadata is an s-expression containing bare values and key-value pairs,
+  wrapped in "(skg ...)" -- something like
+  #+begin_example
+   (skg (vnid 0a) folded node (gnid long-string) (skgRepos (nodeRepo main)) writeProtected)
+  #+end_example
+  Every headline has this one shape: its viewnode ID first, then the
+  position atoms (=focused=, =folded=, =bodyFolded=), then its kind,
+  and every part of the headline beside the kind at the top level, in
+  any order, the derived facts gathered in =(view ...)= and =(diff
+  ...)=, which the parser skips (see "The metadata headers"). The kind
+  is a bare atom (=node=, =ghost=, =unknown=, =restricted=, =alias=,
+  =id=, =tombstone=, a folder atom, =bodyDiff=), or, for a kind with a
+  parameter, a small form naming it (=(flag F)=, =(oldText ASPECT)=,
+  the two moves, =(changesetMarker KIND)=). A headline naming no kind
+  is a node. Each kind
+  takes only its own parts; =(gnid ID)= names the node a node, a
+  ghost or an unknown viewnode stands for, and =(skgRepos (nodeRepo REPO)
+  [(relRepo REPO)])= its home skgrepo and the skgrepo recording its
+  relationship to its viewparent, the relRepo written only when it
+  differs from the default (a ghost has no relRepo; an unknown viewnode
+  and an alias have only one). A ghost, an unknown viewnode and a restricted
+  viewnode require their =(gnid ID)=. The fields a user sets
+  (=noClaim=, =writeProtected=, the requests of =(editRequest ...)=
+  and =(viewRequests ...)=) a kind takes as
+  =shared/metadata-fields.json= lists them for it: the parser reads
+  that table, as both clients' metadata editors do, and refuses a
+  field or a request the table does not list for the kind. The parser
+  refuses the retired spellings listed in "The metadata headers" with
+  a message naming the grammar.
+
+  Any such string is valid metadata
+  (although much of it might be ignored by Emacs),
+  if and only if it adheres to the following:
+
+  - parentheses
+    - The metadata starts with "(skg" and ends with ")".
+    - Key-value pairs are wrapped in their own parens: "(key value)".
+  - whitespace
+    - Whitespace separates all elements.
+    - Extra whitespace is ignored.
+    - Keys and bare values should contain no whitespace. A value that contains
+      whitespace is represented as a quoted string atom; server-rendered skgrepo
+      names and repo-derived herald values use this form automatically.
+
+  On a node, the bare atom =noClaim= says the node
+  takes no part in the membership represented by its viewparent: it is
+  preserved and displayed but does not alter the parent's membership on
+  save. A member carries nothing, and so does a view root. The atom is
+  meaningful only where the save reads the claims of the viewparent's
+  children: under an editable occurrence, and under an editable folder
+  (forks, hidden-outside, alias) of one. In the forks folder a member
+  claims exactly when the folder's viewparent forks it: a forker-only
+  or an indirect member, drawn there by the refresh, carries =noClaim=. Under any
+  other viewparent ('docs/glossary.org', "claims membership", lists
+  them) no child claims, whatever it carries, and the server writes no
+  =noClaim= there.
+
+  The atom =contentInPart= marks an editable member as such of a forks
+  folder, which shows its node's content only in part
+  ('docs/forks.org', "Moving a member out of the folder"). The server
+  writes it on every editable occurrence standing directly in a forks
+  folder, and on no other; it is a declared part, not a view fact, so
+  it goes with the headline when the user moves it. Wherever such a
+  headline stands but in a forks folder, the save reads its title and
+  body and none of the headlines under it as its content: its content
+  stays as the graph has it, and the redrawn view, which writes no
+  =contentInPart= there, draws that content whole.
+
+  The atom =omittedBody= in =(view ...)= accompanies =writeProtected= on a
+  write-protected node whose graphnode has a body — one the rendering
+  hides. Herald "B", hugging the ☮. A derived fact: the parser skips
+  it; the view regenerates it.
+
+  A chain node -- a node of the containerward chain under a member of a
+  partner folder (in a content view, under a member of a containers
+  folder that stands under a forks folder's member), a container of its
+  viewparent (see "View requests" below) -- carries =writeProtected=, no =noClaim= (it stands under a
+  write-protected occurrence, where nothing claims), and, being no
+  member, no =(birth ...)= in its =(view ...)= (see "Stats metadata"
+  below). It is known by where it stands, so it is still one after a
+  save. A chain node carries no change facts.
+contains:
+- 77243a37-3470-44f1-95fe-f51108460122
+- 56d5e1f1-2600-48ec-9529-9b6065be9e7c
+- fae0f737-3c2b-4732-a93b-8edb5846515d
+- 6104cd26-5993-4984-8d2f-169430816b11
+- ba1eceb1-a3e9-4f52-a4d8-88216f3555e3

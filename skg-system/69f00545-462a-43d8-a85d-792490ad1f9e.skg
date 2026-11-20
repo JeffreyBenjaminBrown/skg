@@ -1,0 +1,17 @@
+title: update-relevant neighborhood
+pid: 69f00545-462a-43d8-a85d-792490ad1f9e
+body: |2-
+  For a set of IDs in one graph snapshot, the *update-relevant
+  neighborhood* contains the IDs themselves, their immediate neighbors in
+  both directions along =contains=, =linksTo=, =forks=, and
+  =hides=, and every mirror of each ID, whatever any skgrepo
+  restriction shows (see "mirror"): a change to any relationship among a
+  note's mirrors can change which of them stands where another is
+  drawn. The mirrors are taken from the original IDs only, never from an
+  ordinary neighbor. Thus it includes no mixed ordinary/mirror path
+  and no two-hop ordinary path. Saves compute this
+  neighborhood independently in the before and after graph snapshots.
+  The collateral redraw of clean views uses the whole neighborhood;
+  the dirty-view conflict check uses it without =linksTo=, in both
+  directions ('update_relevant_neighborhood_over' in
+  'server/dbs/in_rust_graph/relation_accessors.rs').

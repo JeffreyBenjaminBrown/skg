@@ -1,0 +1,24 @@
+title: The form of a plan
+pid: 58417063-b0af-4125-ba54-24b94260646f
+body: |2-
+  - It is a unitary declaration: "nothing here is open for discussion",
+    self-standing (every term defined in it or in 'docs/glossary.org'),
+    with the review that produced it named once as background nobody
+    needs to read.
+  - Sections: assignment and authority; commits (one or a few per
+    slice, each naming the plan document and the slice; the slice's
+    last code commit carries its docs and its DONE keyword); scope;
+    vocabulary; agreed behavior (what); pitfalls (why); code map
+    (where); implementation sequence (how, one slice per headline, each
+    ending with its tests); verification and completion.
+  - Write slice headlines as '** TODO Slice N: ...'. The runner looks
+    for DONE; agents remark on a bare headline every time.
+  - Name one-time tools as one-time (a corpus check that answers a
+    question once should not become a workspace member).
+  - Name the one stop the plan expects, if any, and say that stopping is
+    otherwise for the conditions in 'when-to-stop.org'.
+  - Say where deviations go ('progress.org' beside the plan, under a
+    headline naming the plan).
+  - Check the vocabulary section's words against the glossary and
+    the code before the run ('names.org', "Check a plan's words
+    before the run"): a plan's coinage spreads through every slice.

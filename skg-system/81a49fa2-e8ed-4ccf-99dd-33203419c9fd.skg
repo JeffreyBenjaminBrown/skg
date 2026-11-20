@@ -1,0 +1,41 @@
+title: 'The refresh: how a view follows the graph'
+pid: 81a49fa2-e8ed-4ccf-99dd-33203419c9fd
+body: |2-
+  Every buffer the server sends is drawn by one operation, the
+  *refresh* (=refresh_viewforest= in =server/refresh/mod.rs=). It takes a
+  viewforest the parse has read and validation accepted (every new
+  headline already has a gnid and a skgrepo), the *truth* (=Truth=: the
+  in-Rust graph as the skgrepo restriction lets it be seen, with the
+  config), the mode (=RefreshMode= in
+  =server/refresh/mode.rs=: a content view, or a buffer of
+  the diff view over the graph straddle, with the processed store) and
+  the node budget (=initial_node_limit=). It
+  changes the viewforest in place and returns nothing of what it
+  changed; each caller renders the viewforest once, when it is done
+  with it. A fresh content view is the refresh of a stub
+  (=stub_of_fresh_content_view= in =server/update_buffer.rs=: one
+  editable occurrence per requested node, asking for its containers
+  folder and to be the node's editable occurrence); a rerender, the
+  saved view and every collateral view are refreshes of what the
+  buffer holds (=refresh_view= in =server/rerender_pass.rs=); the search buffer is the refresh of
+  a stub built from the hits (=build_search_viewforest=, which
+  =draw_search_buffer= refreshes); the diff
+  view's buffers are refreshes in diff-view mode (=docs/diff-view.org=,
+  "Rendering a buffer").
+
+  The refresh decides everything from the buffer and the truth as they
+  are now, never from what either was at an earlier save. So it is a
+  fixpoint: refreshing its own output changes nothing, up to the
+  viewnode IDs it assigns. =tests/idempotence.rs=
+  asserts this over every content-view and diff-view fixture.
+contains:
+- ef015f0b-cda0-450e-84cc-ce94eab69a28
+- 090dd27a-d46c-4cf8-ab85-4c27a889190a
+- 33b78160-b591-4a73-80f9-89f236eba2da
+- 61e5cb17-a97c-4d3b-bf81-e2bccd1b4cb5
+- b4157935-fe23-4bac-bf8b-45d80a6a6841
+- 04932a6d-8064-40b8-90ba-3129cd76d482
+- 73be3889-5c61-4a49-b482-6e6f550dbb19
+- 008f2957-4d82-4c45-b814-2ef8429c604a
+- 8bf4341e-aa43-4440-a155-651bcf68c7ee
+- 40f7caec-0575-485e-b14a-7a54eb299d5c

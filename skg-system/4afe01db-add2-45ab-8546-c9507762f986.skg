@@ -1,0 +1,14 @@
+title: skg-strip-trailing-whitespace-from-bodies
+pid: 4afe01db-add2-45ab-8546-c9507762f986
+body: |2-
+  Strips trailing whitespace from every line of every body,
+  and trailing blank lines from each body's tail,
+  in every skgrepo you own.
+  Foreign skgrepos are never written, so they are left untouched.
+  It ignores the skgrepo restriction: it rewrites the bodies of nodes
+  the skgrepo restriction keeps out too.
+  Rewrites exactly the .skg files whose bodies change;
+  the derived caches are refreshed to match.
+  Open views stay valid: their saves are not refused for it.
+  Review the result with 'git diff --ignore-all-space',
+  which should show nothing.

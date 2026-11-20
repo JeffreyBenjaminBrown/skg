@@ -1,0 +1,25 @@
+title: Fields
+pid: 3918511d-8bbe-44f3-a2a1-43ac50c129d9
+body: |2-
+  | Field                | Required | Default | Description                                                      |
+  |----------------------+----------+---------+------------------------------------------------------------------|
+  | =tantivy_folder=     | yes      |         | Directory for the Tantivy search index. Relative to data root.   |
+  | =port=               | no       | 1730    | TCP port for Rust-Emacs communication.                           |
+  | =initial_node_limit= | no       | 1000    | Max nodes to render in initial content views.                    |
+  | =timing_log=         | no       | false   | When true, writes a JSON log, =server.jsonl=, beside =server-to-user.log= (see "Log files"). |
+  | =beep_when_server_becomes_available= | no | true | When true, plays a local sound after server initialization finishes. |
+  | =default_repo_set= | no | the most private owned skgrepo | The skgrepo restriction when a client connects: the most private owned skgrepo to show, foreign skgrepos shown. It must name an owned skgrepo; a foreign one is refused. The default is no skgrepo restriction. Runtime changes are per connection and are not written back. |
+  | =max_roleTree_depth= | no | 20 | Max breadth-first depth of a containerward chain. |
+  | =processed_marks_file= | no | =processed-marks-STEM.json= | The diff view's processed marks file (see "Processed marks file"). Relative to data root. |
+  | =repo_watch_quiet_ms= | no | 500 | How long, in milliseconds, the skgrepo directories must be quiet after a =.skg= file changes on disk before the server reloads the changes (see "Repo files reloaded"). A rebuild applies a changed value. |
+
+  The retired keys =db_name=, =delete_on_quit=, and =auto_audit_daily= are
+  rejected with a migration error; remove them from older configurations.
+  So is =owned_folder=; see Skgrepos, below.
+
+  Any other top-level key the server does not know is not refused: it
+  has no effect, and the server warns about it, naming the current
+  spelling of a renamed key (=max_role_tree_depth= is now
+  =max_roleTree_depth=). =skg check-config= prints these warnings and
+  still exits 0; the server logs them and serves them to each client
+  (see "Server warnings", above).

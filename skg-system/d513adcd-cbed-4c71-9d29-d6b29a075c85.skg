@@ -1,0 +1,32 @@
+title: 'C-c f i   : skg-search-interactive'
+pid: d513adcd-cbed-4c71-9d29-d6b29a075c85
+body: |2-
+  Same as skg-search, but after the search terms it prompts:
+
+  : Type a character for each search option: (r)egex, (b)ody, (t)antivy syntax, (h)elp:
+
+  Type one character for each option you want, in any order,
+  then RET. An empty answer uses the same conservative defaults
+  as =skg-search=. Unrecognized characters are ignored. Typing
+  =h= opens this documentation (unfolded, with point on this
+  headline) and abandons the search.
+
+  - =r= (*regex*) — per-token regex instead of phrase search.
+    Bypasses the query parser; each whitespace-separated piece
+    is handed to Tantivy's 'RegexQuery'.
+  - =b= (*body*) — also search the body field (titles are
+    always searched).
+  - =t= (*tantivy syntax*) — Tantivy phrase and operator syntax
+    (AND/OR/NOT/+/-). In non-regex mode this passes through
+    Tantivy's QueryParser (phrase quotes, grouping, field: all
+    work; intra-word operator chars get escaped so =foo:bar=
+    remains findable). In regex mode, AND / OR / NOT / +foo /
+    -bar combine the per-piece RegexQueries at the document
+    level, with conventional precedence and grouping by
+    stand-alone parens; phrase syntax does not apply there. See
+    the regex=true section below.
+contains:
+- 3eaaf23c-6bb2-4803-9a71-e587fee6ec42
+- 8b7aab46-4de1-49ef-8746-96647dbb7bc9
+- a049d106-9680-469e-817b-134ee3ffab32
+- c8da0575-8cdb-4907-a33d-18fecafe1ba8

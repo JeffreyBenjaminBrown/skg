@@ -1,0 +1,9 @@
+title: Cannot move and merge a node in the same save
+pid: a10b87c5-09d7-4fa5-8961-85d373cb45fe
+body: |2-
+  If a single save tries both to move a node's skgrepo *and* to merge
+  it (acquirer or acquiree), skg refuses with
+  =CannotMoveAndMergeSimultaneously=
+  (=server/from_text/validate.rs:151=,
+  =tests/move_repo.rs::test_move_and_merge_simultaneously_rejected=).
+  Do them in two separate saves.

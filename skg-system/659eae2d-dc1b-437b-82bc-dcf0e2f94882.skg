@@ -1,0 +1,33 @@
+title: 'C-c v m : skg-view-metadata'
+pid: 659eae2d-dc1b-437b-82bc-dcf0e2f94882
+body: |2-
+  When called from a node in a view of the graph,
+  this switches to a view of the metadata of that node,
+  with one item per line.
+  It's easy to edit this way.
+  Each field a user may set on the headline's kind is shown,
+  at its default when it is absent, and S-left / S-right cycle
+  it through the values that kind takes,
+  as 'shared/metadata-fields.json' lists them:
+  a write-protected node is offered no delete, nodeMerge or flag request,
+  a removed member is also offered restoreRel,
+  a ghost restoreNode.
+  A value that needs more (a nodeMerge's target, relRepo's skgrepo,
+  a flag and its value, a folder's relation) prompts for it.
+  A field left at its default is dropped when the edit is applied
+  (C-c C-c).
+  A processed request the diff view's gestures wrote
+  (see C-c m) is shown in the edit request field, beside the other
+  request; deleting it there clears it.
+  After each headline, in parentheses, is the herald that field or
+  value gives a headline in a view, colored as there (once the server
+  has sent its herald rules); the hint is not text, and shows what
+  the editor opened with, not what cycling a value makes.
+  Metadata edited by hand, here or in the view itself, is checked
+  against the metadata grammar when you save: a headline whose metadata
+  breaks it refuses the save, and the refusal names the part that
+  breaks it.
+  Note that some properties don't make sense to edit,
+  like the count of how many contents it has.
+  (If you want to change how much content a node has,
+  don't change the node's metadata; change its children in the view.)

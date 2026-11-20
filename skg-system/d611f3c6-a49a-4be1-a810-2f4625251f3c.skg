@@ -1,0 +1,29 @@
+title: Birth
+pid: d611f3c6-a49a-4be1-a810-2f4625251f3c
+body: |2-
+  The letter of a relation that put this occurrence here is shown low;
+  its counts keep their own styles. An occurrence can have more than one
+  birth relation. A side whose only members are ancestors that the birth
+  relation already accounts for has tier low: =aC= (the parent is the sole
+  container) shows the 'a' low. In the forks folder, whose viewparent
+  is each member's grandparent 'b', the heralds tell the sides apart:
+  a forkee shows =bK= (b forks it), with any other forkers counted
+  before the letter (=2bK=: b and one more fork it), and the 'b' medium,
+  because of b's floor; a forker-only member shows =Kb= (it forks b),
+  with any other forkees counted before the 'b' too (=K2b=: it forks b
+  and one more; on either side the numeral precedes the ancestor flags,
+  as in =C9a=); a mutual shows =bKb= (=bK2b= when it forks one more).
+  An indirect member, a mirror of b joined to it only through others
+  (=docs/forks.org=, "Every mirror, flat"), shows neither 'b' flag,
+  since it neither forks b nor is forked by it: =K1= for one that
+  forks one note, say. The birth letter follows the side that stands
+  as a member: =(forks in 2)= on a member that claims, =(forks out 2)=
+  on one that forks b, both on a mutual, none on an indirect member.
+
+  Immediately after =K=, a crucial =ĥ= (precomposed h with circumflex)
+  means this occurrence stands in the place of one of its mirrors. =2Kĥ3= is an
+  example. It comes from the load-bearing 'inPlaceOf' part; an
+  occurrence without that fact has no =ĥ=. The
+  eighth ancestor is a plain =h=, so =Kĥh= shows the two glyphs together.
+  The fact preserves the original member ID when a substituted view
+  is saved. See [[id:e6bc021f-1cb8-4ab0-9a5f-53874e60e14b][mirror substitution]].

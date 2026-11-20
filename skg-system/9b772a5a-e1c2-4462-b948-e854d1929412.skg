@@ -1,0 +1,8 @@
+title: ']i (also <localleader>in) : :SkgIdNext'
+pid: 9b772a5a-e1c2-4462-b948-e854d1929412
+body: |2-
+  Makes the cursor hop among two kinds of IDs:
+  The ID associated with a node in the view,
+  and the ID associated with a link in a node's title.
+  Every node has an ID,
+  but a title can include multiple or no links.

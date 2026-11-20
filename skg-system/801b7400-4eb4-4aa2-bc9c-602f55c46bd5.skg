@@ -1,0 +1,4 @@
+title: The borrow checker can constrain things.
+pid: 801b7400-4eb4-4aa2-bc9c-602f55c46bd5
+body: |2-
+  In Rust, you sometimes can't nest be cause you need to drop a borrow before getting a mutable reference.

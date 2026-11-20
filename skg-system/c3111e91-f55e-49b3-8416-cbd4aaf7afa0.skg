@@ -1,0 +1,10 @@
+title: Avoid legacy support code
+pid: c3111e91-f55e-49b3-8416-cbd4aaf7afa0
+body: |2-
+  If I ask you to change a name, even if it's part of the API,
+  don't create 'legacy support' code for the old name.
+  This repo contains all the relevant code; so far,
+  there are no other clients or servers to maintain compatibility with,
+  and I'm so far the only user and only human dev.
+contains:
+- 0e2faf9d-7aef-4228-a9a4-0c3bbe3658a1

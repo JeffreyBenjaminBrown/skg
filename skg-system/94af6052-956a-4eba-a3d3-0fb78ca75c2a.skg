@@ -1,0 +1,15 @@
+title: gnid-only vognode
+pid: 94af6052-956a-4eba-a3d3-0fb78ca75c2a
+body: |2-
+  A *gnid-only vognode* (a term of plan 08; 'GnidOnlyVognode' in
+  'server/types/viewnode.rs') stands for a gnid and shows nothing of a
+  graphnode, for one of two reasons, its kind ('GnidOnlyKind'):
+  'Unknown', an unknown viewnode (no graphnode answers to the gnid), or
+  'Restricted', a restricted viewnode (the skgrepo restriction keeps
+  the graphnode out). The two take the same parts on the wire under
+  their own atoms, =unknown= and =restricted=; validation and the save
+  treat them alike, and the ID rule, the heralds and the parser's
+  refusal of text tell them apart. User text says "an unknown viewnode"
+  or "a restricted viewnode", never the type. The retired placeholder
+  'restrictedNode', which stood for nothing, is a different thing, and
+  the parser refuses its spelling.

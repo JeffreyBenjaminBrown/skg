@@ -1,0 +1,7 @@
+title: 'C-c m h p : skg-mark-homeSkgrepo-move-processed'
+pid: 59c5a0b3-8eb0-4dd1-a9a4-581a6c273628
+body: |2-
+  Marks processed the home-skgrepo move of the node at point (or the
+  move at point), then saves. With a prefix argument (C-u C-c m h p), it
+  does the same to every descendant whose home skgrepo moved between the
+  same two skgrepos.

@@ -1,0 +1,9 @@
+title: Start here
+pid: 2b00f2c0-5756-485b-bc2b-6be188c3413f
+body: |2-
+  The files of 'docs/' and 'coding-advice/' are generated from notes;
+  change them only as [[id:c5882ac1-f87e-4c4e-9bae-2b8bbecb8bd6][file:generated-docs.org]] says.
+  Read this file and [[id:2c54c461-fad4-4ea1-b928-16d2d60b47ee][the default token-conservation advice]] once at the
+  start of a task. Then use the reading guide below for the work actually in
+  scope. Do not reread unchanged advice for every follow-up in the same task.
+  Do not load the whole folder or 'maybe-obsolete/' as routine onboarding.

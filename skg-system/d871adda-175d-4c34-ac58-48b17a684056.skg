@@ -1,0 +1,13 @@
+title: nodeMerge ("merge" is always qualified)
+pid: d871adda-175d-4c34-ac58-48b17a684056
+body: |2-
+  A /nodeMerge/ joins two graphnodes: the acquirer takes the
+  acquiree's content and IDs, and the acquiree's text is kept in a
+  text preserver. =C-c s m= ('skg-set-merge-request') writes the
+  request, =(editRequest (merge ID))=, and a save applies it; the diff
+  view's merges buffer shows each nodeMerge since HEAD. In prose, say
+  "merge nodes" or "nodeMerge", never a bare "merge"; the bare word
+  appears only in client-facing wire strings, where only nodes can
+  merge. The acquirer and the acquiree are the nodeMerge's two *merge
+  nodes*, and a save carries each merge request as a *merge pair*: the
+  acquirer's pid and the acquiree's. See =docs/merging.org=.

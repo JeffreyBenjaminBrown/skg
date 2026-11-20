@@ -1,0 +1,22 @@
+title: Change-forest leaves
+pid: 42169e4b-fc68-4cf7-b523-3a8454528fbb
+body: |2-
+  The change-forest ('ChangeLeaves', built from the straddle,
+  independent of any view) holds every change a user can mark: its
+  leaves. A leaf's key is a node and an aspect of it (existence, text,
+  home skgrepo, an alias, an extra ID, a flag), or a relationship (a
+  relation, its recorder, its member) and an aspect of it (existence,
+  relRepo). The recorder of a leaf is the node whose file records it; a
+  relationship's leaf lives under its recorder, and seen from either
+  end it is the same leaf. A node's existence leaf covers everything its
+  files hold when it is new or deleted, the order and skgrepos of its
+  lists among it. A node in both graphs has one more aspect, its other
+  changes ("Other changes to a node's file").
+
+  The builder compares only the nodes that one graph lacks or holds
+  unequal, and the nodes that list a member whose ID the two graphs
+  resolve to different nodes: after a nodeMerge since HEAD, a container
+  that still lists the acquiree's ID is equal in both graphs, yet the
+  after-graph resolves that ID to the acquirer. Such IDs are among the
+  extra-ID differences of the unequal nodes. No other node can record a
+  change, so neither the leaves nor C cost a comparison of every node.

@@ -1,0 +1,18 @@
+title: '''(editRequest restoreNode)'': a deleted node'
+pid: 876f5afe-a155-4b18-83ac-9f8daa0e796a
+body: |2-
+  C-c s n ('skg-restore-deleted-node'; Neovim '<localleader>sn',
+  ':SkgRestoreDeletedNode') writes it into a ghost, the only
+  headline that accepts it (herald "restore node"). The save writes the
+  node's file from the before-graph's copy of it (title, body, aliases,
+  extra IDs, flags, home skgrepo, and its four relationship lists with
+  their relRepos), as it writes any node. An out-link to a node still
+  deleted is kept as HEAD recorded it, and shows as that node's ghost,
+  claiming membership, so a later save keeps it.
+  Then it re-adds the node's in-links, from the before-graph's inbound
+  indexes: each node that recorded it at HEAD (as content, as a
+  forkee or as a hidden node) gains it in that list, at the
+  index it had at HEAD, clamped to the list's length, in the skgrepo
+  that recorded it, unless that recorder is itself deleted (it is
+  skipped) or lists it already. A recorder the save already writes, as
+  the buffer's editable occurrence of it, gains it there.

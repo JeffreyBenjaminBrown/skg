@@ -1,0 +1,18 @@
+title: 'C-c s e : skg-set-editable'
+pid: 83cdb6df-e54e-4a71-89cd-c6a246de86fd
+body: |2-
+  If you want to see the editable view of that node
+  from a place where it is currently shown in a write-protected form,
+  call this function. It will make the current editable view
+  (if it exists) write-protected, keeping what it shows
+  (though no longer as its content: no child claims membership
+  under a write-protected occurrence), and then make an editable view here.
+  Moving editability back to that occurrence later
+  makes those children its content again.
+  Called on a node that is already editable,
+  it extends the node's content editable,
+  up to 'initial_node_limit' extensions,
+  and the members as such in its forksFolder too
+  (one an earlier server drew write-protected, say).
+  A buffer may carry only one such request per node.
+  It does not save; the request takes effect at the next save.

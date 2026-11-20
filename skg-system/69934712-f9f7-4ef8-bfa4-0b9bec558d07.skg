@@ -1,0 +1,9 @@
+title: Look for prior art before and after coding.
+pid: 69934712-f9f7-4ef8-bfa4-0b9bec558d07
+body: |2-
+  After determining what needs to happen,
+  look for code that could be useful for it.
+  Then, after writing that code,
+  look for similar-looking ("quasi-duplicate") code,
+  and try to deduplicate it.
+  If you can't, report the quasi-duplication.

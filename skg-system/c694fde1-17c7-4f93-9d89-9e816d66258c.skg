@@ -1,0 +1,8 @@
+title: If node N overrides node O
+pid: c694fde1-17c7-4f93-9d89-9e816d66258c
+body: |2-
+  then the orgnode representing N is shown instead of O
+  wherever a view of O would otherwise have appeared --
+  including inside a subscription view.
+  (A glyph will indicate the override relationship to the user,
+  who can choose to view the original if they wish.)

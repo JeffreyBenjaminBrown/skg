@@ -1,0 +1,10 @@
+title: branching viewnode (vs a viewbranch)
+pid: 683aafe5-dbd7-4414-8d56-8432c70e7483
+body: |2-
+  A *branching viewnode* is a viewnode with more than one viewchild. Do
+  not confuse it with a *viewbranch* (see "view, buffer, viewforest"):
+  any viewnode together with its descendants, which may be degenerate,
+  its root having one viewchild or none.
+
+  None of this is related to forking a node (see "clone, and the fork
+  operation").

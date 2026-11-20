@@ -1,0 +1,6 @@
+title: Forks made before attributions
+pid: 32f0ad67-a7f4-4412-91eb-ef4c4ee930ba
+body: |2-
+  =tools/migrate-attributions-2026-11/= gives the forks you own an
+  attribution from the first note each one's file lists under =forks=,
+  with no commit, since that is not known. Its =README.org= says how.

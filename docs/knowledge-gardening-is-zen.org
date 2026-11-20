@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# a350ea03-fafc-4d85-90b1-873f8845becc
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * Knowledge gardening is Zen.
 Knowledge gardening is a process thousands of years old. It can be done with pen and paper, but it's faster on a computer.
 

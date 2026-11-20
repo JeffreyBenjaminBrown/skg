@@ -1,0 +1,7 @@
+title: Define a report channel by its negatives too
+pid: 8333a1bd-6255-43f4-8134-f45df8e3b879
+body: |2-
+  Whenever a plan adds a warning, a correction or a log, say what
+  it must not report. Plan 04.1 defined corrections and said
+  nothing about what is not one; slice 9 then reported every
+  drawn child, and the definition had to be narrowed afterwards.

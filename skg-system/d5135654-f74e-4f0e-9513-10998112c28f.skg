@@ -1,0 +1,8 @@
+title: Its confirmation
+pid: d5135654-f74e-4f0e-9513-10998112c28f
+body: |2-
+  Only a commit of everything asks. When some changed node is not
+  processed and the request lacks '(confirmed . t)', the answer is the
+  processed summary with '(needs-confirmation . t)', and nothing
+  changes; the client asks for the typed word "yes" and resends
+  confirmed. A commit of the processed ignores '(confirmed . t)'.

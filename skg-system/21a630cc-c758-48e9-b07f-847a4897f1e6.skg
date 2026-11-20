@@ -1,0 +1,9 @@
+title: If a node N has subscriptions
+pid: 21a630cc-c758-48e9-b07f-847a4897f1e6
+body: |2-
+  then the orgnode representing N
+  has a child C entitled 'subscriptions',
+  whose children (so N's grandchildren)
+  represent each of the nodes N subscribes to (its subscribees).
+  The contents of those subscribees (so N's great-grandchildren)
+  are filtered to remove anything N hides from its subscriptions.

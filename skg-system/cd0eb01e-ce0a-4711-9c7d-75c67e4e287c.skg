@@ -1,0 +1,105 @@
+title: partner folder
+pid: cd0eb01e-ce0a-4711-9c7d-75c67e4e287c
+body: |2-
+  Recall that viewnodes and graphnodes are distinct.
+  Some viewnodes correspond to individual graphnodes.
+  Other viewnodes mediate a relationship between their parent and their children.
+  For instance, a 'forks folder' viewnode contains its parent's
+  mirrors: the nodes its parent forks, those that fork it, and those
+  joined to it only through other mirrors:
+  #+begin_example
+    * note
+    ** forks folder
+    *** forkee
+    *** forker
+  #+end_example
+
+  In that example, the first viewnode represents a graphnode,
+  as do the last two. The note forks the forkee, and the forker forks
+  the note. The second viewnode, though, corresponds to nothing in the
+  graph. It exists only to name the relationship between its children
+  and its parent.
+
+  A *partner folder* is the general concept. In code it is a variant of
+  'Folder', an enum that also holds the three property folders (see
+  "Folder, and its per-kind rules").
+  Recall that there are four relations in the graph:
+  containment, link, forking, and hiding.
+  Because a node can be on either side of each relationship --
+  it can be the container or the content, the hider or the hidden, etc. --
+  there are many kinds of partner folder. Most list, as their children,
+  the nodes that play one role toward their parent. For each relation,
+  one folder could list the members its parent records, and another the
+  recorders that record its parent; for forking, one folder lists both:
+
+  | relation      | members its parent records | recorders of its parent |
+  |---------------+----------------------------+-------------------------|
+  | containment   | not implemented[1]         | containerFolder         |
+  | link          | not implemented[2]         | mentionerFolder         |
+  | forking       | forksFolder[3]             | forksFolder[3]          |
+  | hiding        | hiddenFolder               | hiderFolder             |
+
+  1. A contentFolder would be silly: a node's contents are already its
+     ordinary viewchildren.
+  2. A mentionedFolder would be silly: the links are already visible in
+     the node's own text.
+  3. One folder, 'Folder::Forks', holds every mirror of the note, each
+     once: its *fork partners* (the nodes it forks, and the nodes that
+     fork it), whichever roles each plays, and its indirect members: see
+     "the forks folder".
+
+  The four compound partner folders (see "compound partner folder")
+  each join several relationships -- forking, containment and, for
+  three of them, hiding:
+  - an *integratedElsewhereFolder*, under a member as such of a forks
+    folder, lists that member's contents which the user keeps elsewhere
+    (see "integrated");
+  - a *hiddenInForkPartnerFolder*, under a member as such of a forks
+    folder (a forkee or forker as such), lists that member's contents
+    which the note whose folder holds it hides;
+  - a *hiddenByForkerFolder*, under a forker as such, lists what
+    that forker hides of the note's content;
+  - a *hiddenOutsideOfForkPartnersFolder*, last in a forks folder, lists
+    the nodes its parent hides that no member the folder shows
+    contains, a forker it hides among them.
+
+  The diff view adds two more, for nodeMerges since HEAD:
+  - an *acquiredByFolder* ("it was acquired by"), under an acquiree's
+    ghost, holds its acquirer;
+  - an *acquiredFolder* ("it acquired"), under an acquirer, holds the
+    ghosts of the nodes it acquired.
+
+  Membership edits in the forks and hidden-outside folders (and the
+  alias folder, a property folder) are graph edits. The others are
+  write-protected: their membership follows from the graph (see
+  "write-protected set"), and they carry the ☮ herald on their folder
+  headline, meaning "this folder cannot be changed from here" -- the
+  same sense ☮ (=writeProtected=) carries on a node.
+
+  *Default presentation is intentionally narrow.* An occurrence that an
+  editable-view request extends -- a fresh content view's roots, and
+  the editable content the request draws under them -- gets its
+  =forksFolder= automatically where it has a fork partner, either way,
+  by a record the skgrepo restriction shows ('add_default_folders' and
+  'has_a_fork_partner' in 'server/refresh/'), and a fresh content view a
+  =containerFolder= on each root that has containers, which the view's
+  stub asks for ('stub_of_fresh_content_view' in
+  'server/update_buffer.rs'). The other relation folders require an
+  explicit folder request (the =C-c l= commands), even when their
+  herald counts say they would be nonempty. The same rule applies when
+  a member of any partner folder is extended as editable. In a content
+  view each member as such under an editable occurrence -- a forkee as
+  such or a forker as such -- is drawn as content is (see "forkee as
+  such" and "forker as such"), so it is extended, but it gets no forks
+  folder unasked: the folder it stands in lists every mirror already.
+  A forks request on it (=C-c l f=, '(folder forks)') draws one there.
+  An editable member as such gets, first, its nonempty
+  =integratedElsewhereFolder=, of what the user keeps elsewhere, then
+  its nonempty =hiddenInForkPartnerFolder=, the hidden-in compound
+  partner folder specific to how the note sees that member; and an
+  editable forker as such that forks the note, after them, its nonempty
+  =hiddenByForkerFolder=, of what it hides of the note's content.
+  The diff view draws no default folder. Under each member of a partner folder hangs its
+  containerward chain, under a member of the forks folder in a
+  containers folder of its own (see "foldering, the containerward
+  chain, chain node").

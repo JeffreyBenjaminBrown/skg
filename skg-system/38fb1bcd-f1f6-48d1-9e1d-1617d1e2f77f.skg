@@ -1,0 +1,11 @@
+title: What the =contains= relation means, and how it differs from links
+pid: 38fb1bcd-f1f6-48d1-9e1d-1617d1e2f77f
+body: |2-
+  Each document is a curated view of data defined by the =contains= relation. Any document that includes the node N also includes every node that descends from N via =contains=.
+
+  As described in the [[id:82e3cf6d-2e55-41bb-9fcd-2efd2309db7e][technical data model]], nodes can
+  be connected by =contains=, =linksTo=, and several other relationships.
+  Containment and links differ in two ways:
+
+  - Links are defined by the text in a node, whereas containment is defined by nodes' spatial relationships to each other in a tree (the document containing them).
+  - Following a link requires the user to jump to a different context, whereas following a containment relationship need only require moving your eyes. If A contains B, looking at A means looking at a document that already contains B underneath A.

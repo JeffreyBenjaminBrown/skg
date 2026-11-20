@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 9faccef0-1ce2-404c-b824-beeed2c1858b
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * user-facing skg commands
 ** C-x C-s : skg-save
 Each time you save, your view is rebuilt.
@@ -186,7 +190,6 @@ shows what git history knows of the ID.
 Under a skgrepo restriction it refuses ("Deleting the references to an
 absent ID requires no skgrepo restriction"), since it rewrites every
 owned recorder, those the skgrepo restriction keeps out included.
-
 ** C-c f : text search
 The 'f' is for 'find'.
 *** how search works
@@ -1099,7 +1102,6 @@ relationship to the headline above it), with b both. With two prefix
 arguments (C-u C-u), the server instead follows every relationship
 each new node records (contains, forks, hides).
 Every mark works on write-protected headlines too.
-
 *** C-c m n p : skg-mark-node-processed
 Marks the node at point processed, then saves: the changes of the node
 itself, not its relationship to the headline above it. With C-u, the
@@ -1326,11 +1328,11 @@ This toggles whether, at the start of every node,
 metadata is shown in its full plain-text glory,
 or is instead summarized via brief 'heralds'.
 It is turned on at every view by default.
-See [[file:heralds.org][the herald legend]] for the tokens and styles.
+See [[./heralds.org][the herald legend]] for the tokens and styles.
 *** C-c v L : skg-toggle-repo-overlay-on-links
 Toggle display-only home skgrepo suffixes on Skg links in this buffer.
 The suffixes start off. Links confirmed missing are ugly and underlined
-even with suffixes off. See [[file:heralds.org::*Link annotations][link annotations]].
+even with suffixes off. See [[./heralds.org::*Link annotations][link annotations]].
 *** C-c v l : skg-restrict-repo-set
 Switches the skgrepo restriction of display and search for this Emacs
 connection. The skgrepo restriction is two things: a skgrepo-set,
@@ -1459,7 +1461,6 @@ folders, as a fresh view of it would draw them (its containers, its
 forks folder and count, and any other folder you had opened there);
 from the root homes, the node you opened, as it is. The buffer keeps its name. In a search
 buffer, the hits are its roots. See =docs/mirrors.org=.
-
 *** C-c v r : skg-readable-ids-mode
 This changes how node IDs are displayed.
 The ID itself is a kind of special random gibberish called UUID v4.
@@ -1653,14 +1654,12 @@ A link to any other file (source code, an image, a folder) keeps pointing
 where it did, without a warning. An Org link to one is left as written;
 a Markdown link to one, or a link a host-root mapping changes,
 is written as an Org link.
-
 **** Re-export is dangerous.
 Subsequent Org export is for reading, not
 a round-trip backup: it does not preserve Markdown syntax or all Skg graph
 semantics. Exporting to the original input directory would overwrite matching
 =.org= files, while leaving =.md= files alone. There is no dedicated undo or
 crash-recovery transaction; keep the originals and back up the owned skgrepo.
-
 **** Skg asks for a host-root mapping if it finds absolute links to documents.
 Skg runs in a Docker container.
 The folder /home/ubuntu/host in that container
@@ -1669,7 +1668,6 @@ If the files to be imported contain absolute links
 to =.md= or =.org= files,
 skg needs to know how those host-system paths
 correspond to paths in the docker container.
-
 **** Link syntax in literal text is an example, not a link.
 In an Org file, the importer leaves alone any link written inside text
 that Org shows literally:
@@ -1684,7 +1682,6 @@ Use =verbatim= or ~code~ instead.
 (To insert a block in Emacs, use =C-c C-,=, which is =org-insert-structure-template=.)
 The rest of Skg (saving, link statistics, link annotations, export)
 treats links in literal text the same way.
-
 **** An Org headline inside a block or fence stops the import.
 If a line of an Org file looks like a headline (asterisks at the start of
 the line, then a space) but is inside a =#+begin_...= block or a =```= fence,
@@ -1695,14 +1692,12 @@ Often the block was never closed.
 If the line belongs inside the block, escape it with a leading comma
 (=,* ...=), as Org does. This check applies only to Org files;
 in a Markdown file, a =#= line in a code block is ordinary code.
-
 **** Imported Markdown hard breaks become Org's two-backslash hard breaks.
 In Markdown you can put a slash or two spaces after a line
 to ensure that the next line is shown on a separate line,
 rather than smooshed into a single flowing paragraph.
 In Org, such a "hard break" is represented by two slashes,
 so the importer makes that conversion.
-
 *** importing from org-roam
 :PROPERTIES:
 :CUSTOM_ID: import-org-roam
@@ -1783,7 +1778,7 @@ inside each file.
 
 After reviewing the output, place it in the intended owned skgrepo directory
 and configure that skgrepo with the intended name and privacy order. See
-[[file:api-and-formats.org][the configuration reference]]. Check for ID collisions with existing skgrepos
+[[./api-and-formats.org][the configuration reference]]. Check for ID collisions with existing skgrepos
 before loading: the importer itself does not check them.
 
 For a first setup, configure the skgrepo before starting Skg. When replacing
@@ -1798,7 +1793,7 @@ The Cargo command prints a reminder to commit the imported files so Git
 diff views have a baseline; it does not run Git. Reimporting replaces the
 destination and gives ID-less headlines new IDs, so it is not an incremental
 update workflow. Keep your originals and a backup of Skg edits you want to
-retain. [[file:undoing-import.org][Exporting back to Org]] does not restore the original files or all graph
+retain. [[./undoing-import.org][Exporting back to Org]] does not restore the original files or all graph
 semantics.
 **** bash/import-org-roam.sh : host-side Docker and Git wrapper
 [[file:../bash/import-org-roam.sh][This script]] accepts 'REPO DEST NICKNAME' and prompts for a Docker
@@ -1844,7 +1839,6 @@ It asks two things:
   Each exported file begins with comment lines naming the ID of the node
   it was generated from, and warning that edits made directly to the
   file will be clobbered by the next export.
-
 **** choosing what to export: export markers
 Nothing is exported unless you mark
 it. To make node N into an exported file,
@@ -1886,7 +1880,6 @@ export, N is not exported, and you get a warning.
 
 [[#import-md-and-org][skg-import-md-and-org]] adds an export marker to each
 imported document automatically.
-
 **** links and overlap
 Links are rewritten to relative org links. Link syntax that Org shows
 literally (in =verbatim= or ~code~, a fixed-width =:= line, or a

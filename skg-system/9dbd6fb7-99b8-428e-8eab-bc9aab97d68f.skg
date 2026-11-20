@@ -1,0 +1,10 @@
+title: Capital letters do not carry stress.
+pid: 9dbd6fb7-99b8-428e-8eab-bc9aab97d68f
+body: |2-
+    In comments, docstrings, docs and user-visible messages, write a word
+    in lowercase unless it is an acronym or a proper name in letters
+    (HEAD, UUID, TOML, ID, SKG), a placeholder in a wire grammar (GITREPO,
+    PATH), a label that heads a comment section ('PURPOSE:', 'PITFALL:',
+    'NOTE:'), an org keyword, or a word whose sentence warns of something
+    whose neglect breaks the program or the data. Where caps would carry
+    a sentence's stress, reword the sentence to carry it.

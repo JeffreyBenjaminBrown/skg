@@ -1,0 +1,29 @@
+title: Removed members
+pid: c60f5dad-26db-46e1-a059-ac75a04a0298
+body: |2-
+  A removed member is a member of the before-graph's list that the
+  after-graph's lacks: an occurrence whose relationship to its
+  viewparent HEAD alone has, warranted by HEAD ('ghostWarrant'),
+  claiming nothing ('noClaim') where claims are read, with the change
+  fact '(rel removed)'. That is the one encoding of a removed
+  relationship, wherever it stands: in content, in a partner folder, in
+  a ghost's old content, and as a node of the containerward chain whose
+  container relationship only HEAD had. Membership is decided by set
+  difference, so a reorder adds or removes no member (it is the
+  recorder's other changes); the goal's order, the
+  interleaved diff of the two lists, places it: before the next
+  surviving member of the old order, or last
+  ('interleaved_diff_without_reorders'). The partner folders place
+  their removed members the same way; recorders, which no list orders,
+  come sorted by ID.
+
+  A removed dangling ID is not shown in a folder whose membership the
+  save reads, nor in content when neither graph has the node: its leaf
+  in content is under the content changeset marker. Elsewhere it is an
+  unknown viewnode, with '(rel removed)'.
+
+  The restore requests read where it stands: 'restoreRel' is accepted
+  on an occurrence with a ghost warrant in content position or in a
+  partner folder ('restoreRel_stands_where_it_may'), and a save that
+  fulfils one leaves the headline claiming the relationship it
+  restored.

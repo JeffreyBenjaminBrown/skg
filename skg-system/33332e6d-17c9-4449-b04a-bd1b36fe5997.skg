@@ -1,0 +1,21 @@
+title: 'C-c r n c : skg-diffView-goto-next-change'
+pid: 33332e6d-17c9-4449-b04a-bd1b36fe5997
+body: |2-
+  Moves point to the next headline with change facts after point: a headline whose
+  metadata carries a '(leaves ...)' change fact, the server's count of the
+  changes it names. It skips a ☮ occurrence (not a ghost) standing directly in a folder
+  labelled "... (other files)" (its other containers, mentioners or
+  hiders changed), and one standing in the forks folder born only of
+  forking the viewparent ('(birth (forks out 2))'): that member records
+  the relationship in its own file, and its change is drawn, and
+  visited, where its node stands editable. C-c r n C visits those too.
+  Point lands at the start of the headline's line.
+  It does not wrap: past the last one it says "No further
+  change" and leaves point, or, when only skipped ones are left, "No
+  further change but ☮ ones in "(other files)" folders; C-c r n C visits
+  them". It works in any skg buffer; outside the
+  diff view no headline names a change, so it finds none.
+  In a diff view extended to every change (C-c r u), it reaches every
+  change. In one not extended, a node shown only as such a ☮ member has
+  its change shown only there, and only C-c r n C reaches it; the
+  processed summary counts such changes as not editable in this view.

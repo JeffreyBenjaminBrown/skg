@@ -1,0 +1,22 @@
+title: 'Privacy telescopes: one node, many privacy levels'
+pid: ae1f8c25-d6a4-490f-bad5-aa04279daf72
+body: |2-
+  Skg lets a single node live at several privacy levels at once. The
+  mechanism is the *privacy telescope*: same-ID =.skg= files across
+  your skgrepos, each file one *telescope section* holding the slice
+  of the node recorded at that skgrepo's privacy level. There is no linking
+  relationship between the sections — sharing an ID /is/ being the
+  same node. (Why "telescope"? Because it extends one section at a
+  time: a skgrepo widening to the next privacy level pulls out
+  exactly one more section per node, whereas an accordion — the
+  term's rejected predecessor — expands uniformly.)
+contains:
+- babdc358-4721-49e6-9482-ef0d9e155579
+- c0dca3b2-232c-4be9-bf9e-5c9ffaf24dc5
+- c2ce760e-53e1-434c-b25a-678d1e71dae2
+- 8877cc3f-2d4e-4034-b234-961f6d2e74eb
+- d5cc7526-753d-4c39-8009-d4d1a24530e7
+- f6e46a54-a210-4ea4-b108-0f1f9fa2ec55
+- f49d74d1-0a63-4746-9dff-c8db9144d279
+- a1a5ba5b-eb49-454c-92e9-66baee095763
+- 054ca9ab-4833-46b2-9cb9-af077ed45de6

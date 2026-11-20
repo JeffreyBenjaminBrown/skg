@@ -1,0 +1,17 @@
+title: Choose a workflow proportionate to the task
+pid: ef946c22-fa45-416b-aca7-832472a94f6d
+body: |2-
+  Read this file when considering captured test logs, delegation, or a
+  long-task ledger. These are optional additions to the default practices in
+  [[id:2c54c461-fad4-4ea1-b928-16d2d60b47ee][file:to-save-tokens.org]], not routine onboarding requirements.
+
+  Before introducing a progress ledger, changing the test cadence, delegating
+  work, or replacing ordinary test output with quiet captured logs, briefly
+  tell Jeff what you propose and why, and ask whether he wants that workflow.
+  If he has already authorized it for this task, proceed without asking again.
+  The scripts and examples here do not themselves authorize those choices.
+
+  Small investigations and ordinary focused tests need no ceremony. A concise
+  progress.org report at a substantive stop or implementation deviation is
+  required by [[id:fa26e71c-acf3-41a7-ab82-0898a213e429][file:when-to-stop.org]] and already authorized there; the optional
+  ledger below is continuous bookkeeping beyond that report.

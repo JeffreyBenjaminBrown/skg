@@ -1,0 +1,5 @@
+title: '<localleader>On : :SkgPopNode'
+pid: 4e2f05b1-3684-471b-a4e1-dd2c80fff589
+body: |2-
+  Like PasteNode,
+  but also removes the node from the stack.

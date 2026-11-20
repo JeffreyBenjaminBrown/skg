@@ -1,0 +1,14 @@
+title: Close view
+pid: a9ae1f60-41f7-44e0-a5a7-c53f41c67720
+body: |2-
+    - Request: =((request . "close view") (view-id . "VIEW_ID"))=. Each
+      client sends it when a buffer showing a view is killed ('skg-send-close-view'
+      on Emacs's 'kill-buffer-hook'; 'send_close_view' on Neovim's
+      BufDelete and BufWipeout), and waits for no answer.
+    - Response: LP =((response-type close-view) (content "view closed"))=,
+      or =(content "Error: missing view-id")= when the request names no
+      view ('server/serve/handlers/close_view.rs').
+    - The server forgets the view: its viewforest and viewnode IDs go,
+      and no later save rerenders it. Closing the last open buffer of the
+      diff view also drops the graph straddle, which the diff view's
+      buffers share; the next diff view builds it anew.

@@ -1,0 +1,5 @@
+title: Edit the docs through their notes
+pid: 0cfaf267-a181-44b8-9af1-4e0be9f4ca9e
+body: |2-
+  The files of 'docs/' and 'coding-advice/' are exported from the
+  notes of 'skg-system/'. To change one, follow [[id:c5882ac1-f87e-4c4e-9bae-2b8bbecb8bd6][file:generated-docs.org]].

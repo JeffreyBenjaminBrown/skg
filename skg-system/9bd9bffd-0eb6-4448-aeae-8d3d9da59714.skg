@@ -1,0 +1,25 @@
+title: the forkee-visibility step
+pid: 9bd9bffd-0eb6-4448-aeae-8d3d9da59714
+body: |2-
+  The *forkee-visibility step* (a term of plan 10) is the step of
+  the save that, for a forkee as such shown editable under its
+  forker (the note that forks it), reads what the buffer shows of
+  the forkee's content and rewrites the forker's hides to match: content shown there,
+  claiming, is unhidden, and content the view drew there (what the
+  forker neither hid nor integrated before the save, by the graph, and
+  the buffer does not show in the forkee's folder of what the user
+  keeps elsewhere or of what the forker hides in it; nothing, under a
+  forkee typed into the folder in the save) and no longer
+  shows, which neither the forker nor an owned note but the forkee
+  contains after the save, is hidden ('resolve_visibility' in
+  'server/from_text/local_fieldintent_collection/resolve_visibility.rs').
+  It reads the forkee's content and the forker's hides by the
+  records the skgrepo restriction shows, as the view drew them, so a
+  hide recorded in a restricted section is neither removed nor moved,
+  and no hide is written of a member that only a restricted record
+  explains. It compares children by pid, as the forker-visibility step
+  does: a child the forkee's list names by an extra ID (after a
+  nodeMerge) is the child the view shows by its pid, and a hide is
+  written as the list names it. Only a forker the user owns records hides: a save whose
+  step would hide or unhide anything in a foreign forker is refused,
+  naming the forker ('refusal_to_change_what_a_foreign_note_hides').

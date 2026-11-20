@@ -1,0 +1,11 @@
+title: Refusals
+pid: 7c525270-8b54-4bda-ab07-81e0ea224c5a
+body: |2-
+  Every buffer is refused, and the client stops, unless the
+  connection is unrestricted, and when the graph straddle cannot be built: an
+  owned skgrepo that is not in a gitrepo or has no HEAD commit, a
+  HEAD that fails the whole-graph validation, or a HEAD holding '.skg'
+  keys retired in November 2026 ('docs/api-and-formats.org', "The .skg
+  file format"). That last refusal names the files and says to commit
+  the migration ("git -C PATH commit -am 'Migrate to forks'"). A merge
+  commit at HEAD is no reason to refuse.

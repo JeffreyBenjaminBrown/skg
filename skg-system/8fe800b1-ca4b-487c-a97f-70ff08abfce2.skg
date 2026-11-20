@@ -1,0 +1,21 @@
+title: The general rule
+pid: 8fe800b1-ca4b-487c-a97f-70ff08abfce2
+body: |2-
+  In Rust, any time you compute a byte index and use it to slice a
+  =&str=, you must ensure it's a char boundary. Common safe patterns:
+
+  - =str::find()= / =str::char_indices()= -- return byte offsets
+    that are always char boundaries.
+  - =char::len_utf8()= -- gives the byte width of a character, so
+    =pos + ch.len_utf8()= is the next char boundary after =pos=.
+  - =str::is_char_boundary(i)= -- check before slicing.
+
+  Common UNSAFE patterns:
+
+  - Slicing at an arbitrary number like 200.
+  - Slicing at a count of =.chars().count()= -- that's a character
+    count, not a byte offset. (This was the second bug, in
+    =import_org_roam/parse.rs=, where leading-whitespace character
+    count was used as a byte index.)
+  - Slicing at =.len() - N= when the string might end with
+    multi-byte characters.

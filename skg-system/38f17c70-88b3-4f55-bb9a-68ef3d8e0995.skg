@@ -1,0 +1,20 @@
+title: '    <localleader>dd : :SkgDelete'
+pid: 38f17c70-88b3-4f55-bb9a-68ef3d8e0995
+body: |2-
+  Marks the node at point for deletion from the graph.
+  Upon saving the view, it will vanish not just from this view,
+  but from the graph itself.
+  On a fork of yours drawn in place of its original (marked 'ĥ') as
+  content of someone else's note, it deletes the fork and leaves their note as it
+  was, unforked, drawing the original again where the fork stood. Under
+  a note of yours it takes the original out of your note too
+  ('docs/forks.org', "Taking back a fork").
+  Under a skgrepo restriction, when relationships recorded in skgrepos
+  the skgrepo restriction keeps out name the deleted node (another node's
+  private section contains it, say), the save writes nothing and asks
+  "Delete from: (c)ancel, (v)isible records only, (a)ll owned records",
+  saying how many such relationships there are. Visible records only
+  deletes the node and the relationships you can see, and leaves the
+  others as they are, so the node's ID dangles there; all owned records
+  removes them too, as a save with no skgrepo restriction does. Cancel
+  saves nothing. The choice applies to that save alone.

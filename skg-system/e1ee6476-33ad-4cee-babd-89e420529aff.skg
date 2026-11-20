@@ -1,0 +1,4 @@
+title: Try to make it visibly obvious what code a comment applies to.
+pid: e1ee6476-33ad-4cee-babd-89e420529aff
+body: |2-
+     For instance, if the comment applies to a variable definition, put it after the equals sign. This way I know it only applies to that definition, not to following lines of code.

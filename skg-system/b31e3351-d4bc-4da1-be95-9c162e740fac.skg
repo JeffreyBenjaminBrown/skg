@@ -1,0 +1,75 @@
+title: What you keep elsewhere
+pid: b31e3351-d4bc-4da1-be95-9c162e740fac
+body: |2-
+  A child of a member as such is integrated when you keep it somewhere:
+  when any note of your graph contains it, your graph being the notes
+  of your owned skgrepos, as the skgrepo restriction shows them, the
+  member itself excepted ('docs/glossary.org', "integrated"). The note
+  whose forks folder shows the member is one of them when it is yours.
+  A member shows only what is not integrated and that note neither
+  contains nor hides. So moving someone's child into a note of yours,
+  or under one, needs no hide: skg sees that you keep it. In a view of
+  someone else's note, what that note contains is its owner's, not
+  something you keep: a member shows it neither among its content nor
+  in the folder below.
+
+  What the member contains that you keep elsewhere stands in its folder
+  =integratedElsewhereFolder= ("☮ It contains these, and you keep them
+  elsewhere."), first among the member's folders, before the folder of
+  what your note hides in it, drawn when it holds something, under an
+  editable member. It is write-protected, its members are folded, in
+  the member's list's order, and each carries a containers folder,
+  folded, naming where you keep it (its containers, but those the view
+  already shows above it). A child your note hides stands in the hidden
+  folder only, even when you keep it too: the hide is the explicit
+  record, and that folder is where moving it out removes it. A hide
+  that keeping makes redundant stays, harmless; moved out of the hidden
+  folder, the child is unhidden, and stands then in the folder of what
+  you keep elsewhere. No save removes such a hide by itself.
+
+  Before, with your =x= forking someone's =x=, which contains =a=, =b=
+  and =c=, and your =y= containing =a=:
+
+  #+begin_example
+  ,* x                    (yours, editable)
+  ,** forksFolder
+  ,*** x                  (theirs, bK)
+  ,**** ☮ It contains these, and you keep them elsewhere.
+  ,***** a                (folded)
+  ,****** ☮ These also contain it.
+  ,******* y              (yours)
+  ,**** b                 -- cut this, and paste it under your z
+  ,**** c                 -- cut this alone
+  #+end_example
+
+  After the save, your =z= contains =b=, your =x= hides =c= alone, and
+  =b= joins =a= in the folder of what you keep elsewhere. Remove =a=
+  from your =y=, and =a= shows under their =x= again, with no hide.
+  Under a skgrepo restriction that keeps out where you keep a child
+  (your =y= in a private skgrepo, the view showing only the public
+  one), the child is not integrated there, and shows among the member's
+  content.
+
+  The save hides a child cut from a member, or removed from your note
+  while a member contains it, only where no note of yours but that
+  member contains it after the save: a note the save writes, by its
+  contents as the save leaves them, any other as the graph has them.
+  Removing a child from your note that another note of yours keeps
+  hides nothing, and the save says so ("Hides nothing: 'd' left 'x',
+  but 'z' keeps it."). A cut from a member claiming nothing still makes
+  your note fork it (see "Cutting from a forker"), whether or not it
+  hides anything ('tests/hides_by_integration.rs').
+
+  A child the saved buffer shows in a member's folder of what you keep
+  elsewhere, or of what your note hides in it, was not cut from the
+  member. That matters for a stale view: after another view stopped
+  keeping the child (or unhid it), the graph says the member shows it,
+  and the view still shows it set aside; the save reads it as the view
+  shows it, hides nothing, and writes nothing of your note for it
+  ('tests/members_as_such_and_stale_buffers.rs').
+
+  The diff view keeps its forks folders as they were: a member there
+  shows what you keep elsewhere among its content, and counts it among
+  what it shows ('(unintegrated N)'), and no such folder is drawn. A buffer drawn before this rule shows such children under a
+  member, claiming; the next refresh leaves them out, and a save of it
+  before then hides nothing it did not draw.

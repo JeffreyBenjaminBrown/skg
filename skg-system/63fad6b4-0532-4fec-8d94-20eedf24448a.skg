@@ -1,0 +1,24 @@
+title: The fix
+pid: 63fad6b4-0532-4fec-8d94-20eedf24448a
+body: |2-
+  =cargo clean -p <pkg>= discards one package's artifacts and
+  fingerprints, forcing a genuine rebuild of exactly that package. Use
+  it on every package the checker named. Translate the *file* name to
+  the *package* name by dropping =lib=/=-<hash>.rlib= and turning
+  underscores back into hyphens (=libsome_package-370a4...rlib= ->
+  =some-package=).
+
+  #+begin_src bash
+  cargo clean -p skg -p tantivy
+  cargo build --bin skg
+  #+end_src
+
+  Rebuilding those three took *26 seconds*, because the other ~500
+  dependency artifacts were sound and were reused.
+
+  Prefer this to a bare =cargo clean=, which throws away all ~8.5 GiB of
+  =target/= and forces a full cold rebuild of every dependency
+  (libgit2, ring, openssl, tantivy...) -- many minutes,
+  to fix three files. A full =cargo clean= is a correct fix, just a
+  needlessly expensive one. Reach for it only if =check-rlibs.py=
+  reports damage so widespread that enumerating packages is pointless.

@@ -1,0 +1,15 @@
+title: what the refresh changes silently
+pid: c3a5c3a8-127f-4a3b-8382-20405a3afe79
+body: |2-
+  The refresh brings a view up to date with the graph and says nothing
+  of what it changed: no save or rerender response reports it, and no
+  client shows it. A *buffer correction* (a term of plan 06, gone with
+  plan 10) was such a change, recorded and reported; the six kinds it
+  named remain things the refresh does.
+contains:
+- 9e7efaad-00d6-4378-bade-84120d38f21a
+- 5be1f77e-de30-4b84-97b9-b65afd87b928
+- d50e7327-6697-4dc3-988e-a3962f9bff6d
+- 898155b5-d19c-4697-b1ca-1f7b5040bc2c
+- efdc36d2-2472-4c4a-9cde-3b8548a54393
+- 8f43e75e-f073-4e16-9327-553a774837da

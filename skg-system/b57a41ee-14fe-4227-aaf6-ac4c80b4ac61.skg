@@ -1,0 +1,7 @@
+title: gnid, pid, extra ID
+pid: b57a41ee-14fe-4227-aaf6-ac4c80b4ac61
+body: |2-
+  A *gnid* is a graphnode's ID (the type 'ID'): a node's primary gnid is
+  its *pid*, the others its *extra IDs*, acquired by nodeMerges; each of
+  them resolves to the node. On the wire it is =(gnid ID)=. A viewnode
+  ID ("vnid") names a viewnode, not a node.

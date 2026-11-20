@@ -1,0 +1,4 @@
+title: Use short atomic functions, but long names
+pid: 46a3a27a-d095-4bf1-9d27-cb407de5c5a7
+body: |2-
+  Try to provide a collection of atomic, readable functions, none of them too complex. On the other hand, when naming variables and functions, err on the long side -- the more understandable, the better.

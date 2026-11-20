@@ -1,0 +1,28 @@
+title: Node fields
+pid: 96c79bfc-f66d-436e-9dec-bb69852e1ba8
+body: |2-
+  The full composed representation is =Graphnode= in
+  =server/types/nodes/complete.rs=.  =GraphnodeInRust= is its graph projection and adds
+  derived text links.
+
+  | Field | Type | Meaning and storage |
+  |-------+------+---------------------|
+  | =pid= | =ID= | Immutable primary identity.  It determines the home filename and is the key in =InRustGraph.nodes= and Tantivy. |
+  | =extra_ids= | =Vec<ID>= | Former identities acquired by node merge.  They are normalized in stable first-occurrence order, excluding the node's own PID.  Any primary or extra ID resolves to the node's =pid=. |
+  | =home_repo= | =RepoName= | The node's home: the most public skgrepo with a retained telescope section.  It is inferred from file location and never serialized inside YAML. |
+  | =title= | =String= | Composed node title. |
+  | =body= | =Option<String>= | Composed body text.  Leading and trailing whitespace-only lines are normalized away; a body with no remaining content is =None=. |
+  | =overPrivateText_telescope= | =bool= | True when the selected title or body came from a section below the home skgrepo.  Release decisions use this conservative folded fact. |
+  | =aliases= | =MSV<RelPartner<String>>= | Search aliases and the skgrepo at which each is recorded. |
+  | =contains= | =Vec<RelPartner<ID>>= | Ordered content children and each relationship's relRepo. |
+  | =forks= | =MSV<RelPartner<ID>>= | Ordered nodes this node forks, with relRepos: their content it does not contain or hide, and the user keeps in no other owned note, shows under it, and each is its mirror.  Stored under the '.skg' key 'forks'. |
+  | =hides= | =MSV<RelPartner<ID>>= | Nodes suppressed when reached through what this node forks, with relRepos. |
+  | =flags= | =Vec<Flag>= | Node flags: import provenance (=Had_ID_Before_Import=, =Was_Overloaded=) and behavior settings such as =NoSearchMatching=. |
+  | =linksTo= | =Vec<ID>= on =GraphnodeInRust= | Outbound Org =id:= links parsed from title/body text.  Derived rather than serialized as a graph field. |
+
+  =MSV<T>= means “maybe specified vector.”  =Unspecified= says a file or edit
+  has no opinion about the field; =Specified([])= explicitly supplies an empty
+  value.  This distinction is load-bearing while telescope sections and partial
+  nodeIntents are combined.  =RelPartner<T>= attaches the privacy
+  skgrepo where an alias or relationship is recorded.  The order of list-valued fields is
+  preserved.

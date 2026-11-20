@@ -1,0 +1,9 @@
+title: Both skgrepo names must already exist in =skgconfig.toml=
+pid: 80b166e6-1f9d-4230-9346-c67ad8800163
+body: |2-
+  The move uses the skgrepo name to look up the directory. If the new
+  skgrepo name isn't in =[[repos]]=, you'll get a "Skg repo not found"
+  error, not a "move failed" error, and no =.skg= file will be moved.
+  Add the skgrepo first, and restart the server or rebuild its stores
+  ('skg-rebuild-session-lifetime-stores', which re-reads the config)
+  before doing the move.

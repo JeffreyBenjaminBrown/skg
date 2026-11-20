@@ -1,0 +1,27 @@
+title: Changes no mark covers
+pid: d388093a-a16b-4eee-81a6-6be9d3a89a66
+body: |2-
+  A commit of the processed makes one check more, from Git
+  ('files_hold_more_than_their_node'): a node some changed '.skg' file
+  of which, at HEAD or in the worktree, is not byte for byte what skg
+  writes for the node as that side's graph holds it (its decomposition,
+  each section serialized as the writer does). When both sides are what
+  skg writes, the files differ only as the two graphs' nodes do, which
+  the leaves cover; when one is not, the files may hold a change no
+  graph shows (formatting, a comment). Skg writes every file it saves
+  this way, so the check flags only files edited or written by hand. A
+  side whose node keeps its text in a section more private than its
+  home (overPrivateText) is one skg does not write, and its graph does
+  not say which section holds the text, so each file of that side is
+  asked only whether it is a section as skg writes one, its parse
+  serialized again ('section_is_as_skg_writes_it'); where the text
+  moved, the node's other changes say so.
+  Such a node is not processed, whatever its marks. A commit of the
+  processed leaves it out, and its answer names it, saying that its file
+  changed in a way the diff view does not show ("Stage and commit"); a
+  commit of everything takes it. The diff view draws no such change:
+  the check reads each changed file from Git, which a commit does once,
+  and the diff view, refreshed after every save, would do at each.
+  A headline's ✓ after ∃ or M says that
+  the leaves 'node' names there are marked, and after ~ that the one
+  'rel' names is ("What a request names").

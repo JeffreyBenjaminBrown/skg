@@ -1,0 +1,12 @@
+title: graphnode, viewnode
+pid: f87bf0b2-8d36-4760-ab8c-4da75f3a9fd5
+body: |2-
+  A *graphnode* is a node of the graph, which a =.skg= file records; a
+  *viewnode* is a node of a view, which a buffer shows as a headline.
+  A graphnode can appear in one view as several viewnodes, or as none,
+  and some viewnodes stand for no graphnode: a folder, for instance,
+  names a relationship between its viewparent and its children. Say
+  "graphnode" and "viewnode" rather than "graph node" or "view node";
+  bare "node" is fine where only one kind is possible. The
+  implementation sorts viewnodes by whether they stand for a graphnode
+  (see "vognode, non-vognode").

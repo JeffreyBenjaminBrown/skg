@@ -1,0 +1,38 @@
+title: Graph indexes
+pid: 1e2a9c1b-bb4a-471f-8887-6275664af388
+body: |2-
+  =InRustGraph= stores =GraphnodeInRust= values in a persistent =im::HashMap=.  Its
+  derived indexes are:
+
+  | Index | Key -> value | Purpose |
+  |-------+--------------+---------|
+  | =contained_by= | contained pid -> container pids | Inverse =contains= traversal. |
+  | =forkers_of= | forkee pid -> forker pids | Inverse =forks= traversal, mirror lookup and validation. |
+  | =hiders_of= | hidden pid -> hider pids | Inverse hiding lookup. |
+  | =mentioners_of= | destination pid -> linking pids | Incoming text-link traversal. |
+  | =extra_id_to_pid= | extra ID -> primary ID | Canonical identity resolution. |
+
+  Construction is two-pass: first collect every extra-ID mapping, then insert
+  nodes and build recorderward relmaps.  This makes results independent of file read
+  order.  Incremental mutation instead installs the batch's complete final
+  identity state first, then reindexes each touched node and every untouched
+  recorder whose raw relationship can resolve differently under the final identity
+  map.  All four recorderward relmaps use that same final resolver.  Deletion is
+  supported: references to a deleted PID remain raw and surviving recorders are
+  rekeyed where canonical resolution changed.  Writers clone the persistent
+  graph and swap in one new =Arc= atomically; readers retain the immutable
+  generation they captured at operation start.
+
+  Managed saves support monotonic acquisition of extra IDs during node merge,
+  but reject arbitrary extra-ID revocation.  An apparently unused alias may be
+  how someone else's data links to the node, and Skg cannot infer that even the
+  most private skgrepo was never shared with a trusted person.  Raw-file editing
+  and rebuild remain an escape hatch, but spending effort to remove such tiny
+  identity metadata is usually a poor trade.
+
+  Leak-shaped telescope warnings judge only relationships recorded in owned
+  skgrepos; a foreign skgrepo's file is never a leak.  They use the target's
+  home as the privacy ceiling when the target exists.  For a dangling relationship there is no target home, so the
+  extant recorder's home is the conservative ceiling.  Saves recompute warnings for
+  saved recorders plus untouched inbound recorders affected by identity, existence, or
+  home changes; startup and rebuild still audit every recorder.

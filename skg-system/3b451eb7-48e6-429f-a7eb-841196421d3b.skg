@@ -1,0 +1,24 @@
+title: 'import-org-roam : terminal command'
+pid: 3b451eb7-48e6-429f-a7eb-841196421d3b
+body: |2-
+  This imports Org-roam '.org' files into Skg. It is a Cargo subcommand,
+  not an Emacs command, and needs no running server. Unlike the additive
+  interactive importer above, this legacy command replaces its destination.
+
+  Run from the repository root, where Cargo and the input files are available:
+
+  #+begin_src sh
+  cargo run --bin skg -- import-org-roam ORG_DIR OUTPUT_DIR REPO_NAME
+  #+end_src
+
+  All three arguments are required. 'ORG_DIR' contains your Org-roam notes;
+  'OUTPUT_DIR' receives the '.skg' files; 'REPO_NAME' names the destination
+  Skg skgrepo. For example, using a fresh staging directory:
+
+  #+begin_src sh
+  cargo run --bin skg -- import-org-roam /imports/org-roam /tmp/skg-import-review imported-notes
+  #+end_src
+
+  Paths are relative to the process's working directory unless absolute.
+  Inside Docker, supply container-visible paths. There is no host-path
+  mapping argument or interactive prompt.

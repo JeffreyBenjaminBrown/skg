@@ -1,0 +1,34 @@
+title: Query syntax with regex=true
+pid: df3c1e9e-8af7-45d2-8882-3070a034ce84
+body: |2-
+  The query is split on whitespace and each piece is handed to
+  'tantivy::query::RegexQuery' as its own pattern. Matches are
+  against *tokens*, not raw text: the indexer lowercases and
+  splits on whitespace, so no stored token ever contains a
+  space. That's why splitting is the only way multi-word regex
+  queries return anything. Patterns like =histor.*= work for
+  prefix search ('history', 'historical'), and =polit.* scien.*=
+  combines two such prefix searches. Combine with body=true to
+  also search body fields.
+
+  The *=*= gotcha*: in regex =*= means "zero or more of the
+  previous character", not "any characters" (that's =.*=). So
+  =sci*= matches the tokens =sc=, =sci=, =scii=, … — not
+  "anything starting with sci". Use =sci.*= for that.
+
+  With operators=false, pieces are OR'd (SHOULD-combined)
+  like the non-regex default.
+
+  With phrase/operators=true (the wire flag is still
+  =operators=true=), the keywords =AND= / =OR= / =NOT= and the
+  prefixes =+piece= / =-piece= combine the per-piece RegexQueries
+  at the document level:
+  - =poli.* AND sci.*= — documents whose tokens include one
+    matching =poli.*= and one matching =sci.*=.
+  - =poli.* NOT bio.*= — documents matching =poli.*= and not
+    any token matching =bio.*=.
+  - =+poli.* -bio.*= — same as above, without the keywords.
+  - =poli.* OR sci.*= — explicit OR, same as the default.
+  Keywords are consumed rather than matched as patterns. An
+  =AND= adjacent to a piece on either side promotes that piece
+  to MUST.

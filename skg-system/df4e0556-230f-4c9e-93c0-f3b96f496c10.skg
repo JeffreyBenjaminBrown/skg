@@ -1,0 +1,5 @@
+title: '<localleader>oi : :SkgPasteId'
+pid: df4e0556-230f-4c9e-93c0-f3b96f496c10
+body: |2-
+  Inserts the ID at the top of the linkstack at the cursor.
+  Does not modify the stack.

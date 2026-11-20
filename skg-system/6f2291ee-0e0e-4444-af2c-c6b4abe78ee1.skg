@@ -1,0 +1,33 @@
+title: mirror, and a perspective's skgrepo list
+pid: 6f2291ee-0e0e-4444-af2c-c6b4abe78ee1
+body: |2-
+  A *fork*, bare, is a note that forks another: a *fork of* N is a
+  note that forks N (see "clone, and the fork operation" for the
+  gesture that makes one, which is always "the fork operation", never
+  bare "a fork"). A note's *forks*, as in "its forks", are the members
+  of its forks folder ("the forks folder"): its fork partners, either
+  way, the notes it forks and the notes that fork it, and its indirect
+  members. So "its forks" is wider than "the forks of it"; where only
+  one direction is meant, say "its forkees" or "its forkers", or "what
+  it forks". The
+  *mirrors* of N are N and every note joined to N by a path of
+  'forks' relationships, followed in either direction, every
+  relationship's relRepo and every note's home skgrepo on the path shown
+  by the skgrepo restriction ('mirrors_of' in
+  'server/dbs/in_rust_graph/mirrors.rs'). Two forks of one note are
+  mirrors of each other, and a cycle of forks is no special case. (Not
+  "mirror" in its other senses: the save is its mirror, a Neovim
+  function mirrors an Emacs one, a server mirror.)
+
+  A *perspective's skgrepo list* is the order in which the perspective
+  of a skgrepo S ranks a note's mirrors: S first, then every other
+  skgrepo in the config's declaration order, whose owned entries run
+  most public first ('SkgConfig::perspective_skgrepo_list'). Who owns a
+  skgrepo plays no part. It is not a privacy rank, nor the fold order.
+  The *user's own skgrepo list* is the skgrepo list of the perspective
+  of the user's first owned skgrepo in declaration order, the most
+  public (else the first declared:
+  'SkgConfig::first_owned_else_first_declared_skgrepo'); it ranks
+  search hits that are mirrors of one another ('docs/mirrors.org').
+  It is no perspective of a view's, and not the default perspective,
+  the root homes.

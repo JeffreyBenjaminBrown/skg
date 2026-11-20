@@ -1,0 +1,8 @@
+title: hiderel = "hides" relationship
+pid: 81f1af3b-d611-441f-91e5-fd8b010b8e83
+body: |2-
+  A relationship of the relation =hides=, which a '.skg' file
+  records under the key 'hides': the hider keeps the hidden node out of
+  what it shows of every member of its forks folder (see "relation, relationship,
+  member, membership, partner"). See [[id:82e3cf6d-2e55-41bb-9fcd-2efd2309db7e][the technical data model]] for the hiding
+  relationship.

@@ -1,0 +1,24 @@
+title: Old style mod files are better.
+pid: eadb37e1-7b61-416c-8696-7c093e2613b3
+body: |2-
+    The 'old style' is, for every source folder '(module)/'
+    with source files '(module)/(filename).rs' you want in your program,
+    to create a 'mod file' '(module)/mod.rs'
+    listing them.
+
+    The 'new way' is to instead make a file '(module).rs'
+    in the same folder as '(module)/',
+    and use it to indicate which files in '(module)/' to include.
+
+    After using the new way a while, I now know I prefer the old way.
+    That's because it lets me visually distinguish between two cases:
+    - I use only a mod file if the files it refers to
+      are used by scattered users.
+    - I use both a '(module).rs' file and a '(module)/mod.rs' file
+      if the former actually includes interesting code
+      where the modules referred to by the latter come together.
+
+    In the new style, where the same name '(module).rs'
+    is likely to be a boring list of 'use' statements
+    but might include interesting function definitions,
+    I am likely to overlook it.

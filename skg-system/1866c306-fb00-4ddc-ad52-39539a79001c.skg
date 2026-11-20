@@ -1,0 +1,10 @@
+title: D
+pid: 1866c306-fb00-4ddc-ad52-39539a79001c
+body: |2-
+  D, the buffer's first roots, is R deduplicated: R is processed in ID
+  order, and a content origin is discarded when its containerward walk
+  within U reaches another content origin still kept. Of two origins on
+  a shared cycle, exactly one is kept. When D is recomputed for a buffer
+  that already stands (see "Extending the diff view"), the buffer's
+  standing roots are pinned as kept first, so a change to a cycle's
+  membership never adds a second root for it.

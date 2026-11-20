@@ -1,0 +1,29 @@
+title: The extent and the node budget
+pid: 008f2957-4d82-4c45-b814-2ef8429c604a
+body: |2-
+  The *extent* is how much of P's goal the refresh draws
+  (=server/refresh/extent.rs=): all of it for a folder and for an
+  editable occurrence's content, and in the diff view for a ghost's old
+  content where content stands; none of it, beyond what the buffer
+  already shows, for a write-protected occurrence's content and for the
+  containerward chain. An occurrence the refresh draws where its
+  parent's children are editable content is drawn write-protected,
+  carrying an editable-view request, and so is a member as such it
+  draws in a content view (a member of the forks folder of an editable
+  occurrence, a forkee or forker as such, 'drawn_occurrence_editability'
+  in 'server/refresh/editability.rs'); so is a write-protected child
+  that claims membership under an occurrence carrying one, or any
+  write-protected member of that occurrence's forks folder: the request
+  passes on to the content it extends, showing or drawing, and to the
+  members as such its forks folder holds. A plain rerender, which
+  carries no request, leaves a member as such standing write-protected
+  as it is. At the
+  occurrence's own visit the request is consumed: the occurrence
+  becomes editable when no other occurrence of its node is and the
+  budget allows, and stays write-protected otherwise; the request goes
+  when the visit ends. Each editable occurrence whose content is drawn
+  charges the budget once, at its visit, whatever made it editable: the
+  budget need not count exactly, only stop an explosion. The walk keeps
+  nothing else of editability than where each node's one editable
+  occurrence stands. The diff view's deviations are in
+  =docs/diff-view.org=, "Editability in the diff view".

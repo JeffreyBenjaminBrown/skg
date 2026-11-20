@@ -1,0 +1,15 @@
+title: metadata
+pid: d589384a-c1f7-4898-9bb2-4bfc810db5ac
+body: |2-
+  Most headlines are prefixed with some metadata.
+  In Emacs, that metadata is represented as an s-expression like
+  (skg (vnid X) KIND (key value) bare_value ...):
+  its viewnode ID, the position atoms, the headline's kind (its *kind
+  atom*: =node=, =ghost=, =unknown=, =tombstone=, =aliasFolder= and so
+  on), then any
+  number of key-value and bare-value parts in any order
+  ('docs/api-and-formats.org', "The metadata headers").
+  The metadata is used for Rust to know what to do with it,
+  and for the client to let the user know how to interpret it.
+  It is not abbreviated "md", which means Markdown (as in
+  =import-md-and-org=).

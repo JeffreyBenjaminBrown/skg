@@ -1,0 +1,8 @@
+title: 'The familiar part: Trees with links'
+pid: d8c1ee8f-5ba1-44e4-b49d-9bc453c92b5d
+body: |2-
+  This is [[id:05a14ad7-816b-41d0-bf9b-90155297d7a1][the data model that almost all serious knowledge mapping software seems to use]].
+
+  (If 'link' sounds weird, just think 'hyperlink'. If you use the internet, you are used to using these.)
+contains:
+- 38fb1bcd-f1f6-48d1-9e1d-1617d1e2f77f

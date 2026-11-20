@@ -1,0 +1,14 @@
+title: stranded relationship, strandeds
+pid: 8ced1d9f-ec1a-4a36-b19a-923b39f43fc7
+body: |2-
+  A home skgrepo move can strand a relationship touching the moved
+  node: a *stranded relationship* is one that sat at its default relRepo
+  before the move and that the sticky rule would leave off its new
+  default. *Stranded* can be both noun and adjective; "strand"
+  is only a verb. A save finds every one, of every relation, in both
+  directions, shown in some view or not ('server/from_text/strandeds.rs').
+  It raises the inbound strandeds of a privatizing move to the new home
+  by itself, since they would leak the member's ID, and asks the user
+  whether to reset the strandeds of a publicizing move to their new
+  defaults (the strandeds-confirmation). Mentions carry no relRepo, so
+  they are never stranded.

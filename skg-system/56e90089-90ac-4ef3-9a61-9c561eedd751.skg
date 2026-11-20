@@ -1,0 +1,18 @@
+title: '<localleader>tr         : :SkgInvestigateUnknownNode'
+pid: 56e90089-90ac-4ef3-9a61-9c561eedd751
+body: |2-
+  The twin of Emacs's skg-investigate-unknown-node. Says what git
+  history knows of an unknown graphnode: one that an ID in some list
+  names and no graphnode answers to, which a view shows as an unknown
+  viewnode, heralded "Reference to unknown node.". On an unknown
+  viewnode it takes that ID; anywhere else it asks for one. The answer opens read-only in
+  =skg://unknown-node=, as Org text. If the ID resolves to a node, it
+  names that node, its ID and its home skgrepo. Otherwise it searches
+  the git history (first parents, from HEAD) of every skgrepo, and
+  reports the most recent commit that held the ID's file, the commit it
+  vanished at, its title then, its own relation lists then, and every
+  node that referred to it then, links included; or that the ID was
+  never in any skgrepo's history. If HEAD still holds the ID's file,
+  it says so: "still present at HEAD (only the worktree lacks it)". It
+  refuses unless the connection is unrestricted; a refusal opens the
+  same buffer, as "* investigation failed" with the reason under it.

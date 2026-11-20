@@ -1,0 +1,20 @@
+title: extent, extension, node budget
+pid: 26fd66bc-7a79-4428-857f-e6ed1b4fe8d5
+body: |2-
+  The *extent* is how much of a parent's goal the refresh draws
+  ('server/refresh/extent.rs'): all of it for a folder and for an
+  editable occurrence's content (in the diff view, also for a ghost's
+  old content where content stands); none of it, beyond what the buffer
+  already shows, for a write-protected occurrence's content and for the
+  containerward chain. An *extension* is one editable occurrence's
+  content drawn whole; the *node budget* ('initial_node_limit') counts
+  them, each charging it once at its visit, and once it is spent the
+  occurrences the refresh draws are write-protected (they carry an
+  editable-view request their visit consumes,
+  'consume_editableView_request'). A folder fills its members without spending any, but a forkee as
+  such it draws is an editable occurrence, which spends one at its
+  visit, in level order with content. The
+  module comment of 'server/refresh/extent.rs' states the extent, and
+  that of 'server/refresh/editability.rs' the node budget. The
+  server *renders* a viewforest when it produces its org text
+  ('server/org_to_text.rs').

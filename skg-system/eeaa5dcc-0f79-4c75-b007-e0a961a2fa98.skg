@@ -1,0 +1,6 @@
+title: Manipulate others' data as if it were your own, while staying informed of their changes.
+pid: eeaa5dcc-0f79-4c75-b007-e0a961a2fa98
+body: |2-
+  If another user shares data with you, you can navigate, edit and reshape it just like it was yours. When you "modify" external data (that is, data you do not control), your data quietly gains a =fork= of the modified document. The fork is like a clone, which comes into existence with all the original's text and branches, plus a =forks= relationship to the original. If you want to see the original, you still can. But your fork is yours, so you can rearrange its contents, edit them, and scatter them across your other files. Until you remove that relationship, anything the other author adds to the original note will become visible from your fork as new "unintegrated forked content". (The original data that you cloned is considered already integrated.)
+
+  There's a detailed example [[id:1c6e493f-b9ff-49c2-8642-729de8b37e85][here]].

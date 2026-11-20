@@ -1,0 +1,11 @@
+title: The save of any buffer consumes the requests
+pid: 9db15144-f241-4e8c-9c6e-6d66e2f4d4ed
+body: |2-
+  A save of any buffer, not only one of the diff view's, consumes the
+  processed requests after its graph edits succeed: each sets or clears
+  the marks of the change-forest leaves its headline names, at their
+  current fingerprints. A save that stops for a confirmation (strandeds,
+  Hoist, forks) or fails consumes none, and leaves them in the buffer. A
+  request that names no current change is dropped, with the warning =A
+  processed request names no current change; it was dropped.=, naming its
+  headline as a subheadline. See "Save buffer" above.

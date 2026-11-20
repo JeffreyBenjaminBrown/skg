@@ -1,0 +1,7 @@
+title: Performance
+pid: b3757284-c596-44ce-8b8b-7b53d7ede121
+body: |2-
+  Measure what the work does on the real data, read-only: the costs
+  that scale with the graph (a full comparison after every save, a
+  walk per changed node, a file read per node). One number each, with
+  the method, and a judgment of whether anything is worth optimizing.

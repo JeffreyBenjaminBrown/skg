@@ -1,0 +1,8 @@
+title: R and U
+pid: d197abf4-caec-4997-81cb-e85001b83e71
+body: |2-
+  From each node of C the containerward walk climbs through the union
+  of the two graphs, following single containers, until it reaches a
+  content origin: a node with no container or with several, or the
+  members of a rootlike cycle. R is the content origins reached. U, the
+  nodes to extend contentward, is C, R and every node on those walks.

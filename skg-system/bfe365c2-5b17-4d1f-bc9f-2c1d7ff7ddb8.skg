@@ -1,0 +1,14 @@
+title: Checking and fixing them
+pid: bfe365c2-5b17-4d1f-bc9f-2c1d7ff7ddb8
+body: |2-
+  At startup the server warns of doubtful attributions among the notes
+  of your skgrepos, counted by kind: a recorded remote no loaded skgrepo
+  has (perhaps only not loaded, or its remote changed); a recorded name
+  now naming a skgrepo with another remote; with no remote recorded, a
+  name the config lacks, or one that has a remote now. Each warning says
+  how to fix it. =skg check-attributions CONFIG= prints the same
+  without starting a server. =skg fix-attributions CONFIG OLD SKGREPO=
+  rewrites every attribution in your skgrepos whose remote hash or
+  recorded name is OLD to name SKGREPO as it is now, its name and its
+  remote's hash; the original and the commit stay. (Run them as
+  =cargo run --bin skg -- check-attributions CONFIG=, and so on.)

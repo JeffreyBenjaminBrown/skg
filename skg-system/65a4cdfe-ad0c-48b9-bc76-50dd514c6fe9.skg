@@ -1,0 +1,15 @@
+title: Changed folders
+pid: 65a4cdfe-ad0c-48b9-bc76-50dd514c6fe9
+body: |2-
+  A partner, alias, ID or flags folder is written as its bare atom,
+  whether or not something in it changed. A folder is shown because of
+  a change when some member of it carries a change of its relationship
+  to the folder's viewparent: a =(rel ...)= part, or a =(relRepoMove
+  ...)= under it. The clients compute that from the members, and label
+  such a folder "its X changed (this file)" or "(other files)" (see the
+  glossary's "in, out") -- the forks folder, whose members play either
+  side, "its forks changed" -- with ✓ when every changed membership is processed:
+  a member's =(rel ...)= is processed when it carries =(processed ...)= naming
+  =rel= if its =(leaves ...)= lists =rel=, and any =(processed ...)=
+  otherwise; a relRepo move is processed when it carries =(processed ...)=.
+  A processed gesture on such a folder acts on each changed membership.

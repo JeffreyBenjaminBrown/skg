@@ -1,0 +1,7 @@
+title: headline with change facts
+pid: c57c2053-f93e-425f-bcaa-10547269246a
+body: |2-
+  A headline whose metadata carries a '(leaves ...)' change fact. It
+  is processed when its '(processed ...)' names every object its '(leaves ...)' lists,
+  and otherwise unprocessed. The navigation commands (C-c r n c and its
+  kin) move between headlines with change facts.

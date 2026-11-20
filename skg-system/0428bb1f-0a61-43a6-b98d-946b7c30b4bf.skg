@@ -1,0 +1,9 @@
+title: A claim about a field reads the field's definition
+pid: 0428bb1f-0a61-43a6-b98d-946b7c30b4bf
+body: |2-
+  Plan 1_2 said the server's 'config_path' is the config path as
+  given; the comment on the field's neighbor said it is canonical,
+  and the user's config is a symlink, so the server's run folder
+  would have landed beside the wrong file. When a plan derives a
+  path or a name from a field, cite the field's definition and its
+  comment, not only the function that uses it.

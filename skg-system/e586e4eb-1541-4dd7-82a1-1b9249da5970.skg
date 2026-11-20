@@ -1,0 +1,6 @@
+title: '<localleader>ve : :SkgViewNewEmpty'
+pid: e586e4eb-1541-4dd7-82a1-1b9249da5970
+body: |2-
+  Opens a blank Skg content view in which to create new nodes.
+contains:
+- bcce0bd3-0a9a-4b14-8d02-b79bc72661fc

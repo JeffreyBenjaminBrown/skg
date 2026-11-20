@@ -1,0 +1,13 @@
+title: Busy-initializing signal
+pid: 5e628197-73a5-4cb5-8221-b1b6ba82fcf1
+body: |2-
+    - Triggered when a client connects while the server is still building the
+      graph and Tantivy.
+    - Response: the unprefixed, newline-terminated
+      =((busy-initializing . "human-readable status message"))=.
+    - Emacs should display the message and retry the request (or let the user retry manually).
+    - No request triggers this specifically; any request sent during initialization may receive it.
+
+  Once initialization is complete, endpoint errors use that endpoint's
+  normal tagged, length-prefixed response shape (or the shared
+  =response-type error= dispatcher fallback); they are not bare text.

@@ -1,0 +1,19 @@
+title: The tail
+pid: 8bf4341e-aa43-4440-a155-651bcf68c7ee
+body: |2-
+  After the walk, once (=server/refresh/tail.rs=): the derived facts are
+  computed, the stats of each occurrence (its relationship facts,
+  property counts and birth, =cycle=, =repoBoundary=, =omittedBody=, its
+  relRepo where it differs from the default), and in the diff view the
+  '(processed ...)' change facts, from the processed store, and the home
+  skgrepo moves; every
+  childless tombstone is pruned, postorder and roots included, so a
+  buffer may end with no roots, and so is a folder the pruning leaves
+  empty that goes when empty; an editable folder stays even when
+  empty, since the user can add to it, so one whose every member's
+  record the skgrepo restriction keeps out stays, empty, and fills again
+  after a skgrepo widening; every
+  viewnode that lacks a viewnode ID gets one. The refresh renders
+  nothing: each caller renders the viewforest once, when it is done
+  with it (=viewforest_to_string=), the search after it has folded
+  what it drew and excluded the overPrivateText nodes.

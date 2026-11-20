@@ -1,0 +1,5 @@
+title: Org export
+pid: fba5fd2c-48b9-4de8-b6a0-7b3922c0e6c6
+body: |2-
+  Org export follows the stored, repo-gated =contains= graph.  It does
+  not perform interactive mirror substitution.

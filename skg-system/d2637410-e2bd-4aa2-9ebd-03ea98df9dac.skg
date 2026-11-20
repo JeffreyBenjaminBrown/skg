@@ -1,0 +1,22 @@
+title: editable, write-protected
+pid: d2637410-e2bd-4aa2-9ebd-03ea98df9dac
+body: |2-
+  Each occurrence is either *editable* or
+  *write-protected* ('Editability' in 'server/types/viewnode.rs'). Edits to
+  an editable occurrence's title, body and children are saved; a
+  write-protected occurrence shows no body and saves nothing of its own,
+  so a save is refused if one differs from the graph in its title,
+  skgrepo, aliases (one lacked, reordered, or with a relRepo request) or
+  flags; a title or skgrepo as the buffer's baseline shows it, which the
+  graph changed since, is no edit (see "unedited"). No child of a
+  write-protected occurrence claims membership,
+  whatever it carries: a child the user typed under it, which stays
+  unwarranted, since no save reads claims there, is saved as an
+  orphan graphnode (see "claims membership"). A buffer may hold at
+  most one editable occurrence of a node,
+  so that two occurrences cannot contradict each other. Make one
+  editable with =skg-set-editable= (=C-c s e=), which writes a
+  =editableView= view request; make one write-protected with
+  =skg-request-write-protected= (=C-c s w=; =C-c s W= for its whole
+  content subtree), which writes a =writeProtectedView= or
+  =writeProtectedSubtreeView= view request.

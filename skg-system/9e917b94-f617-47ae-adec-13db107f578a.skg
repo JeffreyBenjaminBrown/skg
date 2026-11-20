@@ -1,0 +1,7 @@
+title: 'C-c r n C : skg-diffView-goto-next-change-anywhere'
+pid: 9e917b94-f617-47ae-adec-13db107f578a
+body: |2-
+  Like C-c r n c, visiting the headlines it skips too: every headline
+  with change facts. Each of the six motions has such a twin, its last
+  letter capital, ending in '-anywhere'; at the end each says what its
+  plain twin says, naming no other key.

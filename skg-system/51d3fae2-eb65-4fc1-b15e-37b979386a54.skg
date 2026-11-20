@@ -1,0 +1,7 @@
+title: What the original said
+pid: 51d3fae2-eb65-4fc1-b15e-37b979386a54
+body: |2-
+  =skg show-forked-original CONFIG FORK_ID= prints the original's file
+  as it was at the recorded commit, read from the gitrepo of the loaded
+  skgrepo the attribution names, with a warning first when the
+  attribution says the file was uncommitted then.

@@ -1,0 +1,8 @@
+title: text preserver
+pid: 027a0c8a-670a-4f79-beee-e830d40718a6
+body: |2-
+  A nodeMerge keeps the acquiree's text in a new node, its *text
+  preserver*: titled "MERGED: " and the acquiree's title, with the
+  acquiree's body, and placed first in the acquirer's content. The
+  acquiree's other content joins the acquirer's, and the acquiree's ID
+  becomes an extra ID of the acquirer. See =docs/merging.org=.

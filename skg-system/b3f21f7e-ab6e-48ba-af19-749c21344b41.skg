@@ -1,0 +1,94 @@
+title: Text search
+pid: b3f21f7e-ab6e-48ba-af19-749c21344b41
+body: |2-
+    - Request: =((request . "text search") (terms . "SEARCH_TERMS")
+      (regex . "BOOL") (body . "BOOL") (operators . "BOOL"))=, plus
+      optional =(overPrivateText-telescopes . "include")= or
+      =(overPrivateText-telescopes . "exclude")=.
+      - Search always returns every match. Prominent nodes (a root, a member of a
+        cycle, a node linked to, a node that had an ID before import, or a
+        multiply contained node; 'docs/glossary.org', "prominent") are ranked
+        higher, via their prominence multiplier.
+      - =regex=, =body=, =operators= are optional; each defaults to "false".
+        - "regex=true": interpret the query as a per-token regex; a RegexQuery is built directly and the QueryParser is bypassed.
+        - "body=true": also search node bodies (titles are always searched).
+        - "operators=true": preserve Tantivy phrase and operator syntax (AND / OR / phrase / +foo / -bar / grouping / field:). Intra-word operator chars still get escaped heuristically so C++ etc. remain findable. In regex mode, the query is parsed as a boolean expression over the per-token regexes: AND / OR / NOT / +foo / -bar, conventional precedence (NOT > AND > OR, bare adjacency = OR), and grouping via parens that stand alone between whitespace (a paren attached to a pattern is regex syntax within that piece). Malformed operator syntax is an error; phrase syntax does not apply. Detailed in docs/COMMANDS.org.
+      - The skgrepo restriction is applied before grouping, ranking,
+        alias/title selection, and display truncation. Restricted-skgrepo
+        documents do not influence result order or which title/alias is
+        shown for an unrestricted result.
+      - =overPrivateText-telescopes= is normally absent on the first request. Under
+        a restricted skgrepo-set, if the search index contains any telescope
+        whose selected title or body lies below home, the server does no
+        query and responds with LP
+        =((response-type overPrivateText-telescope-confirmation)
+        (operation text-search) (pids ()) (prompt "..."))=. The empty PID
+        list is deliberate: a pre-query decision must not disclose which
+        overPrivateText node might match. The retry uses ="include"= or ="exclude"=.
+        Exclusion is applied inside the Tantivy query, before matching,
+        and to what the enrichment draws, after it: the occurrences of
+        overPrivateText nodes there become tombstones, and childless
+        tombstones are pruned. The choice
+        is request-scoped. An unrestricted connection needs no choice
+        and returns a warning if the results include overPrivateText
+        telescopes.
+
+    - Response: one LP =((response-type search-results) (content
+      "ORG") (warnings ("..." ...)))=, whose content is the search
+      buffer: each hit, and what the enrichment draws under it. A
+      no-match or error response has the same response type and
+      a single =content= field, a message to the user. (The
+      overPrivateText challenge above is sent instead of it.) No other
+      message follows; the search buffer is an ordinary view from
+      then on, and closing it is an ordinary =close view= of
+      =search:TERMS=.
+      - The hits are the roots of the search buffer, ordinary
+        write-protected occurrences (not special non-vognode kinds),
+        best first. Each shows its node's title.
+      - The search draws the enrichment by a refresh of a stub built
+        from the hits ('build_search_viewforest', then
+        'draw_search_buffer'), the same code every view is drawn
+        with: each hit asks for its containers folder ('(folder
+        containers)'), and holds an empty forks folder when that
+        folder's goal has members, and an empty alias folder when an
+        alias of its node matched; the refresh
+        fills the folders and draws each containers folder member's
+        containerward chain.
+      - Under each hit hang its containers folder, whose members carry
+        the containerward chain; and its forks folder, flat, as every
+        forks folder is: the visible nodes it forks, then those that
+        fork it, then its other mirrors (those it hides aside), each
+        member's chain in a containers folder under it, and no member
+        showing a forks folder of its own (see "View requests"). A
+        folder with no member is not drawn. The
+        members are write-protected. Everything under a hit is folded,
+        so that the hit shows collapsed; but a hit found through an
+        alias shows its folders, each collapsed except its alias
+        folder, which shows all of the node's aliases, the matching one
+        among them. Among hits that are mirrors of one another
+        (=docs/mirrors.org=, "Mirrors"), the one the user's own skgrepo
+        list ranks first stands: the list of the perspective of the
+        config's first owned skgrepo, the most public, then the others
+        in declaration order, so that among owned hits the most public
+        stands; several in one skgrepo tie, and the least pid
+        stands. If it is owned, every other
+        hit among them is suppressed at the top level
+        ('suppressed_result_gnids'), and reappears in the one forks
+        folder of the hit standing, which lists every mirror of it, one
+        it forks or that forks it and one joined to it only through
+        other notes (a sibling fork, say) alike; one the standing hit
+        hides stands in that folder's folder of what it hides outside
+        its fork partners. A foreign hit suppresses nothing.
+      - The search draws the enrichment under the same
+        skgrepo restriction as it searches under. The containerward
+        chain stops before restricted containers.
+      - The search takes no hit cap and no node budget. The refresh's
+        node budget exists, and the stub could be given one; that is
+        left unmade.
+      - Note: the search once answered in two phases: the hits at once,
+        then, after the server asked for a snapshot of the search
+        buffer, the enrichment under them. That protocol showed the hits a
+        tenth to a quarter of a second earlier for a search of hundreds
+        of hits, and was removed for its complexity
+        ('TODO/simplify-refresh/bench-search-enrichment.org' holds the
+        measurements).

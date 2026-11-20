@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 85f81823-5736-41d7-8684-0cfac1433861
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * merging nodes
 ** what merging nodes means
 You might discover that two of your nodes
@@ -17,13 +21,10 @@ Merging two nodes solves this problem.
 Any relationship that either node was in,
 after the two become one,
 is now a relationship that applies to the one.
-
 ** how to merge two nodes
 Steps:
-
 *** Put point on one of the nodes.
 We call this node the 'acquiree'.
-
 *** "Get" that node's ID.
 It's easiest to use 'skg-id-push'.
 
@@ -32,7 +33,6 @@ by visiting a metadata buffer for the node ('skg-view-metadata')
 and copying the ID yourself,
 or by disablling the heralds view (toggled by 'skg-view-heralds-mode')
 and manually copying the ID from the node's metadata.
-
 *** Go to the other node, and add a merge request to its metadata.
 We call this other node the 'acquirer'.
 **** the new, easier way

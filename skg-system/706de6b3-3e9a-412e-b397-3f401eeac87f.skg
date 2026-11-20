@@ -1,0 +1,24 @@
+title: Small semantic notes
+pid: 706de6b3-3e9a-412e-b397-3f401eeac87f
+body: |2-
+  - 'point-column' in the save round-trip is a byte offset here and a
+    character offset in Emacs. The server merely echoes it, so each
+    client round-trips its own convention; on lines containing
+    multibyte characters before point, a buffer saved in one client and
+    restored in the other would land point a few cells off. Harmless in
+    single-client use.
+  - The Lua sexp printer renders the empty list as '()' where elisp
+    prints 'nil'; the server's parser accepts both, and the reader maps
+    both to the same value.
+  - 'view-without-metadata' takes the visual selection (or the last
+    visual marks); Emacs took the active region.
+  - In the metadata editor, S-Left/S-Right read and rewrite a value
+    headline's whole title, so a TODO keyword or tags typed on one are
+    read as part of the value and dropped by the cycle; Emacs's
+    'org-edit-headline' keeps them. Skg writes neither on a value
+    headline, and keeping them would need org's keyword set in Neovim.
+  - 'search-interactive''s 'h' option opens docs/COMMANDS-nvim.org
+    (falling back to COMMANDS.org).
+  - The 'M-x' cosmetic machinery (alias names, completion-predicate
+    hiding of internal names) has no analog; the ':Skg*' commands are
+    the public names.

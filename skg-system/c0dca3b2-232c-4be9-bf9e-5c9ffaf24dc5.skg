@@ -1,0 +1,48 @@
+title: What lives where
+pid: c0dca3b2-232c-4be9-bf9e-5c9ffaf24dc5
+body: |2-
+  The node's *home* is its most public retained section. It holds the title,
+  body, and extra IDs. That the home is the section with the title is
+  an invariant rather than a definition: it would be silly to share a
+  node without sharing its text, so a node's text always lives in its
+  most public section. Data that breaks the rule — a title or body
+  selected below the home section — still loads, but the composition reports
+  it. An interactive save offers Abort or Hoist before changing
+  anything. Hoist explicitly moves the selected title and body to
+  home, removes lower title/body copies, preserves lower relationships and
+  aliases, then rereads the files and requires the telescope to be
+  clean before updating the in-memory graph or session-lifetime stores.
+  Abort leaves every file alone; manual repair requires making the same
+  title/body-only edits in the =.skg= sections. Noninteractive and
+  maintenance writers have no implicit Hoist answer and refuse. Every
+  relationship (a =contains=
+  membership, a =forks= relationship, a hide) carries its own
+  relRepo: the skgrepo of the section that records it.
+
+  Reading the node *composes* the sections, most public first, into one
+  effective node. (A foreign node has no privacy levels here; its
+  sections fold in the order its publisher's manifests give — see
+  "Ownership and folders", below.) Under a restricted skgrepo-set you see the *visible
+  composition* — only the unrestricted sections' contributions — while with no
+  skgrepo restriction you see the *full composition*. A more private section can both /add/ members and
+  /place/ them: its members interleave into the more public list via
+  placement anchors, so your private ordering of a public list
+  survives without the public file recording anything. Saving decomposes
+  the node back into sections, byte-stably: sections you did not
+  affect do not change on disk, and foreign sections are never
+  written.
+
+  A telescope's sections are all one owner's: yours, or one foreign
+  owner's. Sections of one PID in skgrepos of different owners are not
+  one telescope; see "Illegal edits", below.
+
+  If composing has to select a title or body below home, Skg marks the
+  whole telescope *overPrivateText*. An unrestricted connection displays that
+  text with a warning. A restricted skgrepo-set asks before releasing it, using an
+  approval scoped to the exact PIDs and the single request; search asks
+  whether to include or exclude overPrivateText telescopes before it matches. This
+  release approval does not authorize Hoist. Conversely, approving
+  Hoist does not become a standing permission to display unrelated overPrivateText
+  text. Saved and collateral views are rendered in memory and checked
+  before their text is streamed or their open-view registry entries are
+  changed.

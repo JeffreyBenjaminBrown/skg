@@ -1,0 +1,14 @@
+title: skg-rebuild-session-lifetime-stores
+pid: b1e4aa3d-3344-4ce8-bf76-8b04af092733
+body: |2-
+  Re-reads the config file and the authoritative =.skg= files, validates and
+  replaces the in-memory graph, and rebuilds the derived Tantivy search index.
+  It does not rewrite the =.skg= files. So an edited config (a skgrepo added,
+  removed or reordered, say) takes effect without restarting the server, except
+  for its 'port' and 'timing_log', which the answer warns about. An invalid
+  config fails the rebuild, and the server keeps serving the old one. After a
+  successful rebuild every view without unsaved edits is rerendered from the
+  rebuilt graph, as 'skg-request-rerender-all-views' does; the views with
+  unsaved edits are named and left as they are, and a save of one is checked
+  like any other. Files that change on disk need no rebuild: the server reloads
+  them as they change (see the start of this document).

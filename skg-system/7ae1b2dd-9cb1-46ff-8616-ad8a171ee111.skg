@@ -1,0 +1,6 @@
+title: '<localleader>lm : :SkgShowFolderOfMentioners'
+pid: 7ae1b2dd-9cb1-46ff-8616-ad8a171ee111
+body: |2-
+  The mentionerFolder -- the nodes that link to this one. Write-protected
+  (☮): a link lives in the linking node's text. On a node nothing links to,
+  nothing appears.

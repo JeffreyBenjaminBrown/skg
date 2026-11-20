@@ -1,0 +1,9 @@
+title: Recovery and source of truth
+pid: 0371cef4-9519-4fa7-befb-41ad29195162
+body: |2-
+    The filesystem (`.skg` files plus `skgconfig.toml`) is authoritative. The
+    immutable in-Rust graph and Tantivy index are derived from one full read at
+    startup. The `rebuild ephemeral data stores` request constructs and
+    validates a replacement graph/index generation before publishing it
+    atomically. A restart repairs any crash after a successful file write but
+    before derived publication.

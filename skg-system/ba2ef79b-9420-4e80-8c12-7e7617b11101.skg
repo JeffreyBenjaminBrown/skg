@@ -1,0 +1,24 @@
+title: The processed summary
+pid: ba2ef79b-9420-4e80-8c12-7e7617b11101
+body: |2-
+  The answer to each "diff view" request for a nonempty buffer, to each
+  save of a buffer of the diff view, and to C-c r u carries the
+  processed summary, as does the answer to a commit of everything that
+  asks first. When a buffer of the diff view opens, after every save of
+  one, after C-c r u, and before such a commit, the client shows it.
+  It counts nodes, the unit a commit takes ("Stage and commit"): the
+  changed nodes, those processed, those whose only change is the order
+  of some list (the order-only buffer's), and the processed nodes
+  a commit of the processed would hold back ('waiting'), by the rule
+  that commit applies ("Which nodes go in"). A node with sections in
+  two skgrepos counts once. It is computed over the whole
+  change-forest, whatever buffer is open. It adds the changed nodes of
+  the foreign skgrepos (the stems of their changed '.skg' files, each
+  once), and the changes not editable in this view: the leaves whose
+  recorder the buffer does not make editable (see "What counts as
+  editable here"), with the command that extends the buffer to them.
+  The diff view's answer, a save and C-c r u compute it alike
+  ('buffer_processed_summary_for', 'server/diff_view/processed_requests.rs',
+  over 'buffer_processed_summary', 'server/diff_view/change_leaves.rs').
+  The waiting count costs no Git and no check: it is the commit's rule
+  over the straddle the save already has.

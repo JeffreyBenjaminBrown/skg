@@ -1,0 +1,30 @@
+title: 'first some vocab: ''editable'' and ''write-protected'''
+pid: bdd82f8f-64d9-4b98-906a-9d36d1bb0812
+body: |2-
+  A view of a node can be editable or write-protected.
+  Typically the first place in the buffer that depicts a node
+  is the editable view of it. So that other views of that node
+  cannot contradict it, they are 'write-protected': Edits to them
+  cannot affect the node they depict. One also has no content --
+  the server extends none under it,
+  in order to prevent the view from becoming redundant and huge --
+  but it may keep children, which claim nothing there (see below).
+
+  A write-protected occurrence saves nothing of its own,
+  so an edit to it refuses the whole save, and nothing is written:
+  a changed title or home skgrepo;
+  an alias folder lacking or reordering its aliases,
+  or one with a relRepo request;
+  or a flags folder that differs from the graph.
+  The refusal names the occurrence and what differs.
+  No child of a write-protected occurrence claims membership,
+  whatever it carries, and nothing in one of its folders does.
+  A child the user typed under it, which stays unwarranted (⊥),
+  since no save reads claims there, is still saved as a node of its
+  own: an orphan graphnode, a node that no list contains, of which the
+  save warns. A write-protected occurrence is one of the parents that
+  read no claims, which 'docs/glossary.org' lists under "claims
+  membership".
+  The way out is to make the edit at the node's editable occurrence
+  instead, or to undo it, make this occurrence editable
+  (<localleader>se on it), save, and edit it then.

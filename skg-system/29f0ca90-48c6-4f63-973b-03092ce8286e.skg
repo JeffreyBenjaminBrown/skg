@@ -1,0 +1,7 @@
+title: '<localleader>rnC : :SkgDiffViewGotoNextChangeAnywhere'
+pid: 29f0ca90-48c6-4f63-973b-03092ce8286e
+body: |2-
+  Like <localleader>rnc, visiting the headlines it skips too: every
+  headline with change facts. Each of the six motions has such a twin,
+  its last letter capital, ending in 'Anywhere'; at the end each says
+  what its plain twin says, naming no other key.

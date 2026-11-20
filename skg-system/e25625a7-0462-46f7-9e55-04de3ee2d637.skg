@@ -1,0 +1,6 @@
+title: Running a plan
+pid: e25625a7-0462-46f7-9e55-04de3ee2d637
+body: |2-
+  One agent per slice, triage between slices, corrections carried
+  into the plan, the record in 'progress.org', and the review at
+  the end: see [[id:995a3665-33c1-46d6-8f06-ab2c9b61945a][file:orchestration.org]].

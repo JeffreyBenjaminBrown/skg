@@ -1,0 +1,12 @@
+title: Formatting Rules
+pid: 9e76f4ef-51bc-40f3-84ac-22bb3757cdf9
+body: |2-
+  When writing or modifying code:
+  - **Type signatures**: Name, each argument, and return type on separate lines
+  - **Variable definitions**: Type signature required, newline after equals sign
+  - **Function order**: Callers before callees within same module
+  - **Whitespace**: Honestly, hard to describe, but try to follow the precedents you find in the code. My (this is Jeff speaking) goal is readability.
+  - **Bracket grouping**: Adjacent punctuation grouped `(( ))` not `(())`
+  - **Comments**: Inside code blocks they apply to, preserve existing comments
+  - **No empty lines** in function definitions unless necessary for comment clarity.
+  - **Don't reformat existing code** - only apply rules to new/modified code

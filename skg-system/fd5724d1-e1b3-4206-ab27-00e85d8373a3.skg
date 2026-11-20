@@ -1,0 +1,16 @@
+title: Two conventions that worked, and one rule
+pid: fd5724d1-e1b3-4206-ab27-00e85d8373a3
+body: |2-
+  When a later decision changes what an earlier section says, add
+  a child 'TODO UPDATED [Claude] ...' to the earlier section rather
+  than editing it, so that Jeff meets the change where he reads.
+  While Jeff edits the main document, Claude answers in a
+  sidechannel file beside it ('temp-for-claude-to-edit.org') into
+  which Jeff copies the threads; Claude then edits only the
+  sidechannel, even to apply a change Jeff approved there, and a
+  change to the main document waits until Jeff says it is free.
+  Jeff sometimes closes a heading by prefixing 'DONE AGREED : ';
+  it closes like DONE. When Claude finds that a heading of its own
+  restates something a discussion elsewhere has settled, it marks
+  the heading 'DONE-CLAUDE' and gives it a child 'WHY-CLAUDE' that
+  says where it was settled, so Jeff is not asked twice.

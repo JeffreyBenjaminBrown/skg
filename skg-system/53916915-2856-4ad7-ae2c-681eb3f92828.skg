@@ -1,0 +1,10 @@
+title: Verify connection
+pid: 53916915-2856-4ad7-ae2c-681eb3f92828
+body: |2-
+    - Request: ((request . "verify connection"))
+    - Response: LP =((response-type verify-connection) (content "This is the skg server verifying the connection.") (supports ("save preview")))=.
+      =supports= names the protocol features a client cannot otherwise
+      tell an older server lacks: ="save preview"=, the =(preview .
+      "true")= field of "Save buffer", which an older server ignores,
+      saving for real. A client asks before using one; an older server's
+      answer has no =supports=.

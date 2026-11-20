@@ -1,0 +1,13 @@
+title: 'Once forked: the fork operation''s guard'
+pid: 517efbea-6438-4d47-aff1-741f1cdb9938
+body: |2-
+  If you try to fork something you already fork, the save is rejected
+  with a message naming your fork of it — edit that fork instead. This
+  guards the gesture, not the data: an edit that silently made a second
+  clone would more often be an accident. Any number of notes, yours
+  among them, may fork one note; to fork it a second time deliberately,
+  make another note of yours fork it.
+
+  A note may not fork itself, nor contain a note it forks or a note that
+  forks it: a fork is the same note, and containing it is like containing
+  oneself. The save refuses each.

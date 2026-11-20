@@ -1,0 +1,37 @@
+title: the in-folders and out-folders
+pid: 40840921-105d-4803-92f9-c642705b377d
+body: |2-
+  A changed set of containers, mentioners or
+  hiders adds a write-protected folder labelled "its other containers changed
+  (other files)" and so on; a changed set of hidden nodes adds the
+  folder labelled "the nodes it hides changed (this file)". The forks
+  folder holds both sides of 'forks', so it is neither an in-folder nor
+  an out-folder: a change of a fork the node records, or of one
+  recorded by a note that forks it, adds the one forks folder,
+  labelled "its forks changed". The changed folders stand in the order
+  containers, mentioners, forks, hiders, hidden ('PARTNER_FOLDERS' in
+  'server/diff_view/changes.rs'). A containers folder is drawn only
+  when a container not above the node in the view gained or lost it,
+  and, as in every view, leaves out the node's view-ancestors: the
+  node's headline under its parent already carries that containment
+  change ('changed_partner_folder_kinds' in
+  'server/diff_view/changes.rs'). A folder holds the partners in either
+  graph, each tagged as a content member is: its node's existence and
+  other properties, so a modified member shows ☮ M, and 'node' with
+  'rel' there marks its file, and the existence of its relationship to
+  the folder's viewparent, of the folder's kind. The compound partner
+  folders ("It contains these, but c hides them", "a hides these, which
+  c contains" and "b hides these, but no fork partner shown contains them";
+  the diff view draws none unasked) show no change and carry no '(rel ...)'. Under each
+  member of a changed folder hangs its containerward chain directly, a
+  forks folder's member's too (a content view puts that one in a
+  containers folder under the member), so that the user sees where the
+  member sits: the member's
+  containers as write-protected occurrences, theirs under them, up to
+  the roots or to 'max_roleTree_depth', walked over the union of the
+  two graphs ('ContainerwardChainPartners::GraphStraddle'). The refresh
+  draws a chain under a member it draws, and never reinstates a chain
+  node. A ghost member holds no chain. A chain node
+  carries no change facts and takes no processed marker; only
+  the folder's members show change. Before the chain, where the
+  member's relationship moved to another skgrepo, hangs that move.

@@ -1,0 +1,51 @@
+title: 'C-c r c : skg-stage-and-commit'
+pid: 9f0e5984-5591-46f9-b5cb-ee68cc042355
+body: |2-
+  C-c r c commits every node whose changes are all processed, except one
+  that needs a node whose changes are not. A node's changes are its own
+  (its text, aliases, extra IDs, flags, home skgrepo, its existence) and
+  those of its lists, so a child's ~ is its container's change. A node
+  goes in whole, all its '.skg' files or none, in each owned skgrepo
+  (one git-commit per skgrepo); foreign skgrepos are never committed. A
+  processed node waits, uncommitted and still marked, while it needs a
+  node that does not go in: it names a new node that does not, it is
+  deleted and a node that does not go in still names it, or it is part
+  of a merge whose other parts do not all go in.
+
+  A node one of whose files, at HEAD or now, is not what skg writes for
+  it (another field order, say, which only a hand edit makes) is not
+  processed, so C-c r c leaves it out, however many of its marks are
+  set: its file may have changed in a way the diff view does not show,
+  and no mark covers. Such a node goes in only with C-c r C, or with
+  Git.
+
+  It opens the buffer "*skg commit message*", in which you write the
+  commit message, as in magit. There C-c C-c commits with that message,
+  and C-c C-k cancels and kills the buffer; either one restores its
+  window. The header line says which commit C-c C-c makes: the buffer
+  remembers whether C-c r c or C-c r C opened it last. The message is
+  sent as written, less its trailing whitespace; a blank one is
+  refused. Nothing is asked. The line shown afterward says what went in
+  and what is left, and names each processed node that waits and what
+  it waits for: "Committed 2 nodes, in public (9c1e40d), private
+  (41aa07f). 2 changed nodes are left; 1 of them is processed but waits:
+  'Plans for spring' names 'Seed order', which is new and does not go
+  in." It names each node left because it changed in a way no mark
+  covers, and how: "...; 1 of them changed in a way no mark covers,
+  which C-c r C or Git can commit: 'Spring' (its file changed in a way
+  the diff view does not show (formatting, say))." When nothing is processed it says
+  "Nothing is processed, so nothing was committed; C-c r C commits
+  everything."
+
+  After C-c C-c the buffer keeps the message until it is moot: once
+  something is committed, or nothing had changed and nothing failed,
+  the buffer is killed. When nothing is committed otherwise (nothing
+  processed, everything processed waiting, a "yes" declined, a
+  refusal, an error), the message stays there, and C-c r c or C-c r C
+  reopens it. What was staged in git by hand never goes in, and stays
+  staged: a commit is HEAD's tree plus the committed nodes' files. Every
+  open view must be saved or reverted first. Afterward the open buffers
+  of the diff view are rerendered: each keeps its roots, its folding and
+  what it made editable, and what was committed no longer shows as a
+  change. The commit lapses the marks of everything it committed; every
+  other mark stays.

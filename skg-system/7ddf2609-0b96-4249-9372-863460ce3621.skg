@@ -1,0 +1,42 @@
+title: the metadata representation
+pid: 7ddf2609-0b96-4249-9372-863460ce3621
+body: |2-
+  There is no dedicated "move" command. Moves are inferred from a
+  buffer save: if you change the =(nodeRepo ...)= entry inside a node's
+  metadata sexp and save, skg detects the change and performs the move.
+
+  For example, given a node whose =.skg= file currently lives in =public/=:
+
+  #+begin_src org
+    * (skg node (gnid b) (skgRepos (nodeRepo public))) b
+  #+end_src
+
+  You change the metadata to:
+
+  #+begin_src org
+    * (skg node (gnid b) (skgRepos (nodeRepo private))) b
+  #+end_src
+
+  When you save, skg compares the buffer's =repo= field for =b= to
+  the value on disk. If they differ, skg generates a =RepoMove= and
+  applies it. (See =server/from_text/supplement_from_disk.rs:23=,
+  =supplement_none_fields_from_disk_if_save=.)
+
+  Both =public= and =private= must be skgrepos defined in your
+  =skgconfig.toml=, and both must be owned (neither says
+  =foreign = true=). A move to or from a foreign skgrepo is rejected
+  (see Pitfalls below).
+
+  Under privacy telescopes (see =telescopes.org=), what moves is the
+  node's home: its title, body and extra ids relocate to the new
+  skgrepo's section. Only owned skgrepos have privacy levels, so a
+  move is always a step along your own ladder; where a foreign skgrepo
+  sits in the config says nothing about it. Sections of the node at
+  other privacy levels stay
+  where they are, and each relationship keeps its relRepo
+  (relationships are clamped to be at least as private as the new home).
+
+  The buffer can reference a node by any of its IDs — primary or
+  extra — and the move still works correctly. The repo-move's =pid=
+  is always resolved to the primary ID before the move is applied
+  (=tests/move_repo.rs::test_move_node_referenced_by_extra_id=).

@@ -1,0 +1,8 @@
+title: How will it network and scale?
+pid: 7d390d1d-1f82-415c-8fad-6aa91cfc61e3
+body: |2-
+  Two choices, described first in bullets and then in more depth. Both could be used simultaneously.
+
+  -Frequent sharing: Unlimited scale, uses more bandwidth but little local space, requires users make their public notes available online (Github and others will do the job free).
+
+  -Infrequent sharing: Keep a collaborator's entire set of public notes on your disk, occasionally updating it whole. Limited to maybe a few thousand prolific collaborators. Works even via USB without internet, good for espionage.

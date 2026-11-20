@@ -1,0 +1,10 @@
+title: Skg's faces in views
+pid: f0ed04d3-33e0-4acd-b83e-4b1d55c25441
+body: |2-
+  Skg dictates every face in a view, in both clients: a black background,
+  a white default foreground, and Skg's own faces for the Org elements a
+  view contains, such as headline levels and links. These are colors and
+  weights, not the typeface, so nothing from the user's theme shows. They
+  are defined in the view_faces of [[file:../shared/herald-styles.json][shared/herald-styles.json]]. Emacs
+  remaps them buffer-locally in 'skg-content-view-mode'; Neovim maps them
+  into a view window with 'winhighlight'.

@@ -1,12 +1,12 @@
-* Scope reduction
+# This file was generated from the skg node with this ID:
+# bf2793e0-b1b8-4d63-96d4-ab1096796506
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+* Scope reduction
 There's an automatic tool for this. It takes a few minutes to run.
 Here's its [[file:../tools/scope-reducer/README.md][README]].
-
 * Refactoring sequential to nested definitions
-
 ** a definition of the refactor, or at least a diverse set of examples
-
 I always find myself doing this,
 to reduce the scope over which definitions in a function apply.
 I intend to ask AIs to do it.
@@ -85,20 +85,12 @@ Moreover there might be multiple spots in the same function that can be independ
 
 The procedure feels mechanical, yet hard to completely specify.
 I wonder if it might be deceptively NP-complete.
-
 ** Caveats and nuances
-
 *** The "output" could be side effects.
-
 So in the examples above,
 the 'let r = ' in 'let r = {' is really optional.
-
 *** "Single use" isn't always required.
-
 Even variables used multiple times within one logical block can be nested if all uses are contained.
-
 *** The borrow checker can constrain things.
-
 In Rust, you sometimes can't nest be cause you need to drop a borrow before getting a mutable reference.
-
 *** Comments should survive.

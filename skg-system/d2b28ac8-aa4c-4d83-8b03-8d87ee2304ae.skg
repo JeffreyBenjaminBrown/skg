@@ -1,0 +1,7 @@
+title: context node
+pid: d2b28ac8-aa4c-4d83-8b03-8d87ee2304ae
+body: |2-
+  An occurrence the diff view draws only to show where a change sits:
+  its node is not among the changed nodes (not in C; see "C, R, U, D,
+  content origin"). The server draws a context node with its body
+  folded.

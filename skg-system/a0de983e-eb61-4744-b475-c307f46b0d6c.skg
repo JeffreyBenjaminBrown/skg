@@ -1,0 +1,34 @@
+title: Log files
+pid: a0de983e-eb61-4744-b475-c307f46b0d6c
+body: |2-
+  Each server run writes its logs to a folder of its own,
+  =CONFIG.running/START/=, CONFIG being the config file's path as the
+  server was given it, and START the run's start time in UTC,
+  =YYYY-MM-DDTHH-MM-SSZ= (hyphens, not colons, so that it is a valid
+  file name everywhere). START is fixed once per process, so a config
+  reload keeps the folder. 'skg check-config' creates none.
+  - =server-to-user.log= — human-readable log (always on).
+  - =server.jsonl= — structured JSON log (when ~timing_log = true~). Queryable with =jq=.
+  - =views/= — what each view held at its last exchange (always on;
+    'server/view_snapshots.rs'). For each view, =VIEW.sent.org= is the
+    view as the server holds it after its last render, metadata and
+    all, and =VIEW.received.org= the buffer of its last save as the
+    client sent it, whose =folded= and =bodyFolded= atoms say what the
+    user had folded. VIEW is the view ID, each character but a letter,
+    digit, =-= or =_= made =_=, and, unless it is a content view's
+    UUID, followed by a hash of the whole ID ('file_stem'). Each file is
+    overwritten at every exchange, and a closed view's files stay. When
+    a save is refused for releasing text the skgrepo restriction hides,
+    =sent= holds the saved buffer as the server registered it, which the
+    client was not sent. The logs hold only each request's header line;
+    these hold the buffers: the views' text, private skgrepos included,
+    kept after the graph loses it, and never deleted by the server. So a
+    run folder is no longer safe to attach whole to a public report.
+
+  =CONFIG.running/= is the *run folder* ('docs/glossary.org'). When
+  'bash/start-servers.sh' started the server, the run folder also holds
+  the script's =stop-servers.sh= and one =start-servers.START.log= per
+  start of the script (START there being that start's time), holding
+  the output of the rerun loop, or of cargo-watch with =--hot-reload=.
+  Each time the rerun loop restarts the server, a new subfolder
+  appears, so the newest one holds the current run's logs.

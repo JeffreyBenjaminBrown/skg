@@ -1,0 +1,17 @@
+title: Typing a note into the folder
+pid: 2962c1d2-5168-4cd8-b4d9-83a26ae752ce
+body: |2-
+  Only what the view drew under a member can be cut from it. A note you
+  type into the forks folder in a save (or move there from elsewhere)
+  was not drawn there, so nothing was drawn under it: the save hides
+  none of its content, whatever you type under it or leave out. Which
+  members were drawn the save reads from the graph before the save, with
+  your note's forks as they were. Typed claiming, it is forked by your
+  note, as any claiming member is; typed claiming nothing, it is not,
+  and a note that is no mirror of yours then stands in the folder
+  unwarranted. Either way a child you type under it that its list does
+  not name joins its content where you own it (see "Adding a child
+  under a member as such"), and a child of it your note hides, typed
+  under it, is unhidden. The redrawn view shows it as any member: what
+  it shows of its content stands under it, and you may cut from it in
+  the next save ('tests/members_typed_into_a_forks_folder.rs').

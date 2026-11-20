@@ -1,0 +1,6 @@
+title: Edit through skg-for-ai
+pid: 685dc6df-9c0b-40a0-8a9b-1fae96e7ad5d
+body: |2-
+  'python3 tools/skg-for-ai/skg_for_ai.py search WORDS --port PORT'
+  finds a note; 'view ID', edit the compact view it writes, then 'save
+  VIEW --port PORT --yes'. 'tools/skg-for-ai/README.org' says more.

@@ -1,0 +1,9 @@
+title: IDs are mostly invisible, but good to know about.
+pid: 95d47e9f-9168-4a65-9e9a-46170e9dea4e
+body: |2-
+  Every node has an ID,
+  which you can see if you disable skg-view-heralds-mode.
+  Every link also has an ID and a label,
+  but all you see when you look at the ID is the label,
+  unless you disable org-mode (say, by switching to text-mode).
+  You should never need to see IDs explicitly.

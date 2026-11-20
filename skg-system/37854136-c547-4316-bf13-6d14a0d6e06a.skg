@@ -1,0 +1,38 @@
+title: Taking back a fork
+pid: 37854136-c547-4316-bf13-6d14a0d6e06a
+body: |2-
+  Where your clone =C= of =N= is drawn in =N='s place, the list it stands
+  in still names =N=, not =C=. Under someone else's note, in a view
+  switched to your fork's skgrepo's perspective (=C-c v o=), that is how your reply to
+  one of their messages looks: your fork of the message, with your reply
+  under it, in the message's place. Deleting =C= there (=C-c <backspace>=
+  in Emacs, =<localleader>dd= in Neovim, =delete= in its handle for
+  skg-for-ai) deletes =C= and leaves their note as they wrote it: its
+  list keeps =N=, the save asks to fork nothing, and the redrawn view
+  shows in that place the mirror of =N= that perspective now ranks
+  first: =N= again, unless another fork of it ranks before =N=. (Not in a forkee's content in a
+  forks folder, the list of what a note of yours has not integrated:
+  there the deletion hides =N= from your note, as below, unless another
+  note of yours keeps it.)
+
+  Under a note of your own, deleting =C= where it is drawn in =N='s
+  place takes =N= out of your note as well, and, where your note
+  forks =N='s container, hides =N= from it, unless another note of yours
+  keeps =N=: there the list is
+  yours to change, and the deletion is read as the removal of =N= too.
+  To keep =N= in your note, delete =C= from a view where it is not drawn
+  in =N='s place, such as a view of =C= itself.
+
+  Deleting =C= takes =C= out of every list of yours that names it, as
+  deleting any node does, and deletes its own records, what it hides
+  among them. It deletes nothing it contains. A child of =C= that no
+  other note contains, such as your reply, is left in no list (an
+  orphan graphnode); to delete it as well, mark it for deletion in the
+  same save. The recursive delete (=C-u C-c <backspace>=) will not do
+  it where =N= has children: =C= contains them too, they are foreign,
+  and the save refuses to delete them.
+
+  Removing =C='s headline, without deleting it, is another gesture: it
+  takes =N= out of the list =C= stood in, as removing any child does.
+  Under someone else's note that is an edit of their note, so it forks
+  it, and the save asks first.

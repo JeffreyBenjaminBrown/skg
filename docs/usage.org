@@ -1,9 +1,10 @@
+# This file was generated from the skg node with this ID:
+# 57fa0186-c4bc-485c-b543-ce22c0970b2b
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * Usage: How to run Skg
-
 There are two alternatives:
-
 ** Install nothing. Run it in a tailor-made Docker container.
-
 Build the project container described by =bash/docker.sh=.
 
 Start it (using something like the
@@ -16,9 +17,7 @@ Run =cd= to go to the home folder (=/home/ubuntu=).
 
 Then continue at "If you've already got Rust",
 below.
-
 ** If you've already got Rust
-
 Run =cargo run -- data/jeff/skgconfig.toml= (or use =bash/start-servers.sh=).
 This starts the Rust server, which writes its logs to
 =data/jeff/skgconfig.toml.running/START/=, START being the time it started.

@@ -1,0 +1,11 @@
+title: =(leaves N OBJECT...)= -- on every viewnode that names leaves
+pid: c9bccbf1-f375-4a0f-9527-6ea07db5f8c9
+body: |2-
+  It gives the OBJECTs that name some leaf there: =node= and/or =rel= on
+  a vognode or ghost, =rel= on a changeset marker, none where a bare
+  request names a single leaf. N is how many distinct leaves a request
+  naming all of them touches. What each object names is under "The
+  processed requests" below. A request may also name =node= on a
+  changeset marker, which this fact never lists, since the members
+  drawn beside the marker show those leaves. The clients read it to build
+  their requests and to count the leaves an unmark touches.

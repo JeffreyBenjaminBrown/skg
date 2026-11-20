@@ -1,0 +1,81 @@
+title: skgrepo, home skgrepo, skgrepo-set, gitrepo
+pid: ef302f8e-b07c-432a-9cba-a1aa00169b30
+body: |2-
+  A *skgrepo* is a directory of =.skg= files, configured by one
+  =[[repos]]= entry in =skgconfig.toml=. A node's *home skgrepo* is the
+  skgrepo that holds its home section (see below). A *skgrepo-set* is a
+  prefix of the config's privacy ladder, the owned skgrepos in privacy
+  order: the owned skgrepos made available together. A *gitrepo* is a Git repository. Skgrepos are usually gitrepos
+  too, but they need not be.
+
+  In prose, always say "skgrepo" or "gitrepo", never a bare "repo", so the
+  two cannot be confused. ("relRepo" is a single coined term, so it keeps
+  the short form.) Code says 'skgrepo' and 'gitrepo' too ('SkgrepoName',
+  'home_skgrepo'); a skgrepo's config entry is the 'Skgrepo' type.
+
+  The wire coins four more atoms, each one term, which keep their
+  spelling: =skgRepos=, the metadata form that holds a headline's
+  skgrepos; =nodeRepo= in it, the node's home skgrepo, and =relRepo=,
+  its relationship's; =repoBoundary=, the derived fact that an
+  occurrence is a root or that its node's home skgrepo differs from
+  that of the nearest occurrence above it (herald =⌂:LABEL=); and
+  =skgrepoLabels=, the table of skgrepo labels the herald rules come
+  with. A skgrepo's *skgrepo label* is the short name its heralds
+  show: its =abbreviation= in the config, or else its name
+  ('herald_label' in code).
+
+  The *skgrepo restriction* ('SkgrepoRestriction') is what a connection
+  currently shows: a skgrepo-set, named by the most private owned
+  skgrepo it shows (its *rung*), and whether the foreign skgrepos are
+  shown, all of them or none, which they are unless the connection
+  hides them ('foreign_shown'). When the rung is the config's most
+  private owned skgrepo and the foreign skgrepos are shown it holds
+  every skgrepo and restricts nothing: the connection is
+  *unrestricted* (a term of plan 10), and has no skgrepo restriction.
+  The clients show the most private rung so by appending *" (no
+  restriction)"* (a term of plan 10) to that skgrepo's name where they
+  show the skgrepo restriction, words that never travel on the wire or
+  sit in the config. To *switch* the skgrepo restriction is to choose
+  another rung, or to show or hide the foreign skgrepos, with
+  'skg-restrict-repo-set' (=C-c v l=; =<localleader>vl=
+  in Neovim): the clients refuse while a view has unsaved edits, and
+  the server rerenders every open view under the new one, saying
+  nothing of what the rerender changed. A skgrepo inside the
+  skgrepo-set the skgrepo restriction shows is
+  *unrestricted*, one outside it *restricted*, and so are their nodes
+  and occurrences: the *gated graph*, the in-Rust graph as the
+  skgrepo restriction lets it be seen, answers 'restricted' for such a node,
+  as distinct from 'present' and 'absent' ('GnidPresence'), and the
+  view shows nothing of it but, where a visible record names it, a
+  restricted viewnode (see "restricted viewnode"). "Hidden" is reserved
+  for the =hides= relation.
+
+  The skgrepo restriction limits what can be edited as well as what can
+  be seen: no save, nodeMerge,
+  fork, deletion, commit or other write may remove, move, rewrite or
+  create a record, a section or a node file the skgrepo restriction
+  keeps out, nor act on the buffer's silence about such a record, since
+  what the user could not see the user did not edit. A save under a
+  skgrepo restriction therefore keeps every restricted record as it was
+  ('preserve_invisible_members' in 'server/from_text/weave.rs') and asks
+  a record's visibility ('record_is_visible') before any decision that a
+  record's absence from the buffer would drive. It refuses a save that
+  would create or move a record into a restricted section, naming the
+  skgrepo, and a delete whose propagation would strip restricted records
+  of other graphnodes stops for the *delete-from confirmation* (a term
+  of plan 10): the user cancels, deletes from the visible records only,
+  or deletes from all owned records ('docs/api-and-formats.org', "Save
+  buffer").
+
+  A *skgrepo narrowing* is a switch that shows fewer skgrepos (a
+  smaller skgrepo-set, or the foreign skgrepos hidden), and a *skgrepo
+  widening* one that shows more (both terms of plan 08). The words "restriction", "narrowing" and
+  "widening" always take the modifier "skgrepo". Where an occurrence of
+  a node stood when a skgrepo narrowing kept it out, a restricted
+  viewnode stands in its place where its record is visible, holding
+  the occurrence's children; where it is not, the occurrence vanishes
+  with them (see "vanish"), as does a member whose record alone the
+  skgrepo narrowing keeps out, and the skgrepo widening draws each
+  again where the graph puts it. A view root is the exception: it
+  stays, as a restricted viewnode, whether or not its record is
+  visible (see "restricted viewnode").

@@ -1,0 +1,16 @@
+title: Examples
+pid: a0251119-85d2-4211-bf1b-b62ce5e66ea1
+body: |2-
+  #+begin_example
+  (skg node (gnid 7) (skgRepos (nodeRepo main)) (diff (node added) (rel added) (leaves 2 node rel) (processed node)))
+  (skg node (gnid 8) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (properties changed) (leaves 3 node rel) (processed node rel)))
+  (skg node (gnid 9) (skgRepos (nodeRepo main)) noClaim writeProtected (view noWarrant) (diff (rel removed) (leaves 1 rel)))
+  (skg alias (editRequest (processed)) (diff (rel added) (leaves 1)))
+  (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (processed)))
+  (skg ghost (gnid 4) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel)))
+  (skg (oldText title) (diff (leaves 1) (processed)))
+  (skg (changesetMarker content) (diff (leaves 3 rel) (processed rel)))
+  (skg (changesetMarker content) (editRequest (processed node rel)) (diff (leaves 3 rel)))
+  (skg node (gnid 6) (skgRepos (nodeRepo main)) (editRequest (processed rel newContent)) (diff (node added) (rel added) (leaves 2 node rel)))
+  (skg node (gnid 5) (skgRepos (nodeRepo pub)) (diff (homeSkgrepoMove (old priv) (new pub)) (movedLikeAncestor a)))
+  #+end_example

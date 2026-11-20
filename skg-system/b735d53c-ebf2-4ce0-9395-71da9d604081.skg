@@ -1,0 +1,10 @@
+title: processed request, processed gesture
+pid: b735d53c-ebf2-4ce0-9395-71da9d604081
+body: |2-
+  A *processed request* is a metadata form, '(processed OBJECTS)' or
+  '(unprocessed OBJECTS)' inside a headline's '(editRequest ...)', that the
+  save consumes, after its graph
+  edits succeed, to set or clear the marks of a headline's leaves. A
+  *processed gesture* is a gesture (C-c m, then n, r, b or h, then p or
+  u, and their recursive forms) that writes processed requests on one
+  or many headlines, then saves.

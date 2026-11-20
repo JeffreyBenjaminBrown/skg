@@ -1,0 +1,8 @@
+title: no "internal imports"
+pid: c7c4f985-39b4-4aa3-9182-09b40ed07497
+body: |2-
+    In Rust it is valid to use 'use' statements in a function,
+    or to qualify a long name in a type signature
+    using the double-colon notation: _::_::_::_...
+    I find that hard to read, and prefer to limit such notation
+    to the initial, 'use' preamble of each file.

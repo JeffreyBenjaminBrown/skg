@@ -1,0 +1,20 @@
+title: Strip body whitespace
+pid: bd42e097-19ba-4b0d-aa16-8c41207c9d07
+body: |2-
+    - Request: ((request . "strip body whitespace"))
+    - Response: LP response-type "strip-body-whitespace" with
+      =((content "..."))=. Content reports how many files changed and
+      a per-repo breakdown, or "Body whitespace strip failed: ...".
+    - Behavior: Strips trailing whitespace from every line of every
+      body, and trailing blank lines from each body's tail, in every
+      owned skgrepo in the config. Foreign skgrepos are never written, so they are
+      left untouched (stripping them would make them diverge from
+      their upstreams). It ignores the skgrepo restriction: it rewrites
+      the bodies of nodes the skgrepo restriction keeps out too. Rewrites exactly the .skg files whose bodies
+      changed (a clean file stays byte-identical); a body that strips
+      to nothing is dropped from its file. The graph and Tantivy are refreshed
+      to match. Open views stay valid: a view still shows the stripped
+      whitespace until it is redrawn, but the parser trims it, so no
+      save is stale for it ("Save buffer", the stale buffer). The clients suggest
+      reviewing the result with =git diff --ignore-all-space=, which
+      should show nothing.

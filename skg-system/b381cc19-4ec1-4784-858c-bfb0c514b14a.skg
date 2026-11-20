@@ -1,0 +1,16 @@
+title: build-artifacts-corrupted-by-power-loss
+pid: b381cc19-4ec1-4784-858c-bfb0c514b14a
+body: |2-
+  Claude wrote this guide on 2026-07-14, while diagnosing a real
+  instance of the problem (Jeff's machine overheated and cut power
+  mid-build). Everything in it was verified against that instance.
+contains:
+- 523ee37a-fb99-457f-b53b-50af2200bd0b
+- a581c54d-f70f-4e55-852b-80a06dde616d
+- cd130d03-5cb2-43b8-98d6-b936f64c23b5
+- 4443f3d0-b9e4-43da-ab05-5365b29e3811
+- 63fad6b4-0532-4fec-8d94-20eedf24448a
+- e9a43537-a8ae-463d-a499-5bd725ab856a
+- cd80b87b-f360-4d3b-91d7-a02adce79fd8
+- c046c3bf-95b9-41c8-b1ee-d089483a2578
+- 6f25e42d-59dd-4dce-a89f-7b9bac6a3410

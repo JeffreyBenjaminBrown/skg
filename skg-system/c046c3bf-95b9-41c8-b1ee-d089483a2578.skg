@@ -1,0 +1,8 @@
+title: Generalizing
+pid: c046c3bf-95b9-41c8-b1ee-d089483a2578
+body: |2-
+  This is not specific to skg or to overheating. Any hard power loss
+  during any =cargo build= can leave a truncated artifact that Cargo
+  then trusts forever. If you ever see =file too short=, =archive has no
+  index=, or an inexplicable linker failure on code you did not touch,
+  run the checker before you believe anything else.

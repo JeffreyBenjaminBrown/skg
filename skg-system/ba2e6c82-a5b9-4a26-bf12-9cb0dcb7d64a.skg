@@ -1,0 +1,9 @@
+title: gesture
+pid: ba2e6c82-a5b9-4a26-bf12-9cb0dcb7d64a
+body: |2-
+  A *gesture* is a client command that writes requests into headline
+  metadata for the server to apply at a save. The relRepo gesture
+  (=skg-set-relRepo=), the flag gesture (=skg-set-flag-search-matching=),
+  the fork gesture (=skg-fork-node=) and the processed gestures are
+  kinds. The fork and processed gestures save at once; the others leave
+  the save to the user.

@@ -1,0 +1,45 @@
+title: The refresh over the straddle
+pid: 3126354e-4208-405d-a8b9-a0c1e9036854
+body: |2-
+  A buffer of the diff view is drawn, and redrawn after every save,
+  rerender and commit, by the one refresh every view uses
+  ('refresh_viewforest', 'server/refresh/'), in diff-view mode: the
+  mode is 'RefreshMode::DiffView', which carries the straddle, the
+  buffer kind and the processed store, from which the refresh reads
+  the marks ('server/refresh/mode.rs')
+  ('refresh_diffView_viewforest' and
+  'refresh_diffView_buffer_over_current_straddle' in
+  'server/diff_view/buffer_rerender.rs').
+  The diff-view mode ('server/refresh/diff_view.rs') changes the
+  refresh so:
+  - a parent's goal is the union of its lists in the two graphs
+    ('GraphStraddle::partners', in the order of their interleaved
+    diff), so an item only HEAD's list holds is drawn too, warranted
+    by HEAD ('Warrant::ByHead', written 'ghostWarrant');
+  - the ID rule asks, after the truth, whether HEAD has the node: an
+    occurrence whose node the worktree lacks becomes its ghost where
+    it stands, and a ghost becomes an occurrence again, in place,
+    when its node is back;
+  - a ghost where content stands holds its old content, its content
+    at HEAD, drawn as any content is;
+  - the change viewnodes of each editable occurrence are recomputed in
+    place (below), and each child is tagged with its change;
+  - content is shown without mirror substitution: the view shows
+    raw graph facts;
+  - no default folder is drawn; a folder appears where something
+    changed, or where the buffer holds one;
+  - what may be editable, and what the node budget may refuse, the
+    buffer's sets decide ("Editability in the diff view");
+  - in the tail, the '(processed ...)' change facts are set from the
+    store, and in the skgrepo-changes buffer the home skgrepo moves.
+  The diff view opens only on an unrestricted connection, but a
+  switch of the skgrepo restriction rerenders its open buffers under
+  the new skgrepo restriction, and the refresh asks it there as in a
+  content view. The goal omits a member whose record is restricted. It
+  keeps a member whose record is visible and whose node is restricted
+  (the worktree's node, or HEAD's when the worktree has none). That
+  member stands as a restricted viewnode, carrying only its
+  relationship's change fact ('(rel ...)', herald =~+= or =~-=), never
+  a node's ('∃+', '∃-'), and none of the change viewnodes that would
+  show its text ('tag_children' in 'server/refresh/diff_view.rs'). A
+  restricted node is never a ghost.

@@ -1,0 +1,34 @@
+title: '"forker as such", member as such, what a member shows'
+pid: 5a35ee30-0fbe-4758-908b-9cdeb9f12b8e
+body: |2-
+  A *forker as such* is an occurrence member of the forks folder of a
+  note N that claims nothing there. The term is defined by the claim,
+  since the claim is all the save can read of a member (it reads the
+  buffer alone): in a view the server draws, every member claims as the
+  graph says ('docs/forks.org', "Claims in a redrawn view"), so a forker
+  as such there is a forker-only member, a note that forks N and that N
+  does not fork, or an indirect member, a mirror of N joined to it only
+  through others (see "the forks folder"); the messages call either "a
+  member claiming nothing". The term is named for the commoner case:
+  an indirect member need fork nothing of N's (where A forks B and B
+  forks C, C is an indirect member of A's forks folder), and is a
+  forker as such all the same. In a buffer the user has edited, it may also be a
+  forkee the user detached (a pending detachment), until the save ends
+  that fork. (A mutual claims, so it stands as a forkee as such.) A
+  *member as such* is either a forkee as such or a forker as such: an
+  occurrence member of a forks folder. The refresh also asks that it be
+  warranted ('note_of_member_as_such'); the save reads its position and
+  claim alone, as it cannot know a warrant.
+  *What a member shows* of its content, its *unintegrated content*, is
+  its content that is neither N's own, hidden or contained by N, nor
+  integrated, contained by an owned note but the member, by the records
+  the skgrepo restriction shows, in the member's order
+  ('what_the_member_shows' in 'server/refresh/goal.rs';
+  'note_of_member_as_such'; see "integrated"); the '(unintegrated
+  COUNT ...)' part of its view stats counts it, an indirect member's
+  too. What the member contains that the user keeps elsewhere stands in
+  its integrated-elsewhere folder (see "compound partner folder"). For
+  a forker that is what it adds to N; one that adds nothing shows
+  nothing but its folders. In the diff view, which draws no
+  integrated-elsewhere folder, a member shows its content less what N
+  contains or hides alone, and its '(unintegrated COUNT)' counts that.

@@ -1,0 +1,16 @@
+title: After a reload
+pid: 1d288f50-bd94-4e0d-bf68-4d66698bb24e
+body: |2-
+  When the server reloads '.skg' files that changed on disk (another
+  writer's save, a 'git pull'), its "repo-files-reloaded" message names
+  every open buffer of the diff view, and the client asks for the
+  rerender of each that holds no unsaved edits. That rerender extends
+  the buffer as C-c r u would, so a change made elsewhere appears in it
+  even where the buffer did not show its node. The server marks each
+  buffer the message names ('ViewState::extend_at_next_rerender_all')
+  and the next "rerender all views" that includes the buffer extends it
+  and clears the mark; any other rerender is a refresh alone. A buffer
+  with unsaved edits is not rerendered, so it keeps its edits and is not
+  extended; its save is refused if it would write a node the reload
+  changed (COMMANDS.org, "Save buffer"). Under a skgrepo restriction,
+  where C-c r u is refused, no buffer is marked.

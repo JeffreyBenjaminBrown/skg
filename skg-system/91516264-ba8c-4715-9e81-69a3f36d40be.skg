@@ -1,0 +1,4 @@
+title: fold
+pid: 91516264-ba8c-4715-9e81-69a3f36d40be
+body: |2-
+  = hide an org node's children (and body), showing only the title

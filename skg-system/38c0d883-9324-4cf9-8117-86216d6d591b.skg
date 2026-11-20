@@ -1,0 +1,4 @@
+title: 'C-c G RET : skg-goto-and-close-this'
+pid: 38c0d883-9324-4cf9-8117-86216d6d591b
+body: |2-
+  Like skg-goto, but also closes the buffer it was called from.

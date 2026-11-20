@@ -1,0 +1,32 @@
+title: Writing execution plans for unattended agents
+pid: 80c19bd1-86e0-4c2d-8e0a-0fc7d52627e5
+body: |2-
+  #+title: Writing execution plans for unattended agents
+
+  This is advice for whoever writes a plan that an agent will execute
+  without supervision (the planner: usually Claude, sometimes Jeff). It
+  was distilled from the total diff view effort of October 2026, five
+  plans and 104 commits, whose post-mortem is
+  'TODO/total-diff-view/12_total-review.org'. The runner is
+  'bash/run-plan-slices.sh'; how to run a plan is described in
+  'TODO/total-diff-view/11_review.org' under "How to run a plan
+  unattended".
+contains:
+- 6ae8ee24-6e92-4f9d-8aec-12ef8104af5c
+- 0428bb1f-0a61-43a6-b98d-946b7c30b4bf
+- 9750fd8c-1d12-45bd-b6fa-260f951a5ac5
+- 2c5946c4-b089-4ae4-865d-511c0e980b7f
+- e0e68f85-ad74-47cd-9ebd-5d0d1db52085
+- 9987bacc-6a2d-4755-a2ac-eb43b6c82493
+- 8333a1bd-6255-43f4-8134-f45df8e3b879
+- 16e43bc7-e2b4-420e-a202-bd277d2ccac4
+- 3d8a846c-28a9-48d8-bfae-315a7717c766
+- c85658c7-1c70-4aab-9d97-069c53b39b85
+- 8b3c74ae-6836-40e8-a74c-10b23ab7afe6
+- f7c8cb72-5eb5-4418-9426-e1086bacdaaf
+- fd73845c-55cd-43c6-ab01-44c7f1b3d1f5
+- 58417063-b0af-4125-ba54-24b94260646f
+- e25625a7-0462-46f7-9e55-04de3ee2d637
+- 327204f2-c749-4cda-92c7-a770f5cdf465
+- 5addae05-95d1-468f-ac0f-b7ffe07b92ad
+- f795352e-845e-4a71-a2a1-f477bbcf4e23

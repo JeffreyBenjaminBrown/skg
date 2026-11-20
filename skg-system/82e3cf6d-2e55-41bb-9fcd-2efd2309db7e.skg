@@ -1,0 +1,19 @@
+title: 'Skg data model: technical reference'
+pid: 82e3cf6d-2e55-41bb-9fcd-2efd2309db7e
+body: |2-
+  This document describes the complete runtime graph model.  The =.skg= files
+  and =skgconfig.toml= are authoritative.  At startup and explicit rebuild, the
+  server composes all file sections into =Graphnode= values, validates the whole
+  set, builds an immutable =InRustGraph= graph snapshot, and builds Tantivy from the
+  same values.  Tantivy is a derived search index; it is not graph authority.
+
+  For a gentler introduction, see [[id:6158f4c3-1180-4198-b0de-fdfeb5d39c72][the friendly data-model guide]].  For
+  privacy-section composing and decomposing, see [[id:ae1f8c25-d6a4-490f-bad5-aa04279daf72][telescopes]].
+contains:
+- 96c79bfc-f66d-436e-9dec-bb69852e1ba8
+- c34e936f-3728-48f9-a9cc-b39e81be8d10
+- 40660f33-92b3-404f-ae8e-bd2f4501c14d
+- 1e2a9c1b-bb4a-471f-8887-6275664af388
+- 5b0e8269-b36e-442f-b3e3-1120acca7abc
+- 81a49fa2-e8ed-4ccf-99dd-33203419c9fd
+- 186991b2-2468-438b-a52d-72fa29acebdd

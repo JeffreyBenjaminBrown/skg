@@ -1,0 +1,24 @@
+title: relRepo info
+pid: 27d68091-ba30-46b5-a1e7-e817e4b125b2
+body: |2-
+    - Request: ((request . "relRepo info") (recorder . "ID")
+      (member . "ID") (relation . "contains")) — relation is one of
+      =contains=, =forks=: the two
+      relations an explicit =(editRequest (relRepo ...))= request can name.
+    - Response: LP response-type "relRepo-info" with
+      =((default "NAME") (current "NAME"))=. =(current ...)= is absent
+      when the graph records no such exact raw relationship (e.g. one typed into a
+      buffer and not yet saved). An unresolved member is valid: it uses
+      the recorder's home as its default and may still report an exact raw
+      stored relRepo. On failure, =((error "..."))= — e.g. a recorder
+      the graph does not know.
+    - Behavior: between owned endpoints, =default= is the more-private
+      home. From an owned recorder to a foreign member, =default= is the
+      recorder's home regardless of privacy order; this deliberately
+      exposes the member ID and relationship to that owned skgrepo's
+      readers, while avoiding any proposed foreign write. =current= is
+      the relationship's relRepo.
+      =skg-set-relRepo= uses the reply to offer only
+      skgrepos the save can accept. Advisory: the save-time floor check
+      in =apply_sticky_relRepos_in_graph= stays load-bearing, since buffers go
+      stale and the request is plain text.

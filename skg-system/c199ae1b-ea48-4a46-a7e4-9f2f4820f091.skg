@@ -1,0 +1,46 @@
+title: 'Input model (necessary: vim is modal, and C-c belongs to the terminal)'
+pid: c199ae1b-ea48-4a46-a7e4-9f2f4820f091
+body: |2-
+  - The Emacs 'C-c ...' chords become '<localleader>' plus the same
+    mnemonic letters ('C-c s e' -> '<localleader>se'); where Emacs ended
+    a chord with RET the family letter doubles ('C-c g RET' ->
+    '<localleader>gg'); capitals stay capitals. 'C-x C-s' becomes ':w'
+    (skg buffers are 'acwrite'; ':w' runs the save pipeline). Every
+    command is also an ':Skg*' Ex command. The full table lives in
+    nvim/lua/skg/keymaps.lua and docs/COMMANDS-nvim.org.
+  - Neovim has no prefix argument, so each recursive form that Emacs
+    runs with 'C-u' is a command of its own, with its own key: delete's
+    is ':SkgDeleteRecursive' on '<localleader>dR', the flag command's
+    ':SkgSetFlagSearchMatchingRecursive' on '<localleader>sX', and the
+    processed gestures' take a capital last letter ('<localleader>mnP'
+    for 'C-u C-c m n p', '<localleader>mhU' for 'C-u C-c m h u'), and
+    those Emacs runs with 'C-u C-u' a capital 'M' ('<localleader>Mnp').
+  - Extra vim-idiomatic surfaces beyond the Emacs set: ']i' / '[i' as
+    id-next/prev motions; '^' plays the C-a title toggle; '<Tab>'
+    toggles the fold at point and '<S-Tab>' global visibility.
+  - TODO-keyword cycling is 'cit' / 'ciT' (wrapping the org plugin so
+    metadata survives, as the Emacs org-todo advice did). Vim's fold
+    cycling is two-state (open/closed) rather than org's three-state
+    cycle.
+  - The minibuffer linkstack bindings ('C-c o i' etc. in prompts) become
+    command-line-mode mappings '<C-x>i', '<C-x>l', '<C-x>I', '<C-x>L'.
+    The Emacs shell-mode linkstack bindings have no terminal-mode
+    equivalent here; paste the id from a buffer instead.
+  - Emacs binds a few keys outside its content views: search, go-to-ID
+    and the switch of the skgrepo restriction in every buffer, and
+    go-to-node and id-next/prev in magit. Neovim binds no key globally
+    in normal mode (only the command-line-mode linkstack keys above), and none in
+    neogit; every ':Skg*' command works from any buffer instead. Its
+    .skg file buffers and report buffers get the same subsets Emacs
+    gives them (docs/COMMANDS-nvim.org, "keys outside content views").
+  - Emacs also binds 'C-c C-o' to skg-goto, in place of org's
+    open-at-point; Neovim has only '<localleader>gg'.
+  - The relationship-kind menu of the recursive relRepo gesture
+    ('<localleader>sR') is Neovim's selection menu ('vim.ui.select'),
+    one entry per relation role, where Emacs pops up an org buffer of
+    the relations and their roles; choosing a role that cannot be set
+    says why, as RET on it does in Emacs.
+  - The skgrepo prompts cycle with S-Left/S-Right and complete with TAB,
+    as in Emacs; the 'C-?' show-all-skgrepos helper key inside the prompt
+    is dropped (terminals rarely deliver C-?); ':SkgViewRepoList'
+    shows the same list.

@@ -1,0 +1,11 @@
+title: linkstack
+pid: b0e53ddd-5d96-41f6-be16-bd134e6be53e
+body: |2-
+  The *linkstack* is a stack of links the user has stored, to insert
+  later: 'skg-id-push' (=C-c u=) pushes a link to the node at point;
+  'skg-paste-id' (=C-c o i=), 'skg-paste-link' (=C-c o l=) and
+  'skg-paste-node' (=C-c o n=) paste the top one, as an ID, a link or
+  a write-protected occurrence of its node; and 'skg-pop-id' (=C-c O
+  i=) and 'skg-pop-link' (=C-c O l=) pop it. 'skg-view-linkstack' (=C-c v s=) shows the whole stack for
+  editing. Neovim's keys are in 'docs/COMMANDS-nvim.org', "the
+  linkstack".

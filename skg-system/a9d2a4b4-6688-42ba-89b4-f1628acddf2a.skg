@@ -1,0 +1,26 @@
+title: An example of folding
+pid: a9d2a4b4-6688-42ba-89b4-f1628acddf2a
+body: |2-
+  For instance, you might have a document like this:
+  #+begin_example
+    * 1
+    ** 1a
+    *** 1a.1
+    *** 1a.2
+    ... -- imagine about 400 more nodes like that here
+    *** 1a.400
+    ** 1b
+    ...
+  #+end_example
+
+  Because of the 400 items between =1a= and =1b=, you would not be able to see both at the same time without folding. Worse, you would not be able to see =1= from =1b=, even though the title in =1= is (probably) critical for understanding the meaning of the title of =1b=.
+
+  If you fold the branch titled =1a=, you can see all three of =1=, =1a= and =1b= at the same time:
+  #+begin_example
+    * 1
+    ** 1a [folded]
+    ** 1b
+    ...
+  #+end_example
+
+  This =folding= helps a user navigate complex trees without getting lost. Enormous, sprawling content becomes easy to view and reshape.

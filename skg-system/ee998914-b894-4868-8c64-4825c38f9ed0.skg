@@ -1,0 +1,5 @@
+title: How it works
+pid: ee998914-b894-4868-8c64-4825c38f9ed0
+body: |2-
+  - [[id:895c459c-0d60-4608-87d5-ccdf608a3771][Does it use plaintext? Is it interoperable with Emacs org-mode?]]
+    Yes and yes.

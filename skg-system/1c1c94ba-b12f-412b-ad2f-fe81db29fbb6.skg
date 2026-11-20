@@ -1,0 +1,6 @@
+title: 'C-c v e : skg-view-new-empty'
+pid: 1c1c94ba-b12f-412b-ad2f-fe81db29fbb6
+body: |2-
+  Opens a blank Skg content view in which to create new nodes.
+contains:
+- 3881085f-f215-4c9d-ab49-dec741a60b26

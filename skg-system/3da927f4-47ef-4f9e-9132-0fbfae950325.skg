@@ -1,0 +1,12 @@
+title: Sharing
+pid: 3da927f4-47ef-4f9e-9132-0fbfae950325
+body: |2-
+  When you "edit" a note N that you don't own, what actually happens is you gain a new note N', which begins with all of the content from N plus a (deletable) =forks= relationship to N.
+
+  Because nodes in Skg are represented as flat files, N' duplicates very little data. For instance, if N consisted of two big branches, then the file representing N would only contain some text and two nodes. If you changed their order, you would have to duplicate N (with its text and its two nodes), but you would not have to duplicate anything inside either branch.
+
+  The =forks= relationship is what makes Skg show N' wherever N would appear as recursive content. Opening a fresh view of N (say, by following a link) still opens raw N; its forks folder, drawn there and in search results, exposes N', which forks it.
+
+  The same relationship makes new content in N appear in your N' as "unintegrated forked content" (which you can proceed to integrate if you like). If you delete the =forks= relationship, both stop being true. N' can also fork other nodes apart from N.
+
+  If the original N contains C, and you delete C from your N', then N' gains a "hides" relationship to C, which prevents C from being shown as "unintegrated forked content" in N'.

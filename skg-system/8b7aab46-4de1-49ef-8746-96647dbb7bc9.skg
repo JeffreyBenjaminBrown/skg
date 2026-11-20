@@ -1,0 +1,15 @@
+title: Query syntax with phrase/operators=true
+pid: 8b7aab46-4de1-49ef-8746-96647dbb7bc9
+body: |2-
+  The query is handed to Tantivy's QueryParser, with one
+  heuristic adjustment: any operator character sitting strictly
+  inside a word (with word chars on both sides, scanning
+  through consecutive operators within the same token) is
+  backslash-escaped. So =foo:bar= stays findable as a literal,
+  but =AND= / =OR= / =+foo= / =-bar= / ="fox in socks"= /
+  =(dog OR cat)= keep their operator meaning.
+
+  Known imperfection: the heuristic can't distinguish a
+  configured field name from a user word, so
+  =title_or_alias:dog= gets its =:= escaped too. Field-
+  qualified queries need manual =\:= in operators mode.

@@ -1,0 +1,10 @@
+title: '"commit" is qualified when ambiguous: git-, skgsave- or tantivy-commit'
+pid: 4030bfae-1c27-472d-ac78-4529fa0c3615
+body: |2-
+  A /git-commit/ is git's. A /skgsave-commit/ is the step of a save that
+  writes the .skg files and swaps in the new graph; a save that stops to
+  ask for confirmation (fork operations, Hoist, strandeds, delete-from)
+  skgsave-commits nothing. A
+  /tantivy-commit/ makes search-index writes visible; a save's happens
+  later, on a background worker. Where context leaves no doubt (HEAD, a
+  merge commit, a 'git2' call) bare "commit" means a git-commit.

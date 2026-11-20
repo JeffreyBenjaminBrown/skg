@@ -1,0 +1,17 @@
+title: Skgrepos, privacy and sharing
+pid: 9f762e87-9bc6-4f7c-bdd6-111dc579f1d0
+body: |2-
+  'Sharing' makes it sound like more work than it is.
+  Integration need not be mutual.
+  If someone integrates knowledge that you made available into theirs,
+  and they make available the context
+  into which they integrated your knowledge,
+  you don't have to look, or even be notified.
+
+  Recall that each node has a 'home repo'. If your notes are entirely private, you only need one skgrepo, but you might want to distinguish between a private skgrepo and a public skgrepo, or maybe more kinds than that.
+
+  Note that a private node can contain a public one, and vice versa. You do not, thus, have to decide whether a topic in its entirety is public or private; you can decide node by node whether to share each part of that document.
+
+  How you share your data is up to you. Skg includes no network protocol between people. Keeping your public notes on GitHub and giving people a link to the repository would do the job for free.
+
+  If you want to hide your private knowledge from your view (say, while reading it in public) you can do that.

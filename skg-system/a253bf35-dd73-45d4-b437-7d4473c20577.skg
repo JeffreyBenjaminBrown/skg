@@ -1,0 +1,7 @@
+title: 'C-c g m   : skg-goto-in-magit'
+pid: a253bf35-dd73-45d4-b437-7d4473c20577
+body: |2-
+  Opens a magit view of the changes to the file containing the
+  node at point. If the file appears in multiple sections
+  (unstaged, staged, untracked), point lands on the first and
+  the user is warned.

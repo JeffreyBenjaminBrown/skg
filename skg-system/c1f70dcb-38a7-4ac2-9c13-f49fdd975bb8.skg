@@ -1,0 +1,22 @@
+title: The Neovim client's deviations from the Emacs client
+pid: c1f70dcb-38a7-4ac2-9c13-f49fdd975bb8
+body: |2-
+  #+TITLE: The Neovim client's deviations from the Emacs client
+  # Every place the Neovim client behaves differently from the Emacs
+  # client because Neovim cannot do what Emacs does. Anything not
+  # listed here is intended to behave
+  # identically; if it doesn't, that's a bug worth reporting in
+  # ../TODO/problems.org.
+  #
+  # Wire compatibility is total: same protocol, same requests, same
+  # metadata grammar, zero server changes.
+contains:
+- 6760aac3-38f3-4a61-9261-6355054cc7a5
+- c199ae1b-ea48-4a46-a7e4-9f2f4820f091
+- 5f339ea2-2f3e-47a1-ab75-a0664be3e2e0
+- 491c75ce-dabd-4662-af54-90fa2f76e3de
+- a5381bed-a1f0-492e-8edb-62d74d387ef1
+- ac19f498-d076-4a5a-b458-6af633033d31
+- 5d9f646a-21c2-4411-a7c6-9dbb97e4980c
+- 706de6b3-3e9a-412e-b397-3f401eeac87f
+- c06254e7-da59-4489-aaaf-3d4fc0dca53b

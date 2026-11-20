@@ -1,0 +1,30 @@
+title: Extending the diff view
+pid: fd486fc0-dbbb-4035-9d02-791686e6609a
+body: |2-
+  C-c r u ('skg-diffView-extend'; Neovim '<localleader>ru',
+  ':SkgDiffViewExtend'), on a buffer with no unsaved changes, sends
+  "extend diff view", which extends the buffer to the changes it does
+  not show. The server brings the straddle up to
+  date and recomputes the buffer's sets. Every node of U without an
+  editable occurrence becomes editable at its first content occurrence
+  in level order, its children claiming as a buffer read back would
+  ('ensure_editableOccurrences_exist'); a node shown only as a
+  write-protected folder member counts as shown nowhere, since the
+  extension makes no folder member editable. A folder member the user
+  made editable with an editable-view request (C-c s e) is an editable
+  occurrence, and its node counts as shown there.
+  The walk for content occurrences counts a removed member under an
+  occurrence or a ghost as a content occurrence, and passes through a
+  ghost in content position into its old content.
+  Each content origin of D that the buffer makes editable nowhere is
+  then appended as a stub root, in ID order, with the standing roots
+  pinned, and the buffer is refreshed once, as after a save, which
+  gives each node made editable its body and draws its content list
+  and the content of each appended root
+  ('refresh_diffView_buffer_over_current_straddle').
+  The answer
+  is the processed summary, and the rerender stream carries the buffer.
+  It does not matter who write-protected an occurrence: the user asked
+  for every change.
+contains:
+- 1d288f50-bd94-4e0d-bf68-4d66698bb24e

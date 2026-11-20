@@ -1,0 +1,17 @@
+title: If you're a programmer, please help!
+pid: 4e4d0cbf-4492-459a-9dbd-14557560e4b5
+body: |2-
+  [[id:4d38efb4-d523-4fde-85f2-6153f132426f][Skg uses cool technologies!]], including Rust and Emacs. (That said, I'm flexible -- if you want to write another client, or rewrite the server in Haskell, let's go!)
+
+  - [[id:57fa0186-c4bc-485c-b543-ce22c0970b2b][Usage: How to run Skg]]
+  - Skg's data model and user experience
+    - Trees and links: [[id:05cc4bcd-6819-4b6c-a811-00955220612e][Some simple but important definitions]]
+    - [[id:28b3ff10-72e0-44cc-aa45-616702cbf24c][Links can point to any part of a document.]]
+    - [[id:1c6e493f-b9ff-49c2-8642-729de8b37e85]["Forks": Subscription and overriding in detail]]
+    - [[id:043c2947-bc98-4a70-ba80-44f12b4689d4][The data model]].
+    - [[id:ab83219a-c1c5-4dc3-a0b5-96d2faecb587][The sharing model]].
+  - [[id:9faccef0-1ce2-404c-b824-beeed2c1858b][What's available in Skg]]
+  - Some reasonable jumping-off points for understanding the code
+    - [[file:../server/types/nodes/complete.rs][The Rust node types]]
+    - [[file:../server/serve.rs][The Rust server]]. (The =main= module is just a wrapper for this module.)
+    - [[file:../elisp/skg-client.el][The Emacs client]]

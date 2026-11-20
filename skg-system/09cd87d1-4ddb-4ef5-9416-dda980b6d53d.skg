@@ -1,0 +1,12 @@
+title: How an agent uses this to modulate model choice
+pid: 09cd87d1-4ddb-4ef5-9416-dda980b6d53d
+body: |2-
+    Read the snapshot at natural decision points (not every turn) and
+    branch on =session_5h.used_pct=. A reasonable policy:
+
+    - < 80%  -> proceed normally
+    - 80-95% -> downshift (Opus -> Sonnet, or Sonnet -> Haiku)
+    - > 95%  -> do only cheap/essential work, or wait out =seconds_left=
+
+    Tune the thresholds to how much headroom you want. =binding_window=
+    tells you whether the 5h or the 7d window is the one about to bite.

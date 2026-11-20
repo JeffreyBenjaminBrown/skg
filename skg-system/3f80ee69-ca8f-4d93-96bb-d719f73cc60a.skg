@@ -1,0 +1,59 @@
+title: OTHER_SKGREPO_DEPENDENCIES.toml
+pid: 3f80ee69-ca8f-4d93-96bb-d719f73cc60a
+body: |2-
+  At every server start the server writes an =OTHER_SKGREPO_DEPENDENCIES.toml=
+  manifest into each owned skgrepo directory. Its =dependencies= is a
+  list of pairs, one per rung of the privacy ladder through that
+  skgrepo — itself and every more public owned skgrepo, in privacy
+  order, the skgrepo itself last. Foreign skgrepos never appear in it:
+  an owned skgrepo does not depend on one (a relationship to a foreign
+  node is recorded in the owned file and names an ID, not an order).
+  Each pair has a =path= (data-root-relative directory) and, unless the
+  skgrepo is not a gitrepo or has no remote, a =git-remote= (the fetch
+  URL =git remote -v= prints, =origin= preferred), so a receiver knows
+  where to fetch each dependency; when the chosen remote is not =origin=
+  its name is also recorded as =git-remote-name=. skg makes no use of
+  the =git-remote= values itself. For example:
+
+  #+begin_src toml
+  dependencies = [
+    { path = "me/public", git-remote = "git@github.com:me/public.git" },
+    { path = "me/private", git-remote = "git@github.com:me/private.git" },
+  ]
+  #+end_src
+
+  It is generated output — hand edits are clobbered — and lets someone
+  who receives one of your skgrepos see what it depends on and where to get
+  it.
+
+  A receiver reads the manifest of each of its foreign skgrepos when
+  its config loads. An entry names the receiver's foreign skgrepo at
+  the same data-root-relative path, else the one foreign skgrepo whose
+  folder has the same name (the receiver may keep a publisher's
+  skgrepos in another author folder); an entry matching neither way, or
+  several foreign skgrepos by folder name, is skipped. With each
+  config in its owner's folder, a manifest's paths are relative to the
+  publisher's folder (=public=, not =claude/public=), so a receiver
+  matches them by folder name; foreign skgrepos of different owners
+  that share a folder name are matched by neither. The manifests do
+  two things:
+  - *Ownership.* Foreign skgrepos that manifests chain together (a
+    manifest's own skgrepo and every one it lists, transitively) are
+    one owner's ('SkgrepoOwner', 'SkgConfig::skgrepo_owner'); foreign
+    skgrepos no manifest chains are different owners'. Only one owner's
+    sections of a node fold together; the rest are illegal edits.
+  - *Fold order.* A foreign node's sections fold in its owner's order:
+    a pair that some manifest lists, and no manifest lists the other way
+    round, in the manifest's order; a pair two manifests disagree about,
+    as the manifest of the more private one says (the one whose own
+    manifest lists the other; failing that, the one listed first in the
+    config); and any other pair in declaration order, so far as the ordered
+    pairs allow.
+
+  The server warns at startup about a disagreeing pair when some node
+  of that owner has a section in each, naming the node (its ID and
+  title, and how many more nodes span the pair), both skgrepos, the
+  disagreeing manifests, and which one this server folds first; it
+  appears at init, in the log and in the startup warnings each client
+  shows on connect (see "Server warnings", above). (The receiver also
+  reads the bare-string =dependencies= shape.)

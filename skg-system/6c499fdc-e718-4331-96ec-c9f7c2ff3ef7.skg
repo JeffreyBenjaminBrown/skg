@@ -1,0 +1,11 @@
+title: Read from narrow to broad
+pid: 6c499fdc-e718-4331-96ec-c9f7c2ff3ef7
+body: |2-
+  Start with =rg= to locate definitions and callers, then read the relevant
+  ranges and follow the call graph as correctness requires.  Let an exact
+  symbol, wire field, invariant, or failing test define the initial question;
+  avoid rereading large files or diffs when the relevant region has not changed.
+  This is a discovery order, not permission to ignore surrounding invariants.
+  The repository's
+  =tools/introspect/call-graph=, =change-forest=, and =code-map= can help when the
+  ordinary text search stops being clear.

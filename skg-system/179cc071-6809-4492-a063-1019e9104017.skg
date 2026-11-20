@@ -1,0 +1,10 @@
+title: '<localleader>sX : :SkgSetFlagSearchMatchingRecursive'
+pid: 179cc071-6809-4492-a063-1019e9104017
+body: |2-
+  Applies one selected state uniformly through the true-content
+  subtree ('docs/glossary.org', "true-content subtree"),
+  deduplicating PIDs and reporting ineligible descendants; the message
+  counts the pending relRepo requests it replaced. It prunes non-vognodes,
+  branches carrying =noClaim=, ghosts, unknown viewnodes and restricted
+  viewnodes. Save with
+  =:w= afterward.

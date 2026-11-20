@@ -1,0 +1,8 @@
+title: Group adjacent punctuation marks.
+pid: bbf25222-9981-4da6-9695-2c13019719a0
+body: |2-
+     In a sequence of brackets, commas and semicolons, group neighboring pairs of brackets, adjoining neighboring commas, semicolons and question marks if they appear. So, for instance:
+     (()) -> (( ))
+     ()) -> () )
+     (((x))) -> (( (x) ))
+     )),),)?; -> )), ),) ?;

@@ -1,0 +1,33 @@
+title: Its goal and its claims
+pid: ce448f90-6a74-4b0c-b595-b88240efc546
+body: |2-
+  Its goal (=forks_folder_goal= in =server/refresh/goal.rs=) is N's
+  forkees in the order of N's 'forks' list, each claimable, with the
+  relRepo of each unknown or restricted one; then its forker-only
+  members (=forker_only_members=): the notes that fork N, less those N
+  forks or hides, by the declaration order of their home skgrepos
+  ('SkgConfig::declaration_rank'), then pid; then its indirect members
+  (=indirect_members=): the mirrors of N ('mirrors_of',
+  N forking what its list names) less N, its fork partners and what N
+  hides, nearest first, then by the declaration order of their homes,
+  then pid; the members of both tails unclaimable
+  (=GoalItem::claimable= false). The goal is ordered: the forkees take
+  the list's order, and the tails the graph's and the config's, which
+  the refresh restores where a view moved a member. So a member claims
+  exactly when N forks it: a forkee or a mutual claims, a forker-only
+  or an indirect member claims nothing. A member claiming what N no longer forks
+  (another view's save removed the fork) vanishes, unwarranted, unless
+  it still forks N: then it stays where it stands, claiming nothing, as
+  the refresh gives each member the goal names the graph's claim
+  (=claim_forks_folder_members_as_the_graph_does=). So in a view the
+  server draws no member is a pending detachment; one is only where the
+  user removes a forkee's claim before saving.
+
+  The folder is editable: it stays when empty, and is drawn unasked
+  where N has a fork partner either way and N is no member as such of
+  another ('add_default_folders'); a request for it is '(folder forks)'
+  ('FolderRelation::Forks'), on a member as such too. A forker or an
+  indirect member N hides is not drawn in it: it stands in the folder
+  of what N hides outside its fork partners, which the forks folder
+  holds last. A mirror reached only through a note N hides is still a
+  member.

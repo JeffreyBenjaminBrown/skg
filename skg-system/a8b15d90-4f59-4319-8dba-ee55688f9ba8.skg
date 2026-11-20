@@ -1,0 +1,16 @@
+title: Link syntax in literal text is an example, not a link.
+pid: a8b15d90-4f59-4319-8dba-ee55688f9ba8
+body: |2-
+  In an Org file, the importer leaves alone any link written inside text
+  that Org shows literally:
+  - inline =verbatim= or ~code~, like =[[id:ID][label]]=,
+  - a fixed-width line, which begins with a colon and a space
+    (=: [[id:ID][label]]=), or is a lone colon,
+  - a =#+begin_...= / =#+end_...= block of any kind, and
+  - a =```= fence (Markdown syntax, but common in Org files too).
+  Such links are not resolved or rewritten, and do not produce warnings.
+  Backticks (=`code`=) are not literal in Org, so a link inside them is a link.
+  Use =verbatim= or ~code~ instead.
+  (To insert a block in Emacs, use =C-c C-,=, which is =org-insert-structure-template=.)
+  The rest of Skg (saving, link statistics, link annotations, export)
+  treats links in literal text the same way.

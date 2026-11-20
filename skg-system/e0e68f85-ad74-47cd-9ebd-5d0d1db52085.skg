@@ -1,0 +1,9 @@
+title: Keep the list of decisions already taken, and check "what stays" against it
+pid: e0e68f85-ad74-47cd-9ebd-5d0d1db52085
+body: |2-
+  A plan's "What stays as it is" section must be checked against the
+  decisions on record. Plan 02 kept the partial-staging commands
+  although the discussion had already decided partial commits are
+  dangerous; plan 04 then deleted them. Keep one list of decisions
+  (the discussion document's resolved items are that list) and read it
+  before writing each plan.

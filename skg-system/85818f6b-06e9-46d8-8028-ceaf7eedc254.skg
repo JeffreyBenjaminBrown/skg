@@ -1,0 +1,13 @@
+title: What each kind of change looks like
+pid: 85818f6b-06e9-46d8-8028-ceaf7eedc254
+body: |2-
+  Every label is a herald rule on a metadata atom; 'docs/heralds.org'
+  lists them, and the API doc's "Metadata of the diff view" the atoms.
+contains:
+- d5ab8147-76d1-48c2-ae4b-dc4ccbc9dda8
+- e0db5353-57ff-47e4-8d47-05426a54b31f
+- 40840921-105d-4803-92f9-c642705b377d
+- d1d39c16-a058-4f6c-997d-f10f60bfef56
+- 9dafeaf6-b91c-4707-abe1-e5643f3079fc
+- 2ed9c1e4-f77c-43ff-8346-5c244b02da05
+- d58c9f96-d447-4070-9163-e316edf6c08c

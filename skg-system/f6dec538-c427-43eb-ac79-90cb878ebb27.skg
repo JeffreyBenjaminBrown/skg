@@ -1,0 +1,8 @@
+title: 'C-c m r p : skg-mark-rel-processed'
+pid: f6dec538-c427-43eb-ac79-90cb878ebb27
+body: |2-
+  Marks processed the relationship of the headline at point to the
+  headline above it (its ~), then saves. With C-u, that of every
+  headline in the subtree, and the content relationships of the new
+  nodes the server walks to; with C-u C-u, every relationship they
+  record.

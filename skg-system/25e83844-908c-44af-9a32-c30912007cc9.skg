@@ -1,0 +1,18 @@
+title: privacy order and relRepo
+pid: 25e83844-908c-44af-9a32-c30912007cc9
+body: |2-
+  The position of an owned skgrepo in the config's privacy order (most
+  public first), the order of the owned entries, is its privacy level;
+  the owned skgrepos in that order are the *privacy ladder*
+  ('SkgConfig::privacy_ladder'). A foreign skgrepo has no level, and
+  no comparison of privacy involves one: it is neither more nor less
+  public than anything. The order the sections of one node fold in is
+  its *fold order* ('SkgConfig::ordered_skgrepos'): the privacy order
+  for an owned node, and for a foreign one the order its owner's
+  dependencies manifests give ('docs/api-and-formats.org',
+  "OTHER_SKGREPO_DEPENDENCIES.toml"). Live code does not use "level" for the
+  value carried by a relationship: every relationship member carries its
+  *relRepo*, the skgrepo whose section records it. In code
+  that is =RelPartner { relRepo, member }=; a collection of them is
+  a *list of relation partners*. "More private" = later in the
+  privacy order.

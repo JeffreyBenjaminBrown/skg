@@ -1,0 +1,11 @@
+title: Skg clarifies diffs
+pid: f6b72e10-5d7e-49e6-b044-a06bfe752329
+body: |2-
+  For the data structure that makes this possible, see the
+  [[id:82e3cf6d-2e55-41bb-9fcd-2efd2309db7e][technical data model]] and the
+  [[id:043c2947-bc98-4a70-ba80-44f12b4689d4][Skg extensions]].
+
+  Suppose file F contains two branches A and B, and both are big, and you swapped their order. In a system that represents F with a single file, the resulting diff is very large, and it takes some effort to determine that all you did was change the order of the two branches. In Skg, by contrast, F's representation on disk contains only two nodes, so the diff could not be simpler: The order of the two nodes in F changed. Their content is in separate files, and because it has not changed, it does not clutter the diff with irrelevant noise.
+contains:
+- 135e3b61-9146-4bc1-96ae-609f15bc19ea
+- 46ee31ce-97ca-4444-bd10-74a378b262a4

@@ -1,0 +1,14 @@
+title: One can request a 'mentionerward path view' at an orgnode.
+pid: 714a6cfa-b2a7-40c7-917e-d4e3c69b4cc2
+body: |2-
+  This is similar to the containerward path view:
+  It inserts one new child into the node
+  for each mentioner that links to the node.
+  If there is only one such node,
+  it recurses by inserting a mentionerward view for that node,
+  continuing until either it runs into:
+    - a cycle
+    - a 'fork': a node targeted by multiple nodes
+    - a node targeted by nothing
+  In the first two cases, the cycle or the fork is displayed
+  as the last element of the path.

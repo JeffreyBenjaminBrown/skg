@@ -1,0 +1,13 @@
+title: Processed aggregates
+pid: a03fa617-196b-4886-9eac-5a240b61c6aa
+body: |2-
+  A processed aggregate -- a folder, a changeset marker, a node,
+  or the whole changeset -- is processed when every leaf under it
+  that can be processed is processed. An unchanged membership has no leaf and is
+  never asked. The content changeset marker gathers the
+  content relationship leaves of its node; a member's existence leaf
+  belongs to the member itself. A node is processed when every leaf it
+  records is, its own aspects (its other changes among them) and the
+  relationships it records ('ChangeLeaves::node_is_processed'). A commit
+  of the processed asks one thing more, which no mark covers ("Changes
+  no mark covers").

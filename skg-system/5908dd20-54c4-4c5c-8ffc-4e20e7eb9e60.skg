@@ -1,0 +1,9 @@
+title: non-vognode
+pid: 5908dd20-54c4-4c5c-8ffc-4e20e7eb9e60
+body: |2-
+  A headline that stands for no graphnode: a folder, a property member
+  (an alias, an ID, a flag), a change viewnode of the diff view, and a
+  tombstone. The headlines that do stand for one (an occurrence, a
+  ghost, an unknown viewnode, a restricted viewnode) are the
+  *vognodes*. See "vognode, non-vognode" among the terms of the
+  implementation.

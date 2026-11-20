@@ -1,0 +1,5 @@
+title: org-mode is both a format and a program.
+pid: c7abecc6-cc49-47f1-82c0-be3067f535ea
+body: |2-
+  The org-mode program is called a 'minor mode' of Emacs,
+  which has many others.

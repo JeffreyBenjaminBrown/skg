@@ -1,0 +1,25 @@
+title: '<localleader>mf : :SkgFork'
+pid: 6f5c8eb0-59de-4630-9f40-5898dc66d7fa
+body: |2-
+  Fork the node at point that you already own: create a private
+  clone that forks it. This is the explicit counterpart to the
+  implicit fork (which is triggered by editing a /foreign/ node);
+  use it to deepen a fork chain, e.g. to layer a private =D=
+  over a public clone =C= that already forks a foreign =N=.
+
+  Refuses if the buffer has unsaved changes ("Save the buffer
+  before forking."), so the clone's saved state matches what you see.
+  Otherwise it stamps the node and auto-saves; the server returns
+  the usual fork-confirmation buffer (=skg://fork-confirmation=).
+  There you must set the clone's skgrepo with 'SetRepo'
+  (<localleader>ss) (it starts as the placeholder PICK-A-REPO,
+  with your first-declared owned skgrepo suggested above it), then
+  approve with <localleader>cc; or decline with <localleader>ck
+  (which also strips the fork request so the next save does not
+  re-fork). ':w' on the fork-confirmation buffer refuses and points
+  you back at these two keys.
+
+  The clone forks the node, and the original
+  keeps its own (owned) content. A node may have at most one clone
+  you own; forking an already-forked node is rejected, naming the
+  existing clone. See =docs/forks.org=.

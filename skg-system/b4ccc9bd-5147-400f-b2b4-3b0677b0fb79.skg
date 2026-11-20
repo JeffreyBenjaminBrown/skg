@@ -1,0 +1,4 @@
+title: '<localleader>Mru : :SkgMarkRelUnprocessedOutward'
+pid: b4ccc9bd-5147-400f-b2b4-3b0677b0fb79
+body: |2-
+  As <localleader>Mrp, but unmarks. (Emacs: C-u C-u C-c m r u.)

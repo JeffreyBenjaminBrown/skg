@@ -1,0 +1,10 @@
+title: how search treats skgrepo restrictions
+pid: e3a00c31-01bf-4289-ba71-95708c34afd3
+body: |2-
+  Under a skgrepo restriction, if the search index contains any overPrivateText
+  telescope (one whose selected title or body lies below home), Skg asks
+  whether to include or exclude overPrivateText telescopes before running the query.
+  Exclude filters them in Tantivy before matching, and from what is drawn
+  under each hit; Include is permission
+  for this search only. With no skgrepo restriction they are included
+  without a prompt and the result carries a warning.

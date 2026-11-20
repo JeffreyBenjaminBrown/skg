@@ -1,0 +1,122 @@
+title: Other heralds
+pid: 1ca5facb-32d4-4414-8941-ebacd35d5158
+body: |2-
+  The position glyphs stand first among a headline's heralds, the ☮
+  riding the glyph before it, as in =⊥☮B= or =ᗣ☮=.
+  =ᗣ= marks a ghost (a node the worktree lacks, shown in the diff view
+  with HEAD's text) and, in the diff view, what HEAD alone warrants
+  (the atom =ghostWarrant= in =(view ...)=), such as a removed alias.
+  =⊥= marks an unwarranted position (the atom
+  =noWarrant= in =(view ...)=): the graph does not relate the node to
+  its viewparent as the position implies -- content its parent does not
+  contain, a folder member the folder's relation does not hold for, a
+  chain node that does not contain the node above. =☮= marks a
+  write-protected position: a node, a ghost, a folder, or a flag row.
+  On a node, =B= rides the ☮ when the node's body exists but is
+  omitted from the buffer. =⟳= marks a cycle.
+
+  The forks folder reads =It forks these, or these fork it, or these fork or are forked by others here.=, with no ☮:
+  it is editable. The labels of the three folders of what a note hides
+  name the notes they relate by their ancestor letters (see [[id:b1ab14b7-2371-4ccf-a0dd-9c441b052aeb][Ancestor flags and floors]]),
+  shown high (the style keys 'hiddenInForkPartnerFolder_hider',
+  'hiddenOutsideOfForkPartnersFolder_hider',
+  'hiddenByForkerFolder_hider' and
+  'hiddenByForkerFolder_container' in
+  'shared/herald-styles.json'). Under a member as such of a forks
+  folder, a forkee or forker as such, the note whose folder holds it is
+  the great-grandparent (the note, its forks folder, the member, the
+  folder), and the label is the same in both positions, since the
+  viewparent contains and the note hides: =☮ It contains these, but c
+  hides them.= Under a forker as such that forks the note, the folder
+  of what the forker, the viewparent, hides of the note's content reads
+  =☮ a hides these, which c contains.= In the forks folder itself, the
+  note is the grandparent: =b hides these, but no fork partner shown
+  contains them.= (b's hides that no member of the forks folder,
+  forkee, forker or indirect member, contains.) The hider and hidden folders read =☮ These hide
+  it from their forks.= and =☮ It hides these from its forks.= The
+  folder of what a member as such contains that the user keeps
+  elsewhere, first under the member, names no ancestor: =☮ It contains
+  these, and you keep them elsewhere.= (its members are born of the
+  member's contains, =(contains in 2)=; 'docs/forks.org', "What you
+  keep elsewhere").
+
+  The bare atom =noClaim= (a child that does not affect its parent's
+  membership on save) has no glyph of its own. Under an editable parent
+  a child the graph warrants and that claims nothing is one the user
+  marked =noClaim= to detach it: it shows =detach= until the next save
+  takes it out of its parent's list. The client sees that from the
+  parent, since the child's own metadata cannot say it. In a forks
+  folder a forker-only or an indirect member claims nothing too; there a pending
+  detachment is only a member whose =(rels (forks (in ...)))= names
+  ancestor generation 2, which its grandparent still forks. =detach= is
+  styled as a request, and listed with them above, but it is none:
+  detaching writes only the =noClaim= atom, and the save reads that as
+  it reads any claim. =C-c s t= ('skg-detach'; =:SkgDetach= in Neovim)
+  makes one; nothing in a view the server draws is one, since every
+  save consumes it. So =detach= means the next save removes that
+  headline from its parent's list (in a forks folder, ends the fork),
+  leaving the node itself and the headline in the buffer, shown =⊥=.
+  To keep it in the list, =C-c s a= ('skg-attach'; =:SkgAttach=)
+  cancels the detachment before the save.
+
+  =⌂:LABEL= marks a node's home skgrepo boundary (the atom
+  =repoBoundary= in =(view ...)=): a root, or a node whose home herald
+  would say something other than what the nearest node above it says.
+  A fork that records where it was forked from (its attribution,
+  =(attribution NAME [unverified])= in =(view ...)=; =docs/forks.org=,
+  "Attribution") reads =⌂:<LABEL/ORIGINAL>=: ORIGINAL is the label of
+  the skgrepo it was forked from, followed by =?= when no loaded
+  skgrepo is known to be the one recorded, its recorded name then
+  shown. The comparison is of the whole herald, so a herald appears
+  wherever the voice changes: under =⌂:<jeff/claude>=, a note of
+  =jeff= with no attribution reads =⌂:jeff=, one forked from another
+  skgrepo reads its own =⌂:<jeff/OTHER>=, and only a fork from the same
+  =claude= says nothing; an attributed fork under a plain note of its
+  own skgrepo reads =⌂:<jeff/claude>=. Folders between them do not
+  count: the node above is the nearest node occurrence. LABEL is the skgrepo's skgrepo label,
+  its =abbreviation= in the config or else its name, from the label
+  table the server sends beside the herald rules. A =~NAME= immediately
+  before it reports a relationship stored at a more private relRepo than
+  its default (never one stored in a foreign skgrepo, which has no
+  privacy rank); =request:~NAME= is an explicit pending request to change
+  that relationship's skgrepo on save. The home skgrepo belongs to the
+  node; relRepo belongs to a relationship.
+
+  Folder labels, =alias=, =ID= and the flag rows describe their view
+  positions. The flags folder spells out =had ID before import=, =was
+  overloaded during org-roam import=, and =no search matching= when true.
+  =req:folder:...=, =req:flags=, =req:editable=,
+  =req:write-protected= and =req:write-protected-subtree= request a view.
+  =delete=, =merge:...=, =request:strip attribution=, =request:no search matching=
+  or =request:search matching=, and in the diff view =restore membership=
+  and =restore node=, are save requests.
+
+  An unknown viewnode, standing for an unknown graphnode, is labeled
+  =Reference to unknown node.=. A
+  restricted viewnode, standing where a record the skgrepo restriction
+  shows names a node the skgrepo restriction keeps out, is labeled
+  =restricted=, with its record's relRepo (=~NAME=) where that differs
+  from the default, and reveals no node title or home skgrepo.
+  =☮ ILLEGAL EDIT TO FOREIGN NODE=, in the message style (black on
+  white), labels the illegal-edit folder (=illegalEditFolder=): a child of
+  a foreign node holding a section of it in one of your skgrepos, which
+  no save of yours could have made and which is no part of the node. Its
+  headline carries that section's title, its body the section's body,
+  and its children what the section contains; nothing in it is saved.
+  See "Illegal edits" in =telescopes.org=.
+  =something stood here= marks a tombstone: a headline with no title,
+  left where a headline stood that can stand there for nothing, and
+  holding that headline's children. The refresh leaves one where a
+  node stood that the graph lacks and its viewparent's list does not
+  name, such as one a save deleted (in the diff view, its ghost stands
+  there instead); where a node the skgrepo restriction now keeps out
+  stood and no record the skgrepo restriction shows names it; where a folder,
+  a property member or a change viewnode stood in a place its kind
+  cannot stand; where a change viewnode stood whose change is gone;
+  and where a folder stood that was left holding nothing, unless the
+  save reads its membership or it is the flags folder. A text search
+  that excludes overPrivateText telescopes leaves one where the
+  enrichment would have drawn such a node. A tombstone reveals no node
+  title or skgrepo, nor which of these it was. The save discards text
+  typed on its line, and no child of a tombstone claims membership. A
+  tombstone that holds nothing is pruned before the buffer is shown.

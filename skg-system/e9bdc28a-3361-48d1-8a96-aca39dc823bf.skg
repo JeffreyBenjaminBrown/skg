@@ -1,0 +1,15 @@
+title: Merge behavior
+pid: e9bdc28a-3361-48d1-8a96-aca39dc823bf
+body: |2-
+  When node =A= acquires node =B=, their outbound =forks=
+  lists are combined, less any partner that is one of the merged
+  node's own IDs.  Duplicate partners keep the more-private
+  relRepo, and each relRepo is clamped no more public than =A='s
+  home.  References to =B='s primary or extra IDs resolve canonically to
+  =A= after the merge.
+
+  Merge validates the result as a save does: a merge that would leave an
+  owned note containing a note it forks, or one that forks it, is
+  rejected ('docs/data-model_technical.org', "Hard validation
+  constraints").  Two owned notes forking the merged node, or a cycle
+  of forks, are no reason to refuse.

@@ -1,0 +1,5 @@
+title: '<localleader>rpu : :SkgDiffViewGotoPreviousUnprocessedChange'
+pid: eddd7d4b-d16a-4c67-b598-c74bd5c18fcb
+body: |2-
+  Like <localleader>rnu, backward. Before the first one it says "No
+  earlier unprocessed change".

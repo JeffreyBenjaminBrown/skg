@@ -1,0 +1,5 @@
+title: A node should not subscribe to its own recursive content.
+pid: 2edc524d-ffdd-409e-855c-c53258057109
+body: |2-
+  This would be redundant -- why show something in subscriptions,
+  if it's already shown in content? -- but harmless.

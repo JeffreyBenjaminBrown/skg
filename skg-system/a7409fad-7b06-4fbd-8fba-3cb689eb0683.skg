@@ -1,0 +1,12 @@
+title: change facts
+pid: a7409fad-7b06-4fbd-8fba-3cb689eb0683
+body: |2-
+  A headline's *change facts* are the parts of its '(diff ...)' form
+  that the server writes: the three kinds of change, the '(leaves
+  ...)' count of its change-forest leaves, the '(processed ...)' processed state
+  (its processed marker), and in the skgrepo-changes buffer its
+  home skgrepo move and its moved-like-ancestor fact ('ChangeFacts' in
+  'server/types/viewnode.rs'). A
+  processed request, in the headline's '(editRequest ...)', is the
+  user's, not a change fact. The words are never shortened to
+  "facts".

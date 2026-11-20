@@ -1,0 +1,11 @@
+title: startup warnings channel
+pid: 1ee1469b-9a82-4d15-925f-278038d38de2
+body: |2-
+  How the server's startup warnings reach the user: 'load_config'
+  returns warnings beside the config, 'main' records them once on the
+  runtime ('record_startup_warnings' in 'server/types/env.rs'), the
+  server serves them on request ("server warnings"), and each client
+  appends them on connect to its warnings buffer ('*SKG Server
+  Warnings*' in Emacs, 'skg://messages/server-warnings' in Neovim),
+  under a headline "Startup warnings", erasing nothing the buffer
+  holds.

@@ -1,0 +1,10 @@
+title: open views, single-root
+pid: 69431f4f-02fa-46e8-b2ed-27424a0dc16a
+body: |2-
+  The server keeps, per connection, the views open in the client
+  ('OpenViews' in 'server/types/views_state.rs'), each by its
+  viewforest id ('ViewforestId': a content view by its root's ID, a
+  search view by its query), with its viewforest, the IDs it shows and
+  its 'ViewnodeIdRecord'. A content view may have several roots; the
+  request that opens one today asks for a single root, so only the
+  request is "single-root".

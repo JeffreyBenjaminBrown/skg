@@ -1,0 +1,47 @@
+title: mirror substitution, and the vocabulary around it
+pid: 6fd6ec6b-1f9d-4d12-a9a0-3f8a0714de50
+body: |2-
+  Where a node N stands as content of an editable occurrence in a
+  content view, or as a root of it, the refresh shows instead the
+  *mirror shown* for N (see "mirror"): the mirror whose home skgrepo
+  comes first in the skgrepo list of the perspective of the
+  occurrence's top-level tree, ties broken as 'docs/mirrors.org',
+  "Which mirror stands", says ('mirror_shown' in
+  'server/dbs/in_rust_graph/mirrors.rs'). That perspective is the root
+  homes', the tree's root's home skgrepo
+  ('perspective_skgrepo_of_tree_containing'), or one skgrepo's in every
+  tree of a view switched to it ('Perspective'; Emacs 'C-c v o'). The
+  mirror shown may be in any skgrepo: where the perspective's holds no
+  mirror of N, the first declared that holds one stands. In its own
+  skgrepo N itself stands, however many of its mirrors are there; so when
+  the mirror shown is N itself, nothing substitutes. Of several
+  mirrors in one skgrepo other than N's, the least pid stands;
+  visibility gating can cut a chain of forks, so that a middle node
+  shows.
+
+  The shown substitute carries the fact '(inPlaceOf N)'
+  (the crucial herald =ĥ= after =K=; 'in_place_of' on the occurrence),
+  naming the original it stands for. A viewnode's
+  collected ID is what it contributes to its parent's saved lists:
+  the fact's original if present, else its own ID -- so saving a
+  view that shows R in place of N keeps N in the parent's contains.
+  The headline bearing the fact is its *bearer* (not its "carrier",
+  which names the node holding an ID; see "recorder, carrier"). The
+  *tamper check* (also "tamper validation") is the save's refusal of a
+  fact whose bearer is no mirror of the original it names
+  ('inPlaceOf_part_errors' in
+  'server/from_text/buffer_to_viewnodes/validate_tree.rs'), since the
+  fact is load-bearing text a hand edit could forge.
+
+  A node is *shown raw* where it stands as itself, not replaced by the
+  mirror shown for it. Only content and roots substitute, so a member
+  of a partner folder, a chain node and a ghost are shown raw, and so,
+  one level down, are the children of a node shown raw where another
+  mirror would stand ('docs/api-and-formats.org', "Mirror substitution
+  and the inPlaceOf part").
+  A view opened on one node always shows the requested node itself:
+  drawn from the root homes, its root stands in its own home skgrepo,
+  where it stands as itself; so does each hit of a search buffer.
+  Switched to one skgrepo's perspective, the view shows the mirror of
+  the root that skgrepo's list ranks first instead, standing for it
+  ('Perspective').

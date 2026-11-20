@@ -1,0 +1,8 @@
+title: Open questions
+pid: 1cbfea44-093c-4626-b7cb-1ba4c07fba0f
+body: |2-
+  A plan or discussion response ends with an open-questions section. It
+  is self-contained: it defines its terms, so Jeff can answer it without
+  reading the body. Each question gets its own headline, with a one-line
+  answer added once it is answered. A question that is also discussed
+  in a section links there.

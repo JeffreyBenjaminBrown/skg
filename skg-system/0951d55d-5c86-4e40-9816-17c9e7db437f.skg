@@ -1,0 +1,5 @@
+title: '<localleader>mrp : :SkgMarkRelProcessed'
+pid: 0951d55d-5c86-4e40-9816-17c9e7db437f
+body: |2-
+  Marks processed the relationship of the headline at point to the
+  headline above it (its ~), then saves. (Emacs: C-c m r p.)

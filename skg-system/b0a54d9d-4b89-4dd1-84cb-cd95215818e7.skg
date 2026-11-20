@@ -1,0 +1,25 @@
+title: The graph straddle
+pid: b0a54d9d-4b89-4dd1-84cb-cd95215818e7
+body: |2-
+  The graph straddle ('GraphStraddle', 'server/graph_straddle/') holds
+  the before-graph (each owned skgrepo read at HEAD, each foreign one at
+  its worktree) and the after-graph (the live graph), and answers
+  questions about their union (the "union walk"): each node and each
+  relationship it reports carries its existence across the straddle
+  ('existence_across_straddle'): 'Existence::Added' when only the
+  after-graph holds it, 'Existence::Removed' when only the before-graph
+  does, none when both do. A partner of a node in some role is an
+  entry of the union of the two graphs' lists, with its existence and
+  its relRepo in each graph; it changed when the relationship is in one graph only, or
+  its relRepo differs.
+
+  Each connection keeps one straddle. A diff-view request, a save, a
+  rerender and stage-and-commit bring it up to date: it is rebuilt when
+  an owned skgrepo's HEAD moved (as a git-commit does), re-paired with
+  the live graph when that changed, and otherwise reused. The before-graph
+  is read through a cache keyed by the owned skgrepos' HEAD commits.
+  Closing the last buffer of the diff view drops the straddle, and so
+  does a rebuild of the session-lifetime stores, so the next request
+  reads both halves from the disk the rebuilt live graph was read from.
+  What the straddle computes from itself -- C, the change-forest, each
+  buffer's sets -- is computed once per straddle, on first use.

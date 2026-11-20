@@ -1,0 +1,9 @@
+title: '<localleader>vw : :SkgViewWithoutMetadata'
+pid: 8b6d3749-1a0d-4a33-b332-734ec121861d
+body: |2-
+  If a Visual-mode selection is active (or was just left, via the
+  ='<,'>= marks), opens a new org buffer containing that region,
+  but with the '(skg ...)' metadata stripped from every headline.
+  Otherwise it does nothing.
+  This is useful for copying a read-only projection of some data
+  into another application.

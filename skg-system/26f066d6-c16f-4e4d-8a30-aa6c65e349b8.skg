@@ -1,0 +1,4 @@
+title: '=bodyDiff= -- under an old text: the line diff of the body'
+pid: 26f066d6-c16f-4e4d-8a30-aa6c65e349b8
+body: |2-
+  Each line is prefixed by a space, =-= or =+=.

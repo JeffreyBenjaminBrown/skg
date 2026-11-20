@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# c1f70dcb-38a7-4ac2-9c13-f49fdd975bb8
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 #+TITLE: The Neovim client's deviations from the Emacs client
 # Every place the Neovim client behaves differently from the Emacs
 # client because Neovim cannot do what Emacs does. Anything not
@@ -7,7 +11,6 @@
 #
 # Wire compatibility is total: same protocol, same requests, same
 # metadata grammar, zero server changes.
-
 * The two clients' names match
 A Neovim module has its Emacs file's name, without 'skg-' or
 'skg-request-' and with '_' for '-': 'skg-metadata.el' is
@@ -55,7 +58,6 @@ A refusal shows as one line in both clients. Emacs signals it as a
 ('call_showing_refusal' in nvim/lua/skg/keymaps.lua), which shows the
 refusal at error level without the Lua traceback and without the
 "FILE:LINE: " prefix that 'error ()' adds.
-
 * Input model (necessary: vim is modal, and C-c belongs to the terminal)
 - The Emacs 'C-c ...' chords become '<localleader>' plus the same
   mnemonic letters ('C-c s e' -> '<localleader>se'); where Emacs ended
@@ -100,7 +102,6 @@ refusal at error level without the Lua traceback and without the
   as in Emacs; the 'C-?' show-all-skgrepos helper key inside the prompt
   is dropped (terminals rarely deliver C-?); ':SkgViewRepoList'
   shows the same list.
-
 * Buffer locking (necessary: nvim has no overlay modification hooks)
 - A buffer locked during a save/rerender stream rejects edits with
   vim's generic "E21: Cannot make changes, 'modifiable' is off"
@@ -109,7 +110,6 @@ refusal at error level without the Lua traceback and without the
   lock (E21) rather than by the stream-in-progress guard's message;
   the guard still exists as the second line of defense, exactly as
   in Emacs.
-
 * Read-only text regions (necessary: nvim has no per-range read-only)
 - The metadata edit buffer's display-only title group is editable
   while typing; edits to it are discarded at commit (the strip step
@@ -118,7 +118,6 @@ refusal at error level without the Lua traceback and without the
 - The fork-confirmation buffer similarly relies on commit-time
   validation (the placeholder-skgrepo refusal) rather than type-time
   protection.
-
 * Folding (necessary: vim folds are line ranges on windows)
 - A closed fold always displays vim's one-line fold placeholder; org
   hid the text entirely.
@@ -139,7 +138,6 @@ refusal at error level without the Lua traceback and without the
   one level below its headline, which is what makes 'bodyFolded'
   representable) rather than nvim-orgmode's folding; the org plugin
   still provides syntax highlighting.
-
 * The git jumps (necessary: no magit exists for vim)
 - 'skg-goto-in-magit' -> ':SkgGotoInGit': opens neogit (the closest
   magit analog, baked into the docker image) on the skgrepo's gitrepo and
@@ -150,7 +148,6 @@ refusal at error level without the Lua traceback and without the
   git-diff buffer ('skg://git-diff/FILE', readable-ids enabled) with
   the cursor on the first changed line containing the node's id --
   the same information magit showed, without the status chrome.
-
 * Display details
 - Heralds conceal the metadata rather than covering it with a display
   overlay. With 'concealcursor=nc', entering insert mode on a line
@@ -195,7 +192,6 @@ refusal at error level without the Lua traceback and without the
   Emacs used '*TITLE*'. Message/report buffers live under
   'skg://messages/...', 'skg://unknown-node', 'skg://diff-view: ...',
   etc.
-
 * Small semantic notes
 - 'point-column' in the save round-trip is a byte offset here and a
   character offset in Emacs. The server merely echoes it, so each

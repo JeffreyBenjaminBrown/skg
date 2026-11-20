@@ -1,0 +1,4 @@
+title: '<localleader>GG : :SkgGotoAndCloseThis'
+pid: 66378ac4-830c-4552-a925-25ce71c2e79a
+body: |2-
+  Like Goto, but also closes the buffer it was called from.

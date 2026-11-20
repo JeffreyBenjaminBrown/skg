@@ -1,0 +1,30 @@
+title: Other changes to a node's file
+pid: f7cce2b3-871e-446b-bd24-fc1d5b312642
+body: |2-
+  A node's files can change in ways no other leaf records
+  ('OtherChange', 'server/types/viewnode.rs'). The change-forest finds,
+  for each node in both graphs that differs between them, what the
+  other leaves leave out ('other_changes_between' in
+  'server/diff_view/other_changes.rs', which names every field of the
+  node, so a new field must be placed there):
+  - its title or body moved between its home and a more private
+    section: it gained or lost overPrivateText (a Hoist does this);
+  - its attribution changed (a strip, say);
+  - an alias it has in both graphs moved to another skgrepo;
+  - the members both graphs give one of its six lists (content, forks,
+    hidden, aliases, extra IDs, flags) stand in another order;
+  - something else the graph holds changed: a list names a member by
+    another of its IDs, or became an empty list from none. A node that
+    differs between the graphs in a way nothing else finds has this
+    one, so every node that changed records a leaf.
+  Together they are one leaf of the node, its other changes
+  ('NodeAspect::OtherChanges'), recorded in its home file and drawn as
+  one change viewnode ("What each kind of change looks like"). Its
+  fingerprint hashes, for each of them, the values it compares
+  ('hash_other_changes_values'): each graph's overPrivateText; each
+  graph's attribution; the skgrepos of the aliases both graphs give it;
+  the order of the members both graphs give the list; for anything
+  else, its four lists whole. So a later change of the same kind
+  unmarks it, and a change another leaf records (a member added to a
+  reordered list, say) does not. A new or deleted node has none: its
+  existence leaf covers its files.

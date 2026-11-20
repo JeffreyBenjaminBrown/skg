@@ -1,0 +1,40 @@
+title: integrated, the user's graph, kept elsewhere
+pid: 95387319-f26a-43af-a5c7-c15492dc0c69
+body: |2-
+  A child of a member as such S of a note N's forks folder is
+  *integrated* -- the user *keeps it elsewhere*; the two say one thing
+  -- when a note of the *user's graph* but S contains it. The user's
+  graph is every note homed in an owned skgrepo, as the skgrepo
+  restriction shows it: a note the restriction shows, by a record of
+  the child it shows ('owned_notes_containing' in
+  'server/refresh/goal.rs'). So N counts when the user owns it. What a
+  foreign N contains is N's own content, kept by its owner: S does not
+  show it (see "what a member shows"), and it is not integrated. A note
+  containing a mirror of the child does not contain the child. S shows
+  what is neither integrated nor N's own, contained or hidden by N (see
+  "what a member shows"); what is integrated, but for what N hides,
+  stands in S's integrated-elsewhere folder
+  (=integratedElsewhereFolder=, 'Folder::IntegratedElsewhere'; see
+  "compound partner folder"). So moving a child into an owned note
+  needs no hide: a cut hides only what no owned note but the member
+  keeps after the save (see "cut"). A hide that keeping makes
+  redundant is kept, and stands in the hidden-in folder
+  ('docs/forks.org', "What you keep elsewhere").
+
+  A forker as such is drawn as a forkee as such is: in a content view,
+  under an editable N, editable unless it is a repeat or the budget is
+  spent, with the default folders of a member as such (no forks folder
+  unasked), and an editable-view request on
+  N passes to one standing write-protected. Under it stand the folder
+  of what N hides in it and, where it forks N, the folder of what it
+  hides of N's content (see "compound partner folder"). The save reads it as it reads a
+  forkee as such, never as its whole list: an absent child is one N
+  contains or hides, or the user keeps elsewhere, never removed from the
+  forker. Its title and body
+  are saved when the user owns it, and refused when it is foreign; a
+  child placed under it (typed, or moved there) joins its content when
+  the user owns it, and is refused otherwise; its delete, nodeMerge and flag requests are
+  ignored. What the buffer shows under it is the forker-visibility
+  signal (see "the forker-visibility step"): cutting a child from it
+  makes N fork it, so that it stands as a forkee as such (a mutual,
+  where it forks N).

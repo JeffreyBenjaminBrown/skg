@@ -1,0 +1,13 @@
+title: A stop report does not require a continuous ledger
+pid: a3bd7c23-52cf-4eed-8270-decdc0664e64
+body: |2-
+  Create or update progress.org when a substantive stop needs that report,
+  or when recording a meaningful implementation deviation. This instruction
+  already authorizes that concise report; do not ask permission to write it.
+
+  Ordinary execution does not require a chronological ledger, dashboard, or
+  ongoing bookkeeping at every step. Those are optional workflows described
+  in [[id:3bbbf49e-8e61-4b55-beb2-221b2ff634b3][file:optional-workflows.org]], and require the agreement specified there.
+  A plan that asks for a record per slice in progress.org ('plans.org',
+  'orchestration.org') is that agreement; the record has the report shape
+  'orchestration.org' gives, and no more.

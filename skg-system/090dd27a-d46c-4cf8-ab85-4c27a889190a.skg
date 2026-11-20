@@ -1,0 +1,34 @@
+title: The ID rule
+pid: 090dd27a-d46c-4cf8-ab85-4c27a889190a
+body: |2-
+  What a headline standing for a gnid becomes is decided by five
+  questions, the first yes winning (=id_rule= in
+  =server/refresh/id_rule.rs=). Does the truth have the node? Then it is
+  an occurrence of the node's pid. Otherwise, does the truth say the
+  node is restricted (=Restricted=, =GnidPresence=: the
+  skgrepo restriction keeps out its home)? Then, if its viewparent's
+  goal names the gnid (its record is visible), or it is a root
+  of the view (the view is the user's own request), it is a restricted
+  viewnode; if not, a tombstone. Either reveals nothing of the node.
+  Otherwise, in the diff view, does HEAD have it? Then it is the node's
+  ghost, unless the skgrepo restriction keeps out HEAD's node's home, when it
+  is answered as a restricted node is: a restricted node is never a
+  ghost. Otherwise,
+  does its viewparent's list name the gnid? Then it is an unknown viewnode.
+  Otherwise it is a tombstone. In a content view an occurrence the
+  rule answers so does not become one: it *vanishes*, removed with its
+  subtree, a view root included, for its node is gone or restricted and
+  its viewparent's list does not name it ('docs/glossary.org',
+  "vanish"); in the diff view it becomes a tombstone. So an occurrence
+  of a node a skgrepo narrowing keeps out becomes a restricted viewnode
+  in place where its record is visible, and an occurrence again after a
+  skgrepo widening; where its record is not visible it vanishes, and
+  the skgrepo widening draws it again. When an unknown viewnode or a restricted viewnode
+  becomes an occurrence, each of its children claims again, as the
+  text of its view, which writes no =noClaim= under it, would say, and
+  the claims rung makes those vanish that the truth does not warrant
+  there. In the diff view, a gnid that HEAD had
+  as a node and that a nodeMerge has since made an extra ID of another
+  node stays that node's ghost. The headline is re-kinded where it
+  stands, keeping its viewnode ID, its fold state, its children and,
+  for an occurrence, its editability.

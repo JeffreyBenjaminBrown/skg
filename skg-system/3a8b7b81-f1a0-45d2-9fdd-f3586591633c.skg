@@ -1,0 +1,5 @@
+title: =(oldText titleAndBody)=, =(oldText title)=, =(oldText body)= -- the node's text at HEAD
+pid: 3a8b7b81-f1a0-45d2-9fdd-f3586591633c
+body: |2-
+  It sits under a node whose text changed; its headline is the old
+  title, its body the old body.

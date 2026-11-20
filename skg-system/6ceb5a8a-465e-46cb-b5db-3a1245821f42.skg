@@ -1,0 +1,15 @@
+title: Tiers
+pid: 6ceb5a8a-465e-46cb-b5db-3a1245821f42
+body: |2-
+  Each side has a tier, which says how much it deserves attention.
+
+  | Relation              | in-side                         | out-side                                                                   |
+  |-----------------------+---------------------------------+----------------------------------------------------------------------------|
+  | contains              | medium                          | normal; low on a write-protected occurrence; unintegrated numerator medium |
+  | links to              | medium; substantive subset high | normal                                                                     |
+  | forks                 | high                            | medium                                                                     |
+  | hides                 | medium                          | normal                                                                     |
+
+  Most normal sides are normal because their members are usually visible
+  elsewhere: as viewchildren, in the text, or in the hidden-in and
+  hidden-outside folders.

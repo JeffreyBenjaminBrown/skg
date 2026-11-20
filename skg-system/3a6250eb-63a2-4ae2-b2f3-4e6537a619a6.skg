@@ -1,0 +1,4 @@
+title: '<S-Tab> : toggle global fold visibility'
+pid: 3a6250eb-63a2-4ae2-b2f3-4e6537a619a6
+body: |2-
+  All folds closed <-> all folds open, buffer-wide.

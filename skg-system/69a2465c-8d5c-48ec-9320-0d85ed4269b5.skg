@@ -1,0 +1,28 @@
+title: What it is
+pid: 69a2465c-8d5c-48ec-9320-0d85ed4269b5
+body: |2-
+  The diff view shows every change in the owned skgrepos since their
+  last commits -- how each worktree differs from HEAD -- with the
+  context needed to understand each change, in buffers that are
+  ordinary editable views. It lets the user review the changes, mark
+  each one processed, and commit what is processed (C-c r c) or
+  everything (C-c r C). C-c v d
+  ('skg-diffView-open'; Neovim '<localleader>vd') opens it.
+
+  The vocabulary (graph straddle, the three kinds of change, C, R, U,
+  D, change-forest leaf, mark, changeset marker, ...) is the
+  glossary's "Terms a user meets in the diff view" and "Terms of the
+  diff view's implementation" ('docs/glossary.org'); the refresh's
+  words (the ID rule, goal, warrant, the refresh's rungs, extent) are among its
+  "Terms of the implementation", and ghost, tombstone and claims
+  membership among its "Terms a user meets". A buffer of the diff view
+  is drawn by the refresh every view uses, whose model is
+  'docs/data-model_technical.org', "The refresh: how a view follows the
+  graph"; this document says what its diff-view mode adds. The wire forms are the
+  API doc's "Diff view", "Stage and commit", "Extend diff view" and
+  "Metadata of the diff view" ('docs/api-and-formats.org'). The
+  heralds are 'docs/heralds.org', "Diff heralds". The commands are
+  both COMMANDS files, under C-c v d and C-c r, and the two restore
+  requests under C-c s. The server's code is
+  'server/diff_view/' (its 'mod.rs' lists the files), over the graph
+  straddle of 'server/graph_straddle/'.

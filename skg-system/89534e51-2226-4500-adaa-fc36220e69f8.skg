@@ -1,0 +1,26 @@
+title: '<localleader>sR : :SkgSetRelRepoRecursive'
+pid: 89534e51-2226-4500-adaa-fc36220e69f8
+body: |2-
+  Like 'SetRelRepo', but applied throughout the subtree at point (the
+  node at point's own relationship to its viewparent included).
+
+  It first asks, with Neovim's selection menu, which role the
+  view-children should play toward their viewparents: one entry per
+  role of the schema's four node-node relations. Only two roles are
+  settable from the child's position -- =content= (ordinary content)
+  and =forkee= (a claiming forksFolder member); choosing any other role
+  says why its relationship cannot be set from there.
+
+  It then prompts for a skgrepo over every skgrepo, plus the
+  no-override choice, which instead removes the pending requests
+  throughout the subtree. No per-relationship default is fetched, so
+  the save's floor check validates each relationship.
+
+  The walk recurses only on viewchildren that are members: member
+  occurrences, and the two editable folders. It sets an unknown
+  viewnode or a restricted viewnode too, where it stands as such a
+  member. It prunes below write-protected nodes and forkees as such, and prunes write-protected folders, ghosts and other
+  non-vognodes entirely. A pending delete, nodeMerge or flag request
+  anywhere in the walk refuses the whole gesture before any edit
+  ("Cannot request a relRepo where a delete, merge or flag request is
+  pending"). Save the view afterward to apply the changes.

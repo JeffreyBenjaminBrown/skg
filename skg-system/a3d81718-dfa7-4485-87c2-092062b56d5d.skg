@@ -1,0 +1,4 @@
+title: '<localleader>Mbu : :SkgMarkBothUnprocessedOutward'
+pid: a3d81718-dfa7-4485-87c2-092062b56d5d
+body: |2-
+  As <localleader>Mbp, but unmarks. (Emacs: C-u C-u C-c m b u.)

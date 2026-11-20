@@ -1,0 +1,27 @@
+title: The check before anything is committed
+pid: d0c78610-b641-40e1-aebe-192c07a9a982
+body: |2-
+  The commits are prepared first, for every owned skgrepo: each one's
+  tree, and each gitrepo's configured author ('prepare_commits'). A
+  gitrepo with something to commit and no author refuses the whole
+  request, naming its skgrepo. Then the graph the commits would leave
+  is read as the straddle's before-graph is ('read_candidate_graph_snapshot',
+  each owned skgrepo from its gitrepo's last prepared tree, each foreign
+  one from its worktree), and must
+  - pass the whole-graph validation (a note left containing a note that
+    forks it, say, can fail here, since no waiting rule holds such a
+    pair back: the user marks or unmarks the other relationship);
+  - name, in its contains, forks and hides lists, no node it lacks
+    unless HEAD or the worktree names it so too;
+  - differ from the worktree by exactly the change-forest leaves of the
+    changed nodes left out, keys and fingerprints both, among the leaves
+    recorded in owned skgrepos.
+  A failure commits nothing and says why: "Nothing was committed: the
+  commit would not validate: ...", or, for either of the last two, that
+  either a '.skg' file changed on disk and the server has not reloaded
+  it yet, or this is a bug, since the waiting rule should have prevented
+  it; the server's log then has the sets compared
+  ('check_candidate', 'server/serve/handlers/stage_and_commit.rs'). A
+  commit of everything passes the same check, expecting no leaf left.
+  A tree to commit holding '.skg' keys retired in November 2026 is
+  refused as such a HEAD is ("Refusals").

@@ -1,0 +1,6 @@
+title: The =contains= relationship and nesting org-mode headlines
+pid: bc81f41f-1538-449d-9edd-ff21ea0e6bfb
+body: |2-
+  The Skg containment relationship is identical to the org-mode relationship from a headline to one of its subheadlines. (I might rename it "shows" or "presents" or something, to make clear that it is the relationship that defines a "document" or a "view".)
+
+  What's different is their representation on disk. Skg represents each node of a document with a separate file in order to  enable sharing. I can't link to one of your nodes unless every node has an ID. And creating a fork of one of your nodes would have a prohibitive memory cost if the node has many descendents.

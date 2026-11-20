@@ -1,0 +1,8 @@
+title: '<localleader>gm : :SkgGotoInGit'
+pid: 044872dc-38ce-4321-ac9b-d65f01ad5c5e
+body: |2-
+  Opens a neogit status view of the changes to the file containing
+  the node at point. If the file appears in multiple sections
+  (unstaged, staged, untracked), point lands on the first and
+  the user is warned. (If neogit is unavailable, this falls back
+  to the plain git-diff view described below.)

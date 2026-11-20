@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# c5882ac1-f87e-4c4e-9bae-2b8bbecb8bd6
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * The docs are generated from 'skg-system/'
 The '.org' files under 'docs/' and 'coding-advice/' are exported from
 the notes of 'skg-system/', a skgrepo at the top of this repository,
@@ -15,7 +19,7 @@ owns 'skg-system/' alone, so other skgrepos' export markers never
 count. It overwrites files and deletes none: when a document is
 removed or renamed, delete its old file.
 A new document is a note with an export marker
-(see [[file:../docs/COMMANDS.org::*choosing what to export: export markers][how to mark a note for export]]).
+(see [[../docs/COMMANDS.org::*choosing what to export: export markers][how to mark a note for export]]).
 * How an agent edits them
 Only in your own worktree: in '/home/ubuntu/host', Jeff's server owns
 'skg-system/'.

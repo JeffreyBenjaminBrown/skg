@@ -1,0 +1,6 @@
+title: a pending edit request
+pid: 4441bc00-730e-4022-ae04-51578a09d1e4
+body: |2-
+  "Cannot request a relRepo where a delete, merge or flag request is
+  pending": the headline already holds one of those, which takes the
+  edit request's one slot.

@@ -1,0 +1,20 @@
+title: Root cause
+pid: cd130d03-5cb2-43b8-98d6-b936f64c23b5
+body: |2-
+  An unclean shutdown during =cargo build= truncates whatever artifacts
+  were mid-write. Linux writes file data through the page cache and
+  flushes it lazily; when power is cut, the bytes still sitting in the
+  cache are simply gone.
+
+  The signature is unmistakable once you know it: *the truncated files
+  end on an exact power-of-two-MiB boundary*, because that is where the
+  page-cache writeback got to. In the 2026-07-14 incident the three
+  files written in the final 15 seconds of the machine's life were:
+
+  | artifact          |     size | boundary       |
+  |-------------------+----------+----------------|
+  | libtantivy        | 50331648 | 48 MiB exactly |
+  | libskg            | 50331648 | 48 MiB exactly |
+
+  Every one of the other 498 rlibs in =target/debug/deps= was intact.
+  Only the files being written at the moment of death were damaged.

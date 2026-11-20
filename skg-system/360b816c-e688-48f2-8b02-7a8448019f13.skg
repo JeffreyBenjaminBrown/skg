@@ -1,0 +1,46 @@
+title: 'C-c s R : skg-set-relRepo-recursive'
+pid: 360b816c-e688-48f2-8b02-7a8448019f13
+body: |2-
+  Like 'skg-set-relRepo', but applied throughout the
+  subtree at point (the node at point's own relationship to its viewparent
+  included). Also reachable as =C-u C-c s r=.
+
+  It first presents an org-menu asking what kinds of relations to
+  the viewparent should qualify: the schema's four node-node
+  relations are the level-1 headlines, and each level-2 headline is a
+  role the view-child would play in that relation toward its
+  viewparent. Only two roles are settable from the child's
+  position -- =content= (ordinary content) and =forkee= (a
+  claiming forksFolder member); RET on any other role explains why its
+  relationship cannot be set from there (write-protected folders belong
+  to the other end; links carry no independent skgrepo; hide skgrepos
+  are derived at save). RET picks a
+  role; q aborts.
+
+  It then prompts for a skgrepo over every skgrepo, plus the
+  no-override choice, which instead removes existing skgrepo requests
+  throughout the subtree. Unlike the single-relationship command, no
+  per-relationship default is fetched -- the subtree's relationships have different
+  defaults -- so every skgrepo is offered and the save's floor check
+  validates each relationship (an offered skgrepo more public than some relationship's
+  default makes the save fail, naming that relationship).
+
+  The walk applies to, and recurses on, only viewchildren that are
+  members: member occurrences, through the two
+  editable folders. It sets an unknown viewnode or a restricted viewnode
+  too, where it stands as such a member. It prunes below write-protected nodes and
+  forkees as such (their viewchildren's relationships are not
+  collected at save), and prunes write-protected folders, ghosts and
+  other non-vognodes entirely. It refuses, writing nothing, where a
+  headline it would set holds a delete, merge or flag request ("Cannot
+  request a relRepo where a delete, merge or flag request is
+  pending").
+
+  This is the gesture for republicizing a subtree's
+  relationships after 'skg-set-repo-recursive' moved its nodes to a more
+  public skgrepo: the sticky rule keeps each relationship at its old, more
+  private skgrepo, so the contains relationships stay behind until explicitly
+  moved to the new default.
+
+  The command only edits metadata in the current buffer.
+  Save the view afterward to apply the changes.

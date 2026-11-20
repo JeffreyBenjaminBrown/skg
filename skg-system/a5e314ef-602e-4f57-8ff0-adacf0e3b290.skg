@@ -1,0 +1,11 @@
+title: '<localleader>vb : :SkgOrgBodyToggle'
+pid: a5e314ef-602e-4f57-8ff0-adacf0e3b290
+body: |2-
+  Toggles the visibility of the body of the headline at point without
+  folding its children. If the whole headline is folded, the command
+  shows its body and immediate children, but leaves each child's
+  subtree folded. Works from the headline or from inside its body;
+  called from the body, the cursor moves to the start of the headline.
+  A bodyless headline is left alone unless its children need to be
+  revealed. A one-line body cannot be folded, since vim cannot close a
+  one-line fold; the command says so and leaves it shown.

@@ -1,0 +1,12 @@
+title: 'The git jumps (necessary: no magit exists for vim)'
+pid: ac19f498-d076-4a5a-b458-6af633033d31
+body: |2-
+  - 'skg-goto-in-magit' -> ':SkgGotoInGit': opens neogit (the closest
+    magit analog, baked into the docker image) on the skgrepo's gitrepo and
+    lands on the file's entry by text search, warning when the file
+    appears in several sections. Magit's section-object navigation has
+    no neogit API equivalent.
+  - 'skg-goto-in-magit-parent' -> ':SkgGotoInGitParent': opens a plain
+    git-diff buffer ('skg://git-diff/FILE', readable-ids enabled) with
+    the cursor on the first changed line containing the node's id --
+    the same information magit showed, without the status chrome.

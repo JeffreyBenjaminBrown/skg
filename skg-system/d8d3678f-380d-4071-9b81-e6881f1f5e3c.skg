@@ -1,0 +1,7 @@
+title: Most orgnodes correspond to nodes in the graph.
+pid: d8d3678f-380d-4071-9b81-e6881f1f5e3c
+body: |2-
+  But there can be exceptions.
+  For instance, an orgnode C might represent the collection of aliases
+    for the node (in the graph) corresponding to C's parent P.
+    If so, every child of C represents an alias of P.

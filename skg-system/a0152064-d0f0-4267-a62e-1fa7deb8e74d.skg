@@ -1,0 +1,17 @@
+title: How the rule table reads a headline
+pid: a0152064-d0f0-4267-a62e-1fa7deb8e74d
+body: |2-
+  Every part of a headline's metadata stands beside its kind atom, at
+  the top level of =(skg ...)=; only =(view ...)= and =(diff ...)= nest
+  facts. The table lists rules in presentation order. Most rules match
+  an atom or form wherever it appears, but a part that reads
+  differently by kind sits under a WHEN directive,
+  =(WHEN KIND... RULE...)=, whose rules apply to a headline only when
+  one of its elements is one of the KINDs. A =(diff ...)= needs it: on
+  a node or a ghost it has two diff objects (=∃+=, =~+=), on an unknown
+  viewnode or a restricted viewnode one relationship (=~+=), and on a property or
+  a change viewnode one
+  object (=+=). The lens engines ('elisp/skg-sexpr/skg-lens.el',
+  'nvim/lua/skg/sexpr/lens.lua') document the directive, and the Rust
+  conformance tests check that each WHEN names only kind atoms and
+  carries no style.

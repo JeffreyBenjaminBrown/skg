@@ -1,0 +1,17 @@
+title: aliases, IDs and flags
+pid: d1d39c16-a058-4f6c-997d-f10f60bfef56
+body: |2-
+  The alias, ID and flags folders, drawn when their list changed,
+  hold the union of the two lists in the order of their interleaved
+  diff, each member tagged '(rel added)' (+) or '(rel removed)' (-),
+  its existence in the list. A removed alias or ID is an alias or ID
+  member with a ghost warrant ('Warrant::ByHead', written
+  'ghostWarrant'), claiming nothing ('noClaim'), so the save never
+  reads it. Each is one leaf.
+
+  A property folder is matched by its kind among all the children of
+  its node, so a folder the user requested becomes the changed one
+  when its list changes. It stays until the user deletes it, filled
+  from its goal, the union of the two lists: its members tagged while
+  the lists differ, and untagged after. A member a commit made lost
+  for good stays, unwarranted and claiming nothing.

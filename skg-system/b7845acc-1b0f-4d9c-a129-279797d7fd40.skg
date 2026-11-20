@@ -1,0 +1,32 @@
+title: Server warnings
+pid: b7845acc-1b0f-4d9c-a129-279797d7fd40
+body: |2-
+    - Request: ((request . "server warnings"))
+    - Response: LP =((response-type server-warnings) (warnings ("WARNING" ...)))=,
+      or =(warnings ())= when there are none. The warnings are the ones
+      the server raised as it started: one per top-level key of
+      skgconfig.toml it does not know (see "skgconfig.toml", below); one
+      per skgrepo holding an illegal edit to a foreign node — a section
+      of a node in a skgrepo of another owner than its home's — naming
+      the first such node (ID and title), how many more there are, the
+      skgrepo and the home, and saying that an owned one is shown only
+      under the node and a foreign one ignored (=docs/telescopes.org=,
+      "Illegal edits"); one per violation of the fork rules that a
+      foreign note takes part in, naming both notes and which is foreign
+      (=docs/data-model_technical.org=, "Hard validation constraints");
+      and one per pair of one foreign owner's
+      skgrepos that some node spans and whose dependencies manifests
+      disagree about their order, naming the node, the disagreeing
+      manifests and which skgrepo this server folds first (see
+      "OTHER_SKGREPO_DEPENDENCIES.toml", below); and one if the server
+      cannot watch the skgrepo directories (see "Repo files reloaded",
+      below), saying that files changed on disk then need a rebuild.
+      A reload of the config ("Rebuild session-lifetime stores") does
+      not change them.
+    - Each client sends this once per connection, as soon as the
+      connection is up and before it requests any view
+      ('skg-tcp-connect-to-rust', 'client.connect'). A non-empty answer
+      is appended to a buffer, keeping what it holds, under a level-1
+      headline "Startup warnings", each warning a level-2 headline:
+      =*SKG Server Warnings*= in Emacs, =skg://messages/server-warnings=
+      in Neovim. An empty answer opens nothing.

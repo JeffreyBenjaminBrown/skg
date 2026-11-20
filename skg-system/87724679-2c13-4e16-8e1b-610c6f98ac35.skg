@@ -1,0 +1,20 @@
+title: Heralds and reasons for placement
+pid: 87724679-2c13-4e16-8e1b-610c6f98ac35
+body: |2-
+  See [[id:ef1f3f60-2e51-4584-8e5d-7dd6f6214cd2][the herald legend]] for the full relationship
+  notation. A crucial =ĥ= directly after =K= marks actual substitution at
+  this occurrence.
+
+  An ordinary relationship =K= says that the node participates in a
+  visible =forks= relationship.  A highlighted birth =K= says that a
+  =forks= relationship is why this particular viewnode is present beneath
+  its org parent.
+
+  Substituted viewnodes carry =forks=
+  birth information: a mirror shown in =N='s place carries
+  =(forks out)= when it reaches =N= by forker steps only (it
+  forks a note that ... forks =N=), =(forks in)= when by
+  forkee steps only, =(forks out)= where both hold (mutual forks), and
+  none otherwise (a sibling fork, say).  A
+  node can have ordinary =K= facts without a highlighted birth =K= when
+  its placement comes from some other relationship.

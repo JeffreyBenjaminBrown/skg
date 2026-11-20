@@ -1,0 +1,16 @@
+title: Glossary
+pid: d5c0a61c-878d-46cf-8ad7-5d56827d44a1
+body: |2-
+  The words Skg uses, in two parts: the terms a user meets, and the
+  terms of the implementation. Links inside it name headlines.
+
+  A term marked "a term of plan 06", "of plan 08" or "of plan 10" was
+  coined by that plan of the refresh's rewrite (October 2026; plan 06
+  tidied the refresh, plan 08 fixed the skgrepo restriction and tidied
+  again, plan 10 ended the buffer corrections and made every write obey
+  the skgrepo restriction).
+  The other terms are older, or ordinary words.
+contains:
+- dc2efb82-bbda-48f7-99e3-2bfafe94b1da
+- ff2c06ae-0e94-4a66-9044-5d3f221eb214
+- 97c024b8-8f0b-49ab-a572-b6159eb49210

@@ -1,0 +1,8 @@
+title: '''Levels'' (the asterisks) imply containment.'
+pid: 2e8fcfc3-c156-42fc-b1e5-455ce3de964e
+body: |2-
+  For any headline H at level N,
+  the most recent headline with level < N
+  is said to 'contain' H.
+  Equivalently, that headline is H's 'parent',
+  and H is its 'child'.

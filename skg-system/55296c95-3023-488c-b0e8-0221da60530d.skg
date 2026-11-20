@@ -1,0 +1,5 @@
+title: link appearance
+pid: 55296c95-3023-488c-b0e8-0221da60530d
+body: |2-
+  A title or (as in this case) body
+  can have [[id:5af534a4-a917-4d14-b50e-9d8fca9a5169][any]] number of [[id:44c5969d-d829-40ca-93fa-15243f8a5a6f][links]] with [[id:28b3ff10-72e0-44cc-aa45-616702cbf24c][any title, however misleading]].

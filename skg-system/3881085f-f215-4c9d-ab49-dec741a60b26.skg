@@ -1,0 +1,11 @@
+title: why
+pid: 3881085f-f215-4c9d-ab49-dec741a60b26
+body: |2-
+  Creating a headline through Skg's commands prompts for any skgrepo it
+  cannot inherit: a headline inherits one from the nearest occurrence
+  above it, passing through folders, ghosts, tombstones, unknown
+  viewnodes and restricted viewnodes, so a root prompts, and so does a headline whose
+  walk up meets an alias, an ID, a flag or a change viewnode first, or
+  meets no occurrence.  Save
+  validation also catches a node whose skgrepo was omitted when the
+  headline was entered as plain text.

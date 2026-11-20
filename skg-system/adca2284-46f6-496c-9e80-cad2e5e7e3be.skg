@@ -1,0 +1,7 @@
+title: Both in one save
+pid: adca2284-46f6-496c-9e80-cad2e5e7e3be
+body: |2-
+  The restored nodes come first, then the relationships, so a
+  relationship restored in a save may name a node restored in the same
+  save. A relationship that a restored node records is restored with its
+  file.

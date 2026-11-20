@@ -1,7 +1,9 @@
+# This file was generated from the skg node with this ID:
+# 35f6e1cd-6b30-4568-a8c1-a4e1d0b9e953
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * UTF-8, byte indices, and the guitar bug
-
 ** The two systems: bytes vs characters
-
 A character like =a= is one byte (0x61). A character like =⌂=
 is three bytes (0xE2 0x8C 0x82). Both are one character.
 
@@ -30,9 +32,7 @@ In the string ="hi⌂ok"=:
 
 Byte indices 3 and 4 are NOT char boundaries -- they land in the
 middle of =⌂=.
-
 ** What Rust does (and what Emacs Lisp doesn't)
-
 Rust strings (=&str=, =String=) are UTF-8 byte sequences. When
 you write =&s[0..5]=, those are BYTE indices. If byte 5 is in
 the middle of a multi-byte character, Rust panics rather than
@@ -46,9 +46,7 @@ cannot happen in Emacs Lisp.
 (Emacs does have unibyte strings for raw byte manipulation, which
 is what the LP receiver uses. But those are treated as opaque
 byte buffers, not as text with characters.)
-
 ** What happened with the 'guitar' graphnode
-
 The server renders a content view as an org-mode string, wraps it
 in a sexp, and sends it over TCP. Before sending, there's a debug
 log that previews the first 200 bytes:
@@ -75,9 +73,7 @@ connection close, and silently did nothing.
 For other nodes (like "microtonal guitar"), the =⌂= fell at a
 different offset, so byte 200 was a clean boundary and it worked
 fine.
-
 ** The fix
-
 Walk backwards from byte 200 until we find a char boundary:
 
 #+begin_src rust
@@ -92,9 +88,7 @@ Walk backwards from byte 200 until we find a char boundary:
 Rust's =str::is_char_boundary(i)= returns true when byte =i= is
 the start of a character (or the end of the string). This is O(1)
 and the loop runs at most 3 iterations (max UTF-8 char is 4 bytes).
-
 ** The general rule
-
 In Rust, any time you compute a byte index and use it to slice a
 =&str=, you must ensure it's a char boundary. Common safe patterns:
 
@@ -113,9 +107,7 @@ Common UNSAFE patterns:
   count was used as a byte index.)
 - Slicing at =.len() - N= when the string might end with
   multi-byte characters.
-
 ** How this relates to TCP
-
 TCP is a byte stream. The server writes bytes, the client reads
 bytes. TCP knows nothing about character encoding -- it just
 delivers bytes in order.

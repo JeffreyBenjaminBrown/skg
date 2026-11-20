@@ -1,0 +1,26 @@
+title: 'Diagnosis: why the obvious checks all lie'
+pid: 4443f3d0-b9e4-43da-ab05-5365b29e3811
+body: |2-
+  An =.rlib= is an =ar= archive: a chain of member headers, each
+  declaring its own size. A truncated rlib keeps a perfectly valid
+  header table at the *front* of the file. Therefore:
+
+  - =ar t <file>= lists the members and exits *0*. It reads headers, not
+    data. It will happily "validate" a corpse.
+  - Scanning for a tail of NUL bytes finds nothing. The tail is real
+    data; the file just stops early.
+  - =cargo build= reports it as fresh, per the fingerprint problem above.
+
+  The only reliable test is to walk the member chain and confirm it
+  lands exactly on EOF. If a member claims to extend past the end of the
+  file, the file was truncated. That is all
+  =docs/troubleshooting/check-rlibs.py= does:
+
+  #+begin_src bash
+  python3 docs/troubleshooting/check-rlibs.py
+  # checked 501 rlibs in: target/debug/deps
+  #
+  # CORRUPT: target/debug/deps/libskg-89a0f28566cf142a.rlib
+  #   a member runs to byte 50400492, but the file ends at 50331648 -- SHORT BY 68844 bytes
+  # ...
+  #+end_src

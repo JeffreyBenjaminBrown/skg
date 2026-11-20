@@ -1,0 +1,60 @@
+title: compound partner folder
+pid: c5b28bec-00f4-46e3-91bf-cfe2f2209352
+body: |2-
+  A compound partner folder is a partner folder whose membership joins
+  more than one relationship, as against the ordinary partner folders,
+  which read one relation role. There are four. Three join three
+  nodes -- a note N, a member S of N's forks folder and a hidden node
+  H -- by S's membership there (N forks S, S forks N, or S is a mirror
+  of N through others), by a hide of H, and by a containment of H.
+  The fourth, the *integrated-elsewhere folder*
+  (=integratedElsewhereFolder=, label "☮ It contains these, and you
+  keep them elsewhere."), stands under S where S is a member as such of
+  N's forks folder, first among S's folders, and holds S's content that
+  the user keeps elsewhere (an owned note but S contains it, N among
+  them when the user owns N: see "integrated"), less N's hides, in the
+  order of S's list.
+  It is write-protected, its members folded, each carrying a
+  containers folder, folded, naming where the user keeps it (its
+  containers but S's view-ancestors), and no chain directly. A child N
+  hides stands in the hidden-in folder only.
+  The *hidden-in compound partner folder* (=hiddenInForkPartnerFolder=,
+  label "☮ It contains these, but c hides them.") stands under S inside
+  N's forks folder, where S is a member as such (a forkee or forker as
+  such), and holds N's hides that S contains, in the order of N's
+  hides list. The label is the same in both positions: the viewparent
+  S contains, and N, three generations up, hides. The *hidden-by
+  compound partner folder* (=hiddenByForkerFolder=, label "☮ a
+  hides these, which c contains.") stands under S where S is a forker
+  as such that forks N, after the hidden-in folder, and holds S's hides that N
+  contains, in the order of S's hides list: what the forker deleted
+  from N's content. It is write-protected: S's hides are its owner's
+  editing, done in S's own view. Under a forkee as such it is not
+  drawn, nor under an indirect member, whose hides do not apply to
+  N's content; one standing under a member that became a forkee holds
+  nothing and goes. The *hidden-outside
+  compound partner folder* (=hiddenOutsideOfForkPartnersFolder=, label
+  "b hides these, but no fork partner shown contains them.") stands last in N's forks folder and holds N's hides that no
+  member of N's forks folder contains, in the order of N's hides
+  list. The members are those its forks folder shows, forkees,
+  forkers and indirect members alike ('forks_folder_members_shown'), so a
+  hide is there exactly when no member of the same folder explains it:
+  a hide of something only a forker or an indirect member contains
+  stands in that member's hidden-in folder instead. A forker or an
+  indirect member N hides stands there, since the forks folder does
+  not draw it (nor, so, count it as a member), and removing it there
+  unhides it. The note whose hides a compound folder shows is its
+  *hider* ('CompoundFolderParties::hider'), and, for the two folders
+  under a member as such that show a hide, the note whose content holds
+  what is hidden is its *container* ('CompoundFolderParties::container'):
+  the member for the hidden-in folder, N for the hidden-by folder. The
+  integrated-elsewhere folder shows no hide and has neither: its goal
+  reads the member and N ('note_of_member_as_such'). The hidden-in,
+  hidden-by and hidden-outside folders read each relationship by the records the skgrepo
+  restriction shows: under a skgrepo narrowing, a hide of H that S
+  contains only by a restricted record stands in the hidden-outside
+  folder, and a hide recorded in a restricted section stands in
+  neither. The save reads the hidden-outside folder's edits against
+  the same partners ('apply_hiddenoutside_edits'), so a buffer that
+  keeps that folder never hides again what a gesture under a forker
+  as such unhid.

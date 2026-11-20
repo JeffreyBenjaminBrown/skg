@@ -1,0 +1,46 @@
+title: Display details
+pid: 5d9f646a-21c2-4411-a7c6-9dbb97e4980c
+body: |2-
+  - Heralds conceal the metadata rather than covering it with a display
+    overlay. With 'concealcursor=nc', entering insert mode on a line
+    reveals its raw metadata (arguably clearer for editing); Emacs never
+    revealed it. Semantics, colors and the server-owned rule table are
+    identical.
+  - Readable-ids shortens UUIDs by concealing the tail to an ellipsis
+    and renders titles as inline virtual text; same behavior, same
+    server round-trip, different mechanism.
+  - Server messages name Emacs chords and Emacs commands. The client
+    rewrites those it has a twin for, in the messages it shows and in
+    the fork-confirmation buffer and the absent-reference warning
+    ('with_neovim_bindings' in nvim/lua/skg/messages.lua, which reads
+    the Neovim keys and Ex names from nvim/lua/skg/keymaps.lua): the chords
+    C-c s e, C-c s w, C-c s s, C-c s r, C-c g RET, C-c g v, C-c v o, and the
+    fork-confirmation buffer's C-c C-c and C-c C-k, which are
+    '<localleader>cc' and '<localleader>ck' there; and the commands
+    skg-restore-deleted-node, skg-restore-removed-membership,
+    skg-investigate-unknown-node, skg-set-relRepo and
+    skg-set-flag-search-matching, which become their ':Skg*' twins.
+    Any other Emacs name a message carries stays as it is.
+  - The fork confirmation: the server's notification ("N node(s) will
+    be forked. Save again to approve, or kill this buffer to
+    decline.") names no key. In Neovim the client asks at once
+    ("Fork the listed node(s)?"); later, '<localleader>cc' in the
+    confirmation buffer approves and '<localleader>ck' declines, while
+    ':w' there refuses and names those two keys.
+  - A view shown from a perspective other than its root homes
+    (<localleader>vo, ':SkgCyclePerspective') is not marked by
+    default: Emacs's mode name reads "SKG:the perspective of tracy",
+    say, there,
+    but the Neovim client draws no statusline, and setting one would
+    override the user's. The perspective is 'b:skg_perspective'
+    (its wire name, or unset) and its name
+    'b:skg_perspective_name', and
+    =%{v:lua.require'skg.buffer'.perspective_mode_line()}= in a
+    'statusline' or 'winbar' shows ":the perspective of tracy", say,
+    there. The
+    message each switch shows names the perspective the buffer now
+    shows.
+  - View buffers are named 'skg://TITLE' (search: 'skg://?TERMS');
+    Emacs used '*TITLE*'. Message/report buffers live under
+    'skg://messages/...', 'skg://unknown-node', 'skg://diff-view: ...',
+    etc.

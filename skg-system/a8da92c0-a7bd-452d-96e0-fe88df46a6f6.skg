@@ -1,0 +1,15 @@
+title: =claude-usage.sh= -- on-demand probe
+pid: a8da92c0-a7bd-452d-96e0-fe88df46a6f6
+body: |2-
+     Reads the OAuth access token from =.credentials.json= (read-only --
+     it never writes your credentials), makes one =max_tokens:1= Haiku
+     call, and prints JSON:
+
+     #+begin_example
+     { "session_5h": { "used_pct": 25.0, "reset_epoch": ..., "seconds_left": 7487 },
+       "weekly_7d":  { "used_pct": 4.0,  "reset_epoch": ..., "seconds_left": 277487 },
+       "binding_window": "five_hour" }
+     #+end_example
+
+     Cost: one tiny call per invocation. Fine for a decision point; too
+     costly if every agent calls it constantly. For that, use the poller.

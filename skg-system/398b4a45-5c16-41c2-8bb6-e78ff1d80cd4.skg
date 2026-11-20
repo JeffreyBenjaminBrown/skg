@@ -1,0 +1,7 @@
+title: Separate durable evidence from generated artifacts
+pid: 398b4a45-5c16-41c2-8bb6-e78ff1d80cd4
+body: |2-
+  Retain useful test logs and metadata under =target/=, but exclude reproducible
+  package staging trees and other generated copies from fingerprints.  Remove
+  only artifacts created by the current work, using exact paths, and never clean
+  the user's data or unrelated dirty state merely to make a checkpoint tidy.

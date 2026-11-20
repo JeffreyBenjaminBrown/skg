@@ -1,0 +1,9 @@
+title: Probes
+pid: aec6e1b9-9a9c-4003-a7ad-7cd5aa6ba762
+body: |2-
+  Against an isolated server on the final tree (the verify skill
+  says how), drive each behavior of the model end to end: a save
+  and its collateral rerender, a merge of siblings, a repo-set
+  switch, a search, a buffer of the diff view; record what was
+  sent and received. In plan 04.1 the one real defect passed every
+  suite and was caught by a probe.

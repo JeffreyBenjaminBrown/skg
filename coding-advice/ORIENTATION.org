@@ -1,11 +1,14 @@
+# This file was generated from the skg node with this ID:
+# aa083cee-3258-4a08-96c9-88c84e15281b
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * Start here
 The files of 'docs/' and 'coding-advice/' are generated from notes;
 change them only as [[file:generated-docs.org]] says.
-Read this file and [[file:to-save-tokens.org][the default token-conservation advice]] once at the
+Read this file and [[./to-save-tokens.org][the default token-conservation advice]] once at the
 start of a task. Then use the reading guide below for the work actually in
 scope. Do not reread unchanged advice for every follow-up in the same task.
 Do not load the whole folder or 'maybe-obsolete/' as routine onboarding.
-
 * How to work
 ** Conserve tokens
 Before a tool call, identify the unresolved question it will settle. Work one
@@ -39,12 +42,11 @@ server retains one interactive user and admits one interactive client at a
 time.
 
 For a task, start with the smallest relevant local source:
-** [[file:../docs/README.org][README.org]] for a project introduction and documentation entry points.
-** [[file:../docs/api-and-formats.org][api-and-formats.org]] for protocol, view metadata, configuration, and file-format contracts.
-** [[file:../docs/glossary.org][glossary.org]], [[file:../docs/data-model_friendly.org][the conceptual data model]], and [[file:../docs/data-model_technical.org][the technical data model]] for domain vocabulary and semantics.
-** [[file:../docs/diff-view.org][diff-view.org]] for the diff view (C-c v d): its buffers, how they are drawn over the graph straddle, processed marks, and stage-and-commit.
+** [[../docs/README.org][README.org]] for a project introduction and documentation entry points.
+** [[../docs/api-and-formats.org][api-and-formats.org]] for protocol, view metadata, configuration, and file-format contracts.
+** [[../docs/glossary.org][glossary.org]], [[../docs/data-model_friendly.org][the conceptual data model]], and [[../docs/data-model_technical.org][the technical data model]] for domain vocabulary and semantics.
+** [[../docs/diff-view.org][diff-view.org]] for the diff view (C-c v d): its buffers, how they are drawn over the graph straddle, processed marks, and stage-and-commit.
 ** The relevant implementation, callers, tests, and focused documentation for the requested behavior.
-
 Do not read all documentation or TODO material as onboarding; it's too much.
 Consult a plan, open question, or historical note
 only when the current task points to it.

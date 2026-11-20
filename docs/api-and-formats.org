@@ -1,5 +1,8 @@
-* API
+# This file was generated from the skg node with this ID:
+# 02708898-2d66-49cf-ba60-ecc1eb0bbe81
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+* API
 Communication between Rust and Emacs is via TCP on port 1730, configurable in any skgconfig.toml. The connection is persistent.
 
 After initialization, every server response is length-prefixed as
@@ -38,7 +41,6 @@ whose answer to "Verify connection" names the feature in its
 ('tools/skg-for-ai/skg_for_ai.py') asks this for ="save preview"=.
 
 So far there are these endpoints:
-
 ** Verify connection
   - Request: ((request . "verify connection"))
   - Response: LP =((response-type verify-connection) (content "This is the skg server verifying the connection.") (supports ("save preview")))=.
@@ -47,7 +49,6 @@ So far there are these endpoints:
     "true")= field of "Save buffer", which an older server ignores,
     saving for real. A client asks before using one; an older server's
     answer has no =supports=.
-
 ** Text search
   - Request: =((request . "text search") (terms . "SEARCH_TERMS")
     (regex . "BOOL") (body . "BOOL") (operators . "BOOL"))=, plus
@@ -140,7 +141,6 @@ So far there are these endpoints:
       of hits, and was removed for its complexity
       ('TODO/simplify-refresh/bench-search-enrichment.org' holds the
       measurements).
-
 ** Single-root content view from ID
   - Request: =((request . "single root content view")
     (id . "NODE_ID") (view-id . "VIEW_ID")
@@ -177,7 +177,6 @@ So far there are these endpoints:
     the node stands as itself. Its content substitutes as any
     content does. See "Mirror substitution" below. Fork facts can be
     inspected in the heralds (the K token).
-
 ** Close view
   - Request: =((request . "close view") (view-id . "VIEW_ID"))=. Each
     client sends it when a buffer showing a view is killed ('skg-send-close-view'
@@ -190,7 +189,6 @@ So far there are these endpoints:
     and no later save rerenders it. Closing the last open buffer of the
     diff view also drops the graph straddle, which the diff view's
     buffers share; the next diff view builds it anew.
-
 ** Save buffer
   - Request: First =((request . "save buffer") (view-id . "VIEW_ID") (point-lines-below-focused-headline . "N") (point-column . "C") (point-screen-lines-below-window-start . "M"))\n=, then one UTF-8 length-prefixed S-expression envelope:
     #+begin_src lisp
@@ -673,7 +671,6 @@ So far there are these endpoints:
     =overPrivateText-telescope-confirmation= is sent as the terminal response to
     one save attempt.
   - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the save-result format.
-
 ** Get file path
   - Request: ((request . "get file path") (id . "THE_ID") (repo . "THE_REPO"))
   - Response: LP =((response-type get-file-path) (content "PATH"))=,
@@ -685,7 +682,6 @@ So far there are these endpoints:
   - If the requested skgrepo is restricted in the current connection's
     skgrepo restriction, the server refuses to expose the path. Direct
     file visits outside Skg are not intercepted.
-
 ** Herald rules
   - Request: ((request . "herald rules"))
   - Response: LP response-type "herald-rules" with
@@ -707,11 +703,10 @@ So far there are these endpoints:
     reconnect and after a rebuild of the session-lifetime stores.
     If the fetch fails, its herald display disables after bounded retries;
     there is no client-side fallback table. The user-facing legend is
-    [[file:./heralds.org][heralds.org]].
+    [[./heralds.org][heralds.org]].
   - A Rust unit test (=herald_rules_cover_the_emittable_vocabulary=)
     pins the table to the metadata vocabulary the server can emit, in
     both directions. It pins atom coverage only, not presentation.
-
 ** How a message names a headline
 Every message in an =errors= or =warnings= list is Org
 text. Its first line is the message's headline text, which both
@@ -747,7 +742,6 @@ it, while heralds stand in for its metadata. The subheadline is written by
 refused because another view's metadata is invalid lists that view's
 errors on one line, naming each headline by its viewnode ID or title,
 since the command searches the current buffer.
-
 ** The baseline of a view
 A view's baseline is the text the server last drew for it, as the
 client installed it (without the focus and fold metadata the client
@@ -865,7 +859,6 @@ keeps them as text ('TODO/problems.org').
     headline "Startup warnings", each warning a level-2 headline:
     =*SKG Server Warnings*= in Emacs, =skg://messages/server-warnings=
     in Neovim. An empty answer opens nothing.
-
 ** Repo files reloaded
   - Unprompted: the server sends this message without a request, when
     its repo watcher has reloaded =.skg= files that changed on disk
@@ -926,7 +919,6 @@ keeps them as text ('TODO/problems.org').
     changed config still needs "Rebuild session-lifetime stores"; the
     watcher follows the skgrepo directories of whatever config the
     server holds.
-
 ** Link statuses
   - Request: =((request . "link statuses") (request-id . "TOKEN") (ids "ID" ...))=.
     A client batches and deduplicates literal link target IDs in a view.
@@ -940,7 +932,6 @@ keeps them as text ('TODO/problems.org').
     current in-Rust graph snapshot and skgrepo restriction, independently
     of Tantivy title-index commits. =request-id= associates asynchronous
     responses with their requesting buffer and its buffer generation.
-
 ** Diff view
   - Request: =((request . "diff view") (buffer . "BUFFER") (view-id . "VIEW_ID"))=,
     where BUFFER is ="all changes"=, ="merges"=, ="skgrepo changes"= or
@@ -990,7 +981,6 @@ keeps them as text ('TODO/problems.org').
     when it holds nothing.
   - Logic: =server/serve/handlers/diff_view.rs=, =server/diff_view/=
     (=pruned_change_view.rs=, =changes.rs=).
-
 ** Stage and commit
   - Request: =((request . "stage and commit") (message-lines "LINE" ...))=,
     optionally with =(processed-only . t)= or =(confirmed . t)=. MESSAGE,
@@ -1057,7 +1047,6 @@ keeps them as text ('TODO/problems.org').
   - Logic: =server/serve/handlers/stage_and_commit.rs=,
     =server/git_ops/stage_and_commit.rs=, and the choice of nodes in
     =server/diff_view/change_leaves.rs=.
-
 ** Extend diff view
   - Request: =((request . "extend diff view") (view-id . "VIEW_ID"))=,
     where VIEW_ID names a buffer of the diff view. The client
@@ -1090,7 +1079,6 @@ keeps them as text ('TODO/problems.org').
     ('ensure_editableOccurrences_exist',
     'contentOrigins_missing_from_buffer'), and 'refresh_view' in
     =server/rerender_pass.rs=.
-
 ** Investigate unknown node
   - Request: =((request . "investigate unknown node") (id . "ID"))=.
   - Response: LP response-type "investigate-unknown-node" with
@@ -1110,7 +1098,6 @@ keeps them as text ('TODO/problems.org').
     unrestricted: history can hold the text of any skgrepo.
   - Logic: =server/serve/handlers/investigate_unknown_node.rs=,
     =server/git_ops/vanished.rs=.
-
 ** Rebuild session-lifetime stores
   - Request: ((request . "rebuild session-lifetime stores"))
   - Response: LP response-type "rebuild-session-lifetime-stores" with =((content "..."))=.
@@ -1150,7 +1137,6 @@ keeps them as text ('TODO/problems.org').
     change on disk need no rebuild: the server reloads them as they
     change ("Repo files reloaded"). A rebuild is what applies a
     changed config.
-
 ** relRepo info
   - Request: ((request . "relRepo info") (recorder . "ID")
     (member . "ID") (relation . "contains")) — relation is one of
@@ -1173,7 +1159,6 @@ keeps them as text ('TODO/problems.org').
     skgrepos the save can accept. Advisory: the save-time floor check
     in =apply_sticky_relRepos_in_graph= stays load-bearing, since buffers go
     stale and the request is plain text.
-
 ** Flag state
   - Request: =((request . "flag state") (id . "ID")
     (flag . "noSearchMatching"))=.
@@ -1184,7 +1169,6 @@ keeps them as text ('TODO/problems.org').
   - The endpoint is read-only and may report =hadId=, =wasOverloaded=, or
     =noSearchMatching=. Ownership is advisory; save-time validation remains
     authoritative.
-
 ** Repos
   - Request: ((request . "repos"))
   - Response: LP =((response-type repos) (restriction "NAME")
@@ -1204,7 +1188,6 @@ keeps them as text ('TODO/problems.org').
   - The endpoint is read-only and lists every skgrepo of the config,
     restricted or not; =shown= says which the restriction keeps out.
   - Logic: =server/serve/handlers/repos.rs=.
-
 ** Strip body whitespace
   - Request: ((request . "strip body whitespace"))
   - Response: LP response-type "strip-body-whitespace" with
@@ -1223,9 +1206,7 @@ keeps them as text ('TODO/problems.org').
     save is stale for it ("Save buffer", the stale buffer). The clients suggest
     reviewing the result with =git diff --ignore-all-space=, which
     should show nothing.
-
 ** Import Markdown and Org
-
 The Emacs =skg-import-md-and-org= and Neovim =:SkgImportMdAndOrg=
 commands use the same length-prefixed S-expression exchange on one persistent
 TCP connection:
@@ -1273,7 +1254,6 @@ by that attempt where possible and reports residual paths; a process crash
 is not guaranteed atomic. Source files are never changed. An export marker
 under each imported file root prepares a later Org export, but does not run
 one automatically.
-
 ** Export to org
   - Request: =((request . "export to org") (repo-set . "NAME")
     (output-dir . "PATH") (approved-overPrivateText-pids "PID" ...))=.
@@ -1344,9 +1324,7 @@ one automatically.
     skgrepo. Under a skgrepo restriction it fails closed before
     writing unless the flag is present; with no skgrepo restriction
     (and on an approved restricted run) it prints the warning.
-
 ** Delete references to an absent node
-
   - Initial request: =((request . "delete references to absent node")
     (id . "RAW-ID"))=. =RAW-ID= must still be absent.
   - Refused unless the connection is unrestricted, since the cleanup
@@ -1368,7 +1346,6 @@ one automatically.
     =forks= and =hides= lists (the warning's structured relationships
     name these fields "contains", "forks" and "hides").  It
     leaves text links and foreign telescopes untouched.
-
 ** Rerender all views
   - Request: =((request . "rerender all views")
     (approved-overPrivateText-pids "PID" ...))=.
@@ -1411,7 +1388,6 @@ one automatically.
   - =server/serve/rerender_stream.rs= prepares, authorizes and streams
     the rerenders; every request answered by a rerender stream shares
     it.
-
 ** Rerender views
   - Request: =((request . "rerender views") (view-ids "VIEW_ID" ...)
     (approved-overPrivateText-pids "PID" ...))=. =view-ids= is
@@ -1435,7 +1411,6 @@ one automatically.
     release, or an unrestricted connection, adds the shared warning to
     =rerender-done=.
   - =server/serve/handlers/rerender_views.rs=.
-
 ** Set perspective
   - Request: =((request . "set perspective") (view-id .
     "VIEW_ID") (perspective . "next"|PERSPECTIVE)
@@ -1510,7 +1485,6 @@ one automatically.
     followed by an empty rerender stream, in place of the answer; the
     view keeps its choice. A retry with those PIDs is released.
   - =server/serve/handlers/perspective.rs=.
-
 ** skgrepo-sets
   - Skgrepo-sets are the prefixes of the config's privacy ladder, the
     owned skgrepos (see "skgconfig.toml > skgrepo-sets" below): each
@@ -1587,7 +1561,6 @@ one automatically.
     =(operation repo-set-switch-rerender)= and exact PIDs, followed by an empty
     rerender stream. A retry adds =approved-overPrivateText-pids=; declining
     leaves the skgrepo restriction and open-view registry unchanged.
-
 ** Titles by ids
   - Request: =((request . "titles by ids") (ids "ID1" "ID2" ...)
     (approved-overPrivateText-pids "PID" ...))=.
@@ -1607,7 +1580,6 @@ one automatically.
     =(operation titles-by-ids)= and the exact PIDs. An approved retry
     carries those PIDs in =approved-overPrivateText-pids=; an unrestricted
     connection receives the ordinary map with the shared warning.
-
 ** Shutdown server
   - Request: ((request . "shutdown"))
   - Has the same effect as sending SIGINT (Ctrl+C) or SIGTERM (kill) to the server.
@@ -1620,7 +1592,6 @@ one automatically.
     beside the config ('data/jeff/skgconfig.toml.running/stop-servers.sh'
     for 'data/jeff/skgconfig.toml').
   - TODO | PITFALL: Any client can shut down the server. If ever multiple users share a server, one could bother the other. The server exits immediately after sending the response, which interrupts any in-flight requests from other clients.
-
 ** Busy-initializing signal
   - Triggered when a client connects while the server is still building the
     graph and Tantivy.
@@ -1632,9 +1603,7 @@ one automatically.
 Once initialization is complete, endpoint errors use that endpoint's
 normal tagged, length-prefixed response shape (or the shared
 =response-type error= dispatcher fallback); they are not bare text.
-
 * Content view
-
 Rust sends the entire text document to Emacs, org-bullets and all.
 Each org-bullet is followed by a space, some metadata, a space,
 and then headline text.
@@ -1720,9 +1689,7 @@ write-protected occurrence, where nothing claims), and, being no
 member, no =(birth ...)= in its =(view ...)= (see "Stats metadata"
 below). It is known by where it stands, so it is still one after a
 save. A chain node carries no change facts.
-
 ** View requests: (viewRequests ...)
-
 =(viewRequests ...)= carries client→server requests for viewbranches
 (unlike =(view ...)= and the stats below, which are server→client). On save
 the refresh fulfills each request and then drops the atom, so a
@@ -1860,9 +1827,7 @@ no folder unasked but where something changed.
   by =skg-fork-node= (=C-c m f=).
 
 A ghost takes no view request; the parser refuses one there.
-
 ** Edit requests: (editRequest ...)
-
 =(editRequest ...)= carries a client→server request that the save change
 the graph. A save that succeeds consumes every request in the buffer
 it saves, after its graph edits; a save that stops for a confirmation
@@ -1931,9 +1896,7 @@ one on a ghost:
 
 What the save does with the two restore requests is described in
 =docs/diff-view.org=, "Restoring what a change removed".
-
 ** Stats metadata: the view facts, =(view ...)=
-
 The derived facts of a headline's position stand in one form,
 =(view FACT...)=, after its declared parts and before its =(diff
 ...)=. The server computes them at every rendering (the stats pass,
@@ -2060,7 +2023,7 @@ relation. In a forks folder the relationship heralds tell the sides
 apart: a forkee shows =bK= (its viewparent's viewparent, 'b', forks
 it), a forker =Kb=, a mutual =bKb=, an indirect member neither 'b'
 flag ('docs/heralds.org').
-See [[file:./heralds.org][heralds.org]] for the rendered notation and styles.
+See [[./heralds.org][heralds.org]] for the rendered notation and styles.
 
 The graph counts fold into these forms (=forks= / =hides=
 become the =K= / =H= tokens; =aliasing= / =extraIDs= /
@@ -2083,9 +2046,7 @@ is =(editRequest (relRepo NAME))=. And =(inPlaceOf N)=, crucial
 =ĥ= immediately after the =K= token, is a load-bearing declared part,
 documented in "Mirror substitution and the inPlaceOf part"
 below.
-
 ** Node flags
-
 The YAML =flags= list stores =Had_ID_Before_Import=, =Was_Overloaded=, and
 =NoSearchMatching= using those exact spellings. Absence means false.
 =NoSearchMatching= keeps the node's Tantivy documents for ID/title/repo
@@ -2094,9 +2055,7 @@ lookup but marks every title/alias document with indexed, stored
 therefore blocks direct title, alias, body, regexp, operator, and
 field-qualified matches, but is not an access-control boundary and does not
 remove graph context.
-
 ** Mirror substitution and the inPlaceOf part
-
 Where a node N stands as content of an editable occurrence in a
 content view, the refresh shows instead the mirror of N that the
 perspective's skgrepo list ranks first, never in the diff view
@@ -2197,15 +2156,11 @@ between them: =(forks out)= when it reaches N by forker steps only
 forkee steps only (N forks a note that ... forks it), =(forks out)=
 where both hold (mutual forks), none otherwise (a sibling, say);
 'side_of_mirror_shown' in =server/dbs/in_rust_graph/mirrors.rs=.
-
 * skgconfig.toml
-
 The server's configuration file. See example-data/ for an example.
 
 Pass its path as a command-line argument (default: =data/jeff/skgconfig.toml=) when starting the server (see =bash/start-servers.sh=). The directory containing the file is the *data root*; all relative paths in the config are resolved against it. A relative path may leave the data root: a config in =data/jeff/= names a skgrepo in =data/claude/public= as =../claude/public=, and its =..= is resolved when the config loads.
-
 ** Fields
-
 | Field                | Required | Default | Description                                                      |
 |----------------------+----------+---------+------------------------------------------------------------------|
 | =tantivy_folder=     | yes      |         | Directory for the Tantivy search index. Relative to data root.   |
@@ -2228,9 +2183,7 @@ spelling of a renamed key (=max_role_tree_depth= is now
 =max_roleTree_depth=). =skg check-config= prints these warnings and
 still exits 0; the server logs them and serves them to each client
 (see "Server warnings", above).
-
 ** Skgrepos
-
 Each =[[repos]]= entry defines a directory of =.skg= files.
 *The order of the owned entries is load-bearing*: owned skgrepos must
 be listed in privacy order, most public first, most private last.
@@ -2275,9 +2228,7 @@ The retired =user_owns_it= field and the retired top-level
 it renames the owned folder (to =jeff/= unless told otherwise),
 rewrites the paths under it, and adds =foreign = true= to every
 other entry.
-
 ** skgrepo-sets
-
 Skgrepo-sets are no longer declared; the retired =[[repo_sets]]=
 table is rejected with an error. The sets are exactly the
 *prefixes of the privacy ladder*: each owned skgrepo's name denotes
@@ -2317,9 +2268,7 @@ Here the available skgrepo-sets are =public= = {public} and
 =private= = {public, private}, each with Fred's skgrepo added while
 foreign skgrepos are shown; =private= with them shown is no skgrepo
 restriction.
-
 ** OTHER_SKGREPO_DEPENDENCIES.toml
-
 At every server start the server writes an =OTHER_SKGREPO_DEPENDENCIES.toml=
 manifest into each owned skgrepo directory. Its =dependencies= is a
 list of pairs, one per rung of the privacy ladder through that
@@ -2376,9 +2325,7 @@ disagreeing manifests, and which one this server folds first; it
 appears at init, in the log and in the startup warnings each client
 shows on connect (see "Server warnings", above). (The receiver also
 reads the bare-string =dependencies= shape.)
-
 ** Log files
-
 Each server run writes its logs to a folder of its own,
 =CONFIG.running/START/=, CONFIG being the config file's path as the
 server was given it, and START the run's start time in UTC,
@@ -2410,9 +2357,7 @@ start of the script (START there being that start's time), holding
 the output of the rerun loop, or of cargo-watch with =--hot-reload=.
 Each time the rerun loop restarts the server, a new subfolder
 appears, so the newest one holds the current run's logs.
-
 ** Processed marks file
-
 The processed marks file holds the processed marks of the
 diff view ('server/diff_view/processed_store.rs'). It is the config's
 =processed_marks_file=, resolved against the data root, or else
@@ -2449,13 +2394,9 @@ November 2026 (see "The .skg file format") may name ="SubscribesTo"=,
 unreadable, so the migration tool rewrites it
 (=tools/migrate-forks-2026-11/migrate.py --marks FILE=): it drops the
 marks of the first two and renames the third ="Hides"=.
-
 ** Example
-
 See =example-data/skgconfig.toml=.
-
 * The .skg file format
-
 It is a specialization of YAML -- every .skg file is valid YAML,
 although not vice versa. The definitive source of truth is
 =server/types/nodes/fs.rs= (=GraphnodeOnDisk=).
@@ -2557,9 +2498,7 @@ node's most public first) yields the
 node; saving decomposes the node back into sections, byte-stably, so
 untouched sections do not change on disk. An owned section emptied
 by a save is deleted; foreign sections are never touched.
-
 * The metadata headers
-
 Most org headlines in the client will have a 'metadata header',
 consisting of some bare values and some key-value pairs
 separated by whitespace. Each kv pair is wrapped in parens: (key value).
@@ -2715,9 +2654,7 @@ gone, an empty folder nothing can be added to, a ghost on request.
 The refresh prunes it once it is childless, a view root included, so a
 buffer may end with no headlines (the glossary's "tombstone,
 entombstone"). Herald "something stood here".
-
 ** Metadata of the diff view
-
 The buffers of the diff view (see "Diff view") show changes with
 the forms below. The change facts are derived facts, which the
 parser skips; the processed requests and the restore edit requests
@@ -2728,7 +2665,6 @@ its viewparent's worktree list still names), which the save keeps in
 the list, as it keeps an unknown viewnode's.
 The glossary's "Terms a user meets in the diff view" and "Terms of
 the diff view's implementation" define the vocabulary.
-
 *** The change facts: =(diff ...)=
 A headline's change facts form one list, the last part of its
 metadata:
@@ -2784,7 +2720,6 @@ from OLD to NEW since HEAD; herald "-OLD +NEW". Beside it, when the
 nearest vognode ancestor whose home skgrepo moved moved the same way,
 =(movedLikeAncestor LETTER)=, LETTER naming that ancestor as the
 relationship tokens do (a = the viewparent); herald "Δ⌂=LETTER".
-
 *** The processed requests: =(editRequest (processed ...))=
 =(processed OBJECT...)= and =(unprocessed OBJECT...)= inside =(editRequest
 ...)= ask the save to set or clear the processed marks of the
@@ -2831,7 +2766,6 @@ can name an own leaf of a content member drawn beside it. At most one per headli
 the headline's other edit request if it has one: =(editRequest
 delete (processed node))=. Any headline that may carry =(diff ...)= may
 carry one.
-
 *** Who writes each part, and who acts on it
 **** The server writes the change facts
 The server writes the =(diff ...)= form (=diff_form= in
@@ -2878,7 +2812,6 @@ each child's =rel= marks. Where no member is drawn under it, as on a
 folder member, =node= and =rel= together mark its file. Requests work
 on write-protected occurrences. See =docs/diff-view.org=, "Processed
 requests and gestures".
-
 *** The diff view's viewnodes
 **** =alias noClaim (view ghostWarrant)=, =id (view ghostWarrant)= with =(rel removed)= -- in an alias or ID folder: an alias or extra ID that HEAD has and the worktree lacks
 Its headline is the alias or the ID: a member with a ghost warrant,
@@ -2922,7 +2855,6 @@ Under a ghost, an =acquiredByFolder= holds the node that acquired it
 by a nodeMerge; under an acquirer, an =acquiredFolder= holds the
 ghosts of the nodes it acquired. An =acquiredFolder= also accepts a
 child the user puts there, which claims nothing.
-
 *** Changed folders
 A partner, alias, ID or flags folder is written as its bare atom,
 whether or not something in it changed. A folder is shown because of
@@ -2936,7 +2868,6 @@ a member's =(rel ...)= is processed when it carries =(processed ...)= naming
 =rel= if its =(leaves ...)= lists =rel=, and any =(processed ...)=
 otherwise; a relRepo move is processed when it carries =(processed ...)=.
 A processed gesture on such a folder acts on each changed membership.
-
 *** Examples
 #+begin_example
 (skg node (gnid 7) (skgRepos (nodeRepo main)) (diff (node added) (rel added) (leaves 2 node rel) (processed node)))
@@ -2951,7 +2882,6 @@ A processed gesture on such a folder acts on each changed membership.
 (skg node (gnid 6) (skgRepos (nodeRepo main)) (editRequest (processed rel newContent)) (diff (node added) (rel added) (leaves 2 node rel)))
 (skg node (gnid 5) (skgRepos (nodeRepo pub)) (diff (homeSkgrepoMove (old priv) (new pub)) (movedLikeAncestor a)))
 #+end_example
-
 ** Restricted-skgrepo nodes: omission, retention, and save preservation
   - The principle: the skgrepo restriction limits writes as it limits
     views. Under a skgrepo restriction, no save or other

@@ -1,0 +1,6 @@
+title: :SkgReload
+pid: 5f37d0dd-ce03-4e2a-a7ec-46c50c7b72e0
+body: |2-
+  Unloads all skg Lua modules and reloads them from disk.
+  Useful when you've changed Lua code
+  and want to pick up the changes without restarting Neovim.

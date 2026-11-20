@@ -1,0 +1,8 @@
+title: swap in (a runtime generation), vs publish
+pid: dca5422e-1ae4-43cc-b1d5-7ffa35f57511
+body: |2-
+  A save, rebuild or import ends by atomically *swapping in* a new
+  runtime generation (config, graph and search index): readers holding
+  the old one keep it, and the next reader gets the new one. "Publish"
+  means only making text more public: sharing a skgrepo, or writing text
+  into a more public telescope section. Hoist /moves/ text to home.

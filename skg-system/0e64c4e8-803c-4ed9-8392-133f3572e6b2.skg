@@ -1,0 +1,76 @@
+title: Set perspective
+pid: 0e64c4e8-803c-4ed9-8392-133f3572e6b2
+body: |2-
+    - Request: =((request . "set perspective") (view-id .
+      "VIEW_ID") (perspective . "next"|PERSPECTIVE)
+      (approved-overPrivateText-pids "PID" ...))=. =view-id= and
+      =perspective= are required; the approval is optional.
+    - Switches the open view's perspective: the skgrepo whose list
+      ranks the mirrors it shows ("Mirror substitution and the
+      inPlaceOf part" below). A PERSPECTIVE is ="root homes"=, as every
+      fresh view shows (each top-level tree is drawn from its root's
+      home skgrepo), or ="skgrepo SKGREPO"=, SKGREPO's in every tree,
+      whatever its root's home; SKGREPO is any skgrepo the config lists,
+      owned or foreign. Any other name ("root authors", "user", "owner
+      of SKGREPO" among them) is refused. Then the view is rerendered,
+      from what the connection holds for it, from the new perspective.
+    - The view's cycle of perspectives is computed afresh at each
+      request, from what the connection holds for the view: the root
+      homes, then each skgrepo whose perspective draws the view
+      otherwise than the root homes do, judged by drawing the view
+      from each, in memory, and comparing the texts. The skgrepos tried
+      are the homes of the visible mirrors of each original drawn where
+      substitution acts (a root, or a node standing as content of an
+      editable occurrence; its original is its =(inPlaceOf N)=, else
+      itself), in the root homes' drawing and in the view's own; so the
+      cycle found from any perspective holds every member found from
+      the root homes. A skgrepo whose mirrors stand only beneath a node
+      another perspective puts in place is found from that perspective.
+      A skgrepo with no mirror of any such original is not tried, nor
+      is one whose drawing equals the root homes' (a root's own home,
+      say), so that no press changes nothing. The cycle is ordered the
+      root homes, then the skgrepos in the config's declaration order.
+      ="next"= is the first member ranked after the view's perspective,
+      else the root homes: so a perspective that has left the cycle
+      since (the graph changed, or a save named it) is followed by the
+      next one still in it, and the root homes are always reached. A
+      named PERSPECTIVE must be in the cycle ('perspective_to_show' in
+      =server/serve/handlers/perspective.rs=). The cycle is never
+      drawn whole: a request draws the root homes' view, then, for
+      ="next"=, the skgrepos tried in rank order from the first ranked
+      after the view's perspective, stopping at the first that draws the
+      view otherwise; for a named skgrepo, that one alone. The drawing
+      of the perspective chosen is the rerender sent. So a press draws
+      the view once, and once more for each skgrepo tried: twice where
+      the first skgrepo ranked after the view's perspective is in the
+      cycle, once where none is ranked after it.
+    - Response: =((response-type perspective) (view-id
+      "VIEW_ID") (perspective PERSPECTIVE) (perspective-name
+      "NAME"))=, naming the view, the perspective it now shows, and how
+      a message to the user names it: ="the perspective of tracy"=, by
+      the skgrepo's herald label, or ="the perspective of each root's
+      home skgrepo (tracy, main)"=, the homes named in the order of
+      their first roots. A rerender stream (see "Rerender all views")
+      of that one view follows. Each client records the perspective for
+      the buffer when the answer arrives, names it to the user, marks it
+      unless it is the root homes, and sends it on the buffer's saves
+      ("Save buffer", =perspective=).
+    - Refusals carry the view's unchanged perspective, its name, and the
+      reason in =(content "...")=, followed by an empty rerender stream,
+      since the clients lock their buffers before sending the request: a
+      request naming no view or no valid perspective; a view the
+      connection does not hold (after a restart or a reconnection; a
+      save of the buffer registers it again); a buffer of the diff view,
+      which substitutes nothing; ="next"= in a view whose cycle
+      holds only the root homes and that shows them; and a named
+      perspective not in the cycle. The root homes are always in it,
+      so a switch back to them is never refused for that reason.
+    - The rerender starts from what the server last drew or saved, so
+      each client refuses the switch while the buffer has unsaved edits,
+      before it sends the request.
+    - Under a restricted set, overPrivateText content without exact
+      approval returns LP =overPrivateText-telescope-confirmation= with
+      =(operation perspective-switch)= and the exact PIDs,
+      followed by an empty rerender stream, in place of the answer; the
+      view keeps its choice. A retry with those PIDs is released.
+    - =server/serve/handlers/perspective.rs=.

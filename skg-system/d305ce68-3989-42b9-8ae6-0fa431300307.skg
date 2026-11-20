@@ -1,0 +1,37 @@
+title: 'skg-export-some-to-org : exporting to org'
+pid: d305ce68-3989-42b9-8ae6-0fa431300307
+body: |2-
+  :PROPERTIES:
+  :CUSTOM_ID: export-org
+  :END:
+  Exports Skg data to plain =.org= files, so the data can be read
+  (and navigated on GitHub) without running Skg. No keybinding.
+  It ignores the connection's skgrepo restriction: what it exports is
+  decided by the most private skgrepo it asks for, below, whatever
+  'skg-restrict-repo-set' (C-c v l) chose.
+
+  It asks two things:
+  - the most private owned skgrepo to include. The export includes
+    that skgrepo, every owned skgrepo more public than it, and every
+    foreign skgrepo.
+    The default, the most private owned skgrepo (shown with
+    " (no restriction)"), includes every skgrepo, with a warning
+    that private notes will be exported.
+  - which directory to write to (default =org-exports=). This path
+    is interpreted *by the server*, relative to the project root the
+    server runs from. Because the server may run inside a Docker
+    container whose filesystem differs from the host Emacs runs on,
+    this prompt has no tab completion. An absolute path is used
+    as-is.
+    Existing files in the output dir are overwritten in place; other
+    files there are left untouched.
+    A body line Org would read as a headline (such as a Markdown
+    =* item=) is indented two spaces, making it a list item, or inside a
+    =#+begin_= block is escaped with a comma, as Org itself does.
+    Each exported file begins with comment lines naming the ID of the node
+    it was generated from, and warning that edits made directly to the
+    file will be clobbered by the next export.
+contains:
+- 238439fd-eed9-4a93-9671-f4fc5f71a4df
+- 332a8440-beb5-485a-ade7-a9a38f02d7e7
+- 6cdb1dfa-e093-472a-b395-9820fb625115

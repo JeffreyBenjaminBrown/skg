@@ -1,0 +1,10 @@
+title: home skgrepo and relRepo moves
+pid: 2ed9c1e4-f77c-43ff-8346-5c244b02da05
+body: |2-
+  A home skgrepo move is one change viewnode under the node, "⌂ -OLD
+  +NEW", one leaf. A relRepo move is a change viewnode under the member
+  whose relationship moved, "relationship moved from X to Y", one leaf
+  keyed by the relationship, so the same move seen from either end is the
+  same mark. The relRepo changeset marker, "some content relationships
+  changed skgrepo", sits under the recorder when a content relationship
+  moved. Mentions have no relRepo.

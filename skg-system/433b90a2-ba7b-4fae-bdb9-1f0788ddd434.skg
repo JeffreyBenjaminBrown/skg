@@ -1,0 +1,22 @@
+title: Relationships and the view system
+pid: 433b90a2-ba7b-4fae-bdb9-1f0788ddd434
+body: |2-
+    Graph relationships (all ID-based, repo-independent):
+    - contains: parent -> child ordering (Vec<ID>, order matters)
+    - subscribes: subscriber -> subscribee (forking foreign data)
+    - hidesFromSubs: filtering within subscriptions
+    - overrides: an overrider node is drawn in place of the
+      overridden node wherever it would appear as recursive content
+      (override substitution; see docs/glossary.org and docs/sharing-model.org)
+    - linksTo: org-roam style [[id:...]] hyperlinks
+
+    The view system is ephemeral non-vognode viewnodes rebuilt every save:
+    - UnrestrictedVognode: corresponds to an Graphnode, can be Editable (editable) or Write-protected
+    - Non-vognode: display-only nodes; the relation folders are
+      PartnerFolders (subscribeeFolder, subscriberFolder, overriddenFolder, ...),
+      plus AliasFolder, IDFolder, etc. (see docs/glossary.org, "PartnerFolder")
+    - 'complete_viewforest' (server/update_buffer/complete.rs) is one
+      level-order BFS used for both de novo views and post-save
+      rerendering; per-folder reconcilers add and reconcile the
+      non-vognodes. (The older two-DFS-pass 'complete_viewtree' is gone;
+      see TODO/DONE/local-view-update/plan_v2.org.)

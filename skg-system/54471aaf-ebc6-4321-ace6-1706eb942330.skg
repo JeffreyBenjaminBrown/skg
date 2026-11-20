@@ -1,0 +1,10 @@
+title: 'C-c l p : skg-show-folderOf-flags'
+pid: 54471aaf-ebc6-4321-ace6-1706eb942330
+body: |2-
+  Shows the write-protected =flagsFolder=. It lists only true node-file
+  flags as titleless viewnodes whose heralds carry their labels, in canonical
+  order, and remains visible when none are true.
+  =Had ID before import= and =Was overloaded during org-roam import=
+  are provenance; =No search matching= is the user setting. Edit none of these
+  generated viewnodes directly. Delete the whole folder branch to dismiss this
+  optional view; doing so does not change any flag.

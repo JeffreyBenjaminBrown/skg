@@ -1,0 +1,14 @@
+title: History is garbage. Numbers on phases are garbage.
+pid: 5bba2b47-14e9-44a4-a3b7-502fb0ad6699
+body: |2-
+  Don't say "phase 1: do this; phase 2: do that."
+  Such numbers usually go stale, and they illuminate nothing.
+  Instead just say "in order: do this, then that, ...".
+
+  Similarly, when you change something, don't add a comment like,
+  "We used to _ but now we _," or "Now we use _ instead of _".
+  Descriptions of historical changes are generally unhelpful,
+  unless the comment is intended as temporary during a refactor.
+  Unless that's happening, just describe the logic of the existing code;
+  don't document its history.
+  (I'll see the changes in the git diff before committing anyway.)

@@ -1,0 +1,27 @@
+title: 'C-c s s : skg-set-repo'
+pid: cdea5df7-2eb4-4f7a-b7a1-47abf849bc89
+body: |2-
+  Changes the skgrepo of the node at point.
+  The prompt starts with the current skgrepo as editable minibuffer text.
+  You can type the new skgrepo name directly,
+  or use shift-left / shift-right to cycle through owned skgrepos.
+  Press C-? from the prompt to open an org buffer listing every
+  configured skgrepo name as a headline,
+  with that skgrepo's path as the headline body.
+
+  The command only edits the node's metadata in the current buffer.
+  Save the view afterward to apply the move.
+
+  A write-protected occurrence is not changed -- the save would
+  refuse its skgrepo edit -- and produces a loud WARNING,
+  with the full ID list written to =*Messages*=.
+
+  What the move does to the relationships touching the moved nodes, the
+  save decides, whether or not the view shows them. One it would leave
+  more public than a node's new home (an inbound relationship of a move
+  to a more private skgrepo) is raised to that home, and the save's
+  warnings say so. If it would leave others at their old, more private
+  skgrepos, it saves nothing yet: it lists them in
+  =*SKG Stranded Relationships*= and asks whether to reset all of
+  them to their new defaults, none, or each in turn; then it saves with
+  that answer, or not at all if you quit.

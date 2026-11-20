@@ -1,0 +1,41 @@
+title: Which mirror stands
+pid: 7313adc5-c0af-4a75-9b69-3dfab86c61b8
+body: |2-
+  Where =N= stands as content of an editable occurrence in a content
+  view, or as a root of it, the refresh shows the mirror of =N= that
+  the perspective's skgrepo list ranks first ('mirror_shown').  A
+  perspective is one skgrepo =S=, or the root homes, one per tree (see
+  "Perspectives"), and the list of =S=
+  ('SkgConfig::perspective_skgrepo_list') is =S=, then every other
+  skgrepo in the config's declaration order, whose owned entries run
+  most public first.  The mirror shown is the one whose home skgrepo
+  comes first in that list; where several do, the tie is broken thus:
+
+  1. =N= itself stands, if it is one of them: two forks of =N= in
+     =N='s own skgrepo, an owned chain =D forks C forks N= kept there,
+     or a mutual pair in one skgrepo, show =N= as itself.
+  2. Otherwise the one with the least pid stands, whatever forks what.
+     A chain =D forks C forks N= kept in one skgrepo other than =N='s
+     shows there whichever of =C= and =D= has the lesser pid.  A
+     clone's pid is a random UUID, so a fork made in the skgrepo of the
+     mirror shown there stands in its place or not by chance; where it
+     does not, the save says so.
+
+  When the mirror shown is =N=, nothing substitutes.  Who owns a
+  skgrepo plays no part: where =S= holds no mirror of =N=, the first
+  declared skgrepo that holds one decides, owned or foreign.  So in a
+  config that declares a foreign skgrepo first, from a perspective
+  holding no mirror of a note the foreign original outranks the user's
+  own fork; and of a public and a private fork of one note, each stands
+  from its own skgrepo's perspective, and the public one, declared
+  first, from any perspective holding neither.  For
+
+  #+begin_example
+  D forks C forks N
+  #+end_example
+
+  with =N= in owned skgrepo =base=, =C= in =mid= and =D= in =top=, the
+  config declaring =mid=, =base=, =top=, a view drawn from =top= shows
+  =D= where =N= occurs; under a skgrepo restriction keeping =top= out,
+  it shows =C=, =mid= being declared before =base=; from =base=, =N=
+  itself.

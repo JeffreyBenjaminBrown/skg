@@ -1,0 +1,17 @@
+title: where a save's warnings go
+pid: cd8b7917-9830-4358-868d-be9cb5b19048
+body: |2-
+  A save's own warnings and errors go to a buffer of their own,
+  replaced at each save that has any: =skg://messages/save-warnings=,
+  =skg://messages/save-errors= when the save was refused, or
+  =skg://messages/save-errors-and-warnings= when it has both. One such
+  warning names each orphan graphnode the save created: a node that no
+  list contains, made from a headline typed under a parent that reads
+  no claims ('docs/glossary.org', "claims membership", lists those
+  parents). A new view root is in no list either, but is not warned
+  of.
+
+  A rerender that follows a command (<localleader>vl, a commit, an
+  import, the cleanup of references to an absent node, the extension of
+  the diff view, or ':SkgRerenderAllViews') has errors and warnings of
+  its own, which go to =skg://messages/rerender=.

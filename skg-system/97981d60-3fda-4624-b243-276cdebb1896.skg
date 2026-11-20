@@ -1,0 +1,7 @@
+title: Pre-existing failures belong in the pitfalls
+pid: 97981d60-3fda-4624-b243-276cdebb1896
+body: |2-
+  A failure that predates the plan (in 04.1, the 'import-md-and-org'
+  integration test) is listed in the plan's pitfalls by name, so
+  that no agent investigates it again; each report then cites it
+  as pre-existing.

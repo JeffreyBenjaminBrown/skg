@@ -1,5 +1,8 @@
-* Reading Skg heralds and link annotations
+# This file was generated from the skg node with this ID:
+# ef1f3f60-2e51-4584-8e5d-7dd6f6214cd2
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+* Reading Skg heralds and link annotations
 ** What a herald describes
 An Skg headline begins with metadata. In a view, heralds condense that
 metadata into short styled tokens. (Decorations on text that is not
@@ -15,7 +18,6 @@ relationships, and resolve extra IDs. They do not count repeated
 links or unsaved buffer edits as new graph facts. A folded body can still
 contribute links. A view's position can add ancestor flags and a birth
 style, so two occurrences of the same node can have different heralds.
-
 ** Styles
 A herald's style states its importance tier, or for a few heralds a
 polarity or kind, never its hue. There are twelve styles.
@@ -51,9 +53,7 @@ customize it with 'customize-face'. In Neovim its highlight group is
 'SkgHeraldSTYLE' (for example 'SkgHeraldHigh'); override it with
 ':highlight' or 'vim.api.nvim_set_hl' after Skg loads. The Neovim client
 assumes 'termguicolors', since the styles are given as RGB colors.
-
 ** Herald kinds and their styles
-
 | Kind                 | Style       | Glyphs                                                                        |
 |----------------------+-------------+-------------------------------------------------------------------------------|
 | relationship letters | normal      | =C L K H=                                                                     |
@@ -77,7 +77,6 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | illegal edits        | message     | =ILLEGAL EDIT TO FOREIGN NODE=                                                |
 | link annotations     | normal      | a resolved target's =[⌂:pub]=                                                 |
 |                      | ugly        | =[⌂:restricted]=, =[⌂:…]=, =[⌂:lookup failed]=, a dangling link's label           |
-
 ** Relationship heralds
 *** Letters and sides
 The relations, in display order, are =C= contains, =L= links to, =K=
@@ -88,7 +87,6 @@ an out-side after it. The in-side counts nodes that relate to this node
 ("it contains N nodes"). =2C3= thus means two containers and three
 direct contents. Missing sides and empty relations are omitted. The
 property counts =A=, =I= and =F= follow the relations.
-
 *** Tiers
 Each side has a tier, which says how much it deserves attention.
 
@@ -102,7 +100,6 @@ Each side has a tier, which says how much it deserves attention.
 Most normal sides are normal because their members are usually visible
 elsewhere: as viewchildren, in the text, or in the hidden-in and
 hidden-outside folders.
-
 *** Ancestor flags and floors
 Lowercase flags name tracked ancestors: =a= is the viewparent, =b=
 the grandparent, and so on: the ancestor generation, counting folders.
@@ -112,7 +109,6 @@ replaces a numeral when ancestors account for the whole side.
 
 Every glyph has a floor, the least tier it shows: =a= is at least low,
 =b= and higher at least medium, and every other glyph at least normal.
-
 *** Carriers
 A side's tier is shown by one part of the side, its carrier: its
 numeral, if it shows one, and otherwise all its ancestor flags. The
@@ -120,7 +116,6 @@ carrier shows the greater of its floor and the side's tier; every other
 glyph shows just its floor. On the forks in-side, whose tier is
 high, =2aK= shows the 2 high and the 'a' low, while =aK= has no
 numeral, so its 'a' carries the tier and is shown high.
-
 *** Fractions
 Two sides can show a subset with a tier of its own, as a fraction.
 
@@ -153,7 +148,6 @@ the slash shows the side's tier. An ancestor appears once: before the
 slash if it belongs to the numerator, otherwise after the denominator's
 numeral. =a/bL= says both ancestors link here and only 'a' is
 substantive.
-
 *** Birth
 The letter of a relation that put this occurrence here is shown low;
 its counts keep their own styles. An occurrence can have more than one
@@ -180,8 +174,7 @@ example. It comes from the load-bearing 'inPlaceOf' part; an
 occurrence without that fact has no =ĥ=. The
 eighth ancestor is a plain =h=, so =Kĥh= shows the two glyphs together.
 The fact preserves the original member ID when a substituted view
-is saved. See [[file:mirrors.org][mirror substitution]].
-
+is saved. See [[./mirrors.org][mirror substitution]].
 ** Other heralds
 The position glyphs stand first among a headline's heralds, the ☮
 riding the glyph before it, as in =⊥☮B= or =ᗣ☮=.
@@ -302,7 +295,6 @@ enrichment would have drawn such a node. A tombstone reveals no node
 title or skgrepo, nor which of these it was. The save discards text
 typed on its line, and no child of a tombstone claims membership. A
 tombstone that holds nothing is pruned before the buffer is shown.
-
 ** Diff heralds
 In the diff view (see the glossary's "Terms a user meets in the
 diff view"), the heralds show the three kinds of change: a vognode's =∃+=
@@ -353,7 +345,6 @@ nodeMerge folders read =it was acquired by= and =it acquired=.
 In the skgrepo-changes buffer a moved node's own heralds add =-OLD
 +NEW=, and ~Δ⌂=a~ when the nearest moved ancestor (here the parent, a)
 moved the same way.
-
 ** How the rule table reads a headline
 Every part of a headline's metadata stands beside its kind atom, at
 the top level of =(skg ...)=; only =(view ...)= and =(diff ...)= nest
@@ -369,7 +360,6 @@ object (=+=). The lens engines ('elisp/skg-sexpr/skg-lens.el',
 'nvim/lua/skg/sexpr/lens.lua') document the directive, and the Rust
 conformance tests check that each WHEN names only kind atoms and
 carries no style.
-
 ** What the server serves, and what the clients add
 The server serves two tables over the "herald rules" endpoint
 ('docs/api-and-formats.org', "Herald rules"): the rule table, and,
@@ -405,7 +395,6 @@ metadata may hold ('client_computed_atoms' in 'server/heralds.rs'),
 so that the rule table may render it. The code is
 'heralds-from-metadata' in 'elisp/heralds-minor-mode.el' and
 'sexp_for_lens' in 'nvim/lua/skg/heralds.lua'.
-
 ** Link annotations
 The current buffer can display a suffix after each literal
 ='[[id:ID][LABEL]]'= link with the target's home skgrepo abbreviation.
@@ -421,7 +410,6 @@ Even with suffixes off, the label of a link confirmed dangling in the
 current graph is ugly and underlined. Restricted or still unknown
 targets are not marked broken. These display-only annotations do not
 change link text, save contents, or exact-ID navigation.
-
 ** Skg's faces in views
 Skg dictates every face in a view, in both clients: a black background,
 a white default foreground, and Skg's own faces for the Org elements a

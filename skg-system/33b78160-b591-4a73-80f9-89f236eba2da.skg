@@ -1,0 +1,50 @@
+title: Claim and warrant
+pid: 33b78160-b591-4a73-80f9-89f236eba2da
+body: |2-
+  Each child of a vognode or a folder has two flags. It *claims
+  membership* when the save will read it as a member of its
+  viewparent's list. That is declared: the bare atom =noClaim= says no,
+  its absence yes (=claimsMembership= on the occurrence, the ghost, the
+  unknown viewnode, the restricted viewnode, the alias and the ID). The save reads claims only under an
+  editable occurrence, and under an editable folder (forks,
+  hidden-outside, alias) of one
+  (=parent_reads_claims= in =server/refresh/ancestry.rs=); under any
+  other viewparent no child claims, whatever it carries, and the
+  server writes no =noClaim= there. A child *is warranted* when the
+  truth relates it to its viewparent as its position implies: content
+  its occurrence contains, a partner of the folder's relation, a
+  container of the node above it in the containerward chain, a
+  property of the node in a property folder. In the diff view HEAD
+  alone may warrant it, a *ghost warrant*. The warrant is derived
+  (=Warrant { ByGraph, ByHead, No }=), recomputed at every refresh and
+  written in =(view ...)= as =noWarrant= or =ghostWarrant=, nothing
+  meaning warranted by the truth; a root carries none, nor does a
+  tombstone's child, but for an orphan graphnode, which is
+  unwarranted.
+
+  Under an editable parent at rest the two agree: every child that
+  claims and that the truth does not warrant vanishes at the refresh,
+  with its subtree, and the next save makes every claim warranted. They differ only for what
+  the user typed since the last save: a new child claims and is not yet
+  warranted, and a child the user marked =noClaim= to detach it is
+  warranted and claims nothing (a *pending detachment*, herald
+  "detach"). The refresh sets no claim but a root's and a forks-folder
+  member's (below): the user's claims are the user's to make, and a
+  claim the truth does not warrant the refresh does not mark but
+  removes, with the child that made it.
+
+  In the forks folder a claim says "the folder's viewparent forks it".
+  A goal item there may refuse a claim (=GoalItem::claimable= false, a
+  forker-only or an indirect member's), and one drawn for it claims nothing
+  (=draw_item=). Before the warrants are set, in a content view, each
+  member the folder's goal names takes the claim the graph gives it,
+  whatever the buffer gave it
+  (=claim_forks_folder_members_as_the_graph_does=): a refresh draws a
+  buffer that holds no gesture still to be saved, being one the server
+  drew or one whose save just consumed its gestures, so a member there
+  claiming nothing that the note now forks (another view made the
+  fork) is no detachment, and a member claiming that is now a
+  forker-only member is no request to fork it. So a member claims
+  exactly when the note forks it, in every view the server draws, and a
+  save of the view never makes the note fork a forker it only showed,
+  nor ends a fork another view made.

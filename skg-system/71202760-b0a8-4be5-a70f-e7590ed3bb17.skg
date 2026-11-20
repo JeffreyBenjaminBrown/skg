@@ -1,0 +1,21 @@
+title: Investigate unknown node
+pid: 71202760-b0a8-4be5-a70f-e7590ed3bb17
+body: |2-
+    - Request: =((request . "investigate unknown node") (id . "ID"))=.
+    - Response: LP response-type "investigate-unknown-node" with
+      =((content "ORG") (errors (...)) (warnings (...)))=. The content is:
+      - =ID resolves to node TITLE (PID) in SKGREPO= when ID resolves
+        (as primary or extra ID) to a node of the live graph;
+      - otherwise what git history says, as Org text headed =* ID=: for
+        each skgrepo whose first-parent history from HEAD holds the ID's
+        file, the most recent commit that held it, the commit it vanished
+        at, its title then, its own relation lists then, and every node of
+        that tree that referred to it (links included); or
+        =** never present in the git history of any skgrepo=.
+    - A historical blob holding keys retired in November 2026 (see
+      "The .skg file format") is still read, with those keys ignored: as
+      having no forks (and no hides, where it holds =hidesFromSubs=).
+    - Refused, with the reason as an error, unless the connection is
+      unrestricted: history can hold the text of any skgrepo.
+    - Logic: =server/serve/handlers/investigate_unknown_node.rs=,
+      =server/git_ops/vanished.rs=.

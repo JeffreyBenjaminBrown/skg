@@ -1,0 +1,6 @@
+title: The review
+pid: fc6c8f32-fdc9-461a-8f5f-c2b3ccaad859
+body: |2-
+  When the last slice is DONE, write the per-plan review as
+  'code-reviews.org' describes, from the record, the diff, the
+  reviewers' reports and the probes.

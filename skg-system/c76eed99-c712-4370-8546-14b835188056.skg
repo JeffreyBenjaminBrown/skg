@@ -1,0 +1,86 @@
+title: Processed requests and gestures
+pid: c76eed99-c712-4370-8546-14b835188056
+body: |2-
+  A gesture writes processed requests, '(processed OBJECTS)' or '(unprocessed
+  OBJECTS)', into a headline's '(editRequest ...)' (creating the form if
+  the headline lacks one) and saves; the save
+  consumes them after its graph edits succeed (not when it stops for a
+  confirmation), in any buffer, marking or unmarking the leaves each
+  headline names at their current fingerprints. A request naming no
+  current change is dropped with a warning. Validation refuses a save
+  in which two headlines name one leaf, one processed and the other
+  unprocessed, naming the leaf and both headlines
+  ('find_contradictory_processed_requests'); requests that agree are
+  consumed as usual.
+
+  A gesture says what it marks and which way: C-c m, then 'n' (the
+  node), 'r' (its relationship to its viewparent) or 'b' (both), then
+  'p' (processed) or 'u' (unprocessed); 'skg-mark-node-processed' and
+  its five siblings ('elisp/skg-processed.el'). On the headline at point
+  it names the letter's objects among those its '(leaves ...)' lists,
+  and refuses when that is none. A headline that names one leaf, which
+  lists no object, gets the bare request from the letter of the leaf's
+  kind: 'r' for a relRepo move and an unknown or restricted viewnode
+  (which shows no node, only its relationship), 'n' for an alias, extra
+  ID, flag, old text, home skgrepo move or a node's other changes; 'b' for either. On a changeset marker at
+  point the letters go as they are, 'n' naming its members' own leaves
+  (above, "What a request names"). On a changed folder the gesture acts
+  on its children, one level down, each as above.
+
+  With a prefix argument it acts on every headline of the subtree that
+  names some of the letter's objects, a changeset marker below the
+  headline at point naming only what it lists, since its members name
+  their own leaves under their own headlines. At a new node (=(node
+  added)=) in content position (not in a folder), and at the headline
+  at point when it is a new node wherever it stands, it names the
+  letters and =newContent= (with two prefix
+  arguments, =newOutward=) and skips the rest of the node's subtree: the
+  server then walks the graph from it through new nodes only, shown or
+  not, write-protected or not, contentward or along every relationship
+  each records, the letters naming the node's own objects and filtering
+  what the walk marks. The letters go there whole, even where the
+  headline lists fewer, since a walk without a letter names every kind.
+
+  C-c m h p and C-c m h u ('skg-mark-homeSkgrepo-move-processed',
+  '-unprocessed') act on the home skgrepo move of the node at point, and
+  with a prefix argument on every descendant whose home skgrepo moved
+  between the same two skgrepos. Every gesture works on write-protected
+  occurrences. A gesture that would unmark more than one leaf first
+  asks for a typed "yes". It counts as the server does where it can: N
+  of '(leaves N ...)' for every listed object, one for 'rel' alone, N
+  less one for 'node' alone; an object the headline does not list (a
+  walk, 'node' on a changeset marker) counts two, so that unmarking it
+  always asks, since the client cannot count what the server will
+  reach.
+
+  Six commands move point between headlines with change facts, the
+  headlines whose metadata carries a '(leaves ...)' change fact: C-c r n c
+  ('skg-diffView-goto-next-change') to the next, C-c r n u to the next
+  unprocessed one and C-c r n p to the next processed one, and C-c r p c, C-c r
+  p u and C-c r p p to the previous ones. A headline with change facts is processed
+  when its '(processed ...)' names every object its '(leaves ...)' lists.
+  They do not wrap: at the end they say "No further change" (or "No
+  earlier change", with "unprocessed" or "processed" for the filtered forms).
+  They skip a write-protected occurrence (☮; a ghost is not skipped)
+  standing directly in a folder whose changed label says "(other
+  files)", the folders 'folder_heralds.other_files' in
+  'shared/herald-styles.json' lists: its other containers, mentioners
+  and hiders. Each such member records its
+  relationship to the folder's viewparent in its own file, so every
+  change it carries is a leaf it records, and in a buffer extended to
+  every change its node has an editable occurrence, where the refresh
+  draws every leaf the node records: its node changes on its headline
+  or under it, its relationships among its content or in a folder of
+  its own file. A ghost is visited because a deleted node's ghost
+  draws no partner folders: a deleted forker's =forks= relationship stands
+  only on its ghost in the forks folder. They skip likewise a
+  write-protected occurrence standing directly in a forks folder that
+  is born only of '(forks out 2)': a forker, which records that fork
+  in its own file; they visit a forkee or a mutual there. A member made editable
+  inside such a folder (C-c s e) is not skipped, nor is anything under
+  it, since its changes are then drawn there. So in a buffer extended
+  to every change, the plain motions reach each change. Under a skipped
+  member they still visit its relRepo move, a change of the member's
+  file seen from the other side. The same six keys with a capital last
+  letter (C-c r n C, ...) skip nothing. When a plain motion finds
+  nothing but its capital would, it says so and names the capital's key.

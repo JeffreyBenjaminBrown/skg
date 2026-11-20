@@ -1,0 +1,5 @@
+title: 'C-c v s : skg-view-linkstack'
+pid: 94d34ac8-ab27-459c-9986-c59f91cafec7
+body: |2-
+  repeated here; described earlier in this doc.
+  In the linkstack buffer, =C-x C-s= saves your edits to the stack.

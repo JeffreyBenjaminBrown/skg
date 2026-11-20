@@ -1,0 +1,61 @@
+title: Folder, and its per-kind rules
+pid: a82c1bf4-b964-454a-9f85-2bb18ce1c7c6
+body: |2-
+  How a folder (see "partner folder") is built. It is the
+  =ViewnodeKind::Folder= variant and the payload type =Folder=, one
+  enum for the eleven partner folders, the three property folders and
+  the illegal-edit folder.
+  “Folder” here describes an org non-vognode that groups viewnodes; it
+  does not mean a filesystem directory.  “Role col”, “relation col”,
+  and bare “sharing col” are retired names for the general concept.
+
+  Each folder is named by its external non-vognode atom. Methods on
+  =Folder= (=server/types/viewnode.rs=) give the per-kind rules that the
+  refresh, the save and the heralds consult, so a new kind cannot
+  acquire inconsistent treatment in different layers:
+  - =is_editable=: the save reads the folder's membership, so a member
+    typed or removed there edits the graph. These are
+    =forksFolder= (whose claiming members are the note's 'forks'; its
+    forker-only and indirect members claim nothing, and deleting one
+    hides it),
+    =aliasFolder= and =hiddenOutsideOfForkPartnersFolder= (whose
+    visible member set is an explicit edit of that subset of the hides;
+    the hides' relRepos stay derived). An absent folder means "no opinion" (its field lowers to
+    =MSV::Unspecified=, filled from disk); a present-but-empty one, an
+    explicit empty set (=MSV::Specified(vec![])=). Every other folder is
+    write-protected: its membership follows from the graph, and the
+    refresh redraws it from the graph (see [[id:389b717f-fdcb-4b6c-a88d-378559e74987][write-protected set]]).
+  - =goal_is_ordered=: the viewparent's own file records the members'
+    order, which the warranted members take: the editable folders,
+    =hiddenFolder=, and =integratedElsewhereFolder= (in the order of the
+    member's own list). In the forks folder the forkees take it, and its
+    forker-only and indirect members follow them in the graph's and the
+    config's order (see "the forks folder"); in the diff view's forks
+    folder its forker-only members follow them in the order the view
+    has ('Goal::ordered_then_unordered'). In every other folder the refresh
+    moves no child: the inbound folders
+    =hiderFolder=, =containerFolder= and =mentionerFolder= (the folders
+    of =C-c l c= and =C-c l m=; the other side of each is the node's
+    content, or its links, shown without a folder),
+    =hiddenInForkPartnerFolder= and =hiddenByForkerFolder=
+    (derived from hide state), the diff
+    view's =acquiredByFolder= and =acquiredFolder= (derived from the
+    graph straddle, and save-inert), and =idFolder= and =flagsFolder=.
+  - =members_are_properties=: the alias, ID and flags folders.
+  - =members_carry_containerward_chain= (asked with whether the view is
+    the diff view): every folder but the property folders, the two
+    acquisition folders and =integratedElsewhereFolder=, and outside the
+    diff view but the forks folder; the members of these two carry
+    their chain in a containers folder instead.
+
+  The ☮ herald on a write-protected folder's headline is a
+  herald-table fact only (=server/heralds.rs=), with no wire atom of
+  its own: which folders are write-protected is already known from the
+  folder atom. The editable folders carry none.
+
+  A folder left with no child is entombstoned, and so pruned, unless the
+  save reads its membership, so that the user could add to it, or it is
+  the flags folder, which stays to show that the node has no true flag
+  ('folder_goes_when_empty' in 'server/refresh/visit.rs'). The folder of
+  what a note hides outside its fork partners is read by the save, but
+  goes when emptied, as it is drawn only when it holds something.

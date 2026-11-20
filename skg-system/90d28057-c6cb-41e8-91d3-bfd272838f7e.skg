@@ -1,0 +1,9 @@
+title: a write-protected position
+pid: 90d28057-c6cb-41e8-91d3-bfd272838f7e
+body: |2-
+  "Cannot set the relationship's repo from this write-protected FOLDER
+  position", under a folder whose membership the save does not read;
+  "The parent is write-protected here, so the save would not write this
+  relationship; ...", under a write-protected occurrence; "The folder's
+  viewparent is write-protected here, ...", under an editable folder of
+  a write-protected occurrence.

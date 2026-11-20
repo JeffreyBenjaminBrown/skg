@@ -1,0 +1,97 @@
+title: The goal
+pid: 61e5cb17-a97c-4d3b-bf81-e2bccd1b4cb5
+body: |2-
+  A parent's *goal* is what the truth says its children should be
+  (=goal_of_parent= in =server/refresh/goal.rs=): for an occurrence's
+  content, its =contains= list in file order (for a member as such of
+  a forks folder, less what the note whose folder holds it hides or
+  already contains, and less what another note the user owns contains:
+  'docs/forks.org', "What you keep elsewhere"); for a node
+  of the containerward chain, its containers; for a folder, its
+  partners in the folder's relation, or the compound folders' derived
+  lists; for a property folder, the node's aliases, IDs or true flags.
+  A containers folder's goal leaves out every view-ancestor of the node
+  it describes: each gnid a vognode above it stands for, folders passed
+  over, since the view already shows that container
+  (=Folder::omits_view_ancestors=, =view_ancestor_gnids= in
+  =server/refresh/ancestry.rs=).
+  Each item names a gnid, by the pid its list entry resolves to or the
+  raw ID when nothing answers to it, or a property value. The goal is
+  ordered where the viewparent's own file records the order (content,
+  aliases, and the forks, hidden and hidden-outside folders:
+  =Folder::goal_is_ordered=), and unordered elsewhere. The forks
+  folder's goal is ordered throughout: its forkees lead, in the order
+  of the note's 'forks' list, and its forker-only and indirect members
+  follow them all, in the graph's and the config's order ("The forks
+  folder" below). In the diff view's forks folder, which holds the
+  direct fork partners only, the forker-only members follow the
+  forkees in the order the view has them
+  (=Goal::ordered_then_unordered=). In the diff view the goal is the union
+  of the parent's lists in the two graphs of the straddle, an item only
+  HEAD's list holds being warranted by HEAD. A parent whose position
+  implies no relationship (the buffer root, a tombstone, an unknown
+  viewnode, a restricted viewnode) has no goal.
+
+  Under a skgrepo restriction a goal omits each member whose record is
+  restricted: the gated accessors of the in-Rust graph leave it out;
+  an alias folder's goal omits an alias whose record is restricted, and
+  the stats count it nowhere. The diff view's goal asks the
+  skgrepo restriction too, though the diff view opens only on an
+  unrestricted connection: a switch rerenders its open buffers.
+  It keeps each member whose record is visible: a node the
+  skgrepo restriction keeps out, which the ID rule, finding the node restricted and the
+  gnid named by the goal, answers with a restricted viewnode; and a gnid
+  nothing answers
+  to, an unknown viewnode, as under no skgrepo restriction. The save is its mirror: it
+  restores to a list only the members whose records are restricted,
+  and to a node's aliases only those whose records are restricted,
+  which the buffer could not show (=preserve_invisible_members= and
+  =server/from_text/weave.rs=), so a restricted viewnode keeps its member
+  while it claims, and deleting its line removes the record.
+
+  The rule behind the mirror: the skgrepo restriction limits what the
+  save may write as it limits what the refresh may show. Every decision
+  of the save that a record's absence from the buffer drives (a member
+  gone from a list, a hide, an alias, an extra ID, a forks relationship
+  gone, a relRepo or a home that differs) asks the record's
+  visibility first, and a record the skgrepo restriction keeps out is
+  neither removed, moved nor rewritten, whatever the buffer shows in its
+  place. A write that acts on the skgrepo restriction's silence is a defect.
+  So the forkee-visibility step, which rewrites a forker's
+  hides from what an editable forkee as such shows of its content under it
+  (=resolve_visibility.rs=), reads the forkee's content and the
+  forker's hides by their visible records: a hide recorded in a
+  restricted section is neither removed nor moved, though the
+  forkee's visible record shows the hidden node as its content, and
+  no hide is written of a member that only a restricted record
+  explains. The inference of hides from a removal
+  (=infer_hides_from_contains_removals=) reads the same way: the
+  note's visible forkees, forkers and indirect members (the members its
+  forks folder shows, =forks_folder_members_shown=), their content by visible
+  records, and its visible hides. A child removed from the note that
+  such a member still contains is hidden, a forker's content as a
+  forkee's, so that it does not come back under that member, unless
+  the note, or another owned note but that member, contains it after
+  the save. So does the hiding of a forker deleted from a
+  forks folder (=resolve_forks_folder_removals=): only a forker whose
+  record the skgrepo restriction shows was drawn, so only such a one
+  is hidden for its absence.
+
+  The rule has a converse for what the save creates: no record lands in
+  a section the skgrepo restriction keeps out unless the graph already
+  holds it there (=refuse_records_landing_restricted= in
+  =server/from_text/validate.rs=, after the suppression of writes to
+  restricted nodes, which keys on the graph's home as well as the
+  buffer's). A new hide's relRepo is at least as private as the
+  records of some partner on record for it (a fork partner in the graph
+  that contains the hidden node, whatever the skgrepo restriction and
+  whether or not the hider hides it): the forks relationship (in the
+  hider's file for a forkee, in the forker's for a forker) and the
+  partner's contains record (=hide_skgrepo=), so that a public hide
+  never names a private membership. The writes built from the graph rather than the buffer
+  obey the rule apart: a fork's clone copies only the visible records
+  (=build_fork_clone=); a nodeMerge, like a delete, is refused when
+  either graphnode has a restricted section; and a delete's propagation
+  (=apply_delete_propagation_cleanup=) counts the restricted records
+  naming a deleted graphnode first, and the save stops for the
+  delete-from confirmation when there are any.

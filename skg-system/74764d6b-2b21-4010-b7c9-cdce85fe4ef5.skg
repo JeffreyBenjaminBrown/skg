@@ -1,0 +1,10 @@
+title: processed aggregate
+pid: 74764d6b-2b21-4010-b7c9-cdce85fe4ef5
+body: |2-
+  A *processed aggregate* is a thing with change-forest leaves
+  under it: a folder, a changeset marker, a node, a file, the whole
+  changeset. It is processed iff every leaf under it that can be processed is
+  processed; that derived value is *its processed state*. A view shows it as
+  '(processed ...)' in the '(diff ...)' form, which nothing reads at save;
+  a folder carries none, and each client computes whether a folder is processed
+  from its members (see "changed folder").

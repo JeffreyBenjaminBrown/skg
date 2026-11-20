@@ -1,0 +1,37 @@
+title: What the server serves, and what the clients add
+pid: 4d8b8a84-785f-4763-984d-1b251af77623
+body: |2-
+  The server serves two tables over the "herald rules" endpoint
+  ('docs/api-and-formats.org', "Herald rules"): the rule table, and,
+  beside it, the skgrepo label table =(skgrepoLabels ("REPO" "LABEL")...)=,
+  each configured skgrepo's =abbreviation=, or else its name. No
+  rendered text rides in the metadata. Three heralds need what one
+  headline's metadata cannot say, so each client supplies it, before
+  the lens or in its place:
+  - =(repoBoundary LABEL)=: the client replaces the atom =repoBoundary=
+    in =(view ...)= with this form, LABEL looked up in the label table by
+    the headline's =nodeRepo= (the =nodeRepo= itself when the table
+    lacks it), and the rule renders it "⌂:LABEL". Where =(view ...)=
+    holds =(attribution NAME [unverified])=, LABEL is "<HOME/ORIGINAL>",
+    HOME that label and ORIGINAL NAME's, then "?" when unverified; the
+    attribution form itself renders nothing. A headline naming no
+    =nodeRepo= keeps the bare atom, which renders "⌂".
+  - =pendingDetachment=: the client adds this atom to a headline that
+    carries =noClaim=, is warranted by the graph (no =noWarrant=, no
+    =ghostWarrant=, no =(rel removed)=), and stands under an editable
+    parent: a node that is not write-protected, or a folder that is not
+    write-protected whose node is such a node. The rule renders it
+    "detach", styled as a request.
+  - a changed folder: the server writes a folder as its bare atom, with
+    no =(diff ...)=. The client sees from the folder's members whether
+    some member's relationship to the folder's viewparent changed, and
+    whether every such change is processed, and then draws the folder's
+    herald itself instead of the lens's: ☮ when the folder is
+    write-protected, its changed label ("its X changed (this file)",
+    "(other files)", or "its forks changed"), and ✓ when processed, from 'folder_heralds' in
+    'shared/herald-styles.json'.
+  The conformance test counts =pendingDetachment= among the atoms the
+  metadata may hold ('client_computed_atoms' in 'server/heralds.rs'),
+  so that the rule table may render it. The code is
+  'heralds-from-metadata' in 'elisp/heralds-minor-mode.el' and
+  'sexp_for_lens' in 'nvim/lua/skg/heralds.lua'.

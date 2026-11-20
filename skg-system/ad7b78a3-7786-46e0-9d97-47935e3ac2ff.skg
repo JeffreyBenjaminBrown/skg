@@ -1,0 +1,21 @@
+title: Some words are never used bare
+pid: ad7b78a3-7786-46e0-9d97-47935e3ac2ff
+body: |2-
+  Each of these names several things, so code and prose always say which.
+  The glossary ('docs/glossary.org') defines each kind.
+  - merge: nodeMerge, instructionMerge or viewnode merge.
+  - snapshot: graph snapshot, git snapshot or buffer snapshot.
+  - index: search index, git index or graph index. Beside HEAD and
+    worktree, git's index needs no qualifier.
+  - commit: git-commit, skgsave-commit or tantivy-commit. Where git is
+    plain from context (HEAD, a merge commit, a git2 call), bare
+    "commit" means a git-commit.
+  - generation: runtime generation ('RuntimeGeneration'), buffer
+    generation (the clients' per-buffer request counter), or ancestor
+    generation (how far up the view an ancestor is: 1 = viewparent). A
+    bare "generation" of a tree, counting down from its root, is fine.
+  - facts: change facts, a viewnode's '(diff ...)' parts (the three
+    kinds of change, the leaves, the processed mark).
+  - marker: changeset marker (a property viewnode standing for a set
+    of changes) or processed marker (the '(processed ...)' part and
+    its herald).

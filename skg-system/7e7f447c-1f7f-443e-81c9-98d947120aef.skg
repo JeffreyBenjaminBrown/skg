@@ -1,0 +1,17 @@
+title: 'C-c s w : skg-request-write-protected'
+pid: 7e7f447c-1f7f-443e-81c9-98d947120aef
+body: |2-
+  Requests that this occurrence become write-protected,
+  as described above. It does not save.
+  At the next save, edits the occurrence carries are saved first;
+  then the server makes it write-protected,
+  resyncing its title from the graph;
+  its children then claim nothing,
+  so that edits to its title, body or children no longer affect it
+    (although edits to its children still affect those children:
+    they keep their own editability, and their own content).
+  On an occurrence that is already write-protected, it does nothing.
+  In one save with C-c s e on another occurrence of the same node,
+  it moves editability there.
+  The two requests on the same occurrence contradict each other,
+  and the save is refused.

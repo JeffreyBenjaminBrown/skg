@@ -1,0 +1,17 @@
+title: the refresh's rungs, unsayable
+pid: d6ec13e2-48aa-46ae-ac55-a50c3c7bc7f5
+body: |2-
+  The fixed order of *rungs* (a term of plan 06) the refresh applies at
+  each parent to its children, weakest first: re-kind, viewnode merge, warrant,
+  claims, reinstate, reorder, mirror substitution, view requests
+  ('server/refresh/visit.rs'; 'docs/data-model_technical.org', "The
+  walk and the refresh's rungs"). A descriptor -- a folder, a property member, a
+  change viewnode -- whose ancestors are not those the *ancestry table*
+  requires of its kind ('required_ancestry' in
+  'server/refresh/ancestry.rs', the table of the ancestors each kind of
+  descriptor may stand under, nearest first;
+  'docs/data-model_technical.org', "The ancestry table") is
+  *unsayable* there, and is
+  entombstoned, its children staying under the tombstone. An occurrence
+  is never unsayable. (Older text calls the rungs the ladder; they are not the privacy
+  ladder, the skgrepos in privacy order.)

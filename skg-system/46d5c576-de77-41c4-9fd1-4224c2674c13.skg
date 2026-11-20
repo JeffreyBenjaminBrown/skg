@@ -1,0 +1,17 @@
+title: Caveats
+pid: 46d5c576-de77-41c4-9fd1-4224c2674c13
+body: |2-
+  - Each alias is indexed as its own document, so a query can
+    match on an alias even when the title doesn't mention the
+    searched word. The returned node is still the aliased one.
+  - Results are ranked by BM25 times a prominence multiplier
+    (Root 100×, CycleMember ~32×, Mentioned 10×, HadID 10×,
+    MultiContained ~3.2×, everything else 1×). A weaker text
+    match on a root can outrank a stronger match on a leaf,
+    but every match is returned — search is never filtered by
+    graph role.
+  - Regex distance is tokenwise: a pattern never spans
+    whitespace, because we split the query on whitespace before
+    handing the pieces to RegexQuery. A true whole-title regex
+    (one pattern that matches across spaces) would need a
+    separate non-tokenized =raw_title= field. Not done yet.

@@ -1,0 +1,17 @@
+title: Project essentials
+pid: eead44a5-e35c-4786-9494-9ecd4c42a9d0
+body: |2-
+  Skg is a local knowledge-graph editor. Its canonical data is in plaintext
+  '.skg' files; the 'in-Rust graph' and Tantivy are session-lifetime stores.
+  The Rust server is in
+  'server/', with Emacs Lisp and Neovim clients in 'elisp/' and 'nvim/'. A
+  server retains one interactive user and admits one interactive client at a
+  time.
+
+  For a task, start with the smallest relevant local source:
+contains:
+- 3eb55035-42bd-4107-9d8e-a3d198b593d5
+- b9172126-0b02-4d81-9912-df3e192a7620
+- 3c4897ed-6457-405e-99f8-96f51a3e1dce
+- 94ddb569-a7fb-46ff-b804-5d0d02e569a2
+- 39c24f61-4d92-46ae-b309-0dcb7a2b8cc8

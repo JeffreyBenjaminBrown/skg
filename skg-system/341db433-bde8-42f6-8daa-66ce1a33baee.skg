@@ -1,0 +1,15 @@
+title: Restoring what a change removed
+pid: 341db433-bde8-42f6-8daa-66ce1a33baee
+body: |2-
+  Two edit requests undo a removal from the diff view's buffers, without
+  leaving them. Each is written by a command that refuses at once on the
+  wrong kind of headline, and does not save; the parser refuses each
+  there too. They are carried, applied and consumed like every edit
+  request: the save collects them with its graph edits, and consumes them
+  after the skgsave-commit; a save that stops for a confirmation or fails
+  leaves them in the buffer.
+contains:
+- 876f5afe-a155-4b18-83ac-9f8daa0e796a
+- e6b76f92-6d17-4782-90f8-6541b8acc866
+- adca2284-46f6-496c-9e80-cad2e5e7e3be
+- 559001cb-cdcd-435c-976f-9768fb0df0e9

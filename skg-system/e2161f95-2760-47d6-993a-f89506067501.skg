@@ -1,0 +1,16 @@
+title: goal
+pid: e2161f95-2760-47d6-993a-f89506067501
+body: |2-
+  What the truth says a parent's children should be ('goal_of_parent'
+  in 'server/refresh/goal.rs'): an occurrence's =contains= list, a
+  folder's partners in its relation (or a compound folder's derived
+  list), a property folder's aliases, IDs or true flags, a chain node's
+  containers; in the diff view, the union of the parent's lists in the
+  two graphs of the straddle. Each *goal item* names a gnid or a
+  property value ('GoalItem', 'GoalMember'). The goal decides each
+  child's warrant, what is reinstated and, where it is ordered, the
+  children's order. A parent whose position implies no relationship
+  (the buffer root, a tombstone, an unknown viewnode, a restricted
+  viewnode) has none. Under a skgrepo restriction a goal omits the members whose
+  records are restricted and keeps the others, a restricted node's
+  too, which the ID rule makes a restricted viewnode.

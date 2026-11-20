@@ -1,0 +1,49 @@
+title: The two clients' names match
+pid: 6760aac3-38f3-4a61-9261-6355054cc7a5
+body: |2-
+  A Neovim module has its Emacs file's name, without 'skg-' or
+  'skg-request-' and with '_' for '-': 'skg-metadata.el' is
+  'metadata.lua', 'skg-request-text-search.el' is 'text_search.lua',
+  'skg-sexpr-edit.el' and 'skg-sexpr-edit/skg-sexpr-cycling.el' are
+  sexpr_edit.lua' and 'sexpr_edit/sexpr_cycling.lua'. A function has
+  its Emacs twin's name, without the 'skg-' or 'skg--' prefix and its
+  module's own prefix, in the same module. Where an Emacs function acts
+  at point, its twin takes a line number and says '_at_line' for
+  '-at-point'; a few that read the whole buffer at once say
+  '_in_lines' ('pending_detachment_in_lines'), and a few that act at
+  the cursor, as Emacs's act at point, keep '_at_point'
+  ('edit_metadata_at_point', 'unknown_node_id_at_point'). Where Emacs
+  uses org's outline functions, Neovim has line functions of its own in
+  'metadata.lua', which have no Emacs twin: 'parent_line',
+  'next_headline_line' and their kin play 'org-up-heading-safe',
+  'outline-next-heading' and theirs. The shared case files in
+  'tests/shared/' are the oracles both clients are tested against.
+
+  Some names stay apart because they name an Emacs mechanism Neovim
+  does not have: 'heralds-minor-mode.el' is 'heralds.lua' (no minor
+  modes), 'skg-org-fold.el' is 'folds.lua', 'skg-request-file-path.el'
+  is 'goto_git.lua' (no magit; see "The git jumps"),
+  'skg-keymaps-and-aliases.el' is 'keymaps.lua' (no 'M-x' aliases),
+  'skg-request-save/skg-lock-buffers.el' is 'lock.lua'. Where Emacs
+  splits a concern over several files that each hold one command
+  ('skg-request-verify-connection.el',
+  'skg-request-rebuild-session-lifetime-stores.el',
+  'skg-request-strip-body-whitespace.el'), Neovim keeps the commands in
+  'misc_requests.lua'. Helpers Emacs gets from its own library
+  ('read', 'prin1-to-string', reading a field of a response) are
+  'sexpr/parse.lua' and 'payload.lua'. Three Emacs files hold two
+  concerns each, which Neovim keeps apart: 'skg-id-search.el' is
+  'id_search.lua' and 'linkstack.lua', 'skg-config.el' is 'config.lua'
+  and 'picker.lua' (the prompts), 'skg-request-save.el' is 'save.lua'
+  and 'messages.lua' (the report buffers).
+
+  A message has the same words in both clients, and names Neovim's
+  keys where Emacs's names a chord. Some of Neovim's begin 'skg: ', in
+  lowercase where Emacs's begins with a capital.
+
+  A refusal shows as one line in both clients. Emacs signals it as a
+  'user-error'; Neovim raises it as a Lua 'error ()', and every key and
+  ':Skg*' command calls its function through one dispatcher
+  ('call_showing_refusal' in nvim/lua/skg/keymaps.lua), which shows the
+  refusal at error level without the Lua traceback and without the
+  "FILE:LINE: " prefix that 'error ()' adds.

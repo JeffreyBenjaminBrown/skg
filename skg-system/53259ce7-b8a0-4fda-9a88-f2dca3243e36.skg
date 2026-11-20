@@ -1,0 +1,4 @@
+title: Don't rename 'node' to 'parent' or 'child'
+pid: 53259ce7-b8a0-4fda-9a88-f2dca3243e36
+body: |2-
+  Often there's a 'node' (or 'id', or 'pid') argument to a function, which a single 'origin node' at which the function is called. In those cases, call that thing 'node' throughout the function. Its children, we should call 'children', and its parent, 'parent'. I don't want to call the node 'parent', even if we're dealing with its children, because that's confusing.

@@ -1,0 +1,10 @@
+title: User documentation
+pid: f226d627-7b51-4ac8-91f9-24d7007e2722
+body: |2-
+  Enumerate every user-facing command from the source of truth (the
+  '(interactive)' forms and the keymaps, both clients) and every
+  request from the protocol, and check each against the docs: present,
+  under the right binding, described as the code behaves today. Check
+  the glossary for every term the docs use. Look for behavior nobody
+  documented: refusals and their messages, what is written to disk,
+  what happens on commit.

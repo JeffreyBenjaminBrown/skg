@@ -1,0 +1,21 @@
+title: viewnode merge, duplicate viewnode siblings
+pid: 94bb5eeb-6083-4385-a620-9a5de4e990e0
+body: |2-
+  *Duplicate viewnode siblings* are siblings standing for one gnid
+  under one parent. The refresh's second rung ('viewnode_merge') makes
+  each set of them one viewnode, by a *viewnode merge*. The result
+  stands where the first of them stood and has a fresh viewnode ID.
+  It is folded only if every sibling was, and its body is folded only
+  if every sibling's was; it is focused if any sibling was; it is
+  editable if any sibling was, unless it stands for another node (a
+  node and the mirror shown for it stand for one gnid) whose editable
+  occurrence is elsewhere in the buffer; it claims membership if any
+  sibling did. It carries the union of the siblings' view requests,
+  and the edit request and relationship request of whichever sibling
+  carried one. It holds every sibling's children in sibling order;
+  at its own visit the claims rung makes those vanish that claim and
+  that the graph does not warrant there. So a copy pasted beside a
+  member is joined to it. A viewnode merge is neither a nodeMerge,
+  which joins two graphnodes, nor an instructionMerge, and is never
+  called a bare "merge". Both terms are coined by plan 06 ("tidy the
+  refresh").

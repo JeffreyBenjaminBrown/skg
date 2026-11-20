@@ -1,0 +1,31 @@
+title: set up your data folder
+pid: e37b592d-aec2-431a-88bb-cee9bc9136dd
+body: |2-
+  You can make your thoughts entirely private, entirely public,
+  or a mix, and you can share with anyone.
+  See example-data/ for how.
+
+  Keep each person's config and skgrepos in a folder of their own,
+  'data/AUTHOR/'. The folder holding a config is its data root, so
+  'data/AUTHOR/skgconfig.toml' names its own skgrepos as 'REPO' and
+  another person's as '../OTHER/REPO'. In 'skgconfig.toml', every skgrepo is
+  yours unless its entry says 'foreign = true'. List yours most public
+  first: their order is your privacy ladder. The foreign ones have no
+  place on it and may be listed anywhere. A config which sets
+  'owned_folder' or relies on the 'owned/' folder is converted by
+  'bash/migrate-to-foreign-flag.sh CONFIG [NEW_FOLDER]'; see
+  'api-and-formats.org', "Skgrepos".
+
+  Two users can share one data tree,
+  each running a server from a config of their own: both configs list
+  the same skgrepos, each marks the other's 'foreign = true', and each
+  gives its server its own 'port'. A config in each user's own folder
+  ('data/jeff/skgconfig.toml' beside 'data/ed/skgconfig.toml') gives
+  each server its own search index, processed marks and run folder,
+  since those sit in or beside the config's folder. Each server
+  watches every skgrepo directory and reloads the '.skg' files that
+  change on disk, so it shows another server's saves, or a 'git pull',
+  within about a second ('repo_watch_quiet_ms'), and rerenders the open
+  views that show them. A changed config is the one thing that needs a
+  rebuild of the stores ('skg-rebuild-session-lifetime-stores' in
+  Emacs), which re-reads it, so a skgrepo added to it needs no restart.

@@ -1,0 +1,34 @@
+title: '<localleader>sr : :SkgSetRelRepo'
+pid: 853675e9-2c2d-4b0b-b75a-4f97291ddf0e
+body: |2-
+  Sets the relRepo of the relationship the headline at point represents
+  -- =contains= for a content child, the folder's relation for a member
+  of an editable partner folder, or the alias membership for an alias
+  headline. An unknown viewnode or a restricted viewnode in one of
+  those writable positions is supported too: it carries only
+  its raw member ID, never a node edit.
+
+  For a node-to-node relationship, the command asks the server for its
+  default relRepo and current relRepo (the "relRepo info" endpoint; the
+  request names the relationship's recorder -- the viewparent, or the
+  folder's viewparent -- its member and its relation), then prompts
+  -- with TAB completion and S-Left/S-Right cycling, like the other
+  skgrepo prompts -- over the skgrepos at least as private as the
+  default (more public ones could leak an endpoint's ID and would be
+  refused at save), plus a no-override choice. The prompt starts with a
+  pending request when it is offered, else the current relRepo or the
+  default, so Enter keeps the most specific choice. If the server
+  cannot resolve the relationship (e.g. a node not yet saved), every
+  skgrepo is offered and the save's floor check backstops. For an
+  alias, the default is its owning node's home, read from the buffer
+  with no request.
+
+  Choosing a skgrepo writes an =(editRequest (relRepo REPO))= request,
+  which both raises privacy above the default and lowers it back down
+  to (never below) the default. The no-override choice removes the
+  request: a saved relationship keeps its saved skgrepo (sticky); to
+  reach the default, choose it.
+
+  The command only edits the buffer; save the view to apply it.
+contains:
+- bdd59653-1eb7-41b0-857f-d43dff802ba1

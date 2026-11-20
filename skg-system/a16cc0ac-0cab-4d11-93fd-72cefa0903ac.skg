@@ -1,0 +1,6 @@
+title: data root
+pid: a16cc0ac-0cab-4d11-93fd-72cefa0903ac
+body: |2-
+  The directory that holds 'skgconfig.toml'. Every relative path in
+  the config resolves against it ('docs/api-and-formats.org',
+  "skgconfig.toml").

@@ -1,0 +1,9 @@
+title: 'C-c r C : skg-stage-and-commit-everything'
+pid: 805764ca-2008-4340-9cf7-66068249d656
+body: |2-
+  Commits every changed node of the owned skgrepos, processed or not,
+  with a message written in the same buffer as C-c r c's, by the same
+  commit, so nothing waits. If some changed node is not processed, it
+  first shows the processed summary and proceeds only if you type the
+  word "yes"; any other answer, or C-g, leaves everything as it was and
+  says "Not committed; your message is kept in *skg commit message*".

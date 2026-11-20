@@ -1,0 +1,7 @@
+title: MSV = maybe specified vector
+pid: 2ca113ca-0136-491a-81e7-3426f5b71a4f
+body: |2-
+  =MSV<T>= distinguishes "no opinion" from "empty". =Unspecified= says a
+  file section or an edit has nothing to say about the field;
+  =Specified(vec![])= says the field is explicitly empty. Telescope
+  folding and partial nodeIntents both depend on the difference.

@@ -1,0 +1,14 @@
+title: other changes
+pid: 9dafeaf6-b91c-4707-abe1-e5643f3079fc
+body: |2-
+  What a node's files changed that no other leaf records ("Other changes
+  to a node's file") is one change viewnode under it, its other changes,
+  written '(otherChanges KIND...)', a KIND for each way it changed
+  ('OtherChange::wire_name'). Its herald says each in the user's words,
+  joined by "; ": "its content was reordered; its attribution changed".
+  For each list it reordered, its body holds a header naming the list
+  and the line diff of the order of the members both graphs give it, as
+  a body diff writes one ('-' at HEAD, '+' now, ' ' both): one member a
+  line, by its title (an alias by its text, an ID or flag by itself).
+  The members drawn under the node stand in the new order, so the body
+  holds what the view does not show, the old one. It is one leaf.

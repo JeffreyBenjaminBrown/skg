@@ -1,0 +1,5 @@
+title: '<localleader>mrP : :SkgMarkRelProcessedContentward'
+pid: 3bf34b9e-c07e-44da-ab48-dda40c566c5b
+body: |2-
+  As <localleader>mrp, on the subtree, new nodes walked contentward
+  (see the preamble). (Emacs: C-u C-c m r p.)

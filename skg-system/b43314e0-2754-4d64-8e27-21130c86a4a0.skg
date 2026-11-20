@@ -1,0 +1,11 @@
+title: Push back
+pid: b43314e0-2754-4d64-8e27-21130c86a4a0
+body: |2-
+  If I specify a function and a test,
+  and they don't seem to correspond,
+  don't try to make sense of it on your own --
+  explain the contradiction to me.
+
+  If I specify an implementation and it looks
+  inefficient, incorrect, or unnecessary,
+  ditto.

@@ -1,0 +1,10 @@
+title: Terms of the diff view's implementation
+pid: 7f40832e-0454-42a4-817b-64fe3ce796b5
+body: |2-
+  How the diff view ('docs/diff-view.org') is computed.
+contains:
+- a23bff47-8b61-44bd-a969-6a6db7c17d1a
+- 328394d2-a4d5-4548-b9c9-74ca606b579e
+- bc70896a-76e8-4d19-a662-f2b6568489e1
+- dccdfa7b-e186-44f9-a136-bde602c2e238
+- fb2a1aaf-32ce-436c-891d-65c9bf2adc7d

@@ -1,0 +1,10 @@
+title: 'The traditional knowledge mapping data model: Linked trees'
+pid: 05a14ad7-816b-41d0-bf9b-90155297d7a1
+body: |2-
+  This data model is dirt-simple. Ordinary books with citations use it. So do Wikipedia, most of the rest of the internet, and [[id:bbb730bc-7ccc-413d-832d-4b6be0eb7b9e][a large number of "personal knowledge management" apps]].
+
+  Each document is a =tree= of text, with =links=. A tree of text is just text that can (optionally!) be divided into sections, subsections, sub-subsections, etc. Links can go from any part of one tree to any part of any other tree.
+
+  That's the whole model.
+contains:
+- 7956ab1f-c590-40b0-a41a-db68b2d7654f

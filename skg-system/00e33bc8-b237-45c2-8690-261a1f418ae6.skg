@@ -1,0 +1,6 @@
+title: skg-reload
+pid: 00e33bc8-b237-45c2-8690-261a1f418ae6
+body: |2-
+  Unloads all skg elisp modules and reloads them from disk.
+  Useful when you've changed elisp code
+  and want to pick up the changes without restarting Emacs.

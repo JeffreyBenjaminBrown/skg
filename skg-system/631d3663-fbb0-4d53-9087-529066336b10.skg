@@ -1,0 +1,48 @@
+title: start the Skg server
+pid: 631d3663-fbb0-4d53-9087-529066336b10
+body: |2-
+  See ../bash/start-servers.sh
+  It validates the config first, and refuses to start on an invalid one.
+  A config key the server does not know (a misspelling, or an old
+  spelling such as =max_role_tree_depth= for =max_roleTree_depth=) does
+  not stop it: the script prints a warning naming the key, and once the
+  client connects, it shows the same warnings in a buffer
+  (=*SKG Server Warnings*= in Emacs, =skg://messages/server-warnings=
+  in Neovim).
+
+  It takes the config's path and two options, both off by default:
+  #+begin_example
+     ../bash/start-servers.sh [CONFIG] [--deb] [--hot-reload]
+  #+end_example
+  Without CONFIG it uses =data/jeff/skgconfig.toml=, relative to the folder
+  it is run from, so run it from the top of this repository.
+  Its stop script and its own log, and the server's logs, go in
+  the [[id:51168651-13ae-4c8e-8459-cec1c9fdeb63][run folder]] =CONFIG.running/= beside the config (the
+  compiled client's =.elc= files sit beside their sources, and
+  builds go to =target/=).
+  - Without =--deb= it builds and runs the release profile
+    (=target/release/skg=), which is fast. The first release build
+    takes minutes, during which the script sits at "Validating config";
+    that is not a hang. With =--deb= it builds and runs the debug
+    profile (=target/debug/skg=), slower to run but quicker to rebuild.
+    (The environment variable that used to select release is gone;
+    release is now the default.)
+  - Without =--hot-reload= nothing watches the server's source: the
+    server runs, and comes back if it exits or is killed, but an edit
+    under =server/= takes effect only when you run the script again.
+    With =--hot-reload=, cargo-watch rebuilds and restarts the server
+    on every edit under =server/=, which is for working on the server.
+
+  Before starting the server, the script byte-compiles the Emacs client
+  (=../bash/compile-elisp.sh=), writing a =.elc= file beside each =.el=
+  file under =elisp/=. An Emacs that loads the client from this tree
+  must be at least the container's version (31.1) for those =.elc=
+  files to load. A =.el= file newer than its =.elc= (one edited since
+  the last compile) is loaded as source, so a stale =.elc= does no
+  harm. If =emacs= is not on the path, or the compile fails, the
+  script says so and starts the server anyway. An Emacs built with
+  native compilation does not native-compile Skg's files, because
+  =skg-init.el= denies it, so that all building stays in the
+  container; an =.eln= entry for them made before this change may be
+  deleted by hand from the eln-cache (typically
+  =~/.emacs.d/eln-cache/=).

@@ -1,0 +1,21 @@
+title: 'C-c g RET : skg-goto'
+pid: 5e5cc614-ad12-4f55-921a-e9d14284aa97
+body: |2-
+  Also bound to =C-c C-o=, in place of org's =org-open-at-point=,
+  which cannot follow skg links.
+  Calling this when the cursor is on a link, a node's metadata,
+  a bare UUID, or a .skg filename
+  will open a new view from the ID it finds there,
+  or go to the content view of it that was already open if that exists
+  (a buffer of the diff view does not count: the node gets a new view).
+
+  The requested node itself is the root, as itself: a fresh view is
+  drawn from the root homes, where the root's own skgrepo decides. A
+  perspective switch (=C-c v o=) may show another mirror there.
+  Content below it substitutes. Fork facts remain
+  visible in its heralds (the K token).
+
+  If you're not sure whether the cursor is on something visitable
+  (a link or a node's metadata),
+  use skg-id-next and skg-id-prev
+  to identify where those are.

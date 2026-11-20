@@ -1,0 +1,11 @@
+title: IdResolution
+pid: b5f48e57-b736-42de-9f9e-16acc7517a3a
+body: |2-
+  How the parse reads the gnids a buffer writes ('IdResolution' in
+  'server/from_text/buffer_to_viewnodes/add_missing_info.rs'):
+  'ThroughGraph' resolves each through the graph, so an occurrence's
+  gnid becomes its node's pid and, where the parse supplies a node's
+  home skgrepo, it reads the graph's; 'AsWritten' keeps every gnid as
+  written and consults no graph, for a caller that reads only what the
+  text says (the dirty-view dependency scan, tests of fully written
+  text).

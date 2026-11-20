@@ -1,0 +1,5 @@
+title: 'C-c r p p : skg-diffView-goto-previous-processed-change'
+pid: b86fcad2-f2e6-411e-9f64-7a1fb0120d60
+body: |2-
+  Like C-c r n p, backward. Before the first one it says "No earlier
+  processed change".

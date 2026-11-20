@@ -1,0 +1,15 @@
+title: COMMANDS-nvim
+pid: 98a220ae-8089-4bac-9ec1-c05a541c7cec
+body: |2-
+  # This file is generated to mirror docs/COMMANDS.org (the Emacs-client
+  # command reference), translated to Neovim keybindings and :Skg*
+  # Ex commands. nvim/lua/skg/keymaps.lua is the authoritative source
+  # for every binding named here; if this file and that module disagree,
+  # keymaps.lua wins. Where COMMANDS.org describes Emacs-only mechanics
+  # (the minibuffer, magit), the text below is rewritten for the nvim
+  # equivalents (vim command-line prompts, neogit / plain git-diff
+  # buffers) rather than translated word for word.
+contains:
+- 4ca461e6-dae4-4a4d-ad12-c08b840a7aa4
+- aba9655a-5ca2-4c66-9da8-e2870295df75
+- c401d642-e9a0-432c-8821-88360b4b6c13

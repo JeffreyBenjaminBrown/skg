@@ -1,0 +1,30 @@
+title: Setting a relationship's skgrepo
+pid: 8877cc3f-2d4e-4034-b234-961f6d2e74eb
+body: |2-
+  =skg-set-relRepo= (=C-c s r=, see =docs/COMMANDS.org=;
+  formerly =skg-privatize-relationship=) sets the relRepo of the
+  relationship the headline at point represents. It asks the server
+  for the relationship's default and current relRepos (the "relRepo info"
+  endpoint, see =api-and-formats.org=) and offers the skgrepos at least
+  as private as the default. A relationship sitting more private than its default is
+  marked with a red =~NAME= herald and a display =(relRepo NAME)= fact;
+  the pending write is =(editRequest (relRepo NAME))=. The server re-checks at save that any offered skgrepo is no
+  more public than the relationship's default. The canonical use: your public
+  reading-list node contains a book you would rather not advertise —
+  privatize the /membership/ and the book stays public, the list
+  stays public, but the relationship between them lives in your private
+  section.
+
+  The same gesture lowers privacy: choose the default or any
+  more-private skgrepo, and the next save moves the relationship's membership
+  line. For an owned-to-owned relationship there is nothing more public to
+  choose — that would leak the more-private endpoint's ID. To publicize
+  such a relationship further, publicize the more-private endpoint
+  (move its home) first; the relationship's default follows it. Note that
+  removing the atom is not a way toward the default: no atom means "no
+  opinion", so a saved relationship keeps its sticky skgrepo.
+
+  A legacy or hand-authored relationship can already sit /more public/ than its
+  default. Such a relationship renders with the atom (it is off-default), saves
+  back unchanged, and can be made more private — but never moved still
+  more public.

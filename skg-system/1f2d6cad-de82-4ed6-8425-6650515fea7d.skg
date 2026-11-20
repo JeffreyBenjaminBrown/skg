@@ -1,0 +1,20 @@
+title: Metadata of the diff view
+pid: 1f2d6cad-de82-4ed6-8425-6650515fea7d
+body: |2-
+  The buffers of the diff view (see "Diff view") show changes with
+  the forms below. The change facts are derived facts, which the
+  parser skips; the processed requests and the restore edit requests
+  are declared parts, which the save consumes. Saving a buffer reads
+  none of the new viewnodes, which are save-inert, but for a ghost's
+  restore request and the gnid of a ghost that claims membership (one
+  its viewparent's worktree list still names), which the save keeps in
+  the list, as it keeps an unknown viewnode's.
+  The glossary's "Terms a user meets in the diff view" and "Terms of
+  the diff view's implementation" define the vocabulary.
+contains:
+- 7fb06d53-fe36-4c10-b9a7-ba7375ed5171
+- 0a226a39-0aa4-49e3-8f42-269ce1b8acfb
+- 514a300c-4de7-4f04-97eb-b91f783d8c57
+- 5a31a5b0-1d87-4993-bfda-48a776d26b40
+- 65a4cdfe-ad0c-48b9-bc76-50dd514c6fe9
+- a0251119-85d2-4211-bf1b-b62ce5e66ea1

@@ -1,11 +1,13 @@
-See also the [[file:../docs/api-and-formats.org][API]], the
-[[file:../docs/data-model_technical.org][technical data model]], and the
-[[file:../docs/glossary.org][glossary]].
+# This file was generated from the skg node with this ID:
+# de5dcb74-4e1e-49cb-ac34-ead7542aaee6
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
+See also the [[../docs/api-and-formats.org][API]], the
+[[../docs/data-model_technical.org][technical data model]], and the
+[[../docs/glossary.org][glossary]].
 
 Note that the above documents, this document, and any other documentation might be obsolete. The definitive source of truth is the code, not the docs.
-
 * What this program does.
-
 Skg is for manipulating a knowledge graph. The bulk of the logic is performed
 by the Rust server in 'server/'. The Emacs Lisp client lives in 'elisp/', and
 the Neovim Lua client in 'nvim/'. Both use the same server protocol. The user's
@@ -36,7 +38,7 @@ what the buffer should say, and corrects it, saying nothing of what
 it changed.
 A fresh view, every rerender after a save or a request, the search
 enrichment and the diff view's buffers are all refreshes. Its model is
-in [[file:../docs/data-model_technical.org][the technical data model]],
+in [[../docs/data-model_technical.org][the technical data model]],
 "The refresh: how a view follows the graph".
 
 Viewnodes are not all graphnodes:

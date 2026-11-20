@@ -1,0 +1,13 @@
+title: true-content subtree
+pid: 86abaf01-a4d5-494f-b49a-c4a006e7a209
+body: |2-
+  The *true-content subtree* of a headline is the headline and every
+  occurrence below it reached through occurrences that claim
+  membership: its content, its content's content, and so on. A
+  folder, a property member, a ghost, an unknown viewnode, a
+  restricted viewnode, a tombstone and a child carrying =noClaim= end
+  it, with everything under them. The recursive gestures walk it: the
+  recursive flag gesture ('skg-set-flag-search-matching' with =C-u=,
+  =C-u C-c s x=; =<localleader>sX= in Neovim) and the recursive
+  skgrepo gesture ('skg-set-repo' with =C-u=, =C-u C-c s s=;
+  =<localleader>sS=).

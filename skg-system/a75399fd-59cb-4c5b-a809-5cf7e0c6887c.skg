@@ -1,0 +1,8 @@
+title: 'C-c v w : skg-view-without-metadata'
+pid: a75399fd-59cb-4c5b-a809-5cf7e0c6887c
+body: |2-
+  If a region is active, opens a new org buffer containing that region,
+  but with the '(skg ...)' metadata stripped from every headline.
+  If no region is active, it does nothing.
+  This is useful for copying a read-only projection of some data
+  into another application.

@@ -1,0 +1,13 @@
+title: Triage before each launch
+pid: 4fafc235-635a-4d40-8551-6326d1ed7ca1
+body: |2-
+  Read the report and the diff before launching the next agent,
+  and do not run the suites yourself while an agent runs them.
+  A small correction that needs no decision of Jeff's becomes a
+  stage inserted into the plan under the next slice, headed
+  "Corrections carried from slice N", and committed before the
+  launch; 'when-to-stop.org' says which corrections need Jeff. A
+  design question goes to Jeff, and the run stops there when the
+  next slice depends on the answer. The orchestrator's own notes
+  go into 'progress.org' under "Orchestrator's notes after slice
+  N", dated.

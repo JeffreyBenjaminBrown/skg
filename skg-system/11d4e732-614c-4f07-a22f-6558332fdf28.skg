@@ -1,0 +1,11 @@
+title: occurrence
+pid: 11d4e732-614c-4f07-a22f-6558332fdf28
+body: |2-
+  One appearance of a graphnode in a view: the vognode standing for a
+  node the truth has ('Vognode::Occurrence', the struct 'Occurrence' in
+  'server/types/viewnode.rs'). A graphnode can occur several times in
+  one buffer, at most once editable. Facts that depend on the position
+  (=cycle=, the warrant, the relRepo in =(skgRepos ...)=,
+  =(inPlaceOf N)=, and the =(birth ...)= facts, which name the
+  relationship to the viewparent) belong to the occurrence; graphStats
+  ('GraphnodeStats') belong to the graphnode.

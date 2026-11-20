@@ -1,0 +1,17 @@
+title: =claude-usage-poller.sh= -- shared background snapshot
+pid: 15b0bc69-4a95-4cb1-8717-9176f1e283c0
+body: |2-
+     #+begin_example
+     nohup ./bash/claude-usage-poller.sh [interval_secs] [out_file] &>/dev/null &
+     # defaults: 180s cadence, snapshot at $HOME/.claude-usage.json
+     #+end_example
+
+     One daemon polls on a fixed cadence and writes the JSON (plus a
+     =polled_at= epoch) to a file via an atomic rename. Then *any* number
+     of agents read that file for *free* -- no per-check API call. The
+     trade is: instead of N agents each spending a call, one poller
+     spends a negligible call every =interval= (~100 Haiku calls over a
+     5h window at the 180s default).
+
+     Readers should check =polled_at=: if it's old, the poller died or
+     its probe is failing, and the numbers are stale.

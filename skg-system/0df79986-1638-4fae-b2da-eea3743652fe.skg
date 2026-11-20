@@ -1,0 +1,42 @@
+title: the forks folder, fork partner, forker-only member, mutual, indirect member
+pid: 0df79986-1638-4fae-b2da-eea3743652fe
+body: |2-
+  The *forks folder* ('Folder::Forks', atom =forksFolder=, label "It
+  forks these, or these fork it, or these fork or are forked by others
+  here.") is the one partner folder of the
+  relation 'forks'. Under an occurrence of a note N it holds every
+  mirror of N (see "mirror") but N, each once, by records the skgrepo
+  restriction shows: it is *flat*. Its members are N's *fork
+  partners* -- each note N forks, and each that forks N -- and its
+  indirect members. A *mutual* forks N and is forked by it; a
+  *forker-only member* forks N and is not forked by it. Its *indirect
+  members* are N's other mirrors, joined to N only through other
+  mirrors (a fork of N's forkee, say). A fork partner is direct: an
+  indirect member is no fork partner of N, and the code says "members
+  of the forks folder" ('forks_folder_members_shown') where it means
+  both. In a
+  content view a forkee or mutual stands there as a forkee as such, a
+  forker-only or an indirect member as a forker as such (see "forkee
+  as such" and "forker as such"). No member of a forks folder shows a
+  forks folder of its own unless asked (=C-c l f= on it).
+
+  Its goal ('forks_folder_goal' in 'server/refresh/goal.rs') is N's
+  forkees in the order of N's 'forks' list (mutuals among them where
+  the list puts them), then its forker-only members, by the
+  declaration order of their home skgrepos, then pid, then its
+  indirect members ('indirect_members'), nearest first, then by the
+  declaration order of their homes, then pid; each tail less what N
+  hides. The order of the tails is the graph's and the config's: the
+  refresh puts a member moved there back in it. A forker or an
+  indirect member N hides stands in the hidden-outside folder instead,
+  which the forks folder holds last. A mirror reached only through a
+  note N hides is still a member: the hide leaves out that note alone.
+
+  The folder is editable, and a member's claim there says "N forks
+  it": a forkee or a mutual claims, a forker-only or an indirect member
+  claims nothing ('GoalItem::claimable'), and the save reads the
+  claiming members as N's 'forks'. The heralds tell the sides apart: a
+  forkee shows =bK=, a forker-only member =Kb=, a mutual =bKb=, an
+  indirect member neither 'b' flag, since it has no fork relationship
+  with N. What deleting, detaching, attaching or cutting from a member
+  does is in 'docs/data-model_technical.org', "The forks folder".

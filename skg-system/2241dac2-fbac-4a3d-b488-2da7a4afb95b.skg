@@ -1,0 +1,6 @@
+title: :SkgStripAttribution
+pid: 2241dac2-fbac-4a3d-b488-2da7a4afb95b
+body: |2-
+  On a fork, asks the next save to remove its attribution, as
+  skg-strip-attribution does in Emacs ('docs/forks.org',
+  "Attribution"). No binding; does not save.

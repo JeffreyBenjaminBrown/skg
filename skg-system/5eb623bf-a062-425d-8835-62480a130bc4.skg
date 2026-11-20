@@ -1,0 +1,5 @@
+title: '[[id:3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f][Skg exports this document to org.]]'
+pid: 5eb623bf-a062-425d-8835-62480a130bc4
+body: |2-
+  target_filepath = "coding-advice/common-gotchas"
+  root_headline = false

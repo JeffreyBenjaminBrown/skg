@@ -1,0 +1,12 @@
+title: export root, export marker
+pid: 981fe519-b6df-43f3-a455-7d231ff78f9e
+body: |2-
+  An *export root* is a node that the export to org
+  ('skg-export-some-to-org', no key; =:SkgExportToOrg= in Neovim)
+  writes to a file of its own. It is marked by an *export marker*: one
+  of its =contains= children whose title links to the fixed ID
+  =3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f= and whose body names the
+  =target_filepath=. The node that ID names only documents the
+  feature; the docs also call it the export instruction node. See
+  'docs/COMMANDS.org', "choosing what to export: export markers", and
+  'docs/api-and-formats.org', "Export to org".

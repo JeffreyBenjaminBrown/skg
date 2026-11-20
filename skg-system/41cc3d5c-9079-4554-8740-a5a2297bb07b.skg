@@ -1,0 +1,24 @@
+title: Delete references to an absent node
+pid: 41cc3d5c-9079-4554-8740-a5a2297bb07b
+body: |2-
+    - Initial request: =((request . "delete references to absent node")
+      (id . "RAW-ID"))=. =RAW-ID= must still be absent.
+    - Refused unless the connection is unrestricted, since the cleanup
+      scans and rewrites every owned recorder: the error response
+      "Deleting the references to an absent ID requires no
+      skgrepo restriction ...", followed by an empty rerender stream.
+    - If owned title/body links point at the ID, response type
+      =delete-references-confirmation= carries =(id ...)=, an opaque
+      =(approved-preview ...)=, =(content "ORG WARNING")=, and a prompt,
+      followed by an empty rerender stream.  A retry echoes the exact preview.
+      The warning ends with a line naming the command that investigates
+      the ID ("Investigate unknown node").
+    - Success response type =delete-references-result= carries Org =content=,
+      =changed-nodes=, and =changed-memberships=, followed by rerender-lock,
+      rerender-view*, and rerender-done for every open view that shows a
+      changed recorder or the absent ID; the other views are not
+      rerendered.
+    - The mutation removes only exact raw-ID matches in owned =contains=,
+      =forks= and =hides= lists (the warning's structured relationships
+      name these fields "contains", "forks" and "hides").  It
+      leaves text links and foreign telescopes untouched.

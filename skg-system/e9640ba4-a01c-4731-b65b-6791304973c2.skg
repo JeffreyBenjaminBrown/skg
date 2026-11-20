@@ -1,0 +1,6 @@
+title: By default, a node's contents are displayed as its children.
+pid: e9640ba4-a01c-4731-b65b-6791304973c2
+body: |2-
+  That is, the relationship from parent to child,
+  for *most* parent-child pairs,
+  is that the parent contains the child.

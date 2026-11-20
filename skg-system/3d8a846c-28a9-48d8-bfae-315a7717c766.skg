@@ -1,0 +1,12 @@
+title: Prefer deleting a mechanism to adding a rule
+pid: 3d8a846c-28a9-48d8-bfae-315a7717c766
+body: |2-
+  When a mechanism misbehaves, the first proposal is usually a rule to
+  tame it: a refusal, a special case, a comparison with history. In the
+  TDV, the save refusal for a node left without an editable occurrence,
+  the automatic following of the fresh sets after every save, and the
+  counterpart matching by path were all such rules, and in each case
+  the fix Jeff chose once he saw it was to remove the mechanism (let
+  the user write-protect; make the following a command; judge by the
+  graph alone). Before proposing a rule, ask what would be lost if the
+  mechanism it tames were removed.

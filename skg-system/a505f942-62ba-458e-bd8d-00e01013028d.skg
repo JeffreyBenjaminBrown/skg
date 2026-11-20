@@ -1,0 +1,15 @@
+title: what "moving nodes across skgrepos" means
+pid: a505f942-62ba-458e-bd8d-00e01013028d
+body: |2-
+  The user's 'skgconfig.toml' file should list some 'skgrepos'.
+  A skgrepo is just a folder on disk.
+  Skg lets you keep multiple skgrepos so you can treat them differently
+  -- e.g. some of yours might be public, and others private.
+  (All of mine are gitrepos, for safety.)
+
+  Moving a node across skgrepos just means
+  changing which skgrepo directory holds its file.
+  It has to be done *from within the app*.
+  If you just move the file, Skg won't know that you did that,
+  and its databases will now contain the lie
+  that the moved node is in the old place.

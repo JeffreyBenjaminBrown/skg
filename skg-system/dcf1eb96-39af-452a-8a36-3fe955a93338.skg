@@ -1,0 +1,5 @@
+title: An architectural decision we did not anticipate
+pid: dcf1eb96-39af-452a-8a36-3fe955a93338
+body: |2-
+  Stop when completing the goal requires a material choice outside the
+  agreed design. Explain the concrete consequences and recommend an option.

@@ -1,0 +1,15 @@
+title: the ID rule
+pid: 0bcaed77-7988-4115-ad5f-e526e370b652
+body: |2-
+  What a headline standing for a gnid becomes, by five questions in
+  order, the first yes winning ('id_rule' in 'server/refresh/id_rule.rs'):
+  does the truth have the node (an occurrence); does the truth say the
+  node is restricted (a restricted viewnode where its viewparent's goal
+  names it or the headline is a view root, and otherwise a tombstone,
+  never a ghost); in the diff
+  view, does HEAD (a ghost); does its viewparent's list name the gnid
+  (an unknown viewnode); else a tombstone. The
+  refresh *re-kinds* a headline by it where it stands, keeping its
+  viewnode ID, fold state, children and, for an occurrence, its
+  editability; but an occurrence the rule makes a tombstone in a
+  content view vanishes, with its subtree (see "vanish").

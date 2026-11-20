@@ -1,0 +1,158 @@
+title: 'Restricted-skgrepo nodes: omission, retention, and save preservation'
+pid: 31644a79-ec42-4a40-a005-1549c8ccb763
+body: |2-
+    - The principle: the skgrepo restriction limits writes as it limits
+      views. Under a skgrepo restriction, no save or other
+      write removes, moves, rewrites or creates a record, a section or
+      a node file the set keeps out, and none reads the buffer's silence
+      about such a record as an edit: what the user could not see, the
+      user did not edit. The rules below are its cases.
+
+  Under a skgrepo restriction, a node whose home skgrepo the set
+  keeps out is /restricted/, and the view shows nothing of it: no
+  title, no body, no home skgrepo, no stats. What it shows where a
+  relationship names such a node depends on the relationship's
+  /record/, the relationship as one node's file states it, in one
+  skgrepo's section, its relRepo.
+
+  A member whose record the set keeps out is omitted entirely --
+  content, forkees, and every partner folder's members alike.
+  Omission is recursive: an omitted container's whole branch is
+  omitted, unrestricted descendants included (they stay reachable by
+  search or direct visit). A member whose record the set shows, and
+  whose node it keeps out, stands as a /restricted viewnode/, which
+  carries the record's gnid and relRepo and nothing of the node:
+
+  #+begin_example
+  (skg restricted (gnid ID) [(skgRepos (relRepo R))] [noClaim] [(editRequest ...)])
+  #+end_example
+
+  Its herald is "restricted". It has no content of its own drawn: no
+  goal, no folders. It claims membership as an unknown viewnode does, takes a
+  relRepo request and a processed request, and refuses text typed on
+  its line. A member whose record the set shows and that resolves to
+  no node at all is an unknown viewnode, as under no skgrepo restriction. A view rooted
+  at a node the set keeps out (one opened before a skgrepo narrowing;
+  opening one under the skgrepo restriction is refused) shows its root
+  as a restricted viewnode too, whether or not a record names it,
+  since the view is the user's own request; it is the node's occurrence again after a
+  skgrepo widening. An alias whose record the set
+  keeps out is neither drawn nor counted in =(props (aliases N))=.
+  The diff view opens only on an unrestricted connection, but a
+  switch rerenders its buffers under the new set as a content view
+  is rerendered: a restricted node is never a ghost there.
+
+  Saving preserves what rendering omitted: a member whose record is
+  restricted cannot be deleted (or even seen), so the save combines the
+  buffer's visible lists with the disk lists -- order-preserving (the
+  anchored weave) for =contains= and =forks= alike -- restoring only
+  the members whose records are
+  restricted, and a node's aliases whose records are restricted. A
+  restricted viewnode keeps its member in the list while
+  it claims, and deleting its line removes the record, as deleting an
+  unknown viewnode's does, but in the forks folder: there deleting a
+  restricted viewnode changes no relationship to the note it stands
+  for, so the save keeps N's fork of it, hides nothing, and the
+  rerender draws it again. The folder of what a note hides outside its
+  fork partners (the members its forks folder shows, forkees,
+  forkers and indirect members) replaces the hides with a visible record, each of which
+  it showed, as an occurrence or an unknown viewnode; a
+  hide recorded in a restricted section is never replaced, and
+  deleting a restricted viewnode there unhides nothing. Which hides
+  stand outside the fork partners is what the visible records say: a
+  hide of a node a partner contains only by a restricted record
+  stands in that folder, and its line edits the hide. A forkee
+  shown editable under its forker shows its content by its
+  visible records, less the hides with a visible record; the save
+  writes the forker's hides from what it shows, by the same
+  records, so that a hide recorded in a restricted section survives
+  even where the forkee's content shows the hidden node, and no
+  hide is written of a member only a restricted record explains. Edits to
+  visible members, including deletions, are honored. A member whose
+  record is restricted needs no headline for this: the disk supplies
+  it.
+
+  When a switch of the skgrepo restriction is applied to an open view (an
+  already-rendered buffer), every occurrence of a now-restricted node
+  becomes, in place, a restricted viewnode where its record is visible,
+  keeping the occurrence's viewnode ID, fold state and viewchildren, so
+  its visible descendants keep their place, and so does a view root
+  whether or not its record is visible; otherwise it vanishes, with
+  its subtree, so nothing the skgrepo restriction keeps out leaks. So does a member whose record alone the set keeps out, where
+  its parent reads claims: the graph as the set shows it no longer
+  relates it to its parent. Neither is a detachment: a restricted
+  record's membership in its parent's list is owned entirely by disk
+  supplementation, not the buffer. The folders of a node that became a
+  restricted viewnode, like its property members and change viewnodes,
+  cannot stand under it: each becomes a tombstone holding what stood
+  under it, a childless one is pruned, and the tombstones stay after
+  the switch back. An editable folder whose every member's record the
+  new set keeps out stays, empty. The children of a restricted viewnode
+  remain occurrences, claiming nothing. Switching back makes each
+  restricted viewnode an occurrence again, where it stands, its children
+  claiming again where the node's lists name them, and draws again each
+  node and member that vanished, where the graph puts it. A de-novo
+  render under a skgrepo restriction draws no such member in the first
+  place -- members whose records are restricted are omitted and their
+  content is never extended.
+
+  Edits to restricted nodes themselves are /suppressed/ at save, not
+  fatal: any nodeInstruction that would write a restricted skgrepo is
+  dropped and the save succeeds with the warning "Restricted nodes
+  present in saved buffer remain unchanged in graph." A node is
+  restricted by its home as the graph has it, as well as by the home
+  the buffer gives it: a headline for a restricted graphnode, pasted
+  with a visible nodeRepo, leaves the graphnode where it is, its title
+  and body as they were. A node, restricted or not, whose buffer text
+  matches the graph is not written at all: its nodeInstruction is
+  discarded as a no-op first, so it saves silently however old the
+  buffer. A node the buffer would write that changed after the buffer
+  was rendered refuses the whole save ("Save buffer", the stale
+  buffer); a suppressed write to a restricted node is dropped before
+  that check, so it refuses nothing. A
+  nodeMerge of a restricted node is suppressed the same way.
+
+  The writes that are not edits of a restricted node obey the
+  principle as follows.
+    - A record that would land in a restricted section is refused, with
+      nothing written, naming the recorder, the relation, the member and
+      the skgrepo ("Cannot save a record into a restricted repo ...
+      Activate it first; an invisible record is never created
+      silently."): a member typed or pasted whose default floor, the
+      more private of the two homes, is restricted; a hide inferred from
+      a removal, or typed into the folder of what a note hides
+      outside its fork partners, whose floor (its most public partner on
+      record) lands in a restricted section; an explicit relRepo request to a restricted
+      skgrepo. A record the graph already holds there is not refused.
+      Nor may a record leave such a section: a headline pasted for a
+      member whose record is restricted, carrying an explicit relRepo
+      request, is refused ("Cannot move a record out of a restricted
+      repo ...").
+    - A new hide's relRepo is at least as private as some partner on
+      record for it ('docs/glossary.org', "hides"): the =forks= record
+      between the hider and a fork partner, either way (the hider's for
+      a forkee, the forker's for a forker), and that partner's contains
+      record, the more private of the two, the most public such partner
+      winning; and at least the more private of the two homes. A partner
+      on record is any fork partner the graph has, whatever the skgrepo
+      restriction, a forker the hider hides included: the floor asks
+      who can read the hide, not what a view draws. Removals infer hides only from
+      what the set shows: the note's visible forkees, forkers and
+      indirect members (less those it hides), their contents by visible
+      records, and its visible hides, so that re-adding a member drops no restricted
+      hide of it.
+    - A fork copies into its clone only the records the set shows, each
+      at the more private of its relRepo, when owned, and the clone's
+      home. The rest stays the original's; the clone forks it,
+      so after a skgrepo widening the rest shows under the clone as
+      unintegrated content.
+    - Deleting a node whose telescope has a restricted section is
+      refused ("Cannot delete 'ID': it has telescope sections in
+      restricted repos. ..."), and so is a nodeMerge either of whose
+      nodes has one ("Cannot merge 'B' into 'A': ..."). A delete whose
+      propagation reaches restricted records of other nodes stops for
+      the delete-from confirmation ("Save buffer").
+    - The cleanup of the references to an absent ID, and a save's
+      restore and processed requests, are refused unless the connection
+      is unrestricted. The import of md and org files is refused when
+      its destination skgrepo is restricted.

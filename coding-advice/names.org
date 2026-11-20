@@ -1,13 +1,13 @@
+# This file was generated from the skg node with this ID:
+# b5250a0b-7c49-4d84-afea-43432204bc46
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * Use short atomic functions, but long names
-
 Try to provide a collection of atomic, readable functions, none of them too complex. On the other hand, when naming variables and functions, err on the long side -- the more understandable, the better.
-
 * Avoid gratuitous renaming
-
 Don't rename variables, let alone functions, without a good reason.
 A lot of thought has gone into most of those names.
 * mixing camel-case and snake-case in one name is helpful
-
 Also I mix camelcase and snake case,
 so that compound words like _inRustGraph_ can look like one token,
 because that can make names much clearer. For instance
@@ -56,7 +56,6 @@ run, check each against the glossary and the code. "Hidden",
 check after a plan cannot undo a plan's word. Coining a word is
 fine when the plan says so at first use; reusing one that means
 something else is not.
-
 * Please report any synonyms you encounter.
 There's no need to go specifically looking for them,
 but if you encounter them in the course of whatever you're doing,

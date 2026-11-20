@@ -1,0 +1,62 @@
+title: Repo files reloaded
+pid: 01a5070c-a527-4dc0-8295-ec2a1072efe4
+body: |2-
+    - Unprompted: the server sends this message without a request, when
+      its repo watcher has reloaded =.skg= files that changed on disk
+      ('server/repo_watch/'). It comes only between responses: a
+      connection's loop sends it when no request, nor any part of one,
+      has arrived for its read timeout, so it never falls inside another
+      response. Both clients handle it whatever request they have in
+      flight (Emacs's 'skg-unprompted-response-handler-map', Neovim's
+      'state.unprompted_response_handler_map'); skg-for-ai prints its
+      counts and warnings on standard error and reads on, and its daemon
+      logs them and asks for the rerender as the clients do.
+    - Message: LP =((response-type repo-files-reloaded) (reloaded ((SKGREPO N) ...)) (warnings ("WARNING" ...)) (view-ids (VIEW_ID ...)))=.
+      =reloaded= names each skgrepo with files reloaded and how
+      many, in declaration order. The warnings are one per node or batch
+      that could not be reloaded, saying why and that the server keeps
+      serving the previous version. A connection is not told of a
+      skgrepo its skgrepo restriction keeps out, nor of a problem
+      concerning one. The view IDs are the
+      connection's open views that show a node the batch changed, and
+      every buffer of the diff view it holds; every open view, with a
+      warning saying so, when the connection fell too far behind to
+      hear every batch. No message is sent when there is nothing to
+      tell. Each buffer of the diff view among the view IDs is marked,
+      when the connection has no skgrepo restriction, so that the next
+      "Rerender all views" that includes it extends it as "Extend diff
+      view" would ('docs/diff-view.org', "After a reload").
+    - When there are no warnings, each client echoes the counts in one
+      line ("skg: reloaded 2 files from repo first; reloaded 1 file from
+      repo main"), in the echo area in Emacs, as a notification in
+      Neovim. When there is a warning, it appends a line per count and
+      per warning to its server-warnings buffer under a level-1 headline
+      "Repo changes", as it does the startup warnings ("Server
+      warnings"), and shows the buffer. Either way it
+      asks for a rerender of each
+      named view whose buffer has no unsaved edits: a "Rerender all
+      views" request whose =exclude-view-ids= name every other open
+      view. While another streaming request is in flight it asks again
+      every half second, for up to a minute. A buffer with unsaved edits
+      keeps them; its save is refused if it would write a node the
+      batch changed (see "Save buffer", the stale buffer).
+    - The watcher: the server watches every configured skgrepo
+      directory, owned and foreign, with the platform's file-change
+      notification (inotify on Linux), not recursively, since a
+      skgrepo's =.skg= files sit directly in it. Once an event arrives it
+      gathers events until the directories have been quiet for
+      =repo_watch_quiet_ms= (see "skgconfig.toml"), then reloads the
+      batch once, under the mutation gate, so never in the middle of a
+      save: each changed node's telescope is read again from every
+      skgrepo, validated as a save's nodeInstructions are, and swapped
+      in as a new runtime generation, with the search index updated in
+      the background; nothing is written to disk. A file that cannot be read
+      leaves its node as the graph has it; a batch that fails validation
+      leaves the whole graph as it was, and its files are tried again
+      with the next change on disk. The server's own writes are
+      recognized and dropped: each write or removal of a =.skg= file
+      records the path and a hash of what it left there, and an event
+      whose file still matches the record is the server's own. A
+      changed config still needs "Rebuild session-lifetime stores"; the
+      watcher follows the skgrepo directories of whatever config the
+      server holds.

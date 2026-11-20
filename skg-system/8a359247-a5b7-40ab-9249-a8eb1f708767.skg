@@ -1,0 +1,61 @@
+title: An example
+pid: 8a359247-a5b7-40ab-9249-a8eb1f708767
+body: |2-
+  Suppose this document, =mysticism=, is yours, and =eggs= belongs to your
+  friend Egg Man (a skgrepo you do not own):
+
+  #+begin_example
+  ,* eggs                              (Egg Man's, write-protected to you)
+  ,** health
+  ,** recipes
+  ,** mystical
+  ,*** Which came first, the chicken or the egg?
+  #+end_example
+
+  You make =mystical= editable, edit it (say you rename it to
+  =eggy mysticism=), and save. The confirmation buffer lists =mystical=;
+  you approve. Now your graph has a clone of =mystical= that you can file
+  under =mysticism=. Wherever =mystical= would be shown, you see your clone
+  instead, marked as standing in for the original:
+
+  #+begin_example
+  ,* mysticism                         (yours)
+  ,** common objects with mystical associations
+  ,*** eggy mysticism      «Kĥ» (shown in place of Egg Man's "mystical")
+  ,**** forksFolder
+  ,***** mystical          (the forkee as such; no content so far)
+  ,****** ☮ It contains these, and you keep them elsewhere.
+  ,******* Which came first, the chicken or the egg?   (folded)
+  ,**** Which came first, the chicken or the egg?
+  #+end_example
+
+  When Egg Man later extends =mystical=:
+
+  #+begin_example
+  ,* eggs
+  ,** mystical
+  ,*** Which came first, the chicken or the egg?
+  ,*** Egg limpia (curanderismo)       -- NEW
+  ,*** The philosophical egg           -- NEW
+  #+end_example
+
+  his two new children — which you have not integrated — show up under the
+  forkee as such:
+
+  #+begin_example
+  ,*** eggy mysticism      «Kĥ»
+  ,**** forksFolder
+  ,***** mystical
+  ,****** ☮ It contains these, and you keep them elsewhere.
+  ,******* Which came first, the chicken or the egg?   (folded)
+  ,****** Egg limpia (curanderismo)     (unintegrated)
+  ,****** The philosophical egg         (unintegrated)
+  ,**** Which came first, the chicken or the egg?
+  #+end_example
+
+  Since [[id:66047d79-48bf-4d5d-b4ba-811779bb7d14][branches can be folded]], even
+  hundreds of new originals' children need not clutter your view. To
+  integrate one, move it into your clone's own content, or into any
+  other note of yours; it then leaves the forkee's content for its
+  folder of what you keep elsewhere. You can also hide individual
+  children.

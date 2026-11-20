@@ -1,0 +1,6 @@
+title: duplicate siblings merged
+pid: 898155b5-d19c-4697-b1ca-1f7b5040bc2c
+body: |2-
+  It merges duplicate viewnode siblings, siblings standing for one
+  node under one parent, into one headline holding all their children
+  (see "viewnode merge" among the terms of the implementation).

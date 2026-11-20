@@ -1,0 +1,7 @@
+title: 'cit / ciT : cycle the TODO keyword'
+pid: 5c462687-39e0-48e5-b4e6-e016b172bc98
+body: |2-
+  Cycles the headline's TODO keyword forward (=cit=) or backward
+  (=ciT=) without corrupting its metadata: the =(skg ...)= sexp is
+  stripped before org's own TODO-cycling runs, then re-inserted
+  after the stars and before the (possibly new) keyword.

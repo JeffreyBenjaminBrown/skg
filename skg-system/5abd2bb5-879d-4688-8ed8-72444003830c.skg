@@ -1,0 +1,20 @@
+title: keys outside content views
+pid: 5abd2bb5-879d-4688-8ed8-72444003830c
+body: |2-
+  Most keys above are bound only in a content view, a buffer showing
+  part of the graph. A few work elsewhere; every ':Skg' command works
+  anywhere.
+  - In a buffer reading a .skg file: <localleader>gg and
+    <localleader>GG, ]i and [i (also <localleader>in and
+    <localleader>ip), and the linkstack's paste and pop keys
+    (<localleader>oi, ol, on, Oi, Ol, On).
+  - In a read-only report (an unknown graphnode's investigation, the import
+    result): <localleader>ff and fi, the <localleader>g / G keys but
+    gb and gv, <localleader>ve, vl and vs, <localleader>in and ip, and
+    the linkstack keys (<localleader>u, oi, ol, on, Oi, Ol, On).
+  - In a command-line prompt: <C-x>i, <C-x>l, <C-x>I and <C-x>L (see
+    "the linkstack").
+  - In the metadata editor (<localleader>vm): ':w' or <localleader>cc
+    applies the edit, and S-Left / S-Right cycle a field's value.
+  - In the fork-confirmation buffer: <localleader>cc approves and
+    <localleader>ck declines.

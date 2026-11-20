@@ -1,0 +1,16 @@
+title: the nodeInstructions phase, the nodeMerge phase
+pid: a37011fc-9afc-41a4-ac4e-137caaeb76f5
+body: |2-
+  A save applies its savePlan in two phases, both prepared, files
+  included, before either is applied ('prepare_save_under_mutation_gate'
+  and 'PreparedSave::apply' in 'server/save.rs'). *The nodeInstructions
+  phase* prepares and applies the save's ordinary nodeInstructions:
+  those the buffer yields and those the save derives (delete
+  propagation, strandeds resets, Hoist repairs, restore requests), not
+  the ones a nodeMerge yields; its candidate graph is
+  'graph_after_save'. *The
+  nodeMerge phase* then builds the NodeMerge triples from that
+  candidate and prepares and applies their nodeInstructions too, as a
+  second graph update over it ('final_candidate'). The first phase's
+  name means the save's ordinary nodeInstructions, then, not that the
+  other phase applies none.

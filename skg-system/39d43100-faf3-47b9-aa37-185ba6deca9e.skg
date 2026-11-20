@@ -1,0 +1,19 @@
+title: Defaults for every task
+pid: 39d43100-faf3-47b9-aa37-185ba6deca9e
+body: |2-
+  Read narrowly, work one coherent slice at a time, and verify in proportion
+  to the change. Before a tool call, identify the unresolved question it will
+  settle. Do not reread unchanged material on every follow-up or create
+  bookkeeping for its own sake.
+
+  Token economy must never mean weaker verification, hidden failures, unread
+  code, or silently narrowed scope. Preserve evidence needed to assess the
+  result and surface anything that affects correctness or requires a decision.
+  For documentation-only work, check the relevant content, links, and diff;
+  do not run unrelated application tests.
+
+  The practices below are the default. The [[id:3bbbf49e-8e61-4b55-beb2-221b2ff634b3][optional workflow instructions]] cover
+  the quiet test wrapper, delegation, and long-task ledger, including when
+  agreement is required. Read those only when considering that workflow.
+  A concise stop/deviation report required by [[id:fa26e71c-acf3-41a7-ab82-0898a213e429][file:when-to-stop.org]] is already
+  authorized; it does not introduce an ongoing ledger.

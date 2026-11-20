@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 6d6b101e-6d78-4901-9de1-e9c533873992
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 #+title: The diff view
 * What it is
 The diff view shows every change in the owned skgrepos since their
@@ -25,7 +29,6 @@ both COMMANDS files, under C-c v d and C-c r, and the two restore
 requests under C-c s. The server's code is
 'server/diff_view/' (its 'mod.rs' lists the files), over the graph
 straddle of 'server/graph_straddle/'.
-
 * The four buffers
 One command opens up to four buffers, in this order, and skips any
 that would be empty. The client sends one "diff view" request per
@@ -81,7 +84,6 @@ changed nodes, by the stems of their changed '.skg' files.
 The diff view compares HEAD with the worktree. The git index never
 enters it: no fact carries a stage, and a commit is built from HEAD's
 tree and the worktree, not from the git index ("Stage and commit").
-
 * The graph straddle
 The graph straddle ('GraphStraddle', 'server/graph_straddle/') holds
 the before-graph (each owned skgrepo read at HEAD, each foreign one at
@@ -105,7 +107,6 @@ does a rebuild of the session-lifetime stores, so the next request
 reads both halves from the disk the rebuilt live graph was read from.
 What the straddle computes from itself -- C, the change-forest, each
 buffer's sets -- is computed once per straddle, on first use.
-
 * C, R, U and D
 These sets define the pruned change view a buffer renders
 ('PrunedChangeViewSets').
@@ -140,7 +141,6 @@ a shared cycle, exactly one is kept. When D is recomputed for a buffer
 that already stands (see "Extending the diff view"), the buffer's
 standing roots are pinned as kept first, so a change to a cycle's
 membership never adds a second root for it.
-
 * Rendering a buffer
 ** Stub roots
 The buffer starts as one stub per root, in D's order: an editable
@@ -402,7 +402,6 @@ on an occurrence with a ghost warrant in content position or in a
 partner folder ('restoreRel_stands_where_it_may'), and a save that
 fulfils one leaves the headline claiming the relationship it
 restored.
-
 * Editability in the diff view
 The diff view follows the rule that decides which occurrence is
 editable in any view -- one editable occurrence per node, the first
@@ -489,7 +488,6 @@ that is itself in content position),
 since a deleted node's old content is editable nowhere and shown
 there ('nodes_editable_in_diffView'). The change-forest leaves those
 nodes record are the changes editable in the buffer.
-
 * Processed marks
 ** Change-forest leaves
 The change-forest ('ChangeLeaves', built from the straddle,
@@ -624,7 +622,6 @@ changed)' where 'node' names no leaf.
 The server's 'leaves_named_at' is the single rule; the change fact
 is display-only, and the clients read it instead of keeping tables of
 headline kinds.
-
 ** What a request names
 A mark marks what its headline shows. A headline shows two things
 that can change: its node, whose glyph is ∃ or M, and its
@@ -671,7 +668,6 @@ letter also names its own object on the headline, which the walk
 never reaches: '(processed rel newContent)' marks the headline's
 relationship to its viewparent and the content relationships of the
 new nodes reached. There is no object 'all'; the parser refuses it.
-
 ** Processed requests and gestures
 A gesture writes processed requests, '(processed OBJECTS)' or '(unprocessed
 OBJECTS)', into a headline's '(editRequest ...)' (creating the form if
@@ -778,7 +774,6 @@ The diff view's answer, a save and C-c r u compute it alike
 over 'buffer_processed_summary', 'server/diff_view/change_leaves.rs').
 The waiting count costs no Git and no check: it is the commit's rule
 over the straddle the save already has.
-
 * Restoring what a change removed
 Two edit requests undo a removal from the diff view's buffers, without
 leaving them. Each is written by a command that refuses at once on the
@@ -835,7 +830,6 @@ removed member whose relationship returned is warranted again,
 claiming it. A change that no longer differs from HEAD leaves the
 change view; what the buffer still holds of it is kept as "What the
 refresh keeps" describes.
-
 * Stage and commit
 C-c r c ('skg-stage-and-commit') opens a buffer for the message, and
 C-c C-c there sends "stage and commit". The request commits the
@@ -972,7 +966,6 @@ is refreshed as any rerender is: its roots and what it made editable
 stay, and what was committed loses its change viewnodes. The marks of
 the nodes left out stay, since the check proved their leaves
 unchanged.
-
 * Strandeds
 A relationship touching a node whose home skgrepo moves is stranded
 when it sat at its default relRepo before the move and the sticky rule
@@ -990,7 +983,6 @@ rewrites the telescopes of the nodes that record them, and rerenders
 the views that show them. Mentions carry no relRepo, so they are
 never stranded. The client writes only the new home; the analysis is
 the server's.
-
 * Investigating an unknown graphnode
 An unknown viewnode stands for an unknown graphnode: an ID nothing
 in the graph answers to.

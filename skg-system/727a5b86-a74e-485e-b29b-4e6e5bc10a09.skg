@@ -1,0 +1,8 @@
+title: Imported Markdown hard breaks become Org's two-backslash hard breaks.
+pid: 727a5b86-a74e-485e-b29b-4e6e5bc10a09
+body: |2-
+  In Markdown you can put a slash or two spaces after a line
+  to ensure that the next line is shown on a separate line,
+  rather than smooshed into a single flowing paragraph.
+  In Org, such a "hard break" is represented by two slashes,
+  so the importer makes that conversion.

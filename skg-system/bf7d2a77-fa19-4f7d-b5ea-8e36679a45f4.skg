@@ -1,0 +1,10 @@
+title: '"Get" that node''s ID.'
+pid: bf7d2a77-fa19-4f7d-b5ea-8e36679a45f4
+body: |2-
+  It's easiest to use 'skg-id-push'.
+
+  You could, however, also do this "manually",
+  by visiting a metadata buffer for the node ('skg-view-metadata')
+  and copying the ID yourself,
+  or by disablling the heralds view (toggled by 'skg-view-heralds-mode')
+  and manually copying the ID from the node's metadata.

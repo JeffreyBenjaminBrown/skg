@@ -1,0 +1,9 @@
+title: processed marker
+pid: 0faa0a43-435f-472b-b436-c8a057988e5f
+body: |2-
+  The '(processed ...)' part of a headline's '(diff ...)' form, and its
+  herald: the derived processed state of a processed aggregate or of
+  the leaves of a headline with change facts. A changed folder's ✓,
+  which the clients draw from its members, is one too. A folder's
+  member takes one; a chain node takes none. It is never called a bare "marker", since a
+  changeset marker is another thing.

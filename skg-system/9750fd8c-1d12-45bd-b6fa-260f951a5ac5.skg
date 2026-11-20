@@ -1,0 +1,8 @@
+title: Grep for every reader of a file the system writes
+pid: 9750fd8c-1d12-45bd-b6fa-260f951a5ac5
+body: |2-
+  Before a plan moves a log, a lock or a generated script, 'git
+  grep' its name across the whole tree, 'windows/', 'tools/' and
+  'tests/' included, and list every reader in the code map. Plan
+  1_2 found three Windows scripts and the integration test library
+  reading the moved logs only while its slices ran.

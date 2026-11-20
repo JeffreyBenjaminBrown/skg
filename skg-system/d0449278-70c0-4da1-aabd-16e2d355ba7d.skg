@@ -1,0 +1,12 @@
+title: reinstated
+pid: d0449278-70c0-4da1-aabd-16e2d355ba7d
+body: |2-
+  A goal item that no child stands for is *reinstated*: the refresh
+  draws it, as a new viewnode, in a folder and in an editable
+  occurrence's content. So a member the user deleted from a
+  write-protected folder comes back at the next save, since its
+  membership is a fact of the graph, edited from the other side of the
+  relationship; and a member that a save in another view added appears
+  in this one. "Reinstate" names only this:
+  a child the buffer already holds is never drawn again, but re-kinded
+  and re-warranted where it stands.

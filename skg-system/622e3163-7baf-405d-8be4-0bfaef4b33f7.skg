@@ -1,0 +1,6 @@
+title: 'C-a : skg-beginning-of-line'
+pid: 622e3163-7baf-405d-8be4-0bfaef4b33f7
+body: |2-
+  On a headline, moves point to the start of its title, after the stars
+  and the metadata; pressed again, to the true start of the line. On
+  any other line it moves to the start of the line.

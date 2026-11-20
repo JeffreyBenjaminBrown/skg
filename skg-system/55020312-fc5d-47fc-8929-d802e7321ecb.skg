@@ -1,0 +1,4 @@
+title: :SkgInit CONFIG-PATH
+pid: 55020312-fc5d-47fc-8929-d802e7321ecb
+body: |2-
+  Initializes the client against a skgconfig.toml.

@@ -1,0 +1,6 @@
+title: maybe lots of stuff under 'show'
+pid: 4449413e-8ab5-4a86-8697-f7d81fefb1a8
+body: |2-
+  Add a letter to the shortcut.
+  C-c s : show locally
+  C-c g : show globally

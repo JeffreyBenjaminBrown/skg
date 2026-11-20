@@ -1,0 +1,80 @@
+title: claims membership, 'noClaim', pending detachment, detach, attach, orphan graphnode
+pid: 43addc41-bd86-4979-b698-c95ec69b4c6e
+body: |2-
+  A child *claims membership* when the save will read it as a member
+  of its viewparent's list; it is then a *claiming child* (a term of
+  plan 06). That is a
+  declared part: the bare atom =noClaim= says no, its absence yes
+  ('claimsMembership' in code, on an occurrence, a ghost, an unknown
+  viewnode, a restricted viewnode, an alias or an ID;
+  'docs/api-and-formats.org', "Content view"). It means something
+  only where the save reads the claims of its viewparent's children:
+  under an editable occurrence, and under an editable folder
+  (forks, hidden-outside, alias) of one
+  ('parent_reads_claims' in 'server/refresh/ancestry.rs'). In the
+  forks folder a claim says "the folder's viewparent forks it", so a
+  forker-only or an indirect member, drawn there by the refresh,
+  claims nothing (see "the forks folder").
+
+  Every other viewparent *reads no claims*. This is the one list of
+  them, which the user docs cite: a write-protected occurrence; a
+  write-protected folder (a containers or mentioners folder, say), and
+  any folder of a write-protected occurrence; a ghost, an unknown
+  viewnode and a restricted viewnode; a tombstone; and the buffer root, whose
+  children are the view's roots. Under any of them no child claims,
+  whatever it carries, the server writes no =noClaim=, and detach and
+  attach refuse. A child that
+  claims nothing is in no list: the save neither adds nor removes a
+  relationship for it, and what it shows of its own node is saved or
+  not by its editability, as at any occurrence. So a headline typed
+  under a viewparent that reads no claims is saved as an
+  *orphan graphnode*, a node that no list contains, and the save warns of each
+  one, naming its headline ('orphan_warnings' in
+  'server/from_text/local_fieldintent_collection/mod.rs'); of a
+  headline typed at the top of the buffer, a new view root, it does
+  not warn. Under a
+  tombstone, as under a ghost or a folder, the headline takes its
+  skgrepo from the nearest occurrence above.
+
+  "Orphan" always takes its noun. An orphan graphnode is the one above
+  (a term of plan 08; plan 06, which took the word from
+  'docs/COMMANDS.org', used it without its noun); an *orphan viewnode*
+  (a term of plan 08) is a headline the parser cannot place under a
+  parent, being deeper than its parent allows. The weave's "orphaned
+  run" ('weave_orphaned_run_reattaches_leftward' in
+  'tests/unit/weave.rs') and the database's "orphaned records"
+  ('server/dbs/init.rs') keep their nouns too.
+
+  Under an editable parent a child that claims and that the graph
+  does not relate to its viewparent (see "warranted, 'noWarrant',
+  'ghostWarrant'") vanishes (see "vanish"): one whose relationship a
+  save in another view removed, one whose record alone a
+  skgrepo narrowing keeps out, a child a viewnode merge moved there. A child
+  there that claims nothing is one the user marked =noClaim= to
+  detach it: a *pending detachment*, herald "detach", which the next
+  save takes out of the list. In the forks folder a member claiming
+  nothing is a pending detachment only where the folder's viewparent
+  still forks it on disk (its '(rels (forks (in ...)))' names ancestor
+  generation 2): a detached forkee or mutual, not a forker-only or an
+  indirect member.
+  Every view the server draws gives each member there the claim the
+  graph gives it, so only the user's own unsaved gesture makes one
+  ('docs/forks.org', "Claims in a redrawn view").
+  No wire says it; each client sees it and
+  writes the atom =pendingDetachment= into the metadata it hands the
+  herald rules ('docs/heralds.org', "What the server serves, and what
+  the clients add"). 'docs/data-model_technical.org', "The
+  refresh: how a view follows the graph", says how claims and warrants
+  move.
+
+  Under a viewparent that reads claims, to *detach* a child is to write
+  =noClaim= on it, so that the next save takes it out of the
+  viewparent's list, and to *attach* it is to remove the atom, so that
+  the next save puts it in (both terms of plan 06): two gestures on
+  the declared part, no request, though the herald =detach= of a
+  pending detachment is styled as one ('skg-detach' and 'skg-attach',
+  C-c s t and C-c s a;
+  ':SkgDetach' and ':SkgAttach' in Neovim). Both refuse under a
+  viewparent that reads no claims. "Detach" says what the user does to
+  a claim, never what the refresh does to the tree: the refresh never
+  removes a child.

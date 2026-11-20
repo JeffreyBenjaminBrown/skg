@@ -1,0 +1,25 @@
+title: Forks
+pid: 1c6e493f-b9ff-49c2-8642-729de8b37e85
+body: |2-
+  The *fork operation* turns a /foreign/ node — one in a skgrepo you do *not* own,
+  hence write-protected — into an editable *clone* in a skgrepo you /do/ own,
+  which forks it (so the clone is a fork of the original).
+  The clone keeps a live link to the original, so the original's later
+  additions still reach you, but your edits never touch the original.
+
+  See also [[id:ab83219a-c1c5-4dc3-a0b5-96d2faecb587][the sharing model]] for the underlying
+  relations (=forks=,
+  =hides=) and =glossary.org= ("clone, and the fork operation",
+  "forkee as such", "mirror substitution").
+contains:
+- 18dd0339-4d70-4fe7-a2f7-bbd853f7e692
+- d92ef8d3-fdb4-4753-9608-6b377cada2ad
+- c6ab9ce2-7be7-4241-a4e5-4fda54f5f25e
+- 409a3066-b2e2-4502-90be-acf41965509f
+- c6cd5719-7e98-4228-b56d-7c6de070ea70
+- 08da29f9-f36a-48de-8689-2468e86f32ad
+- 37854136-c547-4316-bf13-6d14a0d6e06a
+- 3ab20699-6feb-4200-966e-c9f8406a13f0
+- 517efbea-6438-4d47-aff1-741f1cdb9938
+- 97b62c99-50e2-4321-8654-6f6a5e49923e
+- 3bb1e3a2-e6b3-4c5a-a4ec-2a890d3c3ef7

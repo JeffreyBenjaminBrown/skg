@@ -1,0 +1,15 @@
+title: Install nothing. Run it in a tailor-made Docker container.
+pid: f119d1c4-f984-47be-a66c-ef677553b081
+body: |2-
+  Build the project container described by =bash/docker.sh=.
+
+  Start it (using something like the
+  =docker run= command in =docker.sh=).
+
+  Enter it (using something like the
+  =docker exec= command in =docker.sh=).
+
+  Run =cd= to go to the home folder (=/home/ubuntu=).
+
+  Then continue at "If you've already got Rust",
+  below.

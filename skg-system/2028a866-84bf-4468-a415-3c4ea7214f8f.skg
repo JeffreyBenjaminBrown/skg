@@ -1,0 +1,19 @@
+title: 'C-c s x : skg-set-flag-search-matching'
+pid: 2028a866-84bf-4468-a415-3c4ea7214f8f
+body: |2-
+  Prompts between =search matching= and =no search matching=, with shift-arrow
+  cycling, and stages an idempotent request on the saved occurrence at point.
+  It refuses foreign and write-protected nodes and a node that already
+  holds an edit request (delete, a nodeMerge or a flag). A processed
+  request stays beside it. A pending relRepo request gives way to it,
+  and the message says so: "replaced a pending relRepo request". Delete
+  (=C-c <backspace>=) and a nodeMerge request (=C-c s m=) replace a
+  pending relRepo request too, and a flag request, without saying so.
+  It does not save; save the view to apply it.
+
+  With =C-u=, the selected value is applied uniformly to the true-content
+  subtree only ('docs/glossary.org', "true-content subtree").
+  Non-vognodes, children carrying =noClaim=, ghosts, unknown viewnodes
+  and restricted viewnodes are pruned, with what stands under them. Repeated PIDs are changed once; ineligible descendants
+  are skipped and reported in =*Messages*=, and the message counts the
+  pending relRepo requests it replaced.

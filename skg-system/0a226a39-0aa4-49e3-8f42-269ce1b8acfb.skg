@@ -1,0 +1,48 @@
+title: 'The processed requests: =(editRequest (processed ...))='
+pid: 0a226a39-0aa4-49e3-8f42-269ce1b8acfb
+body: |2-
+  =(processed OBJECT...)= and =(unprocessed OBJECT...)= inside =(editRequest
+  ...)= ask the save to set or clear the processed marks of the
+  leaves those objects name. On a vognode or ghost, =rel= names the
+  existence of its relationship to its viewparent, and =node= every
+  leaf its node records but the relationships shown on it or under it:
+  its own relationship to its viewparent, that of each member drawn
+  under it (in its content or in a partner folder), whatever its
+  aspect, and the content relationships a changeset marker under it
+  gathers. So on a new or deleted node =node= names its existence, and
+  on a modified node its text, home skgrepo, aliases, extra IDs and
+  flags, with any relationship it records that no headline under it
+  shows; never its children's containment where the children are
+  drawn. On a changeset marker, =rel= names the relationships it
+  gathers and =node= the own leaves (existence, text, home skgrepo,
+  aliases, extra IDs, flags) of their members, one level down. With no
+  object a request names what =(leaves ...)= can list: =node= and =rel=
+  on a vognode, =rel= on a changeset marker or an unknown viewnode, and
+  the one leaf elsewhere. There is no object =all=; a request naming it
+  is refused as an unknown diff object. On a vognode, the objects =newContent=
+  and =newOutward= name leaves of the new nodes a walk reaches from its
+  node, through new nodes only: the node itself when it is new, and
+  each new member of a relationship the walk follows that a node
+  reached records ('ChangeLeaves::new_nodes_reached_from').
+  =newContent= follows content relationships, and names each new node's
+  existence (which covers its text) and its content relationships;
+  =newOutward= follows every relationship in its recorded direction,
+  and names every leaf each new node records
+  ('ChangeLeaves::leaves_of_new_nodes_reached_from', 'NewNodeWalk').
+  Neither names the relationship of the node to its container. Beside
+  a walk, =node= and =rel= also filter what it reaches: =node= names
+  each new node's existence, =rel= the relationships it records that
+  the walk follows, and a walk with neither names both:
+  =(processed rel newContent)= marks the headline's relationship to its
+  viewparent and the content relationships of the new nodes reached. The
+  server reads all this from the change forest; what the buffer shows,
+  or write-protects, does not matter. No change fact lists either
+  object. Since which leaves they name only the change forest can
+  tell, validation takes such a request to share a leaf with every
+  request of the opposite kind in the same save that can name a leaf of
+  the same kind (a node's own, or a relationship), and refuses the
+  save; likewise =node= on a changeset marker, with every request that
+  can name an own leaf of a content member drawn beside it. At most one per headline, written after
+  the headline's other edit request if it has one: =(editRequest
+  delete (processed node))=. Any headline that may carry =(diff ...)= may
+  carry one.

@@ -1,0 +1,6 @@
+title: 'C-c o l : skg-paste-link'
+pid: 4cd48bf1-ddc3-4e2f-852e-89d07d831792
+body: |2-
+  Inserts, at the cursor, a link to the node
+  whose ID is at the top of the linkstack.
+  Does not modify the stack.

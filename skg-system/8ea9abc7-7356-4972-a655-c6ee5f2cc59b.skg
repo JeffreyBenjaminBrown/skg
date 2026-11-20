@@ -1,0 +1,30 @@
+title: editability rule
+pid: 8ea9abc7-7356-4972-a655-c6ee5f2cc59b
+body: |2-
+  Which occurrence of a node is editable: at most one per node in a
+  buffer. One the buffer holds keeps its editability; an editable-view
+  request moves it, write-protecting the node's other occurrence; among
+  the occurrences the refresh draws, the first of a node is editable
+  when its parent's children are editable content, or it is a member
+  as such in a content view (a member of the forks folder of an
+  editable occurrence, a forkee or forker as such), no other occurrence
+  of the node is, and the budget allows at its visit
+  ('drawn_occurrence_editability', 'consume_editableView_request'), and
+  a repeat is write-protected. Level order decides which occurrence of
+  a node that is both a member as such and content elsewhere in the
+  view is editable; =C-c s e= moves it. The editable occurrence *holds* its
+  node's editability: the walk keeps where it stands, and an occurrence
+  write-protected, re-kinded or merged away releases it
+  ('Walk::hold_editability', 'server/refresh/editability.rs').
+
+  A *repeat* is an occurrence of a node whose editability another
+  occurrence in the buffer holds ('Walk::is_a_repeat', keyed as
+  'Walk::editability_key' keys it). (It is not the containerward
+  chain's 'ContainerwardRoleTree::Repeated', a container met again on
+  the walk toward the roots.) Whether a drawn occurrence is one
+  is judged where it is drawn, in level order, so an occurrence made
+  editable later in the same refresh does not make an earlier-drawn one
+  a repeat. A repeat in the forks folder shows nothing, not even its
+  containers folder.
+  The diff view's deviations are in 'docs/diff-view.org', "Editability
+  in the diff view".

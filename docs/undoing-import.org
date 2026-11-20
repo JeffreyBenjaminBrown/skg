@@ -1,5 +1,9 @@
+# This file was generated from the skg node with this ID:
+# b778e2a3-8aa2-43e7-a160-1bf648569b39
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * Returning imported data to Org
-Skg can [[file:COMMANDS.org::#export-org][export selected content to plain Org]]. This produces readable
+Skg can [[./COMMANDS.org::#export-org][export selected content to plain Org]]. This produces readable
 documents, not a restoration of the original Org-roam files. Keep the
 originals if you need their exact structure and metadata.
 
@@ -11,4 +15,4 @@ the original graph; the existing Org-roam importer also requires file-level
 IDs that this export does not generate.
 
 For import instructions and replacement behavior, see
-[[file:COMMANDS.org::#import-org-roam][import-org-roam in the command reference]].
+[[./COMMANDS.org::#import-org-roam][import-org-roam in the command reference]].

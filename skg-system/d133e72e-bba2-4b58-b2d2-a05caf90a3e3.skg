@@ -1,0 +1,28 @@
+title: Partner folders in search results
+pid: d133e72e-bba2-4b58-b2d2-a05caf90a3e3
+body: |2-
+  Search hits are raw, write-protected, non-content roots.  In the
+  search enrichment, each result N gains, folded, its forks folder
+  (the nodes N forks, then the nodes that fork N, then its other
+  mirrors), drawn only when it has a member.  The folder is flat, as
+  every forks folder is ('docs/forks.org', "Every mirror, flat"): no
+  member shows a forks folder of its own.  The members are
+  write-protected.  Node visibility and the relationship's relRepo
+  both gate them.
+
+  Search also groups hits that are mirrors of one another (see "Mirror
+  substitution").  Among them, the hit the user's own skgrepo list
+  ranks first stands: the list of the perspective of the config's first
+  owned skgrepo (the most public), then the others in declaration
+  order, so that among owned hits the most public stands.  Several in
+  one skgrepo tie, and the least pid stands.  If the hit standing is
+  owned, every other hit among them is suppressed at the top level,
+  and reappears in the forks folder of the hit standing, which lists
+  every mirror of it, the indirect ones (related to it only through
+  other mirrors) after its fork partners.  So every suppressed hit stands in the one forks
+  folder of the hit that suppressed it (or, where that hit hides it,
+  in that folder's folder of what it hides outside its fork
+  partners).
+  A foreign hit never suppresses another top-level result, although
+  visible foreign relatives can occur in the folders: a
+  foreign mutual pair that both match shows both.

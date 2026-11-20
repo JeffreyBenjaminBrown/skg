@@ -1,0 +1,8 @@
+title: Tests
+pid: 293df644-a6d6-48d1-9302-2727db23fb3c
+body: |2-
+  List every behavior the plans' "Agreed behavior" sections state, as
+  amended by later plans, and name the test that asserts each, or say
+  none does. Check the fixtures and helpers for copies. Sample the
+  tests for naming and for assertions on raw text where a structural
+  check would be clearer.

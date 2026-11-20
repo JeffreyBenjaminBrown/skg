@@ -1,0 +1,6 @@
+title: 'C-c s W : skg-request-write-protected-recursive'
+pid: 6eecd928-c704-4a68-b4fb-8abe942a4869
+body: |2-
+  The same, for the occurrence and its whole content subtree:
+  every node in it becomes write-protected,
+  and no child under them claims membership.

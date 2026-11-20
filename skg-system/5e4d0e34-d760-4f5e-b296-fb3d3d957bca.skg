@@ -1,0 +1,30 @@
+title: Stage and commit
+pid: 5e4d0e34-d760-4f5e-b296-fb3d3d957bca
+body: |2-
+  C-c r c ('skg-stage-and-commit') opens a buffer for the message, and
+  C-c C-c there sends "stage and commit". The request commits the
+  changed nodes of the owned skgrepos, never the foreign ones: with
+  '(processed-only . t)' the processed ones, less those that must wait,
+  and asking nothing; without it every changed node, by the same
+  commit, asking first when some is not processed. The rule a user
+  holds: "C-c r c commits every node whose changes are all processed,
+  except one that needs a node whose changes are not", a reorder among
+  those changes ("Other changes to a node's file"); and a node one of
+  whose files is not what skg writes is not processed ("Changes no mark
+  covers"). C-c r c sends
+  '(processed-only . t)'; C-c r C (Neovim '<localleader>rC', the AI
+  reader's 'commit --all') sends the request without it. The decisions
+  behind it, and the alternatives rejected, are in Vic's plan "commit
+  only the processed nodes, each whole" (node
+  75da3bb2-881a-48cf-94bd-be487db9604c).
+  It refuses unless the connection is unrestricted, for a blank
+  message, and when the straddle cannot be built. It never stages
+  'OTHER_SKGREPO_DEPENDENCIES.toml', which the diff view does not
+  cover: committing that generated manifest is a deliberate, manual act.
+contains:
+- 8ea3fdac-2470-4124-88f4-874ace7d8f50
+- f425deee-d32d-44c3-afed-8264da0db1e4
+- d0c78610-b641-40e1-aebe-192c07a9a982
+- 72ab3cbb-1fce-48f9-abaa-852bb3297d91
+- d5135654-f74e-4f0e-9513-10998112c28f
+- 70dd90b4-8625-4168-8483-97a278e95f47

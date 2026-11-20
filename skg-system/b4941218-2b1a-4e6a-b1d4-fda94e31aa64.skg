@@ -1,0 +1,9 @@
+title: metadata editor
+pid: b4941218-2b1a-4e6a-b1d4-fda94e31aa64
+body: |2-
+  The *metadata editor* is the buffer that 'skg-view-metadata'
+  (=C-c v m=; =<localleader>vm= in Neovim) opens on the metadata of the
+  headline at point, one part per line. It shows each field the
+  headline's kind takes, as 'shared/metadata-fields.json' lists them,
+  and S-left and S-right cycle a field through its values. =C-c C-c=
+  applies the edit to the headline.

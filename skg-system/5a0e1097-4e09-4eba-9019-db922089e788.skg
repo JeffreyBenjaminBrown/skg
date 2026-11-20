@@ -1,0 +1,25 @@
+title: What is recorded, and when
+pid: 5a0e1097-4e09-4eba-9019-db922089e788
+body: |2-
+  Only the fork operation writes it, once, when it makes the clone, and
+  only when the original's home skgrepo is not the clone's: a fork
+  within one skgrepo has nothing to attribute. It records the note
+  actually forked: forking a fork records the fork, and its skgrepo,
+  not the note that fork came from. It is a record, not a view of the
+  =forks= relation, so it outlives the original's deletion, a nodeMerge
+  that acquires it, and its skgrepo not being loaded. The fields
+  ('docs/api-and-formats.org', "The .skg file format"):
+  - the original's pid;
+  - its home skgrepo's name in the forker's config then: a local alias,
+    so only the fallback;
+  - the hash of that skgrepo's git remote ('origin', else the first),
+    its URL normalised so that the ssh and https spellings of one
+    repository agree: the skgrepo's identity, whatever anyone's config
+    calls it. Hashed, so that a private remote's URL never appears in a
+    public note. Left out when the skgrepo has no remote;
+  - the HEAD commit of the gitrepo holding that skgrepo, so that what
+    the original said can be read back; left out when it is no gitrepo;
+  - =uncommitted: true= when the original's file differed from that
+    commit: the commit then lacks the text forked, which only the
+    clone's own first version holds (its first git commit, if the
+    forker commits before editing).

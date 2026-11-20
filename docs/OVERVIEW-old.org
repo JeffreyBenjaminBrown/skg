@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 3693ea2c-f18f-4100-a80b-925a10b46f89
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * old overview : how Skg works
 ** TODO revise viewing the data
 (I just <2025-11-05 Wed> revised the rest of this doc.)

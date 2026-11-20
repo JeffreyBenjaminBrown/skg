@@ -1,0 +1,5 @@
+title: Avoid gratuitous renaming
+pid: 000240cc-6964-4835-bc30-9ad248090d57
+body: |2-
+  Don't rename variables, let alone functions, without a good reason.
+  A lot of thought has gone into most of those names.

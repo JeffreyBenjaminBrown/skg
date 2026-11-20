@@ -1,0 +1,17 @@
+title: The =inPlaceOf= part
+pid: a4cd9fae-7514-4481-8996-6156e596284c
+body: |2-
+  A substituted viewnode carries =(inPlaceOf N)=, where =N= is the
+  original node for which the displayed viewnode substitutes.  The part
+  is load-bearing during save: the viewnode contributes =N= to its parent's
+  stored relationship list rather than its own ID.  Editing the
+  viewnode's title, body, or folders still edits the node it shows.
+
+  The server rejects a forged or stale part whose bearer (the headline
+  bearing it) is not a mirror of =N=, naming the mirror the tree's
+  perspective would show (the tamper check).
+  Any mirror may bear it: which one the refresh shows depends on the
+  perspective and the skgrepo restriction.  The check reads the mirrors
+  under no skgrepo restriction, so that a part which was honest when
+  rendered does not become invalid merely because the skgrepo
+  restriction changed.

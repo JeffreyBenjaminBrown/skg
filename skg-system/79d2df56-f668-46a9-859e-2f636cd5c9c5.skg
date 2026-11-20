@@ -1,0 +1,36 @@
+title: :SkgImportMdAndOrg
+pid: 79d2df56-f668-46a9-859e-2f636cd5c9c5
+body: |2-
+  With the server running, choose an absolute input directory in the
+  server/container filesystem and an existing owned destination skgrepo. The
+  skgrepo determines the privacy of all new nodes; one the
+  skgrepo restriction keeps out is refused. Skg scans exact =.md= and
+  =.org= files recursively, leaves the originals untouched, and asks for a
+  host-root mapping only when absolute links to =.md= or =.org= files occur.
+  Blank mapping leaves unresolved links with warnings. Links to other kinds of
+  files are left pointing where they did, without warnings. Review the file/node counts, generated
+  export paths, and diagnostics; then explicitly confirm or decline. A changed
+  input or destination requires a fresh preview.
+
+  The import is additive: it creates file-root and headline nodes, an import
+  record, and an Org export marker under each file root. The import result
+  buffer links to the record; follow it with =<localleader>gg=. A document whose
+  only top-level headline has nothing before it uses that headline as its
+  file root; otherwise the file root, titled after the document, holds the
+  text before the first headline, and its export marker's
+  =root_headline = false= makes the document export with its original
+  outline. Org links to non-document files stay as written. It does not replace
+  existing =.skg= files, copy attachments, synchronize later changes, or export
+  automatically. Most original markup remains text; Markdown hard breaks become
+  Org's two-backslash form so save-time trailing-whitespace cleanup remains.
+  Later export is a readable rendition, not a round-trip backup. Exporting to
+  the original directory overwrites matching =.org= files but not =.md= files.
+  There is no dedicated undo or crash-recovery transaction.
+
+  In Org files, link syntax inside text Org shows literally (=verbatim=,
+  ~code~, a fixed-width line beginning with =: =, a =#+begin_...= block, or a
+  =```= fence) is an example, and is left alone; backticks are not literal in
+  Org. A line that looks like an Org headline inside a block or fence stops the
+  import, with nothing written; close the block, or escape the line with a
+  leading comma (=,* ...=). The Emacs command reference explains both in more
+  detail.

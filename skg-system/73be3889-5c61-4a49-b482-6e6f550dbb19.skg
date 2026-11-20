@@ -1,0 +1,14 @@
+title: The forks folder
+pid: 73be3889-5c61-4a49-b482-6e6f550dbb19
+body: |2-
+  The forks folder ('Folder::Forks', =forksFolder=) under an occurrence
+  of a note N holds every mirror of N, each once, flat: N's fork
+  partners (the notes N forks, or forkees, and those that fork it),
+  and its *indirect members*, the other mirrors
+  of N, joined to it only through others; all by records the skgrepo
+  restriction shows. A *mutual* both forks N and is forked by it; a
+  *forker-only member* forks N and is not forked by it.
+contains:
+- ce448f90-6a74-4b0c-b595-b88240efc546
+- 9dcb4d7e-6dd5-4b02-a677-9966ba798a46
+- 38c15888-c19d-41ae-9e9e-b943fe847248

@@ -1,0 +1,44 @@
+title: the containerward chain, as drawn
+pid: 7ef8e126-0af8-4358-ab86-fcc57e9b8280
+body: |2-
+  When the refresh draws a member of a folder whose members carry the
+  chain, it hangs the member's chain under it
+  ('draw_containerward_chain' in
+  'server/refresh/chain.rs'); when it draws a member of a content
+  view's forks folder that is no repeat, it puts a containers folder
+  under it instead, and registers the folder so that the members its
+  own visit draws are drawn folded ('after_drawing' and
+  'add_containers_folder_under_member' in
+  'server/refresh/visit.rs', 'Walk::folders_whose_drawn_members_are_folded').
+  Since the member was just drawn, the folder is its first child: an
+  editable member's integrated-elsewhere folder, added at its visit,
+  goes before it, then its hidden-in folder, then a forker's hidden-by
+  folder; a forks folder, where one is asked for (=C-c l f=), and its
+  content go after it. A member that stood
+  in the buffer before gets the same folder at its visit
+  ('add_containers_folder_to_a_standing_member'): in a forks folder,
+  when an editable-view request extends it (=C-c s e= on its note); in
+  an integrated-elsewhere folder, whenever the folder would name a
+  keeper, so that a member whose only keeper was a view-ancestor, given
+  another by a save, names it as a fresh view does; and a member there
+  that has become a repeat loses its containers folder, as a fresh view
+  draws none under a repeat. A member drawn into
+  a compound folder or a containers folder that already stood, all its
+  members folded, is drawn folded too, so that the folder stays
+  collapsed ('stands_drawn_folded'). The chain is drawn
+  walking the member's
+  containers breadth-first over the live graph or, in the diff view,
+  over the union of the straddle. The extent of a chain is none, so a
+  chain node is never reinstated: a chain that stays keeps its
+  viewnodes and their fold state, and only a newly drawn member gets
+  one. A chain node is known by where it stands:
+  'holds_containerward_chain' says whether a viewnode's vognode
+  children are chain nodes (it is a write-protected member of such a
+  folder, or itself a chain node), and 'stands_in_containerward_chain'
+  whether a viewnode is one ('server/types/tree/forest.rs'). Both take
+  whether the view is the diff view, since a forks folder's member
+  holds a chain there and nowhere else; the readers that serve only
+  the diff view (its change tags, its processed and restore leaves,
+  the parse's check of a restoreRel request) pass true. Its goal
+  is its containers, so a chain node that no longer contains the node
+  above it is unwarranted (⊥).

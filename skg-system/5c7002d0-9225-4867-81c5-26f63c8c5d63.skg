@@ -1,0 +1,11 @@
+title: changed folder
+pid: 5c7002d0-9225-4867-81c5-26f63c8c5d63
+body: |2-
+  A partner, alias, ID or flags folder the diff view shows because its
+  membership changed since HEAD. It is written as its bare folder atom,
+  holds the members of either graph, each tagged with the three kinds
+  of change, and reads "its X changed (this file)" or "(other files)"
+  (see "in, out") -- the forks folder, which holds both sides, reads
+  "its forks changed" -- with ✓ when every changed membership is processed: each
+  client sees the change in the members and draws that label in place
+  of the folder's own.

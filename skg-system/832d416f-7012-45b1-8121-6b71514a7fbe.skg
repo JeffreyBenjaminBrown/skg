@@ -1,0 +1,17 @@
+title: declared parts, derived facts
+pid: 832d416f-7012-45b1-8121-6b71514a7fbe
+body: |2-
+  Metadata holds two classes of thing ('docs/api-and-formats.org',
+  "The metadata headers"). The *declared parts* are what the client is
+  responsible for and the save or the refresh reads: the kind, the
+  viewnode ID, the position atoms =focused=, =folded= and =bodyFolded=
+  ('FoldAndFocus' in code), =(gnid ID)=, =(skgRepos ...)=, =noClaim=,
+  =writeProtected=, =(inPlaceOf N)=, =(viewRequests ...)= and
+  =(editRequest ...)=. A headline whose metadata names no kind is a
+  node. The *derived facts* are what the server computes at every
+  rendering and nobody reads back: everything in =(view ...)=, the
+  *view facts* (the relationship facts, the warrant, =cycle=, =repoBoundary=,
+  =omittedBody=) and in =(diff ...)= (the change facts). The parser
+  skips both forms whole, so editing them changes nothing. The one
+  load-bearing part of a substitution, the inPlaceOf part
+  =(inPlaceOf N)=, is declared; see "mirror substitution".

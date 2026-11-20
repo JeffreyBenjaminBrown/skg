@@ -1,0 +1,57 @@
+title: baseline, stale, edited, unedited
+pid: b68abb9c-4214-4368-b7c3-b6b3fcce2817
+body: |2-
+  A buffer's *baseline* is the text the server last drew for it, as
+  the client installed it (without the focus and fold metadata the
+  client removes), before any edit. The clients' names call it the
+  *clean baseline*; the two names mean one thing. Emacs keeps it in
+  'skg-clean-baseline', Neovim in
+  'vim.b.skg_clean_baseline', 'tools/skg-for-ai' in the view's
+  '.full.org' file; each recaptures it whenever a response redraws the
+  buffer, and sends it with every save. A new empty view's baseline is
+  the text the client created it with. *The baseline's writes* are the
+  Save instructions that saving the baseline itself would produce,
+  parsed, supplemented and filtered of no-ops as the saved text is:
+  a baseline viewnode equal to the graph's graphnode yields none; one
+  that differs, or whose graphnode the graph lacks, survives. *The
+  buffer's writes* are the graphnodes the saved buffer writes or deletes:
+  the nodeInstructions its text yields, filtered of no-ops and of its
+  unedited stale graphnodes, plus the original of each fork clone. A
+  view is *dirty* while its buffer holds edits not yet saved (the
+  client's modified flag), and *clean* otherwise. (The
+  "baseline" of a git stage in 'server/types/git.rs', HEAD for the staged
+  changes and the git index for the unstaged, is a git notion, not a
+  buffer's baseline.)
+
+  A graphnode among the baseline's writes is *stale* in the buffer:
+  the baseline's copy of it no longer matches the graph, or the graph no
+  longer has it. The graph changed it under the buffer.
+
+  The buffer *edited* a graphnode when the buffer's copy of it (the Save
+  instruction the saved text yields for it, supplemented and filtered of
+  no-ops) differs from the baseline's copy, both compared as a view reads
+  a graphnode back (relationship lists by distinct pid, the body without
+  trailing whitespace), and left it *unedited* when the two are equal:
+  the user did not edit it, and the buffer merely still shows what the
+  server drew. A delete is an edit, never unedited. A save leaves an
+  unedited stale graphnode out, with its home skgrepo move and any fork
+  of it, writes the rest, and warns of it ("Left as the graph has it:
+  ..."); the redraw shows the graph's version
+  ('without_unedited_stale_saves').
+
+  An *edited stale graphnode* is a stale one the buffer edits (writes
+  from a copy unlike the baseline's, or forks) or deletes: writing the
+  buffer's copy would undo a change the user never saw. A save with an
+  edited stale graphnode is refused whole
+  ('server/serve/handlers/save_staleness.rs'). Staleness is decided by
+  content, not by time: a restart, a rebuild or a whitespace strip makes
+  nothing stale by itself, and a graphnode changed and changed back is
+  not stale. "Stale" applies to a graphnode; by extension, a buffer or
+  view is stale when it holds a stale graphnode's copy, and a save or
+  write is stale when it would write one. The stale error names what
+  changed at its own grain ('StaleAspect': the title, body, content,
+  aliases, extra IDs, flags, forks, hides or home
+  skgrepo), not as diff aspects: it says "body" where they say "text".
+
+  The records in 'TODO/' that predate these words say "outdated" for
+  stale, "untouched" for unedited, and "stale" alone for edited stale.

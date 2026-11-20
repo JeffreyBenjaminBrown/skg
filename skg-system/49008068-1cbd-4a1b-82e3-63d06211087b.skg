@@ -1,0 +1,9 @@
+title: off a relationship
+pid: 49008068-1cbd-4a1b-82e3-63d06211087b
+body: |2-
+  "Not on a headline"; "Not on an occurrence, an unknown viewnode or a
+  restricted viewnode" (on a folder, a ghost or a tombstone, say);
+  "Root headline: there is no relationship here to set"; "The parent
+  headline is neither a node nor a writable folder"; and, on an alias,
+  "Alias has no owning node headline", where the alias folder stands
+  under no headline.

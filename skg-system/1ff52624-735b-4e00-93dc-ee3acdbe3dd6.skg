@@ -1,0 +1,8 @@
+title: ancestor generation
+pid: 1ff52624-735b-4e00-93dc-ee3acdbe3dd6
+body: |2-
+  How far up the view an ancestor is: 1 is the viewparent, 2 the
+  grandparent, counting folders. The '(rels ...)' form's '(ancestors GEN
+  ...)' and its birth fact's GEN are ancestor generations, and heralds
+  show them as a, b, ... z, then {27}. A tree's plain "generation",
+  counting down from its root, is the opposite direction.

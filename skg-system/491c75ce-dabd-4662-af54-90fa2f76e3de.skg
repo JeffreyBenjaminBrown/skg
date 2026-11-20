@@ -1,0 +1,10 @@
+title: 'Read-only text regions (necessary: nvim has no per-range read-only)'
+pid: 491c75ce-dabd-4662-af54-90fa2f76e3de
+body: |2-
+  - The metadata edit buffer's display-only title group is editable
+    while typing; edits to it are discarded at commit (the strip step
+    drops the title group whatever it holds). Emacs rejected the edits
+    at type time.
+  - The fork-confirmation buffer similarly relies on commit-time
+    validation (the placeholder-skgrepo refusal) rather than type-time
+    protection.

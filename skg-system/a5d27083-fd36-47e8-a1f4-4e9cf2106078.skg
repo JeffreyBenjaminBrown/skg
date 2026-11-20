@@ -1,0 +1,5 @@
+title: 'C-c o i : skg-paste-id'
+pid: a5d27083-fd36-47e8-a1f4-4e9cf2106078
+body: |2-
+  Inserts the ID at the top of the linkstack at the cursor.
+  Does not modify the stack.

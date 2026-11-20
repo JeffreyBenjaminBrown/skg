@@ -1,0 +1,6 @@
+title: The infrequent sharing of whole collections of notes option
+pid: aa4a2e69-0641-4c8f-9233-da349233d6af
+body: |2-
+  The [[https://github.com/flancian/agora][Agora federation]] uses a sharing model in which one chooses whose notes to duplicate locally -- on an author by author basis, not a note by note one. Agora polls very frequently (every minute? more?) for updates. They have on the order of a few hundred members.
+
+  The infrequent sharing model works even without internet access. Each person might be limited to sharing with around ten thousand collaborators, if each one's notes were 15 MB like mine are after five years of prolific note-taking. (That would use 150 GB of space.)

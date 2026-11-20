@@ -1,0 +1,9 @@
+title: '<localleader>va : :SkgViewAncestry'
+pid: 1e2b4b7b-2706-4e4d-91a6-d42a087e17a8
+body: |2-
+  If you're at a headline so deep in the tree
+  that you can't remember where it came from,
+  this brings you to a new view showing only that ancestry,
+  with heralds if the view you called it from shows them.
+  This actually works in org-mode outside of skg.
+  (skg uses org-mode, but org-mode can be used without skg.)

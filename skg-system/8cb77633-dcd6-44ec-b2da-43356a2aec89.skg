@@ -1,0 +1,13 @@
+title: Get file path
+pid: 8cb77633-dcd6-44ec-b2da-43356a2aec89
+body: |2-
+    - Request: ((request . "get file path") (id . "THE_ID") (repo . "THE_REPO"))
+    - Response: LP =((response-type get-file-path) (content "PATH"))=,
+      normally with =PATH= relative to the data root. Errors use the same
+      shape with human-readable =content= beginning =Error:=.
+    - The server deliberately returns the computed path when the file no
+      longer exists, so deleted nodes can still be located in a git diff.
+    - Does not require the live graph or Tantivy -- only the config.
+    - If the requested skgrepo is restricted in the current connection's
+      skgrepo restriction, the server refuses to expose the path. Direct
+      file visits outside Skg are not intercepted.

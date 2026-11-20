@@ -1,0 +1,10 @@
+title: Skg asks for a host-root mapping if it finds absolute links to documents.
+pid: 027b6e51-8bbd-49c0-9452-957f3fa9e04b
+body: |2-
+  Skg runs in a Docker container.
+  The folder /home/ubuntu/host in that container
+  corresponds to some folder on the host system.
+  If the files to be imported contain absolute links
+  to =.md= or =.org= files,
+  skg needs to know how those host-system paths
+  correspond to paths in the docker container.

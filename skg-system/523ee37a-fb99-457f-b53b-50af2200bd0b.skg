@@ -1,0 +1,28 @@
+title: TL;DR
+pid: 523ee37a-fb99-457f-b53b-50af2200bd0b
+body: |2-
+  After a power loss, crash, or forced reboot, =./bash/start-servers.sh=
+  fails even though neither the code nor the data has changed. The
+  give-away is a *linker* error, not a compile error:
+
+  #+begin_example
+  error: linking with `cc` failed: exit status: 1
+    = note: ld.bfd: error: target/debug/deps/libskg-<hash>.rlib: file too short
+  error: could not compile `skg` (bin "skg")
+  #+end_example
+
+  Diagnose:
+
+  #+begin_src bash
+  python3 docs/troubleshooting/check-rlibs.py
+  #+end_src
+
+  Fix -- pass every package the script names:
+
+  #+begin_src bash
+  cargo clean -p skg -p tantivy   # e.g.; use your script output
+  cargo build --bin skg
+  ./bash/start-servers.sh
+  #+end_src
+
+  This is a build-artifact failure. Do not delete any data.

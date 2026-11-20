@@ -1,0 +1,8 @@
+title: 'C-c i n : skg-id-next'
+pid: cf7c9fe1-615c-416f-8cff-5889e9cb132e
+body: |2-
+  Makes the cursor hop among two kinds of IDs:
+  The ID associated with a node in the view,
+  and the ID associated with a link in a node's title.
+  Every node has an ID,
+  but a title can include multiple or no links.

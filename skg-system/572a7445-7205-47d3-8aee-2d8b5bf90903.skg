@@ -1,0 +1,71 @@
+title: The redraw delta
+pid: 572a7445-7205-47d3-8aee-2d8b5bf90903
+body: |2-
+  A response that redraws a view may name the headlines whose text
+  changed, so that the client rewrites only those lines: the entry
+  =(changed-headlines (V1 V2 ...))=, whose Vs are viewnode IDs (bare
+  symbols, none read as a number) in the new text's order. Its absence
+  means "whole": the client redraws the whole buffer. Present and
+  empty, =(changed-headlines ())=, it means no headline changed. Only
+  the =save-result= carries it (see "Save buffer"); the server
+  computes it in 'server/view_text_delta.rs'. It never changes the
+  text sent: =content= is the whole new text, fold and focus atoms
+  included.
+
+  The server compares the new text with a reference text, for the
+  =save-result= the saved buffer's text. It splits each into a
+  preamble, the text before the first headline line, and headline
+  records: a headline line (one matching '^\*+ '; the server escapes a
+  body line that would match with a leading comma,
+  'encode_body_for_view' in 'server/body_view_escape.rs') with the
+  body lines after it, up to the next headline line or the
+  end. The viewnode ID of a headline line is the X of a line beginning
+  =^\*+ (skg (vnid X)=. The delta is "whole" when the preambles differ,
+  when the record counts differ, when some headline line of either
+  text has no viewnode ID, when the sequences of viewnode IDs differ,
+  or when the body lines of some record differ (a headline line's
+  own newline counts with its body). Otherwise it lists each viewnode
+  ID whose stripped headline lines differ, perhaps none.
+
+  The stripped form of a headline line is the line with each of the
+  bare atoms =focused=, =folded= and =bodyFolded= that stands at depth
+  1 of its =(skg ...)= form removed, together with the one space before
+  it. The form is the one right after the stars and a space, beginning
+  =(skg= and then a space or =)=. Depth counts parentheses outside
+  string literals (a literal runs from a double quote to the next
+  unescaped one, a backslash escaping the character after it); a bare
+  atom is a maximal run of characters that are not whitespace,
+  parentheses or double quotes. A line without such a form is its own
+  stripped form, as is any line that is not a headline line. The
+  stripped form of a text strips each of its headline lines and leaves
+  its body lines and preamble alone. The server and both clients
+  implement this rule, and test it against the cases in
+  'tests/shared/fold-and-focus-atom-strip-cases.txt'.
+
+  A client given a delta patches the buffer instead of redrawing it.
+  It replaces each listed headline line, found by its viewnode ID, by
+  that viewnode ID's line in the stripped form of the new text,
+  inserted as text; re-heralds the replaced lines, the folders among
+  their two nearest ancestors and the headlines one or two levels
+  below them (whose heralds read them); and then compares the whole
+  buffer with the stripped form of the new text. On success it keeps
+  its folds and point, marks the buffer unmodified, takes the
+  stripped form as the view's baseline (see "The baseline of a view")
+  and refreshes the link annotations. It redraws the whole buffer
+  from the new text instead when a listed viewnode ID is missing from
+  the buffer or from the new text, when the comparison finds any
+  difference (a line the client reprinted otherwise than the server,
+  say), or, in Emacs, when 'org-fold-core-style' is not 'overlays'
+  (under 'text-properties' a replaced headline above a folded body
+  would hide itself). Both clients do this for the =save-result=:
+  Emacs in 'skg--patch-buffer-with-delta'
+  ('elisp/skg-redraw-delta.el'), Neovim in 'patch_buffer_with_delta'
+  ('nvim/lua/skg/redraw_delta.lua'). Each rewrites only the span of a
+  line between the prefix and the suffix the old and new line share,
+  so the cursor keeps its character on the line; in Neovim this also
+  keeps the vim folds, since replacing a whole line
+  ('nvim_buf_set_lines') opens closed expr folds where replacing a
+  span ('nvim_buf_set_text') does not. A Neovim view opened from text
+  acts on that text's fold and focus atoms as a whole redraw does,
+  removing them, so its first save can be patched; the Emacs opener
+  keeps them as text ('TODO/problems.org').

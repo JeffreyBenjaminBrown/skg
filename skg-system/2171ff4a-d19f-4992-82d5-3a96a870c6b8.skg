@@ -1,0 +1,12 @@
+title: 1. FS (=server/save.rs::update_fs_from_saveinstructions=)
+pid: 2171ff4a-d19f-4992-82d5-3a96a870c6b8
+body: |2-
+  The new =.skg= file is written to the new skgrepo directory first
+  (via =write_all_nodes_to_fs=). Then, for each =RepoMove=, the
+  *old* file is removed via =std::fs::remove_file=. "Write first,
+  then delete" is intentional: if the process crashes between these
+  two steps, the data still exists, just at the new location, and the
+  old location's file is at worst stale.
+
+  If the old file is already missing (=ErrorKind::NotFound=), the
+  removal is a silent no-op rather than an error.

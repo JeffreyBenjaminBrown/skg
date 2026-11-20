@@ -1,0 +1,6 @@
+title: instructionMerge ("merge" is always qualified)
+pid: d217122d-b0e3-4ba9-994e-b39b0686f4ea
+body: |2-
+  An /instructionMerge/ is the combining of emitted save intents into
+  the map during local fieldIntent collection. It shares nothing with
+  a nodeMerge (the =NodeMerge= type) but the word.

@@ -1,0 +1,78 @@
+title: skgrepo-sets
+pid: 0f501e3e-a31b-45f0-83ca-aa95d5398992
+body: |2-
+    - Skgrepo-sets are the prefixes of the config's privacy ladder, the
+      owned skgrepos (see "skgconfig.toml > skgrepo-sets" below): each
+      owned skgrepo's name denotes itself plus every more public owned
+      one. The skgrepo restriction is two things: one such rung, the
+      most private owned skgrepo shown, and whether the foreign
+      skgrepos are shown ("shown" unless a connection hides them). Its
+      set is the rung's prefix, plus every foreign skgrepo when they
+      are shown. A connection that shows the config's most private
+      owned skgrepo and the foreign skgrepos is unrestricted.
+    - Request: ((request . "list repo sets"))
+    - Response: LP response-type "repo-sets" with
+      =((restriction "NAME") (foreign-repos "shown"|"hidden") (sets
+      ("NAME1" "NAME2" ...)))=. The sets are the owned skgrepo names in
+      privacy order (most public first), the last of them no skgrepo
+      restriction when foreign skgrepos are shown; order is meaningful
+      (it is the privacy ladder), so clients should preserve it.
+    - Request: ((request . "skgrepo restriction"))
+    - Response: LP response-type "skgrepo-restriction" with
+      =((restriction "NAME") (foreign-repos "shown"|"hidden"))=.
+    - Request: =((request . "set skgrepo restriction") (name . "NAME")
+      (foreign-repos . "shown"|"hidden") (approved-overPrivateText-pids
+      "PID" ...))=, NAME the most private owned skgrepo to show. Either
+      of =name= and =foreign-repos= may be left out, and then stays as
+      it is; one of them must be present.
+    - Response: Multiple length-prefixed messages, sent sequentially:
+      1. Skgrepo-set response:
+         =Content-Length: N\r\n\r\n((response-type skgrepo-restriction) (restriction "NAME") (foreign-repos "shown"))=
+      2. The rerender stream, as in "rerender all views":
+         rerender-lock → rerender-view* → rerender-done. Each open view
+         is re-rendered in place under the new set by the refresh alone:
+         every occurrence of a node the new set keeps out becomes, in
+         place, a restricted viewnode where a record the set shows names
+         it, keeping its viewchildren, and vanishes elsewhere, with its
+         subtree; a member whose record alone the new set keeps out
+         vanishes too, where its parent reads claims; an editable
+         folder whose every member's record the new set keeps out stays,
+         empty, as any empty editable folder does; and the refresh fills
+         every folder per the new set, so a skgrepo widening makes each
+         restricted viewnode an occurrence again and draws again the
+         members and folders it reveals. A view root the new set keeps
+         out stays, as a restricted viewnode, whether or not a record
+         names it. The folders under an occurrence that became a
+         restricted viewnode become tombstones, holding their members,
+         and stay tombstones after a skgrepo widening. None of this is
+         reported: the response names the new skgrepo restriction, and
+         nothing more (see "Restricted-skgrepo nodes" below).
+    - Behavior: The skgrepo restriction is per TCP connection. It
+      defaults from =skgconfig.toml=, resets on reconnect, and is not
+      written back to the config. Changing it requires confirmation in
+      either client, and re-renders (not closes) all active Skg buffers for that
+      connection. The rerender starts from each view as the server last
+      stored it, and the clients replace each buffer's text with the
+      result, which would lose an unsaved edit; so each client refuses
+      the switch while any view has unsaved edits ("Save or revert
+      every skg view before switching the skgrepo restriction"), before
+      it sends the request. The server's own refusals are the two
+      below.
+    - Refusal: the endpoint's error paths (neither a name nor
+      =foreign-repos=; a =foreign-repos= other than "shown" or "hidden";
+      or a name that names no owned skgrepo of the config, a foreign one
+      included: "'NAME' names no owned skgrepo of the config. The
+      skgrepo restriction is the most private owned skgrepo to show;
+      foreign skgrepos are shown or hidden apart from it.") answer in
+      the normal skgrepo-restriction response-type,
+      carrying the explanatory text as =content= and the unchanged set
+      as =restriction=, followed by an empty rerender stream (a
+      rerender-lock naming no views, then rerender-done), so the
+      client's preemptive buffer locks and its stream-in-progress guard
+      unwind.
+    - Rerender authorization precedes both the set change and release of
+      view text. If the proposed set would render an overPrivateText telescope, the
+      first reply is LP =overPrivateText-telescope-confirmation= with
+      =(operation repo-set-switch-rerender)= and exact PIDs, followed by an empty
+      rerender stream. A retry adds =approved-overPrivateText-pids=; declining
+      leaves the skgrepo restriction and open-view registry unchanged.

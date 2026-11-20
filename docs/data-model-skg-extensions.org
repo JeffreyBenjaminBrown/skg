@@ -1,24 +1,26 @@
-* Data Model Skg Extensions
+# This file was generated from the skg node with this ID:
+# 043c2947-bc98-4a70-ba80-44f12b4689d4
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+* Data Model Skg Extensions
 Skg grafts a novel sharing model onto a familiar data model older than Rome.
 ** The familiar part: Trees with links
-This is [[file:./data-model-trees-with-links.org][the data model that almost all serious knowledge mapping software seems to use]].
+This is [[./data-model-trees-with-links.org][the data model that almost all serious knowledge mapping software seems to use]].
 
 (If 'link' sounds weird, just think 'hyperlink'. If you use the internet, you are used to using these.)
-
 *** What the =contains= relation means, and how it differs from links
 Each document is a curated view of data defined by the =contains= relation. Any document that includes the node N also includes every node that descends from N via =contains=.
 
-As described in the [[file:./data-model_technical.org][technical data model]], nodes can
+As described in the [[./data-model_technical.org][technical data model]], nodes can
 be connected by =contains=, =linksTo=, and several other relationships.
 Containment and links differ in two ways:
 
 - Links are defined by the text in a node, whereas containment is defined by nodes' spatial relationships to each other in a tree (the document containing them).
 - Following a link requires the user to jump to a different context, whereas following a containment relationship need only require moving your eyes. If A contains B, looking at A means looking at a document that already contains B underneath A.
 ** Each node of a document is a separate file.
-This is unusual -- in most applications, the entire tree of text would be a single document. The one-file model has the advantage that a document can be easily read without special software. But the Skg model makes it possible to share granularly (see [[file:./sharing-model.org][the sharing model]], and [[file:./diffs-are-clearer-in-skg.org][easy to understand changes]].
+This is unusual -- in most applications, the entire tree of text would be a single document. The one-file model has the advantage that a document can be easily read without special software. But the Skg model makes it possible to share granularly (see [[./sharing-model.org][the sharing model]], and [[./diffs-are-clearer-in-skg.org][easy to understand changes]].
 ** The forks relationship
-A file F can fork file O. Visiting O directly still opens O itself as the raw root. Fork facts can be inspected in the heralds. Separately, wherever O would appear as recursive /content/ of a node already in view, F can be shown in its place automatically; this is /mirror substitution/ (see [[file:./sharing-model.org][the sharing model]]).
+A file F can fork file O. Visiting O directly still opens O itself as the raw root. Fork facts can be inspected in the heralds. Separately, wherever O would appear as recursive /content/ of a node already in view, F can be shown in its place automatically; this is /mirror substitution/ (see [[./sharing-model.org][the sharing model]]).
 
 Forking is useful for both sharing and privacy, as is explained below.
 

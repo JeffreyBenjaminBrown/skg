@@ -1,18 +1,19 @@
-* Forks
+# This file was generated from the skg node with this ID:
+# 1c6e493f-b9ff-49c2-8642-729de8b37e85
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+* Forks
 The *fork operation* turns a /foreign/ node — one in a skgrepo you do *not* own,
 hence write-protected — into an editable *clone* in a skgrepo you /do/ own,
 which forks it (so the clone is a fork of the original).
 The clone keeps a live link to the original, so the original's later
 additions still reach you, but your edits never touch the original.
 
-See also [[file:./sharing-model.org][the sharing model]] for the underlying
+See also [[./sharing-model.org][the sharing model]] for the underlying
 relations (=forks=,
 =hides=) and =glossary.org= ("clone, and the fork operation",
 "forkee as such", "mirror substitution").
-
 ** The implicit gesture: editing a foreign node
-
 You do not run a special command. You just *edit the foreign node*:
 
 1. Make the foreign node /editable/ with the editable-view
@@ -56,9 +57,7 @@ default skgrepo.
 - *Decline* (=C-c C-k=, or just leave the buffer) aborts the /whole/
   save — nothing is written. The confirmation buffer stays open, so you
   can still search it for the IDs involved.
-
 ** Adding new content under a foreign node
-
 Appending a *new* headline under a foreign node is also just an
 edit: it changes the foreign node's child list, so it forks it. The
 new node itself needs an owned skgrepo too:
@@ -73,9 +72,7 @@ new node itself needs an owned skgrepo too:
   so the confirmation flow asks nothing beyond the approve.
 - A new headline that explicitly names a *foreign* skgrepo is an
   error, as ever: foreign skgrepos cannot be written.
-
 ** What the clone is
-
 When you fork a foreign node =N=, the clone =C= is a new node in a skgrepo
 you own. =C=:
 
@@ -97,7 +94,7 @@ you own. =C=:
   where =N= itself stands, so =N= stays there, unedited, until you
   switch the view to =C='s skgrepo's perspective, =C-c v o=, as the
   save's warning says; see
-  [[file:./mirrors.org][mirrors.org]], "Mirror substitution");
+  [[./mirrors.org][mirrors.org]], "Mirror substitution");
 - *hides* any child of =N= that your forking edit /deleted/, so what
   you dismissed does not come straight back as unintegrated forked
   content (below). Later deletions from =C= hide likewise, unless
@@ -115,9 +112,7 @@ all. (The inference takes =N='s /immediate/ owned container, never a
 distant owned node reached by skipping a foreign ancestor.)
 
 =N= itself is left completely untouched on disk.
-
 ** The explicit gesture: forking a node you own
-
 Editing a foreign node forks it implicitly. To fork a node you *already
 own* — for example a public clone =C= you made above, which you now want
 to layer a /private/ version =D= on top of — there is an explicit
@@ -143,10 +138,10 @@ Two differences from the implicit fork:
 
 The result is a *fork chain*: =D forks C forks N=. Chains
 of any length are legal, and so are cycles (see
-[[file:./sharing-model.org][the sharing model]]). When all skgrepos are unrestricted,
+[[./sharing-model.org][the sharing model]]). When all skgrepos are unrestricted,
 viewing =N='s container from the perspective of =D='s skgrepo shows
 the chain's end =D=, where =N= is not in that skgrepo (in its own
-skgrepo =N= itself stands; see [[file:./mirrors.org][mirrors.org]],
+skgrepo =N= itself stands; see [[./mirrors.org][mirrors.org]],
 "Which mirror stands"); restrict the skgrepo-set to hide =D='s
 skgrepo and the same view shows =C=, where =C='s skgrepo is declared
 before =N='s — either way =N= stays in the container's contents. If you point
@@ -157,16 +152,14 @@ fork shown — deepening the chain, never re-forking the node it stands for.
 If you already fork the node, =skg-fork-node= is rejected by the same
 guard (below); deepen the chain by forking your /fork/, not the
 already-forked node.
-
 ** Unintegrated content: the forks folder
-
 Because =C= forks =N=, a generated *forksFolder* ("It forks these, or
 these fork it, or these fork or are forked by others here.") appears
 under =C= listing =N=, claiming, as a
 /forkee as such/. The same folder lists, after
 the forkees, the notes that fork =C=, and then =C='s other mirrors,
 each claiming nothing (deleting one hides it, attaching it makes =C=
-fork it: [[file:./sharing-model.org][sharing-model.org]], "The
+fork it: [[./sharing-model.org][sharing-model.org]], "The
 forks folder"; see "Every mirror, flat", below). A forkee's content is exactly
 what you have *not* yet integrated: a forkee as such shows only the
 children its forker (=C=) neither hides nor already contains, and that
@@ -175,9 +168,7 @@ below). A fresh clone has ~C.contains == N.contains~, so it starts
 showing no content: every child you copied stands, folded, in its
 folder of what you keep elsewhere. As the original gains new children
 you have not pulled in, they appear among its content.
-
 *** An example
-
 Suppose this document, =mysticism=, is yours, and =eggs= belongs to your
 friend Egg Man (a skgrepo you do not own):
 
@@ -230,15 +221,13 @@ forkee as such:
 ,**** Which came first, the chicken or the egg?
 #+end_example
 
-Since [[file:./tree-folding-is-powerful.org][branches can be folded]], even
+Since [[./tree-folding-is-powerful.org][branches can be folded]], even
 hundreds of new originals' children need not clutter your view. To
 integrate one, move it into your clone's own content, or into any
 other note of yours; it then leaves the forkee's content for its
 folder of what you keep elsewhere. You can also hide individual
 children.
-
 *** Every mirror, flat
-
 A note's forks folder lists every mirror of it, each once: what it
 forks, what forks it, and the rest of the family, each note joined to
 it only through others (a fork of what it forks, say), an /indirect
@@ -272,9 +261,7 @@ alike: a hide of something only an indirect member contains stands
 under that member, in its folder of what your note hides in it. Its
 own hides of your note's content are not drawn under it: they apply
 to what it forks, not to your note.
-
 *** What you keep elsewhere
-
 A child of a member as such is integrated when you keep it somewhere:
 when any note of your graph contains it, your graph being the notes
 of your owned skgrepos, as the skgrepo restriction shows them, the
@@ -347,9 +334,7 @@ shows what you keep elsewhere among its content, and counts it among
 what it shows ('(unintegrated N)'), and no such folder is drawn. A buffer drawn before this rule shows such children under a
 member, claiming; the next refresh leaves them out, and a save of it
 before then hides nothing it did not draw.
-
 *** Writing in an unintegrated child integrates it
-
 Writing anything within an unintegrated child, where the
 forkee as such draws it, integrates that child for you: typing
 a reply under it (which forks it, if it is foreign), editing it, or
@@ -374,9 +359,7 @@ that note's skgrepo, goes on drawing the mirror that skgrepo's list
 ranks first, usually the original; the save warns that it does, and
 that switching the view to your fork's skgrepo's perspective
 (=C-c v o=) shows the fork.
-
 *** Adding a child under a member as such
-
 A member as such of the forks folder, forkee or forker, shows its
 content in part, so the save never reads what stands under it as its
 whole list. But a child you place under it that its list does not
@@ -395,9 +378,7 @@ member: the view's baseline shows that child under the member too, so
 the member, which the graph changed under the view, is left as the
 graph has it, with a warning; and if the view edits the member, the
 save is refused ('server/serve/handlers/save_staleness.rs').
-
 *** Typing a note into the folder
-
 Only what the view drew under a member can be cut from it. A note you
 type into the forks folder in a save (or move there from elsewhere)
 was not drawn there, so nothing was drawn under it: the save hides
@@ -412,9 +393,7 @@ under a member as such"), and a child of it your note hides, typed
 under it, is unhidden. The redrawn view shows it as any member: what
 it shows of its content stands under it, and you may cut from it in
 the next save ('tests/members_typed_into_a_forks_folder.rs').
-
 *** Moving a member out of the folder
-
 A save never reads a node's content from a headline the view drew
 without that content. A child drawn in a member's folder of what you
 keep elsewhere, or of what your note hides in it, is drawn
@@ -433,9 +412,7 @@ typed under it in that same save joins no list, and the save warns of
 the orphan. Its folders of what you keep elsewhere and of what your
 note hides in it belong under a member only, so a save that moves them
 out with it is refused ('tests/moved_headlines_whose_content_was_not_drawn.rs').
-
 *** Cutting from a forker
-
 A note that forks yours stands in your note's forks folder too, as a
 /forker as such/, claiming nothing, showing what it adds to your
 note: its content less what yours contains or hides, and less what
@@ -475,9 +452,7 @@ reading another's note) the save is refused, as a cut from a forkee
 there is. The view the save redraws gives the forker's headline its
 claim, as every view the server draws does (see "Claims in a redrawn
 view").
-
 *** Forks of one note meet
-
 Two notes R and T, both yours, fork one note N. N contains X1 to X4
 and hides Z; R contains X1, X2, X3; T contains X1, X3, Y, Z and hides
 X2. Each view shows the others, through its flat forks folder:
@@ -536,9 +511,7 @@ drawn under a forker as such only. Each of these saved views, saved
 again unchanged, writes nothing ('tests/forks_meet.rs';
 'tests/integration/forks-meet/' drives the same scenario through each
 client).
-
 *** Claims in a redrawn view
-
 In a forks folder a member claims exactly when your note forks it;
 taking its claim away (a detachment) and saving ends the fork. So
 every view the server draws gives each member the claim the graph
@@ -556,9 +529,7 @@ nobody wrote, which the next save of that view would carry out.
 What the server cannot tell from a detachment is text you send back
 yourself: undoing past a save and saving the old text again, where
 the forker claimed nothing, ends the fork, as any detachment does.
-
 ** Editing the clone: deletions become hides
-
 Suppose the clone =C= and the original =N= both contain a child =X=,
 and you delete =X= from =C= (or move it out of your notes). Without more, =X=
 would immediately resurface under =C= as unintegrated forked
@@ -602,9 +573,7 @@ a mirror of none of it. Emacs shows the lines in the echo area after the
 save, Neovim notifies them, and skg-for-ai prints them in the report
 before the save as well as after it ('docs/api-and-formats.org', "Save
 buffer").
-
 ** Taking back a fork
-
 Where your clone =C= of =N= is drawn in =N='s place, the list it stands
 in still names =N=, not =C=. Under someone else's note, in a view
 switched to your fork's skgrepo's perspective (=C-c v o=), that is how your reply to
@@ -640,7 +609,6 @@ Removing =C='s headline, without deleting it, is another gesture: it
 takes =N= out of the list =C= stood in, as removing any child does.
 Under someone else's note that is an edit of their note, so it forks
 it, and the save asks first.
-
 ** Attribution
 A reply is often made by forking someone's note and writing under the
 fork. Read later, the fork would look like the forker's own words. So
@@ -654,7 +622,6 @@ drawn under it, with no attribution of the same skgrepo, says its own
 =⌂:FORKER=, so the herald marks where the voice switches back
 ('docs/heralds.org', "Other heralds"). A fork of Claude's note into Jeff's skgrepo =jeff-decid=
 reads =⌂:<jeff-decid/claude-public>=.
-
 *** What is recorded, and when
 Only the fork operation writes it, once, when it makes the clone, and
 only when the original's home skgrepo is not the clone's: a fork
@@ -678,7 +645,6 @@ that acquires it, and its skgrepo not being loaded. The fields
   commit: the commit then lacks the text forked, which only the
   clone's own first version holds (its first git commit, if the
   forker commits before editing).
-
 *** Which skgrepo the herald names
 The herald shows the current name of the loaded skgrepo whose remote
 has the recorded hash, so renaming that skgrepo in a config renames
@@ -687,14 +653,12 @@ name if a skgrepo of that name, with no remote either, is loaded.
 Otherwise it shows the recorded name followed by =?=:
 =⌂:<jeff-decid/claude-public?>= says no loaded skgrepo is known to
 be the one recorded.
-
 *** Removing it
 =skg-strip-attribution= (Emacs, on the headline; =:SkgStripAttribution=
 in Neovim; the word =stripAttribution= in a handle of skg-for-ai)
 writes the request =stripAttribution=; the next save removes the
 attribution. A note meant as your own words, an evergreen note say,
 need not keep one; a reply in a dialog should.
-
 *** Checking and fixing them
 At startup the server warns of doubtful attributions among the notes
 of your skgrepos, counted by kind: a recorded remote no loaded skgrepo
@@ -707,20 +671,16 @@ rewrites every attribution in your skgrepos whose remote hash or
 recorded name is OLD to name SKGREPO as it is now, its name and its
 remote's hash; the original and the commit stay. (Run them as
 =cargo run --bin skg -- check-attributions CONFIG=, and so on.)
-
 *** What the original said
 =skg show-forked-original CONFIG FORK_ID= prints the original's file
 as it was at the recorded commit, read from the gitrepo of the loaded
 skgrepo the attribution names, with a warning first when the
 attribution says the file was uncommitted then.
-
 *** Forks made before attributions
 =tools/migrate-attributions-2026-11/= gives the forks you own an
 attribution from the first note each one's file lists under =forks=,
 with no commit, since that is not known. Its =README.org= says how.
-
 ** Once forked: the fork operation's guard
-
 If you try to fork something you already fork, the save is rejected
 with a message naming your fork of it — edit that fork instead. This
 guards the gesture, not the data: an edit that silently made a second
@@ -731,9 +691,7 @@ make another note of yours fork it.
 A note may not fork itself, nor contain a note it forks or a note that
 forks it: a fork is the same note, and containing it is like containing
 oneself. The save refuses each.
-
 ** Conclusion
-
 You and Egg Man focus on exactly what each of you cares about. Your
 "changes" to Egg Man's data never affect Egg Man's experience. If you
 make public that you integrated his note, and he has chosen to see such

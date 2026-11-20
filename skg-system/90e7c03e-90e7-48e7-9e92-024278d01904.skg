@@ -1,0 +1,11 @@
+title: When orchestrating a plan
+pid: 90e7c03e-90e7-48e7-9e92-024278d01904
+body: |2-
+  The same two reasons stop a run that an orchestrator drives slice
+  by slice ('orchestration.org'). A slice that ends without DONE for
+  one of them stops the run; so does a slice whose suites are red at
+  its end and whose failures the orchestrator cannot classify as
+  expected, pre-existing or flaky; so does a slice that changed a
+  behavior the plan's "What stays" names. A correction that needs no
+  decision of Jeff's is not a stop: it becomes a stage in the plan
+  before the next launch.

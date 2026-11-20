@@ -1,9 +1,11 @@
-* Folding branches lets you handle more data.
+# This file was generated from the skg node with this ID:
+# 66047d79-48bf-4d5d-b4ba-811779bb7d14
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+* Folding branches lets you handle more data.
 Folding a branch just means temporarily hiding its descendents. It lets you handle more data than you could otherwise, by letting you see only the parts you want to see at any given moment.
 
 This idea is only a few decades old, because you really need electronic apps in order to conveniently fold trees.
-
 ** An example of folding
 For instance, you might have a document like this:
 #+begin_example

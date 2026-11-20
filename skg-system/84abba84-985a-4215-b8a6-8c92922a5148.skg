@@ -1,0 +1,8 @@
+title: save-inert
+pid: 84abba84-985a-4215-b8a6-8c92922a5148
+body: |2-
+  A viewnode is *save-inert* if it emits no fieldIntents: tombstones,
+  change viewnodes, the diff view's acquisition folders, a ghost that
+  claims nothing, and an alias or ID member that claims nothing (a
+  removed alias or ID among them). Its descendants may still emit them, so save
+  extraction still visits them.

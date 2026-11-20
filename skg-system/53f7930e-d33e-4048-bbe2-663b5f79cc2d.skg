@@ -1,0 +1,6 @@
+title: The 'server' does the heavy lifting.
+pid: 53f7930e-d33e-4048-bbe2-663b5f79cc2d
+body: |2-
+  It is an app that the user only controls through the client.
+  The server manipulates the graph,
+  and creates views of it (as plain text) for the client.

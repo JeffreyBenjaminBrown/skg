@@ -1,0 +1,12 @@
+title: Forks of foreign data require two more relationships.
+pid: 7698f204-7be7-478e-93b3-f88ffab7159c
+body: |2-
+  The two relations are called 'forks' and 'hides' (as in "hides from its forks").
+
+  When I "edit" a node of yours, I don't change anything for you. I instead create a fork of your node. That fork is a node very much like yours: it has the same text and the same content, except to the extent that I edited those.
+
+  But the fork is created with a new relationship: the fork 'forks' your node. That means two things. First, whenever I view a note of mine involving your node, I will in place of your node see my fork of it. Second, if you add content to your node, it will be visible to me, under my fork.
+
+  (A node can fork multiple other nodes, but let's ignore that for now.)
+
+  If I delete a node from your node's content, that creates a 'hides' relationship from my fork to the deleted node, unless I keep it in another node of mine. Under my fork, I see only the things your node contains that my node neither contains nor hides, and that no other node of mine contains.

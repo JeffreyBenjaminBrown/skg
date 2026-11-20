@@ -1,0 +1,19 @@
+title: Running Tests
+pid: 9d2c6d1f-d70f-4689-ba4f-7397d4f668f9
+body: |2-
+  There are three ways to test the code:
+
+  1. **Emacs Lisp tests**: `bash/emacs-tests.sh`
+     - Runs all automated Emacs tests in `tests/elisp/`
+     - Uses Emacs batch mode with ERT (Emacs Lisp Regression Testing)
+     - Some tests require `cargo run` to be running
+
+  2. **Rust unit/integration tests**: `cargo nextest run`
+     - Runs Rust tests in parallel
+     - Uses service-free graph fixtures and isolated Tantivy directories
+
+  3. **Integration tests**: `bash/integration-tests.sh`
+     - Runs end-to-end tests that exercise both Rust and Emacs components
+     - Tests run in parallel with isolated configurations
+     - The integration runner starts and stops isolated Skg servers
+     - Individual tests located in `tests/integration/*/run-test.sh`

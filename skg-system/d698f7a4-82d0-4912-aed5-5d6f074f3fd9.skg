@@ -1,0 +1,34 @@
+title: warranted, 'noWarrant', 'ghostWarrant'
+pid: d698f7a4-82d0-4912-aed5-5d6f074f3fd9
+body: |2-
+  A child *is warranted* when the truth relates it to its viewparent as
+  its position implies: content its occurrence contains, a partner of
+  the folder's relation in a folder, a container of the node above it
+  in the containerward chain, a property of the node in a property
+  folder. In the diff view HEAD alone may warrant it: a *ghost warrant*,
+  for a relationship HEAD has and the worktree lacks (see "removed
+  member, former member"), or for a ghost under a parent that contained
+  it at HEAD. The warrant is a derived fact, recomputed at every
+  refresh, and written in =(view ...)= as =noWarrant= (herald ⊥) or
+  =ghostWarrant= (herald ᗣ), nothing meaning warranted by the truth; a
+  root carries none, and a ghost no =ghostWarrant=, its kind being its
+  own herald ('Warrant { ByGraph, ByHead, No }', 'warrant' in
+  code). 'Warrant::ByGraph' is the truth's warrant (see "the truth"):
+  the graph as the skgrepo restriction lets it be seen; a root, whose
+  position implies no relationship, carries it too, and the wire
+  writes nothing for it. Claim and warrant are independent: a child
+  the user typed under a write-protected parent, which stays
+  unwarranted, since no save reads claims there, carries no =noClaim=.
+  A tombstone has no goal, so its children carry no warrant fact, but
+  for an orphan graphnode, which no list contains: it is unwarranted
+  there too. In the write-protected hides folder (=hiddenFolder=) a
+  graphnode its viewparent hides by no record vanishes, so that a
+  graphnode a save unhid leaves it; a hide the skgrepo restriction
+  keeps out stays, unwarranted ('mark_claims' in
+  'server/refresh/visit.rs'). In the hidden-by folder
+  (=hiddenByForkerFolder=) under a member that is no forker as
+  such, a forker a cut made a forkee, every member vanishes, so the
+  folder goes, as a fresh view would not draw it
+  ('is_hiddenByForkerFolder_under_no_forker_as_such').
+  The refresh keeps an unwarranted child where it stands; it never
+  removes a child.

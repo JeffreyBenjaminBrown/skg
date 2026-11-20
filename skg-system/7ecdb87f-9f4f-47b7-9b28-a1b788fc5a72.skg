@@ -1,0 +1,16 @@
+title: 'C-c v r : skg-readable-ids-mode'
+pid: 7ecdb87f-9f4f-47b7-9b28-a1b788fc5a72
+body: |2-
+  This changes how node IDs are displayed.
+  The ID itself is a kind of special random gibberish called UUID v4.
+  When skg-readable-ids-mode is on,
+  only the first 8 characters of the ID are shown,
+  and they are followed by the title of the node with that ID,
+  if Skg can figure it out.
+  (It doesn't yet know how to read the git history
+  to find titles for deleted files.)
+
+  The ID-to-title map is cached for the whole Emacs session, so a
+  magit refresh (e.g. after every staging event) re-requests nothing
+  it has already seen; a refresh whose IDs are all cached costs no
+  server round-trip at all. See =C-c v R= for when it goes stale.

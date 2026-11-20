@@ -1,5 +1,8 @@
-* Avoid legacy support code
+# This file was generated from the skg node with this ID:
+# c3111e91-f55e-49b3-8416-cbd4aaf7afa0
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+* Avoid legacy support code
 If I ask you to change a name, even if it's part of the API,
 don't create 'legacy support' code for the old name.
 This repo contains all the relevant code; so far,

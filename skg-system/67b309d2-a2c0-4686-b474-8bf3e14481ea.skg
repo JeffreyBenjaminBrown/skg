@@ -1,0 +1,7 @@
+title: parent and child
+pid: 67b309d2-a2c0-4686-b474-8bf3e14481ea
+body: |2-
+  In the display, the parent-child relationship
+    can be used to display multiple kinds of relationship.
+  In the Skg graph there are no parents or children --
+    there are instead explicit named relationships.

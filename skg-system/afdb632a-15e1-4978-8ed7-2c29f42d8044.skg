@@ -1,0 +1,25 @@
+title: view, buffer, viewforest
+pid: afdb632a-15e1-4978-8ed7-2c29f42d8044
+body: |2-
+  A *view* is one open window onto the graph: a content view, which
+  shows nodes and what they contain, or a search view. A *buffer* is
+  the editor's container for one view (an Emacs or Neovim buffer). A
+  view's *viewforest* is its tree of viewnodes, under a buffer root;
+  say "viewforest" rather than "viewtree" or "forest". The buffer as a
+  whole is named by its viewforest id (see "viewnode ID, vnid,
+  viewforest id").
+
+  A *content view proper* is a content view that is nothing else: not
+  a buffer of the diff view, which the server registers as a content
+  view ('ViewforestId::ContentView') marked as one of the diff view's
+  buffers ('OpenViews::is_content_view_proper' in
+  'server/types/views_state.rs'). A view request for a node that is a
+  root of an open view switches only to a content view proper.
+
+  A *view root* is a root of a viewforest: a level-one headline.
+
+  A *viewbranch* is any subtree of a viewforest: a viewnode with all its
+  descendants. A view request asks the server to add viewbranches: a
+  folder (with its members' chains), the flags folder. A
+  viewbranch may be degenerate,
+  with one viewchild or none; compare "branching viewnode".

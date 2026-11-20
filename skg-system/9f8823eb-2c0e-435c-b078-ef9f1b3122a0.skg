@@ -1,0 +1,13 @@
+title: restore request
+pid: 9f8823eb-2c0e-435c-b078-ef9f1b3122a0
+body: |2-
+  Either of the two edit requests that undo a removal in the diff
+  view. '(editRequest restoreNode)', on a ghost,
+  writes its node back as HEAD had it, in-links included;
+  '(editRequest restoreRel)', on a removed membership (a removed
+  member in content position, or a member of a partner folder whose
+  relationship to the folder's viewparent was removed), re-adds that
+  one relationship as HEAD recorded it. C-c s n ('skg-restore-deleted-node') and C-c s l
+  ('skg-restore-removed-membership') write them, and a save applies
+  and consumes them as it does every edit request
+  ('docs/diff-view.org', "Restoring what a change removed").

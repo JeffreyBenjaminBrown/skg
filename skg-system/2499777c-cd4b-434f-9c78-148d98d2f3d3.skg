@@ -1,0 +1,13 @@
+title: The server writes the change facts
+pid: 2499777c-cd4b-434f-9c78-148d98d2f3d3
+body: |2-
+  The server writes the =(diff ...)= form (=diff_form= in
+  =server/org_to_text.rs=), and it sets =(processed ...)= and =(leaves
+  ...)= in the tail of the refresh (=set_processed_facts_in_viewforest=); see
+  =docs/diff-view.org=, "Change facts on the wire". A rerender of a
+  buffer of the diff view recomputes each kept viewnode's change facts
+  in place from the graph straddle, and so does a save of such a
+  buffer; see "Diff view" and "Save buffer" above. The parser skips
+  =(diff ...)= whole, so editing a change fact changes nothing. The
+  clients read =(leaves ...)= to build their requests and to count the
+  leaves an unmark touches.

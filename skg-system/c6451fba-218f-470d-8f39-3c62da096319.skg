@@ -1,0 +1,4 @@
+title: links
+pid: c6451fba-218f-470d-8f39-3c62da096319
+body: |2-
+  Any text at any node (so both title and body) can contain any number of links to other nodes. A link is defined by the ID of its target and an arbitrary label invented by the author. A link points from its "mentioner" node to its "mentioned" node; the relation is "links to".

@@ -1,0 +1,11 @@
+title: herald
+pid: b22d68ec-2014-4cc3-b0eb-748454dea1b9
+body: |2-
+  A *herald* is a short styled token a client shows at the start of a
+  headline in place of a part of its metadata, when heralds are on
+  (=C-c v h=; =<localleader>vh= in Neovim): =☮= for write-protected,
+  =⊥= for unwarranted, =restricted= for a restricted viewnode, and so
+  on. The server serves the rule table that maps metadata to heralds,
+  and both clients draw by it. 'docs/heralds.org' is the legend of
+  every herald and its style. Decorations on text that is not metadata
+  (the label after a link, say) are *annotations*, not heralds.

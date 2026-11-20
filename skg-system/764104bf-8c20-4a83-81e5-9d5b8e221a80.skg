@@ -1,0 +1,10 @@
+title: Direct editing and imported data
+pid: 764104bf-8c20-4a83-81e5-9d5b8e221a80
+body: |2-
+  The forks folder is editable: a member typed there makes its
+  viewparent fork it, and a forkee removed from it ends that =forks=
+  relationship (a mutual removed from it is hidden too); a forker, or
+  another mirror (an indirect member), removed from it is hidden by its
+  viewparent (sharing-model.org, "The forks folder: what a note forks,
+  and what forks it").  Raw or imported =.skg= data can contain =forks= facts
+  too.

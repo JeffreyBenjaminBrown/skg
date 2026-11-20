@@ -1,0 +1,16 @@
+title: Use a test ladder
+pid: 45c2bb63-7673-44f9-9acf-795d3ee5e0a9
+body: |2-
+  For code changes, start with the smallest test that proves the local edit.
+  At a coherent work boundary run the affected group, at a signature/dependency
+  boundary run =cargo check --all-targets=, and at the settled endpoint run the complete
+  suite. Reuse green evidence only while the relevant code and dependency
+  surface remain unchanged; when using fingerprints, check their scope too.
+
+  Stop at the first useful failure during development.  Run broad
+  =--no-fail-fast= censuses only when learning the complete failure set is the
+  purpose.  Before fixing a failure that fans out, classify it as a contract
+  regression, expected fixture adaptation, overlapping in-progress edit,
+  infrastructure failure, or unrelated pre-existing issue.  Record that
+  classification beside the first failure so subsequent work does not repeat
+  the census or mistake fixture maintenance for product work.

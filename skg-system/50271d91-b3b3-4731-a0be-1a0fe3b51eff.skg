@@ -1,0 +1,41 @@
+title: Rebuild session-lifetime stores
+pid: 50271d91-b3b3-4731-a0be-1a0fe3b51eff
+body: |2-
+    - Request: ((request . "rebuild session-lifetime stores"))
+    - Response: LP response-type "rebuild-session-lifetime-stores" with =((content "..."))=.
+      Content reports that the config was reloaded and the graph and
+      Tantivy rebuilt on success, followed by one line "Warning: ..." per
+      warning of the reload, or "Rebuild failed: ..." on error.
+    - Behavior: Re-reads the config file the server started with (an
+      edited skgrepo list included), then reads the authoritative =.skg= files once, validates a complete
+      candidate graph, builds that graph and a fresh Tantivy index from the same
+      node vector, then atomically swaps in the new runtime generation. It does
+      not rewrite =.skg= files. Failure, an invalid config included, leaves
+      the old generation live. Success rewrites the owned skgrepos'
+      =OTHER_SKGREPO_DEPENDENCIES.toml= as a startup does, and warns, as
+      a startup does, of unknown config keys, illegal edits to foreign
+      nodes and disputed foreign fold orders, and of a changed =port= or
+      =timing_log=, which take
+      effect only at a restart; the server's startup warnings ("Server
+      warnings") stay as they were. Each connection's skgrepo restriction
+      follows the new config at its next request: none stays none, and
+      a restriction keeps its most private skgrepo shown, or, if the
+      config no longer names it as owned, becomes the config's default;
+      either way foreign skgrepos stay shown or hidden as they were. Success
+      keeps the connection's open views, drops the graph straddle of the
+      diff view, and recomputes context rankings for search. A rebuild
+      makes no buffer stale by itself: a save is refused only where a
+      buffer edits a graphnode whose baseline copy no longer matches the
+      rebuilt graph (see "Save
+      buffer", the stale buffer). After a successful rebuild the clients
+      fetch the herald rules again ("Herald rules"), whose skgrepo labels
+      the reloaded config may have changed, and then send "rerender all
+      views", which redraws every view without unsaved edits from the
+      rebuilt graph, under the reconciled restriction, which each view
+      records; a node of a skgrepo the reloaded config no longer names
+      is drawn as an unknown one. A view with unsaved edits keeps its
+      text and baseline, and is compared at its save like any other.
+      Files that
+      change on disk need no rebuild: the server reloads them as they
+      change ("Repo files reloaded"). A rebuild is what applies a
+      changed config.

@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 84912447-844a-45df-beac-7750ecfdb0f3
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * What ensures a document is a tree (i.e. has no cycles)? What prevents cycles or infinite trees?
 Nothing. Skg can't control what data the user creates. But it can warn them, and it can provide finite views of infinite data (see the =repeated= field of the =OrgNode= type for how). So you can't get in trouble.
 

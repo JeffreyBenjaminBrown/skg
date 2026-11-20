@@ -1,0 +1,12 @@
+title: '"diff-view: order-only changes"'
+pid: 9b99374a-1b10-40fb-8054-88e3f7891db2
+body: |2-
+  A flat list, in ID order, of the nodes whose only change is the order
+  of some list: their only leaf is their other changes ("Other changes
+  to a node's file"), each of them a reorder
+  ('ChangeLeaves::order_only_pids'). Each is shown with its other
+  changes, the headline that shows the old order against the new and
+  takes the mark, then its content in the new order, as write-protected
+  members shown without their content. Its sets are empty: it renders
+  no pruned change view. Such a node is in C, so the all-changes buffer
+  shows it too, the same way.

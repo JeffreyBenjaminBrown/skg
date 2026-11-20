@@ -1,0 +1,5 @@
+title: '<localleader>Mnp : :SkgMarkNodeProcessedOutward'
+pid: fa0d7ac8-70eb-48c6-872a-73fd1fde754e
+body: |2-
+  As <localleader>mnP, new nodes walked along every relationship
+  they record. (Emacs: C-u C-u C-c m n p.)

@@ -1,0 +1,5 @@
+title: '<localleader>Ol : :SkgPopLink'
+pid: 540e7375-502f-40b9-b898-c85ef0832475
+body: |2-
+  Like PasteLink,
+  but also removes the node from the stack.

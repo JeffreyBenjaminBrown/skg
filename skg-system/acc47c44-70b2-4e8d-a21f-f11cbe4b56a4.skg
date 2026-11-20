@@ -1,0 +1,8 @@
+title: how 'extra_id's are handled
+pid: acc47c44-70b2-4e8d-a21f-f11cbe4b56a4
+body: |2-
+  If another node references the moved node by an extra_id, that
+  reference does not need updating: the graph's =extra_id_to_pid= map resolves
+  it to the primary ID, which does not change on a move. References by primary
+  ID are also unaffected. So no other =.skg= files need to be
+  touched. (The test suite confirms this for the extra-id case.)

@@ -1,0 +1,14 @@
+title: why
+pid: bcce0bd3-0a9a-4b14-8d02-b79bc72661fc
+body: |2-
+  Every node needs a skgrepo.
+  A headline inherits one from the nearest occurrence above it,
+  passing through folders, ghosts, tombstones, unknown viewnodes and
+  restricted viewnodes; a root, or a headline whose walk up meets an alias, an
+  ID, a flag or a change viewnode first, or meets no occurrence,
+  needs its skgrepo chosen explicitly.
+  nvim-orgmode's insert-heading actions (org_meta_return and
+  org_insert_heading_respect_content) prompt for it when the new
+  headline cannot inherit one; '<localleader>ss' on a headline
+  typed by hand does the same.
+  Save validation catches a node whose skgrepo is missing.

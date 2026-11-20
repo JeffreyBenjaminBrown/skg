@@ -1,0 +1,26 @@
+title: Before writing a rule about existing behavior, read the code path that decides it
+pid: 6ae8ee24-6e92-4f9d-8aec-12ef8104af5c
+body: |2-
+  A plan that says "X happens when Y" is a claim about the code. Three
+  such claims in the TDV effort were false, and each cost a round: that
+  the graph pair identifies a text preserver (it does not; a title
+  heuristic was built and then deleted), that the editable map
+  write-protects a later occurrence so editability cannot move (only an
+  editable occurrence claims its ID, so it can), and that a request on
+  an editable node reaches the cascade (two save rules refused it; the
+  run stopped). The habit: find the function that decides the behavior,
+  read it, and cite it in the plan. If you cannot find it, say so in the
+  plan as an open question rather than stating the rule.
+
+  The rule binds the planner's own sentences as much as the plan's
+  rules. In plan 5 the planner wrote that a save re-sent after it
+  created a child is not refused, without tracing it; the executing
+  agent tested it and found the opposite.
+
+  A rule that two copies of a thing are equal must say in which
+  canonical form they are compared. Plan 2_2 said a graphnode the
+  buffer shows "as the graph has it" never refuses a save, and
+  compared raw ID lists; a graph's content list can name one graphnode
+  twice (an extra ID after a nodeMerge) where a view draws it once, so
+  every save of a view of such a container was refused until a probe
+  found it.

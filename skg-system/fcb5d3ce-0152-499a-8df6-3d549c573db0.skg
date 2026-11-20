@@ -1,0 +1,7 @@
+title: Folding decisions
+pid: fcb5d3ce-0152-499a-8df6-3d549c573db0
+body: |2-
+  When Jeff settles something, fold it into the body (a table, a plan
+  step, an open-question answer), and leave a one-line child saying
+  where it went, e.g. '[Claude]: folded into the relation-sides
+  table.'

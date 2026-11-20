@@ -1,0 +1,6 @@
+title: what that means
+pid: 3dd06ca9-48bc-4361-a64f-c93074a90d88
+body: |2-
+  Each SkgNode has a 'title' (some text that is always shown),
+  a 'body' (some text that can be hidden via 'folding'),
+  and some relationships to other nodes.

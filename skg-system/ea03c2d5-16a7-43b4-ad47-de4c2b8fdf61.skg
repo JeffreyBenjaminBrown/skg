@@ -1,0 +1,11 @@
+title: The linkstack
+pid: ea03c2d5-16a7-43b4-ad47-de4c2b8fdf61
+body: |2-
+  is, like it sounds, a stack of links.
+  A stack is just a list that you interact with,
+  mostly from one side, the 'top':
+  You can 'push' something onto the top of the stack,
+  and you can 'pop' something off of the top of the stack.
+  But you can also jump to a view of your entire stack,
+  using (copying, pasting, deleting) it
+  without any restrictions on order.

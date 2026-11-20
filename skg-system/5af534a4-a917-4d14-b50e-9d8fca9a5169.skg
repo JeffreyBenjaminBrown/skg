@@ -1,0 +1,8 @@
+title: link representation
+pid: 5af534a4-a917-4d14-b50e-9d8fca9a5169
+body: |2-
+  These are encoded 'inline' in the text,
+  just as in org-roam.
+  Except for the whitespace around the brackets and colon
+  (of which there should be none) they are represented as:
+    [ [ id : long-number ] [ any-title-however-misleading ] ]

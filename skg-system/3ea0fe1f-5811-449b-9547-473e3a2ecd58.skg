@@ -1,0 +1,11 @@
+title: Decide the shared model before the first plan that touches it
+pid: 3ea0fe1f-5811-449b-9547-473e3a2ecd58
+body: |2-
+  The questions that took three review rounds to settle (which
+  occurrence of a node is editable, what a write-protected occurrence's
+  children are, what a request means on each kind of node) were
+  answerable from first principles before any code was written, and
+  you answered them that way in the end ("let's not think about how
+  things got there, just what they are"). When a discussion document
+  names a model that several slices will touch, settle it there, as
+  states and transitions, before saying "write the plan".

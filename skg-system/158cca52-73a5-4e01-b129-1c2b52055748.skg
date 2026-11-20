@@ -1,0 +1,9 @@
+title: The forks relationship
+pid: 158cca52-73a5-4e01-b129-1c2b52055748
+body: |2-
+  A file F can fork file O. Visiting O directly still opens O itself as the raw root. Fork facts can be inspected in the heralds. Separately, wherever O would appear as recursive /content/ of a node already in view, F can be shown in its place automatically; this is /mirror substitution/ (see [[id:ab83219a-c1c5-4dc3-a0b5-96d2faecb587][the sharing model]]).
+
+  Forking is useful for both sharing and privacy, as is explained below.
+
+  Forking is represented in the graph with the =forks=
+  relationship.

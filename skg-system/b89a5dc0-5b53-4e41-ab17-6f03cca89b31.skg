@@ -1,0 +1,20 @@
+title: Direct visits are exact
+pid: b89a5dc0-5b53-4e41-ab17-6f03cca89b31
+body: |2-
+  Visiting an ID opens that exact node as the root of a content view:
+  from the root homes, its default perspective, the root's own home
+  skgrepo decides, and there the node stands as itself (see "Which
+  mirror stands").
+  It does not redirect to a fork and does not stop at a choice
+  buffer.  Re-visiting an ID that is already a root switches to its open
+  content view proper, never to a buffer of the diff view.  A node whose home skgrepo the current
+  skgrepo restriction keeps out cannot be visited.
+
+  This makes every viewnode used for navigation a stable destination.  In
+  particular, selecting a node in search results or a partner folder
+  opens the selected node itself.
+
+  The root's ordinary =K= relationship herald reports its visible
+  =forks= facts, and its forks folder shows every mirror of it
+  (=C-c l f=; drawn unasked on an editable occurrence with a fork
+  partner that is no member of another forks folder).

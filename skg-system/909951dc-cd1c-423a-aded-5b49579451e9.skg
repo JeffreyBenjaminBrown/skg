@@ -1,0 +1,9 @@
+title: A mark names what its headline shows, on a write-protected occurrence too
+pid: 909951dc-cd1c-423a-aded-5b49579451e9
+body: |2-
+  =node= on a modified node marks what its =M= stands for, and =rel=
+  what its =~= does; neither marks its children's containment, which
+  each child's =rel= marks. Where no member is drawn under it, as on a
+  folder member, =node= and =rel= together mark its file. Requests work
+  on write-protected occurrences. See =docs/diff-view.org=, "Processed
+  requests and gestures".

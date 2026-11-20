@@ -1,0 +1,15 @@
+title: view-lifetime
+pid: 2e3c804a-abe5-4e79-a9f8-b6bd86f7c7ab
+body: |2-
+  Some data regarding a node is view-lifetime data
+  (viewStats, for instance):
+  it lasts only as long as the view of it in some buffer.
+
+  Data on disk, by contrast,
+  remains when the app terminates,
+  and can be recovered by a later session.
+  *Session-lifetime* data lasts as long as one server session: the
+  in-Rust graph and the search index, together the *session-lifetime
+  stores*. The server rebuilds them from the .skg files when it starts,
+  or when asked ('skg-rebuild-session-lifetime-stores'); they outlive
+  every view. Say which lifetime is meant, never "ephemeral".

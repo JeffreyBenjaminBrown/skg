@@ -1,0 +1,10 @@
+title: '<localleader>vR : :SkgReadableIdsRefresh'
+pid: 511e7ff5-4723-41b3-aaa7-7be8f2ce1215
+body: |2-
+  The ID-to-title map is cached for the whole Neovim session, so a
+  neogit refresh re-requests nothing it has already seen. This empties
+  the cache and annotates the current buffer again. Use it after
+  anything that changes what titles the server would answer with: a
+  node retitled, or a skgrepo widening (IDs restricted under the old
+  skgrepo restriction were cached as unresolvable). The key is bound in
+  content views only; elsewhere, run ':SkgReadableIdsRefresh'.

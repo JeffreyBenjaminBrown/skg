@@ -1,0 +1,21 @@
+title: Repos
+pid: f16e9c7d-6271-4136-87e4-a9332743ba45
+body: |2-
+    - Request: ((request . "repos"))
+    - Response: LP =((response-type repos) (restriction "NAME")
+      (foreign-repos "shown") (repos ((name "NAME") (path "PATH")
+      (abbreviation "ABBR") (owned "true") (shown "true")) ...))=, one
+      entry per configured skgrepo, in fold order: declaration order, the
+      owned ones in privacy order (most public first; see "skgconfig.toml
+      > Skgrepos"). =PATH= is the skgrepo's path as the config writes it:
+      relative to the data root when it lies below it, else absolute.
+      =(abbreviation ...)= appears only when the skgrepo has one,
+      configured or derived (the =abbreviation= field of "Skgrepos").
+      =owned= is "false" for a skgrepo whose entry says
+      =foreign = true=. =shown= is whether the connection's skgrepo
+      restriction shows the skgrepo. =(restriction ...)= and
+      =(foreign-repos ...)= are that restriction, as "skgrepo
+      restriction" reports it.
+    - The endpoint is read-only and lists every skgrepo of the config,
+      restricted or not; =shown= says which the restriction keeps out.
+    - Logic: =server/serve/handlers/repos.rs=.

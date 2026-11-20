@@ -1,0 +1,26 @@
+title: Verifying the fix
+pid: e9a43537-a8ae-463d-a499-5bd725ab856a
+body: |2-
+  Do not stop at "it compiled". Confirm the servers actually come up and
+  the data loaded:
+
+  #+begin_src bash
+  python3 docs/troubleshooting/check-rlibs.py    # expect "all intact"
+  ./bash/start-servers.sh &
+  #+end_src
+
+  Then look for =Server ready.= in the newest script log,
+  =data/jeff/skgconfig.toml.running/start-servers.*.log=, preceded
+  by a plausible node/edge count, e.g.:
+
+  #+begin_example
+  INFO initialize_dbs: Incremental init succeeded.
+  INFO context_computation:   60794 nodes, 56232 edges, 5979 link dests.
+  INFO Server ready.
+  #+end_example
+
+  and check the configured Skg API port is listening (1730 here):
+
+  #+begin_src bash
+  (exec 3<>/dev/tcp/127.0.0.1/1730) && echo "skg up"
+  #+end_src

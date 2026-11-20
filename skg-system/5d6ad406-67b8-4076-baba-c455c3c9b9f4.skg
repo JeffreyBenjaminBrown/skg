@@ -1,0 +1,19 @@
+title: Running and testing skg here
+pid: 5d6ad406-67b8-4076-baba-c455c3c9b9f4
+body: |2-
+    - Ports and collisions: the container runs =--network host=, so every
+      Skg TCP port lands directly on the host and is shared
+      across all the containers. Jeff usually runs ~3 containers at once
+      (two dev, one prod), each launched with its OWN =skgconfig.toml= that
+      picks distinct TCP port(s) and data/tantivy folders so they
+      do not clobber each other's traffic or data. There is therefore NO
+      fixed skg API port -- never hardcode or assume one; read the
+      =skgconfig.toml= the running server was started with. Follow
+      [[file:../tests/integration/test-lib.sh][the integration harness]] for isolated test instances and cleanup.
+    - [[file:../bash/start-servers.sh][start-servers.sh]] brings up an Skg server.
+      [[file:../bash/all-tests.sh][all-tests.sh]] runs the full suite, including both clients;
+      the integration harness manages isolated servers. Rust tests are
+      service-free. Never run tests against the user's live data or server.
+    - Source of truth is the =.skg= files on disk. The in-Rust graph and Tantivy
+      are derived and rebuilt from disk on startup. Any change that
+      correctly lands on the filesystem is recoverable.

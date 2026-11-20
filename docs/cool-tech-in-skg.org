@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 4d38efb4-d523-4fde-85f2-6153f132426f
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * Skg is built on cool technologies.
 Skg uses Rust for the server and immutable in-memory graph, Tantivy for its
 derived search index, and Emacs Lisp or Lua for its clients.

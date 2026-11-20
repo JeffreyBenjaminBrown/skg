@@ -1,0 +1,14 @@
+title: '<localleader>gb : :SkgGotoBiggestBranch'
+pid: f6c99913-a1b9-4ba0-a12f-73a521b6f084
+body: |2-
+  Go to the branch near point with the most recursive content,
+  estimated by counting viewdescendants in the current buffer.
+
+  If the node at point has siblings, this considers that sibling
+  set. If it has no siblings, it considers the node's immediate
+  children instead.
+
+  This can help when a view is loading slowly:
+  replacing the content relationship to its biggest branch
+  with a link relationship (<localleader>ml)
+  reduces the view's demands on the server.

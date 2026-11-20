@@ -1,0 +1,21 @@
+title: to understand the code
+pid: de076003-557e-4559-af03-37bbf018c696
+body: |2-
+  The server and its graph are written in Rust. The =.skg= files are
+  authoritative; the server builds an immutable in-memory graph and a derived
+  Tantivy search index from them. Clients exist for Emacs and Neovim, and the
+  TCP protocol is editor-independent.
+
+  The API, the view metadata format, and the .skg file format are described in [[id:02708898-2d66-49cf-ba60-ecc1eb0bbe81][api-and-formats.org]].
+  How the server draws every view -- the refresh, which corrects a
+  buffer against the graph -- is the last section of [[id:82e3cf6d-2e55-41bb-9fcd-2efd2309db7e][the technical
+  data model]]; its words are in [[id:d5c0a61c-878d-46cf-8ad7-5d56827d44a1][the glossary]], and the diff view's
+  buffers in [[id:6d6b101e-6d78-4901-9de1-e9c533873992][diff-view.org]].
+
+  Some other reasonable jumping-off points include:
+  - [[../server/types/][the types]] (in the server), especially
+    - [[../server/types/nodes/complete.rs][nodes/complete.rs]] -- what nodes in the graph are
+    - [[../server/types/viewnode.rs][viewnode.rs]] -- how nodes in the graph are represented on-screen
+  - [[../server/main.rs][main]]
+  - [[https://github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org][my org-roam notes about Skg online]]
+  - [[../TODO/feasible-now-probably.org][how I implemented some recent features using Claude]]

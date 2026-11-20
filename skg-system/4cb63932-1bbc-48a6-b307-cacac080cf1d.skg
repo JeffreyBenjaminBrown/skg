@@ -1,0 +1,7 @@
+title: Filtering subscriptions facilitate integration.
+pid: 4cb63932-1bbc-48a6-b307-cacac080cf1d
+body: |2-
+  A subscription view will shrink as the subscribee's contents
+  are integrated into the subscriber's graph.
+  That is because once they are visible in the new place,
+  they do not need to be shown in the subscription, too.

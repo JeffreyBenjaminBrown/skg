@@ -1,0 +1,6 @@
+title: '<localleader>sW : :SkgRequestWriteProtectedRecursive'
+pid: d7ae7bf4-e227-4dbf-b5b9-b5f9f474c746
+body: |2-
+  The same, for the occurrence and its whole content subtree:
+  every node in it becomes write-protected,
+  and no child under them claims membership.

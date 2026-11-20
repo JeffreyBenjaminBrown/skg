@@ -1,0 +1,10 @@
+title: Duplication
+pid: cf1d62d9-254b-4b12-ab78-3906ece4ba91
+body: |2-
+  Does the work implement the same thing in more than one way, within
+  itself? Does it implement anything that already existed, so that two
+  implementations now coexist? Look for: two reconcilers or matchers;
+  several ways to compute one set or list; several readers of one
+  encoding; several request handlers with the same pipeline; copies in
+  the tests; copies between the two clients beyond the expected twin
+  structure.

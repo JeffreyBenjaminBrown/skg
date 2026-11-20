@@ -1,0 +1,10 @@
+title: moved-like-ancestor fact
+pid: c890515d-dffd-4636-a6ba-feb6a1710f70
+body: |2-
+  In the skgrepo-changes buffer, a vognode whose home skgrepo moved
+  carries '(homeSkgrepoMove (old OLD) (new NEW))' in its '(diff ...)',
+  its herald "-OLD +NEW". When the nearest vognode ancestor whose home
+  skgrepo moved did so the same way, it also carries the *moved-like-ancestor fact*
+  '(movedLikeAncestor LETTER)', its herald "Δ⌂=a", where the letter
+  names that ancestor as an ancestor generation does (a, the
+  viewparent; b, the grandparent; ...).

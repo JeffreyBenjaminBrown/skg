@@ -1,0 +1,18 @@
+title: Returning imported data to Org
+pid: b778e2a3-8aa2-43e7-a160-1bf648569b39
+body: |2-
+  Skg can [[id:d305ce68-3989-42b9-8ae6-0fa431300307][export selected content to plain Org]]. This produces readable
+  documents, not a restoration of the original Org-roam files. Keep the
+  originals if you need their exact structure and metadata.
+
+  The current export removes Skg metadata and rewrites ID links as file or
+  headline links. It does not preserve node IDs, aliases, privacy sections,
+  forks, or hides. Shared nodes and cycles can appear as
+  link leaves rather than repeated subtrees. Reimporting cannot reconstruct
+  the original graph; the existing Org-roam importer also requires file-level
+  IDs that this export does not generate.
+
+  For import instructions and replacement behavior, see
+  [[id:24be6277-1953-4933-8ebe-384533d324de][import-org-roam in the command reference]].
+contains:
+- 223ad2f2-cb7b-4c7b-8979-efdd294d401a

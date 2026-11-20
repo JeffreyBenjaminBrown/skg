@@ -1,0 +1,9 @@
+title: content
+pid: e0db5353-57ff-47e4-8d47-05426a54b31f
+body: |2-
+  Content has no folder. The members are the node's children, each
+  tagged ∃+ / ∃- for its node's existence, M for its other properties
+  and ~+ / ~- for its relationship's existence; a removed member stands
+  where the interleaved diff of the two lists puts it (below). The
+  content changeset marker, "its content changed", gathers the
+  relationship leaves of the content list.

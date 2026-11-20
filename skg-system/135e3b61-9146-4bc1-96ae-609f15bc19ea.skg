@@ -1,0 +1,71 @@
+title: A concrete example
+pid: 135e3b61-9146-4bc1-96ae-609f15bc19ea
+body: |2-
+  Suppose you start with a file titled =1=:
+  #+begin_example
+    * 1
+    ** 1a
+    *** 1a1
+    *** 1a2
+    ** 1b
+    *** 1b1
+    *** 1b2
+  #+end_example
+
+  and then swap the order of the branches 1a and 1b:
+  #+begin_example
+    * 1
+    ** 1b
+    *** 1b1
+    *** 1b2
+    ** 1a
+    *** 1a1
+    *** 1a2
+  #+end_example
+
+  If =1= is represented as a single file, this is the diff:
+  #+begin_example
+     * 1
+  -  ** 1a
+  -  *** 1a1
+  -  *** 1a2
+     ** 1b
+     *** 1b1
+     *** 1b2
+  +  ** 1a
+  +  *** 1a1
+  +  *** 1a2
+  #+end_example
+
+  If the branches 1a and 1b were bigger, that diff would be correspondingly bigger. The section of "-" symbols must be compared line-by-line to the section of "+" symbols before one can be sure that all that happened was a change in the order of 1a and 1b.
+
+  By contrast, using Skg's representation, the tree =1= would be represented using three separate files:
+  #+begin_example
+    * 1
+    ** 1a
+    ** 1b
+  #+end_example
+
+  #+begin_example
+    ** 1a
+    *** 1a1
+    *** 1a2
+  #+end_example
+
+  #+begin_example
+    ** 1b
+    *** 1b1
+    *** 1b2
+  #+end_example
+
+  The diff would involve only the first of those three files, and would look like this:
+  #+begin_example
+     * 1
+  -  ** 1a
+     ** 1b
+  +  ** 1a
+  #+end_example
+
+  This greatly clarifies what happened.
+
+  This argument does not just extend to the case where the two branches were otherwise unchanged. If there are further changes inside each branch, Skg will have the same clarifying effect on those changes.

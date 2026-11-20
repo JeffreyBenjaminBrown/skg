@@ -1,0 +1,7 @@
+title: Try refactoring sequential to nested definitions
+pid: ee350eae-b0f5-4d80-ac9c-ebdeaaf8ec9b
+body: |2-
+  See [[id:bf2793e0-b1b8-4d63-96d4-ab1096796506][the archived refactoring examples]] when applying this refactor.
+  That is a specific reference, not a request to read the whole archive.
+  Do this to everything you write,
+  and look for opportunities to do it in everything you use.

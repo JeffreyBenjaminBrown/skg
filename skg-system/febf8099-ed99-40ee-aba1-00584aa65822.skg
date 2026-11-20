@@ -1,0 +1,4 @@
+title: If a comment applies to a block of code, put it inside the block.
+pid: febf8099-ed99-40ee-aba1-00584aa65822
+body: |2-
+     Sometimes I use unnecessary braces on purpose, just so I can stick a comment inside them, making it clear that the comment applies only to the encolsed code.

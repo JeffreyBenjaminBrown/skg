@@ -1,0 +1,10 @@
+title: IDs are mostly invisible, but good to know about.
+pid: 852e0d76-8964-4992-8a4e-edbc50f2d4b3
+body: |2-
+  Every node has an ID,
+  which you can see if you disable heralds ('HeraldsToggle',
+  <localleader>vh).
+  Every link also has an ID and a label,
+  but all you see when you look at the ID is the label,
+  unless you disable org-mode (say, by switching to text-mode).
+  You should never need to see IDs explicitly.

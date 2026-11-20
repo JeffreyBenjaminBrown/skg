@@ -1,0 +1,21 @@
+title: Moving a member out of the folder
+pid: 1d9fb1de-fa4c-4980-8262-6de934948e6c
+body: |2-
+  A save never reads a node's content from a headline the view drew
+  without that content. A child drawn in a member's folder of what you
+  keep elsewhere, or of what your note hides in it, is drawn
+  write-protected, folded, without its own content; moved out of the
+  folder to stand under the member (to unhide it), it stays
+  write-protected, and keeps its content as on disk, until you ask for
+  its editable view there ('C-c s e'), which draws that content.
+
+  A member as such is drawn editable, but shows its content only in
+  part, so its headline carries =contentInPart=. Moved out of the forks
+  folder, into your note's content or anywhere else, it takes the atom
+  with it: the save reads its title and body, and nothing under it as
+  its content, which stays as on disk; the redrawn view draws that
+  content whole, without the atom, and you edit it there. A headline
+  typed under it in that same save joins no list, and the save warns of
+  the orphan. Its folders of what you keep elsewhere and of what your
+  note hides in it belong under a member only, so a save that moves them
+  out with it is refused ('tests/moved_headlines_whose_content_was_not_drawn.rs').

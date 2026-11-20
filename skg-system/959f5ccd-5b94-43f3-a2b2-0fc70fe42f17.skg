@@ -1,0 +1,6 @@
+title: '<localleader>rpc : :SkgDiffViewGotoPreviousChange'
+pid: 959f5ccd-5b94-43f3-a2b2-0fc70fe42f17
+body: |2-
+  Like <localleader>rnc, backward: moves the cursor to the previous
+  headline with change facts before it. Before the first one it says "No earlier
+  change".

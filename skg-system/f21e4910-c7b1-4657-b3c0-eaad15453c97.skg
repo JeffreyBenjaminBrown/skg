@@ -1,0 +1,22 @@
+title: Principal implementation references
+pid: f21e4910-c7b1-4657-b3c0-eaad15453c97
+body: |2-
+  - [[file:../server/serve/handlers/single_root_view.rs][exact direct visits]]
+  - [[file:../server/dbs/in_rust_graph/mirrors.rs][mirrors, and which one stands]]
+  - [[file:../server/dbs/in_rust_graph/fork_rules.rs][what an owned note may not fork, contain or hide]]
+  - [[file:../server/refresh/visit.rs][substitution and raw positions ('substitute_mirrors')]]
+  - [[file:../server/rerender_pass.rs][saved-view fork replacement and collateral rerendering]]
+  - [[file:../server/types/views_state.rs][open-view root registration]]
+  - [[file:../server/types/viewnode.rs][folder rules and =inPlaceOf= collection]]
+  - [[file:../server/refresh/visit.rs][on-demand folder construction ('fulfill_view_requests')]]
+  - [[file:../server/serve/handlers/text_search.rs][search suppression]]
+  - [[file:../server/serve/handlers/text_search.rs][the search results' folders ('draw_search_buffer')]]
+  - [[file:../server/from_text/fork.rs][implicit and explicit fork construction]]
+  - [[file:../server/nodeMerge/nodeMergeInstructionTriple.rs][merge list combination]]
+  - [[file:../server/dbs/in_rust_graph/prepared_update.rs][the graph validation of a save or a nodeMerge]]
+  - [[file:../server/save.rs][delete propagation]]
+  - [[file:../server/export_org.rs][raw contains-based Org export]]
+  - [[file:../server/dbs/in_rust_graph/relation_accessors.rs][relRepo-gated relationship access]]
+  - [[file:../server/dbs/in_rust_graph/stats.rs][repo-set-gated herald counts]]
+  - [[file:../tests/forks_under_search_hits.rs][search folder regression coverage]]
+  - [[file:../tests/integration/forked-direct-visit/][exact-visit integration coverage]]

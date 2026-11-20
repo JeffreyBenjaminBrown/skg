@@ -1,0 +1,13 @@
+title: Query syntax with default axes (phrase/operators=false, regex=false)
+pid: 07e2b2c9-339f-412b-835b-c79a81998c53
+body: |2-
+  Queries are literal. The query string is split on whitespace,
+  and any word containing a Tantivy operator character
+  (=+ - & | ! ( ) { } [ ] ^ " ~ * ? : \=) or the bare keyword
+  =AND= / =OR= / =NOT= is wrapped as a phrase so its contents
+  are searched literally. Words without specials pass through.
+  - *OR between words*. "dog cat" matches titles containing
+    either word; a title with both outranks one with only one.
+  - *Literal special characters*. A title like "C++ tips",
+    "[draft] plan", or "cat:dog" is findable by typing its
+    literal text.

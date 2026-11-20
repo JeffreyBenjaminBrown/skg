@@ -1,0 +1,7 @@
+title: Code changes
+pid: 1c82f881-9571-4d44-a336-80a59c977da7
+body: |2-
+  Read [[id:b5250a0b-7c49-4d84-afea-43432204bc46][file:names.org]], [[id:6b447bd8-d2ca-4d8a-bc89-0d3e22f58d98][file:formatting.org]], [[id:48b9be30-3f2c-4f74-b41c-f303c3222848][file:ai-agents.org]],
+  [[id:c3111e91-f55e-49b3-8416-cbd4aaf7afa0][file:no-legacy-support.org]], and [[id:f73d4958-2724-44cc-9d04-542116cd2320][file:common-gotchas.org]]. For execution,
+  also read [[id:fa26e71c-acf3-41a7-ab82-0898a213e429][file:when-to-stop.org]]. Consult [[id:de5dcb74-4e1e-49cb-ac34-ead7542aaee6][file:architecture.org]] when the
+  change crosses graph, storage, server, or client boundaries.

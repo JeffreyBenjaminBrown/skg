@@ -1,0 +1,18 @@
+title: 'Before running: the destination is replaced'
+pid: fccb1fae-6ae5-4430-9b35-802463ad9947
+body: |2-
+  First, if any input file has a line that looks like a headline inside a
+  '#+begin_' block or a fence, the command stops, naming those lines, and
+  nothing is deleted or written; see
+  [[id:4d9459c8-8812-4d58-b51c-d6f9e1dbc669][the same check in the interactive importer]].
+  Otherwise the importer creates 'OUTPUT_DIR' if necessary, then deletes every
+  immediate '.skg' file already in it, before importing the input. There is no confirmation,
+  dry run, mode that combines with the destination, or automatic backup. Other files and
+  nested directories are left alone. Use a fresh staging directory and inspect
+  the result before replacing existing data.
+
+  An incorrect or unreadable input can leave the destination empty. Traversal
+  errors are skipped; unreadable files and files without the required file-level
+  ID silently produce no nodes. The report counts files read, nodes written,
+  and write errors, but a successful exit does not establish that every input
+  was imported. Check the output against your originals.

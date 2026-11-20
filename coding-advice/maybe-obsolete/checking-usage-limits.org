@@ -1,5 +1,8 @@
-* Checking usage limits (Claude Code only -- NOT Codex)
+# This file was generated from the skg node with this ID:
+# fa571122-14d9-4e8b-9f91-b9d38aba9516
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+* Checking usage limits (Claude Code only -- NOT Codex)
   This whole file is about *Claude Code* running against an
   Anthropic subscription. If some future incarnation of this repo is
   being driven by *Codex* (OpenAI), none of the specifics below apply:
@@ -10,9 +13,7 @@
   to be rebuilt for OpenAI's headers. As of this writing Jeff expects
   to keep using Claude, but Jeff is not his future self, so: if you're
   Codex, stop reading and don't trust the two scripts named here.
-
 * The problem this solves
-
   An agent that could see how much of its usage window it has burned
   could *modulate its own model use* -- e.g. drop from Opus to Sonnet
   to Haiku as the session window fills, or pause until the window
@@ -23,9 +24,7 @@
   show them is suppressed when stdout isn't a real terminal. So you
   can't scrape =/usage=, and you can't usefully "echo into" a Claude
   session to read it back.
-
 * Where the numbers actually live
-
   Every =/v1/messages= API *response* carries them, in headers:
 
   | header                                       | meaning                                  |
@@ -43,11 +42,8 @@
   every turn -- they just aren't surfaced to the model, and there's no
   hook that exposes response headers. So to read them you have to make
   a request whose headers you can inspect.
-
 * The two tools (both in =bash/=)
-
 ** =claude-usage.sh= -- on-demand probe
-
    Reads the OAuth access token from =.credentials.json= (read-only --
    it never writes your credentials), makes one =max_tokens:1= Haiku
    call, and prints JSON:
@@ -60,9 +56,7 @@
 
    Cost: one tiny call per invocation. Fine for a decision point; too
    costly if every agent calls it constantly. For that, use the poller.
-
 ** =claude-usage-poller.sh= -- shared background snapshot
-
    #+begin_example
    nohup ./bash/claude-usage-poller.sh [interval_secs] [out_file] &>/dev/null &
    # defaults: 180s cadence, snapshot at $HOME/.claude-usage.json
@@ -77,9 +71,7 @@
 
    Readers should check =polled_at=: if it's old, the poller died or
    its probe is failing, and the numbers are stale.
-
 * How an agent uses this to modulate model choice
-
   Read the snapshot at natural decision points (not every turn) and
   branch on =session_5h.used_pct=. A reasonable policy:
 
@@ -89,9 +81,7 @@
 
   Tune the thresholds to how much headroom you want. =binding_window=
   tells you whether the 5h or the 7d window is the one about to bite.
-
 * Caveats
-
   - *Coarse numbers.* utilization is rounded (e.g. 0.1), good enough
     for throttling thresholds, not for precise accounting.
 

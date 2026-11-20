@@ -1,0 +1,48 @@
+title: What a request names
+pid: 109a9269-ff90-4ba3-8159-59e727b5e22e
+body: |2-
+  A mark marks what its headline shows. A headline shows two things
+  that can change: its node, whose glyph is ∃ or M, and its
+  relationship to its viewparent, whose glyph is ~. 'node' names the
+  first and 'rel' the second ('leaves_named_at' in
+  'server/diff_view/processed_requests.rs'). So 'rel' names the
+  existence of the relationship by which the headline stands where it
+  does, and 'node' names every leaf its node records but the
+  relationships shown on it or under it: its own 'rel', that of each
+  member drawn under it, in its content or a partner folder, whatever
+  the aspect (a relRepo move hangs under the member), and the content
+  relationships a changeset marker under it gathers. On a new or
+  deleted node that is its existence; on a modified node, its text,
+  home skgrepo, aliases, extra IDs, flags and other changes, and any relationship it
+  records that no headline under it shows. Where the node stands with
+  its members, as at its editable occurrence, 'node' leaves their
+  containment to each member's 'rel'; where it stands alone, as in a
+  folder, 'node' and 'rel' together name its whole file. Every leaf is
+  thus named by some headline without a walk; a reordering is its
+  recorder's other changes, which its '(otherChanges ...)' headline
+  names too.
+
+  A member of a forks folder stands for either side of 'forks', or
+  both: its 'rel' names the side or sides that changed
+  ('relationships_to_viewparent' returns both under a forks folder, and
+  only a changed one is a leaf). So a mutual whose two sides both
+  changed carries '(leaves 2 rel)', and a processed mark on it marks
+  both; it is processed only when both are.
+
+  A changeset marker gathers relationships: 'rel' names them, and
+  'node' the own leaves (existence, text, home skgrepo, aliases, extra
+  IDs, flags) of their members, one level down: the content members
+  drawn beside it. Its '(leaves ...)' lists only 'rel', what its label
+  describes; the members show their own leaves under their own glyphs,
+  so a client cannot count from it how many leaves 'node' there names. A request with no object names what
+  '(leaves ...)' can list there: 'node' and 'rel' on a vognode, 'rel'
+  on a changeset marker or an unknown viewnode, the one leaf elsewhere.
+
+  The walks, 'newContent' and 'newOutward', name leaves of the new
+  nodes reached from the headline's node, and the letters beside a walk
+  filter them: 'node' each new node's existence, 'rel' the
+  relationships it records that the walk follows, neither both. Each
+  letter also names its own object on the headline, which the walk
+  never reaches: '(processed rel newContent)' marks the headline's
+  relationship to its viewparent and the content relationships of the
+  new nodes reached. There is no object 'all'; the parser refuses it.

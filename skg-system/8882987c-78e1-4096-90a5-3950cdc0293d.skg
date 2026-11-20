@@ -1,0 +1,18 @@
+title: perspective
+pid: 8882987c-78e1-4096-90a5-3950cdc0293d
+body: |2-
+  A view's *perspective* is one skgrepo, or its root homes, one per
+  tree; a skgrepo's list ranks the mirrors each tree shows (see
+  "mirror"; 'Perspective'; on the wire "perspective", the request "set
+  perspective"): its *root homes*, as every fresh view's is (each
+  top-level tree is drawn from the perspective of the home skgrepo of
+  the node its root stands for; on the wire "root homes"), or one
+  skgrepo's in every tree, owned or foreign, its roots included (on the
+  wire "skgrepo NAME"). So a
+  private and a public fork of one note can each be chosen. 'C-c v o'
+  (Neovim '<localleader>vo') cycles a view through the root homes and
+  then each skgrepo home to a mirror in the view whose perspective
+  would draw it differently, in declaration order
+  ('skg-cycle-perspective'; 'docs/api-and-formats.org', "Set
+  perspective"). Messages name one "the perspective of tracy", by the
+  skgrepo's herald label.

@@ -1,0 +1,13 @@
+title: ':SkgShowUnsavedChanges : archive edits for manual recovery'
+pid: 9a4f24bf-1595-484e-a893-745b451b91a6
+body: |2-
+  Prompts for a local Org file, writes a detached recovery document, opens
+  it, and reports its actual path. The document contains context, lossless
+  JSON strings for the clean baseline and current text, and a readable
+  unified diff. It does not save graph data, close or clean the source view,
+  or register the archive as a live view.
+
+  When a save is refused, archive the relevant dirty views, close those live
+  views, save the remaining view, reopen fresh views, and manually reapply
+  the intended edits. Do not save an entire stale archived copy over the
+  newer graph.

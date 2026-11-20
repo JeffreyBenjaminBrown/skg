@@ -1,0 +1,13 @@
+title: the truth
+pid: 6427c590-ca9f-460b-a80c-594b636446db
+body: |2-
+  What the refresh compares a buffer with ('Truth' in
+  'server/refresh/mod.rs'): the gated graph, the in-Rust graph as the
+  skgrepo restriction lets it be seen (see "skgrepo, home skgrepo,
+  skgrepo-set, gitrepo"), with the config. The in-Rust graph itself,
+  read from each skgrepo's worktree and kept current by every save, is
+  the *live graph*; the diff view compares it, as its after-graph,
+  with HEAD. For a gnid it answers
+  'Present', 'Restricted' or 'Absent' ('GnidPresence',
+  'gnid_presence_gated'). In the diff view the mode adds HEAD, through
+  the graph straddle.

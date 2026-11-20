@@ -1,0 +1,12 @@
+title: Skg is software for manipulating and sharing knowledge.
+pid: 34cf46cd-3c42-47d8-8e72-9058ecabd015
+body: |2-
+  (Yes, we already do those things, but poorly; please keep reading.)
+
+  Skg extends the concept of personal knowledge management (familiar from software like logseq, org-roam, Notion, Roam, Obsidian, Tana, and others) to an experience that can be shared.
+
+  PKM software has many fanatics, working in isolation. That's because anyone who builds a knowledge base becomes attached to its idiosyncratic structure. I might find another user's knowledge base interesting, but (without something like Skg) I can only integrate their knowledge into my own by copying the data. Copying it means their future edits will not be transmitted to my copy. That puts a limit on how deeply we can share our thought processes.
+
+  Skg relaxes that limit. It permits the shared creation of a web of knowledge. One user can 'reshape' another's data however they want -- reordering parts, moving one part into another, deleting parts, etc. -- without affecting how the other user sees their data, and without the disconnect that copying would imply. (How Skg allows this is described below.)
+
+  As a side benefit, Skg will also permit private webs of knowledge that integrate seamlessly with the public one.

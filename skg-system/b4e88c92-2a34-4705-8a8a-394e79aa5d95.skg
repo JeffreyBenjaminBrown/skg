@@ -1,0 +1,39 @@
+title: Processed marks file
+pid: b4e88c92-2a34-4705-8a8a-394e79aa5d95
+body: |2-
+  The processed marks file holds the processed marks of the
+  diff view ('server/diff_view/processed_store.rs'). It is the config's
+  =processed_marks_file=, resolved against the data root, or else
+  =<data_root>/processed-marks-STEM.json=, STEM the config file's name
+  without its extension, after any symlink to it is resolved
+  ('SkgConfig::processed_marks_path'): a server started with
+  =data/jeff/skgconfig.toml= keeps its marks in
+  =data/jeff/processed-marks-skgconfig.json=, and one started with
+  =data/skgconfig-ed.toml=, or with a symlink =data/skgconfig.toml= to
+  it, in =data/processed-marks-skgconfig-ed.json=, so that servers over
+  one data root keep their marks apart. The server reads
+  it at startup and rewrites it after every change; a missing or
+  unreadable file means no marks. When the file is absent and no
+  =processed_marks_file= is stated, the server reads the file's old
+  name, =<data_root>/readiness-marks-STEM.json=, if it exists, and
+  writes its marks under the new name at once, leaving the old file in
+  place ('ProcessedStore::load_or_take_over_old_file'). That fallback is
+  temporary; 'SkgConfig::old_readiness_marks_path' says when it goes. It is a JSON object whose =marks= is a
+  list of ={"leaf": KEY, "fingerprint": N}= entries. KEY names one
+  change-forest leaf ('LeafKey' in 'server/diff_view/change_leaves.rs'): a node
+  aspect ={"Node": {"pid": ..., "aspect": ...}}=, where the aspect is
+  ="Existence"=, ="Text"=, ="Home"=, ={"Alias": TEXT}=, ={"ExtraId": ID}=
+  or ={"Flag": FLAG}=; or a relationship aspect ={"Relationship":
+  {"relation": ..., "recorder": ..., "member": ..., "aspect": ...}}=
+  (the leaf's 'RelationshipKey', flattened, beside its aspect), where
+  the relation is named by its 'NodeRelation' variant (="Contains"=,
+  ="LinksTo"=, ="Forks"= or ="Hides"=) and the aspect is ="Existence"=
+  or ="RelRepo"=. N is the fingerprint
+  of the change the mark approved, a hash of the leaf's before and after
+  values; a mark whose fingerprint no longer matches the current change
+  counts as absent. A marks file written before the relations retired in
+  November 2026 (see "The .skg file format") may name ="SubscribesTo"=,
+  ="Overrides"= or ="HidesFromSubs"=; one such mark makes the whole file
+  unreadable, so the migration tool rewrites it
+  (=tools/migrate-forks-2026-11/migrate.py --marks FILE=): it drops the
+  marks of the first two and renames the third ="Hides"=.

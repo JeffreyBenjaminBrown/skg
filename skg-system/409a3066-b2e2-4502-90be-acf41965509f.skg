@@ -1,0 +1,42 @@
+title: 'The explicit gesture: forking a node you own'
+pid: 409a3066-b2e2-4502-90be-acf41965509f
+body: |2-
+  Editing a foreign node forks it implicitly. To fork a node you *already
+  own* — for example a public clone =C= you made above, which you now want
+  to layer a /private/ version =D= on top of — there is an explicit
+  command, *=skg-fork-node=* (=C-c m f=, alias =skg-fork=).
+
+  Put point on the node's headline and run it. It refuses if the buffer has
+  unsaved changes ("Save the buffer before forking.") — so the clone is
+  built from the node's saved state, exactly what you see. Otherwise it
+  marks the node and auto-saves, and you get the *same fork-confirmation
+  buffer* as the implicit fork: pick the clone's skgrepo at the prompt —
+  e.g. your /private/ skgrepo — (or set it with =C-c s s=), then approve
+  with =C-c C-c=, or decline with =C-c C-k= (which here also strips the
+  fork request so the next save does not re-fork).
+
+  Two differences from the implicit fork:
+
+  - The original is *yours*, so it is /not/ dropped — your edits to it
+    still save normally; the gesture only /adds/ the clone that forks
+    it.
+  - The *suggested* skgrepo is your *first-declared* owned skgrepo (the
+    first =[[repos]]= you own in =skgconfig.toml=), since there is no
+    foreign ancestor to infer from.
+
+  The result is a *fork chain*: =D forks C forks N=. Chains
+  of any length are legal, and so are cycles (see
+  [[id:ab83219a-c1c5-4dc3-a0b5-96d2faecb587][the sharing model]]). When all skgrepos are unrestricted,
+  viewing =N='s container from the perspective of =D='s skgrepo shows
+  the chain's end =D=, where =N= is not in that skgrepo (in its own
+  skgrepo =N= itself stands; see [[id:e6bc021f-1cb8-4ab0-9a5f-53874e60e14b][mirrors.org]],
+  "Which mirror stands"); restrict the skgrepo-set to hide =D='s
+  skgrepo and the same view shows =C=, where =C='s skgrepo is declared
+  before =N='s — either way =N= stays in the container's contents. If you point
+  =skg-fork-node= at a node that is /itself/ a shown substitute (one
+  carrying an =inPlaceOf= part), it forks the node on screen — the
+  fork shown — deepening the chain, never re-forking the node it stands for.
+
+  If you already fork the node, =skg-fork-node= is rejected by the same
+  guard (below); deepen the chain by forking your /fork/, not the
+  already-forked node.

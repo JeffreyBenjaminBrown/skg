@@ -1,0 +1,11 @@
+title: placement, more public anchor
+pid: 9645b0e9-d7be-470b-9a09-d76e893546f2
+body: |2-
+  How a more private section orders its members into a more public
+  list without the public file recording anything: in the section's
+  stored sequence, a =- anchor: ID= entry names a *more public anchor*,
+  a member of the more public list, and the members after it insert
+  immediately after that ID; members before the first anchor prepend.
+  Placements exist only on disk — more public anchors are derived at
+  save from the in-memory order, so they can never go stale in memory.
+  Say "more public anchor", never a bare "anchor".

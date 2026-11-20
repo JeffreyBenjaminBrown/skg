@@ -1,10 +1,13 @@
+# This file was generated from the skg node with this ID:
+# 995a3665-33c1-46d6-8f06-ab2c9b61945a
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 #+title: Running a plan: the orchestrator's habits
 
 How Claude runs an execution plan slice by slice, one agent per
 slice, as it did for plans 17 and 19 of the total diff view and
 plan 04.1 of the refresh rewrite (October 2026). The plan's own
 form is in 'plans.org'; this is what happens once it is written.
-
 * One agent per slice
 Launch one Opus agent per slice, at high effort, and wait for
 its report before launching the next. Its brief is the agent's
@@ -28,7 +31,6 @@ plan and should not need to. The brief holds:
 - where the record goes: the progress file's top-level headline
   for this plan, one subheadline per slice.
 Note the launch time before launching, for the cost record.
-
 * The report shape
 The agent ends with a report of fixed shape, and the same shape
 goes into 'progress.org' under a headline per slice:
@@ -40,7 +42,6 @@ goes into 'progress.org' under a headline per slice:
 - fixtures changed, and why;
 - what was left unfinished;
 - whether the slice's headline is DONE.
-
 * Triage before each launch
 Read the report and the diff before launching the next agent,
 and do not run the suites yourself while an agent runs them.
@@ -52,7 +53,6 @@ design question goes to Jeff, and the run stops there when the
 next slice depends on the answer. The orchestrator's own notes
 go into 'progress.org' under "Orchestrator's notes after slice
 N", dated.
-
 * Files Jeff is editing during a run
 Jeff reads and annotates the plan and the review while a run is
 on, so the plan file, the review and the glossary are often dirty
@@ -63,13 +63,11 @@ index ('git update-index' with the blob, or 'git apply --cached'
 with a patch against HEAD), leaving Jeff's hunks unstaged in the
 working tree. This worked for every slice of plan 4. If a hunk
 cannot be separated, the agent leaves that edit out and says so.
-
 * Pre-existing failures belong in the pitfalls
 A failure that predates the plan (in 04.1, the 'import-md-and-org'
 integration test) is listed in the plan's pitfalls by name, so
 that no agent investigates it again; each report then cites it
 as pre-existing.
-
 * Where a run keeps its logs
 Agents write their logs and one-time conversion scripts under
 'tests/results/<plan>/sliceN/'. 'bash/all-tests.sh' wipes
@@ -78,7 +76,6 @@ alone, and until it does, copy what 'progress.org' cites before
 a full run. The review keeps the reviewers' reports beside it
 ('05_1_review-reports/' next to '05_review.org') for the same
 reason.
-
 * After a session break
 The harness can report a session ended while its agent still
 works. Before resuming a run, check 'ps' for the old session and
@@ -86,14 +83,12 @@ works. Before resuming a run, check 'ps' for the old session and
 orchestrate, and they collide on the plan and the progress file.
 Hand over by messaging the old session rather than relaunching
 its slice.
-
 * The cost record
 Record each slice's launch and report times in 'progress.org',
 so that the review can give durations per slice and the next
 plan can be budgeted. Take each time from 'date -u' at the
 moment, never from an estimate: in plan 2_2 the orchestrator's
 estimated times drifted twenty minutes from the commits' times.
-
 * The review
 When the last slice is DONE, write the per-plan review as
 'code-reviews.org' describes, from the record, the diff, the

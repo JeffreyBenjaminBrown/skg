@@ -1,0 +1,20 @@
+title: 'C-c m c : skg-replace-link-with-content'
+pid: f05bcdb8-c261-45b8-8e85-176e03111756
+body: |2-
+  Replace the leaf at point with a content relationship to the
+  node it links to, then save the buffer.
+
+  Point can be on the headline or in the node body. The node at
+  point can be new or already in the graph. If it already has an
+  ID, the command warns that the old node might become an orphan graphnode.
+
+  The headline title plus body must contain exactly one org bracket
+  link, and that link must be an =id:= link. The node must have no
+  viewdescendants. Its viewparent must be an editable occurrence
+  whose skgrepo is owned in =skgconfig.toml=.
+
+  The command replaces the whole leaf with a same-level
+  write-protected occurrence for the link target. The parent is
+  editable, so saving records the dest as content of the
+  parent; the replacement child is write-protected, so its own text is
+  not rewritten from the link label.

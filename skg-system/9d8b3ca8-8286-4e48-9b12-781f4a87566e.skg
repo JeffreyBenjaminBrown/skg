@@ -1,0 +1,24 @@
+title: 'C-c l c : skg-show-folderOf-containers'
+pid: 9d8b3ca8-8286-4e48-9b12-781f4a87566e
+body: |2-
+  The containerFolder -- the nodes that contain this one, but for those
+  the view already shows above it. Write-protected (☮):
+  containment is edited from the container. Its other side, the node's
+  content, is shown without a folder. On a node nothing else contains,
+  nothing appears, and the save's warnings say "No other containers.",
+  naming it. Under each member of this folder, and of every other partner
+  folder but the diff view's two acquisition folders, hangs its
+  containerward chain: the member's containers, write-protected and
+  claiming nothing, theirs under them, up to the roots or
+  'max_roleTree_depth', a container met again on the way shown once
+  more as a leaf. A request on a chain node draws that node's own
+  containers folder. A fresh content view shows its root's containers
+  folder this way. Under a member of a forksFolder the chain stands in a
+  containerFolder instead, drawn folded (only its headline shows; open
+  it to see the member's containers, but those the view shows above
+  it), so that a fork partner's containers do not look like its
+  content; the diff view hangs the chain directly. A member that
+  repeats a node shown editable elsewhere in the buffer gets nothing.
+  A view drawn before this rule shows the old chain directly under such
+  a member, as content it cannot account for; reopen the view to
+  redraw it.

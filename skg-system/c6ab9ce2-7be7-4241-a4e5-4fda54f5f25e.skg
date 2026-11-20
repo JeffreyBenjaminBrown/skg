@@ -1,0 +1,42 @@
+title: What the clone is
+pid: c6ab9ce2-7be7-4241-a4e5-4fda54f5f25e
+body: |2-
+  When you fork a foreign node =N=, the clone =C= is a new node in a skgrepo
+  you own. =C=:
+
+  - copies =N='s title, body, and *child list* — the child IDs only, a
+    /shallow/ copy, not =N='s whole subtree (this is what makes forking
+    cheap). Each child keeps its privacy: one =N= records in a more
+    private skgrepo than =C='s is recorded in =C='s section of that
+    skgrepo. Under a skgrepo restriction =C= copies only the children
+    you can see; the rest stay =N='s, and surface under =C= as
+    unintegrated content after a skgrepo widening;
+  - *forks* =N=, recorded once, which does two things. =N='s later
+    additions surface to you as unintegrated content (below). And =C=
+    and =N= are mirrors, so /mirror substitution/ shows =C= wherever =N=
+    would otherwise appear as content, from the perspective of =C='s
+    skgrepo, whose list of skgrepos ranks it first — in a view of a note
+    of that skgrepo you see and edit =C= in =N='s place from then on,
+    without =N='s containers being rewritten to point at =C=. (Not in a
+    view of a note in =N='s skgrepo: that is drawn from =N='s skgrepo,
+    where =N= itself stands, so =N= stays there, unedited, until you
+    switch the view to =C='s skgrepo's perspective, =C-c v o=, as the
+    save's warning says; see
+    [[id:e6bc021f-1cb8-4ab0-9a5f-53874e60e14b][mirrors.org]], "Mirror substitution");
+  - *hides* any child of =N= that your forking edit /deleted/, so what
+    you dismissed does not come straight back as unintegrated forked
+    content (below). Later deletions from =C= hide likewise, unless
+    another note of yours keeps the child — see "Editing the clone",
+    below.
+
+  =C='s skgrepo is the one the confirmation flow settles on: specified by
+  your edit, or picked at the prompt (see above). When nothing specified
+  it, the /suggestion/ is the skgrepo *inferred* from =N='s nearest
+  owned ancestor in the view, or, with no owned ancestor, your
+  first-declared owned skgrepo. So a foreign node with no owned ancestor
+  still forks — it just suggests a default you confirm or change. The
+  fork can only fail for lack of a skgrepo if you own *no* skgrepo at
+  all. (The inference takes =N='s /immediate/ owned container, never a
+  distant owned node reached by skipping a foreign ancestor.)
+
+  =N= itself is left completely untouched on disk.

@@ -1,0 +1,5 @@
+title: '<localleader>mhP : :SkgMarkHomeSkgrepoMoveProcessedRecursive'
+pid: 772b75b3-9735-4159-912f-548d033347f4
+body: |2-
+  Also marks every descendant whose home skgrepo moved between the same
+  two skgrepos. (Emacs: C-u C-c m h p.)

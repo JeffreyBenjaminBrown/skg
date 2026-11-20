@@ -1,0 +1,17 @@
+title: Keep the "Pitfalls" section
+pid: c85658c7-1c70-4aab-9d97-069c53b39b85
+body: |2-
+  From plan 04 on, every plan had a section "Pitfalls the slices must
+  respect": facts about the existing code, with file and function, that
+  an agent would otherwise rediscover or trip over (a reconciler that
+  runs first and reorders, a map rebuilt every rerender, a request that
+  cascades). After it was introduced, no executing agent chose a design
+  that the reviewer later rejected; before it, four did. Write it from
+  the code, not from memory.
+
+  A pitfall of the form "only X reads Y" lists every reader. Plan
+  04.1 said the save alone read the claim under write-protected
+  parents; three other readers did, and slice 0 stopped. Before
+  writing such a pitfall, grep every reader of the field or atom
+  and name them; a one-reader claim is the commonest false belief
+  about existing code.

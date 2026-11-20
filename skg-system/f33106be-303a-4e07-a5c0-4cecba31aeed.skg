@@ -1,0 +1,7 @@
+title: '^ : :SkgBeginningOfLine'
+pid: f33106be-303a-4e07-a5c0-4cecba31aeed
+body: |2-
+  Toggles the cursor between the start of the line and the start of
+  the title (the text after the stars and any =(skg ...)= metadata).
+  The nvim analog of the Emacs client's C-a toggle. On a
+  non-headline, it's just beginning-of-line.

@@ -1,0 +1,14 @@
+title: skgconfig.toml
+pid: 1cc77936-d29e-4f82-81d4-fb59ffb83fda
+body: |2-
+  The server's configuration file. See example-data/ for an example.
+
+  Pass its path as a command-line argument (default: =data/jeff/skgconfig.toml=) when starting the server (see =bash/start-servers.sh=). The directory containing the file is the *data root*; all relative paths in the config are resolved against it. A relative path may leave the data root: a config in =data/jeff/= names a skgrepo in =data/claude/public= as =../claude/public=, and its =..= is resolved when the config loads.
+contains:
+- 3918511d-8bbe-44f3-a2a1-43ac50c129d9
+- 77303e30-0a78-44b4-9d47-c8bd3f1a4e17
+- a6d75e71-a019-4fb2-8342-465f6fb9165f
+- 3f80ee69-ca8f-4d93-96bb-d719f73cc60a
+- a0de983e-eb61-4744-b475-c307f46b0d6c
+- b4e88c92-2a34-4705-8a8a-394e79aa5d95
+- 3b7a6a1b-6e81-4477-8486-d0362c17db48

@@ -1,0 +1,4 @@
+title: 'C-c r p U : skg-diffView-goto-previous-unprocessed-change-anywhere'
+pid: 4059369a-813d-4173-914e-6ac5d118c248
+body: |2-
+  Like C-c r p u, skipping nothing.

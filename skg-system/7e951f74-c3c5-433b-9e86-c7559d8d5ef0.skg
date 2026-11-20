@@ -1,0 +1,64 @@
+title: 'C-c v d : skg-diffView-open'
+pid: 7e951f74-c3c5-433b-9e86-c7559d8d5ef0
+body: |2-
+  If you use git to manage your data,
+  this opens the diff view: every change in the owned skgrepos
+  since their last commits (how each worktree differs from HEAD), with
+  the context needed to understand it. It opens up to four buffers,
+  "diff-view: all changes", "diff-view: merges", "diff-view: skgrepo
+  changes" and "diff-view: order-only changes", skipping any that would
+  be empty. It refuses unless the connection is unrestricted, and
+  when an owned skgrepo is not in a git repository or has no HEAD
+  commit (the refusal names the skgrepo). As each buffer opens, the
+  minibuffer shows its processed summary, as after a save (see C-c m).
+
+  Once the diff view's buffers are open, a switch of the
+  skgrepo restriction ('skg-restrict-repo-set', C-c v l) rerenders them under
+  the new one: a buffer of the diff view then draws no ghost of a graphnode the skgrepo restriction keeps out, and
+  draws such a graphnode, where a visible relationship names it, as a
+  restricted viewnode carrying only that relationship's change (=~+=
+  or =~-=), as C-c v l below says.
+
+  A buffer keeps its roots until you close it, but for a ghost root
+  whose deletion a commit records: it becomes a tombstone, which keeps
+  what stood under it and goes when it holds nothing. Saving it (or
+  committing) keeps what you folded. A save (of it or of another view)
+  decides what it adds anew by what changed: a new member that changed,
+  or leads to a change, is editable with its content, and any other new
+  member is a write-protected member shown without its content. But a
+  save makes nothing editable that the buffer already shows, and
+  appends no root: the processed summary counts a change since the
+  buffer opened that it holds nowhere editable as not editable in this
+  view. C-c r u extends the buffer to such changes. Nothing the
+  buffer holds editable is write-protected again by the server. An
+  editable-view request (C-c s e) works as in any view, except that
+  'initial_node_limit' refuses only the extension of a node outside U
+  (the nodes the buffer extends anyway: those that changed and those
+  leading to them). Every node of U drawn editable counts toward it,
+  as does every other extension in the buffer, but no node of U is
+  ever refused, and nothing else in the buffer is bounded by that
+  limit.
+  Why a commit takes whole nodes, and never a set of files: the graph
+  is one structure spread over many files, so committing some changed
+  files and not others can leave HEAD inconsistent: it can name nodes
+  it does not contain, or hold a moved node in two skgrepos at once, or
+  in none. Such a HEAD cannot be reasoned about, and the next diff view
+  against it reports changes that are only its own inconsistency. So a
+  commit takes whole nodes, all their files in every owned skgrepo,
+  holds back a node that needs one that does not go in, and before
+  committing anything checks that the commit would read back as a
+  valid graph differing from the worktree by exactly the changes left
+  out; otherwise nothing is committed. Review with the processed marks (C-c m),
+  and commit what you have processed with C-c r c.
+  The merges buffer shows each nodeMerge since HEAD: the acquiree and
+  its acquirer, in context. The acquiree's text preserver appears as a
+  new member of the acquirer's content. The skgrepo
+  changes buffer shows the nodes whose home skgrepo changed and the
+  nodes that record a relationship whose relRepo changed, each with all
+  of its changes; a moved node's
+  heralds read "-OLD +NEW", followed by "Δ⌂=a" when its nearest moved
+  ancestor (a, the viewparent; b, the grandparent; ...) moved the same
+  way. The order-only buffer lists the nodes whose only change is the
+  order of some list, each with its other changes, which show the old
+  order against the new and take the mark, then its content in the new
+  order. The all-changes buffer shows them too.

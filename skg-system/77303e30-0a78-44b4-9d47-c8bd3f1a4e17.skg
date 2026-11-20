@@ -1,0 +1,47 @@
+title: Skgrepos
+pid: 77303e30-0a78-44b4-9d47-c8bd3f1a4e17
+body: |2-
+  Each =[[repos]]= entry defines a directory of =.skg= files.
+  *The order of the owned entries is load-bearing*: owned skgrepos must
+  be listed in privacy order, most public first, most private last.
+  That order, the privacy ladder, defines the privacy levels of the
+  telescope model (see =docs/telescopes.org=) and the available
+  skgrepo-sets (below). The foreign entries form an unordered set: they
+  have no place on the ladder and may be listed anywhere, before,
+  between or after the owned ones.
+
+  | Field          | Required | Description |
+  |----------------+----------+-------------|
+  | =path=         | yes      | Directory containing =.skg= files. Relative to data root. |
+  | =name=         | no       | Unique name for this skgrepo (used in metadata, provenance). Defaults to =path=. |
+  | =abbreviation= | no       | Short label for heralds. Owned skgrepos with defaulted names abbreviate to the path minus its first component (the author folder). |
+  | =foreign=      | no       | =true= marks a skgrepo the user does not own. Defaults to =false=. |
+
+  Two skgrepos of one name are rejected.
+
+  *Ownership is declared per entry*: a skgrepo is owned (writable)
+  unless its entry says =foreign = true=; a foreign skgrepo is never
+  written. No folder name means anything to the server. The intended
+  layout is one author folder per person, =data/AUTHOR/=, holding that
+  person's config and skgrepos (=data/AUTHOR/REPO=). The config's
+  folder is its data root, so it names another person's skgrepos by
+  paths that leave it (=../OTHER/REPO=). People sharing one data tree
+  list the same skgrepos and differ only in which entries say
+  =foreign=. Since a config orders only its
+  owned skgrepos, two people's configs never disagree about an order:
+  each states only its own ladder.
+
+  A node's sections are all one owner's: the user's owned skgrepos, or
+  the foreign skgrepos of one foreign owner, which the foreign
+  skgrepos' dependencies manifests identify, and whose order they give
+  (see "OTHER_SKGREPO_DEPENDENCIES.toml", below). A section in another
+  owner's skgrepo is an illegal edit to the node (=docs/telescopes.org=,
+  "Illegal edits").
+
+  The retired =user_owns_it= field and the retired top-level
+  =owned_folder= key are rejected with an error.
+  =bash/migrate-to-foreign-flag.sh= rewrites a config that relied on
+  =owned_folder= (or its default, =owned/=):
+  it renames the owned folder (to =jeff/= unless told otherwise),
+  rewrites the paths under it, and adds =foreign = true= to every
+  other entry.

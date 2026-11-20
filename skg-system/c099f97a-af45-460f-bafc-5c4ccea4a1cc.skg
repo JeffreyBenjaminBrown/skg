@@ -1,0 +1,6 @@
+title: prominence source, prominence multiplier
+pid: c099f97a-af45-460f-bafc-5c4ccea4a1cc
+body: |2-
+  A node's *prominence source* ('ProminenceSource') says why it is
+  prominent (see "prominent"). Each source has a *prominence
+  multiplier* applied to the text-match score.

@@ -1,0 +1,7 @@
+title: '<localleader>rnu : :SkgDiffViewGotoNextUnprocessedChange'
+pid: acfaee49-6171-4d39-8b5a-09224b5806ac
+body: |2-
+  The same, visiting only headlines with change facts that are not
+  processed: a headline counts as processed when every change it names
+  is marked. Past the last
+  one it says "No further unprocessed change".

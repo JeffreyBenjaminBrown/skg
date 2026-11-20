@@ -1,0 +1,9 @@
+title: composition (visible vs full), decomposition
+pid: db90293f-c1d3-410a-b395-52c45ff46131
+body: |2-
+  The *composition* of a telescope combines its sections, most public
+  first, into one effective node (=server/telescope/compose.rs=). The
+  *full composition* uses every section; a *visible composition* uses only the
+  sections unrestricted under the current skgrepo restriction, and is what a
+  restricted view renders. *Decomposition* is the save-side inverse:
+  splitting the effective node back into sections, byte-stably.

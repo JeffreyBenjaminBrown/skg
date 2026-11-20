@@ -1,0 +1,18 @@
+title: mode, 'RefreshMode', 'RerenderMode'
+pid: fdcee153-3948-418b-a1b3-eb530b9830d9
+body: |2-
+  Which kind of view a refresh refreshes ('RefreshMode' in
+  'server/refresh/mode.rs', a term of plan 06): 'ContentView', or
+  'DiffView', which carries three parts, the graph straddle, the buffer
+  kind and the processed store. It
+  decides whether a parent's goal includes what HEAD alone warrants,
+  whether ghosts and change viewnodes are drawn, and what the node
+  budget may refuse.
+
+  A rerender pass is told less: 'RerenderMode' (a term of plan 08, in
+  'server/rerender_pass.rs') is 'ContentView' or 'DiffView' with the
+  buffer kind, built from the view being rerendered; the rerender of a
+  buffer of the diff view adds the graph straddle the pass shares
+  across the views it rerenders ('RerenderPassContext' in
+  'server/rerender_pass.rs') and the processed store, making the
+  refresh's mode.

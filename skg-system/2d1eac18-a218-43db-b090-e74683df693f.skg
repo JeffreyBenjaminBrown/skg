@@ -1,0 +1,41 @@
+title: The relationship
+pid: 2d1eac18-a218-43db-b090-e74683df693f
+body: |2-
+  If =R= forks =N=, =R= is the /forker/ and =N= is the /forkee/.  The
+  relationship is stored on =R= as an entry in its =forks= list, which
+  a '.skg' file writes under the key =forks=:
+
+  #+begin_example
+  R.forks = [N]
+  #+end_example
+
+  The stored value is a =RelPartner<ID>=.  Its =member= is =N= and its
+  =relRepo= says which telescope section records the relationship.
+  The relRepo is independent of either endpoint's home skgrepo: two
+  public nodes can be connected by a =forks= relationship recorded only
+  in =private=.  The list is ordered, and a more private section places
+  its members among a more public section's with anchors, as =contains=
+  does ('docs/api-and-formats.org', "The .skg file format").
+
+  =R= forks =N= says two things.  =R= shows =N='s content that =R=
+  neither contains nor hides, nor keeps in another note of the user's:
+  in =R='s forks folder, claiming, =N= is a forkee as such
+  ('docs/glossary.org', "forkee as such"; 'docs/forks.org', "What you
+  keep elsewhere").  And
+  =R= and =N= are mirrors, so either may stand in the other's place
+  (see "Mirror substitution").  So a fork shown, editable, in its
+  original's place draws, by default, its forks folder with the
+  original in it, and
+  two notes that fork one note can stand in each other's places.
+
+  A forker may fork any number of nodes, and any number of nodes, owned
+  or not, may fork one node.  Thus =R -> N1= and =R -> N2= are legal, as
+  are the linear chain =D -> C -> N=, two owned notes forking one
+  target, and owned mutual forks (=A -> B -> A=).  Mirror substitution,
+  which ranks a note's mirrors by skgrepo, has no special case for a
+  branch or a cycle (see "Mirror substitution").
+
+  What an owned note may not do, the save and the startup refuse
+  ('docs/data-model_technical.org', "Hard validation constraints"):
+  fork itself; contain or hide itself; both fork and contain one note;
+  or contain a note that forks it.

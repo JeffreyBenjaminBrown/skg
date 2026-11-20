@@ -1,0 +1,8 @@
+title: Foreign skgrepo files are never written by skg
+pid: 838292e6-6513-4fe4-a133-36bb2fcc4215
+body: |2-
+  This is more general but bears repeating in the move context: skg
+  will never write to a foreign skgrepo dir (one marked =foreign=). If
+  you accidentally try to move a foreign node *out* by editing it
+  locally, the save fails before any FS change. The original foreign
+  file stays put.

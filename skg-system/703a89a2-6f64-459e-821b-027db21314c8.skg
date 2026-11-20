@@ -1,0 +1,24 @@
+title: privacy telescope, telescope section, home
+pid: 703a89a2-6f64-459e-821b-027db21314c8
+body: |2-
+  One node can be recorded at several privacy levels at once: same-ID
+  =.skg= files across skgrepos, at most one per skgrepo. That family of
+  files is the node's *privacy telescope*; each file is one
+  *telescope section* ("section" for short in code), holding the
+  slice of the node recorded at its skgrepo's privacy level. The *home* is
+  the most public retained section; it alone holds title, body, and extra
+  ids. That the home carries the title is an invariant, not a
+  search rule: a node's text always lives in its most public
+  section, so a titleless section above the title is a violation
+  the composition reports (=CompositionWarning::TitleBelowHome=), not a shape to
+  look past. There is no linking relationship between sections —
+  sharing an ID is being the same node. See =docs/telescopes.org=
+  and =server/types/nodes/fs.rs=.
+
+  A telescope's sections are all one owner's (see "owned, foreign").
+  Before composing, sections of one PID in skgrepos of different owners
+  are separated: the home owner's are the telescope, and the rest are
+  *illegal edits to a foreign node* — shown, when in an owned skgrepo,
+  as an =illegalEditFolder= child of the node, and otherwise ignored,
+  with a startup warning and no filesystem edit (=docs/telescopes.org=,
+  "Illegal edits").

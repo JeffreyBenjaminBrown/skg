@@ -1,0 +1,23 @@
+title: What is imported
+pid: 03bff3ad-1a4d-4641-9e59-2b7508163078
+body: |2-
+  The scan recurses for the exact extension '.org', skipping '.git' directories.
+  Each file must begin with a ':PROPERTIES:' drawer containing ':ID:'.
+  Indentation on that first drawer line is accepted; blank lines before it
+  are not. Files without this file-level ID are skipped even if headlines have IDs.
+
+  Each accepted file becomes a node, titled from '#+title:' or, if absent,
+  the filename without its extension. Each headline becomes a node, with
+  ordered 'contains' relationships representing the outline. Existing IDs are
+  retained; headlines without IDs get fresh UUIDs on every run. Some skipped
+  headline levels introduce grouping nodes titled 'These are special!' and
+  'These are normal.' rather than reproducing the outline literally.
+
+  'ROAM_ALIASES' becomes Skg aliases. Nodes with an original ID receive the
+  'Had ID before import' flag. Duplicate IDs within the input
+  are combined into one node: children and aliases are combined, and additional titles and
+  bodies are appended with a separator. Such nodes receive 'Was overloaded
+  during org-roam import'. This does not compare or combine with existing
+  nodes in your configured Skg skgrepos.
+contains:
+- 143f35d9-4e1c-4157-a778-6d6d8e985ebe

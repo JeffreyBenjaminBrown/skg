@@ -1,0 +1,5 @@
+title: '<Tab> : toggle the fold at point'
+pid: 6ebdc9f5-7cd8-4f79-b0f9-1bacbca5aaea
+body: |2-
+  Equivalent to org's own =za=: opens or closes the fold under the
+  cursor.

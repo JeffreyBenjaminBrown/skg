@@ -1,0 +1,5 @@
+title: '<localleader>mhp : :SkgMarkHomeSkgrepoMoveProcessed'
+pid: 9b76e6f2-4066-4d65-9365-3b4d0234c0ce
+body: |2-
+  Marks processed the home-skgrepo move of the node at point (or the
+  move at point), then saves. (Emacs: C-c m h p.)

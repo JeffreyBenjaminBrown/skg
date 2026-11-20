@@ -1,0 +1,9 @@
+title: Carriers
+pid: 515abef1-fd9e-4494-95c6-98d2946d0119
+body: |2-
+  A side's tier is shown by one part of the side, its carrier: its
+  numeral, if it shows one, and otherwise all its ancestor flags. The
+  carrier shows the greater of its floor and the side's tier; every other
+  glyph shows just its floor. On the forks in-side, whose tier is
+  high, =2aK= shows the 2 high and the 'a' low, while =aK= has no
+  numeral, so its 'a' carries the tier and is shown high.

@@ -1,0 +1,11 @@
+title: '<localleader>gM : :SkgGotoInGitParent'
+pid: 840edf29-4584-4d07-be5d-f6602d9bfdcc
+body: |2-
+  Opens a plain git-diff buffer (named =skg://git-diff/FILE=) of
+  the *parent*'s file -- the combined staged+unstaged diff, or the
+  untracked file's own content if it has no HEAD diff -- with point
+  on the first line in that buffer containing this node's ID.
+  Warns if the ID appears multiple times. (Emacs's magit has an API
+  for landing on a specific line within a status section; neogit
+  doesn't, so this variant uses a plain diff buffer instead of a
+  neogit view -- same information, different chrome.)

@@ -1,0 +1,8 @@
+title: changeset marker
+pid: 487c0e8a-326e-4b2b-aaa3-99c471a4a1d1
+body: |2-
+  A childless change viewnode ('ChangeViewnode::ChangesetMarker') that
+  stands for a set of changes recorded in its parent's file, and carries
+  their derived processed state. There are two kinds: the content changeset
+  marker ("its content changed") and the relRepo changeset marker ("some
+  content relationships changed skgrepo").

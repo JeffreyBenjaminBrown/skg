@@ -1,0 +1,10 @@
+title: The voice switch is visible
+pid: 9dc0e659-c157-4ff3-99d1-37230ca0a7d6
+body: |2-
+  Every reply begins its headline with an author marker:
+  "[Claude]" or "[Jeff]", meaning "Claude says" or "Jeff says".
+  Jeff often abbreviates his to '[j]' or '[js]; Claude, who "types
+  faster", needn't. More title text after the marker is
+  optional, e.g. '[Claude]: yes for data, and I'd stop there'.
+  Headings beneath a marked heading are by the same author until another
+  marker starts a reply, so the marker need not be repeated.

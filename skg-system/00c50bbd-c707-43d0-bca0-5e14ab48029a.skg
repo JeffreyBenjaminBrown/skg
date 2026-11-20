@@ -1,0 +1,10 @@
+title: =(properties changed)= -- the node's other properties
+pid: 00c50bbd-c707-43d0-bca0-5e14ab48029a
+body: |2-
+  The node is in both graphs and its file records a change that =node=
+  names on this headline ("modified", herald =M=): one no headline under
+  it, nor its own =rel=, shows (below), on a member, a removed member, a folder member or a
+  root. So a node whose only changes are its relationships to members
+  shown under it, or its own relationship to its viewparent, carries no
+  =M= there. Never beside =(node added)= or =(node removed)=, and never
+  on a ghost.

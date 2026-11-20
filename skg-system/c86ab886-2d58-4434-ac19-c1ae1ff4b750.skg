@@ -1,0 +1,35 @@
+title: the refresh
+pid: c86ab886-2d58-4434-ac19-c1ae1ff4b750
+body: |2-
+  The one operation that takes a buffer, parsed and validated, and the
+  truth, and brings the buffer up to date with the truth, in place
+  ('refresh_viewforest' in 'server/refresh/mod.rs'). Every view is drawn
+  by it: a fresh content view (the refresh of a stub), every rerender
+  (the saved view, the collateral views, "rerender all views", a
+  switch of the skgrepo restriction), the search enrichment and the diff view's
+  buffers. It decides everything from the buffer and the truth as they
+  are now, and is a *fixpoint*: refreshing its own output changes
+  nothing, up to the viewnode IDs it assigns
+  ('tests/idempotence.rs'). 'docs/data-model_technical.org', "The
+  refresh: how a view follows the graph", states the whole model.
+
+  A view that does not exist yet is drawn from a *stub*, a viewforest
+  of little more than its roots, which the refresh fills: for a fresh
+  content view, one editable occurrence per requested node, asking for
+  its containers folder and its extension ('stub_of_fresh_content_view'
+  in 'server/update_buffer.rs'); for a search, the hits
+  ('build_search_viewforest', which 'draw_search_buffer' refreshes, in
+  'server/serve/handlers/text_search.rs'); for a buffer of the diff
+  view, one *stub
+  root* per member of D ('docs/diff-view.org', "Stub roots").
+
+  The refresh walks the viewforest, visiting each parent once and
+  applying its rungs there (see "the refresh's rungs, unsayable"); its
+  *tail* is what it does once, after the walk ('server/refresh/tail.rs'):
+  the *stats pass*, which computes every occurrence's derived facts
+  ('viewnodestats.rs', 'graphnodestats.rs' beside it); in the diff
+  view, the '(processed ...)' change facts and the home skgrepo moves; the
+  pruning of childless tombstones, and of folders the pruning empties;
+  and a viewnode ID for each viewnode lacking one. The tail renders
+  nothing: each caller renders the viewforest once, when it is done
+  with it.

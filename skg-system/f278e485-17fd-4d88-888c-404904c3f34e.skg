@@ -1,0 +1,16 @@
+title: Forking
+pid: f278e485-17fd-4d88-888c-404904c3f34e
+body: |2-
+  Editing an editable foreign node and saving requests an implicit fork.
+  After confirmation, Skg creates an owned clone which forks the
+  foreign original, recording =forks: [N]= once.  It shallow-copies the edited content
+  IDs and hides original children removed by the edit.  The original is
+  unchanged.
+
+  =skg-fork-node= (=C-c m f=) explicitly forks an owned node, commonly to
+  add a more-private layer such as =D= over =C=.  Forking a substituted
+  viewnode forks the node shown on screen and therefore deepens the chain.
+  Either gesture is refused on a note you already fork, naming your fork
+  of it ('docs/forks.org', "Once forked: the fork operation's guard");
+  a second owned fork made otherwise (by a nodeMerge, in a forks
+  folder, or in a note's file) is saved.

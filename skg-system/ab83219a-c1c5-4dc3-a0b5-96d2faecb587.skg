@@ -1,0 +1,20 @@
+title: How sharing works in skg
+pid: ab83219a-c1c5-4dc3-a0b5-96d2faecb587
+body: |2-
+  Each author or skgrepo you want access to should be downloaded to some local folder. Some of these notes will, presumably, be ones you wrote; others can be ones others wrote. Your own skgrepos form a privacy ladder, and a single node of yours can live at several privacy levels at once — see [[id:ae1f8c25-d6a4-490f-bad5-aa04279daf72][telescopes.org]] for that half of the sharing story: what a restricted view shows, how to privatize a single relationship, and what can leak.
+
+  You can navigate and edit them as if you owned them all. When you "modify" someone else's original note, you actually create a clone of it, in your data rather than theirs. The clone is implemented as an ordinary note just like the original, with the same text and branches, and with a =forks= relationship to the original: the clone forks the original. You can change the text of the clone, rearrange its branches, discard them, scatter them across your other files.
+
+  *The gesture.* You do not run a clone command. You make the foreign node /editable/ with =C-c s e=, edit it, and save. Any real change to a foreign node is read as a request to fork it; the save first shows a confirmation buffer — each clone-to-be over the original it forks — and waits for your approval (=C-c C-c= to approve, =C-c C-k= to decline). Each clone needs a skgrepo you own: if your edit already specified one (explicit owned skgrepos on new children), it is shown settled; otherwise the client prompts you to choose, suggestion pre-filled (=C-c s s= on the clone-to-be also works), and approving before every clone's skgrepo is set is refused. See [[id:1c6e493f-b9ff-49c2-8642-729de8b37e85][forks.org]] for the walkthrough.
+
+  All of the original content is considered "integrated" into the clone. Branches you then delete from the clone become branches the clone "hides"; these hides are recorded explicitly in the filesystem on save. A branch you move into another note of yours instead needs no hide: you keep it there. There is no need to /also/ record that integrated content is hidden from the clone's forks — the display rule already excludes it. *A forkee as such shows only what its forker neither hides nor contains, and no other note of yours contains* ('docs/forks.org', "What you keep elsewhere"). So any branch that appears as the clone's ordinary integrated content, or that you keep in any note of yours, does not also show up as unintegrated forked content; it stands, folded, in the forkee's folder of what you keep elsewhere ("☮ It contains these, and you keep them elsewhere."), each member there naming where you keep it. (This is also why a /fresh/ clone — whose =contains= equal the original's — shows no unintegrated content until the original gains new children. And why moving a forked child into the clone's own content, or into any note of yours, which deliberately records no hide, still drops it from the forkee's content: you keep it.) "Your notes" are those of your owned skgrepos as the skgrepo restriction shows them: under a restriction that keeps out where you keep a child, the child shows among the forkee's content again.
+
+  If, later, the other author adds content to their note, it will be visible from the clone, because the clone forks the original, as "unintegrated forked content". You can if you wish proceed to incorporate that content into yours, too.
+
+  Because nodes in Skg are represented as flat files, this way of forking foreign data duplicates very little of it. For instance, if the original had two branches when the clone was made, the clone would only need to =contain= two IDs. None of the descendents of those IDs need to be mentioned, unless and until one of them is also modified.
+contains:
+- 48c3f1f7-0b1e-4c1b-8fea-1980138dfe37
+- 67b25333-c250-4e98-99d4-09d4da3bc0eb
+- 3a212421-b2a1-4f94-8725-76decd432e80
+- 6b911d3e-ec64-41cd-97eb-ce7b8f342484
+- 9c5d5103-edc2-4a0c-afe1-153c4ab09c29

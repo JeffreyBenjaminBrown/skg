@@ -1,0 +1,8 @@
+title: The refresh reports nothing
+pid: 40f7caec-0575-485e-b14a-7a54eb299d5c
+body: |2-
+  The refresh changes a view and says nothing of it: no response
+  carries what it changed, and neither client shows it
+  ('docs/glossary.org', "what the refresh changes silently"). It does
+  not warn either; the warnings a save or a rerender sends are the
+  save's and the rerender's own.

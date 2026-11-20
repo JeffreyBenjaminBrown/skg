@@ -1,0 +1,88 @@
+title: '<localleader>vl : :SkgRestrictRepoSet'
+pid: 27b015f2-2dc3-4604-800b-61c2cbd5eced
+body: |2-
+  Switches the skgrepo restriction of display and search for this
+  Neovim connection. The skgrepo restriction is two things: a
+  skgrepo-set, a prefix of the config's privacy ladder (the owned
+  skgrepos), and whether the foreign skgrepos are shown. Foreign
+  skgrepos have no place on the ladder; they are shown or hidden all at
+  once, apart from the rung, and are shown until you hide them.
+
+  The command asks for the most private owned skgrepo to show, which
+  activates it and every more public owned skgrepo, or for the foreign
+  skgrepos to be shown or hidden. The prompt, "Most private repo to
+  show, or foreign: shown/hidden (S-left/right cycle): ", lists the
+  owned skgrepos by name in privacy order, the most private as "NAME
+  (no restriction)", which is the default, then "foreign: shown" and
+  "foreign: hidden" (only when the config has a foreign skgrepo;
+  otherwise the prompt is "Most private repo to show (S-left/right
+  cycle): "); TAB completes and S-Left / S-Right cycles. Choosing a
+  skgrepo changes the rung and leaves the foreign skgrepos as they
+  were; choosing a foreign choice shows or hides them and leaves the
+  rung. It then asks "Switch the skgrepo restriction and re-render all
+  SKG buffers?", and on yes tells the server, and the server rerenders
+  every open Skg buffer in place. The confirmation reads "Skgrepo
+  restriction: NAME", with "; foreign repos hidden" while they are.
+  Choose the most private skgrepo, with foreign skgrepos shown, to
+  remove the skgrepo restriction.
+
+  Hidden, a foreign node is treated as any node outside the set, below:
+  an open view that showed it re-renders without it.
+
+  Under a skgrepo restriction, a node in a skgrepo outside the set
+  shows nothing of itself. Where a relationship recorded in a skgrepo
+  the set holds names such a node (say a public node contains a
+  private one), the view shows a headline with no title, heralded
+  =restricted=, standing for it: a restricted viewnode. It keeps the
+  relationship as it was when you save, and deleting its line removes
+  the relationship, as deleting an unknown viewnode does;
+  '<localleader>sr' sets its relRepo. A relationship recorded in a
+  skgrepo outside the set shows nothing at all, and a save keeps it. The
+  skgrepo restriction limits what you can edit as it limits what you can see:
+  a save never removes, moves or rewrites a relationship the set keeps
+  out, however the buffer looks, and never creates one silently. A save
+  that would record a relationship in a skgrepo the set keeps out (a
+  restricted viewnode pasted as content, a hide only a relationship
+  outside the set explains, '<localleader>sr' toward such a skgrepo) is refused, naming the
+  skgrepo. A fork copies into its clone only the relationships the set
+  shows; a node merge, like a delete, is refused when either node has a
+  section outside the set; a delete whose cleanup would strip
+  relationships outside the set asks first (see the delete). Restoring
+  from HEAD, processed requests and the cleanup of an absent ID's
+  references are refused unless the connection is unrestricted, and an
+  import into a skgrepo outside the set is refused. A
+  skgrepo narrowing (a switch to a smaller set) turns an open view's
+  headline of such a node into a restricted viewnode in place, its
+  children kept, and a skgrepo widening (a switch to a larger set)
+  turns the restricted viewnode back. Where nothing the set shows
+  names the node, its headline vanishes with what stood under it, and
+  so does a member whose record alone the set keeps out (a public node
+  that a private record says the headline's parent contains); a
+  skgrepo widening draws each again where the graph puts it. A view
+  root is the exception: a view rooted at such a node keeps its root,
+  as a restricted viewnode, whether or not anything the set shows
+  names it, since the view is your own request, and a
+  skgrepo widening makes it an occurrence again. The folders under a
+  headline that a skgrepo narrowing made a restricted viewnode (its
+  containers folder, say) describe a node it shows nothing of, so they
+  become tombstones, holding their members, and stay tombstones after
+  the skgrepo widening. A buffer of the diff view follows the same
+  rules (see <localleader>vd, ':SkgDiffViewOpen'). The switch reports none of this: it
+  says only "Skgrepo restriction: " and the name of the
+  skgrepo restriction.
+
+  The rerender redraws each open buffer from the view the server last
+  saved or rendered for it, which would lose an unsaved edit; so while
+  any view has unsaved edits the command refuses ("skg: save or revert
+  every skg view before switching the skgrepo restriction"), as stage-and-commit
+  does, and asks nothing.
+
+  If the proposed set would rerender overPrivateText telescope text, Skg asks before
+  changing the skgrepo restriction or any view. Declining leaves both unchanged and
+  an empty rerender stream releases the client's preemptive locks.
+
+  ':SkgListRepoSets' shows the current skgrepo restriction and the
+  skgrepo-sets available, and ':SkgShowSkgrepoRestriction' shows the
+  skgrepo restriction alone, each marking the most private skgrepo
+  " (no restriction)": "Skgrepo restriction: public; available:
+  public, private (no restriction)".

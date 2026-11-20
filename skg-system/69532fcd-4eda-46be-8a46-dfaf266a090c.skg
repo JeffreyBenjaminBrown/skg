@@ -1,0 +1,9 @@
+title: After a session break
+pid: 69532fcd-4eda-46be-8a46-dfaf266a090c
+body: |2-
+  The harness can report a session ended while its agent still
+  works. Before resuming a run, check 'ps' for the old session and
+  'ListAgents' for its agents: two live sessions can both
+  orchestrate, and they collide on the plan and the progress file.
+  Hand over by messaging the old session rather than relaunching
+  its slice.

@@ -1,5 +1,8 @@
-* Skg data model: technical reference
+# This file was generated from the skg node with this ID:
+# 82e3cf6d-2e55-41bb-9fcd-2efd2309db7e
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+* Skg data model: technical reference
 This document describes the complete runtime graph model.  The =.skg= files
 and =skgconfig.toml= are authoritative.  At startup and explicit rebuild, the
 server composes all file sections into =Graphnode= values, validates the whole
@@ -8,9 +11,7 @@ same values.  Tantivy is a derived search index; it is not graph authority.
 
 For a gentler introduction, see [[./data-model_friendly.org][the friendly data-model guide]].  For
 privacy-section composing and decomposing, see [[./telescopes.org][telescopes]].
-
 ** Node fields
-
 The full composed representation is =Graphnode= in
 =server/types/nodes/complete.rs=.  =GraphnodeInRust= is its graph projection and adds
 derived text links.
@@ -36,9 +37,7 @@ value.  This distinction is load-bearing while telescope sections and partial
 nodeIntents are combined.  =RelPartner<T>= attaches the privacy
 skgrepo where an alias or relationship is recorded.  The order of list-valued fields is
 preserved.
-
 ** Relationships
-
 All stored relationships are directed from the owning node to a member ID.
 Member IDs may be primary IDs or extra IDs; graph indexes canonicalize known
 extra IDs to the corresponding primary ID.  A dangling member is retained so
@@ -54,9 +53,7 @@ that hand-authored or temporarily incomplete graphs remain representable.
 Home skgrepo and which node carries each extra ID are node properties, not separate runtime
 relationship entities.  Relationship relRepo remains part of every stored
 =RelPartner= and participates in skgrepo-set/privacy gating.
-
 ** Hard validation constraints
-
 =validate_complete_graph= runs before the startup/rebuild swap-in.  Saves
 preserve the same constraints incrementally: while holding the mutation gate,
 they derive an exact persistent candidate from the current valid graph snapshot,
@@ -88,7 +85,7 @@ that leaves such a pair is still refused, so a save of the owned note
 succeeds only once it ends the pair.
 
 Any number of notes, owned or not, may fork one note, and forks may form
-cycles: mirror substitution ([[file:mirrors.org][mirrors.org]], "Mirror
+cycles: mirror substitution ([[./mirrors.org][mirrors.org]], "Mirror
 substitution") ranks a note's mirrors and has no cycle case.
 
 Relationship roles are enforced by distinct Rust fields.  A node has exactly
@@ -112,9 +109,7 @@ mutation, graph swap-in, and Tantivy enqueue so two writers cannot validate
 against the same stale graph snapshot.  Filesystem preflight and graph validation
 produce tokens tied to that exact graph snapshot; skgsave-commit consumes those prepared
 values rather than recomputing them after writes begin.
-
 ** Graph indexes
-
 =InRustGraph= stores =GraphnodeInRust= values in a persistent =im::HashMap=.  Its
 derived indexes are:
 
@@ -150,9 +145,7 @@ home as the privacy ceiling when the target exists.  For a dangling relationship
 extant recorder's home is the conservative ceiling.  Saves recompute warnings for
 saved recorders plus untouched inbound recorders affected by identity, existence, or
 home changes; startup and rebuild still audit every recorder.
-
 ** Runtime generations and rebuilding
-
 An =SkgEnv= family shares one atomic =RuntimeGeneration= swap-in point and
 one mutation gate.  A generation contains an =Arc<SkgConfig>=, an
 =Arc<InRustGraph>=, the matching =TantivyIndex=, and a monotonically increasing
@@ -176,9 +169,7 @@ generation: the save compares the buffer's baseline, the text the server
 last drew for it, with the graph (=docs/api-and-formats.org=, "Save buffer"
 and "The baseline of a view").  So a restart, a rebuild or a strip of body
 whitespace makes no buffer stale by itself.
-
 *** A batch of files changed on disk becomes a generation
-
 The server also learns of =.skg= files that change on disk without it
 (another writer, a =git pull=): the repo watcher (=server/repo_watch/=)
 watches every skgrepo directory and gathers the changed paths of a
@@ -211,9 +202,7 @@ its client between requests and names the views to rerender
 (=docs/api-and-formats.org=, "Repo files reloaded"); the rerender of
 a buffer of the diff view it names also extends it
 (=docs/diff-view.org=, "After a reload").
-
 ** The refresh: how a view follows the graph
-
 Every buffer the server sends is drawn by one operation, the
 *refresh* (=refresh_viewforest= in =server/refresh/mod.rs=). It takes a
 viewforest the parse has read and validation accepted (every new
@@ -241,7 +230,6 @@ are now, never from what either was at an earlier save. So it is a
 fixpoint: refreshing its own output changes nothing, up to the
 viewnode IDs it assigns. =tests/idempotence.rs=
 asserts this over every content-view and diff-view fixture.
-
 *** The kinds a refresh sees
 A *vognode* stands for a gnid (=Vognode=): an *occurrence*, of a node
 the truth has, editable or write-protected; a *ghost*, in the diff
@@ -260,7 +248,6 @@ children are tombstones stays, as after deleting a node and what it
 contained: these nested tombstones are by design, and collapsing them
 was considered and rejected because it could confuse the user. The
 buffer root holds the roots.
-
 *** The ID rule
 What a headline standing for a gnid becomes is decided by five
 questions, the first yes winning (=id_rule= in
@@ -293,7 +280,6 @@ as a node and that a nodeMerge has since made an extra ID of another
 node stays that node's ghost. The headline is re-kinded where it
 stands, keeping its viewnode ID, its fold state, its children and,
 for an occurrence, its editability.
-
 *** Claim and warrant
 Each child of a vognode or a folder has two flags. It *claims
 membership* when the save will read it as a member of its
@@ -342,7 +328,6 @@ forker-only member is no request to fork it. So a member claims
 exactly when the note forks it, in every view the server draws, and a
 save of the view never makes the note fork a forker it only showed,
 nor ends a fork another view made.
-
 *** The goal
 A parent's *goal* is what the truth says its children should be
 (=goal_of_parent= in =server/refresh/goal.rs=): for an occurrence's
@@ -438,7 +423,6 @@ either graphnode has a restricted section; and a delete's propagation
 (=apply_delete_propagation_cleanup=) counts the restricted records
 naming a deleted graphnode first, and the save stops for the
 delete-from confirmation when there are any.
-
 *** The walk and the refresh's rungs
 Before the walk, every editable-view request in the text is
 fulfilled: its occurrence becomes the node's editable one and any
@@ -564,7 +548,6 @@ content view holds, last, the folder of what its viewparent hides
 outside its fork partners, when it hides something there
 (=add_hidden_outside_folder_to_forks_folder=), so that a forker a
 save hid stands there.
-
 *** The ancestry table
 =required_ancestry= (=server/refresh/ancestry.rs=) gives each kind of
 descriptor the ancestors it may stand under, nearest first: a folder
@@ -576,7 +559,6 @@ property folder; a change viewnode under an occurrence or a ghost,
 and a body diff under an old text. A descriptor whose ancestors are
 not those is unsayable. A vognode has no row: an occurrence is never
 unsayable.
-
 *** The forks folder
 The forks folder ('Folder::Forks', =forksFolder=) under an occurrence
 of a note N holds every mirror of N, each once, flat: N's fork
@@ -585,7 +567,6 @@ and its *indirect members*, the other mirrors
 of N, joined to it only through others; all by records the skgrepo
 restriction shows. A *mutual* both forks N and is forked by it; a
 *forker-only member* forks N and is not forked by it.
-
 **** Its goal and its claims
 Its goal (=forks_folder_goal= in =server/refresh/goal.rs=) is N's
 forkees in the order of N's 'forks' list, each claimable, with the
@@ -617,7 +598,6 @@ indirect member N hides is not drawn in it: it stands in the folder
 of what N hides outside its fork partners, which the forks folder
 holds last. A mirror reached only through a note N hides is still a
 member.
-
 **** What each member shows
 A member as such -- a forkee as such, or a forker-only or an
 indirect member (a forker as such) -- shows its content less what N
@@ -639,7 +619,6 @@ on a member claiming nothing is refused at validation
 (=is_forks_folder_member_claiming_nothing= in
 =server/from_text/buffer_to_viewnodes/validate_tree.rs=): its record
 is in its own file, or it has none with N.
-
 **** What a save reads there
 The save's traversal (=visit_forks_folder= in
 =server/from_text/local_fieldintent_collection/traverse.rs=) reads
@@ -712,7 +691,6 @@ folder shows contains, forkee, forker or indirect
 same members ('apply_hiddenoutside_edits'), so a hide of what only a
 forker contains, unhidden under that forker as such, is not hidden
 again by a buffer that keeps the hidden-outside folder.
-
 *** The extent and the node budget
 The *extent* is how much of P's goal the refresh draws
 (=server/refresh/extent.rs=): all of it for a folder and for an
@@ -740,7 +718,6 @@ budget need not count exactly, only stop an explosion. The walk keeps
 nothing else of editability than where each node's one editable
 occurrence stands. The diff view's deviations are in
 =docs/diff-view.org=, "Editability in the diff view".
-
 *** The tail
 After the walk, once (=server/refresh/tail.rs=): the derived facts are
 computed, the stats of each occurrence (its relationship facts,
@@ -758,7 +735,6 @@ viewnode that lacks a viewnode ID gets one. The refresh renders
 nothing: each caller renders the viewforest once, when it is done
 with it (=viewforest_to_string=), the search after it has folded
 what it drew and excluded the overPrivateText nodes.
-
 *** The refresh reports nothing
 The refresh changes a view and says nothing of it: no response
 carries what it changed, and neither client shows it

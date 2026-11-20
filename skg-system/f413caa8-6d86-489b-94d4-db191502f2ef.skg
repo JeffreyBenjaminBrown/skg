@@ -1,0 +1,484 @@
+title: Save buffer
+pid: f413caa8-6d86-489b-94d4-db191502f2ef
+body: |2-
+    - Request: First =((request . "save buffer") (view-id . "VIEW_ID") (point-lines-below-focused-headline . "N") (point-column . "C") (point-screen-lines-below-window-start . "M"))\n=, then one UTF-8 length-prefixed S-expression envelope:
+      #+begin_src lisp
+      ((saved-buffer "...Org text...")
+       (baseline "...the saved buffer's text as the server last drew it...")
+       (other-views
+         (((view-id "...") (dirty false))
+          ((view-id "...") (dirty true)
+           (baseline (present "...last clean text..."))
+           (current "...edited text..."))
+          ((view-id "...") (dirty true)
+           (baseline unavailable)
+           (current "...edited text...")))))
+      #+end_src
+      =Content-Length= is the envelope's UTF-8 byte length. =baseline= is
+      mandatory: the saved buffer's baseline, the text the server last
+      drew for it, as the client installed it (without the focus and
+      fold metadata the client removes) and before any edit (Emacs keeps it in
+      'skg-clean-baseline', Neovim in 'vim.b.skg_clean_baseline',
+      skg-for-ai in the view's '.full.org' file). A new empty view's
+      baseline is the text the client created it with (see "The
+      baseline of a view" below). It has no =unavailable= form. A save whose envelope lacks it is refused,
+      with an error naming the field, and nothing is written. =other-views=
+      is mandatory even when empty and covers every other live client view,
+      including views the server has not registered. Clean entries carry no
+      buffer snapshots. Dirty entries carry exact current text and either the exact
+      clean baseline or explicit =unavailable=. Duplicate view IDs, the saved view ID,
+      missing fields, and inconsistent clean/dirty fields are rejected. Raw Org
+      in place of the envelope is not a supported legacy form.
+      - Two optional fields drive the fork-confirmation round-trip
+        (below): =(approved-forks . "true")= marks a re-issued save whose
+        forks the user approved, and
+        =(fork-repos ((N . REPO) ...))= pairs each forked node's id
+        N with the owned skgrepo chosen for its clone. Both are absent on
+        an ordinary save.
+      - =(strandeds-reviewed . "true")= and =(reset-strandeds ("RELATION"
+        "RECORDER" "MEMBER") ...)= are present only on a retry after
+        =strandeds-confirmation=: the first says the user reviewed the
+        stranded relationships, the second names those to reset to default
+        (possibly none).
+      - =(delete-from . "visible")= or =(delete-from . "all")= is
+        present only on a retry after =delete-from-confirmation=: the
+        user chose to strip the deleted IDs from the visible records
+        only, or from every owned record. It rides that save and its
+        retries, and is never cached.
+      - =(approved-hoist-pids "PID" ...)= is present only on a retry
+        after =telescope-hoist-confirmation=. It is the exact list the
+        user approved for text publication; it is not a boolean and
+        does not authorize any other PID or bypass ordinary save
+        validation.
+      - A save carries no =(approved-overPrivateText-pids ...)=: the
+        text-release approval of a save's rerender rides the "Rerender
+        views" request that follows the save's
+        =overPrivateText-telescope-confirmation= (below), not the save.
+        It is independent of Hoist authority: viewing text and publishing
+        it on disk are different decisions.
+      - =(diff-view-buffer . "NAME")= is optional: it names the buffer
+        of the diff view the saved buffer is, by the =buffer= name of the
+        "Diff view" request (="all changes"=, ="merges"=, ="skgrepo
+        changes"=, ="order-only changes"=). It matters only for a view
+        the connection does not hold (a connection that ends with each
+        command, as skg-for-ai's does without its daemon, or one opened
+        after a server restart): the save then re-renders the buffer as that buffer of
+        the diff view, with its processed summary, keeps every viewnode
+        ID it carries (see =(vnid X)= under "The metadata headers"), and
+        leaves the connection holding it as that buffer, so that an
+        "Extend diff view" request can follow. A view the
+        connection holds keeps the kind it was registered with. A name
+        no buffer has refuses the save, and nothing is written. Both
+        clients keep the name in each buffer of the diff view they open
+        and send it on its saves, as skg-for-ai does.
+      - =(perspective . "skgrepo SKGREPO")= is optional:
+        it names the perspective the saved buffer was drawn from,
+        when that is not its root homes (see
+        "Set perspective"). The save checks the buffer's
+        =(inPlaceOf N)= parts against, and rerenders it from,
+        the perspective it names, and the connection keeps the perspective
+        for the view, for the rerenders it starts itself. Without it, or
+        with =(perspective . "root homes")=, the buffer is drawn from
+        its root homes. A held view's earlier perspective yields to
+        the one its save names, which is how a buffer the server lost in
+        a restart regains it. Any other value, a skgrepo the config
+        does not list after "skgrepo" included, refuses the save, and
+        nothing is written. A save need not name a perspective in the
+        view's cycle. Each client keeps the perspective in the buffer
+        and sends it only while it is not the root homes.
+      - =(preview . "true")= is optional: it asks only what the save
+        would hide and stop hiding, and writes nothing. The server builds
+        the save's plan and checks it as for a save, up to the
+        stale-buffer check and the restore and processed refusals below,
+        then answers, after =save-lock= and in place of every other
+        terminal message, =((response-type save-preview) (hides ("..."
+        ...)) (errors (...)) (warnings (...)))=: the =hides= lines a
+        save-result would carry (below), present even when empty, and
+        the errors that would refuse the save, worded as a
+        save-result's, when it would be refused. A request the server
+        refuses before reading its plan (a bad envelope, a bad
+        =perspective=) is answered =save-preview= too. It asks no
+        question, so a preview of a save that would fork, Hoist, ask
+        about strandeds or about deletes says only what it would hide;
+        it writes nothing, registers no view, rerenders none, and
+        consumes no processed request. An older server ignores the
+        field and saves, so a client sends it only to a server whose
+        "Verify connection" answer names ="save preview"=. skg-for-ai's
+        'save' without '--yes' sends one; neither editor client does.
+      - =point-lines-below-focused-headline= is global to the buffer save: the number of text lines from the focused headline to point before save.
+      - =point-column= is global to the buffer save: the column of point within its line, echoed back so the client can restore the exact cursor position.
+      - =point-screen-lines-below-window-start= is global to the buffer save: the number of screen lines from the window's top line to point before save. The server echoes all three point fields in the final save response so Emacs can restore point and scroll position after replacing the buffer text.
+    - Response: Multiple length-prefixed messages, sent sequentially:
+      1. Early lock acknowledgement (sent immediately, before reading the envelope):
+         =Content-Length: N\r\n\r\n((response-type save-lock) (lock-views ("view ID1" "view ID2" ...)))=
+         Both clients lock every local Skg view before taking the request's
+         buffer snapshots. This message acknowledges that broad lock; its server-known
+         view ID list does not authorize unlocking client-only views.
+      2. Save-relax-lock message (sent after preparation and conflict checking, before mutation):
+         =Content-Length: N\r\n\r\n((response-type save-relax-lock) (lock-views ("view ID1" "view ID2" ...)))=
+         The keep-set contains selected collateral targets and every dirty view
+         whose baseline/current buffer snapshots were checked, including unregistered
+         views. The saved view is retained implicitly. Only unrelated clean
+         views may unlock at this point. A malformed save-relax-lock message leaves
+         all locks held until terminal cleanup.
+      3. Zero or more collateral-view messages (one per collateral view, streamed as each finishes):
+         =Content-Length: N\r\n\r\n((response-type collateral-view) (view-id "VIEW_ID") (content "..."))=
+         No dirty view is among them. Each client unlocks and updates
+         each buffer as it arrives, and keeps its text as the buffer's
+         baseline; a client never replaces a buffer with unsaved edits,
+         but leaves it as it is and names it in a message. An update
+         keeps point, and the fold of every headline the buffer
+         already showed, by viewnode ID. The content's =folded= and
+         =bodyFolded= atoms are those of the view's last save, so the
+         client decides them anew: a headline is =folded= when the
+         parent it now has hid its children before the update, and
+         =bodyFolded= when it hid only its own body, or hid its
+         children and has none now. The content's atoms stand where
+         the deciding headline is new in it.
+      4. Final save response:
+         =Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))=
+         =content= is the re-rendered saved buffer (nil on failure).
+         The client keeps the content as the buffer's new baseline; a
+         failed save carries none, and the buffer keeps its own. =errors= is a list of failure-explaining strings. =warnings= is a list of nonfatal messages. Both lists are present and empty if none.
+         The refresh of each view the save rerenders says nothing of
+         what it changed there ('docs/glossary.org', "what the refresh
+         changes silently").
+         Each message names the headlines it concerns as subheadlines
+         (see "How a message names a headline" below). A failed save
+         sends one error, =NOTHING WAS SAVED=, whose validation errors
+         follow as =** Error N= headlines.
+         When the save hid something, stopped hiding something, or took
+         a child out of a forker without hiding it, the answer
+         carries =(hides ("LINE" ...))=, after the point entries and the
+         processed summary (below) and before =changed-headlines=, one
+         line each, in words the server chooses
+         ('hide_report_lines' in 'server/from_text/hide_report.rs'):
+         - =Hides 'M' from 'S', as content of 'E'.= for each member M
+           the save adds to note S's =hides=, naming each member
+           E of S's forks folder (a note S forks, or a forker or an
+           indirect member S does not hide) whose content holds M (the clause is absent
+           for a hide outside every such partner);
+         - =Stops hiding 'M' from 'S', as content of 'E'.= for each it
+           removes;
+         - =Hides nothing: 'R' left 'S', but WHY.= for each child R that
+           left the content of an owned note S, which has such a fork
+           partner, whose departure hid nothing. WHY names the rule:
+           =it is no content of 'E', nor a mirror of any= (R neither is a
+           member of a partner's content nor a mirror of one, as a
+           note's own fork of it is), =it was hidden already= (or
+           ='M', which it stands for, was hidden already=), ='S' still
+           contains 'M', which it stands for=, =this save shows it
+           under 'E'= (an explicit gesture in the forks folder won), or
+           =this save places it under 'E'= (R moved under a member as
+           such E, whose content it joins), or ='Y' keeps it= (or ='Y'
+           keeps 'M', which it stands for=; several keepers =keep=):
+           an owned note Y other than S contains it after the save, so
+           no member of the forks folder shows it ('docs/forks.org', "What you keep
+           elsewhere").
+         Each quoted name is a title, as the save leaves it. A fork's
+         clone counts as a forker with no hides on disk, named =the
+         fork 'T'=, since it has its original's title; a node the save
+         deletes is named in no line. Only records the skgrepo
+         restriction shows count. The hides are computed from the save's
+         plan against the graph, so they are what the plan writes,
+         whatever gesture asked for them (a removal, a forks-folder
+         edit, a hidden folder's edit, a forking edit); what merges,
+         restore requests and delete propagation add after the plan is
+         not reported. When the server withholds the save's rerender
+         (=overPrivateText-telescope-confirmation=, below), the save is
+         written but its hides are not sent. Emacs shows the
+         lines in the echo area, below the message the save already
+         showed; Neovim notifies them as one message; skg-for-ai prints
+         them after the server's counts.
+         When the saved buffer is one of the diff view's, the point
+         entries are followed by =(processed-summary (processed N) (changed M) (foreign F) (order-only O) (waiting W) (notEditable K))=:
+         of the M changed nodes of the owned skgrepos (O of them changed only
+         in the order of some list), N are processed, and W of those N are
+         held back by a commit of the processed, which would wait for a
+         node that does not go in (=docs/diff-view.org=, "Which nodes go
+         in"); F nodes changed in foreign skgrepos, counted by the stems
+         of their changed =.skg= files; and K changes are not editable in the view: they
+         are recorded by nodes whose changes the buffer does not make editable. A
+         buffer makes a node's changes editable where it has an editable
+         occurrence of it, in content or in a partner folder, or a
+         ghost of it in content position: under the buffer
+         root or an occurrence, or in the old content of such a
+         ghost. The buffer is refreshed over the graph straddle: its
+         roots, and every headline it holds editable, stay as saved, and
+         its change facts, change viewnodes and removed members are
+         recomputed. What it adds anew it adds by its pruned
+         change view sets recomputed after the save: a new member in U is editable,
+         with its content list, and any other new member is a
+         write-protected member shown without its content. It
+         makes no occurrence editable and appends no root; the "extend
+         diff view" request below does, and so does the rerender that
+         follows a "Repo files reloaded" message. An editable-view request
+         cascades as in any view. Every extension spends
+         =initial_node_limit=, but the budget refuses only the extension
+         of a node outside U; nothing else in the buffer is bounded by
+         it.
+         After everything else comes =(changed-headlines (V ...))=, the
+         redraw delta from the saved buffer's text (the envelope's
+         =saved-buffer=) to =content=, when the two differ only in
+         headline lines (see "The redraw delta" below). Each V is a
+         viewnode ID, a bare symbol; =(changed-headlines ())= means no
+         headline changed. Without the entry, the client redraws the
+         whole buffer. A failed save and every confirmation carry none.
+    - Processed requests (=(processed OBJECTS)= and =(unprocessed OBJECTS)=
+      inside a headline's =(editRequest ...)=; see "Metadata of the
+      diff view") are
+      consumed by a save of any buffer, not only one of the diff view's,
+      after its graph edits succeed: each sets or clears the marks of the
+      change-forest leaves its headline names, at their current
+      fingerprints. A save that stops for a confirmation (delete-from,
+      strandeds, Hoist, forks) or fails consumes none, and leaves them in
+      the buffer. Under a skgrepo restriction a save carrying a processed
+      request, or a restore request, is refused before anything is
+      written: =A processed request requires no skgrepo restriction= (or
+      =A restore request ...=), in the words of the diff view's refusal. A request that names no current change is dropped, with
+      the warning =A processed request names no current change; it was
+      dropped.=, which names its headline as a subheadline.
+    - A =(folder containers)= request on an occurrence that the refresh
+      leaves with no =containerFolder=, since nothing but its
+      view-ancestors contains it, if anything does, adds the warning
+      =No other containers.=, which names each such headline as a
+      subheadline ('no_other_containers_warning' in
+      'server/rerender_pass.rs').
+    - A save from a stale buffer is refused only if the buffer edited one
+      of its stale graphnodes, before anything is written and before any
+      confirmation is asked ('stale_write_errors' in
+      'server/serve/handlers/save_staleness.rs'). A save writes a
+      graphnode either from the buffer's copy of it, the Save
+      instruction its saved text yields, or from the graph as it stands
+      at save time; only the buffer's copy can be older than the graph,
+      and only a write from it, or a delete, can discard graph state the
+      user never saw. What the buffer showed before any edit is its
+      baseline (see "The baseline of a view" below). So the server
+      parses the baseline as it parses the saved text, up to the filter
+      that drops nodeInstructions identical to the graph as no-ops, under
+      the same skgrepo restriction; what survives are the baseline's
+      writes, the graphnodes whose copy in the baseline no longer
+      matches the graph (or that the graph no longer has): the stale
+      ones. A stale graphnode the buffer shows exactly as its
+      baseline does (compared as a view reads a graphnode back: its
+      relationship lists by distinct pid, its body without trailing
+      whitespace) is unedited: the user did not edit it, and writing
+      it would only undo what changed. The save leaves it out, before
+      the plan's validators judge it ('without_unedited_stale_saves'
+      in the same file): its write, its move back to the home skgrepo
+      the buffer shows, and, if it is foreign, its fork. The rest of the
+      save proceeds, and its response carries one warning per graphnode
+      left out, =Left as the graph has it: TITLE (ID), which changed
+      after this buffer was rendered and which this buffer did not
+      edit.=, TITLE as the buffer shows it, or =... which was deleted
+      after ...= for one the graph no longer has; the redraw shows the
+      graph's version. A write-protected occurrence, which writes
+      nothing, is not refused for showing a title or home skgrepo that
+      an occurrence of its graphnode in the baseline shows, editable or
+      write-protected, though the graph changed it since: it is no edit.
+      A stale graphnode the buffer edits or deletes is an edited stale
+      graphnode: writing the buffer's text of it would silently undo a
+      change made since the buffer was drawn. A delete is never
+      unedited. What the buffer writes is what its text yields after
+      that filter, minus its unedited stale graphnodes, plus the original of
+      each fork clone; the writes the save derives from the current
+      graph (nodeMerges, delete propagation, strandeds resets, Hoist
+      repairs, restore requests) undo nothing and are not checked. So a
+      node the buffer shows as the graph has it, or as its baseline
+      does, never refuses a save, however old the buffer; a node the
+      graph deleted after the buffer was drawn is left out if the
+      buffer did not edit it and refuses the save if it did, so an old buffer
+      cannot recreate it; a merge request is never stale; and a
+      restart, a rebuild or a body-whitespace strip makes nothing stale
+      by itself. A graphnode the buffer writes
+      without holding a copy of it in its baseline (pasted in by ID, or
+      typed into a new empty view) has nothing to compare, and is not
+      checked. A baseline that cannot be parsed refuses the save, saying
+      so. Each edited stale graphnode is one =** Error N= of the =NOTHING WAS SAVED=
+      message, whose first line reads "A node this save would write
+      changed after the buffer was rendered:", naming the buffer's
+      occurrences of it as subheadlines, and saying what changed: the
+      graph's title of it, its ID, and the aspects that differ from the
+      baseline's copy ("the title (then "X", now "Y")", "the body", "the
+      content (gained IDS, lost IDS)", "the home skgrepo (then A, now
+      B)", and by name the aliases, extra IDs, flags, forks and
+      hides); a changed body is followed by its changed
+      lines, baseline against graph, each lost line prefixed "- " and
+      each gained one "+ ", at most 40 each way. A deleted node's error
+      says instead "It was deleted after this buffer was rendered." The
+      user's own edits are the diff of the buffer against the same
+      baseline, which the recovery command writes. There is no
+      save-anyway path: the user reopens a fresh view and reapplies the
+      edit; the refused buffer keeps its text. Since each connection
+      rerenders only its own views, this is what protects a buffer from
+      another connection's save (another client, or 'tools/skg-for-ai'),
+      and from files reloaded after another writer changed them.
+    - A save of a view the connection holds is refused, before the
+      stale-buffer check and before anything is written, when the view
+      was last drawn under a skgrepo restriction showing another set of
+      skgrepos than the connection's current one
+      ('error_unless_view_was_rendered_under_current_restriction' in
+      'server/serve/handlers/save_buffer.rs'). The server records, for
+      each view it holds, the restriction it was last drawn under: at
+      the view request, at each rerender, and at the save's own redraw.
+      A buffer drawn under another restriction says nothing of what
+      that restriction kept out, or shows what the current one keeps
+      out, so its text means something else under the current one. The
+      refusal reads "This view was rendered under a different skgrepo
+      restriction (then: main, private; now: main). Rerender it, or
+      archive its edits and reopen it." A restriction switch rerenders
+      every open view, and the clients refuse to switch while a view has
+      unsaved edits; this makes the server independent of that courtesy,
+      and covers any change of the connection's restriction that
+      rerenders no view. A rebuild is one ("Rebuild session-lifetime
+      stores"): when the reloaded config changes the set of skgrepos
+      the connection shows, a view with unsaved edits, which the rerender
+      after the rebuild skips, is refused at its save by this rule. A
+      buffer the connection does not hold has no record and is not
+      checked.
+    - A write-protected occurrence saves nothing of its own, so a save is
+      refused, before anything is written, if one differs from the graph
+      ('errors_for_writeProtected_occurrences' in
+      'server/from_text/write_protected_edits.rs'): in its title or home
+      skgrepo (unless the buffer's baseline shows the same, the graph
+      having changed since: see the stale buffer above), or in its alias
+      folder, when present, by lacking or
+      reordering one of the node's aliases or by carrying a relRepo
+      request. Under a write-protected occurrence no child claims
+      membership, so anything else standing there -- an alias the node
+      lacks, a child, a folder's members -- is the user's note or the
+      diff view's, which the refresh shows unwarranted, and is not
+      checked. An ID folder, under any node, is refused only when it
+      lacks one of the node's IDs; and a present flags folder, under any
+      node, must equal the node's flags.
+    - Before mutation, the server computes the update-relevant neighborhood of
+      every prepared write/delete identity independently in the before and
+      candidate graphs, twice: over every ordinary relation, and over them
+      without links ('SaveAffectedIds' in
+      'server/serve/handlers/save_dependencies/mod.rs'). Other registered views
+      containing an unrestricted ID of the full neighborhood are rerendered,
+      except any the save envelope's other-views marks dirty. For
+      every dirty client view, the server parses and unions
+      dependencies from its clean baseline, current text, and registered viewforest
+      when present. A dependency is a graphnode the view holds a viewnode of: an
+      occurrence, the original an occurrence's =(inPlaceOf N)= names, a gnid-only viewnode, a
+      ghost, or an ID property member. A merge request's target and a link's
+      target are not dependencies merely by being named there: the request or
+      the link holds no copy of the target, so a save that changes the target
+      clobbers nothing the view holds.
+      Any intersection with the neighborhood without links refuses the save
+      conservatively. The dirty-view match ignores links in both directions: a
+      dirty view of L, where L links to a saved A, does not conflict, nor does a
+      dirty view showing A conflict with a save that only adds a link to A. The
+      collateral redraw does not ignore them, but it skips every dirty view: a
+      dirty view is never redrawn, even one that reaches the save only through a
+      link, so what a link changes in it (A's mentionerFolder, say) is refreshed
+      at its next redraw. Malformed
+      or missing dirty dependency data also refuses. A refusal returns
+      =save-result= with nil content and actionable errors naming view IDs and
+      IDs, and performs no filesystem, graph, search index, registry, or collateral
+      update. There is no save-anyway path.
+    - Deleting under a skgrepo restriction: a delete's propagation strips
+      the deleted IDs from every owned recorder ('apply_delete_propagation
+      _cleanup' in 'server/save.rs'). When records in sections the
+      skgrepo restriction keeps out name a deleted graphnode and the request
+      lacks =(delete-from ...)=, nothing is skgsave-committed and the
+      server replies, before any other decision and in place of
+      save-result, =((response-type delete-from-confirmation) (count N)
+      (prompt "..."))=, N the number of such records, with no IDs. The
+      clients ask "Delete from: (c)ancel, (v)isible records only, (a)ll
+      owned records" and re-issue the same save with
+      =(delete-from . "visible")= or =(delete-from . "all")=; cancel
+      saves nothing. Under "visible" the restricted records stay as they
+      are, and the dangling ID shows as an unknown viewnode where its
+      recorder is shown; under "all" every owned record of the deleted
+      IDs goes, as with no skgrepo restriction.
+    - A nodeMerge is built from the graph as the save's ordinary edits
+      leave it: the server prepares the buffer's other writes first, then
+      builds each merge request's three writes (the text preserver, the
+      updated acquirer, the deleted acquiree) from that candidate graph
+      ('prepare_save_under_mutation_gate' in 'server/save.rs'). So an
+      edit the same save makes to the acquirer or to the acquiree is
+      kept, and the merged contents lack what the save deletes. A save
+      whose buffer deletes the acquirer or the acquiree of one of its own
+      merge requests is refused before anything is written, with an
+      error that begins =A node this save would merge is also deleted
+      by it= and gives the node's title and ID and which of the two it
+      is; only the buffer's own deletes count, not delete propagation.
+    - Moving a node between skgrepos: for each home skgrepo move the server
+      finds every relationship touching the moved node, in either
+      direction and whether or not a view shows it, that sat at its
+      default relRepo and that the sticky-else-default rule would leave
+      off its new default ('server/from_text/strandeds.rs'). One left more
+      public than its member's new home (an inbound relationship of a
+      privatizing move) is raised to the new default, and the save's
+      warnings say so. If any other remains and the request lacks
+      =(strandeds-reviewed . "true")=, nothing is skgsave-committed and the
+      server replies, before any other decision but the delete-from
+      confirmation and in place of save-result,
+      =((response-type strandeds-confirmation) (strandeds (((relation
+      "contains") (recorder "R") (member "M") (relRepo "REPO") (default
+      "REPO")) ...)) (prompt "..."))=, with IDs but no titles. The
+      client re-issues the same save with =(strandeds-reviewed . "true")=
+      and the chosen =(reset-strandeds ...)=; the server resets those
+      to their new defaults, saving each recorder (outside the view or
+      not), so the views that show them rerender as collateral.
+    - The first alternative terminal message: after validation, a save
+      rereads every telescope it will write. If any currently selects a
+      title or body below home and lacks exact approval, nothing is
+      skgsave-committed and the server replies, in place of save-result,
+      =((response-type telescope-hoist-confirmation) (telescopes
+      (((pid "P") (home "REPO")) ...)) (prompt "..."))=.
+      This response contains no title or body. The prompt explains that
+      Hoist moves the selected title/body text to home and removes lower
+      title/body copies while retaining lower relationships and aliases;
+      Abort writes nothing and requires manual =.skg= repair. Hoist
+      re-issues the same save with =(approved-hoist-pids "P" ...)=.
+      The server rereads and reclassifies on that retry, so newly dirty
+      PIDs produce another batch confirmation. Each attempt still sends
+      =save-lock= first, and the confirmation is terminal for that
+      attempt: neither =save-relax-lock=, =collateral-view=, nor
+      =save-result= follows it.
+    - The second alternative terminal message: a save that detects forks
+      (edited foreign nodes, or explicit fork requests) and does not
+      carry =(approved-forks . "true")= skgsave-commits nothing and replies, in
+      place of save-result,
+      =((response-type fork-confirmation) (content "...") (to-minibuffer "..."))=,
+      where =content= is the fork-confirmation buffer (an instructions
+      headline, then per fork the clone-to-be over the original it
+      forks; an unspecified clone skgrepo renders as the PICK-A-REPO
+      placeholder under a =# Suggested repo ...= comment). The client
+      shows it, collects a skgrepo per placeholder, and on approval
+      re-issues the same save with =(approved-forks . "true")= and
+      =(fork-repos ...)=. Hoist is decided first: when a save needs
+      both decisions, its approved Hoist retry then returns the fork
+      confirmation, and neither attempt writes.
+    - The third alternative terminal message protects the saved and
+      collateral rerenders. After a valid save has updated disk and the
+      session-lifetime stores, the server renders the saved view and every collateral view in memory.
+      Under a restricted skgrepo-set, if the staged forests contain overPrivateText
+      telescopes, it streams no content, and sends
+      =((response-type overPrivateText-telescope-confirmation)
+      (operation save-rerender) (pids ("P" ...)) (prompt "...")
+      (view-ids ("SAVED_VIEW_ID" "COLLATERAL_VIEW_ID" ...)))=:
+      the views whose rerender is withheld, the saved view first.
+      The save itself has succeeded; only its updated text is withheld.
+      The server registers the saved view as the save left it (with the
+      IDs the save gave its new nodes), sending none of it; the
+      collateral views keep their registrations. To approve, the client
+      sends "Rerender views" (below) naming those views, with
+      =(approved-overPrivateText-pids "P" ...)=: it answers with their
+      rerenders, and writes nothing. The save is never sent again for
+      this, because it would apply a second time: its edits of existing
+      graphnodes now match the graph and are not written again, a new
+      graphnode it put under a container would make that container an
+      edited stale graphnode (the stale-buffer rule above) and so refuse it, and a new root of
+      the view would be created a second time. On an unrestricted connection the
+      ordinary save-result carries the shared overPrivateText-telescope
+      warning. Declining leaves the client's buffers as they are.
+    - Exactly one of =save-result=, =save-preview=, =delete-from-confirmation=,
+      =strandeds-confirmation=,
+      =telescope-hoist-confirmation=, =fork-confirmation=, and the save-rerender
+      =overPrivateText-telescope-confirmation= is sent as the terminal response to
+      one save attempt.
+    - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the save-result format.

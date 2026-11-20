@@ -1,0 +1,37 @@
+title: How a message names a headline
+pid: f837e39c-d8f6-4d57-b9e0-68a32aa9006c
+body: |2-
+  Every message in an =errors= or =warnings= list is Org
+  text. Its first line is the message's headline text, which both
+  clients write as a level-2 headline (=** =) under =* errors= or =*
+  warnings=; the lines after
+  it are its body. A message that concerns a headline of the
+  buffer names it as a level-3 subheadline, after the message's own
+  lines:
+  #+begin_example
+  ,** A processed request names no current change; it was dropped.
+  ,*** b
+  - graphnode ID: b
+  - viewnode ID: 0z. To find it: C-c g v 0z
+  #+end_example
+  The subheadline's text is the headline's title, or =(untitled)= for a
+  headline without one, such as a folder. Under it comes =- graphnode
+  ID: X= when the headline carries a graphnode ID, then =- viewnode ID:
+  X= (see "The metadata headers") with the command that finds it, or =-
+  not yet saved= for a headline without a viewnode ID: one the user
+  typed or copied since the last render. A warning of a node the same
+  save created from such a headline (an orphan graphnode) ends after
+  the graphnode ID, since the headline is saved and has no viewnode ID
+  until the rerender gives it one. No message invents a viewnode
+  ID. A message about several occurrences of a node names each in
+  turn. A failed save's validation errors each follow as a =** Error
+  N= headline of the one =NOTHING WAS SAVED= message, so their
+  subheadlines nest under them; a parse error ends with the headline it
+  is in. The command, 'skg-goto-viewnode-id' on =C-c g v= in Emacs and
+  =<localleader>gv= in Neovim (which the Neovim client writes in place
+  of =C-c g v=), reads a viewnode ID and moves to the headline carrying
+  it, while heralds stand in for its metadata. The subheadline is written by
+  'HeadlineName::org_subheadline' (=server/types/errors.rs=). A save
+  refused because another view's metadata is invalid lists that view's
+  errors on one line, naming each headline by its viewnode ID or title,
+  since the command searches the current buffer.

@@ -1,0 +1,9 @@
+title: The relevant implementation, callers, tests, and focused documentation for the requested behavior.
+pid: 39c24f61-4d92-46ae-b309-0dcb7a2b8cc8
+body: |2-
+  Do not read all documentation or TODO material as onboarding; it's too much.
+  Consult a plan, open question, or historical note
+  only when the current task points to it.
+  The external knowledge graph is optional background material, not required
+  orientation: the repository's code and local documentation contain the
+  operative information for implementation.

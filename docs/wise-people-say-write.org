@@ -1,13 +1,12 @@
+# This file was generated from the skg node with this ID:
+# 66b91932-6326-4686-a7e5-fc0140abb3f0
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * Wise People Say Write
-
-Knowledge mapping is [[file:./it-will-be-fun.org][easier than traditional writing]], but it is, at root, writing.
-
+Knowledge mapping is [[./it-will-be-fun.org][easier than traditional writing]], but it is, at root, writing.
 ** Why writing matters
-
 A remarkable number of people have said that writing improves thinking, memory, self-awareness, comprehension of others, and even raw perception.
-
 ** Who says?
-
 - Anne Frank
 - Anne Lamott
   - "We are a species that needs and wants to understand who we are. Sheep lice do not seem to share this longing, which is one reason why they write so little."

@@ -1,0 +1,17 @@
+title: The fix
+pid: 9b40f2d6-afc2-4d5a-971b-98132e43556e
+body: |2-
+  Walk backwards from byte 200 until we find a char boundary:
+
+  #+begin_src rust
+    let preview_len : usize = {
+      let target : usize = payload . len () . min (200);
+      let mut i : usize = target;
+      while i > 0 && !response . is_char_boundary (i) { i -= 1; }
+      i };
+    let preview : &str = &response [..preview_len];
+  #+end_src
+
+  Rust's =str::is_char_boundary(i)= returns true when byte =i= is
+  the start of a character (or the end of the string). This is O(1)
+  and the loop runs at most 3 iterations (max UTF-8 char is 4 bytes).

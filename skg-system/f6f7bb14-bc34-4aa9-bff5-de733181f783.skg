@@ -1,0 +1,12 @@
+title: recorder, carrier
+pid: f6f7bb14-bc34-4aa9-bff5-de733181f783
+body: |2-
+  A relationship is recorded in the .skg file of one of its two nodes, its
+  *recorder*: the node playing the relation's first role (the container,
+  the mentioner, the forker, the hider). The other node
+  is a member of the recorder's list. The relationship as the
+  recorder's file states it, in one of its sections, is a *record* (see
+  "record, restricted, visible").
+
+  The node that has an ID, as its PID or as an extra ID, is that ID's
+  *carrier*. (Not "owner": the user *owns* skgrepos.)

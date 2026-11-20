@@ -1,0 +1,27 @@
+title: view request vs edit request
+pid: 3bff19c5-a275-41d2-a1ff-5cc2f44ee71a
+body: |2-
+  Both are requests the client writes into metadata and the server
+  consumes. A *view request* (=(viewRequests ...)=: =folder=,
+  =flags=, =editableView=, =writeProtectedView=,
+  =writeProtectedSubtreeView=) asks for more of the view
+  (viewbranches) or changes which occurrence of a node is editable; the
+  refresh fulfills it and drops it.
+  (=fork= is also written as a view request, but the save consumes
+  it.) An *edit request* (=(editRequest ...)=: =delete=, =merge=, =flag=,
+  =relRepo=, and in the diff view =restoreRel= on a removed membership
+  and =restoreNode= on a ghost) asks the save to change the graph; a
+  successful save consumes it, and a failed save leaves it in the
+  buffer. The two restore requests are described in
+  'docs/diff-view.org', "Restoring what a change removed". A
+  *processed request* (see "processed request, processed gesture") is a
+  third kind, written in the same form: =(editRequest ...)= holds at
+  most one edit request and one processed request. The save consumes a
+  processed request after its graph edits succeed, to mark or unmark
+  changes processed, and it changes neither the view nor the graph.
+  In code a node's own edit request is a 'NodeEditRequest', kept in
+  'Editability::Editable'; a request about a headline's relationship to
+  its viewparent (=relRepo=, =restoreRel=), which an occurrence, an
+  unknown viewnode, a restricted viewnode or an alias may carry, is a
+  'RelationshipEditRequest'; a
+  processed request is the viewnode's 'ProcessedRequest'.

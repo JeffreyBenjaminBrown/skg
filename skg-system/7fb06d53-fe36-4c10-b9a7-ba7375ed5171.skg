@@ -1,0 +1,23 @@
+title: 'The change facts: =(diff ...)='
+pid: 7fb06d53-fe36-4c10-b9a7-ba7375ed5171
+body: |2-
+  A headline's change facts form one list, the last part of its
+  metadata:
+  #+begin_example
+  (diff (node added) (rel removed) (properties changed) (leaves N OBJECT...) (processed OBJECT...) (homeSkgrepoMove (old OLD) (new NEW)) (movedLikeAncestor LETTER))
+  #+end_example
+  The first three parts are the three kinds of change, and say only
+  what is true. The parts come in that order, and a part is absent when
+  it has nothing to say; a headline with nothing to say carries no
+  =(diff ...)=, and =(diff)= is never written. A node, a ghost, an
+  unknown viewnode, a restricted viewnode, an alias, id or flag member and the
+  change viewnodes other
+  than =bodyDiff= may carry it; a folder never does (see "Changed
+  folders" below).
+contains:
+- 66d3847f-5bcc-4d1b-8bdd-e15684689473
+- 8d2495b2-bc52-43c4-bee9-fe3860bafcca
+- 00c50bbd-c707-43d0-bca0-5e14ab48029a
+- c9bccbf1-f375-4a0f-9527-6ea07db5f8c9
+- a5cf0b33-3666-4b25-8560-4ed0826399ed
+- cfe8c4b6-3328-4fc7-82da-272a95b5daaa

@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 50596504-bd3c-4656-8594-caede08f2c7e
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * Sharing information is good.
 Anyone familiar with the processes of science, journalism, law or government knows about the power of larger groups to building and using knowledge.
 

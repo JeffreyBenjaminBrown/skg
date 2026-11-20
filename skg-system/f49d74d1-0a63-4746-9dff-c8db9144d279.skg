@@ -1,0 +1,23 @@
+title: Ownership and folders
+pid: f49d74d1-0a63-4746-9dff-c8db9144d279
+body: |2-
+  A skgrepo is yours unless its config entry says =foreign = true=;
+  no folder name is special, and a foreign entry may sit anywhere in
+  the list — see =api-and-formats.org=, "Skgrepos". Only
+  owned sections are ever written; a save that empties an owned
+  section deletes the file, and re-privatizing later recreates it.
+  Each owned skgrepo also receives a generated =OTHER_SKGREPO_DEPENDENCIES.toml=
+  naming the rungs of your ladder it may reference (itself and every
+  more public owned skgrepo), so a skgrepo you share carries its own
+  dependency claim. It never names a foreign skgrepo.
+
+  A receiver, to whom those skgrepos are foreign, has no order of its
+  own for them; the manifests supply it, and say whose they are. Two
+  foreign skgrepos that manifests chain together (one's manifest lists
+  the other, directly or through others) are one owner's ladder, and a
+  node with sections in both is a telescope of that owner's, folded in
+  the manifest's order. Should two manifests disagree about a pair, the
+  receiver folds it as the manifest of the more private one says (the
+  one whose own manifest lists the other) and warns at startup, naming
+  the node. Foreign skgrepos no manifest chains are different owners'.
+  See =api-and-formats.org=, "OTHER_SKGREPO_DEPENDENCIES.toml".

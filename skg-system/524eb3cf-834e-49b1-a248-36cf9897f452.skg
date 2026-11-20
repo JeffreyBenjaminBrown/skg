@@ -1,0 +1,5 @@
+title: The "output" could be side effects.
+pid: 524eb3cf-834e-49b1-a248-36cf9897f452
+body: |2-
+  So in the examples above,
+  the 'let r = ' in 'let r = {' is really optional.

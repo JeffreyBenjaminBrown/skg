@@ -1,0 +1,9 @@
+title: =(processed OBJECT...)= -- the diff objects whose change-forest leaves are all marked processed
+pid: a5cf0b33-3666-4b25-8560-4ed0826399ed
+body: |2-
+  The objects are those of =(leaves ...)= that are processed. A bare
+  =(processed)= marks a headline that lists no object (one naming a
+  single leaf). Absent
+  when nothing is processed. A
+  headline is processed when its =(processed ...)= names every object its
+  =(leaves ...)= lists.

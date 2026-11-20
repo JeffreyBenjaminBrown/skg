@@ -1,0 +1,28 @@
+title: Which nodes go in
+pid: f425deee-d32d-44c3-afed-8264da0db1e4
+body: |2-
+  A processed node waits while it needs a node that does not go in, in
+  one of three ways, each named as the answer names it:
+  - 'names-new': its worktree names, in one of its four lists, a new node.
+  - 'still-named': it is deleted, and a node names it at HEAD, in one of
+    its four lists, by an ID that node's worktree list lacks.
+  - 'merge': it is a part of a merge. The acquirer (a node whose extra
+    IDs changed) and the acquiree (the node whose pid is such an ID)
+    need each other: the acquirer alone would hold one ID as primary
+    and extra, and the acquiree's deletion alone would leave the ID
+    dangling. A node listing that ID resolves it through whichever is
+    committed, so one listing it in both graphs and the two need each
+    other; one listing it at HEAD only is needed by the two but needs
+    nothing; one listing it in the worktree only needs the two
+    ('merge_needs').
+  The rule is applied in rounds until a round holds nothing back
+  ('hold_back_waiting_nodes', 'server/diff_view/change_leaves.rs'). So
+  a node needing a waiting node waits too, and every chain of waits
+  ends at a node that is not processed. Each waiting node names the
+  first by title of the nodes it needs that do not go in; for a merge,
+  of those that are not processed, if any is. A new node
+  whose container waits goes in uncontained, which is valid and is what
+  was marked. A waiting node keeps its marks: HEAD does not change for
+  it, so its leaves keep their fingerprints. Mentions hold nothing back:
+  a link is text.
+  A commit of everything chooses every changed node, so nothing waits.

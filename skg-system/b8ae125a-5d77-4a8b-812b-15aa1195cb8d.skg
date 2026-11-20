@@ -1,0 +1,5 @@
+title: :SkgCloseAllSkgBuffers
+pid: b8ae125a-5d77-4a8b-812b-15aa1195cb8d
+body: |2-
+  Kills every skg view buffer (each triggers a close-view notice to
+  the server first).

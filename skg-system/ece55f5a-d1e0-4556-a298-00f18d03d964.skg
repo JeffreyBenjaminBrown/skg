@@ -1,0 +1,20 @@
+title: 'C-c f l   : skg-search-make-link'
+pid: ece55f5a-d1e0-4556-a298-00f18d03d964
+body: |2-
+  Search-then-link: pick a result, return here, get a link.
+
+  Like =skg-search= but tailored for inserting a link to a node
+  you don't yet know the ID of. The current buffer is not saved
+  first: the position of point is remembered, and a detour through
+  the search results' links works against your unsaved edits. Save
+  the buffer afterwards. The same conservative search defaults as
+  =skg-search= apply.
+
+  In the resulting search buffer, find the result you want and
+  press =C-c C-c=. The search buffer closes; you return to the
+  buffer you started in, at the position you were at; and a
+  =[[id:X][LABEL]]= link is inserted at point.
+
+  The label is the result's title with any inline links inside
+  it reduced to their labels (so the new link's label is plain
+  text, never another link inside a link).

@@ -1,0 +1,9 @@
+title: fingerprint, the processed store
+pid: dccdfa7b-e186-44f9-a136-bde602c2e238
+body: |2-
+  Marks are stored in the server's processed marks file
+  ('<data_root>/processed-marks-CONFIGSTEM.json' unless the config names
+  another; 'docs/api-and-formats.org', "Processed marks file"), each with a
+  *fingerprint* of the change it approved. A mark whose fingerprint no
+  longer matches the change counts as absent, which is how editing a
+  marked change unmarks it.

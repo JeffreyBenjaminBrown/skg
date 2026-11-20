@@ -1,0 +1,23 @@
+title: Why this is so confusing
+pid: a581c54d-f70f-4e55-852b-80a06dde616d
+body: |2-
+  Three things conspire to make this look like a mystery:
+
+  1. *"The code hasn't changed."* True -- and irrelevant. What changed is
+     the compiled artifacts on disk, not the skgrepo.
+
+  2. *Cargo will not rebuild the broken file.* Cargo decides freshness
+     from fingerprints and mtimes; it never checksums its own output. If
+     the machine died *after* the fingerprint was written but *before*
+     the artifact finished streaming to disk, Cargo believes a truncated
+     file is a good one, hands it to the linker, and fails the same way
+     every single time. The failure is permanent, not flaky. Re-running
+     the build does not help, which is exactly what makes people assume
+     the problem must lie elsewhere (the config or the data).
+
+  3. *The error is buried.* =start-servers.sh= runs the build inside
+     =preflight_check_config=, and on failure prints "ERROR: skg failed
+     to compile". That wording is misleading: the crate compiled fine.
+     It failed to *link*. And if you started the servers backgrounded,
+     the linker error scrolls past or lands in a log you did not think
+     to read.

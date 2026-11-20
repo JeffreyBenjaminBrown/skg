@@ -1,0 +1,11 @@
+title: Node flags
+pid: 6104cd26-5993-4984-8d2f-169430816b11
+body: |2-
+  The YAML =flags= list stores =Had_ID_Before_Import=, =Was_Overloaded=, and
+  =NoSearchMatching= using those exact spellings. Absence means false.
+  =NoSearchMatching= keeps the node's Tantivy documents for ID/title/repo
+  lookup but marks every title/alias document with indexed, stored
+  ~no_search_matching=true~; every text query adds a mandatory exclusion. It
+  therefore blocks direct title, alias, body, regexp, operator, and
+  field-qualified matches, but is not an access-control boundary and does not
+  remove graph context.

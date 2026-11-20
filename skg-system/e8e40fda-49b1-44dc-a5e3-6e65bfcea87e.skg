@@ -1,0 +1,10 @@
+title: Stub roots
+pid: e8e40fda-49b1-44dc-a5e3-6e65bfcea87e
+body: |2-
+  The buffer starts as one stub per root, in D's order: an editable
+  occurrence, its body folded unless its node is in C (it is
+  context), or, when the after-graph lacks the node, its ghost. In a
+  pruned change view, a root with several containers gets a folded
+  container folder, which the refresh fills with its containers in
+  either graph and their containerward chains
+  ('stub_viewforest_of_roots' in 'server/diff_view/buffer_rerender.rs').

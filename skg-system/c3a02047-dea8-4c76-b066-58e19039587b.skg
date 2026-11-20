@@ -1,0 +1,16 @@
+title: Do not ask the reader to learn a distinction that does not exist outside skg
+pid: c3a02047-dea8-4c76-b066-58e19039587b
+body: |2-
+  Two ordinary words that are near-synonyms outside skg must not be
+  given different technical meanings inside it. Outside skg, "unfold"
+  and "expand" are roughly equivalent, and nothing makes one of them
+  more pertinent to org folding than the other; so skg must not say
+  "unfold" for the org fold state and "expand" for drawing more of the
+  viewforest and expect a reader to keep them apart. When two things
+  need distinct names, make the names different in a way the reader
+  can see: a qualifier that says which thing is meant ("org-fold",
+  "viewforest-unfold"; in a longer symbol, 'orgFold' and
+  'viewforestUnfold'), not a pair of plain synonyms with a private
+  convention attached. The same applies to "fresh" versus "current",
+  "drawn" versus "shown", and any other pair whose difference a
+  newcomer could not guess.

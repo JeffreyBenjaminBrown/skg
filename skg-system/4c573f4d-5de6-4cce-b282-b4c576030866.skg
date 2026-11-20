@@ -1,0 +1,4 @@
+title: build the Docker container
+pid: 4c573f4d-5de6-4cce-b282-b4c576030866
+body: |2-
+  See the image and mounts documented in =../bash/docker.sh=.

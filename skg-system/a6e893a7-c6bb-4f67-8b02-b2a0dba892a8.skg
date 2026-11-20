@@ -1,0 +1,6 @@
+title: Tests and debugging
+pid: a6e893a7-c6bb-4f67-8b02-b2a0dba892a8
+body: |2-
+  Read [[id:f73d4958-2724-44cc-9d04-542116cd2320][file:common-gotchas.org]]. Consult [[id:021d6a2d-a5a3-42a3-b6e2-c9206b5cdf26][file:consider-experimenting.org]] for
+  an uncertain algorithm or implementation technique, and
+  [[id:35f6e1cd-6b30-4568-a8c1-a4e1d0b9e953][file:pitfall_bytes-vs-characters.org]] for text offsets, slicing, or framing.

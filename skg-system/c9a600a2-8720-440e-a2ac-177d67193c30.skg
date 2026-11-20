@@ -1,0 +1,17 @@
+title: 'C-c d a : skg-delete-references-to-absent-node'
+pid: c9a600a2-8720-440e-a2ac-177d67193c30
+body: |2-
+  On an unknown viewnode, removes that exact raw ID from every owned
+  structured relationship in every retained telescope.  It never edits
+  foreign telescopes or text links.  If owned title/body text links point at
+  the same absent ID, Skg shows a retained warning buffer and asks before the
+  structural cleanup; otherwise it runs immediately.  The confirmation is
+  bound to the scanned relationships and text links: if they change before
+  confirmation, Skg refuses the stale approval and requires a rescan.  Before
+  running, save or revert every open skg view.  Afterward, Skg refreshes only
+  views which show a changed recorder or the exact absent raw ID.  The
+  warning ends by naming skg-investigate-unknown-node (C-c t r), which
+  shows what git history knows of the ID.
+  Under a skgrepo restriction it refuses ("Deleting the references to an
+  absent ID requires no skgrepo restriction"), since it rewrites every
+  owned recorder, those the skgrepo restriction keeps out included.

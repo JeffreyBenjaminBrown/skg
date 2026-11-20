@@ -1,0 +1,22 @@
+title: Attribution
+pid: 3ab20699-6feb-4200-966e-c9f8406a13f0
+body: |2-
+  A reply is often made by forking someone's note and writing under the
+  fork. Read later, the fork would look like the forker's own words. So
+  the fork operation records, in the clone's file, where the clone came
+  from: its *attribution*. Its herald then reads
+  =⌂:<FORKER/ORIGINAL>=, the labels of the clone's home skgrepo and of
+  the skgrepo it was forked from, wherever the clone is drawn, even
+  under a note of its own skgrepo, where no other node shows its home
+  skgrepo, unless the note above it says the same. A note of its home
+  drawn under it, with no attribution of the same skgrepo, says its own
+  =⌂:FORKER=, so the herald marks where the voice switches back
+  ('docs/heralds.org', "Other heralds"). A fork of Claude's note into Jeff's skgrepo =jeff-decid=
+  reads =⌂:<jeff-decid/claude-public>=.
+contains:
+- 5a0e1097-4e09-4eba-9019-db922089e788
+- 4bb478dc-f9bc-4bfa-8725-c6794b389248
+- 04e11367-3397-45ae-ad67-34b9b69a2fb5
+- bfe365c2-5b17-4d1f-bc9f-2c1d7ff7ddb8
+- 51d3fae2-eb65-4fc1-b15e-37b979386a54
+- 32f0ad67-a7f4-4412-91eb-ef4c4ee930ba

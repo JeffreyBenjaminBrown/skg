@@ -1,37 +1,39 @@
+# This file was generated from the skg node with this ID:
+# 72b1f5d1-a9a2-411f-8a76-2bb427251180
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * an early, flabby introduction to skg
 ** Purpose
 Skg is for thinking, individually and collectively. It is a simple, novel way to write, collect (from other writers), organize and share information. (Any of which can be ignored -- you don't have to share, for instance, to use the app productively.) In a world of abundant information, I hope Skg will let users direct their attention, process information and collaborate more effectively.
 
-Skg begins from a [[file:data-model-trees-with-links.org][simple web-of-thought data model]] that [[file:who-maps-knowledge.org][many people already love]]. Its novelty is to extend that model [[file:skg-enables-deep-sharing.org][to integrate the thoughts of different users]].
+Skg begins from a [[./data-model-trees-with-links.org][simple web-of-thought data model]] that [[./who-maps-knowledge.org][many people already love]]. Its novelty is to extend that model [[./skg-enables-deep-sharing.org][to integrate the thoughts of different users]].
 
-Technical doubts? See the small [[file:FAQ.org][FAQ]].
-
+Technical doubts? See the small [[./FAQ.org][FAQ]].
 ** If you need more motivation
 to get excited about this idea:
 
-- [[file:preempt.org][Preempting some common concerns]] about ownership and privacy.
+- [[./preempt.org][Preempting some common concerns]] about ownership and privacy.
 - Some less obvious motivations
-  - [[file:wise-people-say-write.org][Writing is like thinking with power tools.]]
-  - [[file:ownership-has-been-awkward.org][Traditional data ownership is awkward.]]
+  - [[./wise-people-say-write.org][Writing is like thinking with power tools.]]
+  - [[./ownership-has-been-awkward.org][Traditional data ownership is awkward.]]
   - The web of thought experience feels good.
-    - [[file:it-will-be-fun.org][It is liberating, fun, peaceful, and psychically integrating.]]
-    - [[file:knowledge-gardening-is-zen.org][It is Zen.]]
-  - [[file:private-writing.org][Private writing is powerful.]]
-  - [[file:integrate-public-and-private.org][Integrating your public and private writing only recently became possible]]
-    - which is important, because [[file:wise-people-say-write.org][writing is like thinking with power tools]].
-- And of course, [[file:sharing-is-powerful.org][sharing information is powerful.]]
-
+    - [[./it-will-be-fun.org][It is liberating, fun, peaceful, and psychically integrating.]]
+    - [[./knowledge-gardening-is-zen.org][It is Zen.]]
+  - [[./private-writing.org][Private writing is powerful.]]
+  - [[./integrate-public-and-private.org][Integrating your public and private writing only recently became possible]]
+    - which is important, because [[./wise-people-say-write.org][writing is like thinking with power tools]].
+- And of course, [[./sharing-is-powerful.org][sharing information is powerful.]]
 ** If you're a programmer, please help!
-[[file:cool-tech-in-skg.org][Skg uses cool technologies!]], including Rust and Emacs. (That said, I'm flexible -- if you want to write another client, or rewrite the server in Haskell, let's go!)
+[[./cool-tech-in-skg.org][Skg uses cool technologies!]], including Rust and Emacs. (That said, I'm flexible -- if you want to write another client, or rewrite the server in Haskell, let's go!)
 
-- [[file:usage.org][Usage: How to run Skg]]
+- [[./usage.org][Usage: How to run Skg]]
 - Skg's data model and user experience
-  - Trees and links: [[file:vocabulary.org][Some simple but important definitions]]
-  - [[file:hyperlinks.org][Links can point to any part of a document.]]
-  - [[file:forks.org]["Forks": Subscription and overriding in detail]]
-  - [[file:data-model-skg-extensions.org][The data model]].
-  - [[file:sharing-model.org][The sharing model]].
-- [[file:COMMANDS.org][What's available in Skg]]
+  - Trees and links: [[./vocabulary.org][Some simple but important definitions]]
+  - [[./hyperlinks.org][Links can point to any part of a document.]]
+  - [[./forks.org]["Forks": Subscription and overriding in detail]]
+  - [[./data-model-skg-extensions.org][The data model]].
+  - [[./sharing-model.org][The sharing model]].
+- [[./COMMANDS.org][What's available in Skg]]
 - Some reasonable jumping-off points for understanding the code
   - [[file:../server/types/nodes/complete.rs][The Rust node types]]
   - [[file:../server/serve.rs][The Rust server]]. (The =main= module is just a wrapper for this module.)

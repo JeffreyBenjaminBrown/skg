@@ -1,0 +1,11 @@
+title: Letters and sides
+pid: b535005f-46c5-422c-9e85-b3111c7e0d17
+body: |2-
+  The relations, in display order, are =C= contains, =L= links to, =K=
+  forks (the K of forK; =F= is the flags count), and =H= hides (from
+  its forks). A relation's token has an in-side before its letter and
+  an out-side after it. The in-side counts nodes that relate to this node
+  ("N nodes contain it"); the out-side counts nodes this node relates to
+  ("it contains N nodes"). =2C3= thus means two containers and three
+  direct contents. Missing sides and empty relations are omitted. The
+  property counts =A=, =I= and =F= follow the relations.

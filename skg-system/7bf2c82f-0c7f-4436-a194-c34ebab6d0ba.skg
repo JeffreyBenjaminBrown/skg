@@ -1,0 +1,5 @@
+title: 'C-c r p u : skg-diffView-goto-previous-unprocessed-change'
+pid: 7bf2c82f-0c7f-4436-a194-c34ebab6d0ba
+body: |2-
+  Like C-c r n u, backward. Before the first one it says "No earlier
+  unprocessed change".

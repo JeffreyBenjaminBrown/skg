@@ -1,0 +1,7 @@
+title: 'C-c g M   : skg-goto-in-magit-parent'
+pid: 1660c712-b77f-474a-a385-8bcffbd8cc86
+body: |2-
+  Opens a magit view of the *parent*'s file, with point on
+  the first line in that section containing this node's ID.
+  Warns if the ID appears multiple times, or if the parent
+  appears in multiple sections.

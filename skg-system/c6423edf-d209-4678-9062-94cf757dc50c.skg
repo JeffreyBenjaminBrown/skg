@@ -1,0 +1,12 @@
+title: Reviews and plans
+pid: c6423edf-d209-4678-9062-94cf757dc50c
+body: |2-
+  Read [[id:80c19bd1-86e0-4c2d-8e0a-0fc7d52627e5][file:plans.org]] before writing an execution plan for an unattended
+  agent, and [[id:ab2840ee-e0cc-4769-a2d4-ceb805552051][file:code-reviews.org]] before reviewing a finished body of
+  work, and [[id:995a3665-33c1-46d6-8f06-ab2c9b61945a][file:orchestration.org]] before running a plan slice by
+  slice; [[id:6cf705a0-70cd-448d-840e-7efbd8dc039b][file:jeff-should-do.org]] holds the habits directed at Jeff.
+  Read [[id:221eef80-d448-4564-9304-07397872bdfa][file:org-discussions.org]] for how discussions in Org files mark
+  authorship and what needs attention.
+  Read [[id:de5dcb74-4e1e-49cb-ac34-ead7542aaee6][file:architecture.org]] for architectural work and [[id:fa26e71c-acf3-41a7-ab82-0898a213e429][file:when-to-stop.org]]
+  when deciding which implementation choices need Jeff's input. Read the
+  code-change advice when reviewing or specifying the corresponding details.

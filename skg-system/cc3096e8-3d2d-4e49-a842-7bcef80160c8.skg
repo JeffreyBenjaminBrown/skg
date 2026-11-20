@@ -1,0 +1,10 @@
+title: the old, "manual" way
+pid: cc3096e8-3d2d-4e49-a842-7bcef80160c8
+body: |2-
+  Open the acquirer's metadata ('skg-view-metadata'),
+  go to the "None" under "editRequests",
+  and use shift-left or shift-right to cycle through possible values,
+  until reaching 'merge'. You will be prompted for a node.
+  Paste a link to, or the raw ID of,
+  the node at the top of the linkstack --
+  see 'skg-paste-link' and similar commands.

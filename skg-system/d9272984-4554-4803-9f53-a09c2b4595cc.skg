@@ -1,0 +1,7 @@
+title: Foreign skgrepos
+pid: d9272984-4554-4803-9f53-a09c2b4595cc
+body: |2-
+  Foreign skgrepos are read at their worktrees in both halves of the
+  straddle, so they never produce a change: they are outside C, the
+  change-forest and the processed marks. The processed summary only counts their
+  changed nodes, by the stems of their changed '.skg' files.

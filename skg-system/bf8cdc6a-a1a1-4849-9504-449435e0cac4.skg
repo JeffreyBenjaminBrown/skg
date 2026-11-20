@@ -1,0 +1,47 @@
+title: ordinary usage
+pid: bf8cdc6a-a1a1-4849-9504-449435e0cac4
+body: |2-
+  Run =M-x skg-import-md-and-org= with the server running. Choose an absolute
+  directory in the server/container filesystem and an existing owned skgrepo.
+  That skgrepo determines where every new node will be written; one the
+  skgrepo restriction keeps out is refused. The importer scans
+  exact =.md= and =.org= files recursively, skips symlinks and =.git=, and
+  leaves the originals untouched.
+
+  Review the preview of files, generated =.org= export paths, and warnings,
+  then explicitly approve or decline. Approval applies only to that preview;
+  another run requires a new one.
+
+  The operation creates file-root and headline nodes,
+  which correspond 1-to-1 to sections of the imported data.
+  A document whose only top-level headline has nothing before it
+  is that headline, so the headline is its file root;
+  otherwise the file root is titled after the document
+  (its =#+title=, else its filename), its body is the text
+  before the first headline, and its export marker says
+  =root_headline = false=, so that the document exports
+  with its original outline.
+  It also creates two kinds of nodes that do not so correspond:
+  - a single import-record node with links to all file roots,
+    so you can see everything you just imported in one place.
+    The import result buffer links to it; follow the link with =C-c g RET=.
+  - an export marker under each root,
+    so you can export back to the same path if you want.
+    But this is dangerous -- see "Re-export is dangerous" below.
+
+  The importer does not combine its nodes with existing ones,
+  copy attachments, synchronize later edits, or automatically export.
+
+  Only document structure, selected metadata, links, and named Markdown
+  footnotes are interpreted. Other Markdown/Org markup remains readable text,
+  not a full format conversion. Unresolved links and unsupported constructs
+  are left in place with warnings.
+
+  The comment lines that begin a file exported by Skg are ignored,
+  so an exported file imports back to the same shape.
+
+  Only links to =.md= and =.org= files are resolved, or warned about.
+  A link to any other file (source code, an image, a folder) keeps pointing
+  where it did, without a warning. An Org link to one is left as written;
+  a Markdown link to one, or a link a host-root mapping changes,
+  is written as an Org link.

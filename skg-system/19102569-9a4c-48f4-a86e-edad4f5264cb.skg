@@ -1,0 +1,17 @@
+title: What a herald describes
+pid: 19102569-9a4c-48f4-a86e-edad4f5264cb
+body: |2-
+  An Skg headline begins with metadata. In a view, heralds condense that
+  metadata into short styled tokens. (Decorations on text that is not
+  metadata, such as the label shown after a link or a title shown beside
+  an ID in magit, are *annotations*, not heralds.) Toggle the compact display with
+  'skg-view-heralds-mode' (=C-c v h=) in Emacs or ':SkgHeraldsToggle'
+  (=<localleader>vh=) in Neovim. The expanded metadata is useful when you
+  need to inspect the exact derived facts or requests.
+
+  Relationship counts describe the latest rendered graph within the current
+  skgrepo restriction. They count distinct visible nodes, including visible
+  relationships, and resolve extra IDs. They do not count repeated
+  links or unsaved buffer edits as new graph facts. A folded body can still
+  contribute links. A view's position can add ancestor flags and a birth
+  style, so two occurrences of the same node can have different heralds.

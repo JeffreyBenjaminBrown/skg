@@ -1,0 +1,50 @@
+title: '"forkee as such"'
+pid: e90d64f0-903e-46bf-bfc7-0ff75b6c05b2
+body: |2-
+  In Skg some nodes fork others: the forker forks the forkee.
+  (See [[id:82e3cf6d-2e55-41bb-9fcd-2efd2309db7e][the technical data model]].)
+  A node that plays the forkee role can be viewed as an ordinary node,
+  or /as/ a forkee. In the latter case it appears
+  underneath the relevant forker, claiming, in its 'forksFolder':
+  #+begin_example
+    * forker
+    ** forksFolder
+    *** forkee1
+    *** forkee2
+    ...
+  #+end_example
+
+  In the above view, forkee1 and forkee2 are both "forkees as
+  such": a member of a forks folder that claims (and,
+  in the refresh, that the graph warrants). They are not just forkees,
+  but they are being shown /as/ forkees. A forkee as such shows its
+  content less what the forker contains or hides and what the user
+  keeps elsewhere ('what_the_member_shows' in
+  'server/refresh/goal.rs'; see "integrated").
+
+  In a content view, under an editable forker, the refresh draws a
+  forkee as such as it draws content: write-protected, carrying an
+  editable-view request, which its visit consumes, so that it is
+  editable unless another occurrence holds its node's editability or the
+  node budget is spent (see "editability rule"). A foreign one is drawn
+  editable too. A forkee as such the buffer already shows
+  write-protected stays so at a plain rerender; an editable-view request
+  on its forker (=C-c s e=) passes through the forks folder to it.
+
+  Showing a node as a forkee changes the way edits are interpreted. Its
+  own list is never read there, since it shows its content in part. Its
+  title and body are saved when the user owns it, and refused when it
+  is foreign (a text claim: they must stay as on disk). Cutting one of
+  its children, or showing again one the forker hides, edits what the
+  forker hides (see "the forkee-visibility step"). A child placed under
+  it that its list does not name -- a headline typed there, or a node
+  moved there from elsewhere -- joins its content, after the sibling it
+  follows, when the user owns it; under a foreign one the save is
+  refused, saying to make the node one's own first
+  ('add_children_placed_under_member_as_such' in
+  'server/from_text/local_fieldintent_collection/resolve_visibility.rs';
+  'docs/forks.org', "Adding a child under a member as such").
+  Its delete, nodeMerge and flag requests are ignored. A member of the
+  folder claiming nothing -- a forker-only or an indirect member, or a
+  forkee the user detached -- is no forkee as such but a forker as
+  such.

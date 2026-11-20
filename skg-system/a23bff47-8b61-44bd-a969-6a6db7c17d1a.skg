@@ -1,0 +1,8 @@
+title: buffer kind
+pid: a23bff47-8b61-44bd-a969-6a6db7c17d1a
+body: |2-
+  Which of the four buffers of the diff view a buffer is
+  ('DiffViewBufferKind'). A buffer of the diff view is refreshed over
+  the graph straddle; the straddle, the buffer kind and the processed
+  store are the three parts of the refresh's diff-view mode
+  ('RefreshMode::DiffView').

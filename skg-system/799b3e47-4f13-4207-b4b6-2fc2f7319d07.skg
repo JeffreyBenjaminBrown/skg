@@ -1,0 +1,12 @@
+title: what a hit shows
+pid: 799b3e47-4f13-4207-b4b6-2fc2f7319d07
+body: |2-
+  The hits come best first, each a write-protected headline showing
+  its node's title. Under each hang, folded, its containers folder,
+  whose members carry their own containers up to the roots, and,
+  when there are any, its forks folder, flat: the nodes it forks, those
+  that fork it, then its other mirrors, each with its own containers
+  folder. A hit found through an alias shows those
+  folders collapsed and its alias folder open, holding all of the
+  node's aliases, the matching one among them. The search buffer
+  arrives whole, in one answer, and is an ordinary view.

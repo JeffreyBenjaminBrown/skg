@@ -1,0 +1,47 @@
+title: Change viewnodes and tags
+pid: b27b9996-fa0a-4a39-a080-d6164ade02d3
+body: |2-
+  At each editable occurrence of a node in C, the refresh holds, ahead
+  of its content, what 'model_of_front_change_viewnodes'
+  ('server/diff_view/changes.rs') says: its old text, its home skgrepo
+  move, its "it acquired" folder, its alias, ID and flags folders whose
+  list changed; then its partner folders whose membership changed;
+  then its changeset markers and its other changes, the last before its
+  content. A root of the order-only buffer, which is in no set of that
+  buffer, holds them as a node in C does. Each is kept while its change exists, drawn when
+  missing (after the one before it, or first), and entombstoned when
+  its change is gone; the tombstone holds whatever stood under it. A
+  write-protected occurrence holds none: an earlier one's change
+  viewnodes are entombstoned.
+
+  What a node in C shows, the refresh reads from the leaves that
+  mention the node (those it records and the relationship leaves naming
+  it as member), grouped by aspect ('ChangedAspects'); the graphs supply
+  only what each viewnode shows, such as the old title. A new aspect of
+  a leaf is added in one place, and C, the extension and the processed marks
+  follow. The mentioner folder alone reads the nodes whose set of
+  mentioners changed, since a mention is no leaf.
+
+  Each child is tagged with its change ('tag_children'): an occurrence
+  with its node's existence ('(node added)', '(node removed)'), its
+  node's other properties ('(properties changed)') and its
+  relationship's existence ('(rel added)', '(rel removed)'), the last
+  from the goal item it is; a ghost with its node's removal and its
+  relationship's; an unknown viewnode, a restricted viewnode or a
+  property member with its relationship's. A root, and an occurrence the goal does not name, are
+  tagged as a node only; a node of the containerward chain carries no
+  change. Under a member whose relationship moved to another skgrepo
+  stands its relRepo move, first.
+
+  A node was added when only the after-graph has it, and removed when
+  only the before-graph does ('GraphStraddle::node_existence'); its
+  other properties changed ("modified", herald M) when both graphs have
+  it and it records at least one leaf
+  ('GraphStraddle::node_properties_changed') that neither its own 'rel'
+  nor a headline under it shows: the tail of the refresh clears '(properties changed)' where
+  the object 'node' names no leaf ("Change facts on the wire"), so
+  that M stands for what a mark of 'node' marks there. A node whose
+  only changes are its relationships to the members drawn under it
+  shows no M where it stands with them; its changeset markers and
+  members show those changes. A ghost never carries
+  '(properties changed)'.

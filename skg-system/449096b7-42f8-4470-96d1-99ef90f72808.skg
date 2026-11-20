@@ -1,0 +1,8 @@
+title: Privacy relies on forking.
+pid: 449096b7-42f8-4470-96d1-99ef90f72808
+body: |2-
+  The previous section describes how forking is used to integrate foreign content into one's data. Forking is also the mechanism by which private data is added to public data.
+
+  Suppose you have a puBlic note B that contains branches X and Y. Suppose you would like to include a third branch Z, but you want Z to be private.
+
+  Skg's solution is to fork B into a new priVate note V, which contains X, Y and Z. When you view B in "private mode", your private note V will stand in B's place. But when you are in "public mode", following a link to B will bring you to B.

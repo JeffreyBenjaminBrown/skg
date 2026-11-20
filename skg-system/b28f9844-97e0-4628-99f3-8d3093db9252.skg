@@ -1,0 +1,18 @@
+title: 'C-c s t : skg-detach'
+pid: b28f9844-97e0-4628-99f3-8d3093db9252
+body: |2-
+  Under a parent that reads claims -- an editable occurrence, or a
+  folder under one that is not write-protected -- writes 'noClaim' on
+  the headline at point, so that the next save takes it out of the
+  parent's list. The headline stays in the buffer: a child the graph
+  put there shows =detach= until the save, and =⊥= after it.
+  Under a parent that reads no claims (a write-protected occurrence
+  or folder, a ghost, an unknown viewnode, a restricted viewnode, a
+  tombstone, or none at all; 'docs/glossary.org', "claims
+  membership", is the list) it refuses, since no child claims
+  membership there ("Cannot detach: the parent reads no claims ...").
+  On a headline whose kind claims nothing anywhere (a folder, a flag,
+  a tombstone, a change viewnode of the diff view) it refuses too
+  ("Cannot detach: a headline of this kind (KIND) claims no membership"). On
+  a headline that claims nothing already, it says so and changes
+  nothing. It does not save.

@@ -1,0 +1,4 @@
+title: language
+pid: f74bd4ee-3ab2-40d0-986b-252d84b68252
+body: |2-
+  a 'mentioner' node 'linksTo' a 'mentioned' node.

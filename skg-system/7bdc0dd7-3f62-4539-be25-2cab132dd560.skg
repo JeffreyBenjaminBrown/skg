@@ -1,0 +1,4 @@
+title: '<localleader>mnU : :SkgMarkNodeUnprocessedContentward'
+pid: 7bdc0dd7-3f62-4539-be25-2cab132dd560
+body: |2-
+  As <localleader>mnP, but unmarks. (Emacs: C-u C-c m n u.)

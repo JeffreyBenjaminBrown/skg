@@ -1,0 +1,21 @@
+title: Deletion and dangling references
+pid: 1e822bee-28f6-4503-a7ef-ba2cf6813e4b
+body: |2-
+  Deleting a node removes its primary and extra IDs from the outbound
+  relationship lists of owned referencers, including
+  =forks=.  Foreign files are not rewritten.  The explicit
+  absent-reference cleanup can remove an exact dangling =forks= partner
+  from owned data.
+
+  A deleted fork shown in its original's place, marked
+  =(inPlaceOf N)=, under a container the user does not own, still
+  collects =N= for that container's list
+  ('deleted_mirror_keeps_its_original' in
+  =server/from_text/local_fieldintent_collection/predicates.rs=): the
+  deletion takes the fork out of the graph, not =N= out of the
+  container, so the container is not forked, and the rerender draws =N=
+  there again. Under an owned container the deletion removes =N= from
+  its list too ([[id:1c6e493f-b9ff-49c2-8642-729de8b37e85][forks.org]], "Taking back a fork").
+
+  A forkee that is an unknown graphnode cannot substitute,
+  because there is no node to show.

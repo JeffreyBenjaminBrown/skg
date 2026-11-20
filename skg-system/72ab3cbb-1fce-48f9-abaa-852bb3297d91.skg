@@ -1,0 +1,23 @@
+title: The commit
+pid: 72ab3cbb-1fce-48f9-abaa-852bb3297d91
+body: |2-
+  Each owned skgrepo with something to commit gets one git-commit, in
+  declaration order, with the message, by its gitrepo's configured user; in
+  a gitrepo shared by several, each commit's parent is the one before.
+  So a home skgrepo move between two skgrepos is one node in two
+  commits. A commit's tree is the tree before it with the skgrepo's
+  committed paths taken from the worktree (removed, for a deletion), not
+  the git index: what was staged by hand never goes in. After a commit,
+  each committed path's git index entry is set to the commit's (removed,
+  for a deletion), and every other entry is left as it was, so a file
+  staged by hand stays staged. Nothing in the worktree is written.
+  Before the first git-commit, every gitrepo's HEAD must still hold the
+  tree its commit was built on, or nothing is committed. A git failure
+  after that stops the rest; it is reported, 'committed-nodes' counts
+  only the nodes each of whose files went in, and the next diff view
+  shows what is left.
+  The save's mutation gate is held from the choice of nodes to the last
+  git-commit, so no save changes the worktree or the graph between them.
+  A mark rides on a save; the commit reads the marks once, under the
+  processed store's lock, when it chooses, so a mark lands wholly before
+  the choice or wholly after it.

@@ -1,0 +1,10 @@
+title: What counts as editable here
+pid: e3dbf289-2fae-4cc7-9ec4-a7420c388f47
+body: |2-
+  A buffer makes a node's changes editable when it holds an editable
+  occurrence of the node, wherever that sits, or the node's ghost in
+  content position (under the buffer root, an occurrence, or a ghost
+  that is itself in content position),
+  since a deleted node's old content is editable nowhere and shown
+  there ('nodes_editable_in_diffView'). The change-forest leaves those
+  nodes record are the changes editable in the buffer.

@@ -1,0 +1,13 @@
+title: Design the shared model once, before any plan
+pid: 2c5946c4-b089-4ae4-865d-511c0e980b7f
+body: |2-
+  When several slices will touch one model (for the TDV: editability,
+  write-protection, members and non-members, view requests), write that
+  model down first, in the discussion document, as a stateless
+  description: what states a thing can be in, what moves it between
+  them, and what the save does with each state. Do it before the first
+  plan that touches it. The TDV redesigned this model three times across
+  plans 04, 06 and 08; the stateless description that settled it was
+  written last, in the 07 review thread, and would have saved two
+  rounds written first. "Stateless" means: decide from what the buffer
+  and the graph are now, never from what they were at an earlier save.

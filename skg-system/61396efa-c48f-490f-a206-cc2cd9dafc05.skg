@@ -1,0 +1,21 @@
+title: Fingerprint scopes
+pid: 61396efa-c48f-490f-a206-cc2cd9dafc05
+body: |2-
+  By default the wrapper fingerprints the repository's broad code, test, client,
+  script, documentation, data/config, and packaging surface.  It does not cover
+  every repository file; notably, =coding-advice/= and =TODO/= are outside the
+  default.  Derived =windows/out/= package copies are deliberately excluded.
+
+  For focused work, explicitly name the paths whose changes could affect the
+  result:
+
+  #+begin_src sh
+  bash/quiet-test.sh --label wrapper-self-test \
+    --scope bash --scope tests -- \
+    bash tests/quiet-test-wrapper.sh
+  #+end_src
+
+  Use =--scope .= only when a whole-worktree fingerprint is genuinely useful.
+  It can hash unrelated untracked files, which may be slow or privacy-surprising.
+  Never claim that a green result covers a later or differently scoped worktree;
+  compare the fingerprint in the =.meta= file.

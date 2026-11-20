@@ -1,0 +1,29 @@
+title: 'Unintegrated content: the forks folder'
+pid: c6cd5719-7e98-4228-b56d-7c6de070ea70
+body: |2-
+  Because =C= forks =N=, a generated *forksFolder* ("It forks these, or
+  these fork it, or these fork or are forked by others here.") appears
+  under =C= listing =N=, claiming, as a
+  /forkee as such/. The same folder lists, after
+  the forkees, the notes that fork =C=, and then =C='s other mirrors,
+  each claiming nothing (deleting one hides it, attaching it makes =C=
+  fork it: [[id:ab83219a-c1c5-4dc3-a0b5-96d2faecb587][sharing-model.org]], "The
+  forks folder"; see "Every mirror, flat", below). A forkee's content is exactly
+  what you have *not* yet integrated: a forkee as such shows only the
+  children its forker (=C=) neither hides nor already contains, and that
+  no other note of yours contains (see "What you keep elsewhere",
+  below). A fresh clone has ~C.contains == N.contains~, so it starts
+  showing no content: every child you copied stands, folded, in its
+  folder of what you keep elsewhere. As the original gains new children
+  you have not pulled in, they appear among its content.
+contains:
+- 8a359247-a5b7-40ab-9249-a8eb1f708767
+- 10bd7840-5e74-4d0f-8915-58dc14fad6b7
+- b31e3351-d4bc-4da1-be95-9c162e740fac
+- 49067800-a66f-4d03-a201-3ecf9f5a3c31
+- 5839a81b-1e4c-438c-ac47-1265f404ab5c
+- 2962c1d2-5168-4cd8-b4d9-83a26ae752ce
+- 1d9fb1de-fa4c-4980-8262-6de934948e6c
+- 8bf16f55-f61d-41d2-88c4-ca6199d719b6
+- 24344276-d1ce-4116-ba0b-18d9871c8cc3
+- 28d3942e-cec3-4a20-b9e0-32b53eefe26c

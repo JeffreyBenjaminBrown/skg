@@ -1,0 +1,13 @@
+title: =(otherChanges KIND...)= -- what the node's files changed that no other leaf records
+pid: 0b70a6f9-12c2-446e-a486-d956b7ddc0b6
+body: |2-
+  Each KIND is one way: =sectionMove= (its text moved between a private
+  and a public section), =attributionChange=, =aliasSkgrepoMove= (an
+  alias moved to another skgrepo), =contentOrder=, =forksOrder=,
+  =hiddenOrder=, =aliasOrder=, =idOrder=, =flagOrder= (that list was
+  reordered) and =otherInFile= (something else in its file changed). Its
+  headline has no title. Its body, for each reordered list, is a header
+  naming the list and the line diff of the order of the members both
+  graphs give it, each line prefixed by a space, =-= (HEAD) or =+= (now);
+  the parser keeps it and nothing reads it. One leaf, marked bare
+  (=docs/diff-view.org=, "Other changes to a node's file").

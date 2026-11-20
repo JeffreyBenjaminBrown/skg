@@ -1,0 +1,5 @@
+title: '<localleader>mnp : :SkgMarkNodeProcessed'
+pid: 89b112a9-ead3-46ee-be26-b5e4f8147165
+body: |2-
+  Marks the node at point processed, then saves: the changes of the node
+  itself, not its relationship to the headline above it. (Emacs: C-c m n p.)

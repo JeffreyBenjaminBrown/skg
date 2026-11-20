@@ -1,0 +1,15 @@
+title: '<localleader>sm : :SkgSetMergeRequest'
+pid: 75dc684b-d5c5-4d6e-8f3a-b0ea832e0b39
+body: |2-
+  (See [[id:85f81823-5736-41d7-8684-0cfac1433861][the docs on merging]] for why would you merge two nodes,
+  and what it means to do that.)
+
+  Run this from the acquirer node.
+  It prompts for the acquiree, accepting either a bare ID
+  or an org link like =[[id:ID][label]]=,
+  and edits the acquirer's metadata to request a nodeMerge.
+
+  The command only edits the node's metadata in the current buffer.
+  Save the view afterward to apply the nodeMerge.
+  Other edits in the same save, to either node or elsewhere, are kept,
+  but a save that also deletes the acquirer or the acquiree is refused.

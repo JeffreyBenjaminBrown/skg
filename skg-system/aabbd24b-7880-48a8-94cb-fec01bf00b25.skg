@@ -1,0 +1,13 @@
+title: Checking usage limits (Claude Code only -- NOT Codex)
+pid: aabbd24b-7880-48a8-94cb-fec01bf00b25
+body: |2-
+    This whole file is about *Claude Code* running against an
+    Anthropic subscription. If some future incarnation of this repo is
+    being driven by *Codex* (OpenAI), none of the specifics below apply:
+    the credential file, the token shape, the API endpoint, and the
+    rate-limit header names are all different. The *idea* -- "read your
+    remaining quota from response headers and downshift the model when
+    it's running low" -- might carry over, but the mechanism would have
+    to be rebuilt for OpenAI's headers. As of this writing Jeff expects
+    to keep using Claude, but Jeff is not his future self, so: if you're
+    Codex, stop reading and don't trust the two scripts named here.

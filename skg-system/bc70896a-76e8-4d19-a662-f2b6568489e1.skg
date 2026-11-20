@@ -1,0 +1,11 @@
+title: union walk, existence across the straddle
+pid: bc70896a-76e8-4d19-a662-f2b6568489e1
+body: |2-
+  The *union walk* is the API over the graph straddle that answers
+  questions about the union of its two graphs
+  ('server/graph_straddle/union_walk.rs'). Each node and each
+  relationship it reports carries its existence across the straddle
+  ('existence_across_straddle'): 'Existence::Added' when only the
+  after-graph holds it, 'Existence::Removed' when only the before-graph
+  does, and none when both do. A view shows it as
+  [[id:aef93dff-d098-4e8d-a9ef-074cb5c2b748][the three kinds of change]].

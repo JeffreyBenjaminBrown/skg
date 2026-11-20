@@ -1,0 +1,6 @@
+title: the search ranking rules
+pid: 1deafb78-3816-4b93-9247-90c0da2b87f1
+body: |2-
+  Prominent nodes (roots, cycle members,
+  mentioned nodes, and nodes that had an org-roam ID before import)
+  are bumped in the ranking via their prominence multiplier.

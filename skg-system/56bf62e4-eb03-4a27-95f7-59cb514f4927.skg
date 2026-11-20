@@ -1,0 +1,19 @@
+title: Strandeds
+pid: 56bf62e4-eb03-4a27-95f7-59cb514f4927
+body: |2-
+  A relationship touching a node whose home skgrepo moves is stranded
+  when it sat at its default relRepo before the move and the sticky rule
+  would leave it off its new default. The save finds every stranded
+  relationship of every relation, in both directions, shown in some view
+  or not ('server/from_text/strandeds.rs'); only a relationship recorded
+  in an owned skgrepo can be stranded. An inbound stranded
+  relationship of a privatizing move would leak its member's ID, so the
+  save raises it to the new home by itself and says so in its warnings.
+  The strandeds of a publicizing move are listed in a
+  strandeds-confirmation; the client asks which to reset to their new
+  defaults and re-saves with '(strandeds-reviewed . "true")' and the
+  chosen '(reset-strandeds ...)', after which the server resets them,
+  rewrites the telescopes of the nodes that record them, and rerenders
+  the views that show them. Mentions carry no relRepo, so they are
+  never stranded. The client writes only the new home; the analysis is
+  the server's.

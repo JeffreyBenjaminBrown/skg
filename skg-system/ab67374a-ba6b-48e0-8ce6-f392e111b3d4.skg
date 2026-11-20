@@ -1,0 +1,9 @@
+title: Work one narrow vertical slice at a time
+pid: ab67374a-ba6b-48e0-8ce6-f392e111b3d4
+body: |2-
+  For implementation, choose one behavior, trace its request-to-effect path,
+  and implement it. Run the smallest meaningful test before opening another
+  substantial front. Do
+  not redesign adjacent concerns merely because they share a type or module.
+  Record the interface boundary and defer the next concern until the first slice
+  is stable.

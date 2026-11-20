@@ -1,0 +1,8 @@
+title: Re-export is dangerous.
+pid: 0e3cc904-3b31-46cb-9c26-702aa92eb2b5
+body: |2-
+  Subsequent Org export is for reading, not
+  a round-trip backup: it does not preserve Markdown syntax or all Skg graph
+  semantics. Exporting to the original input directory would overwrite matching
+  =.org= files, while leaving =.md= files alone. There is no dedicated undo or
+  crash-recovery transaction; keep the originals and back up the owned skgrepo.

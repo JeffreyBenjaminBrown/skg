@@ -1,0 +1,8 @@
+title: If you've already got Rust
+pid: b4609d0d-6057-4bdd-b5cd-e352e7abbf0a
+body: |2-
+  Run =cargo run -- data/jeff/skgconfig.toml= (or use =bash/start-servers.sh=).
+  This starts the Rust server, which writes its logs to
+  =data/jeff/skgconfig.toml.running/START/=, START being the time it started.
+
+  Now you can use the [[file:../elisp/skg-client.el][Emacs client]].

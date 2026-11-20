@@ -1,0 +1,16 @@
+title: text search, search view, enrichment
+pid: a2cbb369-5ba0-4a67-b7de-8c24def5f6fd
+body: |2-
+  A *text search* (=C-c f=) answers with one message, which opens a
+  *search view*: an ordinary view, named by its query (=search:TERMS=),
+  whose roots are the hits, best first, each a write-protected
+  occurrence of its node. Its buffer is the *search buffer*, a synonym
+  the docs and the code use for the search view. The *enrichment* (the search enrichment) is
+  what the search draws under each hit, with the refresh every view is
+  drawn with: its containers folder, whose members carry the
+  containerward chain; its forks folder, when it has fork partners;
+  and, for a hit found through an alias, its alias
+  folder, the one folder not folded. Under a skgrepo restriction that
+  excludes overPrivateText telescopes, what the enrichment would draw
+  of such a node is a tombstone. See 'docs/api-and-formats.org', "Text
+  search".

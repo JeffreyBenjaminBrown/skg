@@ -1,0 +1,5 @@
+title: Containers, dependencies, and isolated server instances
+pid: a69e9c39-a383-4eb6-80ba-0282a993fc5c
+body: |2-
+  Read [[id:a072d977-7a82-45fa-82cc-b278941b1aae][file:docker.org]] before environment or image work, or starting test
+  servers whose ports and data paths need isolation.

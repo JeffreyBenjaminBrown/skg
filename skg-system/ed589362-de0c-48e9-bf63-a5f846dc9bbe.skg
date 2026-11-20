@@ -1,0 +1,22 @@
+title: '<localleader>r : the diff view: extending, committing, moving between changes'
+pid: ed589362-de0c-48e9-bf63-a5f846dc9bbe
+body: |2-
+  These act on the buffers of the diff view (<localleader>vd). Marking
+  its changes processed is <localleader>m ("<localleader>m : processed
+  marks, in the diff view").
+contains:
+- 02def2b6-cf7b-4862-b31d-9b97b7bc1e06
+- a347eaad-6890-4453-9567-d6469e1ed85b
+- ae5065fe-9312-4b62-88ff-1656300e6c8a
+- 67805771-fdeb-4b12-9388-6eb58b103607
+- acfaee49-6171-4d39-8b5a-09224b5806ac
+- 79415dd9-c238-4c99-8ea7-21a9993d4135
+- 959f5ccd-5b94-43f3-a2b2-0fc70fe42f17
+- eddd7d4b-d16a-4c67-b598-c74bd5c18fcb
+- f3759912-5265-4bc4-ae7a-6788b0ba655e
+- 29f0ca90-48c6-4f63-973b-03092ce8286e
+- 64af4f20-7cd6-4403-919b-2ed303da400b
+- 025527a2-f7ac-4405-b3df-d464be73cc95
+- c99088f9-521b-4c60-96b6-8e316d9639f5
+- 80458811-8dec-49c8-8e53-8401715a5a7f
+- 5eaf0b21-5245-424e-9249-37630fcbc457

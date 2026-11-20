@@ -1,0 +1,33 @@
+title: sticky rule (sticky-else-default), floor check
+pid: b9d42e62-4edf-498e-85d2-9399c007cee6
+body: |2-
+  Where a relationship's relRepo comes from at save time:
+  a relationship already on disk keeps its relRepo (*sticky*); a new relationship
+  between owned nodes defaults to the more-private endpoint home. A new
+  relationship from an owned recorder to a foreign member defaults to the recorder's
+  home, deliberately making the foreign ID and relationship visible at
+  that owned skgrepo without proposing a foreign write. Every relRepo is
+  clamped to be no more public than the recorder's home. Hides have
+  a higher floor (at least the most public partner on record for them;
+  see "hides" under "relation, relationship, member, membership,
+  partner", and "floor" below). A
+  =(relRepo NAME)= atom (the =skg-set-relRepo= gesture)
+  overrides sticky with any skgrepo at least as private as the relationship's
+  default — raising privacy, or moving a stuck skgrepo back to the
+  default; a more-public choice is a save error. A legacy or
+  hand-authored relationship whose disk relRepo already sits more public than
+  its default may be held or made more private, never made still more
+  public. See =server/from_text/supplement_from_disk.rs=.
+
+  A relationship's default relRepo is its *floor*: the most public
+  skgrepo it may be recorded in. The save's *floor check*
+  ('apply_sticky_relRepos_in_graph') refuses a relRepo request more
+  public than the floor, naming the relationship. The relRepo gesture
+  ('skg-set-relRepo', =C-c s r=) offers only the skgrepos at least as
+  private as the floor when the server can say what the floor is; where it
+  cannot (a node not yet saved, or the recursive gesture,
+  'skg-set-relRepo-recursive', =C-c s R=; =<localleader>sR= in Neovim,
+  whose relationships have different floors), it offers every
+  skgrepo, and the floor check is what refuses a choice too public.
+contains:
+- 8ced1d9f-ec1a-4a36-b19a-923b39f43fc7

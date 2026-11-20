@@ -1,0 +1,7 @@
+title: '<localleader>lh : :SkgShowFolderOfHides'
+pid: 19feb9d0-cf7e-4612-ac5c-42293e0e5d39
+body: |2-
+  The hiderFolder and hiddenFolder -- both write-protected (☮). Hiding is edited from
+  a member as such, the forks folder, or the folder of what a note hides
+  outside its fork partners, never from these folders. On a node that neither
+  hides nor is hidden, nothing appears.

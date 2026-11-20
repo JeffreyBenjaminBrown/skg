@@ -1,0 +1,15 @@
+title: processed summary
+pid: 14ef3d99-0e84-4a7b-93cd-788822d3896d
+body: |2-
+  The line a client shows after every save of a diff-view buffer, after the
+  "extend the diff view" command (C-c r u), and before a commit of
+  everything (C-c r C) that would take unprocessed changes: "12 of 14
+  changed nodes are processed (1 of them waits)", or "Commit ready. All
+  14 of 14 changed nodes are processed." It counts nodes, the unit a
+  commit takes. A changed node is processed when every change it records
+  is marked; a node whose only change is order is processed without
+  marks; a processed node waits when the commit of the processed (C-c r
+  c) would hold it back, because it needs a node that does not go in.
+  "Commit ready" means C-c r c would commit every changed node. The
+  summary also counts the changed nodes of foreign skgrepos and the
+  changes not editable in the view.

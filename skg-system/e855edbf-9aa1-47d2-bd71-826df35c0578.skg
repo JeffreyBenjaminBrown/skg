@@ -1,0 +1,13 @@
+title: stop the server later if you want
+pid: e855edbf-9aa1-47d2-bd71-826df35c0578
+body: |2-
+  Run the stop script, giving it the config you gave the start script
+  (by default, as for the start script, data/jeff/skgconfig.toml):
+  #+begin_example
+     bash/stop-servers.sh [CONFIG]
+  #+end_example
+  It runs the stop script that the start wrote in the run folder
+  (data/jeff/skgconfig.toml.running/stop-servers.sh for the default
+  config), after checking that its PID still names that start.
+
+  You can't use the client (much) when the server isn't running.

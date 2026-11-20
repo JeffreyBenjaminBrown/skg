@@ -1,0 +1,9 @@
+title: Synthesize, then let the human process it in org
+pid: 4d035ec8-efe7-4fb4-bed3-a9178effc3aa
+body: |2-
+  The synthesis answers the questions in the order asked, says in a
+  verdict paragraph what survived and what needs work, and ends with
+  what to do next as TODO items for the human. The human replies in
+  the document under the '[Jeff]' protocol of 'org-discussions.org';
+  the planner answers each reply, marks mere agreements DONE without
+  replying, and turns the settled items into a plan.

@@ -1,0 +1,8 @@
+title: editable in the diff view
+pid: 07c3ad55-6c25-4b3f-bcad-22db09d28890
+body: |2-
+  A buffer *makes a node's changes editable* when it holds an
+  editable occurrence of the node, wherever it sits, or the node's
+  ghost in content position
+  ('nodes_editable_in_diffView'). The change-forest leaves those
+  nodes record are the changes editable in the buffer.

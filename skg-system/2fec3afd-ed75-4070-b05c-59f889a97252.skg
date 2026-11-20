@@ -1,0 +1,6 @@
+title: skg-connection-verify
+pid: 2fec3afd-ed75-4070-b05c-59f889a97252
+body: |2-
+  Sends a ping to the Rust server
+  to check if the connection is working.
+  Displays the result in the minibuffer.

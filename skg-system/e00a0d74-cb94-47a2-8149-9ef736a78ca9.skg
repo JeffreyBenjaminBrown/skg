@@ -1,0 +1,16 @@
+title: change-forest, change-forest leaf, recorder of a leaf
+pid: e00a0d74-cb94-47a2-8149-9ef736a78ca9
+body: |2-
+  The *change-forest* is the picture of everything that can be marked
+  processed, built from the graph straddle, independent of any
+  view: its roots are the changed graphnodes; under each come its
+  changed aspects; its leaves, the *change-forest leaves* (*change
+  leaves* for short, as in 'ChangeLeaves'; "change leaf" is a term of
+  plan 06), are the individual changes
+  a user marks. The type 'ChangeLeaves'
+  ('server/diff_view/change_leaves.rs') holds every leaf, keyed by its recorder,
+  its aspect and, for a relationship, the relationship ('LeafKey'). The
+  *recorder* of a leaf is the node whose file records the change, and
+  that node *records* the leaf; a relationship's leaf is recorded by
+  the relationship's recorder, so seen from either end it is the same
+  leaf.

@@ -1,0 +1,10 @@
+title: Where a run keeps its logs
+pid: 8e37a5bd-1000-4dfb-851f-ca12c15602a0
+body: |2-
+  Agents write their logs and one-time conversion scripts under
+  'tests/results/<plan>/sliceN/'. 'bash/all-tests.sh' wipes
+  'tests/results/' at its start; it is to leave such subdirectories
+  alone, and until it does, copy what 'progress.org' cites before
+  a full run. The review keeps the reviewers' reports beside it
+  ('05_1_review-reports/' next to '05_review.org') for the same
+  reason.

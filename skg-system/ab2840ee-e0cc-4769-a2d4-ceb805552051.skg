@@ -1,0 +1,19 @@
+title: 'Reviewing a body of work: the post-mortem method'
+pid: ab2840ee-e0cc-4769-a2d4-ceb805552051
+body: |2-
+  #+title: Reviewing a body of work: the post-mortem method
+
+  How to review a finished feature, or a milestone of one, so that the
+  next effort is better. Distilled from the post-mortem of the total
+  diff view (October 2026, 'TODO/total-diff-view/12_total-review.org',
+  with the agents' reports in '12_1_postmortem-reports/'). The
+  per-plan reviews that precede it (what the agents built, what
+  deviated, what to fix next) are a different, smaller thing; this is
+  the review of the whole.
+contains:
+- b61fae7b-38d8-4a6a-a37b-c7010d1c0862
+- 2b1bfa18-0170-4efa-9ec4-cf11f31713a1
+- 4d035ec8-efe7-4fb4-bed3-a9178effc3aa
+- 528ba152-b169-442e-81e1-ed6d4ad1e8f1
+- 79efaaa2-b75e-40fe-b2df-a7ffd2d4575b
+- aefcd3fc-4222-4cda-aa8e-d6d466cb0a53

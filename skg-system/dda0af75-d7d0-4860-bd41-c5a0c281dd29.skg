@@ -1,0 +1,6 @@
+title: preamble
+pid: dda0af75-d7d0-4860-bd41-c5a0c281dd29
+body: |2-
+  These act on the buffers of the diff view (C-c v d). Marking its
+  changes processed is C-c m ("C-c m : processed marks, in the diff
+  view").

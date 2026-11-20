@@ -1,0 +1,24 @@
+title: keys outside content views
+pid: 0281225e-b1e6-4342-808e-86c222ddc091
+body: |2-
+  Most keys above are bound only in a content view, a buffer showing
+  part of the graph. A few work elsewhere:
+  - Anywhere, in any buffer: C-c f RET, C-c f i and C-c f l (search),
+    C-c g i (go to a typed ID) and C-c v l (switch the skgrepo restriction).
+  - In magit: C-c g RET and C-c G RET (go to the node whose ID is at
+    point), and C-c i n and C-c i p (move among IDs). Magit buffers
+    cannot be written to, so the linkstack keys are absent.
+  - In the minibuffer and in M-x shell: C-c o i, C-c o l, C-c O i and
+    C-c O l (paste or pop an ID or a link from the linkstack).
+  - In a buffer visiting a .skg file (skg-file-minor-mode, on by
+    itself): C-c g RET, C-c G RET, C-c i n, C-c i p, and the linkstack's
+    paste and pop keys (C-c o i, C-c o l, C-c o n, C-c O i, C-c O l,
+    C-c O n).
+  - In a read-only report (an unknown graphnode's investigation, the import
+    result; skg-report-mode): search (C-c f RET, C-c f i), C-c C-o and
+    the C-c g / C-c G keys but C-c g b and C-c g v, C-c v e, C-c v l,
+    C-c v s, C-c i n, C-c i p, and the linkstack keys (C-c u, C-c o i,
+    C-c o l, C-c o n, C-c O i, C-c O l, C-c O n).
+  - In the metadata editor (C-c v m): C-c C-c applies the edit, and
+    S-left / S-right cycle a field's value.
+  - In the linkstack's buffer (C-c v s): C-x C-s saves the stack.

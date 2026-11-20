@@ -1,0 +1,19 @@
+title: C
+pid: 68370d2d-6fc9-4d76-8299-12a24f5a33fc
+body: |2-
+  C is the set of changed graphnodes, read off the change-forest leaves
+  (see "Change-forest leaves"). It has two halves:
+  - out-changed: the recorders of leaves, the nodes whose own files
+    record a change -- a new or deleted node, a changed title or body,
+    alias, extra ID, flag or home skgrepo, an added or removed member of
+    its contains, forks or hides list, a
+    moved relRepo of one, or its other changes (a reordered list, say);
+  - in-changed: the nodes whose set of containers, mentioners,
+    forkers or hiders changed: every member of a
+    relationship leaf whose relationship exists in one graph only, and
+    every node a recorder mentions in one graph only (a mention is no
+    leaf: it changes with its mentioner's text, the mentioner's leaf),
+    when that node exists in either graph.
+  A relRepo move puts only the recorder in C, and so does a change of
+  order: it is the recorder's other changes, and no member's set of
+  containers changed.

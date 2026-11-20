@@ -1,0 +1,21 @@
+title: Ask separable questions, one agent each
+pid: 2b1bfa18-0170-4efa-9ec4-cf11f31713a1
+body: |2-
+  Each question below is one subagent (Opus), reading the range
+  read-only and writing a report of at most about 200 lines to a file,
+  ranked findings first, each finding with file:line, the two or more
+  places involved, which is older, what differs, and whether a fix is
+  cheap, costly or unwise. The synthesis is written by the planner from
+  the reports; the human reads the synthesis, not the reports.
+contains:
+- 353aeba2-7738-42c9-af15-0e7c614f4d43
+- cf1d62d9-254b-4b12-ab78-3906ece4ba91
+- 9d4febbe-581b-44e6-9087-ca1c0d20d3ac
+- 11e2aff2-8d61-4b77-9586-3757de04ab39
+- f226d627-7b51-4ac8-91f9-24d7007e2722
+- 293df644-a6d6-48d1-9302-2727db23fb3c
+- aec6e1b9-9a9c-4003-a7ad-7cd5aa6ba762
+- b3757284-c596-44ce-8b8b-7b53d7ede121
+- e82036e3-a24b-488a-9881-5096d05d2a4f
+- 705dde14-5f38-4826-890c-98e28f0fe2ed
+- 2d93e5d1-3de2-4133-bb36-ae30340663a2

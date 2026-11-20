@@ -1,0 +1,4 @@
+title: Disregard Reverted Edits
+pid: 1081486a-797d-47f5-8269-6d1c030d7dec
+body: |2-
+  If you make an edit and then see in a system-reminder that the file has been modified (reverting your changes), this might mean I clobbered them by accident or on purpose. Stop to ask.

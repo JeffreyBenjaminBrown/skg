@@ -1,0 +1,8 @@
+title: Removing it
+pid: 04e11367-3397-45ae-ad67-34b9b69a2fb5
+body: |2-
+  =skg-strip-attribution= (Emacs, on the headline; =:SkgStripAttribution=
+  in Neovim; the word =stripAttribution= in a handle of skg-for-ai)
+  writes the request =stripAttribution=; the next save removes the
+  attribution. A note meant as your own words, an evergreen note say,
+  need not keep one; a reply in a dialog should.

@@ -1,0 +1,8 @@
+title: In Org-mode documents, do not wrap code references in double apostrophes.
+pid: 270c635d-65e5-4cfa-85b3-3311f234dfec
+body: |2-
+    That is: write 'function_name' (single apostrophes), not ''function_name'' (double).
+    A dense sequence of double-apostrophe wrappers across a long
+    document can freeze Emacs's org-mode via pathological regex
+    backtracking in the emphasis parser. Single-apostrophe wrapping is
+    safe and is the project convention.

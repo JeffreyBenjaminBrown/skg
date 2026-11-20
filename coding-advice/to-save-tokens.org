@@ -1,5 +1,8 @@
-#+TITLE: Token economy during repository work
+# This file was generated from the skg node with this ID:
+# 2c54c461-fad4-4ea1-b928-16d2d60b47ee
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+#+TITLE: Token economy during repository work
 * Defaults for every task
 Read narrowly, work one coherent slice at a time, and verify in proportion
 to the change. Before a tool call, identify the unresolved question it will
@@ -12,31 +15,25 @@ result and surface anything that affects correctness or requires a decision.
 For documentation-only work, check the relevant content, links, and diff;
 do not run unrelated application tests.
 
-The practices below are the default. The [[file:optional-workflows.org][optional workflow instructions]] cover
+The practices below are the default. The [[./optional-workflows.org][optional workflow instructions]] cover
 the quiet test wrapper, delegation, and long-task ledger, including when
 agreement is required. Read those only when considering that workflow.
 A concise stop/deviation report required by [[file:when-to-stop.org]] is already
 authorized; it does not introduce an ongoing ledger.
-
 * Work one narrow vertical slice at a time
-
 For implementation, choose one behavior, trace its request-to-effect path,
 and implement it. Run the smallest meaningful test before opening another
 substantial front. Do
 not redesign adjacent concerns merely because they share a type or module.
 Record the interface boundary and defer the next concern until the first slice
 is stable.
-
 * Keep raw output out of the conversation
-
 Keep ordinary test output unless Jeff has agreed to the optional captured-log
 workflow. When using that workflow, retain complete output in an ignored log
 and report the command, result, duration/counts, first useful failure, and log
 path. Bound exploratory output without hiding failures. Do not paste thousands
 of passing lines into the conversation or a planning document.
-
 * Read from narrow to broad
-
 Start with =rg= to locate definitions and callers, then read the relevant
 ranges and follow the call graph as correctness requires.  Let an exact
 symbol, wire field, invariant, or failing test define the initial question;
@@ -45,9 +42,7 @@ This is a discovery order, not permission to ignore surrounding invariants.
 The repository's
 =tools/introspect/call-graph=, =change-forest=, and =code-map= can help when the
 ordinary text search stops being clear.
-
 * Separate investigation from implementation
-
 Before a difficult change, capture only the unresolved facts, proposed
 invariants, and the test that could disprove the proposal. Within an
 implementation assignment, once the interface is chosen, stop broadening
@@ -56,9 +51,7 @@ compact Org note; small work needs no extra artifact.
 
 Do not run overlapping investigations unless their questions are independent
 and their deliverables do not require rereading the same code.
-
 * Use a test ladder
-
 For code changes, start with the smallest test that proves the local edit.
 At a coherent work boundary run the affected group, at a signature/dependency
 boundary run =cargo check --all-targets=, and at the settled endpoint run the complete
@@ -72,34 +65,26 @@ regression, expected fixture adaptation, overlapping in-progress edit,
 infrastructure failure, or unrelated pre-existing issue.  Record that
 classification beside the first failure so subsequent work does not repeat
 the census or mistake fixture maintenance for product work.
-
 * Let compiler diagnostics bound mechanical work
-
 For signature changes, compiler error spans can provide a precise caller list.
 Make the smallest mechanical correction, compile again, and finish with =rg=
 for feature-gated, script, protocol, documentation, and dead-code references
 the compiler cannot see.  Compiler-guided editing is not a substitute for
 understanding semantic call sites.
-
 * Use temporary adapters to stage intentional migrations
-
 When an intentional representation change would cause unrelated fixture and
 consumer churn, a narrow adapter at the boundary can keep the migration in
 testable slices.  Migrate and prove one consumer family at a time, then remove
 the adapter as soon as its remaining consumers are ready.  This is especially
 useful for snapshot, journal, and wire types; it is not a reason to add
 permanent legacy compatibility.
-
 * Keep edits and review surfaces small
-
 At each checkpoint, inspect the diff for the files in that slice.  Do not mix
 formatting cleanup, unrelated test repair, design notes, and behavioral
 changes in one review surface unless they are necessary to make the behavior
 testable.  Commit only when Jeff has requested it, following the repository's
 commit guidance.
-
 * Separate durable evidence from generated artifacts
-
 Retain useful test logs and metadata under =target/=, but exclude reproducible
 package staging trees and other generated copies from fingerprints.  Remove
 only artifacts created by the current work, using exact paths, and never clean

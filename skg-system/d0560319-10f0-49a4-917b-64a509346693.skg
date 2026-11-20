@@ -1,0 +1,8 @@
+title: no search matching
+pid: d0560319-10f0-49a4-917b-64a509346693
+body: |2-
+  A node-file flag (=NoSearchMatching= in YAML,
+  =noSearchMatching= on the wire) that prevents the node's title, aliases, and
+  body from producing a direct text-search hit. The node remains indexed for
+  exact-ID lookup and may appear as context around another hit. It is search
+  decluttering, not privacy.

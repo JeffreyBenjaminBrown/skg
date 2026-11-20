@@ -1,0 +1,11 @@
+title: The docs are generated from 'skg-system/'
+pid: 5adfe873-5ca2-4886-9585-9ec91e1365e4
+body: |2-
+  The '.org' files under 'docs/' and 'coding-advice/' are exported from
+  the notes of 'skg-system/', a skgrepo at the top of this repository,
+  tracked by the same Git. Never edit those files by hand: edit the
+  notes, then export. Each file begins with a comment naming the note it
+  was exported from. 'bash/check-docs-exported.sh', which
+  'bash/all-tests.sh' runs, fails if a committed file differs from a
+  fresh export, or if no note exports it.
+  'docs/troubleshooting/check-rlibs.py' is not a note; edit it as code.

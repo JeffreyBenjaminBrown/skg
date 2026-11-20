@@ -1,0 +1,21 @@
+title: 'PITFALL: SkgNodes and OrgNodes are different.'
+pid: 95ca8fe4-f968-4e30-9f51-cd52b10c160b
+body: |2-
+      SkgNodes are the fundamental unit of knowledge in a Skg graph.
+      OrgNodes are used to represent some portion of the Skg graph.
+      Most OrgNodes correspond directly to a node in the graph,
+      but there are important exceptions,
+      used to encode other kinds of data.
+      For instances, when a SkgNode N has aliases,
+      they are represented as N's descendents in the org view:
+  #+begin_example
+    * N                                   # true node
+    ** its aliases                        # 'non-vognode' node
+    *** alias 1                           # 'non-vognode' node
+    *** alias 2                           # 'non-vognode' node
+    ** the first SkgNode that N contains  # true node
+    ** the second SkgNode that N contains # true node
+  #+end_example
+  As the comments indicate, some of those org nodes
+  correspond to true skg nodes, while others ('non-vognode' nodes)
+  describe an ancestor -- in this case, the SkgNode N.

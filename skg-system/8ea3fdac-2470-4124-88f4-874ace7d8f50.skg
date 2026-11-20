@@ -1,0 +1,32 @@
+title: The unit is the node
+pid: 8ea3fdac-2470-4124-88f4-874ace7d8f50
+body: |2-
+  A node goes in whole, all its changed files or none: its sections in
+  every owned skgrepo, so a home skgrepo move, a relRepo move and an
+  alias moved from one section to another never split. It is processed
+  when every leaf it records is ("Processed aggregates"); a child's '~'
+  is its container's.
+  The changed nodes are the straddle's: every node that records a leaf
+  in an owned skgrepo ('ChangeLeaves::changed_nodes'). A foreign node that lists an ID a
+  merge re-resolved records a leaf, but in a foreign skgrepo, so it is
+  none: no commit takes it, and it holds nothing back. A container
+  whose file is unchanged but which lists a member a merge re-resolved
+  is one, with nothing to stage. Their files are found from Git, not
+  from the change-forest: every '.skg' path of an owned skgrepo whose
+  worktree blob differs from HEAD's (new and untracked, changed, or
+  gone), grouped by the
+  file's stem, its node's pid ('changed_skg_paths_by_stem',
+  'server/git_ops/stage_and_commit.rs'). A leaf's 'files' are not exact
+  enough to stage from: an alias leaf names the home file wherever the
+  alias is recorded. A stem Git lists that the straddle does not count
+  changed differs only in bytes the parser does not read. It goes in
+  with a commit of everything, and is counted in 'committed-nodes'; a
+  commit of the processed leaves it out, since its file is not what skg
+  writes ("Changes no mark covers"), counts it in 'left-nodes', and
+  names it among 'unmarkable'. A stem that names no owned node of the graph
+  (a section of a foreign node in an owned skgrepo, which the graph
+  sets apart as an illegal edit) never goes in. A path is changed when its contents, as Git
+  would store them (through the gitrepo's filters, line endings among
+  them), differ from HEAD's. Only the '.skg' files directly in a
+  skgrepo's folder count, as only those are read into the graph; a file
+  the gitrepo ignores counts too, since the graph reads it.

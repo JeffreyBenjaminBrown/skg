@@ -1,0 +1,9 @@
+title: 'C-c s S : skg-set-repo-recursive'
+pid: e0830e48-a391-4c33-af09-cff612ce07c1
+body: |2-
+  Like 'skg-set-repo', but it also
+  changes the skgrepo of every content descendent of the node at point
+  whose skgrepo matches the original skgrepo of the node at point.
+  Only member descendents (those without the 'noClaim' atom) are traversed.
+  The write-protected warning and the save's handling of relationships
+  described under =C-c s s= apply here too, across the whole subtree.

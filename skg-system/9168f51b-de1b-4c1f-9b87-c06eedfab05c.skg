@@ -1,0 +1,12 @@
+title: removed alias, removed ID
+pid: 9168f51b-de1b-4c1f-9b87-c06eedfab05c
+body: |2-
+  An alias or extra ID of a node that HEAD has and the worktree lacks.
+  The diff view shows it in the node's alias or ID folder as an alias or
+  ID member with a ghost warrant, written 'alias noClaim (view
+  ghostWarrant)' or 'id (view ghostWarrant)', with '(diff (rel
+  removed))', where the LCS of the two lists puts it, with the '-'
+  herald. The save reads no alias from it, since it claims nothing; the
+  ID folder, whose claims the save never reads, carries no 'noClaim',
+  and the save's check of an ID folder refuses only one lacking an ID of
+  the node. Marking it marks the leaf of the removed alias or ID.

@@ -1,0 +1,19 @@
+title: What is in the container, for coding skg
+pid: 186ccc1b-a541-4c73-9e58-78998e680464
+body: |2-
+    - Rust: =cargo=, =rustc=, =cargo-nextest=, =cargo-watch=.
+    - A legacy image may still contain an unused =typedb= binary until the
+      external image-cleanup follow-up is deployed. Skg never starts or contacts
+      it.
+    - Native build deps are already present (=gcc=, =gnumake=, =cmake=,
+      =pkg-config=, =openssl=, alsa/pipewire/dbus/glib, etc.), so
+      =cargo build= of skg's C-linked crates works out of the box.
+    - Editors: =emacs= (with magit) runs the Skg client in =elisp/=.
+      =nvim= (with nvim-orgmode + its org tree-sitter parser, plus neogit
+      and diffview) runs the client in =nvim/=; see [[file:../nvim/README.org][its README]].
+      Both clients are implemented and tested. An older container image
+      may lack =nvim=; check installed tools before running its tests.
+    - Everyday tools: =git=, =rg=, =fd=, =jq=, =bat=, =tmux=, etc.
+    - The skg server itself is NOT baked into the image -- it is compiled
+      at runtime from the mounted source (=cargo run --bin skg=). So skg's
+      own Rust dependencies live in =Cargo.toml=, not in =docker.nix=.

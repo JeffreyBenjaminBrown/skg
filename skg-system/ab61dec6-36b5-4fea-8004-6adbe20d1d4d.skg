@@ -1,0 +1,12 @@
+title: Flag state
+pid: ab61dec6-36b5-4fea-8004-6adbe20d1d4d
+body: |2-
+    - Request: =((request . "flag state") (id . "ID")
+      (flag . "noSearchMatching"))=.
+    - Response: =((response-type flag-state) (id "CANONICAL-PID")
+      (flag "noSearchMatching") (value "true") (repo "REPO")
+      (owned "true"))=. Extra IDs resolve to the canonical PID. Unknown IDs
+      or flag atoms return =(error "...")= under the same response type.
+    - The endpoint is read-only and may report =hadId=, =wasOverloaded=, or
+      =noSearchMatching=. Ownership is advisory; save-time validation remains
+      authoritative.

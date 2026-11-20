@@ -1,0 +1,11 @@
+title: Export
+pid: 5b0d7a60-b682-430a-ade8-82552c92fce2
+body: |2-
+  'bash/export-docs.sh' writes every document 'skg-system/' marks for
+  export into the top of the repository. It needs no server: it runs
+  'skg export-org' with 'bash/skg-system.skgconfig.toml', a config that
+  owns 'skg-system/' alone, so other skgrepos' export markers never
+  count. It overwrites files and deletes none: when a document is
+  removed or renamed, delete its old file.
+  A new document is a note with an export marker
+  (see [[id:238439fd-eed9-4a93-9671-f4fc5f71a4df][how to mark a note for export]]).

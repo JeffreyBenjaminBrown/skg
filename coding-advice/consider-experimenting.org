@@ -1,5 +1,8 @@
-* Run experiments if appropriate
+# This file was generated from the skg node with this ID:
+# 021d6a2d-a5a3-42a3-b6e2-c9206b5cdf26
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+* Run experiments if appropriate
 Your coding need not be limited to production and tests.
 When you're using a new language feature,
 or implementing a tricky algorithm,

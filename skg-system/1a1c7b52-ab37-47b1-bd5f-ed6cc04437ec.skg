@@ -1,0 +1,20 @@
+title: 'C-c m l : skg-replace-content-with-link'
+pid: 1a1c7b52-ab37-47b1-bd5f-ed6cc04437ec
+body: |2-
+  Replace the branch at point with a link to the node that used to
+  be there, then save the buffer.
+
+  Point can be on the headline or in the node body.
+  The command uses the headline either way.
+
+  The node being replaced must be an existing occurrence with an ID,
+  and a viewchild of an editable occurrence whose skgrepo is
+  owned in =skgconfig.toml=. The command acts locally,
+  replacing only this occurrence in the current buffer:
+  the headline at point and all of its viewdescendants,
+  including non-vognodes, ghosts, unknown viewnodes and restricted viewnodes,
+  are removed from the view and replaced by a same-level headline
+  whose title is an =[[id:...][...]]= link to the original node.
+
+  If the original headline title already contains a link, the
+  command asks before proceeding: "Are you sure you want to make that title, which contains a link, into a link? (There's nothing wrong with that, and sometimes it's appropriate, but it can be confusing.)"

@@ -1,5 +1,8 @@
-#+TITLE: Optional workflow machinery
+# This file was generated from the skg node with this ID:
+# 3bbbf49e-8e61-4b55-beb2-221b2ff634b3
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+#+TITLE: Optional workflow machinery
 * Choose a workflow proportionate to the task
 Read this file when considering captured test logs, delegation, or a
 long-task ledger. These are optional additions to the default practices in
@@ -15,9 +18,7 @@ Small investigations and ordinary focused tests need no ceremony. A concise
 progress.org report at a substantive stop or implementation deviation is
 required by [[file:when-to-stop.org]] and already authorized there; the optional
 ledger below is continuous bookkeeping beyond that report.
-
 * The quiet test wrapper
-
 =bash/quiet-test.sh= runs an arbitrary command, captures its complete output,
 and prints only a one-line result on success.  On failure it prints a bounded
 diagnostic and points to the full log.  It does not retry, clean state, widen
@@ -52,9 +53,7 @@ containing:
 On failure, read the bounded diagnostic first.  Open the full log only as far
 as needed to diagnose the first actionable failure.  Do not blindly rerun a
 failed expensive suite.
-
 ** Fingerprint scopes
-
 By default the wrapper fingerprints the repository's broad code, test, client,
 script, documentation, data/config, and packaging surface.  It does not cover
 every repository file; notably, =coding-advice/= and =TODO/= are outside the
@@ -73,17 +72,13 @@ Use =--scope .= only when a whole-worktree fingerprint is genuinely useful.
 It can hash unrelated untracked files, which may be slow or privacy-surprising.
 Never claim that a green result covers a later or differently scoped worktree;
 compare the fingerprint in the =.meta= file.
-
 * Delegate only bounded independent work
-
 When Jeff has chosen a workflow that includes delegation, give each delegate
 an exact file or question boundary.  Ask for concrete entry points, a proposed
 data shape when relevant, and the smallest verification command.  Several
 agents independently loading the same broad architecture costs more context
 than it saves.
-
 * Maintain a compact resume record for long tasks
-
 For work likely to survive many context compactions, a small dashboard plus a
 chronological progress ledger can record:
 

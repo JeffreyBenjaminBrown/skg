@@ -1,0 +1,31 @@
+title: write-protected set
+pid: 389b717f-fdcb-4b6c-a88d-378559e74987
+body: |2-
+  A write-protected set is a generated folder whose membership follows
+  from graph facts rather than direct edits to that folder.  A view
+  may preserve an order for the set locally, but adding or removing an
+  item in the generated folder does not add or remove the underlying
+  graph membership fact.  No child of such a set claims membership, so
+  the save reads nothing there: an item the user typed inside it,
+  which stays unwarranted (⊥), since no save reads claims there, is
+  kept where it stands.  If the
+  refresh finds that a real member is missing from the view, it
+  reinstates that member (see "reinstated").
+
+  For instance, if nodes R and T hide node N, the user might land
+  at a view like the following:
+  #+begin_example
+    * N
+    ** hiderFolder
+    *** R
+    *** T
+  #+end_example
+  The hiderFolder ("folder of hiders") is a write-protected set.
+  Thus the user could flip the order of R and T in the hiderFolder,
+  and this change would be respected in the display, but have no effect
+  in the graph. The user could insert X under hiderFolder,
+  but because it is a write-protected set, X claims nothing there: it
+  is shown unwarranted (⊥), and has no effect on N.
+  (If the user wants X to hide N, they must modify X, not N.)
+  The user could delete R, but it is reinstated as soon as they save,
+  because, again, the hiderFolder is a write-protected set.

@@ -1,0 +1,14 @@
+title: Skgrepo-set behavior
+pid: 5bdc866e-9815-417a-8857-8138cb2d490e
+body: |2-
+  The partner folders, the containerward chain, search grouping, =K=
+  relationship counts, and automatic substitution all
+  derive their topology from relRepo-gated relationship accessors.
+
+  For mirror substitution, a =forks= relationship joins two mirrors
+  only when its relRepo and both notes' home skgrepos are unrestricted.
+  A relationship outside the skgrepo restriction therefore cannot
+  silently select a node which the corresponding folders and heralds
+  omit, and a restricted note in the middle of a path cuts it.
+contains:
+- 002a67a7-1ced-4df9-8511-587055fd7edf

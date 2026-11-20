@@ -1,8 +1,11 @@
+# This file was generated from the skg node with this ID:
+# 6b447bd8-d2ca-4d8a-bc89-0d3e22f58d98
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 I format code unusually.
 If you are a human I won't ask you to adhere to these conventions,
 because they are annoying --
 but if you are an AI, it's pretty much costless, so please do.
-
 * Old style mod files are better.
   The 'old style' is, for every source folder '(module)/'
   with source files '(module)/(filename).rs' you want in your program,

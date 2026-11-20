@@ -1,0 +1,18 @@
+title: Relationships
+pid: c34e936f-3728-48f9-a9cc-b39e81be8d10
+body: |2-
+  All stored relationships are directed from the owning node to a member ID.
+  Member IDs may be primary IDs or extra IDs; graph indexes canonicalize known
+  extra IDs to the corresponding primary ID.  A dangling member is retained so
+  that hand-authored or temporarily incomplete graphs remain representable.
+
+  | Relationship | First role | Second role | Semantics |
+  |--------------+------------+-------------+-----------|
+  | =contains= | container | contained | Ordered document/content nesting. |
+  | =forks= | forker | forkee | The forker shows the forkee's content that the forker neither contains nor hides, nor the user keeps in another owned note, and the two are mirrors: either may stand in the other's place where mirror substitution acts.  The fork operation's clone forks its original. |
+  | =hides= | hider | hidden | Suppresses the hidden node only when it would be reached through what the hider forks. |
+  | =linksTo= | mentioner | mentioned | Plain Org ID links derived from text. |
+
+  Home skgrepo and which node carries each extra ID are node properties, not separate runtime
+  relationship entities.  Relationship relRepo remains part of every stored
+  =RelPartner= and participates in skgrepo-set/privacy gating.

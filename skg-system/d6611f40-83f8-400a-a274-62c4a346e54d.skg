@@ -1,0 +1,74 @@
+title: API
+pid: d6611f40-83f8-400a-a274-62c4a346e54d
+body: |2-
+  Communication between Rust and Emacs is via TCP on port 1730, configurable in any skgconfig.toml. The connection is persistent.
+
+  After initialization, every server response is length-prefixed as
+  =Content-Length: LENGTH\r\n\r\nPAYLOAD=; =LENGTH= is the number of
+  UTF-8 bytes in =PAYLOAD=. The exceptional busy-initializing signal is
+  described below.
+
+  Many responses carry their main payload in a =(content "...")= field.
+  That field is just "the payload": it has nothing to do with a node's
+  =contains= list or the "content view" (though a content-view response
+  has one too).
+
+  A string atom in a response is double-quoted when it is empty, or
+  holds a double quote, whitespace, or a number; any other string atom
+  is a bare symbol. So an empty view arrives as =(content "")=.
+
+  The shared overPrivateText-telescope release warning is
+  =OPERATION includes title or body text selected below its node's home
+  repo for PID P.= (or =PIDs P1, P2, ...=). A restricted request that
+  needs approval instead receives
+  =((response-type overPrivateText-telescope-confirmation) (operation OPERATION)
+  (pids ("P" ...)) (prompt "..."))=; the response itself contains no
+  protected title or body. Except for search's include/exclude choice,
+  approval is always the exact request-local list
+  =(approved-overPrivateText-pids "P" ...)= and is never cached.
+
+  A server ignores a request field it does not know, so a new field
+  that means "write nothing", such as the save's =(preview . "true")=,
+  would make an older server write for real. So shape a new field, first,
+  so that a server ignoring it does the harmless thing, as "Import
+  Markdown and Org" does: it writes only given =(action . "apply")= and
+  an approval token, and without an action it previews. Where that cannot
+  be done, as for a save, the client sends the field only to a server
+  whose answer to "Verify connection" names the feature in its
+  =(supports (...))= list; the AI reader's =server_supports=
+  ('tools/skg-for-ai/skg_for_ai.py') asks this for ="save preview"=.
+
+  So far there are these endpoints:
+contains:
+- 53916915-2856-4ad7-ae2c-681eb3f92828
+- b3f21f7e-ab6e-48ba-af19-749c21344b41
+- a85ddf73-e425-4928-8089-89272426f931
+- a9ae1f60-41f7-44e0-a5a7-c53f41c67720
+- f413caa8-6d86-489b-94d4-db191502f2ef
+- 8cb77633-dcd6-44ec-b2da-43356a2aec89
+- 4181363d-7fde-4e2d-a3c2-be9f7587e68e
+- f837e39c-d8f6-4d57-b9e0-68a32aa9006c
+- 62464b75-220a-4e0b-986e-c1b86997ae4f
+- 572a7445-7205-47d3-8aee-2d8b5bf90903
+- b7845acc-1b0f-4d9c-a129-279797d7fd40
+- 01a5070c-a527-4dc0-8295-ec2a1072efe4
+- 1d92cbdd-2ec4-4eab-9bf0-a622fee2ef17
+- 361a0807-d65d-4f33-9d74-864df23edb1c
+- 8e33c59a-33bc-4803-9232-edeff2dc6e9c
+- 2d1738f1-bf13-46e2-bdf8-9002a7de5fb3
+- 71202760-b0a8-4be5-a70f-e7590ed3bb17
+- 50271d91-b3b3-4731-a0be-1a0fe3b51eff
+- 27d68091-ba30-46b5-a1e7-e817e4b125b2
+- ab61dec6-36b5-4fea-8004-6adbe20d1d4d
+- f16e9c7d-6271-4136-87e4-a9332743ba45
+- bd42e097-19ba-4b0d-aa16-8c41207c9d07
+- 11ab19b9-ab57-4caa-8d25-219c2ac09631
+- d5f0330a-015b-44a2-8719-338654e9b8b9
+- 41cc3d5c-9079-4554-8740-a5a2297bb07b
+- 193fdd65-fc55-444a-8b3a-076ddbed9697
+- bd991797-7e52-4967-aa83-94717707ada9
+- 0e64c4e8-803c-4ed9-8392-133f3572e6b2
+- 0f501e3e-a31b-45f0-83ca-aa95d5398992
+- 1ea3003f-a8c9-4866-a7bd-5cde67cc180a
+- 62065a9e-6d31-405c-819f-aed024101236
+- 5e628197-73a5-4cb5-8221-b1b6ba82fcf1

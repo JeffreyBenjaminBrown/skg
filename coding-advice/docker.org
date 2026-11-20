@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# a072d977-7a82-45fa-82cc-b278941b1aae
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * You are coding skg inside a Docker container
   The skg working tree is bind-mounted at =/home/ubuntu/host= (your
   primary working dir). The mount is live and bidirectional: files you
@@ -8,7 +12,6 @@
   The container runs with =--network host= (so container ports are host
   ports) and bind-mounts the host's =/nix/store= read-only (so the image's
   store references resolve against the host store at runtime).
-
 * The host/container split -- this shapes what you can do
   You are inside the container. =nix=, =nix-instantiate=, and
   =docker= are not installed here; they run on the host, driven by Jeff.
@@ -31,7 +34,6 @@
     host's =/tmp= is not shared into the container. When you need the
     output of a command Jeff runs, tell him to =... | tee some-file.log=
     into the project tree (e.g. the working dir), then Read it there.
-
 * What is in the container, for coding skg
   - Rust: =cargo=, =rustc=, =cargo-nextest=, =cargo-watch=.
   - A legacy image may still contain an unused =typedb= binary until the
@@ -49,7 +51,6 @@
   - The skg server itself is NOT baked into the image -- it is compiled
     at runtime from the mounted source (=cargo run --bin skg=). So skg's
     own Rust dependencies live in =Cargo.toml=, not in =docker.nix=.
-
 * Running and testing skg here
   - Ports and collisions: the container runs =--network host=, so every
     Skg TCP port lands directly on the host and is shared
@@ -67,7 +68,6 @@
   - Source of truth is the =.skg= files on disk. The in-Rust graph and Tantivy
     are derived and rebuilt from disk on startup. Any change that
     correctly lands on the filesystem is recoverable.
-
 * Modifying the image
   - Add packages to the =contents= list in =docker.nix=. To bundle an
     editor together with its plugins, follow the existing patterns:

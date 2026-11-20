@@ -1,0 +1,9 @@
+title: changes not editable in the view
+pid: 10ffc5fe-1b44-4127-934d-957eeb7ff85a
+body: |2-
+  The change-forest leaves recorded by the nodes whose changes a
+  buffer does not
+  [[id:07c3ad55-6c25-4b3f-bcad-22db09d28890][make editable]] are the *changes
+  not editable in the view*, which the processed summary counts. A
+  save never makes them editable; C-c r u extends the buffer to them,
+  as does the rerender of a clean buffer after a reload.

@@ -1,0 +1,9 @@
+title: hot reload
+pid: 59499abb-13a2-4628-ba4d-107ba7deefff
+body: |2-
+  The server rebuilt and restarted by cargo-watch on every edit under
+  'server/'. It is on when 'bash/start-servers.sh' is given
+  =--hot-reload=, and off by default, when an edit under 'server/' takes
+  effect only once that script is run again. Not to be confused with
+  the server rereading changed '.skg' files ('server/repo_watch/'), nor
+  with the Emacs client's 'skg-reload'.

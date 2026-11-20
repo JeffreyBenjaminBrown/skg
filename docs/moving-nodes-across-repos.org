@@ -1,7 +1,9 @@
+# This file was generated from the skg node with this ID:
+# b26b1f67-29b9-406e-ae7b-143703c567ec
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * moving nodes across skgrepos
-
 ** what "moving nodes across skgrepos" means
-
 The user's 'skgconfig.toml' file should list some 'skgrepos'.
 A skgrepo is just a folder on disk.
 Skg lets you keep multiple skgrepos so you can treat them differently
@@ -14,7 +16,6 @@ It has to be done *from within the app*.
 If you just move the file, Skg won't know that you did that,
 and its databases will now contain the lie
 that the moved node is in the old place.
-
 ** how to do it
 Open a metadata buffer view of the node ('skg-view-metadata').
 Go to the node that specifies its skgrepo --
@@ -25,9 +26,7 @@ Save that work and exit the metadata view (C-c C-c).
 Now save the buffer.
 The buffer will be rebuilt,
 and the skgrepo change will now be visible.
-
 ** pitfalls
-
 *** Foreign skgrepos are rejected on either end
 Foreign skgrepos (repos whose config entry says =foreign = true=,
 forked in via =forks= relationships) are write-protected. Trying to move a node *into* or *out
@@ -37,7 +36,6 @@ of* a foreign skgrepo produces
 fails entirely, and nothing is written. If you need data from a
 foreign skgrepo in a skgrepo you own, the model is to fork, not
 move.
-
 *** Cannot move and merge a node in the same save
 If a single save tries both to move a node's skgrepo *and* to merge
 it (acquirer or acquiree), skg refuses with
@@ -45,7 +43,6 @@ it (acquirer or acquiree), skg refuses with
 (=server/from_text/validate.rs:151=,
 =tests/move_repo.rs::test_move_and_merge_simultaneously_rejected=).
 Do them in two separate saves.
-
 *** Both skgrepo names must already exist in =skgconfig.toml=
 The move uses the skgrepo name to look up the directory. If the new
 skgrepo name isn't in =[[repos]]=, you'll get a "Skg repo not found"
@@ -53,12 +50,10 @@ error, not a "move failed" error, and no =.skg= file will be moved.
 Add the skgrepo first, and restart the server or rebuild its stores
 ('skg-rebuild-session-lifetime-stores', which re-reads the config)
 before doing the move.
-
 *** Containment, forks, links: all unaffected
 All graph relationships are by ID, not =(ID, repo)=. The set of
 relationships to/from the moved node is invariant under a skgrepo move.
 Don't expect anything related to graph topology to change.
-
 *** Foreign skgrepo files are never written by skg
 This is more general but bears repeating in the move context: skg
 will never write to a foreign skgrepo dir (one marked =foreign=). If
@@ -106,12 +101,10 @@ The buffer can reference a node by any of its IDs — primary or
 extra — and the move still works correctly. The repo-move's =pid=
 is always resolved to the primary ID before the move is applied
 (=tests/move_repo.rs::test_move_node_referenced_by_extra_id=).
-
 *** how session-lifetime stores are updated
 The save pipeline collects =RepoMove= records alongside the
 ordinary =NodeInstruction= saves and deletes. The applied
 order is:
-
 **** 1. FS (=server/save.rs::update_fs_from_saveinstructions=)
 The new =.skg= file is written to the new skgrepo directory first
 (via =write_all_nodes_to_fs=). Then, for each =RepoMove=, the
@@ -122,18 +115,15 @@ old location's file is at worst stale.
 
 If the old file is already missing (=ErrorKind::NotFound=), the
 removal is a silent no-op rather than an error.
-
 **** 2. In-memory graph (=apply_definenodes=)
 The new skgrepo is reflected in the in-memory =GraphnodeInRust= via the
 ordinary =SaveNode=, which carries the new skgrepo field. There is
 no separate move step in memory — the save is sufficient.
-
 **** 3. Tantivy
 Tantivy is not given the =RepoMove= list at all. Skgrepo moves are
 applied implicitly: the search-index update is "delete every doc by ID,
 then re-add docs for every save," and the =SaveNode= carries the
 new =repo= field, so the re-added document has the correct skgrepo.
-
 *** how 'extra_id's are handled
 If another node references the moved node by an extra_id, that
 reference does not need updating: the graph's =extra_id_to_pid= map resolves

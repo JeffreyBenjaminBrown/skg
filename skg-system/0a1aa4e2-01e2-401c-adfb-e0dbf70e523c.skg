@@ -1,0 +1,6 @@
+title: '<localleader>ol : :SkgPasteLink'
+pid: 0a1aa4e2-01e2-401c-adfb-e0dbf70e523c
+body: |2-
+  Inserts, at the cursor, a link to the node
+  whose ID is at the top of the linkstack.
+  Does not modify the stack.

@@ -1,0 +1,20 @@
+title: 'C-c o n : skg-paste-node'
+pid: c4462e7e-c6f3-4e80-aaa9-21927c94ceee
+body: |2-
+  This is the easiest way to give a node multiple containers --
+  push it to the stack, then paste it as a node somewhere else.
+
+  Inserts, at the cursor, a write-protected view
+  of the node whose ID is at the top of the linkstack.
+  Its metadata includes only the ID, =writeProtected=,
+  and (usually) an editable view request;
+  its title comes from the stack.
+  Does not modify the stack or save.
+  Saving will provide the rest of its metadata,
+  and fulfill the editable view request,
+  making the node writable with its real title, body and content.
+
+  The view request is omitted if the buffer already has
+  an editable occurrence of the node (or one requesting an editable view),
+  because a buffer can hold only one editable occurrence of each node.
+  Then the pasted node stays write-protected, and Emacs says so.

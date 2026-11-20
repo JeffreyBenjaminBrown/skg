@@ -1,0 +1,21 @@
+title: the linkstack
+pid: 8d0a31d2-f3b7-4077-bd6e-e4d404c7aa75
+body: |2-
+  <localleader>u for push, <localleader>o _ for paste,
+  <localleader>O _ for pop.
+
+  Inside a Vim command-line prompt (search, an Ex command's argument,
+  ...), <localleader> chords aren't available, so paste and pop also
+  ride cmdline-mode mappings: <C-x>i pastes the top id, <C-x>l pastes
+  a link to it, <C-x>I pops the id, <C-x>L pops the link. (Push, and
+  pasting/popping a full node, have no cmdline form -- do those from
+  a buffer.)
+contains:
+- c341430f-845d-4ce8-bc74-f2ea0f1653fc
+- df4e0556-230f-4c9e-93c0-f3b96f496c10
+- f53885f4-1fb4-4593-9776-41dcb490188c
+- 0a1aa4e2-01e2-401c-adfb-e0dbf70e523c
+- 540e7375-502f-40b9-b898-c85ef0832475
+- faf64c25-f161-45ec-b88d-094e0b6883d9
+- 4e2f05b1-3684-471b-a4e1-dd2c80fff589
+- 8cd0542f-40e9-4561-92eb-747a5a4c1100

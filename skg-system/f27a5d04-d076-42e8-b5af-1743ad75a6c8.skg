@@ -1,0 +1,18 @@
+title: vognode, non-vognode
+pid: f27a5d04-d076-42e8-b5af-1743ad75a6c8
+body: |2-
+  A *vognode* is a viewnode standing for a gnid ('Vognode' in
+  'server/types/viewnode.rs'), one of three structs: an *occurrence*
+  ('Occurrence'), of a graphnode the truth has; a *ghost* ('Ghost'),
+  in the diff view only, of a graphnode HEAD has and the worktree
+  lacks; and a gnid-only vognode ('GnidOnlyVognode', see "gnid-only
+  vognode"), an unknown viewnode or a restricted viewnode. An
+  occurrence of a restricted graphnode becomes a restricted viewnode
+  where its record is visible; where it is not, in a content view, it
+  vanishes (see "vanish"), and in the diff view it becomes a
+  tombstone.
+
+  The other viewnodes are *non-vognodes*: the *descriptors* -- folders,
+  property members and change viewnodes, which describe their
+  viewparent or its relationships rather than standing for a graphnode
+  -- the buffer root and tombstones.

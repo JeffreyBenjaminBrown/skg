@@ -1,0 +1,8 @@
+title: =(homeSkgrepoMove (old OLD) (new NEW))=, =(movedLikeAncestor LETTER)= -- a node's home skgrepo moved
+pid: cfe8c4b6-3328-4fc7-82da-272a95b5daaa
+body: |2-
+  In the skgrepo-changes buffer, on a node whose home skgrepo moved
+  from OLD to NEW since HEAD; herald "-OLD +NEW". Beside it, when the
+  nearest vognode ancestor whose home skgrepo moved moved the same way,
+  =(movedLikeAncestor LETTER)=, LETTER naming that ancestor as the
+  relationship tokens do (a = the viewparent); herald "Δ⌂=LETTER".

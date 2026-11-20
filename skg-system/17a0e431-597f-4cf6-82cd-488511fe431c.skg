@@ -1,0 +1,14 @@
+title: 'C-c s n : skg-restore-deleted-node'
+pid: 17a0e431-597f-4cf6-82cd-488511fe431c
+body: |2-
+  In a buffer of the diff view, on a ghost (a node deleted since HEAD,
+  shown =ᗣ☮ ∃-=), requests that the save write the node back
+  as HEAD had it: its file in its home skgrepo, its own relationships
+  included, and its place in each list that recorded it at HEAD (at its
+  index there, in the skgrepo that recorded it), unless that recorder is
+  itself deleted. The headline shows =restore node= until the save. On
+  any other headline it refuses at once, with "Only a node deleted
+  since HEAD can be restored; restoreNode belongs on a ghost
+  (skg-restore-deleted-node)". It does not save. Save the view
+  afterward to apply it. See "Restoring what a change removed" in
+  [[id:6d6b101e-6d78-4901-9de1-e9c533873992][the diff view's docs]].

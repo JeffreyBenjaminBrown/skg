@@ -1,0 +1,4 @@
+title: 'C-c r p C : skg-diffView-goto-previous-change-anywhere'
+pid: 702533ec-5393-4a8e-aca4-8963784ae2ca
+body: |2-
+  Like C-c r p c, skipping nothing.

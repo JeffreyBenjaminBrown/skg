@@ -1,0 +1,13 @@
+title: The problem this solves
+pid: 725da491-7be6-4d19-9868-92ffedf617d6
+body: |2-
+    An agent that could see how much of its usage window it has burned
+    could *modulate its own model use* -- e.g. drop from Opus to Sonnet
+    to Haiku as the session window fills, or pause until the window
+    resets -- instead of blindly hitting a wall.
+
+    The catch: the numbers you see in the interactive =/usage= screen are
+    *not* stored anywhere on disk, and the debug/TUI output that would
+    show them is suppressed when stdout isn't a real terminal. So you
+    can't scrape =/usage=, and you can't usefully "echo into" a Claude
+    session to read it back.

@@ -1,0 +1,5 @@
+title: Scope reduction
+pid: 589e605d-8eab-448f-a9f9-eaa5384389e4
+body: |2-
+  There's an automatic tool for this. It takes a few minutes to run.
+  Here's its [[file:../tools/scope-reducer/README.md][README]].

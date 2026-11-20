@@ -1,0 +1,37 @@
+title: the forker-visibility step
+pid: fc21b6fe-023f-43f9-900a-9eb94405e102
+body: |2-
+  The *forker-visibility step* is the step of the save that, for a
+  forker as such F shown editable in the forks folder of a note N,
+  reads what the buffer shows of F's content
+  ('resolve_forker_visibility' in
+  'server/from_text/local_fieldintent_collection/resolve_visibility.rs'):
+  a child typed there joins F's content (refused under a foreign F); a
+  child of F that N hides, shown claiming under F, is unhidden in N, as
+  under a forkee; and a child F showed that the buffer no longer shows
+  claiming under F was cut from it (see "cut"). A cut from a forker
+  makes N fork F, so that F, if it forks N, becomes a mutual, and N
+  hides each child cut that neither it nor an owned note but F contains
+  after the save (one pasted into N's content, or into any note of the
+  user's, is not hidden). The view the save redraws
+  gives F's headline its claim, so that it stands among the forkees,
+  not as a pending detachment: every view the refresh draws gives each
+  member of a forks folder the claim the graph gives it
+  ('claim_forks_folder_members_as_the_graph_does' in
+  'server/refresh/visit.rs'; 'docs/forks.org', "Claims in a redrawn
+  view"). Where the same save
+  removes the claim of a mutual (a detachment), a cut from it only
+  hides: the detachment stands. A foreign N can record neither a fork
+  nor a hide, so a save that cuts from F or unhides under it is refused,
+  naming N ('refusal_to_change_what_a_foreign_note_hides'), in the words the
+  forkee-visibility step uses. The fork rules still bind: a save that
+  would make N fork F while N contains F is refused. The step reads F's
+  content and N's hides and content by the records the skgrepo
+  restriction shows, as the view drew them: F shows its content less
+  what N contains or hides and what the user keeps elsewhere, by the
+  graph before the save, where the forks folder showed F before the
+  save. An F typed into the folder in the save had nothing drawn under
+  it, so nothing is cut from it: N neither forks it nor hides anything
+  for it ('docs/forks.org', "Typing a note into the folder"). A forker
+  the graph lacks (typed there) has no list to lose: what it shows is
+  its contains.

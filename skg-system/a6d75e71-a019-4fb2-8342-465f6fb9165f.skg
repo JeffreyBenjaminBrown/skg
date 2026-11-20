@@ -1,0 +1,42 @@
+title: skgrepo-sets
+pid: a6d75e71-a019-4fb2-8342-465f6fb9165f
+body: |2-
+  Skgrepo-sets are no longer declared; the retired =[[repo_sets]]=
+  table is rejected with an error. The sets are exactly the
+  *prefixes of the privacy ladder*: each owned skgrepo's name denotes
+  the set consisting of itself and every more-public owned skgrepo; the
+  most private owned skgrepo's set holds every owned skgrepo. Choosing
+  a set is choosing "the most private owned skgrepo to make
+  available." Apart from that choice, a connection shows or hides the
+  foreign skgrepos, all of them at once; they are shown unless it hides
+  them. The most private set with the foreign skgrepos shown is no
+  skgrepo restriction. =default_repo_set= (top-level field) names the
+  set when a client connects, with the foreign skgrepos shown; left
+  out, it is the most private owned skgrepo. Naming a foreign skgrepo
+  there is refused.
+
+  Example:
+
+  #+begin_src toml
+  default_repo_set = "public"
+
+  # The owned skgrepos in privacy order: most public first.
+  # Foreign skgrepos may sit anywhere.
+  [[repos]]
+  name = "public"
+  path = "me/public"      # owned => writable
+
+  [[repos]]
+  name = "Fred"
+  path = "fred/public"
+  foreign = true          # write-protected
+
+  [[repos]]
+  name = "private"
+  path = "me/private"
+  #+end_src
+
+  Here the available skgrepo-sets are =public= = {public} and
+  =private= = {public, private}, each with Fred's skgrepo added while
+  foreign skgrepos are shown; =private= with them shown is no skgrepo
+  restriction.

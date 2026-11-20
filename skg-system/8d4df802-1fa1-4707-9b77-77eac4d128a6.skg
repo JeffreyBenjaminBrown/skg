@@ -1,0 +1,8 @@
+title: diff view
+pid: 8d4df802-1fa1-4707-9b77-77eac4d128a6
+body: |2-
+  Four buffers that show every change in the owned skgrepos since their
+  last commits, with the context needed to understand them: "all
+  changes", "merges", "skgrepo changes" and "order-only changes". Each is
+  an ordinary editable view. Foreign skgrepos are excluded; the
+  processed summary only counts their changed nodes.

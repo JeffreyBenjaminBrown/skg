@@ -1,0 +1,13 @@
+title: '<localleader>ru : :SkgDiffViewExtend'
+pid: 02def2b6-cf7b-4862-b31d-9b97b7bc1e06
+body: |2-
+  Extends the buffer of the diff view to every change not editable in it.
+  Each changed node with no editable occurrence becomes editable where
+  the buffer first shows it, in content or else in a partner folder,
+  with its change and its content shown under it; when a change is
+  under a root the buffer lacks, that root is appended at the end. A
+  notification then shows the processed summary, as after a save.
+  Refuses with "Save the buffer first." while the buffer has unsaved
+  changes. A clean buffer the server rerenders after reloading files
+  changed on disk is extended the same way, with no key pressed.
+  (Emacs: C-c r u.)

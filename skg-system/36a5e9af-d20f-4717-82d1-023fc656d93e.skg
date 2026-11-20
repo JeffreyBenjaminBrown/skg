@@ -1,0 +1,11 @@
+title: in, out, in-folder, out-folder, "(this file)", "(other files)"
+pid: 36a5e9af-d20f-4717-82d1-023fc656d93e
+body: |2-
+  A relationship is *out* from its recorder (the node whose file records
+  it) and *in* to its member. In the diff view, a folder of out-relationships
+  that changed, an *out-folder*, is labelled "its ... changed (this
+  file)", and one of in-relationships, an *in-folder*, "its ... changed
+  (other files)" ('docs/diff-view.org', "the in-folders and
+  out-folders"). The forks folder is neither: its members play either
+  side, so its label, "its forks changed", carries no suffix. Changeset
+  markers carry no suffix.

@@ -1,0 +1,10 @@
+title: ':SkgRerenderAllViews : redraw every clean view'
+pid: 74878c64-99eb-4172-8d85-73326fccf407
+body: |2-
+  Redraws every open view that has no unsaved edits from the graph as it
+  now is, each with all of its roots; a buffer of the diff view is
+  refreshed. A view with unsaved edits is left as it is, since the server
+  draws a view from what it last rendered or saved, and the redraw would
+  discard the edits; a notification names each one skipped. See ":w"
+  for its use after a refused save. (Emacs: M-x
+  skg-request-rerender-all-views.)

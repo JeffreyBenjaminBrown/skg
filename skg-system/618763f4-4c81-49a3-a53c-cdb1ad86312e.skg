@@ -1,0 +1,5 @@
+title: '[[id:3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f][Skg exports this document to org.]]'
+pid: 618763f4-4c81-49a3-a53c-cdb1ad86312e
+body: |2-
+  target_filepath = "coding-advice/generated-docs"
+  root_headline = false

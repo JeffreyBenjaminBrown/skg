@@ -1,0 +1,12 @@
+title: =ghost (gnid ID) (skgRepos (nodeRepo REPO)) ...= -- a ghost
+pid: bc63aee2-1047-4cb9-94a3-f45535eff459
+body: |2-
+  It is a node HEAD has and the worktree lacks, with HEAD's title and
+  body, drawn only in the diff view. Its ID is written =(gnid ID)= and
+  its home skgrepo =(skgRepos (nodeRepo REPO))=, as a node's are. It
+  claims membership only where its viewparent's worktree list still
+  names its gnid; elsewhere, where claims are read, it carries
+  =noClaim=, and where nothing warrants it, =(view noWarrant)= (never
+  =ghostWarrant=: the kind is its own herald). It may carry
+  =(editRequest restoreNode)= (see "Edit requests: (editRequest ...)"),
+  and no view request.

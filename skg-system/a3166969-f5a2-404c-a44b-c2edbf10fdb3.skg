@@ -1,0 +1,5 @@
+title: 'C-c O n : skg-pop-node'
+pid: a3166969-f5a2-404c-a44b-c2edbf10fdb3
+body: |2-
+  Like skg-paste-node,
+  but also removes the node from the stack.

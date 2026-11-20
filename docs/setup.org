@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# 6202c84c-6b73-4233-9349-5a22d300583a
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * Setting up Skg
 Everything runs locally on your machine. You don't have to share.
 Skg is free software, without a ghost of a path to making money.
@@ -26,7 +30,7 @@ It takes the config's path and two options, both off by default:
 Without CONFIG it uses =data/jeff/skgconfig.toml=, relative to the folder
 it is run from, so run it from the top of this repository.
 Its stop script and its own log, and the server's logs, go in
-the [[file:glossary.org::*run folder][run folder]] =CONFIG.running/= beside the config (the
+the [[./glossary.org::*run folder][run folder]] =CONFIG.running/= beside the config (the
 compiled client's =.elc= files sit beside their sources, and
 builds go to =target/=).
 - Without =--deb= it builds and runs the release profile
@@ -56,11 +60,11 @@ container; an =.eln= entry for them made before this change may be
 deleted by hand from the eln-cache (typically
 =~/.emacs.d/eln-cache/=).
 *** optional : import data from org-roam
-See [[file:COMMANDS.org::#import-org-roam][importing from Org-roam]] for arguments,
+See [[./COMMANDS.org::#import-org-roam][importing from Org-roam]] for arguments,
 supported input, and setup steps. Use a fresh staging directory:
 the command deletes existing '.skg' files in its destination.
 For an additive, previewed import of mixed Markdown and ordinary Org files
-into an existing owned skgrepo, use [[file:COMMANDS.org::#import-md-and-org][=M-x skg-import-md-and-org=]]
+into an existing owned skgrepo, use [[./COMMANDS.org::#import-md-and-org][=M-x skg-import-md-and-org=]]
 after starting the server and client instead. Keep the source documents as
 a backup; Org export is readable but not a round trip.
 ** set up your data folder

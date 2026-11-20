@@ -1,0 +1,11 @@
+title: '<localleader>sx : :SkgSetFlagSearchMatching'
+pid: d7b0819d-58bd-42c4-92e1-e825fa677c8b
+body: |2-
+  Prompts between =search matching= and =no search matching= and stages the
+  desired state without saving. Foreign/write-protected/unsaved roots and a
+  node that already holds an edit request (delete, a nodeMerge or a
+  flag) are refused. A processed request stays beside it. A pending
+  relRepo request gives way to it, and the message says so: "replaced a
+  pending relRepo request". ':SkgDelete' (<localleader>dd) and
+  ':SkgSetMergeRequest' (<localleader>sm) replace a pending relRepo
+  request too, and a flag request, without saying so.

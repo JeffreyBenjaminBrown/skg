@@ -1,0 +1,20 @@
+title: 'C-c f RET : skg-search'
+pid: fb6d5697-c196-401d-ac02-543711ad146b
+body: |2-
+  Text search across titles and aliases, returning every
+  matching node.
+
+  A node with the =NoSearchMatching= flag will not be found
+  (will not be a "hit") through
+  its title, aliases, or body in any search mode. It may still appear as graph
+  context around another hit and can still be opened by ID. This is a
+  decluttering preference, not privacy or access control. For example, a packing
+  list can mention “shaver” without that packing list itself matching a search
+  for shaver.
+
+  Prompts for search terms. All search axes take their conservative
+  defaults: no per-token regex, titles only (no body), no Tantivy
+  phrase and operator syntax.
+
+  Run 'skg-goto' (below) from one of the links in the search
+  results to open the view from that node.

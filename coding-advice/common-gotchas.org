@@ -1,3 +1,7 @@
+# This file was generated from the skg node with this ID:
+# f73d4958-2724-44cc-9d04-542116cd2320
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * History is garbage. Numbers on phases are garbage.
 Don't say "phase 1: do this; phase 2: do that."
 Such numbers usually go stale, and they illuminate nothing.

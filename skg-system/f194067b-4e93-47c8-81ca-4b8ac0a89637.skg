@@ -1,0 +1,23 @@
+title: vanish
+pid: f194067b-4e93-47c8-81ca-4b8ac0a89637
+body: |2-
+  A headline of a view *vanishes* (a term of plan 10) when the refresh
+  removes it, and everything under it, from the view, for one of two
+  reasons. The graph no longer relates it to its viewparent: a child
+  that claims membership under a viewparent whose claims the save
+  reads, and whose warrant is not 'ByGraph' (the claims rung,
+  'vanish_if_unwarranted' in 'server/refresh/visit.rs'). Or the graph
+  no longer has its node: an occurrence in a content view, a view root
+  included, whose node is gone or restricted and whose viewparent's
+  list does not name it (the ID rule's tombstone answer,
+  'rekind_vognode' in 'server/refresh/id_rule.rs'). A view whose roots
+  all vanish is an empty buffer. What vanishes is not detached: the
+  graph, as the view sees it, already lacks the relationship, so a save
+  of the view has nothing to remove; a record a skgrepo narrowing keeps
+  out the save keeps, as it keeps every restricted record, and the
+  skgrepo widening draws the member again, where the goal names it. A
+  =noClaim= the user wrote on a warranted child (a pending detachment)
+  stays; so do the children of a viewparent that reads no claims, a
+  chain node, and, in the diff view, a ghost and a tombstone. The word
+  is unrelated to 'server/git_ops/vanished.rs', which asks at what
+  commit a node's file left the git history.

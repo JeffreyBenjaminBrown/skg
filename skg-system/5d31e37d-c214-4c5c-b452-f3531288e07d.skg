@@ -1,0 +1,13 @@
+title: 'C-c s l : skg-restore-removed-membership'
+pid: 5d31e37d-c214-4c5c-b452-f3531288e07d
+body: |2-
+  In a buffer of the diff view, on a removed member, or on a member of
+  a partner folder whose relationship to the folder's viewparent was removed
+  (=~-=), editable or write-protected, requests that the save re-add that
+  one relationship as HEAD recorded it. The headline shows =restore
+  membership= until the save. On a ghost it refuses with
+  "This node is deleted; restore it first (skg-restore-deleted-node)",
+  and on any other headline that is not a removed membership with
+  "Only a removed membership can be restored", at once. It does not
+  save. Save the view afterward to apply it. A relationship whose other end is still deleted
+  is not restored; the save says so.

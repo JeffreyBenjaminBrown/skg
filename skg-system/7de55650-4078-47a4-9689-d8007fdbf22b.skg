@@ -1,0 +1,18 @@
+title: where a save's warnings go
+pid: 7de55650-4078-47a4-9689-d8007fdbf22b
+body: |2-
+  A save's own warnings and errors go to a buffer of their own,
+  replaced at each save that has any: =*SKG Save Warnings*=,
+  =*SKG Save Errors - Inconsistencies Found*= when the save was
+  refused, or =*SKG Save Errors and Warnings*= when it has both. One
+  such warning names each orphan graphnode the save created: a node
+  that no list contains, made from a headline typed under a parent
+  that reads no claims ('docs/glossary.org', "claims membership",
+  lists those parents). A new view root is in no list either, but is
+  not warned of.
+
+  A rerender that follows a command (C-c v l, 'skg-restrict-repo-set';
+  a commit; an import; the
+  cleanup of references to an absent node, the extension of the diff
+  view, or M-x skg-request-rerender-all-views) has errors and
+  warnings of its own, which go to =*skg rerender messages*=.

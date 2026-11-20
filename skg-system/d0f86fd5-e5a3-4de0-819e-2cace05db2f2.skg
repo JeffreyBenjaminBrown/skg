@@ -1,0 +1,12 @@
+title: connection, reload, rebuild session-lifetime stores
+pid: d0f86fd5-e5a3-4de0-819e-2cace05db2f2
+body: |2-
+  Unless you're coding or troubleshooting,
+  you probably won't need these.
+contains:
+- 2fec3afd-ed75-4070-b05c-59f889a97252
+- c6f5b0fa-39c1-4f69-b38a-79eae5b8aefe
+- b1e4aa3d-3344-4ce8-bf76-8b04af092733
+- 4afe01db-add2-45ab-8546-c9507762f986
+- b6a241c0-03f9-406a-9723-bef26204dee8
+- 00e33bc8-b237-45c2-8690-261a1f418ae6

@@ -1,0 +1,12 @@
+title: An Org headline inside a block or fence stops the import.
+pid: 4d9459c8-8812-4d58-b51c-d6f9e1dbc669
+body: |2-
+  If a line of an Org file looks like a headline (asterisks at the start of
+  the line, then a space) but is inside a =#+begin_...= block or a =```= fence,
+  nothing is imported, and the preview explains which lines are the problem.
+  Org would read the line as a headline and end the block there,
+  so Skg cannot tell what was meant.
+  Often the block was never closed.
+  If the line belongs inside the block, escape it with a leading comma
+  (=,* ...=), as Org does. This check applies only to Org files;
+  in a Markdown file, a =#= line in a code block is ordinary code.

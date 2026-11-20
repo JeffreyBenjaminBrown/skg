@@ -1,0 +1,13 @@
+title: Edit conservatively
+pid: 662280fd-d7ac-4330-b47b-401594fb6b3a
+body: |2-
+  If I ask for code changes and have not mentioned version control,
+  ask if I want commits. When I want them, I want them granular
+  (to make the history easy to spelunk) rather than one mega-commit.
+  Use verbose, understandable names as described in [[id:b5250a0b-7c49-4d84-afea-43432204bc46][file:names.org]].
+
+  Do not alter Git configuration, credentials, index, branches, or commits
+  unless explicitly asked. Do not gratuitously rename things or add legacy
+  compatibility code. Preserve relevant comments and follow the existing local
+  style when modifying code. The code is authoritative when documentation and
+  code differ.

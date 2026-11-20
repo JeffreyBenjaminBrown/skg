@@ -1,0 +1,14 @@
+title: the fork rules
+pid: f641d56d-794a-44c2-8ed9-f8b6d15c0ee5
+body: |2-
+  The *fork rules* are rules 4 to 6 of the hard validation constraints
+  ('docs/data-model_technical.org'), which a save of an owned note must
+  keep and the graph is checked against at startup: its home skgrepo is
+  one the config names; it forks, contains and hides nothing of itself;
+  and it neither contains what it forks, nor what forks it, nor forks
+  what contains it ('server/dbs/in_rust_graph/fork_rules.rs',
+  'ForkRuleViolation'). Most of them are about forks, whence the name;
+  the skgrepo rule and the self-containment and self-hide rules are
+  checked with them because they read the same records of the notes a
+  save touches. A violation a foreign note's record takes part in is a
+  startup warning (a "fork rule warning"), not a refusal.

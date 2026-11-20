@@ -1,0 +1,24 @@
+title: The host/container split -- this shapes what you can do
+pid: c981e735-fa44-4a8e-9854-eba1d84969fc
+body: |2-
+    You are inside the container. =nix=, =nix-instantiate=, and
+    =docker= are not installed here; they run on the host, driven by Jeff.
+    You cannot build, load, or run the image yourself, and you cannot
+    evaluate Nix. Consequences you must plan around:
+
+    - *Changing the image is a request, not an action you take.* Edit
+      =docker.nix=, then ask Jeff to rebuild on the host
+      (=nix-build docker.nix && docker load < result=, ~10 min). A rebuilt
+      image only takes effect in a NEWLY started container -- the running
+      container keeps whatever it launched with.
+    - *You can't attr-check Nix yourself.* nixpkgs attribute names are
+      easy to get wrong (they follow the plugin/package *skgrepo* name, not
+      the upstream project name). Before a ~10-min build, have Jeff run a
+      =nix-instantiate --eval= one-liner (seconds) to confirm every new
+      attribute/expression exists in his pin. A typo fails fast at eval
+      time, but a wrong-yet-valid name wastes the whole build plus a
+      container start to notice.
+    - *Hand back command output through the mounted tree, never /tmp.* The
+      host's =/tmp= is not shared into the container. When you need the
+      output of a command Jeff runs, tell him to =... | tee some-file.log=
+      into the project tree (e.g. the working dir), then Read it there.

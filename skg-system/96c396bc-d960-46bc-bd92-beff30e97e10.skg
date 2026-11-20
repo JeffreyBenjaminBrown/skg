@@ -1,0 +1,4 @@
+title: lp = length-prefixed
+pid: 96c396bc-d960-46bc-bd92-beff30e97e10
+body: |2-
+  Sometimes an API response is prefixed with a length, letting the receiver know how many characters to expect in the response.

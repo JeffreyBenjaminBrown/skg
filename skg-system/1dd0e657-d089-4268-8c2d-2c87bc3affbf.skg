@@ -1,0 +1,21 @@
+title: Marks, fingerprints and the store
+pid: 1dd0e657-d089-4268-8c2d-2c87bc3affbf
+body: |2-
+  A mark says that one leaf is processed. The processed store
+  ('server/diff_view/processed_store.rs') keeps each mark with the fingerprint of
+  the change it approved, a hash of the leaf's before and after values.
+  A mark whose fingerprint no longer matches the change counts as
+  absent: editing a marked change unmarks it, and nothing signals that
+  an earlier version was approved. The fingerprint of a new or removed
+  membership, and of a new or removed alias, holds the skgrepo that
+  records it, so moving it to another skgrepo unmarks it too. The store lives on the server, is
+  written to its file after every change, and is read at startup; a
+  missing or unreadable file is an empty store. The file is the
+  config's 'processed_marks_file', or else
+  '<data_root>/processed-marks-STEM.json', STEM the config file's name
+  without '.toml' (a symlink to a config resolved first), so that
+  servers over one data root keep their marks apart
+  ('SkgConfig::processed_marks_path').
+  The file serializes the leaf keys, aspect names included, so their
+  spelling is kept stable. After a git-commit, the store keeps exactly
+  the marks whose leaves still exist in the rebuilt straddle.

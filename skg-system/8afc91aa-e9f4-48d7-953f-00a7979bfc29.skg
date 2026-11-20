@@ -1,0 +1,9 @@
+title: 'M-x skg-request-rerender-all-views : redraw every clean view'
+pid: 8afc91aa-e9f4-48d7-953f-00a7979bfc29
+body: |2-
+  Redraws every open view that has no unsaved edits from the graph as it
+  now is, each with all of its roots; a buffer of the diff view is
+  refreshed. A view with unsaved edits is left as it is, since the server
+  draws a view from what it last rendered or saved, and the redraw would
+  discard the edits; the echo area names each one skipped. See "C-x
+  C-s" for its use after a refused save.

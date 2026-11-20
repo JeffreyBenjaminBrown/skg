@@ -1,3 +1,6 @@
-* Public Mode
+# This file was generated from the skg node with this ID:
+# 8fb7e3e4-dd61-42f3-8c85-4c674f077d6f
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+* Public Mode
 When you want to view your work in "public mode" (maybe to share your screen) private sections will be hidden. Your data will look to you temporarily just as it looks to others.

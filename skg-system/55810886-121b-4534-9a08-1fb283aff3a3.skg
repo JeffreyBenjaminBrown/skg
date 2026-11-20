@@ -1,0 +1,8 @@
+title: node budget
+pid: 55810886-121b-4534-9a08-1fb283aff3a3
+body: |2-
+  How many editable occurrences' content a view draws at once
+  ('initial_node_limit' in the config, 1000 by default). Once it is
+  spent, the occurrences a view draws are write-protected, and
+  'skg-set-editable' (=C-c s e=) makes one editable. See "extent,
+  extension, node budget" among the terms of the implementation.

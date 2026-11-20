@@ -1,0 +1,72 @@
+title: 'C-c s r : skg-set-relRepo'
+pid: 1c364c9f-b546-46cd-9148-1ebcef78c543
+body: |2-
+  Sets the relRepo of the relationship instance the headline at
+  point represents -- =contains= for a content child, the folder's
+  relation for a member of an editable partner folder, or the alias membership
+  for an alias headline. An unknown viewnode or a restricted viewnode
+  in one of those writable positions is supported
+  too: it carries only its raw relationship member ID, never a node
+  edit. (Formerly
+  =skg-privatize-relationship=; renamed because the gesture now moves
+  privacy in both directions.)
+
+  For a node-to-node relationship, the command asks the server for its default
+  relRepo and current relRepo (the
+  "relRepo info" endpoint; the request names the relationship's
+  recorder -- the viewparent, or the folder's viewparent -- its member and
+  its relation), then prompts -- with both
+  tab-completion and S-left/S-right cycling, like the other skgrepo
+  dialogs -- over the skgrepos at least as private as the default (more
+  public ones could leak an endpoint's ID and would be rejected at
+  save), plus a no-override choice. The minibuffer starts pre-filled
+  with a pending request when it is offerable, else the current relRepo
+  or default, so RET keeps the most specific available choice. If the server cannot resolve the relationship
+  (e.g. a node not yet saved), every skgrepo is offered and the save's
+  floor check backstops. For an alias, its default is its recorder's home
+  and the current relRepo is read directly from the alias metadata, so
+  no synthetic graph relationship or broader endpoint is needed.
+
+  For a relationship from an owned recorder to a foreign member, the default is
+  the recorder's home regardless of privacy order. That choice deliberately
+  shares the foreign ID and relationship with readers of the owned
+  skgrepo; Skg never offers the foreign skgrepo as a write destination.
+
+  Choosing a skgrepo writes an =(editRequest (relRepo REPO))= metadata
+  request. This
+  both raises privacy above the default and lowers it back down to
+  (never below) the default -- the way to publicize a relationship stuck at
+  an old, more private skgrepo after its endpoint's home skgrepo moved. A relationship
+  sitting more private than its default is marked with a red =~NAME= herald
+  immediately before the ⌂ skgrepo herald; once saved at its default,
+  request and display herald disappear.
+
+  The no-override choice removes the request, which means "no opinion":
+  a saved relationship keeps its saved skgrepo (sticky). It does not reset the
+  relationship to its default -- to reach the default, choose it.
+
+  Refuses with an error when point is on a member of a write-protected folder
+  (hiderFolder, hiddenFolder,
+  containerFolder, mentionerFolder, acquiredByFolder, acquiredFolder,
+  integratedElsewhereFolder, hiddenInForkPartnerFolder, hiddenByForkerFolder,
+  hiddenOutsideOfForkPartnersFolder), or on
+  a member of the forksFolder that claims nothing (it forks the
+  viewparent, which does not fork it): the relationship belongs to the
+  other end there, so setting its skgrepo from this side would be
+  meaningless. Also refuses on a root
+  headline, which represents no relationship.
+
+  The command only edits the node's metadata in the current buffer.
+  Save the view afterward to apply the change.
+
+  Note that the name 'skg-set-relRepo' is somewhat misleading.
+  Normally, by 'relationship' we mean
+  'a relationship between two nodes in the graph'.
+  But for this command we need to broaden the definition to
+  'a relationship from what this viewnode represents
+  (which might be an alias) to what its parent represents (a node in the graph)'.
+
+  With a prefix argument (=C-u C-c s r=) it instead runs
+  'skg-set-relRepo-recursive', described next.
+contains:
+- 92759638-d534-480d-a259-5f79f851314c

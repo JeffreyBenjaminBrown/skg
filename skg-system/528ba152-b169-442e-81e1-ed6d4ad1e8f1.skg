@@ -1,0 +1,21 @@
+title: The per-plan review
+pid: 528ba152-b169-442e-81e1-ed6d4ad1e8f1
+body: |2-
+  The review written when a plan's last slice is DONE (for 04.1,
+  'TODO/simplify-refresh/05_review.org') has a fixed shape:
+  - a verdict;
+  - what the reviewer checked itself: the launches and the record,
+    the central code read in full, the docs' statement of the
+    model, the suites by the record;
+  - results: the run, the durations, the counts, the commit rule,
+    the problems file, what the record lost;
+  - what each slice did beyond the plan's words;
+  - the churn ledger within the plan, and the cost;
+  - what the user sees differently, by decision and by accident;
+  - the reviewers' reports: the questions above, one agent each,
+    the reports kept beside the review;
+  - the open questions, each self-contained;
+  - Decide: the items for Jeff, each opening with its state, in
+    sentences, the present tense for what is true now and would
+    or will for what would change;
+  - suggestions for this advice.

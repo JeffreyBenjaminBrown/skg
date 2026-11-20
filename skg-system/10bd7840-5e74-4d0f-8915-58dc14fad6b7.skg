@@ -1,0 +1,36 @@
+title: Every mirror, flat
+pid: 10bd7840-5e74-4d0f-8915-58dc14fad6b7
+body: |2-
+  A note's forks folder lists every mirror of it, each once: what it
+  forks, what forks it, and the rest of the family, each note joined to
+  it only through others (a fork of what it forks, say), an /indirect
+  member/ ('docs/glossary.org', "the forks folder"). Since forking is
+  transitive in this sense, no member of the folder draws a forks
+  folder of its own, which would only restate the family: if =a= forks
+  =b=, =b= stands in =a='s folder and =a= in =b='s, and neither again
+  under the other. Asked for one (=C-c l f= on the member), a member
+  draws it.
+
+  The order: first what the note forks, in its list's order, which you
+  edit there; then what forks it, by the declaration order of their
+  home skgrepos in your config, then pid; then the indirect members,
+  nearest first, then by the declaration order of their homes, then
+  pid. Only the first part's order is yours: the refresh puts a member
+  of the other two that you moved back where the graph and the config
+  put it.
+
+  An indirect member is treated as a forker-only member is: it claims
+  nothing; it shows what your note neither contains nor hides of its
+  content, and no other note of yours contains (see "What you keep
+  elsewhere"); deleting it from the folder hides it in your note, and it
+  stands then in the folder of what your note hides outside its fork
+  partners, where removing it unhides it; cutting a child from it makes
+  your note fork it and hide the child, unless your note, or another
+  note of yours, keeps the child after the save (see "Cutting from a
+  forker");
+  and its heralds have no =b= flag toward your note, since it neither
+  forks your note nor is forked by it. Every member explains a hide
+  alike: a hide of something only an indirect member contains stands
+  under that member, in its folder of what your note hides in it. Its
+  own hides of your note's content are not drawn under it: they apply
+  to what it forks, not to your note.

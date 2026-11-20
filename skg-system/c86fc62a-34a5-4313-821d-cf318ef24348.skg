@@ -1,0 +1,9 @@
+title: '"snapshot" is always qualified: graph, git or buffer snapshot'
+pid: c86fc62a-34a5-4313-821d-cf318ef24348
+body: |2-
+  A /graph snapshot/ is one immutable state of the in-Rust graph
+  ('GraphSnapshot'). A /git snapshot/ is one of HEAD, the git index or
+  the worktree; 'server/git_ops/git_snapshot.rs' reads HEAD and the
+  worktree (the graph straddle's before-graph reads HEAD). A /buffer snapshot/ is a
+  buffer's text as a client sends it, for a dirty view in the save
+  envelope.

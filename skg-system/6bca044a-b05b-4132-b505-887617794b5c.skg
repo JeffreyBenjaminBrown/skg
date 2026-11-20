@@ -1,0 +1,9 @@
+title: '<localleader>gv : :SkgGotoViewnodeId'
+pid: 6bca044a-b05b-4132-b505-887617794b5c
+body: |2-
+  Moves the cursor to the headline carrying a viewnode ID, read from
+  the prompt. A message names each headline it concerns by its
+  viewnode ID, with this command: "To find it: <localleader>gv X". It
+  finds the headline while heralds conceal its metadata, and opens the
+  folds around it. See =docs/api-and-formats.org=, "How a message
+  names a headline".

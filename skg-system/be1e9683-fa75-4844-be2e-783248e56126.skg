@@ -1,0 +1,11 @@
+title: Separate investigation from implementation
+pid: be1e9683-fa75-4844-be2e-783248e56126
+body: |2-
+  Before a difficult change, capture only the unresolved facts, proposed
+  invariants, and the test that could disprove the proposal. Within an
+  implementation assignment, once the interface is chosen, stop broadening
+  the investigation and implement that choice. For long work this can be a
+  compact Org note; small work needs no extra artifact.
+
+  Do not run overlapping investigations unless their questions are independent
+  and their deliverables do not require rereading the same code.

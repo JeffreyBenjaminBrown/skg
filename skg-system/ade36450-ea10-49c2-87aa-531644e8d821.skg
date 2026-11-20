@@ -1,0 +1,13 @@
+title: Initialization Instructions
+pid: ade36450-ea10-49c2-87aa-531644e8d821
+body: |2-
+  Upon starting each session, automatically:
+
+  1. Read all files in `coding-advice/` directory to understand project context.
+
+  2. Also read:
+     - `docs/api-and-formats.org` - TCP API specification and data formats
+     - `docs/data-model_technical.org` - graph fields, constraints, and indexes
+     - `docs/glossary.org` - Project terminology and abbreviations
+
+  3. Retain all this information in context for the entire session to ensure consistent adherence to project conventions and understanding of the codebase architecture

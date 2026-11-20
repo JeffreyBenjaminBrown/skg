@@ -1,0 +1,9 @@
+title: How an agent edits them
+pid: 781d43a0-898c-474e-9c87-6c99749bf930
+body: |2-
+  Only in your own worktree: in '/home/ubuntu/host', Jeff's server owns
+  'skg-system/'.
+contains:
+- d3075004-d4e0-4f96-bda3-ee133861adb1
+- 685dc6df-9c0b-40a0-8a9b-1fae96e7ad5d
+- 5ba3c06d-f87c-43ec-b593-16660098e258

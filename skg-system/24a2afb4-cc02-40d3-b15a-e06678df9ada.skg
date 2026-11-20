@@ -1,0 +1,29 @@
+title: C, R, U, D, content origin
+pid: 24a2afb4-cc02-40d3-b15a-e06678df9ada
+body: |2-
+  The sets the pruned change view is computed from: C, the changed
+  nodes; R, the content origins; U, the nodes to extend contentward; D,
+  the deduplicated content origins. *C*, the changed nodes, is the set of changed
+  graphnodes, in two halves: a node is changed *out* when its own file
+  records a change (it is new or deleted, or its text, aliases, extra
+  IDs, flags, home skgrepo or own relationships changed), and *in* when
+  its recorders' files do (its set of containers, mentioners,
+  forkers or hiders changed). A node can be both. A
+  relRepo move puts only the recorder in C, and a change of order alone
+  puts nothing in it. *R*, the content origins, is the set of content
+  origins reached from C by walking containerward through the union of
+  the straddle. A *content origin* is a node with no
+  container, a multiply-contained node, or a member of a rootlike cycle
+  (the stop rule of 'server/prominence.rs'). *U*, the nodes to
+  extend contentward, is R, C and every node on a containerward path
+  from a node of C to an origin. *D*, the deduplicated content origins,
+  the roots of the "all changes" buffer, is what remains of R when each
+  origin, in ID order, is discarded if its own containerward walk within
+  U reaches another origin still kept; of two origins on one cycle,
+  exactly one is kept.
+
+  A user-visible message that must name one of these sets says its long
+  name, then the letter in parentheses, then where the algorithm is
+  described: "the nodes to extend contentward (U; see
+  'docs/diff-view.org', "C, R, U and D", and the module comment of
+  'server/diff_view/pruned_change_view.rs')".

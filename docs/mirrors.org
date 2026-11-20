@@ -1,8 +1,10 @@
+# This file was generated from the skg node with this ID:
+# e6bc021f-1cb8-4ab0-9a5f-53874e60e14b
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
+
 * Fork relationships, substitution, and navigation
 #+date: 2026-09-20
-
 ** The relationship
-
 If =R= forks =N=, =R= is the /forker/ and =N= is the /forkee/.  The
 relationship is stored on =R= as an entry in its =forks= list, which
 a '.skg' file writes under the key =forks=:
@@ -41,9 +43,7 @@ What an owned note may not do, the save and the startup refuse
 ('docs/data-model_technical.org', "Hard validation constraints"):
 fork itself; contain or hide itself; both fork and contain one note;
 or contain a note that forks it.
-
 ** Direct visits are exact
-
 Visiting an ID opens that exact node as the root of a content view:
 from the root homes, its default perspective, the root's own home
 skgrepo decides, and there the node stands as itself (see "Which
@@ -61,9 +61,7 @@ The root's ordinary =K= relationship herald reports its visible
 =forks= facts, and its forks folder shows every mirror of it
 (=C-c l f=; drawn unasked on an editable occurrence with a fork
 partner that is no member of another forks folder).
-
 ** Partner folders in search results
-
 Search hits are raw, write-protected, non-content roots.  In the
 search enrichment, each result N gains, folded, its forks folder
 (the nodes N forks, then the nodes that fork N, then its other
@@ -89,14 +87,10 @@ partners).
 A foreign hit never suppresses another top-level result, although
 visible foreign relatives can occur in the folders: a
 foreign mutual pair that both match shows both.
-
 ** Mirror substitution
-
 Substitution is a recursive-content rendering rule, not a navigation
 rule ('server/dbs/in_rust_graph/mirrors.rs').
-
 *** Mirrors
-
 A /fork/ of a note =N= is a note that forks =N=.  The /mirrors/
 of =N= are =N= and every note joined to it by a path of =forks=
 relationships, followed in either direction, each relationship's
@@ -104,9 +98,7 @@ relRepo and each note's home skgrepo shown by the skgrepo
 restriction.  So two forks of one note are mirrors of each other, a
 note's forkee is one of its mirrors, and a cycle of forks is no
 special case.
-
 *** Which mirror stands
-
 Where =N= stands as content of an editable occurrence in a content
 view, or as a root of it, the refresh shows the mirror of =N= that
 the perspective's skgrepo list ranks first ('mirror_shown').  A
@@ -145,9 +137,7 @@ config declaring =mid=, =base=, =top=, a view drawn from =top= shows
 =D= where =N= occurs; under a skgrepo restriction keeping =top= out,
 it shows =C=, =mid= being declared before =base=; from =base=, =N=
 itself.
-
 *** Perspectives
-
 A view's perspective is one skgrepo, or its root homes, one skgrepo
 per tree.  Until the user chooses a skgrepo, each top-level tree of
 the view is drawn from its root's home skgrepo, the
@@ -224,9 +214,7 @@ member as such of a forks folder), its immediate content children are
 also shown raw.  Substitution resumes at
 the grandchildren.  This one-level rule makes the raw node show its own
 children rather than another mirror's interpretation of them.
-
 *** The just-saved fork buffer
-
 Once an approved save creates fork =K= from original =F=, the buffer that made
 the edit must not continue to show editable =F=: editing it again would request
 another fork.  The post-save update therefore makes one saved-view-only
@@ -250,9 +238,7 @@ the buffer is thereafter registered as rooted at =K= rather than =F=.
 Collateral rerenders do not apply the root exception; their content
 occurrences substitute as every refresh's do.  A later independent direct
 visit to =F= still opens =F= itself, in accordance with the exact-visit rule.
-
 *** The =inPlaceOf= part
-
 A substituted viewnode carries =(inPlaceOf N)=, where =N= is the
 original node for which the displayed viewnode substitutes.  The part
 is load-bearing during save: the viewnode contributes =N= to its parent's
@@ -267,10 +253,8 @@ perspective and the skgrepo restriction.  The check reads the mirrors
 under no skgrepo restriction, so that a part which was honest when
 rendered does not become invalid merely because the skgrepo
 restriction changed.
-
 ** Heralds and reasons for placement
-
-See [[file:heralds.org][the herald legend]] for the full relationship
+See [[./heralds.org][the herald legend]] for the full relationship
 notation. A crucial =ĥ= directly after =K= marks actual substitution at
 this occurrence.
 
@@ -287,11 +271,8 @@ forkee steps only, =(forks out)= where both hold (mutual forks), and
 none otherwise (a sibling fork, say).  A
 node can have ordinary =K= facts without a highlighted birth =K= when
 its placement comes from some other relationship.
-
 ** How fork relationships are created
-
 *** Forking
-
 Editing an editable foreign node and saving requests an implicit fork.
 After confirmation, Skg creates an owned clone which forks the
 foreign original, recording =forks: [N]= once.  It shallow-copies the edited content
@@ -305,9 +286,7 @@ Either gesture is refused on a note you already fork, naming your fork
 of it ('docs/forks.org', "Once forked: the fork operation's guard");
 a second owned fork made otherwise (by a nodeMerge, in a forks
 folder, or in a note's file) is saved.
-
 *** Direct editing and imported data
-
 The forks folder is editable: a member typed there makes its
 viewparent fork it, and a forkee removed from it ends that =forks=
 relationship (a mutual removed from it is hidden too); a forker, or
@@ -315,9 +294,7 @@ another mirror (an indirect member), removed from it is hidden by its
 viewparent (sharing-model.org, "The forks folder: what a note forks,
 and what forks it").  Raw or imported =.skg= data can contain =forks= facts
 too.
-
 ** Merge behavior
-
 When node =A= acquires node =B=, their outbound =forks=
 lists are combined, less any partner that is one of the merged
 node's own IDs.  Duplicate partners keep the more-private
@@ -330,9 +307,7 @@ owned note containing a note it forks, or one that forks it, is
 rejected ('docs/data-model_technical.org', "Hard validation
 constraints").  Two owned notes forking the merged node, or a cycle
 of forks, are no reason to refuse.
-
 ** Deletion and dangling references
-
 Deleting a node removes its primary and extra IDs from the outbound
 relationship lists of owned referencers, including
 =forks=.  Foreign files are not rewritten.  The explicit
@@ -347,13 +322,11 @@ collects =N= for that container's list
 deletion takes the fork out of the graph, not =N= out of the
 container, so the container is not forked, and the rerender draws =N=
 there again. Under an owned container the deletion removes =N= from
-its list too ([[file:./forks.org][forks.org]], "Taking back a fork").
+its list too ([[./forks.org][forks.org]], "Taking back a fork").
 
 A forkee that is an unknown graphnode cannot substitute,
 because there is no node to show.
-
 ** Skgrepo-set behavior
-
 The partner folders, the containerward chain, search grouping, =K=
 relationship counts, and automatic substitution all
 derive their topology from relRepo-gated relationship accessors.
@@ -363,9 +336,7 @@ only when its relRepo and both notes' home skgrepos are unrestricted.
 A relationship outside the skgrepo restriction therefore cannot
 silently select a node which the corresponding folders and heralds
 omit, and a restricted note in the middle of a path cuts it.
-
 *** Other relationships
-
 Initial construction of the default =forksFolder= also asks the
 relRepo-gated accessors, in both directions, whether the note has a
 fork partner ('has_a_fork_partner') before drawing the folder.  A private =forks= relationship between
@@ -392,14 +363,10 @@ problem:
 
 Raw relationship reads in save, merge, deletion, and invariant-checking code
 are intentionally full-graph operations rather than skgrepo-set presentation.
-
 ** Org export
-
 Org export follows the stored, repo-gated =contains= graph.  It does
 not perform interactive mirror substitution.
-
 ** Principal implementation references
-
 - [[file:../server/serve/handlers/single_root_view.rs][exact direct visits]]
 - [[file:../server/dbs/in_rust_graph/mirrors.rs][mirrors, and which one stands]]
 - [[file:../server/dbs/in_rust_graph/fork_rules.rs][what an owned note may not fork, contain or hide]]

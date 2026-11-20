@@ -1,0 +1,10 @@
+title: Which skgrepo the herald names
+pid: 4bb478dc-f9bc-4bfa-8725-c6794b389248
+body: |2-
+  The herald shows the current name of the loaded skgrepo whose remote
+  has the recorded hash, so renaming that skgrepo in a config renames
+  the herald too. Where no remote was recorded, it shows the recorded
+  name if a skgrepo of that name, with no remote either, is loaded.
+  Otherwise it shows the recorded name followed by =?=:
+  =⌂:<jeff-decid/claude-public?>= says no loaded skgrepo is known to
+  be the one recorded.

@@ -1,5 +1,8 @@
-* Privacy telescopes: one node, many privacy levels
+# This file was generated from the skg node with this ID:
+# ae1f8c25-d6a4-490f-bad5-aa04279daf72
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+* Privacy telescopes: one node, many privacy levels
 Skg lets a single node live at several privacy levels at once. The
 mechanism is the *privacy telescope*: same-ID =.skg= files across
 your skgrepos, each file one *telescope section* holding the slice
@@ -9,9 +12,7 @@ same node. (Why "telescope"? Because it extends one section at a
 time: a skgrepo widening to the next privacy level pulls out
 exactly one more section per node, whereas an accordion — the
 term's rejected predecessor — expands uniformly.)
-
 ** The privacy order
-
 Your =skgconfig.toml= lists the skgrepos you own in privacy order,
 most public first (see =api-and-formats.org=). That order is the
 ladder of *privacy levels*. Foreign skgrepos have no level: privacy
@@ -25,9 +26,7 @@ shown or hidden, all at once; they are shown unless you hide them.
 The whole ladder with the foreign skgrepos shown is no skgrepo
 restriction. Screen-sharing with a colleague, you might switch to
 the =public= prefix; alone, back to the most private skgrepo.
-
 ** What lives where
-
 The node's *home* is its most public retained section. It holds the title,
 body, and extra IDs. That the home is the section with the title is
 an invariant rather than a definition: it would be silly to share a
@@ -73,9 +72,7 @@ Hoist does not become a standing permission to display unrelated overPrivateText
 text. Saved and collateral views are rendered in memory and checked
 before their text is streamed or their open-view registry entries are
 changed.
-
 ** Where new relationships land: the sticky-else-default rule
-
 When you save, each relationship keeps the relRepo it already had
 on disk (*sticky*), unless an =(editRequest (relRepo ...))= request explicitly
 names another skgrepo at least as private as the relationship's default. A new
@@ -95,9 +92,7 @@ explanation is a =forks= relationship whose forkee contains the hidden
 node, and stands at the more private of that relationship's relRepo
 and the relRepo of that contains relationship, so a public hide never
 names a private membership.
-
 ** Setting a relationship's skgrepo
-
 =skg-set-relRepo= (=C-c s r=, see =docs/COMMANDS.org=;
 formerly =skg-privatize-relationship=) sets the relRepo of the
 relationship the headline at point represents. It asks the server
@@ -125,9 +120,7 @@ A legacy or hand-authored relationship can already sit /more public/ than its
 default. Such a relationship renders with the atom (it is off-default), saves
 back unchanged, and can be made more private — but never moved still
 more public.
-
 ** What cannot be expressed
-
 Two things are documented inexpressibles, by design:
 
 - *Private links.* A link lives in the body, and the body
@@ -137,9 +130,7 @@ Two things are documented inexpressibles, by design:
 - *Moving a relationship more public than its default.* As above:
   a relationship may move to a more-private skgrepo, never to one
   more public than its default.
-
 ** What leaks, and what repair fixes
-
 A leak is data you intend to share revealing data you intend not to
 share, so only your own files can leak: an owned skgrepo naming a node
 whose home is a more private owned skgrepo is a "leak-shaped
@@ -158,9 +149,7 @@ it; rewriting history is manual.
 pre-telescope data did. It is buried in
 =_burying/not_using/obsolete/migrate-to-telescopes/=; every user now
 starts with telescopes in place.)
-
 ** Ownership and folders
-
 A skgrepo is yours unless its config entry says =foreign = true=;
 no folder name is special, and a foreign entry may sit anywhere in
 the list — see =api-and-formats.org=, "Skgrepos". Only
@@ -181,9 +170,7 @@ receiver folds it as the manifest of the more private one says (the
 one whose own manifest lists the other) and warns at startup, naming
 the node. Foreign skgrepos no manifest chains are different owners'.
 See =api-and-formats.org=, "OTHER_SKGREPO_DEPENDENCIES.toml".
-
 ** Illegal edits
-
 A node belongs to one owner, and only its owner writes it: a save
 never writes into another owner's node (an edit to a foreign node
 forks it). A section of a node in a skgrepo of another owner than its

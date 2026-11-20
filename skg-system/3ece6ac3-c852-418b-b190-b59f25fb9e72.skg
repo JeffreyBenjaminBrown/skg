@@ -1,0 +1,7 @@
+title: 'Each org node can be thought of as having four properties:'
+pid: 3ece6ac3-c852-418b-b190-b59f25fb9e72
+body: |2-
+  level    : int -- represented by the number of leading asterisks
+  title    : string
+  body     : optional string
+  children : list of other org-nodes, often empty

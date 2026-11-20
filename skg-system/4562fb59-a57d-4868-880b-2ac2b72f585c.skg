@@ -1,0 +1,7 @@
+title: '"diff-view: merges"'
+pid: 4562fb59-a57d-4868-880b-2ac2b72f585c
+body: |2-
+  A pruned change view over the nodeMerges since HEAD: its C is each acquiree (a
+  node only the before-graph has, which an after-graph node lists as an
+  extra ID) and its acquirer. The acquiree's text preserver is not in
+  C; it shows as a new member of the acquirer's content.

@@ -1,0 +1,20 @@
+title: The kinds a refresh sees
+pid: ef015f0b-cda0-450e-84cc-ce94eab69a28
+body: |2-
+  A *vognode* stands for a gnid (=Vognode=): an *occurrence*, of a node
+  the truth has, editable or write-protected; a *ghost*, in the diff
+  view only, of a node HEAD has and the worktree lacks; an *unknown
+  viewnode*, of a gnid its viewparent's list names and no node answers to; a
+  *restricted viewnode*, of a node the skgrepo restriction keeps out
+  that a visible record names (a record is a relationship as one
+  node's file states it, in one skgrepo's section, visible when the
+  skgrepo restriction holds that skgrepo), showing nothing of the node but the
+  record's gnid and relRepo. A
+  *descriptor* describes its viewparent: a folder, a property member
+  (an alias, an ID or a flag in its property folder) or a change
+  viewnode. A *tombstone* says only that something stood there, and
+  holds the children of what it replaced. A tombstone whose only
+  children are tombstones stays, as after deleting a node and what it
+  contained: these nested tombstones are by design, and collapsing them
+  was considered and rejected because it could confuse the user. The
+  buffer root holds the roots.

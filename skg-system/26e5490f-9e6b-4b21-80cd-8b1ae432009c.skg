@@ -1,0 +1,14 @@
+title: role tree, and the -ward adjectives
+pid: 26e5490f-9e6b-4b21-80cd-8b1ae432009c
+body: |2-
+  A *role tree* is what a view shows of a node's partners in one role
+  (see "relation, relationship, member, membership, partner"): for the
+  content role, the node's content; for either role of 'forks', the
+  members of the node's forks folder that play that role; for every
+  other role, the members of the node's partner folder of that role,
+  each with its containerward chain. A role, unlike a relation, is directed, so a
+  role tree goes one way.
+
+  The adjectives containerward, contentward, mentionerward,
+  forkerward, forkeeward, and so on name the role a role tree
+  follows: a containerward role tree follows the container role.

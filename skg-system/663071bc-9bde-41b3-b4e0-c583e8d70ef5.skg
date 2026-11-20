@@ -1,0 +1,12 @@
+title: how to do it
+pid: 663071bc-9bde-41b3-b4e0-c583e8d70ef5
+body: |2-
+  Open a metadata buffer view of the node ('skg-view-metadata').
+  Go to the node that specifies its skgrepo --
+  it's the only child of a node that says simply 'skgrepo'.
+  "Rotate" the value, using shift-left or shift-right,
+  until it shows the skgrepo where you want the node to be.
+  Save that work and exit the metadata view (C-c C-c).
+  Now save the buffer.
+  The buffer will be rebuilt,
+  and the skgrepo change will now be visible.

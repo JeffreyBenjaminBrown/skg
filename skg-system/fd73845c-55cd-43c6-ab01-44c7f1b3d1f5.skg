@@ -1,0 +1,15 @@
+title: 'Tenses: the present is for the code as it stands'
+pid: fd73845c-55cd-43c6-ab01-44c7f1b3d1f5
+body: |2-
+  In a plan, the present tense refers only to the code as it is now,
+  before the plan runs: "the walk reads a hash set", "the printer
+  quotes nothing". "It has been like this since plan 13" is fine for the
+  same state. The past ("it was broken") refers to states before the
+  current one. Everything the plan asks for is future, and says so with
+  "will", "should", "would", etc.: "the walk will sort its containers", "a
+  removed member should be editable there". If that repeats those two words a
+  lot, so be it. The reason: a reviewer reading "'in_folder' is renamed
+  'parent_is_a_folder'" cannot tell a report from an instruction, and in
+  the 16_review round of the diff view that cost a question per item.
+  The same rule holds for a review's proposals: what the code does now
+  is present, what you propose is "would" or "should".

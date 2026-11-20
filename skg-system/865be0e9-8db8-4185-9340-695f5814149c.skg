@@ -1,0 +1,10 @@
+title: Mirrors
+pid: 865be0e9-8db8-4185-9340-695f5814149c
+body: |2-
+  A /fork/ of a note =N= is a note that forks =N=.  The /mirrors/
+  of =N= are =N= and every note joined to it by a path of =forks=
+  relationships, followed in either direction, each relationship's
+  relRepo and each note's home skgrepo shown by the skgrepo
+  restriction.  So two forks of one note are mirrors of each other, a
+  note's forkee is one of its mirrors, and a cycle of forks is no
+  special case.

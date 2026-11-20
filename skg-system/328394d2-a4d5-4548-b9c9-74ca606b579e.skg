@@ -1,0 +1,9 @@
+title: graph straddle, before-graph, after-graph
+pid: 328394d2-a4d5-4548-b9c9-74ca606b579e
+body: |2-
+  The *graph straddle* ('GraphStraddle { before, after }',
+  'server/graph_straddle/') is what the diff view compares. A straddle stands
+  with one foot in the committed graph and one in the live graph. The
+  *before-graph* is an in-Rust graph built from each owned skgrepo at
+  HEAD (each foreign skgrepo at its worktree); the *after-graph* is the
+  live graph.

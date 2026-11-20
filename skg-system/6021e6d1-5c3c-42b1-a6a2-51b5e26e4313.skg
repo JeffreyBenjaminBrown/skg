@@ -1,0 +1,8 @@
+title: start the client
+pid: 6021e6d1-5c3c-42b1-a6a2-51b5e26e4313
+body: |2-
+  #+begin_src elisp
+    (progn (load-file "../elisp/skg-reload.el")
+           (skg-reload)
+           (skg-client-init "../data/jeff/skgconfig.toml"))
+  #+end_src

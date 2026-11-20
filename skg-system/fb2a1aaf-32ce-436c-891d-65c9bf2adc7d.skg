@@ -1,0 +1,7 @@
+title: content position
+pid: fb2a1aaf-32ce-436c-891d-65c9bf2adc7d
+body: |2-
+  A viewnode is in *content position* when its viewparent is the buffer
+  root, an occurrence, or a ghost that is itself in content position
+  ('in_content_position'). A ghost in
+  content position holds its old content under it.

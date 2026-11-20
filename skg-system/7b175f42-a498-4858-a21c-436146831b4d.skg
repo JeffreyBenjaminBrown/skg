@@ -1,0 +1,7 @@
+title: An 'm' prefix
+pid: 7b175f42-a498-4858-a21c-436146831b4d
+body: |2-
+  In Haskell, 'm' is sometimes prefixed to a word to indicate 'maybe'.
+  The Rust term for Maybe is Optional, but I've used the Haskell idiom.
+  For any function with a name like this, if its meaning is unclear,
+  the type signature should clarify what's going on.

@@ -1,0 +1,24 @@
+title: '"child" and "parent"'
+pid: a67e35cc-4a08-494b-80cf-cd4e33995fb1
+body: |2-
+  They are shorthand for 'viewchild' and 'viewparent' (likewise
+  viewancestor, viewdescendant). Code may use the short forms, since it
+  almost always handles one tree at a time. Docs should spell out the
+  long forms wherever a reader might mistake a child for content, which
+  in user-facing docs is almost everywhere.
+
+  There are two concepts of node in skg: graphnode and viewnode.
+  Viewnodes are nodes in a view, and some of them correspond to nodes in the graph,
+  but some of them don't -- they describe their parent,
+  or the relationship between their parent and their children,
+  or maybe something else.
+
+  The Skg graph contains a few (currently five) formal relationships -- =contains=,
+  =linksTo=, etc. In the graph, there is no concept of parent or child;
+  those are only meaningful in a view.
+  Where the code says "child" or "parent", it means the relationship between viewnodes
+  -- e.g., in Emacs, the relationship between headlines in an Org buffer
+  -- and might or might not correspond to a graph relation.
+
+  For one example, see the discussion of alias nodes in
+  [[id:de5dcb74-4e1e-49cb-ac34-ead7542aaee6][the architecture documentation]].

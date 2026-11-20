@@ -1,0 +1,25 @@
+title: One agent per slice
+pid: 2b60a179-60a8-4099-982d-ad9d513e9ac7
+body: |2-
+  Launch one Opus agent per slice, at high effort, and wait for
+  its report before launching the next. Its brief is the agent's
+  only context; it does not see the discussion that produced the
+  plan and should not need to. The brief holds:
+  - the runner's prompt: the plan's path, the slice number, the
+    progress file, the commit rule;
+  - a "context carried forward" paragraph the orchestrator writes:
+    what earlier slices built that this one relies on, names that
+    changed since the plan was written, pitfalls found since;
+  - the suites to run, each named with its command, with the
+    instruction to serialize full runs (two at once collide on
+    fixed temp paths and the Tantivy writer). List every suite
+    whose assertions could depend on the slice's behavior, not
+    only those whose code the slice touches: the AI tool's tests
+    assert the server's behavior, and plan 4's briefs left them
+    out, so one failed unseen for a day;
+  - the tracked files that are dirty before the launch and whose
+    they are, so that the agent neither commits Jeff's edits nor
+    takes them for a stopped slice's leftovers;
+  - where the record goes: the progress file's top-level headline
+    for this plan, one subheadline per slice.
+  Note the launch time before launching, for the cost record.

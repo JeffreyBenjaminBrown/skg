@@ -1,0 +1,34 @@
+title: '<localleader>fi : :SkgSearchInteractive (search-interactive)'
+pid: 5f4a538b-39e6-4448-812e-9999edfc4349
+body: |2-
+  Same as Search, but after the search terms it prompts:
+
+  : Type a character for each search option: (r)egex, (b)ody, (t)antivy syntax, (h)elp:
+
+  Type one character for each option you want, in any order,
+  then press Enter. An empty answer uses the same conservative
+  defaults as ':SkgSearch'. Unrecognized characters are ignored.
+  Typing =h= opens this documentation (docs/COMMANDS-nvim.org,
+  falling back to docs/COMMANDS.org if that file is missing), with
+  all folds opened and the cursor searched onto this headline -- and
+  abandons the search. If the headline can't be found the whole file
+  is still shown, with a notice that the search failed.
+
+  - =r= (*regex*) — per-token regex instead of phrase search.
+    Bypasses the query parser; each whitespace-separated piece
+    is handed to Tantivy's 'RegexQuery'.
+  - =b= (*body*) — also search the body field (titles are
+    always searched).
+  - =t= (*tantivy syntax*) — Tantivy phrase and operator syntax
+    (AND/OR/NOT/+/-). In non-regex mode this passes through
+    Tantivy's QueryParser (phrase quotes, grouping, field: all
+    work; intra-word operator chars get escaped so =foo:bar=
+    remains findable). In regex mode, AND / OR / NOT / +foo /
+    -bar combine the per-piece RegexQueries at the document
+    level; phrase syntax does not apply there. See the regex=true
+    section below.
+contains:
+- 07e2b2c9-339f-412b-835b-c79a81998c53
+- a7385891-a864-41a2-a2ba-9df4272c72b7
+- df3c1e9e-8af7-45d2-8882-3070a034ce84
+- 46d5c576-de77-41c4-9fd1-4224c2674c13

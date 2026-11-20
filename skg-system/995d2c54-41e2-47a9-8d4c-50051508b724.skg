@@ -1,0 +1,14 @@
+title: 'PITFALL: Don''t make something ''editable'' by directly editing its metadata.'
+pid: 995d2c54-41e2-47a9-8d4c-50051508b724
+body: |2-
+  Instead, use 'SetEditable' (<localleader>se), below.
+  That's because Skg has to make other occurrences of it
+  (in this same buffer -- and maybe in the future other buffers too)
+  write-protected. That's because a buffer can only be saved
+  if it has at most one editable occurrence of a node.
+  Otherwise, two editable nodes could contradict each other.
+
+  Making a node write-protected is likewise a request
+  ('RequestWriteProtected' (<localleader>sw), below), which the server
+  performs: the children of the write-protected occurrence then claim
+  nothing, since a write-protected occurrence has no content.

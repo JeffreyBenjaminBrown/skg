@@ -1,0 +1,23 @@
+title: viewnode ID, vnid, viewforest id
+pid: 39e4afc9-505f-49bc-8533-b523469b6e6f
+body: |2-
+  A *viewnode ID* identifies one viewnode within one buffer, for the
+  life of the buffer: the atom =(vnid X)=, X one or more lowercase
+  letters and digits, that begins every viewnode's metadata
+  ('docs/api-and-formats.org', "The metadata headers"). "vnid" is the
+  wire's word; prose and messages say "viewnode ID", and code
+  'ViewnodeId' and 'viewnode_id'. A message names a headline by its
+  viewnode ID, which =C-c g v= finds (see "how a message names a
+  headline"). The view gives one to each viewnode that lacks one at
+  the end of a refresh and never reuses one, so a viewnode ID that
+  reappears after a cut and paste names the same viewnode moved. A
+  parsed headline carrying a viewnode ID the view does not know (typed
+  by hand, or brought back by an old copy of the buffer's text) loses
+  it and gets a fresh one. A switch of the skgrepo restriction keeps the viewnode ID
+  of everything the new skgrepo restriction still shows. The view's
+  'ViewnodeIdRecord' ('server/types/views_state.rs') holds the counter
+  and the viewnode IDs of the viewforest as last rendered.
+
+  A *viewforest id* names a whole buffer, not one viewnode:
+  'ViewforestId' in code, the key =view-id= on the wire, and "view ID"
+  in the clients' prose (see "view, buffer, viewforest").

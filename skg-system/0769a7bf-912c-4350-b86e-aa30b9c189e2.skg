@@ -1,0 +1,5 @@
+title: Beware race conditions across tests.
+pid: 0769a7bf-912c-4350-b86e-aa30b9c189e2
+body: |2-
+  Tests are executed in parallel,
+  so they must not share mutable fixture or index directories.

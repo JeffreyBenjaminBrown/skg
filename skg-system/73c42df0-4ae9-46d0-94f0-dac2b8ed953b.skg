@@ -1,0 +1,7 @@
+title: Schedule the full post-mortem at milestones, not at the end of each plan
+pid: 73c42df0-4ae9-46d0-94f0-dac2b8ed953b
+body: |2-
+  Structure (where a feature should live, what to reify) is only
+  visible once the behavior has settled. Ask for the full method of
+  'code-reviews.org' when a feature's behavior has stopped changing,
+  and the short check otherwise.

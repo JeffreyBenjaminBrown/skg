@@ -1,0 +1,10 @@
+title: what C-c s r refuses
+pid: 92759638-d534-480d-a259-5f79f851314c
+body: |2-
+  It writes nothing, and says why, where the headline at point
+  represents no relationship it can set.
+contains:
+- 49008068-1cbd-4a1b-82e3-63d06211087b
+- 87770b9c-51e2-4ec6-8940-192e29f187d2
+- 90d28057-c6cb-41e8-91d3-bfd272838f7e
+- 4441bc00-730e-4022-ae04-51578a09d1e4

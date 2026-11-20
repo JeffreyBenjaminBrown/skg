@@ -1,0 +1,161 @@
+title: The metadata headers
+pid: 4434565e-a44d-4499-97e2-8faf88086921
+body: |2-
+  Most org headlines in the client will have a 'metadata header',
+  consisting of some bare values and some key-value pairs
+  separated by whitespace. Each kv pair is wrapped in parens: (key value).
+  The whole collection is wrapped in (skg ...).
+  This metadata appears right after the org bullet and a whitespace,
+  and right before another whitespace and the node's title.
+
+  The metadata grammar (which keys are recognized and how they're
+  parsed) lives in =server/serve/parse_metadata_sexp.rs=. The
+  in-memory types those keys correspond to are in
+  =server/types/viewnode.rs= (=Viewnode=, =ViewnodeKind=, =Vognode=,
+  =Folder=, =PropertyMember=, the diff view's =ChangeViewnode=, and its
+  =ChangeFacts= and =ProcessedRequest=, which every =Viewnode= carries).
+
+  Every headline has one shape:
+  #+begin_example
+  (skg (vnid X) [focused] [folded] [bodyFolded]
+       KIND DECLARED...
+       [(view FACT...)] [(diff FACT...)])
+  #+end_example
+  The parts are of two classes. The declared parts are what the client
+  is responsible for and the save reads: the kind, the viewnode ID, the
+  position atoms, =(gnid ID)=, =(skgRepos ...)=, =noClaim=,
+  =writeProtected=, =contentInPart=, =(inPlaceOf ID)=, =(viewRequests
+  ...)= and =(editRequest ...)=. The derived facts are what the server computes
+  at every rendering and nobody reads back: everything in =(view ...)=
+  (see "Stats metadata: the view facts" above) and in =(diff ...)=
+  (see "Metadata of the diff view" below). The parser skips both forms
+  whole. KIND is a bare atom, but five kinds carry their parameter in a
+  small form headed by the kind: =(flag F)=, =(oldText ASPECT)=,
+  =(homeSkgrepoMove ...)=, =(relRepoMove ...)= and =(changesetMarker
+  KIND)=. A headline whose metadata names no kind is a node: a client
+  writes =(skg folded)= on a headline that has no metadata yet. Each kind
+  takes only its own declared parts:
+  #+begin_example
+  node [(gnid ID)] [(skgRepos [(nodeRepo R)] [(relRepo R)])]
+       [noClaim] [writeProtected] [contentInPart] [(inPlaceOf ID)]
+       [(editRequest [REQUEST] [PROCESSED])] [(viewRequests ...)]
+       [(view ...)] [(diff ...)]
+  ghost (gnid ID) (skgRepos (nodeRepo R)) [noClaim]
+        [(editRequest [restoreNode] [PROCESSED])]
+        [(view ...)] [(diff ...)]
+  unknown (gnid ID) [(skgRepos (relRepo R))] [noClaim]
+          [(editRequest [(relRepo R)] [PROCESSED])] [(diff ...)]
+  restricted (gnid ID) [(skgRepos (relRepo R))] [noClaim]
+             [(editRequest [(relRepo R)] [PROCESSED])] [(diff ...)]
+  alias [(skgRepos (relRepo R))] [noClaim]
+        [(editRequest [(relRepo R)] [PROCESSED])] [(view ...)] [(diff ...)]
+  id [noClaim] [(editRequest PROCESSED)] [(view ...)] [(diff ...)]
+  (flag F) [(editRequest PROCESSED)] [(view ...)] [(diff ...)]
+  (oldText ASPECT), (homeSkgrepoMove ...), (relRepoMove ...),
+  (changesetMarker KIND): [(editRequest PROCESSED)] [(diff ...)]
+  bodyDiff, tombstone, forestRoot, a folder atom
+  #+end_example
+  where PROCESSED is =(processed OBJECT...)= or =(unprocessed OBJECT...)= (see
+  "Metadata of the diff view"). =(gnid ID)= names the node a node, a
+  ghost, an unknown viewnode or a restricted viewnode (=restricted=, see
+  "Restricted-skgrepo nodes") stands for, and =(skgRepos (nodeRepo REPO)
+  [(relRepo REPO)])= its home skgrepo and the skgrepo recording its
+  relationship to its viewparent, the relRepo written only when it
+  differs from the default (a ghost has no relRepo; an unknown viewnode,
+  a restricted viewnode and an alias have only one). A restricted viewnode
+  carries no title, and text typed on its line is refused, as on an
+  unknown viewnode's. =noClaim= on a node, a ghost, an alias, an ID, an
+  unknown viewnode or a restricted viewnode says the save does not read it as a member of its
+  viewparent's list; a claiming child carries nothing, and so does every
+  child of a viewparent whose claims the save does not read. A removed
+  alias and a dangling partner the worktree lost (an unknown viewnode carrying
+  =(rel removed)=) carry =noClaim= where their viewparent's claims are
+  read, so that the save, which skips the =(diff ...)= saying they were
+  lost, leaves them out of the list.
+  =(editRequest ...)= holds at most two requests: one edit request and
+  one processed request, written after it.
+
+  Every viewnode's metadata starts with its viewnode ID, =(vnid X)=, where
+  X is one or more lowercase letters and digits: =(skg (vnid 0a) node
+  (gnid 1) (skgRepos (nodeRepo main)))=. It identifies the viewnode within its buffer for the
+  life of the buffer. The server assigns one, from the view's counter in
+  base 36 (two characters at least, skipping any spelled like a number,
+  such as =05= or =1e5=), to every viewnode that lacks one at the end of a
+  refresh, and while it holds the view never reassigns or reuses one: a headline keeps the
+  viewnode ID it carried through a save and a rerender, through a cut
+  and paste, and through a switch of the skgrepo restriction that leaves it standing. A
+  headline typed without one gets one; of two headlines carrying one
+  viewnode ID, the first in buffer order keeps it and the second (a copy)
+  gets a fresh one. What else a saved headline keeps depends on whether
+  the server holds the view the save names (it holds a view per
+  connection, from the view's opening or a save of it until the view is
+  closed or the connection ends). For a view it holds, a headline carrying one the
+  view does not know (typed by hand, or brought back by an old copy of
+  the buffer's text) gets a fresh one too, and the counter does not move
+  past it. For a view it does not hold (a save on a new connection, or
+  after a server restart), the buffer's own viewnode IDs are the view's:
+  every headline keeps the one it carries, and the counter starts past
+  the highest of them, so a fresh one is never one the buffer carries
+  (though it can be one a headline removed before the save carried).
+  Such a buffer may carry none past =1y2p0ij32e8e7= (half the counter's
+  range, 'LARGEST_CARRIED_VIEWNODE_ID_COUNTER'), which leaves the
+  counter room: a save of one carrying a larger ID (one typed by hand)
+  is refused, naming it, and nothing is written. A buffer of the diff
+  view is re-rendered as one only when the server holds it as one, or
+  the save names its buffer ("Save buffer", =diff-view-buffer=).
+  The clients show nothing for it and save it back untouched. The view's
+  record of its viewnode IDs, with the counter and the viewnode IDs of
+  the viewforest as last rendered, is 'ViewnodeIdRecord' in
+  =server/types/views_state.rs=.
+
+  The parser refuses, with a message naming the grammar, the retired
+  spellings: =(node ...)=, =(ghost ...)= and =(unknown ...)= as forms,
+  =(deleted ...)=, =(historical ...)=, =(id ID)=, =(repo REPO)=, a
+  top-level =(relRepo REPO)=, =(FOLDER changed)=, =(rels ...)=,
+  =(viewStats ...)=, =omittedBody= or the old home skgrepo herald
+  outside =(view ...)=, =(readyRequest ...)=, =(unreadyRequest ...)=,
+  and the old atoms of a child claiming nothing and of a restricted
+  node's retired placeholder ('parse_metadata_sexp.rs' names each).
+
+  Metadata is not WYSIWYG; its appearance in the client
+  is determined by =elisp/heralds-minor-mode.el=, whose rule table is
+  served by Rust (see "Herald rules" above; the table lives in
+  =server/heralds.rs=).
+
+  Partner folders are represented in Rust as
+  =ViewnodeKind::Folder (Folder)=, but their external metadata
+  remains the established bare non-vognode atom:
+  =forksFolder=,
+  =hiderFolder=, =hiddenFolder=, =integratedElsewhereFolder=,
+  =hiddenInForkPartnerFolder=, =hiddenByForkerFolder=,
+  =hiddenOutsideOfForkPartnersFolder=, =containerFolder=, =mentionerFolder=,
+  or, in the diff view only, =acquiredByFolder= or =acquiredFolder=;
+  and, outside the diff view, =illegalEditFolder=.
+
+  An =illegalEditFolder= stands first under an occurrence of a foreign
+  node into which one of the user's skgrepos writes a section: an
+  illegal edit to a foreign node ('IllegalEdit'; =docs/telescopes.org=,
+  "Illegal edits"). The server draws it at every refresh while the
+  graph holds such a section in a skgrepo the skgrepo restriction
+  shows, and removes it otherwise. Its headline text is the section's
+  title, its body the section's body (several sections' joined), and its
+  children the section's =contains= members, write-protected. It is
+  write-protected and save-inert: the parser keeps its text only for the
+  refresh to replace, and a save reads nothing in it. Herald: =☮ ILLEGAL
+  EDIT TO FOREIGN NODE=, in the message style.
+
+  A tombstone is written =(skg (vnid X) tombstone)=: it has
+  no ID, no change facts and no title (the parser discards text typed on
+  its line), and holds only what stands below it. The refresh makes one
+  of a headline that can stand where it is for nothing: an occurrence
+  whose node a save deleted (in the diff view, its ghost instead, when
+  HEAD has the node) or the skgrepo restriction keeps out where no
+  visible record names it, a descriptor
+  whose position its kind forbids, a change viewnode whose change is
+  gone, an empty folder nothing can be added to, a ghost on request.
+  The refresh prunes it once it is childless, a view root included, so a
+  buffer may end with no headlines (the glossary's "tombstone,
+  entombstone"). Herald "something stood here".
+contains:
+- 1f2d6cad-de82-4ed6-8425-6650515fea7d
+- 31644a79-ec42-4a40-a005-1549c8ccb763

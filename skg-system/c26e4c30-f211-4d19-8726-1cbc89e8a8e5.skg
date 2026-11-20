@@ -1,0 +1,11 @@
+title: Mirror substitution
+pid: c26e4c30-f211-4d19-8726-1cbc89e8a8e5
+body: |2-
+  Substitution is a recursive-content rendering rule, not a navigation
+  rule ('server/dbs/in_rust_graph/mirrors.rs').
+contains:
+- 865be0e9-8db8-4185-9340-695f5814149c
+- 7313adc5-c0af-4a75-9b69-3dfab86c61b8
+- a9656c26-0e94-4a42-816f-dcf5082f2f13
+- c6355100-0ed1-47c9-b44d-3e24780cee34
+- a4cd9fae-7514-4481-8996-6156e596284c

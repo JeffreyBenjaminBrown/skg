@@ -1,0 +1,25 @@
+title: Illegal edits
+pid: a1a5ba5b-eb49-454c-92e9-66baee095763
+body: |2-
+  A node belongs to one owner, and only its owner writes it: a save
+  never writes into another owner's node (an edit to a foreign node
+  forks it). A section of a node in a skgrepo of another owner than its
+  home's, which only a hand-written file can make, is therefore an
+  *illegal edit to a foreign node*, not part of the node. Which section
+  is the node: where your skgrepos and a foreign one share a PID, the
+  foreign one, since only you can have written into another's node here;
+  where two foreign owners' skgrepos share one, the owner of the one
+  listed first in the config.
+
+  The server reports each at startup, naming the node and the skgrepo
+  holding the illegal section ("Server warnings" in
+  =api-and-formats.org=; the per-node report is
+  =telescope-warnings.org=). It never edits the file. Beyond that:
+  - An illegal section in one of your skgrepos — one you wrote into
+    someone else's node — is shown to you alone, under every occurrence
+    of the node, as a child headline heralded *ILLEGAL EDIT TO FOREIGN
+    NODE*, holding its title, body and what it contains
+    (=illegalEditFolder=, write-protected and never saved). It is no
+    part of the node: the node's owner, and everyone else, does not see
+    it. Move what it says into a node of your own, and delete the file.
+  - An illegal section in a foreign skgrepo is ignored.

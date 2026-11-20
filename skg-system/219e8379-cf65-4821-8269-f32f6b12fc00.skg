@@ -1,0 +1,45 @@
+title: relation, relationship, member, membership, partner
+pid: 219e8379-cf65-4821-8269-f32f6b12fc00
+body: |2-
+  As in TypeDB, a *relation* is a kind of relationship: =contains=,
+  =linksTo=, =forks=, =hides=. Each names its two roles:
+  container contains content, mentioner linksTo mentioned, forker forks
+  forkee, hider hides hidden. A forks B says two things: A shows
+  B's content that A neither contains nor hides, nor the user keeps in
+  another note of theirs (see "forkee as such" and "integrated"), and A
+  and B are mirrors (see "mirror"). =hides= means
+  "hides from its forks", from every member of its forks folder: the
+  hider keeps the hidden node out of what it shows of every member its
+  forks folder shows, a note it forks, one forking it, or an indirect
+  member, that it does not hide
+  ('forks_folder_members_shown' in 'server/refresh/goal.rs'; see "the forks
+  folder"). A member that contains the hidden node *explains* the hide:
+  the view draws it there, under that member, and a hide no member
+  explains stands in the hidden-outside folder (see "compound partner
+  folder"). The save's inference of hides from removals, the edits of
+  the hidden-outside folder, a nodeMerge and the hide report all read
+  the same members. The floor of a new
+  hide's relRepo ('hide_skgrepo' in
+  'server/from_text/supplement_from_disk.rs') asks another question,
+  of records rather than of a view: whose readers can see why the
+  hider hides the node. So it counts a wider set, the *partners on
+  record*: every fork partner the graph has, either way, whatever the
+  skgrepo restriction, a forker the hider hides included, that
+  contains the hidden node; the hide is no more public than the most
+  public such pair of records (the =forks= record and the =contains=
+  record). A forker the hider hides explains no hide, but is a partner
+  on record. A *relationship* is one instance of a relation: this
+  node contains that one. (Graph theory would call it an edge; we don't,
+  because the word is opaque to newcomers.)
+
+  Either end of a relationship is the other's *partner*. One of the
+  two records the relationship in its file (see "recorder, carrier");
+  the other is a *member* of the recorder's list. In a view, the
+  children of an occurrence or a folder are its *members* too, those
+  of one monomorphic list: an occurrence's content, or a folder's
+  partners on one side of some relation with the folder's viewparent.
+  A property folder's members are its *property members*: aliases, IDs
+  or flags ('PropertyMember' in code).
+
+  A *membership* is the relationship that causes a node to be drawn
+  as a member of a list or folder; the member is the node.

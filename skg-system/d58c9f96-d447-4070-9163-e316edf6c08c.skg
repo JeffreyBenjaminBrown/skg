@@ -1,0 +1,18 @@
+title: deleted and new nodes
+pid: d58c9f96-d447-4070-9163-e316edf6c08c
+body: |2-
+  A deleted node is shown as its ghost, written 'ghost (gnid ID)
+  (skgRepos (nodeRepo REPO)) ...': write-protected,
+  with HEAD's title and body, under each former container. Its old
+  content stands beneath it, recursing into deleted members. Its
+  existence is one leaf. An acquiree's ghost holds a derived,
+  save-inert folder "it was acquired by" with its acquirer, and the
+  acquirer holds "it acquired" with the ghosts of its acquirees. A new
+  node is an ordinary editable node with ∃+; its existence is one leaf.
+
+  A ghost claims membership only where its parent's worktree list
+  still names its gnid (a dangling reference to a node HEAD has): it
+  carries no 'noClaim' there, and the save keeps its gnid in the list
+  as it keeps an unknown viewnode's ('traverse.rs'). Anywhere else under an
+  editable parent it claims nothing ('noClaim'), and contributes
+  nothing to the save.

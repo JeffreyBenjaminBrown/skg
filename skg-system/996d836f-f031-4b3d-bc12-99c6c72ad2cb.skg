@@ -1,0 +1,14 @@
+title: Editability in the diff view
+pid: 996d836f-f031-4b3d-bc12-99c6c72ad2cb
+body: |2-
+  The diff view follows the rule that decides which occurrence is
+  editable in any view -- one editable occurrence per node, the first
+  the refresh draws where its parent is editable content, the
+  editable-view request and the node budget, described in the module
+  comment of 'server/refresh/editability.rs' -- with these deviations.
+contains:
+- 3593475c-0bf1-424e-a6d2-c65fb90434bb
+- e1f27aa5-a3d9-49e3-b7c6-8a5b0948094f
+- 8d0b3dc9-f5a5-4190-9d5d-104827a11e90
+- fd486fc0-dbbb-4035-9d02-791686e6609a
+- e3dbf289-2fae-4cc7-9ec4-a7420c388f47

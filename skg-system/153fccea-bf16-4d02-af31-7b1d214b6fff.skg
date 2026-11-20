@@ -1,0 +1,17 @@
+title: Link annotations
+pid: 153fccea-bf16-4d02-af31-7b1d214b6fff
+body: |2-
+  The current buffer can display a suffix after each literal
+  ='[[id:ID][LABEL]]'= link with the target's home skgrepo abbreviation.
+  Use 'skg-toggle-repo-overlay-on-links' (=C-c v L=) in Emacs or
+  ':SkgToggleRepoOverlayOnLinks' (=<localleader>vL=) in Neovim.
+  Suffixes start off and the toggle is local to the buffer. A resolved
+  target shows its skgrepo, for example =[⌂:pub]=. Extra IDs resolve to
+  their target's home skgrepo. =[⌂:restricted]=, =[⌂:…]= and
+  =[⌂:lookup failed]= distinguish restricted, pending and lookup-failed
+  targets, and reveal no skgrepo name. A dangling link gets no suffix.
+
+  Even with suffixes off, the label of a link confirmed dangling in the
+  current graph is ugly and underlined. Restricted or still unknown
+  targets are not marked broken. These display-only annotations do not
+  change link text, save contents, or exact-ID navigation.

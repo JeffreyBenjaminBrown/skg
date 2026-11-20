@@ -1,0 +1,5 @@
+title: '<localleader>mnP : :SkgMarkNodeProcessedContentward'
+pid: fa1e2f14-7ecd-47b6-ba57-767a1e3d5e3c
+body: |2-
+  As <localleader>mnp, on the subtree, new nodes walked contentward
+  (see the preamble). (Emacs: C-u C-c m n p.)

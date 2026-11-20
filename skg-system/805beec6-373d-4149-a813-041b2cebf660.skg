@@ -1,0 +1,9 @@
+title: Investigating an unknown graphnode
+pid: 805beec6-373d-4149-a813-041b2cebf660
+body: |2-
+  An unknown viewnode stands for an unknown graphnode: an ID nothing
+  in the graph answers to.
+  C-c t r ('skg-investigate-unknown-node') asks the server what git
+  history knows of that unknown graphnode: when it was last present, the commit it vanished
+  at, its title and relations then, and what referred to it (the API
+  doc's "Investigate unknown node").

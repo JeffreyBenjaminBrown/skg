@@ -1,0 +1,7 @@
+title: the new, easier way
+pid: 90bc6838-cd68-4df2-b983-222032c7ea21
+body: |2-
+  Run 'skg-set-merge-request' from the acquirer
+  and enter the acquiree.
+  The acquiree can be a link or a raw ID;
+  see 'skg-paste-link' and similar commands.

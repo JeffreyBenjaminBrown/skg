@@ -1,0 +1,10 @@
+title: One can request a 'containerward path view' at an orgnode.
+pid: 93993367-ff2c-4a41-84b1-0b80d4311c03
+body: |2-
+  This inserts the node's container as its *child*
+  (reversing the usual relationship),
+  and then that thing's container as its child, etc.,
+  recursing until it finds a cycle, a fork,
+  or something with no container (a root).
+  If it finds a cycle or a fork, that becomes the last thing
+  displayed in the path.

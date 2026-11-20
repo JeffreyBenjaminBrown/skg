@@ -1,0 +1,10 @@
+title: '<localleader>rC : :SkgStageAndCommitEverything'
+pid: ae5065fe-9312-4b62-88ff-1656300e6c8a
+body: |2-
+  Commits every changed node of the owned skgrepos, processed or not,
+  with a message written in the same buffer as <localleader>rc's, by
+  the same commit, so nothing waits. If some changed node is not
+  processed, it first shows the processed summary and proceeds only if
+  you type the word "yes"; any other answer, or an interrupt, leaves
+  everything as it was and says "Not committed; your message is kept in
+  skg://commit-message". (Emacs: C-c r C.)

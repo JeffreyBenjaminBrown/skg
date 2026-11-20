@@ -1,0 +1,10 @@
+title: how session-lifetime stores are updated
+pid: 9c9dcfd5-ca03-43ef-bcd6-c1b77625a82a
+body: |2-
+  The save pipeline collects =RepoMove= records alongside the
+  ordinary =NodeInstruction= saves and deletes. The applied
+  order is:
+contains:
+- 2171ff4a-d19f-4992-82d5-3a96a870c6b8
+- 54ed2471-4ea5-4302-b73a-bb8e5b0101d3
+- 43bb9505-dc61-4e52-b028-4491345ec5e4

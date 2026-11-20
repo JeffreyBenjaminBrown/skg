@@ -1,0 +1,15 @@
+title: '"diff-view: skgrepo changes"'
+pid: c84bbaed-dcf2-4c87-9f06-a5d42d1f7c02
+body: |2-
+  A pruned change view over the skgrepo moves
+  ('prunedChangeView_sets_for_skgrepo_changes'):
+  its C is the recorders of the change-forest leaves whose aspect is
+  the home skgrepo or the relRepo, that is, the nodes whose home skgrepo
+  moved and the recorders of the relationships whose relRepo moved. A
+  node of that C is shown as in any buffer, with all of its changes.
+  The processed summary counts the whole changeset whatever buffer is open;
+  only the count of changes not editable in the buffer depends on what
+  this buffer shows. In this buffer each
+  moved vognode's own heralds also read "-OLD +NEW", and "Δ⌂=a" when
+  the nearest moved vognode ancestor (a, the viewparent; b, the
+  grandparent; ...) moved the same way ('set_homeSkgrepoMove_facts_in_viewforest').

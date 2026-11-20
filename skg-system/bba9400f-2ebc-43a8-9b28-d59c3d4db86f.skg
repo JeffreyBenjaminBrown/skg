@@ -1,0 +1,7 @@
+title: 'C-c r n u : skg-diffView-goto-next-unprocessed-change'
+pid: bba9400f-2ebc-43a8-9b28-d59c3d4db86f
+body: |2-
+  The same, visiting only headlines with change facts that are not
+  processed: a headline counts as processed when every change it names
+  is marked. Past the last one it
+  says "No further unprocessed change".

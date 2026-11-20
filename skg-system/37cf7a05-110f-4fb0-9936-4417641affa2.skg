@@ -1,0 +1,34 @@
+title: restricted viewnode
+pid: 37cf7a05-110f-4fb0-9936-4417641affa2
+body: |2-
+  A *restricted viewnode* (a term of plan 10; on the wire =restricted
+  (gnid ID) [(skgRepos (relRepo REPO))] [noClaim] [(editRequest
+  ...)]=) is the headline standing for a graphnode the
+  skgrepo restriction keeps out (a restricted graphnode; see "record,
+  restricted, visible"). It stands where a visible record names a
+  restricted graphnode, or where a view opened before a
+  skgrepo narrowing is rooted at one (the view is the user's own
+  request; opening a view of a restricted graphnode is refused). It carries the record's gnid and relRepo
+  and nothing of the graphnode: no title, no body, no home skgrepo, no
+  stats; its herald is "restricted", and text typed on its line is
+  refused, as on an unknown viewnode's. A goal keeps such a member,
+  and omits only members whose records are restricted; the ID rule
+  answers it where the goal names its gnid (see "the ID rule").
+
+  An occurrence of a graphnode that a skgrepo narrowing keeps out
+  becomes a restricted viewnode in place, keeping its viewnode ID,
+  fold state and children, and an occurrence again after a
+  skgrepo widening. A view root of such a graphnode becomes a
+  restricted viewnode whether or not a record names it. The
+  folders under such an occurrence describe a graphnode the restricted
+  viewnode shows nothing of, so they become tombstones, holding their
+  members, and stay tombstones after the skgrepo widening. In the diff
+  view, after a switch, a restricted graphnode's ghost becomes a
+  restricted viewnode, or a tombstone, by the same rule, since a
+  restricted graphnode is never a ghost. A restricted viewnode claims
+  membership as an unknown viewnode does: a save keeps its gnid in the
+  list it claims a place in, and deleting its line removes the record;
+  the save restores to a list only the members whose records are
+  restricted, which the buffer could not show. It takes a relRepo
+  request and a processed request. In the implementation it is a
+  gnid-only vognode (see "gnid-only vognode").

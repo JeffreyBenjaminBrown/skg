@@ -1,0 +1,9 @@
+title: 'C-c v b : skg-org-body-toggle'
+pid: 8ddb9d10-faa1-4f8f-b2a9-af22657547ff
+body: |2-
+  Toggles the visibility of the body of the headline at point without
+  folding its children. If the whole headline is folded, the command
+  shows its body and immediate children, but leaves each child's entry
+  folded. Works from the headline or from inside its body; called from
+  the body, point moves to the start of the headline. A bodyless
+  headline is left alone unless its children need to be revealed.

@@ -1,0 +1,51 @@
+title: Diff view
+pid: 361a0807-d65d-4f33-9d74-864df23edb1c
+body: |2-
+    - Request: =((request . "diff view") (buffer . "BUFFER") (view-id . "VIEW_ID"))=,
+      where BUFFER is ="all changes"=, ="merges"=, ="skgrepo changes"= or
+      ="order-only changes"=. The client sends one request per buffer, in
+      that order, each after the previous answer.
+    - Response: LP response-type "diff-view", one of:
+      - =((content "ORG") (errors ()) (warnings ()) (processed-summary ...))=:
+        the buffer, now registered under VIEW_ID as a buffer of the diff
+        view, and its processed summary, in the form
+        and with the counts a save of the buffer unchanged would report
+        (see "Save buffer").
+      - =((empty . t) (errors ()) (warnings ()))=: the buffer would show
+        nothing, so the client does not open it.
+      - =((content "") (errors ("REFUSAL")) (warnings ()))=: refused, when
+        the connection has a skgrepo restriction, when an owned skgrepo is
+        not a gitrepo or has no HEAD commit, or for an unknown BUFFER. A
+        refusal applies to every buffer, so the client stops.
+    - What each buffer shows: the "all changes" buffer is the pruned change view over
+      every change in the owned skgrepos since HEAD; the merges and
+      skgrepo-changes buffers are pruned change views over the nodeMerges and over the
+      home skgrepo and relRepo moves; the order-only buffer lists the
+      nodes whose only change is the order of a list. Foreign skgrepos
+      are excluded. See the glossary's "Terms a user meets in the diff
+      view", and "Metadata of the diff view" below.
+    - The server compares HEAD with the worktree through a graph straddle it
+      keeps per connection, brought up to date at each request, at each
+      save of a buffer of the diff view, and at each rerender of
+      every view. Closing the last such buffer drops it, as does a
+      rebuild of the session-lifetime stores, so the next request reads
+      both halves from the disk the rebuilt live graph was read from. Saving such a buffer is ordinary (see "Save
+      buffer"), and its response carries the processed summary.
+    - A rerender of such a buffer (after a save, collateral, or after a
+      commit) is a refresh in diff-view mode (see
+      =docs/data-model_technical.org=, "The refresh: how a view follows
+      the graph", and =docs/diff-view.org=, "Rendering a buffer"): every
+      headline it holds is kept, with its =folded= and =bodyFolded=, and
+      re-kinded and re-tagged in place (a member that loses its
+      relationship becomes a removed member, a deleted node its ghost,
+      and back); a change viewnode whose change is gone becomes a
+      tombstone, pruned once it holds nothing; what the goals name and
+      the buffer lacks is drawn.
+      The server sets a fold state only on a viewnode it draws: a
+      context node's body starts folded. A root stays until the
+      buffer is closed. A ghost, a pending change, is shown until it is
+      restored or its deletion is committed; a ghost root whose node a
+      commit deleted, now in neither graph, becomes a tombstone, pruned
+      when it holds nothing.
+    - Logic: =server/serve/handlers/diff_view.rs=, =server/diff_view/=
+      (=pruned_change_view.rs=, =changes.rs=).

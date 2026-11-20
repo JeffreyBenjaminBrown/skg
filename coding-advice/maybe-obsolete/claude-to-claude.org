@@ -1,5 +1,8 @@
-* Initialization Instructions
+# This file was generated from the skg node with this ID:
+# 2dd11ff2-614a-4d99-ab2d-230ebfc200cb
+# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.
 
+* Initialization Instructions
 Upon starting each session, automatically:
 
 1. Read all files in `coding-advice/` directory to understand project context.
@@ -10,18 +13,14 @@ Upon starting each session, automatically:
    - `docs/glossary.org` - Project terminology and abbreviations
 
 3. Retain all this information in context for the entire session to ensure consistent adherence to project conventions and understanding of the codebase architecture
-
 * Key Project Context
-
 This is the **skg** project - a knowledge graph manipulation system with:
 - **Rust server** (`server/`) handling the in-memory graph and Tantivy index
 - **Emacs client** (`elisp/`) providing org-mode interface
 - **YAML data storage** in `.skg` files
 - **TCP communication** between components:
   - Port 1730 (default): Rust-Emacs API communication (configurable)
-
 * Formatting Rules
-
 When writing or modifying code:
 - **Type signatures**: Name, each argument, and return type on separate lines
 - **Variable definitions**: Type signature required, newline after equals sign
@@ -31,16 +30,12 @@ When writing or modifying code:
 - **Comments**: Inside code blocks they apply to, preserve existing comments
 - **No empty lines** in function definitions unless necessary for comment clarity.
 - **Don't reformat existing code** - only apply rules to new/modified code
-
 * Testing Dependencies
-
 `bash/all-tests.sh --no-sound` manages the server instances needed by the
 integration tests. Rust tests do not require an external database service.
 Config files such as `data/skgconfig.toml` select distinct TCP ports, Skg repo
 folders, and Tantivy folders for concurrently running Skg instances.
-
 * Running Tests
-
 There are three ways to test the code:
 
 1. **Emacs Lisp tests**: `bash/emacs-tests.sh`
@@ -57,9 +52,7 @@ There are three ways to test the code:
    - Tests run in parallel with isolated configurations
    - The integration runner starts and stops isolated Skg servers
    - Individual tests located in `tests/integration/*/run-test.sh`
-
 * The save-buffer pipeline
-
   The canonical definition of step 5, "local fieldIntent
   collection", lives in 'docs/glossary.org'; this section lists the
   surrounding stages and links there rather than re-explaining
@@ -92,9 +85,7 @@ There are three ways to test the code:
 
   Key entry point: 'handle_save_buffer_request' in server/serve/handlers/save_buffer.rs.
   Key data flow: buffer text -> MpViewnode -> Viewnode -> CollectedIntents -> NodeIntent -> DefineNode (Save|Delete) -> filesystem/graph/Tantivy.
-
 * Skg repo (RepoName)
-
   Skg repo is a RepoName (String wrapper) identifying which configured directory holds a node's .skg file. It is:
   - NOT serialized in .skg files — inferred from file location at load time
   - Stored in the complete in-Rust node and in Tantivy as a search field
@@ -102,9 +93,7 @@ There are three ways to test the code:
   - Governed by user_owns_it flag: foreign Skg repos are write-protected
 
   All graph relationships (contains, subscribesTo, etc.) reference nodes by ID, not by Skg repo. Skg repo is purely about where the .skg file lives on disk.
-
 * Relationships and the view system
-
   Graph relationships (all ID-based, repo-independent):
   - contains: parent -> child ordering (Vec<ID>, order matters)
   - subscribes: subscriber -> subscribee (forking foreign data)
@@ -124,9 +113,7 @@ There are three ways to test the code:
     rerendering; per-folder reconcilers add and reconcile the
     non-vognodes. (The older two-DFS-pass 'complete_viewtree' is gone;
     see TODO/DONE/local-view-update/plan_v2.org.)
-
 * Recovery and source of truth
-
   The filesystem (`.skg` files plus `skgconfig.toml`) is authoritative. The
   immutable in-Rust graph and Tantivy index are derived from one full read at
   startup. The `rebuild ephemeral data stores` request constructs and

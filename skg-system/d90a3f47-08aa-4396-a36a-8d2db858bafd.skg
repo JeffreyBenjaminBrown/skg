@@ -1,0 +1,36 @@
+title: What the refresh keeps
+pid: d90a3f47-08aa-4396-a36a-8d2db858bafd
+body: |2-
+  Nothing that exists is drawn again: the refresh decides everything
+  from the buffer and the truth as they are now ('server/refresh/mod.rs'),
+  and every buffer it draws refreshes to itself
+  ('every_diff_view_fixture_is_a_fixpoint_of_the_refresh' in
+  'tests/idempotence.rs'). A child keeps its vnid, its fold state and
+  its place; it is re-kinded where it stands, by the ID rule (a member
+  whose node was deleted becomes its ghost and back); siblings standing
+  for one gnid are joined by a viewnode merge, so a copy the user pasted
+  beside a member is joined to it. A child the goal does not name
+  vanishes, with its subtree, where it claims under an editable
+  parent; one that claims nothing, or stands where no claim is read,
+  is kept, unwarranted. A member whose node was deleted is never
+  removed: it stays as its ghost. A tombstone keeps its children, and is pruned when it holds
+  nothing; so is a folder the prune leaves empty. The server sets a fold
+  state only on a viewnode it draws (a context node's body and a
+  container folder start folded, the rest open).
+
+  A root stays until the buffer is closed, whatever becomes of the
+  changes under it. A ghost is a pending change: it is shown until it
+  is restored or its deletion is committed. A commit is an ordinary
+  rerender: the roots
+  stand as plain context with their change viewnodes entombstoned; a
+  ghost root whose node the commit deleted, now in neither graph,
+  becomes a tombstone, which keeps what stood under it, and one whose
+  gnid the commit left an extra ID of its acquirer becomes an
+  occurrence of the acquirer, in place.
+
+  The goal orders what it warrants where the graph records an order
+  (content, aliases, the hidden folder, and the forks folder's
+  forkees, after which its forker-only members keep the order the view
+  has); every other child stays right after the sibling it followed. So a
+  buffer saves back to itself, and a view other than the one saved
+  follows a reorder saved elsewhere.

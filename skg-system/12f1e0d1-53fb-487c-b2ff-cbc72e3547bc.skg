@@ -1,0 +1,37 @@
+title: '<localleader>ff : :SkgSearch'
+pid: 12f1e0d1-53fb-487c-b2ff-cbc72e3547bc
+body: |2-
+  Text search across titles and aliases, returning every
+  matching node. Prominent nodes (roots, cycle members,
+  mentioned nodes, and nodes that had an org-roam ID before import)
+  are bumped in the ranking via their prominence multiplier.
+
+  A node with =NoSearchMatching= cannot be a direct title, alias, or body hit
+  in any search mode. It may still appear as context for another hit and remains
+  openable by ID. This is decluttering, not privacy. A packing list mentioning
+  “shaver,” for example, can be excluded while the shaver node still matches.
+
+  Prompts for search terms. All search axes take their conservative
+  defaults: no per-token regex, titles only (no body), no Tantivy
+  phrase and operator syntax.
+
+  Under a skgrepo restriction, if the search index contains any overPrivateText
+  telescope (one whose selected title or body lies below home), Skg asks
+  whether to include or exclude overPrivateText telescopes before running the query.
+  Exclude filters them in Tantivy before matching, and from what is drawn
+  under each hit; Include is permission
+  for this search only. With no skgrepo restriction they are included
+  without a prompt and the result carries a warning.
+
+  The hits come best first, each a write-protected headline showing
+  its node's title. Under each hang, folded, its containers folder,
+  whose members carry their own containers up to the roots, and,
+  when there are any, its forks folder, flat: the nodes it forks, those
+  that fork it, then its other mirrors, each with its own containers
+  folder. A hit found through an alias shows those
+  folders collapsed and its alias folder open, holding all of the
+  node's aliases, the matching one among them. The search buffer
+  arrives whole, in one answer, and is an ordinary view.
+
+  Run 'Goto' (<localleader>gg, below) from one of the links in the
+  search results to open the view from that node.

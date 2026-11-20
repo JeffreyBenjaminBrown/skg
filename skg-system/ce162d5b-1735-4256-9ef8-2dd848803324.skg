@@ -1,0 +1,17 @@
+title: overPrivateText
+pid: ce162d5b-1735-4256-9ef8-2dd848803324
+body: |2-
+  This is kind of an error. Skg can handle it if it sees it in your data,
+  but it's a good thing to fix.
+
+  A privacy telescope has *overPrivateText* when its composed title or body is
+  selected from a section more private than its home (most public retained)
+  section. The flag applies to the whole telescope, even if only one text
+  field is below home. This violates the rule that the node's text lives at
+  home; see [[id:ae1f8c25-d6a4-490f-bad5-aa04279daf72][privacy telescopes]].
+
+  An unrestricted connection can show that text with a warning. A restricted request
+  asks for approval scoped to the affected node IDs and that request before
+  releasing it; search asks whether to include or exclude such telescopes.
+  Approval to display the text does not authorize *Hoist*, the separate
+  repair that moves the selected title and body to home (see "Hoist").

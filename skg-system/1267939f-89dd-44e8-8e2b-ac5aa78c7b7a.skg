@@ -1,0 +1,17 @@
+title: local fieldIntent collection
+pid: 1267939f-89dd-44e8-8e2b-ac5aa78c7b7a
+body: |2-
+  The save path's fieldIntent extraction: one pure DFS preorder over
+  the buffer's viewforest, in which each position reads only itself and
+  its direct children, plus a context that flows down from its
+  ancestors. Each visit emits fieldIntents into a map keyed by
+  node ID; downstream stages (validation, lowering, visibility
+  resolution, disk supplementation, the noop filter) consume the map.
+  Lives in =server/from_text/local_fieldintent_collection/=, entered
+  via =extract_nonmergeSavePlan_locally=.
+
+  This entry is the canonical sketch of the save pipeline. Its
+  surrounding stages are, in order: parse (which supplies each new
+  headline's gnid and skgrepo; see "IdResolution"), validate, place,
+  extract (this entry), foreign-node validation, nodeMerge build, graph
+  update, and the refresh of the saved and collateral views.

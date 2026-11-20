@@ -1,0 +1,4 @@
+title: If 'cargo run --bin skg' is not running,
+pid: 9e7e5dc9-ab84-41b0-933b-f775e2863111
+body: |2-
+  some Emacs Lisp tests might not pass.

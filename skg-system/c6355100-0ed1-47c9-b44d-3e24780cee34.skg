@@ -1,0 +1,26 @@
+title: The just-saved fork buffer
+pid: c6355100-0ed1-47c9-b44d-3e24780cee34
+body: |2-
+  Once an approved save creates fork =K= from original =F=, the buffer that made
+  the edit must not continue to show editable =F=: editing it again would request
+  another fork.  The post-save update therefore makes one saved-view-only
+  exception to the rule that a root stands for the node it shows (see
+  "Mirror substitution"): a level-one =F= named by
+  one of this save's exact =ForkSpec=s is rewritten to =K=
+  ('replace_saved_view_fork_roots' in =server/rerender_pass.rs=).  A
+  recursive-content occurrence of =F= is replaced by its newly visible
+  substitute =K= at any refresh, as substitution always does.
+
+  The content occurrence carries =(inPlaceOf F)=; the root does not.  The
+  root case is not ordinary recursive-content substitution; it is the one-time
+  identity transition of the view which performed the fork, and a root marked
+  =(inPlaceOf F)= stands for =F=, which the root homes show as itself.  The
+  re-rooted clone is substituted like any root: from the root homes, it stands
+  in its own home, so shows; a view switched to another skgrepo shows the mirror
+  that skgrepo ranks first, and the save warns of it.  After refreshing that viewforest, the server
+  stores it under the same view ID and recomputes the open-view root index, so
+  the buffer is thereafter registered as rooted at =K= rather than =F=.
+
+  Collateral rerenders do not apply the root exception; their content
+  occurrences substitute as every refresh's do.  A later independent direct
+  visit to =F= still opens =F= itself, in accordance with the exact-visit rule.

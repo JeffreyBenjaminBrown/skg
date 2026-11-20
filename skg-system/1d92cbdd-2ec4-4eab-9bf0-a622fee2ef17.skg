@@ -1,0 +1,15 @@
+title: Link statuses
+pid: 1d92cbdd-2ec4-4eab-9bf0-a622fee2ef17
+body: |2-
+    - Request: =((request . "link statuses") (request-id . "TOKEN") (ids "ID" ...))=.
+      A client batches and deduplicates literal link target IDs in a view.
+    - Response: LP =((response-type link-statuses) (request-id "TOKEN")
+      (results (("ID" resolved "PID" "REPO-LABEL")
+                ("ID" restricted) ("ID" missing) ...)))=.
+      Results follow the requested IDs. =PID= is the resolved primary ID,
+      including resolution from an extra ID. =REPO-LABEL= is the visible
+      target's home skgrepo's skgrepo label, not the link's relRepo. Restricted
+      and missing rows return neither title nor skgrepo. The lookup reads the
+      current in-Rust graph snapshot and skgrepo restriction, independently
+      of Tantivy title-index commits. =request-id= associates asynchronous
+      responses with their requesting buffer and its buffer generation.

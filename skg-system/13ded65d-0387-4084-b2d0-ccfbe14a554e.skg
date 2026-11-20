@@ -1,0 +1,10 @@
+title: Skg repo (RepoName)
+pid: 13ded65d-0387-4084-b2d0-ccfbe14a554e
+body: |2-
+    Skg repo is a RepoName (String wrapper) identifying which configured directory holds a node's .skg file. It is:
+    - NOT serialized in .skg files — inferred from file location at load time
+    - Stored in the complete in-Rust node and in Tantivy as a search field
+    - Used by 'path_from_pid_and_repo' to compute file paths: repo.path / pid.skg
+    - Governed by user_owns_it flag: foreign Skg repos are write-protected
+
+    All graph relationships (contains, subscribesTo, etc.) reference nodes by ID, not by Skg repo. Skg repo is purely about where the .skg file lives on disk.

@@ -1,0 +1,4 @@
+title: Each node of a document is a separate file.
+pid: 0fdcc5f1-faad-4818-9a88-d497d692c410
+body: |2-
+  This is unusual -- in most applications, the entire tree of text would be a single document. The one-file model has the advantage that a document can be easily read without special software. But the Skg model makes it possible to share granularly (see [[id:ab83219a-c1c5-4dc3-a0b5-96d2faecb587][the sharing model]], and [[id:f6b72e10-5d7e-49e6-b044-a06bfe752329][easy to understand changes]].

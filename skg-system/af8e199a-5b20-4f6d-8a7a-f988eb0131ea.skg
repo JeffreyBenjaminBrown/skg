@@ -1,0 +1,20 @@
+title: Caveats
+pid: af8e199a-5b20-4f6d-8a7a-f988eb0131ea
+body: |2-
+    - *Coarse numbers.* utilization is rounded (e.g. 0.1), good enough
+      for throttling thresholds, not for precise accounting.
+
+    - *Token expiry.* Both scripts read whatever access token
+      =.credentials.json= currently holds. Claude Code refreshes that
+      token in the background, so while a live session is running the
+      scripts ride along fine. But a *detached* poller with no live
+      Claude Code to refresh the token will start getting 401s once the
+      token expires (~every several hours); its snapshot then goes stale
+      and =polled_at= stops advancing. We deliberately did NOT add
+      self-refresh (reading the refreshToken and minting a new access
+      token), because the intended use is an agent inside a live session.
+      If you later need an unattended, long-lived poller, that
+      self-refresh is the missing piece to add.
+
+    - *Reading, not writing, credentials.* Per =coding-advice/ai-agents.org=,
+      don't touch Jeff's credentials. These scripts only read them.

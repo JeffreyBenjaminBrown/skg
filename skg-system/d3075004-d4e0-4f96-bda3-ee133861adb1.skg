@@ -1,0 +1,12 @@
+title: Start a server that owns your worktree's 'skg-system/'
+pid: d3075004-d4e0-4f96-bda3-ee133861adb1
+body: |2-
+  From the top of the worktree, in the background (the Bash tool's
+  'run_in_background'), on a free port, never 1730, 1731 or 1761:
+  : bash/docs-server.sh PORT --deb
+  It writes '.skg-system-server/skgconfig.toml', which Git ignores: a
+  copy of 'bash/skg-system.skgconfig.toml' on PORT. Then it runs
+  'bash/start-servers.sh' on it. Wait for "Server ready." in the newest
+  '.skg-system-server/skgconfig.toml.running/*/server-to-user.log'.
+  Stop it with
+  : bash/stop-servers.sh "$PWD/.skg-system-server/skgconfig.toml"

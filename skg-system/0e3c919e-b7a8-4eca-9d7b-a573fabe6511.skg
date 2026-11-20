@@ -1,0 +1,5 @@
+title: Avoid empty lines in function definitions.
+pid: 0e3c919e-b7a8-4eca-9d7b-a573fabe6511
+body: |2-
+     Sometimes, admittedly, empty lines are necessary in function definitions -- namely, when a comment applies to a few consecutive commands that cannot be wrapped in a block of code (because the block defines things that are used later). In that case, precede the commands with the comment, and follow them with a newline so it's clear where the comment stops applying.
+     But if possible, use one of the above tricks to group the comment with the code it applies to, rendering the trailing empty line unnecessary.

@@ -1,0 +1,9 @@
+title: link status, link annotation
+pid: a7390d33-5442-4eee-9265-967e9798fb18
+body: |2-
+  A link's *link status* is what the server says of its target: resolved
+  (with its pid and its home skgrepo's skgrepo label), restricted, or
+  missing ('docs/api-and-formats.org', "Link statuses"). A client shows
+  it after the link as a *link annotation*, such as =[⌂:pub]= or
+  =[⌂:restricted]= ('docs/heralds.org', "Link annotations"), which is
+  not a herald.

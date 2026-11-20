@@ -1,0 +1,27 @@
+title: Writing in an unintegrated child integrates it
+pid: 49067800-a66f-4d03-a201-3ecf9f5a3c31
+body: |2-
+  Writing anything within an unintegrated child, where the
+  forkee as such draws it, integrates that child for you: typing
+  a reply under it (which forks it, if it is foreign), editing it, or
+  editing anything below it. The save appends the child to the
+  forker's content, by the ID the original's list names, and moves
+  its headline, with what you typed, to the end of the forker's
+  content; the count of unintegrated children falls by one. Your fork
+  of it, if the edit made one, is drawn in its place there, since a
+  view of your own note is drawn from its skgrepo, where your fork is
+  homed. Read as mail, with the
+  forks folder of your fork of someone's inbox note as the list of
+  messages you have not touched, a reply files the message it answers.
+
+  This happens only where the save writes the forker's content: an
+  editable forker in a skgrepo you own. It files only a child the
+  original's list names (not a node you placed under the
+  forkee as such yourself), and nothing the forker already
+  contains, hides, or holds a fork of. Where the forker is
+  someone else's (you are reading another's fork of a note), nothing is
+  filed, and if your edit forked something there, the view, drawn from
+  that note's skgrepo, goes on drawing the mirror that skgrepo's list
+  ranks first, usually the original; the save warns that it does, and
+  that switching the view to your fork's skgrepo's perspective
+  (=C-c v o=) shows the fork.

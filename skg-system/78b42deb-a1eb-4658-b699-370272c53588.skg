@@ -1,0 +1,10 @@
+title: '<localleader>sS : :SkgSetRepoRecursive'
+pid: 78b42deb-a1eb-4658-b699-370272c53588
+body: |2-
+  Like 'SetRepo', but it also
+  changes the skgrepo of every content descendent of the node at point
+  whose skgrepo matches the original skgrepo of the node at point.
+  Only member descendents (those without the 'noClaim' atom) are traversed.
+  The write-protected warning and the save's handling of relationships
+  described under <localleader>ss apply here too, across the whole
+  subtree.

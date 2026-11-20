@@ -1,0 +1,9 @@
+title: 'C-c v h : skg-view-heralds-mode'
+pid: b33f37b1-3823-4d03-bd53-49f0b43a955d
+body: |2-
+  This command toggles it.
+  This toggles whether, at the start of every node,
+  metadata is shown in its full plain-text glory,
+  or is instead summarized via brief 'heralds'.
+  It is turned on at every view by default.
+  See [[id:ef1f3f60-2e51-4584-8e5d-7dd6f6214cd2][the herald legend]] for the tokens and styles.

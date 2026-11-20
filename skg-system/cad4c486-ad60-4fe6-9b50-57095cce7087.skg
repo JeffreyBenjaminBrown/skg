@@ -1,0 +1,9 @@
+title: Use temporary adapters to stage intentional migrations
+pid: cad4c486-ad60-4fe6-9b50-57095cce7087
+body: |2-
+  When an intentional representation change would cause unrelated fixture and
+  consumer churn, a narrow adapter at the boundary can keep the migration in
+  testable slices.  Migrate and prove one consumer family at a time, then remove
+  the adapter as soon as its remaining consumers are ready.  This is especially
+  useful for snapshot, journal, and wire types; it is not a reason to add
+  permanent legacy compatibility.

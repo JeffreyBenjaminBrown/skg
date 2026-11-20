@@ -1,0 +1,5 @@
+title: skg-close-all-skg-buffers
+pid: b6a241c0-03f9-406a-9723-bef26204dee8
+body: |2-
+  Kills every skg view buffer (each sends the server a close-view
+  notice first).

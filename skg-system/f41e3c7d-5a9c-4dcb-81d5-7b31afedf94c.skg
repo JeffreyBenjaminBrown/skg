@@ -1,0 +1,6 @@
+title: M-x skg-request-single-root-content-view-from-id
+pid: f41e3c7d-5a9c-4dcb-81d5-7b31afedf94c
+body: |2-
+  Prompts for a node ID and opens a content view of that node, as
+  skg-goto does from an ID at point. It has no key; skg-goto and
+  skg-goto-by-id are usually more convenient.

@@ -1,0 +1,8 @@
+title: collateral view
+pid: 5b67aee8-78de-4b55-8a7f-ac4f2d010aa7
+body: |2-
+  When a save changes nodes that other open views show, those views are
+  *collateral*: the server rerenders them and streams each as a
+  =collateral-view= message. The save envelope's =other-views= lists every
+  other open view; the collateral views are the subset that needs a
+  rerender.

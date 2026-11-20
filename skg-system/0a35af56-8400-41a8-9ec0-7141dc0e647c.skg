@@ -1,0 +1,7 @@
+title: Follow the requested scope
+pid: 0a35af56-8400-41a8-9ec0-7141dc0e647c
+body: |2-
+  A request for a review, diagnosis, discussion, or plan ends with that
+  deliverable; it does not authorize implementing the proposed changes.
+  When asked to implement, continue through the agreed work and verification.
+  The detailed execution and stop rules are in [[id:fa26e71c-acf3-41a7-ab82-0898a213e429][file:when-to-stop.org]].
