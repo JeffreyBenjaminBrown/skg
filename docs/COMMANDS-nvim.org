@@ -1575,7 +1575,7 @@ only top-level headline has nothing before it uses that headline as its
 file root; otherwise the file root, titled after the document, holds the
 text before the first headline, and its export marker's
 =root_headline = false= makes the document export with its original
-outline. It does not replace
+outline. Org links to non-document files stay as written. It does not replace
 existing =.skg= files, copy attachments, synchronize later changes, or export
 automatically. Most original markup remains text; Markdown hard breaks become
 Org's two-backslash form so save-time trailing-whitespace cleanup remains.

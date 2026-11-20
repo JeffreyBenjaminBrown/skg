@@ -356,7 +356,8 @@ fn names_a_document (
 /// image, a folder) keeps pointing where it pointed, in Org syntax, and
 /// raises no warning, wherever it points. Under a host mapping, a target
 /// inside the input tree gets its host path, since its container path
-/// would not work on the host. A search suffix is left as written.
+/// would not work on the host. A search suffix is left as written, and
+/// so is an Org link whose path stays the same.
 fn link_to_a_non_document (
   document : &ParsedDocument,
   path : &str,
@@ -370,6 +371,8 @@ fn link_to_a_non_document (
     &document . path, path, input_directory, host_root)) {
     (Some (host), Some (relative)) => host . join (relative) . display () . to_string (),
     _ => path . to_string (), };
+  if link . syntax == LinkSyntax::Org && usable_path == path {
+    return LinkTarget::External; }
   LinkTarget::ExternalFile (format! ("[[file:{}][{}]]", usable_path, link . label))
 }
 
@@ -612,6 +615,28 @@ mod tests {
       . map (|diagnostic| diagnostic . message . as_str ()) . collect ();
     assert_eq! (messages,
       vec! ["Path \"../gone.md\" is outside the imported input tree or host mapping"]);
+  }
+
+  #[test]
+  fn an_org_link_to_a_non_document_stays_as_written_unless_mapped () {
+    let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+    fs::create_dir (temp . path () . join ("assets")) . unwrap ();
+    let text : &str =
+      "[[../server/save.rs][code]] [[./assets/][folder]] [[file:assets/chart.png]]";
+    let skgrepo : SkgrepoName = SkgrepoName::from ("owned");
+    let mut next = || ID::new (&uuid::Uuid::new_v4 () . to_string ());
+    let mut body_under = |host_root : Option<&Path>| -> String {
+      let mut documents : Vec<ParsedDocument> = vec![parse_document (
+        Path::new ("readme.org"), text . to_string ())];
+      let mut built : Vec<BuiltDocument> = documents . iter ()
+        .map (|document| build_document (document, &skgrepo, &mut next) . unwrap ())
+        .collect ();
+      resolve_document_links (&mut documents, &mut built,
+        temp . path (), host_root, &HashMap::new ());
+      built [0] . nodes [0] . body . clone () . unwrap () };
+    assert_eq! (body_under (None), text);
+    assert_eq! (body_under (Some (Path::new ("/host/notes"))),
+      "[[../server/save.rs][code]] [[file:/host/notes/assets][folder]] [[file:/host/notes/assets/chart.png][file:assets/chart.png]]");
   }
 
   #[test]

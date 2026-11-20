@@ -1626,7 +1626,9 @@ so an exported file imports back to the same shape.
 
 Only links to =.md= and =.org= files are resolved, or warned about.
 A link to any other file (source code, an image, a folder) keeps pointing
-where it did, written as an Org link, without a warning.
+where it did, without a warning. An Org link to one is left as written;
+a Markdown link to one, or a link a host-root mapping changes,
+is written as an Org link.
 
 **** Re-export is dangerous.
 Subsequent Org export is for reading, not
