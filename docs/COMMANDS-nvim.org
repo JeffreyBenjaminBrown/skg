@@ -1461,6 +1461,13 @@ content views only; elsewhere, run ':SkgReadableIdsRefresh'.
 *** <localleader>vs : :SkgViewLinkstack
 View and maybe edit the set of links you've stored.
 (See "the linkstack" below.)
+*** <localleader>vu : :SkgToggleForkDedupOverlay
+Toggles, in this buffer, the extmarks that cover what a member of a
+forks folder restates of its note, as C-c v u does in Emacs: =<b's
+title, unchanged>= over a title equal to the note's, =<b's body,
+unchanged>= over such a body, its other lines concealed. They are on
+unless the buffer variable 'skg_fork_dedup_overlay' is false. The
+buffer always holds the real text, and a save sends it.
 *** <localleader>vw : :SkgViewWithoutMetadata
 If a Visual-mode selection is active (or was just left, via the
 ='<,'>= marks), opens a new org buffer containing that region,

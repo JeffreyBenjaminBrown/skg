@@ -218,6 +218,9 @@ function M.reherald_after_rewrites (buf, indices)
     vim.api.nvim_buf_clear_namespace(buf, heralds.namespace, index - 1, index)
     heralds.apply_to_line(buf, index - 1, lines)
   end
+  local rows = {}
+  for _, index in ipairs(indices) do table.insert(rows, index - 1) end
+  require('skg.fork_dedup').refresh_rows(buf, rows, lines)
 end
 
 ---The indices in LINES of the headlines one or two levels below the

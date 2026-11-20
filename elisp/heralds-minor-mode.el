@@ -17,6 +17,7 @@
 (require 'skg-metadata) ;; for skg--folder-change-processed-at-point and skg--pending-detachment-at-point-p
 (require 'skg-sexpr-search)
 (require 'skg-shared)
+(require 'skg-fork-dedup)
 
 ;; Defined in skg-request-herald-rules.el, which requires this file, so
 ;; we cannot require it back (circular). `heralds--ensure-rules' reaches
@@ -207,15 +208,18 @@ levels (a member's '(relRepoMove ...)' child counts)."
     (progn
       (remove-hook 'after-change-functions #'heralds-after-change t)
       (remove-hook 'after-revert-hook #'heralds-apply-to-buffer t)
-      (heralds-clear-overlays))))
+      (heralds-clear-overlays)
+      (skg-fork-dedup--clear (point-min) (point-max)))))
 
 (defun heralds-apply-to-buffer ()
-  "Do `heralds-apply-to-line` to each line."
+  "Do `heralds-apply-to-line` to each line, and draw the overlays over
+what forks-folder members restate (`skg-fork-dedup-refresh-buffer')."
   (save-excursion
     (goto-char (point-min))
     (while (< (point) (point-max))
       (heralds-apply-to-line)
-      (forward-line 1))))
+      (forward-line 1)))
+  (skg-fork-dedup-refresh-buffer))
 
 (defun heralds-after-change (beg end _len)
   "Refresh overlays only on lines touched by the edit from BEG to END."
@@ -230,7 +234,8 @@ levels (a member's '(relRepoMove ...)' child counts)."
         (dotimes (_ (1+ (- end-line start-line)) )
           (heralds-apply-to-line)
           (forward-line 1))
-        (heralds--refresh-folders-above lbeg) )) ))
+        (heralds--refresh-folders-above lbeg)
+        (skg-fork-dedup-refresh-lines (list lbeg lend)) )) ))
 
 (defun heralds--refresh-folders-above (pos)
   "Re-apply the herald of each folder headline among the two headlines

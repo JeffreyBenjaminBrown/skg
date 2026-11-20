@@ -1485,6 +1485,14 @@ in a magit or raw .skg buffer, use M-x.
 *** C-c v s : skg-view-linkstack
 View and maybe edit the set of links you've stored.
 (See "the linkstack" below.)
+*** C-c v u : skg-toggle-fork-dedup-overlay
+Toggles, in this buffer, the overlays that cover what a member of a
+forks folder restates of its note: =<b's title, unchanged>= over a
+title equal to the note's, =<b's body, unchanged>= over such a body
+(docs/forks.org, "A member that restates its note"). They are on by
+default (the buffer-local variable 'skg-fork-dedup-overlay'); turn
+them off to read or edit the text under them. The buffer always holds
+the real text, and a save sends it.
 *** C-c v w : skg-view-without-metadata
 If a region is active, opens a new org buffer containing that region,
 but with the '(skg ...)' metadata stripped from every headline.

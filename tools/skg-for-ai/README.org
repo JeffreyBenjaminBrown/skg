@@ -59,7 +59,10 @@ A headline whose handle holds a sentence is a folder. 'These also
 contain it.' and 'These link to it.' list notes, each with its own
 containers under it, so there nesting reads upward. In 'It forks
 these, or these fork it, ...', 'bK' marks a note the folder's note
-forks, 'Kb' one that forks it. So a count before C beyond 'a' says
+forks, 'Kb' one that forks it. A member there whose title is the
+folder's note's carries 'title=b'; one whose body is, 'body=b', and
+its body is left out of the compact file: read b's (see "Restated
+titles and bodies"). So a count before C beyond 'a' says
 the note is filed elsewhere too ('contains ID'), one before L who
 cites it ('links-here ID'), 'K' that it forks or is forked ('forest
 forks ID'), '1H' that a note hides it, so that its forks folder no
@@ -404,7 +407,9 @@ the metadata. It is also the view's baseline, the text the server last
 drew for it, which every save of the view sends beside the edited
 buffer ('docs/api-and-formats.org', "Save buffer").
 ** The compact view
-'BASE.compact.org' has every line of the full view, in the same order.
+'BASE.compact.org' has every line of the full view, in the same order,
+but the body of a forks-folder member that restates its note's (see
+"Restated titles and bodies").
 A body line is copied unchanged, except that its links are annotated.
 A headline keeps its stars and its title; its '(skg ...)' metadata is
 removed, and a handle is added at the end of the line.
@@ -533,6 +538,19 @@ the folder's parent changed reads 'its other containers changed (other
 files)' and so on, with '✓' when every such change is processed. In the
 skgrepo-changes buffer a moved node adds '-OLD +NEW', and 'Δ⌂=a' when
 its nearest moved ancestor (here the parent) moved the same way.
+*** Restated titles and bodies
+A member of a forks folder often says what the folder's note says.
+Where its title equals the note's, its handle carries 'title=b'; where
+its nonblank body does, 'body=b', and the compact file leaves its body
+out: it is b's, the body under the headline two levels up ('b' is the
+note's ancestor letter as counted from the member). The full file has
+every body. The clients draw the same members with "<b's title,
+unchanged>" and "<b's body, unchanged>" over the text
+('elisp/skg-fork-dedup.el'). A save of a headline that still says
+'body=b' and has no body under it sends the body the full file gave
+it, unchanged; text written under it is its new body; to empty the
+body, take the word away. The words are the tool's: a save sends
+neither, and 'title=b' changes nothing (the title is there to edit).
 *** Folded headlines
 A headline the server marks 'folded', one a client shows collapsed,
 ends its handle with the word 'folded': '⟨0j ☮ cH ⌂:fred folded⟩'.

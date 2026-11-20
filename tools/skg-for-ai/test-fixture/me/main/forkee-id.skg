@@ -1,4 +1,5 @@
 pid: forkee-id
 title: A forkee, outside the view
+body: A body the forker and the forkee share.
 aliases:
 - Another name for it

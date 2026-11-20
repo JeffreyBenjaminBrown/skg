@@ -1,0 +1,23 @@
+title: A member that restates its note
+pid: 28764d3e-2b4d-4435-80e0-096ba233d48a
+body: |2-
+  A member of the forks folder often says what its note says: a fresh
+  clone's original, before you edit the clone, or a note forked to file
+  a reply under. Where a member's title equals its note's, the clients
+  draw =<b's title, unchanged>= over it; where its body equals its
+  note's, =<b's body, unchanged>= over the body, in the message style
+  (black on white). b is the note, as the heralds name it from the
+  member (its grandparent, past the folder). The two are independent: a
+  member may show either, both, or neither. This is drawing only: the
+  buffer holds the member's real title and body, and a save sends them
+  as they are.
+
+  Each view buffer has its own switch, on by default: =C-c v u=
+  ('skg-toggle-fork-dedup-overlay', the buffer-local variable
+  'skg-fork-dedup-overlay'; in Neovim =<localleader>vu=,
+  =:SkgToggleForkDedupOverlay=, the buffer variable
+  'skg_fork_dedup_overlay') shows the text, to read or edit it. An edit
+  that makes the member differ from its note uncovers it. skg-for-ai,
+  whose files have no overlays, marks such a member's handle 'title=b'
+  or 'body=b' and leaves a restated body out of its compact file
+  ('tools/skg-for-ai/README.org', "Restated titles and bodies").

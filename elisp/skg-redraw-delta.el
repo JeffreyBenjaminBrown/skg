@@ -76,7 +76,8 @@ Leaves folds and point as they are."
                                  (gethash viewnode-id new-lines)))
                          wanted-viewnode-ids))))
           (when heralds-minor-mode
-            (skg--reherald-after-rewrites rewritten-line-starts))
+            (skg--reherald-after-rewrites rewritten-line-starts)
+            (skg-fork-dedup-refresh-lines rewritten-line-starts))
           (mapc (lambda (marker) (set-marker marker nil))
                 rewritten-line-starts))
         (string= (buffer-substring-no-properties (point-min) (point-max))

@@ -659,6 +659,8 @@ function M.disable (buf)
   buf = buf ~= 0 and buf or vim.api.nvim_get_current_buf()
   vim.b[buf].skg_heralds = false
   vim.api.nvim_buf_clear_namespace(buf, M.namespace, 0, -1)
+  vim.api.nvim_buf_clear_namespace(
+    buf, require('skg.fork_dedup').namespace, 0, -1)
 end
 
 ---@param buf integer
@@ -688,6 +690,7 @@ function M.apply_to_buffer (buf)
   vim.api.nvim_buf_clear_namespace(buf, M.namespace, 0, -1)
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   for row = 0, #lines - 1 do M.apply_to_line(buf, row, lines) end
+  require('skg.fork_dedup').refresh_buffer(buf, lines)
 end
 
 ---Lens the first (skg ...) occurrence on 0-based line ROW of BUF into
@@ -798,6 +801,8 @@ function M.watch_buffer (buf)
           buf, M.namespace, first, last)
         for row = first, last - 1 do M.apply_to_line(buf, row, lines) end
         M.reapply_to_folder_ancestors(buf, first - 1, lines)
+        require('skg.fork_dedup').refresh_rows(
+          buf, { first, math.max(first, last - 1) }, lines)
       end)
     end })
 end

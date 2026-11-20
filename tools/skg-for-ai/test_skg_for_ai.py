@@ -848,13 +848,44 @@ def failures_of_writing (scratch, data_root):
                 check_server_refusal, check_stale_view,
                 check_new_root, check_handles_across_saves,
                 check_exact_retype, check_reworded_retype_asked,
-                check_reworded_retype_kept, check_reworded_retype_all_new ]:
+                check_reworded_retype_kept, check_reworded_retype_all_new,
+                check_restated_member ]:
     try:
       case (context)
     except CaseFailure as failure:
       # Later cases build on this one's graph.
       return [ case . __name__ + ": " + str (failure) ]
   return []
+
+def check_restated_member (context):
+  """A member of a forks folder whose body equals its note's carries
+  'body=b' in its handle, and the compact view leaves its body out
+  (README, "Restated titles and bodies"). Saved so, nothing changes;
+  text written under it is its new body, and its note's stays."""
+  folder = os . path . join ( context [ "scratch" ], "write", "restated" )
+  require_tool_run ([ "view", "forker-id", "--out-dir", folder, "--no-summary" ])
+  base_name = "view_forker-id"
+  member = compact_line_starting (folder, "*** A forkee, outside the view ⟨", base_name)
+  compact = read_file ( os . path . join (folder, base_name + ".compact.org") )
+  if " body=b⟩" not in member or member + "\n" not in compact or (
+      compact . endswith ( member + "\n" ) is False
+      and "A body the forker and the forkee share." in compact . split ( member ) [1] ):
+    raise CaseFailure ( f"the forkee's restated body is not left out:\n{compact}" )
+  files_before = skg_files (context)
+  completed = run_save (folder, "--yes")
+  if completed . returncode != 0 or "No changes." not in completed . stdout:
+    raise CaseFailure ( f"the unchanged save: {completed . stdout}{completed . stderr}" )
+  require_equal ( "the files after an unchanged save", skg_files (context), files_before )
+  edit_compact ( folder, [ ( member + "\n", member + "\nThe forkee's own body now.\n" ) ],
+                 base_name )
+  completed = run_save (folder, "--yes")
+  if completed . returncode != 0:
+    raise CaseFailure ( f"the save failed: {completed . stdout}{completed . stderr}" )
+  require_equal ( "the forkee's body", skg_body (context, "forkee-id"),
+                  [ "The forkee's own body now." ] )
+  require_equal ( "the forker's body",
+                  [ line for line in skg_lines (context, "forker-id") if line . startswith ("body:") ],
+                  [ "body: A body the forker and the forkee share." ] )
 
 def check_title_edit (context):
   folder = fresh_root_view (context, "title")
@@ -3837,12 +3868,27 @@ def git (folder, git_arguments):
     capture_output = True, text = True, check = True ) . stdout
 
 def failures_of_handles (base_name, full_lines, compact):
-  """The compact tree has one line per full-view line, and each
-  headline's handle is the viewnode ID of the full view's headline on
-  the same line."""
+  """The compact tree has one line per full-view line, but the body
+  lines of a headline whose handle says 'body=b', which it leaves out,
+  and each headline's handle is the viewnode ID of the full view's
+  headline on the same line."""
   tree_lines = [ line for line in compact . split ("\n") [ : -1 ]
                  if not line . startswith ("# ") ]
   full_lines = full_lines [ : -1 ] if full_lines [-1] == "" else full_lines
+  restated_handles = { handle [-1] for handle in
+                       ( HANDLE_PATTERN . findall (line) for line in tree_lines
+                         if line . startswith ("*") and " body=b" in line )
+                       if handle }
+  kept_full_lines = []
+  leaving_out = False
+  for full_line in full_lines:
+    if full_line . startswith ("*"):
+      viewnode_id = VIEWNODE_ID_PATTERN . match (full_line)
+      leaving_out = bool (viewnode_id) and viewnode_id . group (1) in restated_handles
+      kept_full_lines . append (full_line)
+    elif not leaving_out:
+      kept_full_lines . append (full_line)
+  full_lines = kept_full_lines
   failures = []
   if len (tree_lines) != len (full_lines):
     failures . append (

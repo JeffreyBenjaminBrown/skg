@@ -149,6 +149,7 @@ the old one open beside the one it makes on its next request."
      skg-file-minor-mode
      skg-zippy-mode
      skg-view-ancestry
+     skg-fork-dedup
      heralds-minor-mode )
   "The features `skg--reload-modules' unloads, so that requiring them
 again loads the files on disk. A feature left out stays as it was first

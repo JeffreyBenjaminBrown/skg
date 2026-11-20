@@ -657,7 +657,7 @@ def command_save (arguments):
       f"The full view has a headline whose viewnode ID is "
       f"'{NEW_NODE_HANDLE_WORD}', which the compact view reads as the mark "
       "of a new node; view a smaller part of the graph." )
-  edited = parse_edited_compact_view (saved_view . compact_text)
+  edited = edited_outline (saved_view)
   original = outline_of_full_view (saved_view . parsed_view)
   report_head = (
     "Changes in " + os . path . basename (saved_view . compact_path) +
@@ -968,7 +968,7 @@ def require_port_of_sidecar (port, sidecar):
 def compact_view_has_edits (saved_view):
   """Whether the compact view differs from its full view in anything a
   save would send: a bad handle, a change, a request word."""
-  edited = parse_edited_compact_view (saved_view . compact_text)
+  edited = edited_outline (saved_view)
   return bool (
     handle_error_lines (edited, saved_view . headline_of_handle)
     or change_report_lines (
@@ -981,7 +981,7 @@ def current_buffer_of_edited_view (saved_view):
   A placed node keeps its typed title; the words of 'subtree' are not
   given below. A compact view whose handles are in error has no such
   buffer, and is refused, naming it."""
-  edited = parse_edited_compact_view (saved_view . compact_text)
+  edited = edited_outline (saved_view)
   if handle_error_lines (edited, saved_view . headline_of_handle):
     raise SkgToolError (
       f"The held view {saved_view . compact_path} has edits in error, so the "
@@ -2084,23 +2084,79 @@ def fetch_repo_ownership (connection):
 # ============================================================
 
 def compact_tree_lines (parsed_view, link_statuses, herald_tables):
+  """The compact view's lines of PARSED_VIEW: each line of it, but
+  the body of a forks-folder member that restates its note's
+  ('restatements')."""
   contexts = herald_contexts (parsed_view)
+  restated, omitted_line_numbers = restatements (parsed_view)
   return [ compact_line ( view_line, link_statuses, herald_tables,
-                          contexts . get ( view_line . line_number ))
-           for view_line in parsed_view ]
+                          contexts . get ( view_line . line_number ),
+                          restated . get ( view_line . line_number, () ))
+           for view_line in parsed_view
+           if view_line . line_number not in omitted_line_numbers ]
 
-def compact_line (view_line, link_statuses, herald_tables, context):
+def compact_line (view_line, link_statuses, herald_tables, context,
+                  restated = ()):
   if not view_line . is_headline:
     return annotate_links (view_line . text, link_statuses)
   title = annotate_links (view_line . title, link_statuses)
-  handle = handle_text (view_line, herald_tables, context)
+  handle = handle_text (view_line, herald_tables, context, restated)
   return ( view_line . stars + " " + title +
            ( " " if title else "" ) + handle )
 
-def handle_text (view_line, herald_tables, context):
-  """'⟨ID HERALDS folded⟩': ID the headline's viewnode ID, HERALDS
-  every herald a client shows for it but a bare 'aC', and 'folded'
-  when a client shows it collapsed."""
+# The word a handle carries for each field a forks-folder member
+# restates of its note, b, the folder's viewparent: its title, its
+# body ('restatements').
+RESTATED_WORDS = { "title" : "title=b", "body" : "body=b" }
+
+def restatements (parsed_view):
+  """({LINE NUMBER: FIELDS}, OMITTED): for each headline of PARSED_VIEW
+  that is a node standing in a forks folder whose title, or nonblank
+  body, equals that of the folder's viewparent node (its note), the
+  fields it restates, 'title' and 'body'; and the line numbers of the
+  bodies it restates, which the compact view leaves out. The clients
+  draw such a member with its title and body covered
+  ('elisp/skg-fork-dedup.el'); a save reads a left-out body back from
+  the full view ('edited_outline')."""
+  headlines = []
+  for view_line in parsed_view:
+    if view_line . is_headline:
+      headlines . append (( view_line, [] ))
+    elif headlines:
+      headlines [-1] [1] . append (view_line)
+  parents = parent_indices_by_level (
+    [ len ( view_line . stars ) for view_line, _ in headlines ] )
+  def body_text (body_lines):
+    return "\n" . join ( line . text for line in body_lines ) . rstrip ()
+  restated = {}
+  omitted = set ()
+  for index, (view_line, body_lines) in enumerate (headlines):
+    folder = parents [index]
+    note = None if folder is None else parents [folder]
+    def has_atom (line, atom):
+      return line . metadata is not None and metadata_has_atom (line . metadata, atom)
+    if ( note is None
+         or not has_atom ( headlines [folder] [0], "forksFolder" )
+         or not has_atom ( view_line, "node" )
+         or not has_atom ( headlines [note] [0], "node" )):
+      continue
+    note_line, note_body = headlines [note]
+    fields = []
+    if view_line . title . strip () and view_line . title == note_line . title:
+      fields . append ("title")
+    body = body_text (body_lines)
+    if body and body == body_text (note_body):
+      fields . append ("body")
+      omitted . update ( line . line_number for line in body_lines )
+    if fields:
+      restated [ view_line . line_number ] = tuple (fields)
+  return restated, omitted
+
+def handle_text (view_line, herald_tables, context, restated = ()):
+  """'⟨ID HERALDS title=b body=b folded⟩': ID the headline's viewnode
+  ID, HERALDS every herald a client shows for it but a bare 'aC', a
+  word for each field it restates of its note ('restatements'), and
+  'folded' when a client shows it collapsed."""
   viewnode_id = headline_viewnode_id (view_line . metadata)
   if viewnode_id is None:
     raise SkgToolError (
@@ -2112,6 +2168,7 @@ def handle_text (view_line, herald_tables, context):
     omitted_relationship_tokens = ( BARE_PARENT_CONTAINS_TOKEN, ))
   if heralds:
     parts . append (heralds)
+  parts += [ RESTATED_WORDS [field] for field in restated ]
   if metadata_has_atom (view_line . metadata, "folded"):
     parts . append ("folded")
   return "⟨" + " " . join (parts) + "⟩"
@@ -2975,6 +3032,23 @@ class OutlineHeadline:
     """The title the report gives the headline: for a placed node, the
     one the server has, once resolved."""
     return self . placed_title if self . placed_title is not None else self . title
+
+def edited_outline (saved_view):
+  """The edited compact view of SAVED_VIEW, parsed, each body the
+  compact view left out because it restates its note's ('restatements')
+  read back from the full view: a headline whose handle still carries
+  'body=b' and that has no body there gets the body the full view gave
+  it. Text written under it is its body instead; to empty the body,
+  take the word away."""
+  edited = parse_edited_compact_view (saved_view . compact_text)
+  original_body = { headline . handle : headline . body
+                    for headline in outline_of_full_view (saved_view . parsed_view) }
+  for headline in edited:
+    if ( RESTATED_WORDS [ "body" ] in headline . tokens
+         and headline . handle in original_body
+         and not any ( line . strip () for line in headline . body )):
+      headline . body = list ( original_body [ headline . handle ] )
+  return edited
 
 def parse_edited_compact_view (compact_text):
   """The edited compact view's headlines, in order. The summary's

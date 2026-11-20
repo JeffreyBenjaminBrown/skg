@@ -186,6 +186,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c v r") #'skg-readable-ids-mode)
     (define-key map (kbd "C-c v R") #'skg-readable-ids-refresh)
     (define-key map (kbd "C-c v s") #'skg-view-linkstack)
+    (define-key map (kbd "C-c v u") #'skg-toggle-fork-dedup-overlay)
     (define-key map (kbd "C-c v w") #'skg-view-without-metadata) )
   (progn;; id navigation (moving among IDs in the current buffer)
     (define-key map (kbd "C-c i n") #'skg-id-next)

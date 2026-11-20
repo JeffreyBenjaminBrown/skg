@@ -1,0 +1,10 @@
+title: 'C-c v u : skg-toggle-fork-dedup-overlay'
+pid: 7be8718c-810c-4959-998b-9dcb1d058bd3
+body: |2-
+  Toggles, in this buffer, the overlays that cover what a member of a
+  forks folder restates of its note: =<b's title, unchanged>= over a
+  title equal to the note's, =<b's body, unchanged>= over such a body
+  (docs/forks.org, "A member that restates its note"). They are on by
+  default (the buffer-local variable 'skg-fork-dedup-overlay'); turn
+  them off to read or edit the text under them. The buffer always holds
+  the real text, and a save sends it.

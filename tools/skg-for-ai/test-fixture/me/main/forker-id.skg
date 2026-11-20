@@ -1,5 +1,6 @@
 pid: forker-id
 title: A forker, outside the view
+body: A body the forker and the forkee share.
 forks:
 - forkee-id
 flags:

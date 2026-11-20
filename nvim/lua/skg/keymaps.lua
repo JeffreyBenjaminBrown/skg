@@ -116,6 +116,9 @@ M.commands = {
                    desc = 'Open a fresh root node in a chosen repo' },
   HeraldsToggle = { module = 'skg.heralds', fn = 'toggle',
                     desc = 'Toggle herald display of metadata', pass_buf = true },
+  ToggleForkDedupOverlay = {
+    module = 'skg.fork_dedup', fn = 'toggle',
+    desc = "Toggle covering what forks-folder members restate", pass_buf = true },
   ToggleRepoOverlayOnLinks = {
     module = 'skg.link_annotations', fn = 'toggle_repo_overlay',
     desc = 'Toggle repo suffixes on Skg links', pass_buf = true },
@@ -419,6 +422,7 @@ M.content_view_bindings = {
   { 'vr', 'ReadableIdsToggle' },         -- C-c v r
   { 'vR', 'ReadableIdsRefresh' },        -- C-c v R
   { 'vs', 'ViewLinkstack' },               -- C-c v s
+  { 'vu', 'ToggleForkDedupOverlay' },      -- C-c v u
   { 'vw', 'ViewWithoutMetadata' },       -- C-c v w
   { 'in', 'IdNext' },                    -- C-c i n
   { 'ip', 'IdPrev' },                    -- C-c i p
