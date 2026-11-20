@@ -15,6 +15,11 @@ use org_literal_ranges::org_literal_ranges;
 static LINK_PATTERN : LazyLock<Regex> =
   LazyLock::new ( || Regex::new (
     r"\[\[id:(.*?)\]\[(.*?)\]\]") . unwrap () );
+/// A label that wraps: each line break in it is followed by a line
+/// that is not blank, since a blank line ends Org's paragraph.
+static LINK_WITH_WRAPPED_LABEL_PATTERN : LazyLock<Regex> =
+  LazyLock::new ( || Regex::new (
+    r"\[\[id:(.*?)\]\[((?:.|\n[ \t]*\S)*?)\]\]") . unwrap () );
 static LINK_LABEL_PATTERN : LazyLock<Regex> =
   LazyLock::new ( || Regex::new (
     r"\[\[.*?\]\[(.*?)\]\]") . unwrap () );
@@ -101,6 +106,22 @@ pub fn links_with_ranges_from_text (
   text: &str )
   -> Vec <(Range<usize>, Link)> {
   captures_outside_literals (&LINK_PATTERN, text) . into_iter ()
+    . map ( |capture| (
+      capture . get (0) . unwrap () . range (),
+      Link::new ( capture [1] . to_string (),
+                      capture [2] . to_string () )) )
+    . collect () }
+
+/// Like 'links_with_ranges_from_text', but a link's label may wrap
+/// across lines, as Org allows within a paragraph (and as filling a
+/// paragraph produces). The Org exporter uses this so that it rewrites
+/// every link Org would show. The rest of Skg does not count such a
+/// link (see 'TODO/problems.org').
+pub fn links_with_wrapped_labels_and_ranges_from_text (
+  text: &str )
+  -> Vec <(Range<usize>, Link)> {
+  captures_outside_literals (&LINK_WITH_WRAPPED_LABEL_PATTERN, text)
+    . into_iter ()
     . map ( |capture| (
       capture . get (0) . unwrap () . range (),
       Link::new ( capture [1] . to_string (),

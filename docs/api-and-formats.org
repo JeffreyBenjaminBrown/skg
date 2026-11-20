@@ -1322,7 +1322,7 @@ one automatically.
     to plain label text. A deep link targets =*Heading=, or =#PID=
     when that headline contains a link or repeats an earlier
     headline's text in its file; only headlines targeted by
-    =#PID= get a =:CUSTOM_ID: PID= drawer.
+    =#PID= get a =:CUSTOM_ID: PID= drawer. Labels may wrap across lines.
   - The same export is available as a CLI subcommand (no running server):
     =cargo run --bin skg -- export-org [config-path] [skgrepo-restriction]
     [output-dir] [--include-overPrivateText-telescopes]=; =skgrepo-restriction=,

@@ -19,8 +19,8 @@ use crate::types::misc::ID;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::links::org_literal_ranges::org_literal_ranges;
 use crate::types::links::{
-  replace_each_link_with_its_label, links_from_text,
-  links_with_ranges_from_text};
+  replace_each_link_with_its_label,
+  links_with_wrapped_labels_and_ranges_from_text};
 
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
@@ -599,7 +599,8 @@ fn custom_id_link_targets (
             if title_is_shown { &node . title } else { "" },
             node . body . as_deref () . unwrap_or ("") ];
           for text in texts {
-            for link in links_from_text (text) {
+            for (_, link) in
+              links_with_wrapped_labels_and_ranges_from_text (text) {
               let pid : ID = resolve_pid (&link . gnid, alias_to_pid);
               linked . push (
                 if homes . contains_key (&pid) { pid }
@@ -667,7 +668,7 @@ fn rewrite_links (
   let sink_pid : ID = ID::from (BROKEN_LINK_SINK_ID);
   let mut out : String = String::new ();
   let mut copied_up_to : usize = 0;
-  for (range, link) in links_with_ranges_from_text (text) {
+  for (range, link) in links_with_wrapped_labels_and_ranges_from_text (text) {
     out . push_str (&text [copied_up_to .. range . start]);
     copied_up_to = range . end;
     let uid : ID = link . gnid;

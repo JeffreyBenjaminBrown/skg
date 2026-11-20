@@ -1874,6 +1874,7 @@ with the same text. So a link to either kind of headline uses its
 node's ID instead, =[[./file.org::#ID][label]]=, and that headline
 gets a =:CUSTOM_ID: ID= property. Only headlines something links to
 get one.
+A label may wrap across lines, as Org allows.
 
 if an exported node contains another export root,
 the second root’s contents go in its own file,

@@ -463,3 +463,23 @@ fn an_unreadable_root_headline_value_is_a_warning () {
   assert_eq! (report . warnings . len (), 1, "{:?}", report . warnings);
   assert! (report . warnings [0] . contains ("maybe"));
 }
+
+#[test]
+fn a_link_whose_label_wraps_is_rewritten () {
+  // Org reads a link whose label wraps across lines of a paragraph; a
+  // blank line ends the paragraph, and so cannot be in a label.
+  let nodes : Vec<Graphnode> = vec! [
+    node ("a", "Root A",
+          Some ("see [[id:b][the\n  bee]] here\n[[id:b][not\n\na link]]"),
+          &["ma", "b"]),
+    node ("ma", &format! ("[[id:{}][how]]", MAGIC),
+          Some ("target_filepath = a"), &[]),
+    node ("b", "Bee", None, &[]),
+  ];
+  let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
+  let a : String =
+    fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
+  assert! (a . contains ("see [[*Bee][the\n  bee]] here\n[[id:b][not\n\na link]]"),
+           "a.org:\n{}", a);
+}

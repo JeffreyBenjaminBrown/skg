@@ -6,6 +6,18 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* Skg does not count a link whose label wraps across lines (2026-11-20)
+  Org reads =[[id:X][a label\nthat wraps]]= as a link (a blank line
+  ends it), and filling a paragraph makes such links. The server's
+  link pattern ('LINK_PATTERN' in 'server/types/links.rs') does not
+  cross a line break, so for the server ('linksTo' and what derives
+  from it, save-time dangling-link warnings, absent-reference cleanup,
+  the vanished-node check, search text) such a link is plain text. The Markdown/Org importer creates
+  them from wrapped links in its input. Only the Org exporter reads
+  them ('links_with_wrapped_labels_and_ranges_from_text'). Making
+  'LINK_PATTERN' match them would change what counts as a link
+  everywhere, and the Neovim client's patterns would need the same
+  change.
 * The diff view does not see a change of attribution alone (2026-11-19)
   A fork's 'attribution' ('docs/forks.org', "Attribution") is no
   change fact of the diff view: 'node_changes_between' in
