@@ -523,8 +523,9 @@ alias, ID or flag in its folder, '+' or '-'; on an unknown viewnode,
 headlines the diff view adds to explain a change show their labels:
 'old title' (or 'old body', 'old title and body') and 'body diff',
 'its content changed' (a changeset marker), '⌂ -OLD +NEW' (a move to
-another skgrepo) and 'relationship moved from OLD to NEW'; each takes
-a '✓' when processed. A folder shown because a member's relationship to
+another skgrepo), 'relationship moved from OLD to NEW', and a node's
+other changes in words ('its content was reordered', 'its attribution
+changed', joined by '; '); each takes a '✓' when processed. A folder shown because a member's relationship to
 the folder's parent changed reads 'its other containers changed (other
 files)' and so on, with '✓' when every such change is processed. In the
 skgrepo-changes buffer a moved node adds '-OLD +NEW', and 'Δ⌂=a' when
@@ -1670,12 +1671,25 @@ and what each change replaced. A deleted node stands as its ghost,
 with HEAD's title and body; a changed title or body has its old text
 under it ('oldText ...'), a changed body its line diff ('bodyDiff');
 a changed content list a 'changesetMarker content', and a removed
-member stands where it stood, marked '~-'. The handles carry the
+member stands where it stood, marked '~-'. What a node's file changed
+that none of those shows (its text moved between a private and a
+public section, its attribution changed, an alias moved to another
+skgrepo, a list was reordered) is one headline under it, just above
+its content, its other changes ('otherChanges ...'), whose handle says
+them in words; for a reordered list its body shows the old order
+against the new, a line a member, '-' at HEAD, '+' now:
+#+begin_example
+** ⟨0c its content was reordered⟩
+The order of its content (- at HEAD, + now):
++Second child, a forker
+ First child, renamed
+-Second child, a forker
+#+end_example
+The handles carry the
 change facts (see "Change facts, in the diff view"). There are up to
 four buffers, written in this order when not empty: all changes, the
 nodeMerges, the moves between skgrepos, and the nodes whose only
-changes are ones no mark covers (the order of a list, mostly; see
-"Committing"). Each is a view like any other: it can
+change is the order of some list (which all changes shows too). Each is a view like any other: it can
 be edited and saved, and its save answers with the processed summary.
 After any save, 'diff' again for a fresh rendering; a save of a diff
 buffer rewrites that buffer's files.
@@ -1697,8 +1711,10 @@ list, so that 'processed rel' on a headline whose relationship did not
 change is an error. A headline showing one change (an old text, an
 alias, a move, an unknown viewnode) is marked by the letter of its
 kind: a relationship moved between skgrepos and an unknown or
-restricted viewnode's membership by 'rel' or 'both', any other by
-'node' or 'both'. On a changed folder the words mark its members one level down;
+restricted viewnode's membership by 'rel' or 'both', any other (a
+node's other changes among them) by 'node' or 'both'. A mark covers
+the change as it is now: a reorder's mark lapses when the list is
+reordered again. On a changed folder the words mark its members one level down;
 on a changeset marker ('its content changed') 'rel' marks the changed
 relationships it gathers and 'node' its members' own changes.
 
@@ -1772,19 +1788,18 @@ Committed 2 nodes, in public (9c1e40d2...), private (41aa07fe...). 2 changed nod
 When nothing is processed it prints "Nothing is processed, so nothing
 was committed; 'commit --all' commits everything."
 
-A node whose files changed in a way no mark covers is not processed,
-however many of its marks are set, and 'commit' leaves it out: its
-text moved between a private and a public section (a Hoist), its
-attribution changed, an alias moved to another skgrepo, the order of
-one of its lists changed, or one of its files changed in a way the
-diff view does not show, because that file, at HEAD or now, is not
-byte for byte what skg writes (another field order, say; a file only
-so changed counts as left too). The diff view shows none of these as
-a change to mark ('docs/diff-view.org', "Changes no mark covers"), so
-such a node goes in only with 'commit --all', or with Git. The tool
-names each, with how it changed:
+A reorder, a Hoist, a stripped attribution and an alias moved to
+another skgrepo are each a change to mark like any other (a node's
+other changes, above), and 'commit' takes the node once they are
+marked. A node one of whose files, at HEAD or now, is not byte for
+byte what skg writes (another field order, say; a file only so
+changed counts as left too) is not processed, however many of its
+marks are set, and 'commit' leaves it out: its file may have changed
+in a way the diff view does not show, and no mark covers that
+('docs/diff-view.org', "Changes no mark covers"), so such a node goes
+in only with 'commit --all', or with Git. The tool names each:
 #+begin_example
-Nothing was committed. 1 changed node is left; 1 of them changed in a way no mark covers, which 'commit --all' or Git can commit: 'Spring' (its text moved between a private and a public section).
+Nothing was committed. 1 changed node is left; 1 of them changed in a way no mark covers, which 'commit --all' or Git can commit: 'Spring' (its file changed in a way the diff view does not show (formatting, say)).
 #+end_example
 'commit --all' takes them, and a file that differs from HEAD only in
 bytes the parser does not read, which it counts, so it can take more

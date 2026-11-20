@@ -384,7 +384,7 @@ So far there are these endpoints:
        When the saved buffer is one of the diff view's, the point
        entries are followed by =(processed-summary (processed N) (changed M) (foreign F) (order-only O) (waiting W) (notEditable K))=:
        of the M changed nodes of the owned skgrepos (O of them changed only
-       in order, and so processed), N are processed, and W of those N are
+       in the order of some list), N are processed, and W of those N are
        held back by a commit of the processed, which would wait for a
        node that does not go in (=docs/diff-view.org=, "Which nodes go
        in"); F nodes changed in foreign skgrepos, counted by the stems
@@ -1025,10 +1025,11 @@ keeps them as text ('TODO/problems.org').
       (=names-new=, =still-named= or =merge=), and the node it waits for,
       with its title; titles are sent whole, since the connection is
       unrestricted. Each =unmarkable= entry is a node left out because
-      its files changed in a way no mark covers, though every mark it
-      can take is set (=docs/diff-view.org=, "Changes no mark covers"),
-      its title, and each such change, in the user's words ("its
-      attribution changed", say). For a commit of everything =waiting=
+      one of its files is not what skg writes for it, though every mark
+      it can take is set (=docs/diff-view.org=, "Changes no mark
+      covers"), its title, and that change, in the user's words: "its
+      file changed in a way the diff view does not show (formatting,
+      say)". For a commit of everything =waiting=
       and =unmarkable= are empty and L is 0. When nothing is processed,
       or nothing changed, =commits= is empty and N is 0 (for a commit
       of everything, unless some file changed only in bytes the parser
@@ -2772,8 +2773,7 @@ their requests and to count the leaves an unmark touches.
 **** =(processed OBJECT...)= -- the diff objects whose change-forest leaves are all marked processed
 The objects are those of =(leaves ...)= that are processed. A bare
 =(processed)= marks a headline that lists no object (one naming a
-single leaf). The order-only changeset marker names no leaf, and is
-never processed: no mark covers the change it stands for. Absent
+single leaf). Absent
 when nothing is processed. A
 headline is processed when its =(processed ...)= names every object its
 =(leaves ...)= lists.
@@ -2904,7 +2904,18 @@ title, its body the old body.
 Each line is prefixed by a space, =-= or =+=.
 **** =(homeSkgrepoMove (old REPO) (new REPO))= -- the node's home skgrepo moved
 **** =(relRepoMove (old REPO) (new REPO))= -- under a member: the skgrepo recording its relationship to its viewparent moved
-**** =(changesetMarker content)=, =(changesetMarker relRepo)=, =(changesetMarker orderOnly)= -- a changeset marker
+**** =(changesetMarker content)=, =(changesetMarker relRepo)= -- a changeset marker
+**** =(otherChanges KIND...)= -- what the node's files changed that no other leaf records
+Each KIND is one way: =sectionMove= (its text moved between a private
+and a public section), =attributionChange=, =aliasSkgrepoMove= (an
+alias moved to another skgrepo), =contentOrder=, =forksOrder=,
+=hiddenOrder=, =aliasOrder=, =idOrder=, =flagOrder= (that list was
+reordered) and =otherInFile= (something else in its file changed). Its
+headline has no title. Its body, for each reordered list, is a header
+naming the list and the line diff of the order of the members both
+graphs give it, each line prefixed by a space, =-= (HEAD) or =+= (now);
+the parser keeps it and nothing reads it. One leaf, marked bare
+(=docs/diff-view.org=, "Other changes to a node's file").
 **** =acquiredByFolder=, =acquiredFolder= are write-protected and derived
 Under a ghost, an =acquiredByFolder= holds the node that acquired it
 by a nodeMerge; under an acquirer, an =acquiredFolder= holds the

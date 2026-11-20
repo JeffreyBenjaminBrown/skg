@@ -1764,8 +1764,8 @@ processed summary only counts their changed nodes.
 
 A headline the diff view adds to describe a change
 ('ChangeViewnode'): a node's old text, with its body diff; its home
-skgrepo move; its changeset markers; and, under a member, the relRepo
-move of the member's relationship. At each refresh an occurrence's
+skgrepo move; its changeset markers; its other changes; and, under a
+member, the relRepo move of the member's relationship. At each refresh an occurrence's
 change viewnodes are recomputed in place from the straddle: kept
 while the change exists, drawn when missing, entombstoned when the
 change is gone, the tombstone keeping what the user drew under it
@@ -1835,7 +1835,19 @@ content relationships; 'newOutward' follows every relationship in its
 recorded direction ("out") and names every leaf each new node
 records. A *diff aspect* is what a
 change-forest leaf is about: existence, text, home skgrepo, an alias,
-an extra ID, a flag, or relRepo.
+an extra ID, a flag, other changes, or relRepo.
+
+**** other changes
+
+What a node's files changed that no other change-forest leaf records,
+all of it one leaf of the node, drawn as one change viewnode
+('(otherChanges KIND...)'): its text moved between a private and a
+public section, its attribution changed, an alias moved to another
+skgrepo, one of its lists was reordered, or something else in its file
+changed. Its herald names each in those words, and its body shows the
+old order of a reordered list against the new. Its mark covers the
+state it was made on: a later change of the same kind unmarks it
+('docs/diff-view.org', "Other changes to a node's file").
 
 **** C, R, U, D, content origin
 
@@ -1911,12 +1923,9 @@ changeset marker is another thing.
 
 A childless change viewnode ('ChangeViewnode::ChangesetMarker') that
 stands for a set of changes recorded in its parent's file, and carries
-their derived processed state. There are three kinds: the content changeset
-marker ("its content changed"), the relRepo changeset marker ("some
-content relationships changed skgrepo") and the order-only changeset marker
-("order-only change", which is never processed, since no mark covers
-the change it stands for; see "Changes no mark covers" in
-'docs/diff-view.org').
+their derived processed state. There are two kinds: the content changeset
+marker ("its content changed") and the relRepo changeset marker ("some
+content relationships changed skgrepo").
 
 **** removed member, former member
 
@@ -2064,8 +2073,8 @@ ordinary sense.
 The order in which a buffer of the diff view shows a list that
 changed: the worktree's list, each member HEAD alone had placed
 before the next member of HEAD's order that the worktree kept, or
-last ('interleaved_diff_without_reorders'). A reorder alone shows
-nothing.
+last ('interleaved_diff_without_reorders'). A reorder alone adds or
+removes no member there; it is its recorder's other changes.
 
 **** context node
 

@@ -867,13 +867,11 @@ it needs a node that does not go in: it names a new node that does
 not, it is deleted and a node that does not go in still names it, or
 it is part of a merge whose other parts do not all go in.
 
-A node whose files changed in a way no mark covers is not processed,
-so <localleader>rc leaves it out, however many of its marks are set:
-its text moved between a private and a public section, its
-attribution changed, an alias moved to another skgrepo, the order of
-one of its lists changed, or its file changed in a way the diff view
-does not show (formatting, say). The diff view shows none of these as
-a change to mark, so for now such a node goes in only with
+A node one of whose files, at HEAD or now, is not what skg writes for
+it (another field order, say, which only a hand edit makes) is not
+processed, so <localleader>rc leaves it out, however many of its
+marks are set: its file may have changed in a way the diff view does
+not show, and no mark covers. Such a node goes in only with
 <localleader>rC, or with Git.
 
 It opens the buffer 'skg://commit-message' in a split, in which you
@@ -890,8 +888,8 @@ left; 1 of them is processed but waits: 'Plans for spring' names 'Seed
 order', which is new and does not go in." It names each node left
 because it changed in a way no mark covers, and how: "...; 1 of them
 changed in a way no mark covers, which <localleader>rC or Git can
-commit: 'Spring' (its text moved between a private and a public
-section)." When nothing is processed it says "Nothing is processed,
+commit: 'Spring' (its file changed in a way the diff view does not
+show (formatting, say))." When nothing is processed it says "Nothing is processed,
 so nothing was committed; <localleader>rC commits everything."
 
 After sending, the buffer keeps the message until it is moot: once
@@ -978,9 +976,21 @@ another). A headline whose
 change is processed shows ✓ after it; a processed aggregate (a
 folder of changes, a changeset marker) shows ✓ when all of its changes are. A node that
 existed at HEAD and has changes of its own (its text, home skgrepo,
-aliases, extra IDs, flags) shows M ("modified"), and M✓ once those are
+aliases, extra IDs, flags, other changes such as a reordered list)
+shows M ("modified"), and M✓ once those are
 marked (<localleader>mnp); a node whose only change is which children it contains
 shows no M, its children's ~ showing those changes.
+
+A node's other changes, the ways its files changed that no other
+headline shows (its text moved between a private and a public
+section, its attribution changed, an alias moved to another skgrepo,
+one of its lists was reordered, or something else in its file
+changed), are one headline under it, just above its content, which
+says them in those words: "its content was reordered". For a
+reordered list its body shows the old order against the new, a line
+a member, '-' at HEAD and '+' now. n marks it. The mark covers the
+order (or attribution, or section) it was made on: change it the same
+way again and the mark lapses.
 
 After every save of one of the diff view's buffers, a
 notification shows the processed summary, in nodes, the unit
@@ -988,9 +998,7 @@ notification shows the processed summary, in nodes, the unit
 them waits)", or "Commit ready. All 14 of 14 changed nodes are
 processed." "Commit ready" means <localleader>rc would commit every
 changed node. A changed node counts as processed when every change it
-records is marked and its files changed in no way a mark cannot cover
-(see <localleader>rc), so a node whose only change is the order of a
-list is never processed; a processed node waits when <localleader>rc
+records is marked, its other changes among them; a processed node waits when <localleader>rc
 would hold it back (see <localleader>rc). The summary
 adds how many changes are not editable in this view (<localleader>ru
 extends the diff view to them) and how many nodes changed in foreign
@@ -1013,10 +1021,10 @@ processed, u unprocessed); the Emacs keys are C-c m and the same
 letters. A headline shows two things that can change: its node (∃+
 new, ∃- deleted, M modified) and its relationship to the headline above
 it (~+, ~-). On a modified node, n marks the changes of the node
-itself: its text, home skgrepo, aliases, extra IDs and flags, not the
+itself: its text, home skgrepo, aliases, extra IDs, flags and other changes, not the
 containment of its children, which each child's own ~ shows and r
 marks. A headline that is one change (an old text, an alias, an ID, a
-flag, a home-skgrepo move) is marked by n or b; an unknown node's membership, or a
+flag, a home-skgrepo move, a node's other changes) is marked by n or b; an unknown node's membership, or a
 relationship moved to another skgrepo, by r or b. On a changeset marker ("its content
 changed"), r marks the changed memberships it stands for and n the
 changes of those members themselves. On a folder of changes, the
@@ -1221,10 +1229,10 @@ nodes that record a relationship whose relRepo changed, each with all
 of its changes; a moved node's
 heralds read "-OLD +NEW", followed by "Δ⌂=a" when its nearest moved
 ancestor (a, the viewparent; b, the grandparent; ...) moved the same
-way. The order-only buffer lists the nodes whose files changed in
-ways no mark covers and in no other way (the order of a list, mostly),
-each with its content in the new order; <localleader>rc leaves them
-out.
+way. The order-only buffer lists the nodes whose only change is the
+order of some list, each with its other changes, which show the old
+order against the new and take the mark, then its content in the new
+order. The all-changes buffer shows them too.
 *** <localleader>ve : :SkgViewNewEmpty
 Opens a blank Skg content view in which to create new nodes.
 **** why
