@@ -483,3 +483,79 @@ fn a_link_whose_label_wraps_is_rewritten () {
   assert! (a . contains ("see [[*Bee][the\n  bee]] here\n[[id:b][not\n\na link]]"),
            "a.org:\n{}", a);
 }
+
+#[test]
+fn a_label_that_is_its_own_destination_exports_unlabeled () {
+  // The importer labels an unlabeled link with its destination. If
+  // that label, read as a link, goes where the export link goes, the
+  // link exports unlabeled, as it was. A label that Org would read as
+  // a text search ('b.org') keeps the link labeled.
+  let nodes : Vec<Graphnode> = vec! [
+    node ("a", "Root A",
+          Some ("[[id:b][file:b.org]] [[id:b][./b.org]] [[id:b][b.org]] [[id:c][file:b.org::*Cee]] [[id:a2][*Ay two]] [[id:c][file:other.org]]"),
+          &["ma", "a2"]),
+    node ("ma", &format! ("[[id:{}][how]]", MAGIC),
+          Some ("target_filepath = a"), &[]),
+    node ("a2", "Ay two", None, &[]),
+    node ("b", "Bee", None, &["mb", "c"]),
+    node ("mb", &format! ("[[id:{}][how]]", MAGIC),
+          Some ("target_filepath = b"), &[]),
+    node ("c", "Cee", None, &[]),
+  ];
+  let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
+  let a : String =
+    fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
+  assert! (a . contains (
+    "[[file:b.org]] [[./b.org]] [[./b.org][b.org]] [[file:b.org::*Cee]] [[*Ay two]] [[./b.org::*Cee][file:other.org]]"),
+    "a.org:\n{}", a);
+}
+
+#[test]
+fn a_headline_with_its_own_custom_id_is_linked_by_it () {
+  // A CUSTOM_ID in the drawer that begins a body (as an imported
+  // document has) addresses that headline, even where the exporter
+  // would otherwise use '#PID', and no second drawer is added.
+  let nodes : Vec<Graphnode> = vec! [
+    node ("a", "Root A",
+          Some ("[[id:t][plain]] [[id:l][linked]] [[id:r][repeat]]"),
+          &["ma", "t", "l", "first", "r"]),
+    node ("ma", &format! ("[[id:{}][how]]", MAGIC),
+          Some ("target_filepath = a"), &[]),
+    node ("t", "Target",
+          Some (":PROPERTIES:\n:CUSTOM_ID: tee\n:END:\nText"), &[]),
+    node ("l", "Has [[id:t][a link]]",
+          Some (":properties:\n:ID: x\n:custom_id: ell\n:end:"), &[]),
+    node ("first", "Same", None, &[]),
+    node ("r", "Same", Some (":PROPERTIES:\n:CUSTOM_ID: r\n:END:"), &[]),
+    node ("z", "Zed", Some ("[[id:t][far]]"), &["mz"]),
+    node ("mz", &format! ("[[id:{}][how]]", MAGIC),
+          Some ("target_filepath = z"), &[]),
+  ];
+  let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
+  let a : String =
+    fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
+  assert! (a . contains ("[[#tee][plain]] [[#ell][linked]] [[#r][repeat]]"),
+           "a.org:\n{}", a);
+  assert_eq! (a . matches (":PROPERTIES:") . count (), 2, "a.org:\n{}", a);
+  assert_eq! (a . matches (":CUSTOM_ID:") . count (), 2, "a.org:\n{}", a);
+  let z : String =
+    fs::read_to_string (dir . path () . join ("z.org")) . unwrap ();
+  assert! (z . contains ("[[./a.org::#tee][far]]"), "z.org:\n{}", z);
+}
+
+#[test]
+fn leading_spaces_in_a_title_are_kept () {
+  let nodes : Vec<Graphnode> = vec! [
+    node ("a", "Root A", None, &["ma", "b"]),
+    node ("ma", &format! ("[[id:{}][how]]", MAGIC),
+          Some ("target_filepath = a"), &[]),
+    node ("b", "   spaced", None, &[]),
+  ];
+  let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  export_to_org (&restriction_all (), &nodes, dir . path ()) . unwrap ();
+  let a : String =
+    fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
+  assert! (a . ends_with ("* Root A\n**    spaced\n"), "a.org:\n{}", a);
+}

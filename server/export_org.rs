@@ -562,7 +562,8 @@ fn build_homes (
         && ! earlier_anchors . insert ( anchor_text (node) );
       if homes . contains_key (&ev . pid) { continue; }
       let search : String =
-        if anchor_is_repeat { format! ("#{}", node . pid) }
+        if anchor_is_repeat && own_custom_id (node) . is_none () {
+          format! ("#{}", node . pid) }
         else { org_search_for_heading (node) };
       homes . insert (
         ev . pid . clone (),
@@ -607,7 +608,10 @@ fn custom_id_link_targets (
                 else { sink_pid . clone () } ); }} }, }}
     for pid in linked {
       if let Some (home) = homes . get (&pid) {
-        if link_uses_custom_id (home, &root . target) {
+        let drawer_declares_it : bool = by_pid . get (&pid)
+          . is_some_and ( |node| own_custom_id (node) . is_some () );
+        if link_uses_pid_as_custom_id (home, &root . target, &pid)
+           && ! drawer_declares_it {
           targets . insert (pid); }}}}
   targets }
 
@@ -642,7 +646,8 @@ fn render_root (
           let headline : String = // keeps its links, rewritten like body links
             rewrite_links ( &node . title, target, homes,
                             alias_to_pid, broken, warnings );
-          out . push_str ( & format! ("{} {}\n", stars, headline . trim ()) );
+          out . push_str ( & format! ( // leading spaces, as in "*   x", are kept
+            "{} {}\n", stars, headline . trim_end () ) );
           if custom_id_targets . contains (&node . pid) {
             out . push_str ( & format! (
               ":PROPERTIES:\n:CUSTOM_ID: {}\n:END:\n", node . pid ) ); }}
@@ -699,28 +704,52 @@ fn org_link_for_home (
   label          : &str,
 ) -> String {
   let same : bool = home . target == current_target;
-  match &home . kind {
+  let destination : String = match &home . kind {
     HomeKind::Root { search } =>
-      if same && ! search . is_empty () { format! ("[[{}][{}]]", search, label) }
-      else { format! ("[[{}][{}]]",
-                      relpath (current_target, &home . target),
-                      label) },
+      if same && ! search . is_empty () { search . clone () }
+      else { relpath (current_target, &home . target) },
     HomeKind::Content { search } =>
-      if same { format! ("[[{}][{}]]", search, label) }
-      else    { format! ("[[{}::{}][{}]]",
+      if same { search . clone () }
+      else    { format! ("{}::{}",
                          relpath (current_target, &home . target),
-                         search, label) }, }}
+                         search) }, };
+  if label_is_a_link_to (label, &destination) {
+    format! ("[[{}]]", label) }
+  else { format! ("[[{}][{}]]", destination, label) }}
 
-/// Whether 'org_link_for_home' would address this home by CUSTOM_ID
-/// from a link in 'current_target'.
-fn link_uses_custom_id (
+/// Whether 'label', read as an Org link destination, goes where
+/// 'destination' does: a 'file:' or './' spelling of the same path and
+/// search, or the same search. Such a link exports unlabeled, as Org
+/// shows an unlabeled link's destination as its text; that is how the
+/// importer labels one. A label merely naming the file, like 'x.org',
+/// does not qualify: unlabeled, Org would read it as a text search.
+fn label_is_a_link_to (
+  label       : &str,
+  destination : &str,
+) -> bool {
+  let label_is_a_file_link : bool =
+    label . starts_with ("file:") || label . starts_with ("./")
+    || label . starts_with ("../");
+  let label_is_a_search : bool =
+    label . starts_with ('*') || label . starts_with ('#');
+  if label_is_a_search { return label == destination; }
+  if ! label_is_a_file_link { return false; }
+  let path : &str = label . strip_prefix ("file:") . unwrap_or (label);
+  path . strip_prefix ("./") . unwrap_or (path)
+    == destination . strip_prefix ("./") . unwrap_or (destination) }
+
+/// Whether 'org_link_for_home' would address this home, the node
+/// 'pid', by the CUSTOM_ID PID from a link in 'current_target'.
+fn link_uses_pid_as_custom_id (
   home           : &Home,
   current_target : &str,
+  pid            : &ID,
 ) -> bool {
+  let pid_search : String = format! ("#{}", pid);
   match &home . kind {
     HomeKind::Root { search } =>
-      home . target == current_target && search . starts_with ('#'),
-    HomeKind::Content { search } => search . starts_with ('#'), }}
+      home . target == current_target && *search == pid_search,
+    HomeKind::Content { search } => *search == pid_search, }}
 
 /// Relative path from the file at `from_target` to the file at
 /// `to_target` (both extension-less, '/'-separated, under the same
@@ -790,11 +819,35 @@ fn title_has_link (
 ) -> bool {
   LINK_PATTERN . is_match (&node . title) }
 
+/// A headline's own CUSTOM_ID, declared in a property drawer that
+/// begins its body (as in an imported document), addresses it best;
+/// failing that, its PID does when its title has a link.
 fn org_search_for_heading (
   node : &Graphnode,
 ) -> String {
-  if title_has_link (node) { format! ("#{}", node . pid) }
+  if let Some (custom_id) = own_custom_id (node) {
+    format! ("#{}", custom_id) }
+  else if title_has_link (node) { format! ("#{}", node . pid) }
   else { format! ("*{}", anchor_text (node)) }}
+
+/// The CUSTOM_ID in the property drawer that begins 'node''s body, if
+/// any. Exported right after the headline, that drawer is the
+/// headline's.
+fn own_custom_id (
+  node : &Graphnode,
+) -> Option<String> {
+  let mut lines = node . body . as_deref () ? . lines ()
+    . skip_while ( |line| line . trim () . is_empty () );
+  if ! lines . next () ? . trim () . eq_ignore_ascii_case (":PROPERTIES:") {
+    return None; }
+  for line in lines {
+    let line : &str = line . trim ();
+    if line . eq_ignore_ascii_case (":END:") { return None; }
+    let Some (name) = line . get (.. ":CUSTOM_ID:" . len ()) else { continue; };
+    if ! name . eq_ignore_ascii_case (":CUSTOM_ID:") { continue; }
+    let value : &str = line [":CUSTOM_ID:" . len () ..] . trim ();
+    if ! value . is_empty () { return Some (value . to_string ()); }}
+  None }
 
 fn anchor_text (
   node : &Graphnode,

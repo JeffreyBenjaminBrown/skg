@@ -1873,7 +1873,12 @@ a link by its text, and finds only the first of several headlines
 with the same text. So a link to either kind of headline uses its
 node's ID instead, =[[./file.org::#ID][label]]=, and that headline
 gets a =:CUSTOM_ID: ID= property. Only headlines something links to
-get one.
+get one. A node whose body begins with a property drawer giving a
+=CUSTOM_ID= (as an imported headline's can) is linked to by that,
+=[[./file.org::#CUSTOM_ID][label]]=, and gets no second drawer.
+A link whose label is itself a link to the same place
+(such as =file:file.org=, the label the importer gives an unlabeled link)
+is exported without a label, as =[[file:file.org]]=.
 A label may wrap across lines, as Org allows.
 
 if an exported node contains another export root,
