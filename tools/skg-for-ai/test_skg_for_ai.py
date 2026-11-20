@@ -277,15 +277,14 @@ def failures_of_commit_result_text ():
   no mark covers, with how, and says what can commit it."""
   response = skg_for_ai . parse_sexp (
     '((commits (("main" "9c1e40d2"))) (committed-nodes 1) (left-nodes 2)'
-    ' (waiting ()) (unmarkable (("h" "H" ("its text moved between a private and a public section"))'
-    ' ("t" "T" ("its attribution changed" "the order of its content changed"))))'
+    ' (waiting ()) (unmarkable (("h" "H" ("its file changed in a way the diff view does not show (formatting, say)"))'
+    ' ("t" "T" ("its file changed in a way the diff view does not show (formatting, say)"))))'
     ' (errors ()) (warnings ()))' )
   text = skg_for_ai . commit_result_text (response)
   expected = ( "Committed 1 node, in main (9c1e40d2). 2 changed nodes are left;"
                " 2 of them changed in ways no mark covers, which 'commit --all'"
-               " or Git can commit: 'H' (its text moved between a private and a"
-               " public section); 'T' (its attribution changed, the order of its"
-               " content changed)." )
+               " or Git can commit: 'H' (its file changed in a way the diff view does not show (formatting, say));"
+               " 'T' (its file changed in a way the diff view does not show (formatting, say))." )
   return ( [] if text == expected
            else [ f"the commit's line is {text!r}, not {expected!r}" ] )
 
@@ -2115,7 +2114,7 @@ def failures_of_reviewing (scratch, data_root):
                 check_unconfirmed_commit,
                 check_restoring_a_deleted_node, check_confirmed_commit,
                 check_extending_the_diff_view, check_marking_a_subtree_processed,
-                check_blank_commit_message ]:
+                check_marking_a_reorder, check_blank_commit_message ]:
     try:
       case (context)
     except CaseFailure as failure:
@@ -2380,6 +2379,57 @@ def check_marking_a_subtree_processed (context):
     saved_line (0) + "Processed: 0 of 2 changed nodes are processed.\n" +
     diff_written_paths (folder),
     ignoring_view_ids = True )
+
+REORDER_COMMIT_MESSAGE = "Put the second child first."
+
+def check_marking_a_reorder (context):
+  """A reorder of the root's content, saved through a content view, is
+  the root's other changes: the diff view shows it as 'its content was
+  reordered', with the old order against the new in its body, and
+  writes the order-only buffer too. 'processed node' marks it, and
+  'commit' takes the root."""
+  require_tool_run ([ "commit", "Before the reorder.", "--all", "--yes" ])
+  view = fresh_root_view (context, "reorder")
+  compact_path = os . path . join (view, "view_root-id.compact.org")
+  lines = read_file (compact_path) . split ("\n")
+  first = next ( i for i, line in enumerate (lines)
+                 if line . startswith ("** First child, renamed ⟨") )
+  second = next ( i for i, line in enumerate (lines)
+                  if line . startswith ("** Second child, a forker ⟨") )
+  end = len (lines) - 1 if lines [-1] == "" else len (lines)
+  lines = lines [ : first ] + lines [ second : end ] + lines [ first : second ] + lines [ end : ]
+  with open (compact_path, "w") as f:
+    f . write ( "\n" . join (lines) )
+  require_save_succeeds (view)
+  folder = os . path . join ( context [ "scratch" ], "review", "reorder" )
+  completed = require_tool_run ([ "diff", "--out-dir", folder ])
+  if "diff_order-only-changes.compact.org" not in completed . stdout:
+    raise CaseFailure ( f"'diff' wrote no order-only buffer: {completed . stdout!r}" )
+  shown = ( "its content was reordered⟩\n"
+            "The order of its content (- at HEAD, + now):\n"
+            "+Second child, a forker\n"
+            " First child, renamed\n"
+            "-Second child, a forker\n" )
+  require_in_diff_compact (folder, shown)
+  edit_compact ( folder, [ ( "its content was reordered⟩",
+                             "its content was reordered processed node⟩" ) ],
+                 DIFF_BASE_NAME )
+  require_output (
+    run_tool ([ "save", sidecar_of_diff (folder), "--yes" ]),
+    diff_report_head () +
+    "Processed: ⟨0c⟩ (otherChanges contentOrder), as '(processed)'.\n" +
+    saved_line (0) +
+    "Processed: Commit ready. All 1 of 1 changed nodes are processed.\n" +
+    diff_written_paths (folder),
+    ignoring_view_ids = True )
+  require_in_diff_compact ( folder, "its content was reordered✓⟩\n" )
+  completed = run_tool ([ "commit", REORDER_COMMIT_MESSAGE ], standard_input = "" )
+  head = git ( context [ "main_repo" ], [ "rev-parse", "HEAD" ] ) . strip ()
+  require_output ( completed, f"Committed 1 node, in main ({head}).\n" )
+  require_equal ( "the files the reorder's commit took",
+                  git ( context [ "main_repo" ],
+                        [ "show", "--name-only", "--format=", "HEAD" ] ),
+                  "root-id.skg\n" )
 
 def check_blank_commit_message (context):
   """A blank message is refused before anything is sent: no server
@@ -3199,7 +3249,7 @@ def check_marking_like_moves_processed (context):
   require_in_diff_compact ( folder, "** ⟨0b ⌂ -private +main✓⟩\n" )
   require_in_diff_compact ( folder, "** Its private leaf ⟨0d M✓⟩\n"
                                     "*** ⟨0e ⌂ -private +main✓⟩\n" )
-  require_in_diff_compact ( folder, "***** ⟨0t ⌂ -private +main⟩\n" )
+  require_in_diff_compact ( folder, "***** ⟨0u ⌂ -private +main⟩\n" )
 
 def check_deleting_references (context):
   """'delete-references ID' sends nothing without '--yes'; with it the

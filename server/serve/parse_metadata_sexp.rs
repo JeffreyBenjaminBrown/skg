@@ -37,7 +37,8 @@
 //!     (oldText titleAndBody | title | body)
 //!     (homeSkgrepoMove (old REPO) (new REPO))
 //!     (relRepoMove (old REPO) (new REPO))
-//!     (changesetMarker content | relRepo | orderOnly)
+//!     (changesetMarker content | relRepo)
+//!     (otherChanges KIND...), KIND as 'OtherChange::wire_name' writes it
 //!   each of which may carry '(editRequest PROCESSED)';
 //!   bodyDiff, tombstone, forestRoot and the folders' bare atoms,
 //!   which carry nothing.
@@ -67,7 +68,7 @@ use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
   ChangeFacts, DiffObject, FoldAndFocus, ProcessedRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
-  ChangesetMarkerKind, PropertyMember, ChangeViewnode, Folder,
+  ChangesetMarkerKind, OtherChange, PropertyMember, ChangeViewnode, Folder,
   Ghost, GnidOnlyKind, GnidOnlyVognode,
   Editability, RelationshipEditRequest, ViewnodeId, Warrant,
 };
@@ -417,8 +418,9 @@ fn occurrence_from_metadata (
 
 /// The change viewnode a change viewnode's metadata, title and body
 /// say. An OldText's text comes from the headline and the body (the
-/// parser marks only which aspects it shows), a BodyDiff's from the
-/// body; any other refuses a body.
+/// parser marks only which aspects it shows), a BodyDiff's and the
+/// order diff of an OtherChanges from the body; any other refuses a
+/// body.
 fn change_viewnode_from_metadata (
   change   : &ChangeViewnode,
   title    : String,
@@ -435,6 +437,11 @@ fn change_viewnode_from_metadata (
     ChangeViewnode::BodyDiff { .. } =>
       ( ViewnodeKind::ChangeViewnode ( ChangeViewnode::BodyDiff {
           diff : body . unwrap_or_default () } ),
+        None, None ),
+    ChangeViewnode::OtherChanges { changes, .. } =>
+      ( ViewnodeKind::ChangeViewnode ( ChangeViewnode::OtherChanges {
+          changes : changes . clone (),
+          orders  : body . unwrap_or_default () } ),
         None, None ),
     other =>
       ( ViewnodeKind::ChangeViewnode ( other . clone () ),
@@ -686,6 +693,15 @@ fn classify_metadata_element (
               ChangeViewnode::HomeSkgrepoMove { skgrepo_change }
             } else {
               ChangeViewnode::RelRepoMove { skgrepo_change } } )) },
+        "otherChanges" => {
+          let changes : Vec<OtherChange> = args . iter ()
+            . map ( |arg| {
+              let name : String = atom_to_string (arg) ?;
+              OtherChange::from_wire_name (&name) . ok_or_else ( || format! (
+                "Unknown otherChanges kind: {}", name )) } )
+            . collect::<Result<Vec<OtherChange>, String>> () ?;
+          whole ( MetadataKind::ChangeViewnode ( ChangeViewnode::OtherChanges {
+            changes, orders : String::new () } )) },
         "changesetMarker" => {
           let name : String = single_argument (&head, args) ?;
           let kind : ChangesetMarkerKind =

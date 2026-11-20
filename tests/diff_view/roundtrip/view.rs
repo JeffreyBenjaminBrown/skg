@@ -29,7 +29,8 @@ use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::nodes::rust::GraphnodeInRust;
 use skg::types::tree::moves::{move_before, move_to_first_child};
 use skg::types::viewnode::{
-  ChangesetMarkerKind, Existence, ChangeViewnode, Folder, Viewnode, ViewnodeKind,
+  ChangesetMarkerKind, Existence, ChangeViewnode, Folder, OrderedList, OtherChange,
+  Viewnode, ViewnodeKind,
   Vognode, mk_unknown_viewnode, mk_writeProtected_viewnode, viewnode_of};
 use skg::types::views_state::ViewforestId;
 
@@ -158,7 +159,10 @@ fn buffer_with_every_new_viewnode (
       id : ID::from ("b"), existence : None,
       relRepo_before : Some (SkgrepoName::from ("main")),
       relRepo_after  : Some (SkgrepoName::from ("elsewhere")) } )
-      . expect ("the relationship moved") ); }
+      . expect ("the relationship moved") );
+    b_mut . append ( viewnode_of (ViewnodeKind::ChangeViewnode ( ChangeViewnode::OtherChanges {
+        changes : vec! [ OtherChange::Attribution, OtherChange::Order (OrderedList::Content) ],
+        orders  : "The order of its content (- at HEAD, + now):\n-x\n y\n+x\n" . to_string () } )) ); }
   { // acq's "it acquired" folder, holding the ghost of what it acquired.
     let acq : NodeId = treeid_of (&tree, "acq");
     let folder : NodeId = tree . get_mut (acq) . unwrap () . append (
@@ -187,7 +191,7 @@ fn the_new_viewnodes_cross_the_wire (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ( |f| {
     let buffer : String = buffer_with_every_new_viewnode (f) ?;
-    let atoms : [&str; 14] = [
+    let atoms : [&str; 15] = [
       "ghost (gnid gone) (skgRepos (nodeRepo main))",
       "ghost (gnid gc) (skgRepos (nodeRepo main))",
       ") kept", // a surviving member under gone
@@ -196,7 +200,8 @@ fn the_new_viewnodes_cross_the_wire (
       "(homeSkgrepoMove (old main) (new elsewhere))",
       "(relRepoMove (old main) (new elsewhere))",
       "(changesetMarker content)", "(changesetMarker relRepo)",
-      "(changesetMarker orderOnly)",
+      "(otherChanges attributionChange contentOrder)",
+      "The order of its content (- at HEAD, + now):\n-x\n y\n+x\n",
       "acquiredFolder", "acquiredByFolder",
       "ghost (gnid acquired) (skgRepos (nodeRepo main))" ];
     let change_facts : [&str; 4] = [

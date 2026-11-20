@@ -97,8 +97,8 @@ impl GraphStraddle {
     self . change_leaves . get_or_init (
       || ChangeLeaves::from_graph_straddle (self) ) }
 
-  /// The nodes whose file changed but whose change-forest has no
-  /// leaf: only the order of some list changed.
+  /// The nodes whose only change is the order of some list: their
+  /// only leaf is their other changes, each a reorder.
   pub fn order_only_pids (
     &self,
   ) -> &BTreeSet<ID> {

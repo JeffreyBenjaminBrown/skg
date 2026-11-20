@@ -127,6 +127,21 @@ pub fn blobs_at_head_and_in_worktree (
              . map_err ( |e| format! ( "hashing {:?}: {}", path . path, e . message () )) ? ) };
   Ok (( at_head, in_worktree )) }
 
+/// The text of the blob 'blob' in the gitrepo of the skgrepo 'skgrepo'.
+pub fn blob_text (
+  config  : &SkgConfig,
+  skgrepo : &SkgrepoName,
+  blob    : Oid,
+) -> Result<String, String> {
+  let skgrepo_config : &Skgrepo = config . skgrepos . get (skgrepo)
+    . ok_or_else ( || format! ( "Repo '{}' not found in config", skgrepo )) ?;
+  let gitrepo : Repository = open_gitrepo ( Path::new (&skgrepo_config . path) )
+    . ok_or_else ( || format! ( "skgrepo {} is not in a git repository", skgrepo )) ?;
+  let found = gitrepo . find_blob (blob)
+    . map_err ( |e| format! ( "reading blob {}: {}", blob, e . message () )) ?;
+  String::from_utf8 ( found . content () . to_vec () )
+    . map_err ( |e| format! ( "blob {} is not UTF-8: {}", blob, e )) }
+
 /// Whether 'path' is a '.skg' file directly in the folder 'prefix'.
 fn is_skg_directly_in (
   path   : &Path,

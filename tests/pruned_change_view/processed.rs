@@ -252,10 +252,11 @@ fn the_save_reports_the_processed_summary (
     Ok (( )) }) }
 
 /// A save of the merges buffer of the 'buffers' fixture (described in
-/// 'other_buffers.rs') counts as not editable the eleven leaves of the nodes
+/// 'other_buffers.rs') counts as not editable the twelve leaves of the nodes
 /// it does not show editable: txt's text, the home and relRepo moves
-/// of mvc, mvg, mvp, mvr and mvt, and the creation of pres, which it
-/// shows as a write-protected member of acq's content.
+/// of mvc, mvg, mvp, mvr and mvt, the creation of pres, which it
+/// shows as a write-protected member of acq's content, and the reorder
+/// of ord's content.
 #[test]
 fn the_summary_counts_the_changes_the_saved_buffer_does_not_show (
 ) -> Result<(), Box<dyn Error>> {
@@ -265,9 +266,9 @@ fn the_summary_counts_the_changes_the_saved_buffer_does_not_show (
     let response : SaveResponse = save_buffer (f, DiffViewBufferKind::Merges, &text) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     let summary : BufferProcessedSummary = summary_of (&response);
-    assert_eq! ( summary . changes_not_editable_here, 11, "{:?}", summary );
+    assert_eq! ( summary . changes_not_editable_here, 12, "{:?}", summary );
     assert_eq! ( sexp_to_client_string (&summary . to_sexp ()),
-                 format! ( "(processed-summary (processed {}) (changed {}) (foreign 0) (order-only 1) (waiting 0) (notEditable 11))",
+                 format! ( "(processed-summary (processed {}) (changed {}) (foreign 0) (order-only 1) (waiting 0) (notEditable 12))",
                            summary . summary . processed_nodes,
                            summary . summary . changed_nodes ));
     Ok (( )) }) }

@@ -1,11 +1,11 @@
 //! The "stage and commit" request ('docs/diff-view.org', "Stage and
 //! commit"). With '(processed-only . t)' it commits the processed
 //! nodes, less those that must wait for a node that does not go in
-//! ('processed_commit_choice'), and asks nothing. A node whose files
-//! changed in a way no mark covers ('server/diff_view/unmarkable_changes.rs')
-//! is not processed, and a file Git lists as changed whose node did
-//! not change in the graph goes in only when it is what skg writes,
-//! which it is not. Without it, it
+//! ('processed_commit_choice'), and asks nothing. A node one of whose
+//! files is not what skg writes for it ('files_hold_more_than_their_node'
+//! in 'server/diff_view/other_changes.rs') is not processed, and a file
+//! Git lists as changed whose node did not change in the graph goes in
+//! only when it is what skg writes, which it is not. Without it, it
 //! commits every changed node by the same commit, and first asks for
 //! confirmation, unless the request carries '(confirmed . t)', when
 //! some changed node is not processed.
@@ -33,8 +33,8 @@ use crate::diff_view::change_leaves::{
   processed_response_trailing_entries, processed_summary,
   title_in_straddle, whole_commit_choice};
 use crate::diff_view::processed_store::ProcessedStore;
-use crate::diff_view::unmarkable_changes::{
-  UnmarkableChange, files_hold_more_than_their_node};
+use crate::diff_view::other_changes::{
+  FILE_NOT_AS_SKG_WRITES_IT, files_hold_more_than_their_node};
 use crate::git_ops::git_snapshot::read_candidate_graph_snapshot;
 use crate::git_ops::git_snapshot_types::GraphSnapshot;
 use crate::git_ops::stage_and_commit::{
@@ -92,17 +92,16 @@ pub enum StageAndCommitAnswer {
 /// What a commit did: the git-commit of each skgrepo committed, how
 /// many changed nodes went in and how many did not, the processed
 /// nodes held back (each with its title, and the title of what it
-/// waits for), the nodes left out because their files changed in a
-/// way no mark covers though every mark is set (each with its title
-/// and those changes), and any error met during or after the
-/// git-commits.
+/// waits for), the nodes left out because one of their files is not
+/// what skg writes for them though every mark is set (each with its
+/// title), and any error met during or after the git-commits.
 #[derive(Debug, Default)]
 pub struct CommitReport {
   pub commits         : Vec<(SkgrepoName, Oid)>,
   pub committed_nodes : usize,
   pub left_nodes      : usize,
   pub waiting         : Vec<(WaitingNode, String, String)>,
-  pub unmarkable      : Vec<(ID, String, Vec<UnmarkableChange>)>,
+  pub unmarkable      : Vec<(ID, String)>,
   pub errors          : Vec<String>,
 }
 
@@ -265,7 +264,7 @@ pub fn commit_nodes (
   going_in      : &BTreeSet<ID>,
   left_out      : &BTreeSet<ID>,
   waiting       : &[WaitingNode],
-  unmarkable    : &[(ID, Vec<UnmarkableChange>)],
+  unmarkable    : &[ID],
   withheld      : &BTreeSet<ID>,
   message       : &str,
 ) -> StageAndCommitAnswer {
@@ -295,13 +294,12 @@ pub fn commit_nodes (
                        title_in_straddle (straddle, &node . waits_for) ))
       . collect (),
     unmarkable      : {
-      let mut unmarkable : Vec<(ID, String, Vec<UnmarkableChange>)> =
+      let mut unmarkable : Vec<(ID, String)> =
         unmarkable . iter () . cloned ()
-        . chain ( byte_only_withheld . into_iter () . map ( |stem|
-          ( stem, vec! [ UnmarkableChange::FileNotAsSkgWritesIt ] )) )
-        . map ( |(pid, changes)| {
+        . chain ( byte_only_withheld )
+        . map ( |pid| {
           let title : String = title_in_straddle (straddle, &pid);
-          (pid, title, changes) } )
+          (pid, title) } )
         . collect ();
       unmarkable . sort_by ( |a, b| a . 0 . cmp (&b . 0) );
       unmarkable },
@@ -448,8 +446,8 @@ fn rebuild_straddle_and_drop_committed_marks (
 ///    (left-nodes L) (waiting (("PID" "TITLE" REASON "PID" "TITLE") ...))
 ///    (unmarkable (("PID" "TITLE" ("CHANGE" ...)) ...))
 ///    (errors (...)) (warnings ()))
-/// Each CHANGE is an unmarkable change in the user's words
-/// ('UnmarkableChange::in_words').
+/// Each CHANGE is a change no mark covers, in the user's words: that
+/// one of its files is not what skg writes ('FILE_NOT_AS_SKG_WRITES_IT').
 /// The processed summary has the save response's form, with a
 /// not-editable count of 0. 'commits' lists the skgrepos
 /// git-committed. Printed by hand, each string through
@@ -487,11 +485,10 @@ pub fn stage_and_commit_response_sexp (
           quoted (&node . waits_for . 0), quoted (waits_for_title) ))
         . collect ();
       let unmarkable : Vec<String> = report . unmarkable . iter ()
-        . map ( |(pid, title, changes)| format! (
+        . map ( |(pid, title)| format! (
           "({} {} ({}))",
           quoted (&pid . 0), quoted (title),
-          changes . iter () . map ( |change| quoted ( change . in_words () ))
-            . collect::<Vec<String>> () . join (" ") ))
+          quoted (FILE_NOT_AS_SKG_WRITES_IT) ))
         . collect ();
       let trailing : Vec<String> =
         [ format_string_list_sexp ("errors", &report . errors),

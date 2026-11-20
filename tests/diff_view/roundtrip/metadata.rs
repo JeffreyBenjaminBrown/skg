@@ -8,7 +8,7 @@ use skg::serve::parse_metadata_sexp::{
   RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP, parse_metadata_to_viewnodemd};
 use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
-  ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, Folder, Ghost, ChangeViewnode, PropertyMember, DiffObject, ProcessedRequest, RelationshipEditRequest, Viewnode,
+  ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, Folder, Ghost, ChangeViewnode, OrderedList, OtherChange, PropertyMember, DiffObject, ProcessedRequest, RelationshipEditRequest, Viewnode,
   ViewnodeKind, Vognode, Warrant, mk_editable_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
 
@@ -86,13 +86,23 @@ fn skgrepo_moves_round_trip () {
 fn changeset_markers_round_trip () {
   for (kind, expected) in [
     ( ChangesetMarkerKind::Content,   "(changesetMarker content) (diff (processed rel))" ),
-    ( ChangesetMarkerKind::RelRepo,   "(changesetMarker relRepo) (diff (processed rel))" ),
-    ( ChangesetMarkerKind::OrderOnly, "(changesetMarker orderOnly) (diff (processed))" ), ] {
-    let objects : &[DiffObject] =
-      if kind == ChangesetMarkerKind::OrderOnly { &[] } else { &[ DiffObject::Rel ] };
+    ( ChangesetMarkerKind::RelRepo,   "(changesetMarker relRepo) (diff (processed rel))" ), ] {
     assert_round_trip (
-      change_viewnode ( ChangeViewnode::ChangesetMarker { kind }, processed (objects), None ),
+      change_viewnode ( ChangeViewnode::ChangesetMarker { kind },
+                        processed (&[ DiffObject::Rel ]), None ),
       expected ); }}
+
+/// A node's other changes name their kinds; the order diff of its body
+/// is the server's, which the parser leaves empty.
+#[test]
+fn other_changes_round_trip () {
+  assert_round_trip (
+    change_viewnode ( ChangeViewnode::OtherChanges {
+      changes : vec! [ OtherChange::Attribution,
+                       OtherChange::Order (OrderedList::Content) ],
+      orders  : String::new () },
+      processed (&[]), request_node_and_rel () ),
+    "(otherChanges attributionChange contentOrder) (editRequest (processed node rel)) (diff (processed))" ); }
 
 #[test]
 /// An alias or ID the worktree lost since HEAD is a member with a

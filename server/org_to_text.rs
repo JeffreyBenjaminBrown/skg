@@ -304,7 +304,10 @@ fn changeViewnode_metadata_to_string (
         metadata_value_atom (&skgrepo_change . old),
         metadata_value_atom (&skgrepo_change . new) )),
     ChangeViewnode::ChangesetMarker { kind } =>
-      parts . push ( format! ( "(changesetMarker {})", kind . wire_name () )), }
+      parts . push ( format! ( "(changesetMarker {})", kind . wire_name () )),
+    ChangeViewnode::OtherChanges { changes, .. } =>
+      parts . push ( sexp_form ( change . repr_in_client (),
+        changes . iter () . map ( |change| change . wire_name () ) . collect () )), }
   parts . extend ( editRequest_form ( None, request ));
   parts . extend ( diff_form (change_facts) );
   parts . join (" ") }

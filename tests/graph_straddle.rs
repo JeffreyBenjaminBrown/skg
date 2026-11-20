@@ -112,14 +112,15 @@ fn a_relRepo_only_change_is_reported_from_both_ends () {
 #[test]
 fn changed_pids_splits_out_changed_and_in_changed () {
   // A gains content Y; X's title changes; New is created; O only
-  // reorders its content.
+  // reorders its content, which its file records as its other
+  // changes, and which changes no member's set of containers.
   let (_f, straddle) : (Fixture, GraphStraddle) =
     one_skgrepo_straddle ("out_changed_and_in_changed");
   assert_eq! ( straddle . changed_pids () . out_changed,
-               ids (&["A", "New", "X"]) );
+               ids (&["A", "New", "O", "X"]) );
   assert_eq! ( straddle . changed_pids () . in_changed, ids (&["Y"]) );
   assert_eq! ( straddle . changed_pids () . all (),
-               ids (&["A", "New", "X", "Y"]) );
+               ids (&["A", "New", "O", "X", "Y"]) );
   assert! ( straddle . node_changes (&id ("X")) . title_changed );
   assert! ( ! straddle . node_changes (&id ("X")) . body_changed );
   assert_eq! ( straddle . node_existence (&id ("New")),

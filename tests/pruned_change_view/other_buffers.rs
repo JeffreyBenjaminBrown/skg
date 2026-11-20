@@ -180,20 +180,39 @@ fn the_homeSkgrepoMove_heralds_are_only_in_the_skgrepo_changes_buffer (
   assert! ( ! headline_of (&text, "mvc") . contains ("homeSkgrepoMove"), "{}", text );
   Ok (( )) }
 
+/// ord only reorders its content: the order-only buffer lists it, with
+/// its other changes as their one headline, whose body shows the old
+/// order against the new, and its content below in the new order.
 #[test]
-fn the_order_only_buffer_is_a_flat_list_with_markers (
+fn the_order_only_buffer_is_a_flat_list_of_reorders_to_mark (
 ) -> Result<(), Box<dyn Error>> {
   let text : String = without_viewnode_ids ( &buffer (DiffViewBufferKind::OrderOnlyChanges) ? );
   let lines : Vec<&str> = text . lines () . collect ();
   assert_eq! ( roots (&text) . len (), 1, "{}", text );
-  assert! ( without_viewnode_ids (lines [0]) . starts_with ("* (skg bodyFolded node (gnid ord)"),
+  assert! ( lines [0] . starts_with ("* (skg bodyFolded node (gnid ord)")
+            && lines [0] . contains ("(diff (properties changed) (leaves 1 node))"),
             "{}", text );
-  assert_eq! ( lines [1], "** (skg (changesetMarker orderOnly))",
-               "no mark covers a reorder, so the marker is never processed" );
-  assert! ( lines [2] . contains ("node (gnid o2) (skgRepos (nodeRepo public)) writeProtected")
-            && lines [3] . contains ("node (gnid o1) (skgRepos (nodeRepo public)) writeProtected"),
+  assert_eq! ( lines [1 .. 6], [
+    "** (skg (otherChanges contentOrder) (diff (leaves 1)))",
+    "The order of its content (- at HEAD, + now):",
+    "+o2", " o1", "-o2" ], "{}", text );
+  assert! ( lines [6] . contains ("node (gnid o2) (skgRepos (nodeRepo public)) writeProtected")
+            && lines [7] . contains ("node (gnid o1) (skgRepos (nodeRepo public)) writeProtected"),
             "the content is shown in its new order, as leaves:\n{}", text );
-  assert_eq! ( lines . len (), 4, "{}", text );
+  assert_eq! ( lines . len (), 8, "{}", text );
+  Ok (( )) }
+
+/// The all-changes buffer shows ord's reorder too, by the same headline.
+#[test]
+fn the_all_changes_buffer_shows_a_reorder_as_other_changes (
+) -> Result<(), Box<dyn Error>> {
+  let text : String = without_viewnode_ids ( &buffer (DiffViewBufferKind::AllChanges) ? );
+  let lines : Vec<&str> = text . lines () . collect ();
+  let ord : usize = lines . iter ()
+    . position ( |line| line . contains ("node (gnid ord)") )
+    . unwrap_or_else ( || panic! ("no ord:\n{}", text) );
+  assert! ( lines [ord + 1] . ends_with ("(otherChanges contentOrder) (diff (leaves 1)))"),
+            "{}", text );
   Ok (( )) }
 
 #[test]

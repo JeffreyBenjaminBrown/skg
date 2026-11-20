@@ -325,7 +325,8 @@ impl NamedLeafSet {
           NodeAspect::HomeSkgrepo => "home skgrepo" . to_string (),
           NodeAspect::Alias (alias) => format! ("alias {:?}", alias),
           NodeAspect::ExtraId (id)  => format! ("extra ID {}", id),
-          NodeAspect::Flag (flag)   => format! ("flag {}", flag . wire_name ()), };
+          NodeAspect::Flag (flag)   => format! ("flag {}", flag . wire_name ()),
+          NodeAspect::OtherChanges  => "other changes" . to_string (), };
         format! ("the {} of node {}", what, pid) },
       NamedLeafSet::Leaf (LeafKey::Relationship { relationship, aspect }) =>
         format! ("the {} of the relationship {} {} {}",
@@ -442,6 +443,9 @@ fn leaves_named_at (
         ChangeViewnode::HomeSkgrepoMove { .. } =>
           named . push ( NamedLeafSet::Leaf ( LeafKey::Node {
             pid : parent_pid () ?, aspect : NodeAspect::HomeSkgrepo } )),
+        ChangeViewnode::OtherChanges { .. } =>
+          named . push ( NamedLeafSet::Leaf ( LeafKey::Node {
+            pid : parent_pid () ?, aspect : NodeAspect::OtherChanges } )),
         ChangeViewnode::RelRepoMove { .. } =>
           named . extend ( relationships_to_viewparent (
             parent, &parent_pid () ?, pid_of,
@@ -450,8 +454,7 @@ fn leaves_named_at (
         ChangeViewnode::ChangesetMarker { kind } => {
           let aspect : RelationshipAspect = match kind {
             ChangesetMarkerKind::Content   => RelationshipAspect::Existence,
-            ChangesetMarkerKind::RelRepo   => RelationshipAspect::RelRepo,
-            ChangesetMarkerKind::OrderOnly => return Some (named), }; // no leaf records an order
+            ChangesetMarkerKind::RelRepo   => RelationshipAspect::RelRepo, };
           let pid : ID = parent_pid () ?;
           if objects . is_empty () || objects . contains (&DiffObject::Rel) {
             named . push ( NamedLeafSet::ContentRelationshipsOf (
@@ -504,8 +507,7 @@ fn relationships_named_elsewhere (
         ChangesetMarkerKind::Content =>
           elsewhere . content_aspects . push (RelationshipAspect::Existence),
         ChangesetMarkerKind::RelRepo =>
-          elsewhere . content_aspects . push (RelationshipAspect::RelRepo),
-        ChangesetMarkerKind::OrderOnly => {}, },
+          elsewhere . content_aspects . push (RelationshipAspect::RelRepo), },
       _ => {}, }}
   elsewhere }
 
@@ -524,9 +526,7 @@ fn keys_in_forest (
 /// leaf of 'forest' and every leaf it names is marked at its current
 /// fingerprint ('store'). On a vognode or a changeset marker,
 /// '(processed ...)' names the objects of its '(leaves ...)' that are
-/// processed; the order-only changeset marker never is, since no leaf
-/// records the change it stands for ('UnmarkableChange'); any
-/// other processed viewnode has a single object, and writes it bare,
+/// processed; any other processed viewnode has a single object, and writes it bare,
 /// '(processed)'. The '(leaves ...)' fact is 'leaves_fact_at'.
 /// A modified node's 'M' ('(properties changed)') stands for what
 /// 'node' names there ('leaves_named_at'), and so is not drawn where
@@ -564,8 +564,6 @@ pub fn set_processed_facts_in_viewforest (
             processed_among (node, &leaves),
           ViewnodeKind::Vognode (Vognode::GnidOnly (_)) =>
             object_is_processed (node, &[]) . then (BTreeSet::new),
-          ViewnodeKind::ChangeViewnode ( ChangeViewnode::ChangesetMarker {
-            kind : ChangesetMarkerKind::OrderOnly } ) => None,
           ViewnodeKind::ChangeViewnode ( ChangeViewnode::ChangesetMarker { .. } ) =>
             processed_among (node, &leaves),
           ViewnodeKind::PropertyMember (_) =>

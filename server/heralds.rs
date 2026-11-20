@@ -47,8 +47,8 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Folder, GraphnodeStats,
-  PropertyMember, ChangeViewnode, DiffObject, ViewRequest, ViewnodeStats,
-  Warrant};
+  OtherChange, PropertyMember, ChangeViewnode, DiffObject, ViewRequest,
+  ViewnodeStats, Warrant};
 
 use serde_json::Value;
 use std::collections::HashSet;
@@ -260,9 +260,22 @@ fn diffView_property_rules (
       . map ( |kind| rule ( kind . wire_name (), vec! [ s (
         match kind {
           ChangesetMarkerKind::Content   => "its content changed",
-          ChangesetMarkerKind::RelRepo   => "some content relationships changed skgrepo",
-          ChangesetMarkerKind::OrderOnly => "order-only change", } ) ] ))
-      . collect () ) ] }
+          ChangesetMarkerKind::RelRepo   => "some content relationships changed skgrepo", } ) ] ))
+      . collect () ),
+    other_changes_rule () ] }
+
+/// The node's other changes, each in the user's words
+/// ('OtherChange::in_words'), joined by "; ": "its content was
+/// reordered; its attribution changed".
+fn other_changes_rule (
+) -> RuleChild {
+  RuleChild::Rule ( HeraldRule {
+    node_heralds_key : Some ("otherChanges"), interc : Some ("; "),
+    when : vec! [], label : Some ("otherChanges"), abut : false,
+    children : OtherChange::ALL . into_iter ()
+      . map ( |change| rule ( change . wire_name (),
+                              vec! [ s ( change . in_words () ) ] ))
+      . collect () } ) }
 
 /// The diff view's '(diff ...)' form on a vognode: its node's
 /// existence ('(node added)', '(node removed)') as ∃+ ∃-, its other
@@ -936,6 +949,7 @@ fn property_and_change_kind_atoms (
       ChangeViewnode::OldText { .. }
         | ChangeViewnode::BodyDiff { .. } | ChangeViewnode::HomeSkgrepoMove { .. }
         | ChangeViewnode::RelRepoMove { .. } | ChangeViewnode::ChangesetMarker { .. }
+        | ChangeViewnode::OtherChanges { .. }
         => () }}
   let _ = changeViewnode_guard;
   let no_change : &dyn Fn () -> SkgrepoChange = &|| -> SkgrepoChange {
@@ -953,7 +967,9 @@ fn property_and_change_kind_atoms (
                 ChangeViewnode::BodyDiff { diff : String::new () },
                 ChangeViewnode::HomeSkgrepoMove { skgrepo_change : no_change () },
                 ChangeViewnode::RelRepoMove { skgrepo_change : no_change () },
-                ChangeViewnode::ChangesetMarker { kind : ChangesetMarkerKind::Content } ]
+                ChangeViewnode::ChangesetMarker { kind : ChangesetMarkerKind::Content },
+                ChangeViewnode::OtherChanges { changes : Vec::new (),
+                                               orders  : String::new () } ]
               . iter () . map (ChangeViewnode::repr_in_client) )
     . collect () }
 
@@ -1041,7 +1057,9 @@ fn property_and_folder_atoms () -> Vec<&'static str> {
   let property_argument_atoms : Vec<&'static str> =
     [ vec! [ "titleAndBody", "title", "body", "old", "new" ],
       ChangesetMarkerKind::ALL . into_iter ()
-        . map (ChangesetMarkerKind::wire_name) . collect () ] . concat ();
+        . map (ChangesetMarkerKind::wire_name) . collect (),
+      OtherChange::ALL . into_iter ()
+        . map (OtherChange::wire_name) . collect () ] . concat ();
   let mut out : Vec<&'static str> = Vec::new ();
   out . extend ( Folder::all () . iter ()
                  . map ( |c| c . repr_in_client () ) );

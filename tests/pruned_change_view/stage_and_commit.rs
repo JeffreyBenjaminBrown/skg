@@ -8,7 +8,7 @@ use crate::pruned_change_view::common::{
   all_changes_buffer, open_all_changes_buffer, rerendered_view_content,
   send_stage_and_commit_request, viewforest_id_of, with_fixture};
 
-use skg::diff_view::change_leaves::{ChangeLeaves, LeafKey};
+use skg::diff_view::change_leaves::{ChangeLeaves, LeafKey, ProcessedSummary, processed_summary};
 use skg::graph_straddle::types::GraphStraddle;
 use skg::diff_view::processed_store::ProcessedStore;
 use skg::serve::handlers::stage_and_commit::{
@@ -139,25 +139,22 @@ fn a_confirmed_request_commits_every_owned_skgrepo_with_one_message (
               "{}", response );
     Ok (( )) }) }
 
-/// With every leaf marked, the summary is still incomplete while ord,
-/// whose content was reordered, changed in a way no mark covers, so a
-/// commit of everything asks; confirmed, it commits everything and
-/// lapses every mark.
+/// With every leaf marked, ord's reorder among them, the summary is
+/// complete, so a commit of everything asks nothing; it commits
+/// everything and lapses every mark.
 #[test]
-fn a_reorder_keeps_the_summary_incomplete_and_the_commit_lapses_the_marks (
+fn a_marked_reorder_completes_the_summary_and_the_commit_lapses_the_marks (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &SKGREPOS, |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let all_skgrepos : SkgrepoRestriction = all (f) ?;
     mark_every_leaf (f, &env) ?;
+    let summary : ProcessedSummary = processed_summary (
+      &f . config, &graph_straddle (f) ?,
+      &env . runtime . processed_store . lock () . unwrap () );
+    assert! ( summary . is_complete () && summary . order_only_nodes == 1, "{:?}", summary );
     let answer : StageAndCommitAnswer = stage_and_commit (
       &env, &mut f . views_state, &all_skgrepos, "all processed", UNCONFIRMED );
-    let StageAndCommitAnswer::NeedsConfirmation { summary } = &answer
-      else { panic! ("expected a question, got {:?}", answer) };
-    assert_eq! ( ( summary . changed_nodes - summary . processed_nodes,
-                   summary . order_only_nodes ), (1, 1), "{:?}", summary );
-    let answer : StageAndCommitAnswer = stage_and_commit (
-      &env, &mut f . views_state, &all_skgrepos, "all processed", CONFIRMED );
     assert! ( matches! (answer, StageAndCommitAnswer::Committed (_)),
               "{:?}", answer );
     assert_everything_committed (f, "all processed") ?;

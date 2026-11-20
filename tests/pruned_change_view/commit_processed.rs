@@ -555,11 +555,11 @@ fn a_mismatch_in_the_check_commits_nothing () -> TestResult {
       Ok (( )) }) }
 
 /// x's alias moves from its public section to a private one, and
-/// nothing else changes. No leaf records that, so no mark covers it: a
-/// commit of the processed leaves x out and says why, and a commit of
-/// everything takes both of its files.
+/// nothing else changes. That is x's other changes, a leaf like any
+/// other: unmarked, a commit of the processed leaves x out as it leaves
+/// out any node not processed; marked, it takes both of x's files.
 #[test]
-fn an_alias_moved_between_sections_waits_for_a_commit_of_everything () -> TestResult {
+fn an_alias_moved_between_sections_goes_in_once_marked () -> TestResult {
   let public_x : String = yaml ("x", "x", &[]);
   let private_x : &str = "aliases:\n- al\npid: x\n";
   with_scratch ( TWO_GITREPOS, &[
@@ -570,37 +570,35 @@ fn an_alias_moved_between_sections_waits_for_a_commit_of_everything () -> TestRe
       let before = snapshot (f, &["public", "private"]) ?;
       let answer : StageAndCommitAnswer = commit_processed (f, env);
       assert_eq! ( stage_and_commit_response_sexp (&answer),
-                   "((commits ()) (committed-nodes 0) (left-nodes 1) (waiting ()) (unmarkable ((\"x\" \"x\" (\"an alias moved to another skgrepo\")))) (errors ()) (warnings ()))" );
+                   "((commits ()) (committed-nodes 0) (left-nodes 1) (waiting ()) (unmarkable ()) (errors ()) (warnings ()))" );
       assert_eq! ( snapshot (f, &["public", "private"]) ?, before );
-      let answer : StageAndCommitAnswer =
-        commit (f, env, CommitScope::Everything { confirmed : true });
+      mark_nodes (f, env, &["x"]) ?;
+      let answer : StageAndCommitAnswer = commit_processed (f, env);
       assert_eq! ( report (&answer) . committed_nodes, 1, "{:?}", answer );
       assert_eq! ( head_files (f, "public") ? ["x.skg"], public_x );
       assert_eq! ( head_files (f, "private") ? . get ("x.skg") . map ( String::as_str ), Some (private_x) );
       assert! ( statuses (f, "public") ? . is_empty () && statuses (f, "private") ? . is_empty () );
       Ok (( )) }) }
 
-/// The pids and the changes, in the user's words, of the nodes a
-/// commit left out because their files changed in a way no mark covers.
+/// The pids of the nodes a commit left out because one of their files
+/// is not what skg writes for them, each with its words.
 fn unmarkable_of (
   report : &CommitReport,
-) -> Vec<(String, Vec<&'static str>)> {
-  report . unmarkable . iter ()
-    . map ( |(pid, _, changes)| ( pid . 0 . clone (),
-                                  changes . iter () . map ( |c| c . in_words () ) . collect () ))
-    . collect () }
+) -> Vec<String> {
+  report . unmarkable . iter () . map ( |(pid, _)| pid . 0 . clone () ) . collect () }
 
-/// Each node below changed in a way no leaf records, and a commit of
-/// the processed leaves it out, saying how, while a, whose only change
-/// is marked, goes in: h's text moved from its private section up to
-/// its public home (a Hoist); s lost its attribution; r's content was
-/// reordered; t's title changed, which is marked, and its attribution
-/// did too; k's file changed only in its formatting, which the graph
-/// does not see; and u's title changed, which is marked, and its file
-/// is formatted otherwise than skg writes it. A commit of everything
-/// then takes the six left.
+/// Each node below changed in a way only its other-changes leaf
+/// records, and, marked, goes in with a, whose only change is its
+/// title: h's text moved from its private section up to its public
+/// home (a Hoist); s lost its attribution; r's content was reordered;
+/// t's title changed and its attribution did too. k's file changed
+/// only in its formatting, which the graph does not see, and u's title
+/// changed, which is marked, and its file is formatted otherwise than
+/// skg writes it: no mark covers those, so a commit of the processed
+/// leaves them out and names them, and a commit of everything takes
+/// them.
 #[test]
-fn a_change_no_mark_covers_leaves_its_node_out () -> TestResult {
+fn marked_other_changes_go_in_and_formatting_waits_for_everything () -> TestResult {
   let attributed = |pid : &str, title : &str| -> String {
     format! ( "title: {}\npid: {}\nattribution:\n  original: o\n  skgrepo: theirs\n", title, pid ) };
   with_scratch ( TWO_GITREPOS, &[
@@ -613,24 +611,21 @@ fn a_change_no_mark_covers_leaves_its_node_out () -> TestResult {
     ("public",  "k", Some (&yaml ("k", "k", &[])), Some ("pid: k\ntitle: k\n")),
     ("public",  "u", Some (&yaml ("u", "u", &[])), Some ("pid: u\ntitle: u2\n")), ],
     |f, env| {
-      mark_nodes (f, env, &["a", "t", "u"]) ?;
+      mark_nodes (f, env, &["a", "h", "s", "r", "t", "u"]) ?;
       let before = snapshot (f, &["private"]) ?;
       let answer : StageAndCommitAnswer = commit_processed (f, env);
       let left : &CommitReport = report (&answer);
-      assert_eq! ( ( left . committed_nodes, left . left_nodes ), (1, 6), "{:?}", left );
-      assert_eq! ( unmarkable_of (left), vec! [
-        ( "h" . to_string (), vec! [ "its text moved between a private and a public section" ] ),
-        ( "k" . to_string (), vec! [ "its file changed in a way the diff view does not show (formatting, say)" ] ),
-        ( "r" . to_string (), vec! [ "the order of its content changed" ] ),
-        ( "s" . to_string (), vec! [ "its attribution changed" ] ),
-        ( "t" . to_string (), vec! [ "its attribution changed" ] ),
-        ( "u" . to_string (), vec! [ "its file changed in a way the diff view does not show (formatting, say)" ] ), ] );
+      assert_eq! ( ( left . committed_nodes, left . left_nodes ), (5, 2), "{:?}", left );
+      assert_eq! ( unmarkable_of (left), vec! [ "k", "u" ] );
+      assert! ( stage_and_commit_response_sexp (&answer) . contains (
+        "(unmarkable ((\"k\" \"k\" (\"its file changed in a way the diff view does not show (formatting, say)\"))" ),
+        "{}", stage_and_commit_response_sexp (&answer) );
       assert_eq! ( statuses (f, "public") ? . keys () . collect::<Vec<_>> (),
-                   vec! [ "h.skg", "k.skg", "r.skg", "s.skg", "t.skg", "u.skg" ] );
-      assert_eq! ( snapshot (f, &["private"]) ?, before );
+                   vec! [ "k.skg", "u.skg" ] );
+      assert_ne! ( snapshot (f, &["private"]) ?, before, "h's private section is gone" );
       let answer : StageAndCommitAnswer =
         commit (f, env, CommitScope::Everything { confirmed : true });
-      assert_eq! ( ( report (&answer) . committed_nodes, report (&answer) . left_nodes ), (6, 0),
+      assert_eq! ( ( report (&answer) . committed_nodes, report (&answer) . left_nodes ), (2, 0),
                    "{:?}", answer );
       assert! ( statuses (f, "public") ? . is_empty () && statuses (f, "private") ? . is_empty () );
       Ok (( )) }) }

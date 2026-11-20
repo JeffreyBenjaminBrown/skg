@@ -96,7 +96,8 @@
     "movedLikeAncestor":               "nonstandard",
     "relRepoMove":                     "message",
     "relRepoMove_skgrepo":             "normal",
-    "changesetMarker":                 "message"
+    "changesetMarker":                 "message",
+    "otherChanges":                    "message"
   },
   "folder_heralds": {
     "comment": "What the clients need to draw two heralds that depend on a folder. 'write_protected' names the folders whose label carries ☮: the user cannot change their membership from here, so a member under one detaches nothing. 'changed_labels' gives the label of a folder the diff view shows because a member carries a change of its relationship to the folder's viewparent; the client draws it, styled as the folder's own label, in place of that label, after the folder's ☮ if it has one, and followed by ✓ (styled as node_heralds.processed) when every such change is processed. The server checks both against its rule table at startup. 'other_files' names the folders whose changed label says '(other files)': each member records its relationship to the folder's viewparent in its own file, a direction the viewparent does not own. The diff view's plain motions (C-c r n c and its five siblings) skip a write-protected occurrence (☮, not a ghost) standing directly in one; its change is drawn, and visited, at its node's own editable occurrence. The clients' tests check this list against 'changed_labels'. The forks folder is in no such list and its changed label names no file, since its members play either side of 'forks': the plain motions skip a write-protected member of it born only of its forking the folder's viewparent ('(birth (forks out 2))'), which it records in its own file, and visit a forkee or a mutual.",

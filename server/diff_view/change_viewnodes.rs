@@ -1,20 +1,22 @@
 //! The diff view's own viewnodes, made from the graph straddle
 //! ('docs/diff-view.org', "What each kind of change
 //! looks like"): the old text and its body diff, the home and relRepo
-//! moves, the changeset markers, the ghost of a node
+//! moves, the changeset markers, the other changes, the ghost of a node
 //! the after-graph lacks, and the two derived acquisition folders.
 //! Each is save-inert. The kinds of change they show are set here;
 //! whether each is processed is read from the store where they are placed.
 
+use crate::diff_view::change_leaves::title_in_straddle;
+use crate::diff_view::other_changes::common_members_in_order;
 use crate::graph_straddle::types::{GraphStraddle, Partner};
 use crate::types::misc::{ID, SkgrepoChange};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
-  Folder, Ghost, ChangeViewnode,
+  Folder, Ghost, ChangeViewnode, OrderedList, OtherChange,
   Viewnode, ViewnodeKind, Vognode, Warrant, viewnode_of};
 
-use similar::{ChangeTag, TextDiff};
+use similar::{Algorithm, ChangeTag, TextDiff, capture_diff_slices};
 
 /// The old text of the node 'pid', its title or body as HEAD has it
 /// where either changed; None when neither did. Its body diff is a
@@ -77,6 +79,57 @@ pub fn mk_relRepo_move_viewnode (
       skgrepo_change : SkgrepoChange {
         old : partner . relRepo_before . clone () ?,
         new : partner . relRepo_after  . clone () ? } } )) ) }
+
+/// The other changes of the node 'pid' ('ChangeLeaves::other_changes'),
+/// with, as its body, how each list it reordered was ordered at HEAD
+/// and is now ('order_diff'). None when it has none.
+pub fn mk_other_changes_viewnode (
+  straddle : &GraphStraddle,
+  pid      : &ID,
+) -> Option<Viewnode> {
+  let changes : Vec<OtherChange> =
+    straddle . change_leaves () . other_changes (pid) . to_vec ();
+  if changes . is_empty () { return None; }
+  let (before, after) : (&GraphnodeInRust, &GraphnodeInRust) =
+    ( straddle . before . get (pid) ?, straddle . after . get (pid) ? );
+  let orders : String = changes . iter ()
+    . filter_map ( |change| match change {
+      OtherChange::Order (list) => Some (*list),
+      _ => None, } )
+    . map ( |list| order_diff (straddle, list, before, after) )
+    . collect ();
+  Some ( viewnode_of ( ViewnodeKind::ChangeViewnode (
+    ChangeViewnode::OtherChanges { changes, orders } ))) }
+
+/// How the members both versions of a node give the list 'list' were
+/// ordered at HEAD and are now: a header naming the list, then their
+/// line diff, as a body diff writes one ('mk_body_diff_viewnode'), one
+/// member a line, by its title (a node's, in the after-graph, else the
+/// before-graph), its text (an alias), or its ID or flag.
+fn order_diff (
+  straddle : &GraphStraddle,
+  list     : OrderedList,
+  before   : &GraphnodeInRust,
+  after    : &GraphnodeInRust,
+) -> String {
+  let (old, new) : (Vec<String>, Vec<String>) =
+    common_members_in_order (list, before, after);
+  let shown = |member : &String| -> String {
+    match list {
+      OrderedList::Content | OrderedList::Forks | OrderedList::Hidden =>
+        title_in_straddle ( straddle, &ID::from ( member . as_str () )),
+      _ => member . clone (), } };
+  let mut diff : String = format! (
+    "The order of its {} (- at HEAD, + now):\n", list . name () );
+  for op in capture_diff_slices (Algorithm::Myers, &old, &new) {
+    for change in op . iter_changes (&old, &new) {
+      diff . push_str ( &format! ( "{}{}\n",
+        match change . tag () {
+          ChangeTag::Equal  => ' ',
+          ChangeTag::Delete => '-',
+          ChangeTag::Insert => '+', },
+        shown ( &change . value () ) )); }}
+  diff }
 
 pub fn mk_changeset_marker_viewnode (
   kind : ChangesetMarkerKind,

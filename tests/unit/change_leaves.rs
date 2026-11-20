@@ -3,7 +3,7 @@
 use super::*;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::diff_view::unmarkable_changes::OrderedList;
+use crate::types::viewnode::{OrderedList, OtherChange};
 use crate::diff_view::processed_requests::{
   LeafKinds, NamedLeafSet, RequestedProcessed, apply_processed_requests};
 use crate::types::errors::HeadlineName;
@@ -115,42 +115,53 @@ fn a_relRepo_move_is_one_leaf_recorded_in_both_files () {
     ChangedFile { skgrepo : SkgrepoName::from ("main"),    pid : ID::from ("r") },
     ChangedFile { skgrepo : SkgrepoName::from ("private"), pid : ID::from ("r") } ] ); }
 
-/// A reorder records no leaf, so no mark covers it: r is never
-/// processed, and a commit of the processed leaves it out, saying why.
+/// A reorder is one leaf of its recorder, its other changes: r is
+/// processed once that is marked, and goes in. The mark covers the
+/// order it was made on: a member added to the list keeps it, a later
+/// reorder makes it lapse.
 #[test]
-fn a_reorder_has_no_leaf_and_is_never_processed () {
-  let straddle : GraphStraddle = straddle (
-    vec! [ node ("r", "r", &["a", "b"]),
-           node ("a", "a", &[]), node ("b", "b", &[]) ],
-    vec! [ node ("r", "r", &["b", "a"]),
-           node ("a", "a", &[]), node ("b", "b", &[]) ] );
-  let forest : &ChangeLeaves = straddle . change_leaves ();
+fn a_reorder_is_a_leaf_whose_mark_lapses_when_the_order_changes_again () {
+  let others = || -> Vec<Graphnode> {
+    [ "a", "b", "c", "d" ] . iter () . map ( |pid| node (pid, pid, &[]) ) . collect () };
+  let with_r = |contains : &[&str]| -> Vec<Graphnode> {
+    let mut nodes : Vec<Graphnode> = others ();
+    nodes . push ( node ("r", "r", contains) );
+    nodes };
+  let before : Vec<Graphnode> = with_r (&["a", "b", "c"]);
+  let reordered : GraphStraddle = straddle ( before . clone (), with_r (&["b", "a", "c"]) );
+  let forest : &ChangeLeaves = reordered . change_leaves ();
   let r : ID = ID::from ("r");
-  assert! ( forest . leaves_under (&r) . is_empty () );
-  assert_eq! ( straddle . order_only_pids () . iter () . collect::<Vec<_>> (),
-               vec! [ &r ] );
-  assert_eq! ( forest . unmarkable_changes (&r),
-               &[ UnmarkableChange::Order (OrderedList::Content) ] );
-  let store : ProcessedStore = ProcessedStore::default ();
-  let summary : ProcessedSummary = processed_summary ( &owned_main (), &straddle, &store );
-  assert_eq! ( summary, ProcessedSummary {
+  let key : LeafKey = node_key ("r", NodeAspect::OtherChanges);
+  assert_eq! ( keys_under (forest, "r"), vec! [ key . clone () ] );
+  assert_eq! ( reordered . order_only_pids () . iter () . collect::<Vec<_>> (), vec! [ &r ] );
+  assert_eq! ( forest . other_changes (&r), &[ OtherChange::Order (OrderedList::Content) ] );
+  let mut store : ProcessedStore = ProcessedStore::default ();
+  assert_eq! ( processed_summary ( &owned_main (), &reordered, &store ), ProcessedSummary {
     processed_nodes : 0, changed_nodes : 1, foreign_changed_nodes : 0,
     order_only_nodes : 1, waiting_nodes : 0 } );
-  assert! ( ! summary . is_complete () );
+  mark_all_of (&reordered, &mut store, &["r"]);
+  assert! ( forest . node_is_processed (&store, &r) );
   let choice : CommitChoice =
-    processed_commit_choice (&owned_main (), &straddle, &store, &BTreeSet::new ());
-  assert! ( choice . going_in . is_empty () );
-  assert_eq! ( choice . unmarkable,
-               vec! [ ( r, vec! [ UnmarkableChange::Order (OrderedList::Content) ] ) ] ); }
+    processed_commit_choice (&owned_main (), &reordered, &store, &BTreeSet::new ());
+  assert_eq! ( choice . going_in, BTreeSet::from ([ r . clone () ]) );
+  let grown : GraphStraddle = straddle ( before . clone (), with_r (&["b", "a", "d", "c"]) );
+  assert! ( grown . change_leaves () . processed_of_leaves (&store, [&key]),
+            "a member added leaves the order of the others as marked" );
+  assert! ( ! grown . order_only_pids () . contains (&r),
+            "r records the new membership too" );
+  let reordered_again : GraphStraddle = straddle ( before, with_r (&["c", "b", "a"]) );
+  assert! ( ! reordered_again . change_leaves () . processed_of_leaves (&store, [&key]) );
+  assert! ( ! reordered_again . change_leaves () . node_is_processed (&store, &r) ); }
 
-/// Each change below records no leaf, and is found as what it is:
-/// hoisted's text moves up to its home from a private section;
-/// stripped loses its attribution; moved's alias moves to another
-/// skgrepo; swapped's extra IDs change order; renamed names its member
-/// a by a's extra ID instead. retitled, whose title changed too, records
-/// its text leaf, and marking it is not enough.
+/// Each change below records no leaf but its node's other changes,
+/// and is found as what it is: hoisted's text moves up to its home from
+/// a private section; stripped loses its attribution; moved's alias
+/// moves to another skgrepo; swapped's extra IDs change order; renamed
+/// names its member a by a's extra ID instead. retitled, whose title
+/// changed too, records its text leaf beside it, and goes in once both
+/// are marked. Only swapped changed in order alone.
 #[test]
-fn each_change_no_leaf_records_is_found () {
+fn each_other_change_is_found () {
   let private : SkgrepoName = SkgrepoName::from ("private");
   let with = |pid : &str, edit : &dyn Fn (&mut Graphnode)| -> Graphnode {
     let mut node : Graphnode = node (pid, pid, &[]);
@@ -180,26 +191,51 @@ fn each_change_no_leaf_records_is_found () {
            with ("retitled", &|n| n . title = "retitled, twice" . to_string ()) ] );
   let forest : &ChangeLeaves = straddle . change_leaves ();
   for (pid, expected) in [
-    ( "hoisted",  UnmarkableChange::TextSection ),
-    ( "stripped", UnmarkableChange::Attribution ),
-    ( "moved",    UnmarkableChange::AliasSkgrepo ),
-    ( "swapped",  UnmarkableChange::Order (OrderedList::ExtraIds) ),
-    ( "renamed",  UnmarkableChange::OtherInGraph ), ] {
-    assert! ( forest . leaves_under ( &ID::from (pid) ) . is_empty (), "{}", pid );
-    assert_eq! ( forest . unmarkable_changes ( &ID::from (pid) ), &[ expected ], "{}", pid ); }
+    ( "hoisted",  OtherChange::TextSection ),
+    ( "stripped", OtherChange::Attribution ),
+    ( "moved",    OtherChange::AliasSkgrepo ),
+    ( "swapped",  OtherChange::Order (OrderedList::ExtraIds) ),
+    ( "renamed",  OtherChange::OtherInGraph ), ] {
+    assert_eq! ( keys_under (forest, pid), vec! [ node_key (pid, NodeAspect::OtherChanges) ],
+                 "{}", pid );
+    assert_eq! ( forest . other_changes ( &ID::from (pid) ), &[ expected ], "{}", pid ); }
+  assert_eq! ( straddle . order_only_pids () . iter () . map ( |pid| pid . 0 . as_str () )
+               . collect::<Vec<_>> (), vec! [ "swapped" ] );
   let retitled : ID = ID::from ("retitled");
-  assert_eq! ( keys_under (forest, "retitled"), vec! [ node_key ("retitled", NodeAspect::Text) ] );
-  assert_eq! ( forest . unmarkable_changes (&retitled), &[ UnmarkableChange::Attribution ] );
+  assert_eq! ( keys_under (forest, "retitled"), vec! [
+    node_key ("retitled", NodeAspect::Text),
+    node_key ("retitled", NodeAspect::OtherChanges) ] );
+  assert_eq! ( forest . other_changes (&retitled), &[ OtherChange::Attribution ] );
   let mut store : ProcessedStore = ProcessedStore::default ();
-  mark_all_of (&straddle, &mut store, &["retitled"]);
-  assert! ( forest . leaves_all_marked (&store, &retitled) );
+  store . mark ( node_key ("retitled", NodeAspect::Text),
+                 forest . leaf_fingerprint ( &node_key ("retitled", NodeAspect::Text) ) . unwrap () );
   assert! ( ! forest . node_is_processed (&store, &retitled) );
+  mark_all_of (&straddle, &mut store, &["retitled", "hoisted", "stripped"]);
   let choice : CommitChoice =
     processed_commit_choice (&owned_main (), &straddle, &store, &BTreeSet::new ());
-  assert! ( choice . going_in . is_empty () );
-  assert_eq! ( choice . unmarkable . iter () . map ( |(pid, _)| pid . 0 . as_str () )
-               . collect::<Vec<_>> (),
-               vec! [ "hoisted", "moved", "renamed", "retitled", "stripped", "swapped" ] ); }
+  assert_eq! ( choice . going_in . iter () . map ( |pid| pid . 0 . as_str () )
+               . collect::<Vec<_>> (), vec! [ "hoisted", "retitled", "stripped" ] );
+  assert! ( choice . unmarkable . is_empty () ); }
+
+/// The mark of a node's other changes lapses when a later change of
+/// the same kind changes what it compares: here, a stripped
+/// attribution that is then set to another original.
+#[test]
+fn an_attribution_mark_lapses_when_the_attribution_changes_again () {
+  let attributed = |original : &str| -> Graphnode {
+    let mut node : Graphnode = node ("f", "f", &[]);
+    node . attribution = Some ( Attribution {
+      original : ID::from (original), skgrepo : SkgrepoName::from ("theirs"),
+      remote_hash : None, commit : None, uncommitted : false } );
+    node };
+  let before : Vec<Graphnode> = vec! [ attributed ("o") ];
+  let stripped : GraphStraddle = straddle ( before . clone (), vec! [ node ("f", "f", &[]) ] );
+  let changed  : GraphStraddle = straddle ( before, vec! [ attributed ("p") ] );
+  let key : LeafKey = node_key ("f", NodeAspect::OtherChanges);
+  let mut store : ProcessedStore = ProcessedStore::default ();
+  mark_all_of (&stripped, &mut store, &["f"]);
+  assert! ( stripped . change_leaves () . processed_of_leaves (&store, [&key]) );
+  assert! ( ! changed . change_leaves () . processed_of_leaves (&store, [&key]) ); }
 
 /// A node whose files are not what skg writes for them (which only a
 /// commit can ask Git) is not processed, though every leaf is marked.
@@ -213,8 +249,7 @@ fn files_not_as_skg_writes_them_leave_a_marked_node_out () {
   let choice : CommitChoice = processed_commit_choice (
     &owned_main (), &straddle, &store, &BTreeSet::from ([ a . clone () ]) );
   assert! ( choice . going_in . is_empty () );
-  assert_eq! ( choice . unmarkable,
-               vec! [ ( a, vec! [ UnmarkableChange::FileNotAsSkgWritesIt ] ) ] ); }
+  assert_eq! ( choice . unmarkable, vec! [ a ] ); }
 
 /// A mark covers where its change is recorded: a new membership's mark
 /// lapses when the membership moves to another skgrepo, a new alias's

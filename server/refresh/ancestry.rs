@@ -225,7 +225,8 @@ pub fn required_ancestry (
       ChangeViewnode::OldText { .. }
         | ChangeViewnode::HomeSkgrepoMove { .. }
         | ChangeViewnode::RelRepoMove { .. }
-        | ChangeViewnode::ChangesetMarker { .. } => ANC_OCCURRENCE_OR_GHOST, },
+        | ChangeViewnode::ChangesetMarker { .. }
+        | ChangeViewnode::OtherChanges { .. } => ANC_OCCURRENCE_OR_GHOST, },
     ViewnodeKind::Vognode (_)
       | ViewnodeKind::BufferRoot
       | ViewnodeKind::Tombstone => ANC_NONE, } }

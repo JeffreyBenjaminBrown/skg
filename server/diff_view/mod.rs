@@ -9,7 +9,7 @@
 //!   that say it;
 //! - 'change_viewnodes.rs': the diff view's own viewnodes;
 //! - 'change_leaves.rs': the change-forest leaves and whether they are processed;
-//! - 'unmarkable_changes.rs': the changes to a node's files that no
+//! - 'other_changes.rs': the changes to a node's files that no other
 //!   leaf records;
 //! - 'processed_store.rs': the marks the user set;
 //! - 'processed_requests.rs': where the store meets a viewforest;
@@ -24,4 +24,4 @@ pub mod pruned_change_view;
 pub mod processed_requests;
 pub mod processed_store;
 pub mod restore_requests;
-pub mod unmarkable_changes;
+pub mod other_changes;

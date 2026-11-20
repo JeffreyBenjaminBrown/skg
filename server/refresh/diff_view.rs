@@ -24,7 +24,7 @@
 use crate::diff_view::change_viewnodes::{
   mk_body_diff_viewnode, mk_relRepo_move_viewnode};
 use crate::diff_view::changes::{
-  ChangedAspects, FrontChangeViewnodeConditions, changed_partner_folder_kinds,
+  ChangedAspects, changed_partner_folder_kinds,
   model_of_front_change_viewnodes, union_with_existence};
 use crate::diff_view::pruned_change_view::{
   PrunedChangeViewSets, prunedChangeView_sets_of_buffer};
@@ -311,6 +311,7 @@ enum ChangeKey {
   HomeSkgrepoMove,
   RelRepoMove,
   ChangesetMarker (ChangesetMarkerKind),
+  OtherChanges,
   Folder (Discriminant<Folder>),
 }
 
@@ -341,8 +342,10 @@ pub(crate) fn change_is_gone (
 
 /// The change viewnodes (and derived and changed folders) the parent
 /// at 'parent' should hold, in order, as freshly drawn: for an
-/// editable occurrence, its front change viewnodes, then its changed
-/// partner folders, then its changeset markers; for an old text, its body diff
+/// editable occurrence of a node in C, or of a root of the order-only
+/// buffer, its front change viewnodes, then its changed partner
+/// folders, then its changeset markers and its other changes, the
+/// last before its content; for an old text, its body diff
 /// when the body changed; for a ghost where content stands, its
 /// acquired-by folder. Empty for anything else.
 fn expected_change_viewnodes (
@@ -359,18 +362,19 @@ fn expected_change_viewnodes (
       if ! occurrence . is_writeProtected () => {
       let pid : &ID = &occurrence . gnid;
       let in_c : bool = sets (walk) . is_some_and ( |sets| sets . c . contains (pid) );
+      let shows_its_changes : bool = in_c
+        || ( buffer_kind == DiffViewBufferKind::OrderOnlyChanges
+             && straddle . order_only_pids () . contains (pid) );
       let aspects : ChangedAspects =
-        if in_c { ChangedAspects::of_node (straddle . change_leaves (), pid) }
+        if shows_its_changes {
+          ChangedAspects::of_node (straddle . change_leaves (), pid) }
         else { ChangedAspects::default () };
       let fronts : Vec<Viewnode> = model_of_front_change_viewnodes (
-        straddle, pid, &aspects,
-        FrontChangeViewnodeConditions {
-          in_c,
-          order_only : buffer_kind == DiffViewBufferKind::OrderOnlyChanges
-                       && straddle . order_only_pids () . contains (pid) } );
-      let is_marker : &dyn Fn (&Viewnode) -> bool =
+        straddle, pid, &aspects, shows_its_changes );
+      let is_marker : &dyn Fn (&Viewnode) -> bool = // or its other changes
         &|viewnode : &Viewnode| -> bool {
-        matches! ( change_key (viewnode), Some (ChangeKey::ChangesetMarker (_)) ) };
+        matches! ( change_key (viewnode),
+                   Some ( ChangeKey::ChangesetMarker (_) | ChangeKey::OtherChanges )) };
       let partner_folders : Vec<Viewnode> =
         if in_c { changed_partner_folder_kinds (
                     &aspects, &view_ancestor_gnids (tree, parent, walk . truth . graph) ) . into_iter ()
@@ -441,7 +445,8 @@ fn change_key (
       ChangeViewnode::BodyDiff { .. }        => ChangeKey::BodyDiff,
       ChangeViewnode::HomeSkgrepoMove { .. } => ChangeKey::HomeSkgrepoMove,
       ChangeViewnode::RelRepoMove { .. }     => ChangeKey::RelRepoMove,
-      ChangeViewnode::ChangesetMarker { kind } => ChangeKey::ChangesetMarker (*kind), } ),
+      ChangeViewnode::ChangesetMarker { kind } => ChangeKey::ChangesetMarker (*kind),
+      ChangeViewnode::OtherChanges { .. }    => ChangeKey::OtherChanges, } ),
     ViewnodeKind::Folder (folder) => Some ( ChangeKey::Folder (discriminant (folder)) ),
     _ => None, } }
 

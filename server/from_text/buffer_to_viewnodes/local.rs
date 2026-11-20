@@ -94,7 +94,9 @@ pub fn validate_local_structure (
         ChangeViewnode::HomeSkgrepoMove { .. } | ChangeViewnode::RelRepoMove { .. }) =>
         validate_skgrepo_move (tree, treeid),
       ViewnodeKind::ChangeViewnode (ChangeViewnode::ChangesetMarker { kind, .. }) =>
-        validate_changeset_marker (tree, treeid, *kind) };
+        validate_changeset_marker (tree, treeid, *kind),
+      ViewnodeKind::ChangeViewnode (ChangeViewnode::OtherChanges { .. }) =>
+        validate_other_changes (tree, treeid) };
 
   if errors . is_empty() {
     Ok (( ))
@@ -504,6 +506,24 @@ fn validate_changeset_marker (
                     if *sibling_kind == kind))
     { errors . push("A changesetMarker of each kind must be unique among its siblings."
                     . to_string()); }
+  errors }
+
+fn validate_other_changes (
+  tree    : &Tree<Viewnode>,
+  treeid  : NodeId,
+) -> Vec<String> {
+  let mut errors : Vec<String> = Vec::new();
+  if !generation_exists_and_includes(
+    tree, treeid, -1, false,
+    |node| matches!(&node . kind, ViewnodeKind::Vognode (_)))
+    { errors . push("otherChanges must have a vognode parent." . to_string()); }
+  if !generation_does_not_exist(tree, treeid, 1, false) {
+    errors . push("otherChanges must have no children." . to_string()); }
+  if !siblings_cannot_include(
+    tree, treeid,
+    |node| matches!(&node . kind,
+                    ViewnodeKind::ChangeViewnode (ChangeViewnode::OtherChanges { .. })))
+    { errors . push("otherChanges must be unique among its siblings." . to_string()); }
   errors }
 
 fn validate_idFolder (

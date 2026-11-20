@@ -2,7 +2,8 @@
 //! mention it ('ChangedAspects'), and the change viewnodes that say it
 //! ahead of its content ('model_of_front_change_viewnodes'): its old
 //! text, its home skgrepo move, its "it acquired" folder, its alias,
-//! ID and flags folders that changed, and its changeset markers; and
+//! ID and flags folders that changed, its changeset markers and its
+//! other changes; and
 //! which of its partner folders changed ('changed_partner_folder_kinds').
 //! The refresh's diff-view mode ('server/refresh/diff_view.rs') draws
 //! them ('docs/diff-view.org', "What each kind of change looks like").
@@ -13,7 +14,8 @@ use crate::diff_view::change_leaves::{
   ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
 use crate::diff_view::change_viewnodes::{
   mk_acquired_folder_viewnode, mk_changeset_marker_viewnode,
-  mk_homeSkgrepoMove_viewnode, mk_old_text_viewnode};
+  mk_homeSkgrepoMove_viewnode, mk_old_text_viewnode,
+  mk_other_changes_viewnode};
 use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
 use crate::types::misc::ID;
 use crate::types::viewnode::{
@@ -44,6 +46,8 @@ pub(crate) struct ChangedAspects {
   aliases      : bool,
   extra_ids    : bool,
   flags        : bool,
+  /// Its files changed in a way no other leaf records ('OtherChange').
+  other_changes : bool,
   /// The relations of the relationships the node records that were
   /// added or removed (existence) or moved (relRepo).
   recorded     : HashSet<(NodeRelation, RelationshipAspect)>,
@@ -69,7 +73,8 @@ impl ChangedAspects {
           NodeAspect::HomeSkgrepo  => aspects . home_skgrepo = true,
           NodeAspect::Alias (_)    => aspects . aliases      = true,
           NodeAspect::ExtraId (_)  => aspects . extra_ids    = true,
-          NodeAspect::Flag (_)     => aspects . flags        = true, },
+          NodeAspect::Flag (_)     => aspects . flags        = true,
+          NodeAspect::OtherChanges => aspects . other_changes = true, },
         LeafKey::Relationship { relationship, aspect } => {
           aspects . recorded . insert (( relationship . relation, *aspect )); }, }}
     for leaf in leaves . leaves_naming_member (pid) {
@@ -89,29 +94,21 @@ impl ChangedAspects {
     self . recorded . contains (&( relation, aspect )) }
 }
 
-/// Where the node stands, for its front change viewnodes: whether it
-/// is in C, and whether the buffer is the order-only one and its
-/// content changed in order only.
-pub(crate) struct FrontChangeViewnodeConditions {
-  pub in_c       : bool,
-  pub order_only : bool,
-}
-
-/// What an editable node holds ahead of its content, in order,
-/// partner folders aside: for a node in C, its old text, its home
-/// skgrepo move, its "it acquired" folder, its alias, ID and flags
-/// folders that changed, and its content and relRepo changeset
-/// markers, each as 'aspects' says; then, in the order-only buffer,
-/// its order-only changeset marker. Each is one viewnode; the refresh draws what lies under
-/// it at its own visit.
+/// What an editable node whose changes the buffer shows (a node in
+/// C, or a root of the order-only buffer) holds ahead of its content,
+/// in order, partner folders aside: its old text, its home skgrepo
+/// move, its "it acquired" folder, its alias, ID and flags folders
+/// that changed, its content and relRepo changeset markers, and its
+/// other changes, each as 'aspects' says. Each is one viewnode; the
+/// refresh draws what lies under it at its own visit.
 pub(crate) fn model_of_front_change_viewnodes (
   straddle   : &GraphStraddle,
   pid        : &ID,
   aspects    : &ChangedAspects,
-  conditions : FrontChangeViewnodeConditions,
+  shows_its_changes : bool,
 ) -> Vec<Viewnode> {
   let mut model : Vec<Viewnode> = Vec::new ();
-  if conditions . in_c {
+  if shows_its_changes {
     if aspects . text {
       model . extend ( mk_old_text_viewnode (straddle, pid) ); }
     if aspects . home_skgrepo {
@@ -125,10 +122,9 @@ pub(crate) fn model_of_front_change_viewnodes (
     if aspects . recorded_changed (
       NodeRelation::Contains, RelationshipAspect::RelRepo ) {
       model . push (
-        mk_changeset_marker_viewnode (ChangesetMarkerKind::RelRepo) ); }}
-  if conditions . order_only {
-    model . push (
-      mk_changeset_marker_viewnode (ChangesetMarkerKind::OrderOnly) ); }
+        mk_changeset_marker_viewnode (ChangesetMarkerKind::RelRepo) ); }
+    if aspects . other_changes {
+      model . extend ( mk_other_changes_viewnode (straddle, pid) ); }}
   model }
 
 /// The kinds of the node's partner folders whose membership changed,

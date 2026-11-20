@@ -368,10 +368,14 @@
 (skg (changesetMarker relRepo))
 ---- text: some content relationships changed skgrepo
 ---- styles: message*42
-==== diff view: the order-only changeset marker
-(skg (changesetMarker orderOnly) (diff (processed)))
----- text: order-only change✓
----- styles: message*17 go*1
+==== diff view: a node's other changes, one kind
+(skg (otherChanges contentOrder) (diff (leaves 1)))
+---- text: its content was reordered
+---- styles: message*25
+==== diff view: a node's other changes, two kinds, processed
+(skg (otherChanges attributionChange contentOrder) (diff (leaves 1) (processed)))
+---- text: its attribution changed; its content was reordered✓
+---- styles: message*50 go*1
 ==== diff view: a ghost, its existence processed
 (skg ghost (gnid x) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (processed node)))
 ---- text: ᗣ☮ ∃-✓ ~-

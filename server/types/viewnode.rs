@@ -576,6 +576,15 @@ pub enum ChangeViewnode {
   /// A childless stand-in for a set of changes recorded in its
   /// parent's files, carrying whether they are processed (derived).
   ChangesetMarker { kind : ChangesetMarkerKind },
+  /// The node's file changed in ways no other leaf records
+  /// ('OtherChange'): 'changes', in the order of 'OtherChange'.
+  /// 'orders' is its body: for each reordered list, the line diff of
+  /// the order of the members both graphs give it, empty when no list
+  /// was reordered. Its change-forest leaf is the node's other
+  /// changes.
+  OtherChanges {
+    changes : Vec<OtherChange>,
+    orders  : String, },
 }
 
 /// Which changes a 'ChangeViewnode::ChangesetMarker' stands for.
@@ -583,7 +592,38 @@ pub enum ChangeViewnode {
 pub enum ChangesetMarkerKind {
   Content,   // "its content changed": the ~ change-forest leaves of its content
   RelRepo,   // "some content relationships changed skgrepo"
-  OrderOnly, // "order-only change", never processed: no leaf records it
+}
+
+/// One way a node in both graphs changed that no other leaf records:
+/// together they are one leaf, its other changes
+/// ('docs/diff-view.org', "Other changes to a node's file").
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum OtherChange {
+  /// Its title or body moved between its home and a more private
+  /// section: it gained or lost overPrivateText.
+  TextSection,
+  /// Its attribution (what a fork records of its original) changed.
+  Attribution,
+  /// An alias it has in both graphs is recorded in another skgrepo.
+  AliasSkgrepo,
+  /// The members both graphs give one of its lists stand in another
+  /// order.
+  Order (OrderedList),
+  /// Something else the graph holds of it changed: an ID in a list
+  /// replaced by another ID of the same node, or a list written empty
+  /// where none was, or the reverse.
+  OtherInGraph,
+}
+
+/// The lists of a node whose order no relationship leaf records.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum OrderedList {
+  Content,
+  Forks,
+  Hidden,
+  Aliases,
+  ExtraIds,
+  Flags,
 }
 
 /// A viewnode grouping the children of one kind of relationship of
@@ -1018,6 +1058,7 @@ impl ChangeViewnode {
       ChangeViewnode::HomeSkgrepoMove { .. } => "homeSkgrepoMove",
       ChangeViewnode::RelRepoMove { .. }     => "relRepoMove",
       ChangeViewnode::ChangesetMarker { .. } => "changesetMarker",
+      ChangeViewnode::OtherChanges { .. }    => "otherChanges",
     } }
 
   pub fn title (&self) -> &str {
@@ -1027,37 +1068,107 @@ impl ChangeViewnode {
       ChangeViewnode::BodyDiff { .. }
         | ChangeViewnode::HomeSkgrepoMove { .. }
         | ChangeViewnode::RelRepoMove { .. }
-        | ChangeViewnode::ChangesetMarker { .. } => "",
+        | ChangeViewnode::ChangesetMarker { .. }
+        | ChangeViewnode::OtherChanges { .. } => "",
     } }
 
   pub fn body (&self) -> Option<&String> {
     match self {
       ChangeViewnode::OldText { body, .. } => body . as_ref (),
       ChangeViewnode::BodyDiff { diff } => Some (diff),
+      ChangeViewnode::OtherChanges { orders, .. } =>
+        ( ! orders . is_empty () ) . then_some (orders),
       ChangeViewnode::HomeSkgrepoMove { .. }
         | ChangeViewnode::RelRepoMove { .. }
         | ChangeViewnode::ChangesetMarker { .. } => None, } }
 }
 
 impl ChangesetMarkerKind {
-  pub const ALL : [ChangesetMarkerKind; 3] = [
+  pub const ALL : [ChangesetMarkerKind; 2] = [
     ChangesetMarkerKind::Content,
-    ChangesetMarkerKind::RelRepo,
-    ChangesetMarkerKind::OrderOnly ];
+    ChangesetMarkerKind::RelRepo ];
 
   pub fn wire_name (
     self,
   ) -> &'static str {
     match self {
       ChangesetMarkerKind::Content   => "content",
-      ChangesetMarkerKind::RelRepo   => "relRepo",
-      ChangesetMarkerKind::OrderOnly => "orderOnly", } }
+      ChangesetMarkerKind::RelRepo   => "relRepo", } }
 
   pub fn from_wire_name (
     s : &str,
   ) -> Option<ChangesetMarkerKind> {
     ChangesetMarkerKind::ALL . into_iter ()
       . find ( |kind| kind . wire_name () == s ) }
+}
+
+impl OtherChange {
+  pub const ALL : [OtherChange; 10] = [
+    OtherChange::TextSection,
+    OtherChange::Attribution,
+    OtherChange::AliasSkgrepo,
+    OtherChange::Order (OrderedList::Content),
+    OtherChange::Order (OrderedList::Forks),
+    OtherChange::Order (OrderedList::Hidden),
+    OtherChange::Order (OrderedList::Aliases),
+    OtherChange::Order (OrderedList::ExtraIds),
+    OtherChange::Order (OrderedList::Flags),
+    OtherChange::OtherInGraph ];
+
+  /// Its atom in '(otherChanges KIND...)'.
+  pub fn wire_name (
+    self,
+  ) -> &'static str {
+    match self {
+      OtherChange::TextSection  => "sectionMove",
+      OtherChange::Attribution  => "attributionChange",
+      OtherChange::AliasSkgrepo => "aliasSkgrepoMove",
+      OtherChange::Order (list) => match list {
+        OrderedList::Content  => "contentOrder",
+        OrderedList::Forks    => "forksOrder",
+        OrderedList::Hidden   => "hiddenOrder",
+        OrderedList::Aliases  => "aliasOrder",
+        OrderedList::ExtraIds => "idOrder",
+        OrderedList::Flags    => "flagOrder", },
+      OtherChange::OtherInGraph => "otherInFile", } }
+
+  pub fn from_wire_name (
+    s : &str,
+  ) -> Option<OtherChange> {
+    OtherChange::ALL . into_iter ()
+      . find ( |change| change . wire_name () == s ) }
+
+  /// The change in the user's words, as its herald shows it.
+  pub fn in_words (
+    self,
+  ) -> &'static str {
+    match self {
+      OtherChange::TextSection =>
+        "its text moved between a private and a public section",
+      OtherChange::Attribution  => "its attribution changed",
+      OtherChange::AliasSkgrepo => "an alias moved to another skgrepo",
+      OtherChange::Order (list) => match list {
+        OrderedList::Content  => "its content was reordered",
+        OrderedList::Forks    => "its forks were reordered",
+        OrderedList::Hidden   => "the nodes it hides were reordered",
+        OrderedList::Aliases  => "its aliases were reordered",
+        OrderedList::ExtraIds => "its IDs were reordered",
+        OrderedList::Flags    => "its flags were reordered", },
+      OtherChange::OtherInGraph => "something else in its file changed", } }
+}
+
+impl OrderedList {
+  /// The list as the header of its order's diff names it.
+  pub fn name (
+    self,
+  ) -> &'static str {
+    match self {
+      OrderedList::Content  => "content",
+      OrderedList::Forks    => "forks",
+      OrderedList::Hidden   => "hidden nodes",
+      OrderedList::Aliases  => "aliases",
+      OrderedList::ExtraIds => "IDs",
+      OrderedList::Flags    => "flags", } }
 }
 
 impl Vognode {

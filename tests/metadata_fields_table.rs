@@ -69,13 +69,15 @@ fn every_kind_atom (
     ChangeViewnode::BodyDiff { diff : String::new () },
     ChangeViewnode::HomeSkgrepoMove { skgrepo_change : change . clone () },
     ChangeViewnode::RelRepoMove { skgrepo_change : change },
-    ChangeViewnode::ChangesetMarker { kind : ChangesetMarkerKind::Content } ];
+    ChangeViewnode::ChangesetMarker { kind : ChangesetMarkerKind::Content },
+    ChangeViewnode::OtherChanges { changes : Vec::new (), orders : String::new () } ];
   for change in &changes {
     match change {
       ChangeViewnode::OldText { .. }
         | ChangeViewnode::BodyDiff { .. } | ChangeViewnode::HomeSkgrepoMove { .. }
         | ChangeViewnode::RelRepoMove { .. }
-        | ChangeViewnode::ChangesetMarker { .. } => (), } }
+        | ChangeViewnode::ChangesetMarker { .. }
+        | ChangeViewnode::OtherChanges { .. } => (), } }
   let folders : Vec<Folder> = vec! [
     Folder::Alias, Folder::ID, Folder::flags (),
     Folder::Forks,
@@ -184,6 +186,7 @@ fn example_of_kind (
     "homeSkgrepoMove" | "relRepoMove" =>
       format! ( "(skg ({} (old a) (new b)))", atom ),
     "changesetMarker"      => "(skg (changesetMarker content))" . to_string (),
+    "otherChanges"         => "(skg (otherChanges contentOrder))" . to_string (),
     _                      => format! ( "(skg {})", atom ), } }
 
 /// 'example' with 'field' inserted beside the kind, at the top level
