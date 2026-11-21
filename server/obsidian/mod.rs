@@ -4,4 +4,6 @@
 //! Obsidian's rules. The plan is 'TODO/export-obsidian/plan.org'.
 
 pub mod dialect;
+pub mod export;
 pub mod read_text;
+pub mod vault_check;

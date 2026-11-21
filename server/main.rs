@@ -16,6 +16,8 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::heralds::herald_styles_inconsistencies;
 use skg::export_org::{
   export_candidate_pids, export_to_org, ExportReport};
+use skg::obsidian::export::{RenderedVault, export_skgrepo_to_vault};
+use skg::obsidian::vault_check::{VaultCheckReport, check_vault};
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::telescope::dependencies_manifest::foreign_section_warnings;
 use skg::dbs::init::{InitContextHandoff, initialize_dbs};
@@ -56,6 +58,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         . unwrap_or_else ( |_| tracing_subscriber::EnvFilter::new ("info") ) )
       . init ();
     return run_export_org (&args); }
+
+  if args . len() > 1 && args[1] == "export-obsidian" {
+    return run_export_obsidian (&args); }
+
+  if args . len() > 1 && args[1] == "check-obsidian-vault" {
+    return run_check_obsidian_vault (&args); }
 
   if args . len() > 1 && [ "check-attributions", "fix-attributions",
                            "show-forked-original" ]
@@ -461,6 +469,46 @@ fn run_export_org (
   let report : ExportReport =
     export_to_org (&restriction, &nodes, &output_base) ?;
   print! ("{}", report . summary ());
+  Ok (( )) }
+
+/// Export one skgrepo as an Obsidian vault
+/// ('TODO/export-obsidian/plan.org'). It reads that skgrepo's files
+/// and no others, and needs no server.
+///
+/// USAGE: cargo run --bin skg -- export-obsidian [config-path] [skgrepo] [output-dir]
+/// (skgrepo defaults to the config's most public owned skgrepo,
+/// output-dir to "obsidian-vault"; a foreign skgrepo is refused).
+fn run_export_obsidian (
+  args : &[String],
+) -> Result<(), Box<dyn Error>> {
+  let config_path : String =
+    args . get (2) . cloned ()
+    . unwrap_or_else ( || "data/jeff/skgconfig.toml" . to_string () );
+  let config : SkgConfig =
+    load_config (&config_path) ? . 0;
+  let skgrepo : SkgrepoName = match args . get (3) {
+    Some (name) => SkgrepoName::from (name . as_str ()),
+    None => config . privacy_ladder () . into_iter () . next ()
+      . ok_or ("the config owns no skgrepo") ?, };
+  let output_dir : PathBuf = std::env::current_dir () ?
+    . join ( args . get (4) . map ( |s| s . as_str () ) . unwrap_or ("obsidian-vault") );
+  let vault : RenderedVault =
+    export_skgrepo_to_vault (&config, &skgrepo, &output_dir) ?;
+  print! ("{}", vault . report . summary ());
+  println! ("Wrote {} files to {}.", vault . files . len (), output_dir . display ());
+  Ok (( )) }
+
+/// Check a vault against Obsidian's rules ('server/obsidian/vault_check.rs').
+/// Exits 1 if it finds a problem.
+///
+/// USAGE: cargo run --bin skg -- check-obsidian-vault VAULT-DIR
+fn run_check_obsidian_vault (
+  args : &[String],
+) -> Result<(), Box<dyn Error>> {
+  let vault : &String = args . get (2) . ok_or ("usage: skg check-obsidian-vault VAULT-DIR") ?;
+  let report : VaultCheckReport = check_vault (Path::new (vault)) ?;
+  print! ("{}", report . summary ());
+  if ! report . problems . is_empty () { std::process::exit (1); }
   Ok (( )) }
 
 /// Set up where log output goes. Three destinations:
