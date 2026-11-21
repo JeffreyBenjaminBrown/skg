@@ -1,0 +1,27 @@
+title: what the vault holds
+pid: 47f57fda-1b33-4b55-b69b-16ceca89e96b
+body: |2-
+  The vault holds a folder named after the skgrepo, a =README.md= that
+  explains the format to readers, and =.skg-export.toml=, a manifest
+  (which Obsidian ignores) mapping each note's ID to its file.
+  Each file of the folder is a /document/: a note that no other note of
+  the skgrepo contains, or one that forks something, with the tree it
+  contains. A cycle that no such note reaches makes a document of its
+  smallest ID. The file is named after the root's title, made safe for
+  every filesystem, followed by the first eight characters of its ID,
+  as in =Feelings (41ec1d8d).md=.
+  The root's title is the file's heading, and its ID, aliases and other
+  metadata are properties. Every other note is a bullet ending in its ID
+  as a block ID (=^ID=), with its body indented beneath it and the notes
+  it contains nested beneath that. A note reached a second time (one
+  with several containers, or the step that closes a cycle) is written
+  where it is first reached, and is an embed (=![[File#^ID]]=)
+  everywhere else. A bullet's metadata rides in a comment,
+  =%%skg {...}%%=, which Obsidian's reading view hides.
+  Links become =[[File#^ID|label]]=. A link to a note outside the vault
+  points to the note "Some links might be broken." when the vault has
+  it, else to the README, and keeps the ID in a comment after it.
+  Characters that Markdown would read as structure (=[[=, =%%=, =^=,
+  =#=, =$= and a few more) are escaped with a backslash. A body or title
+  the escapes cannot give back exactly is written verbatim in a fenced
+  block, or a property; the summary counts them.

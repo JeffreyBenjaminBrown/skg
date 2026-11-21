@@ -1,0 +1,13 @@
+title: checking a vault
+pid: e72c5228-1568-458c-881b-f22d2f816259
+body: |2-
+  : cargo run --bin skg -- check-obsidian-vault VAULT-DIR
+  reads a vault the way the rules Obsidian documents (and its users
+  report) say Obsidian does, and lists every problem: a link or embed
+  naming no single file, or a block ID or heading that file lacks; a
+  repeated or ill-formed block ID; front matter that is not YAML, or
+  whose values Obsidian has no property type for; an unclosed code fence
+  or comment; a filename some system refuses, a path too long for
+  Windows, or two names that differ only in case; a note the manifest
+  places in a file that lacks it. It exits 1 if it finds any. It has not
+  been checked against Obsidian itself.

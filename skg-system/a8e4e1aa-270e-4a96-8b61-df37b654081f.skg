@@ -1,0 +1,22 @@
+title: 'skg export-obsidian : exporting a skgrepo as an Obsidian vault'
+pid: a8e4e1aa-270e-4a96-8b61-df37b654081f
+body: |2-
+  :PROPERTIES:
+  :CUSTOM_ID: export-obsidian
+  :END:
+  Writes one owned skgrepo as a vault that Obsidian can open, so that
+  the notes can be read without Skg. It needs no server, and no client
+  command runs it yet:
+  : cargo run --bin skg -- export-obsidian [config-path] [skgrepo] [output-dir]
+  =skgrepo= defaults to the config's most public owned skgrepo, and
+  =output-dir= (relative to the current directory) to =obsidian-vault=.
+  A foreign skgrepo is refused. Only the files of the skgrepo named are
+  read, so no text of another skgrepo can reach the vault.
+  The output directory must be absent, empty, or a vault an earlier
+  export wrote. Files that earlier export wrote and this one does not
+  are removed; nothing else there is touched.
+  The plan, and how the build departs from it, are in
+  =TODO/export-obsidian/=.
+contains:
+- 47f57fda-1b33-4b55-b69b-16ceca89e96b
+- e72c5228-1568-458c-881b-f22d2f816259
