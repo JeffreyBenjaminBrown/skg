@@ -174,3 +174,38 @@ what catch an escape that leaves structure for Obsidian to misread.
 * Settled with Jeff, 2026-11-21
 A link whose label holds a backtick or a '|' stays as Org
 text. Jeff: "seems fine until someone complains".
+
+* No manifest (2026-11-21)
+Agreed with Jeff: the hidden '.skg-export.toml' is gone. This
+supersedes what Slices 1 and 2 above say of the manifest.
+** Where its contents went
+- The format version is the README's text property 'skg-format', now
+  "skg-obsidian 2".
+- Each folder's skgrepo name, remote hash and commit are the README's
+  list properties 'skg-folders', 'skg-skgrepos', 'skg-remote-hashes'
+  and 'skg-commits', one entry per folder in the same order, an
+  unknown hash or commit as the empty text. Obsidian shows lists of
+  text; it cannot show a list of maps.
+- The map from each note's ID to its file is dropped. Nothing read
+  it; a note is found by its block ID, or a document by 'skg-id'.
+- The "broken links" note's ID is dropped. It is a constant of skg
+  ('BROKEN_LINK_SINK_ID'), and each link to it keeps its own ID.
+** Who reads the README
+- The importer reads only the folders 'skg-folders' lists, so a
+  responder's own folder beside them is not misread, and refuses a
+  vault whose 'skg-format' is not the one it reads.
+- The checker requires 'skg-format', and checks that every file of a
+  listed folder has an 'skg-id' and that no note is written twice in a
+  folder (as a root or a block ID). Its count of notes found replaces
+  the manifest's.
+** How a re-export knows its own files
+The output folder must be absent, empty, or hold a README whose
+'skg-format' begins "skg-obsidian ". In each folder that README lists,
+a file this export does not write is removed only if it is one an
+export wrote: a '.md' file whose 'skg-id' property names a note, and
+whose name ends in ' (SUFFIX).md', SUFFIX one of the suffixes the
+exporter derives from that ID. A user's own file has no such
+property; a copy made in Obsidian ('NAME 1.md') or a file renamed by
+hand has not that name; a folder the README does not list is not
+looked in. All of these stay. An edited exported file is still
+overwritten, as before.

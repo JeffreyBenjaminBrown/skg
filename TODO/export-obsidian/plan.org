@@ -290,6 +290,13 @@ hash and commit (needed to attribute a responder's forks), the
 "broken links" note, and a map from ID to file. It holds no timestamps,
 so two exports of the same data are identical byte for byte.
 'README.md' explains the format to readers and to responders.
+*** 2026-11-21: no manifest
+Agreed with Jeff: there is no hidden manifest. The format version and,
+for each folder, its skgrepo, remote hash and commit are properties of
+'README.md', as lists with one entry per folder. The map from ID to
+file is dropped: a note is found by its block ID or 'skg-id'. The
+"broken links" note is dropped too: it is a constant of skg. See
+'progress.org', "No manifest".
 
 * 2. Lossless, defined as a test
 ** The definition
