@@ -33,6 +33,12 @@ body: |2-
     With =--hot-reload=, cargo-watch rebuilds and restarts the server
     on every edit under =server/=, which is for working on the server.
 
+  The binary has subcommands too, which need no server: checking a
+  config, checking and fixing attributions, exporting and importing.
+  =bash/skg= runs the built binary (=target/release/skg=, or else
+  =target/debug/skg=) from any directory, so =bash/skg --help= lists
+  them, and =bash/skg SUBCOMMAND --help= describes one.
+
   Before starting the server, the script byte-compiles the Emacs client
   (=../bash/compile-elisp.sh=), writing a =.elc= file beside each =.el=
   file under =elisp/=. An Emacs that loads the client from this tree
