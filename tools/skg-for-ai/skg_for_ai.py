@@ -57,7 +57,9 @@ Other commands: 'close SIDECAR'; 'raw REQUEST', which sends one
 request line and prints every response; 'import INPUT_DIR REPO',
 which previews and applies a Markdown and Org import;
 'delete-references ID', which removes the owned structured references
-to an absent node; 'restrict [NAME]', which prints or (through a
+to an absent node; 'receipt ITEM TEXT', which writes a read receipt
+under your fork of a mailed item and hides the item from your fork of
+its mailbox, printing first what it would do, and with '--yes' doing it; 'restrict [NAME]', which prints or (through a
 daemon) sets the skgrepo restriction; 'linkstack ACTION', the clients'
 linkstack kept in a file.
 The port is '--port', else SKG_PORT; there is no default. A command
@@ -222,6 +224,9 @@ def run_command (arguments):
     return
   if arguments . command == "delete-references":
     command_delete_references (arguments)
+    return
+  if arguments . command == "receipt":
+    command_receipt (arguments)
     return
   if arguments . command == "restrict":
     command_restrict (arguments)
@@ -482,6 +487,34 @@ def parse_command_line (argv):
     "--leave-links", action = "store_true",
     help = ( "approve the cleanup when titles or bodies link to the ID: "
              "those links stay, dangling" ))
+  receipt_parser = commands . add_parser (
+    "receipt",
+    help = ( "write a read receipt, a note TEXT, as the first child of your "
+             "fork of ITEM (forking it if you hold none), and hide ITEM from "
+             "your fork of the mailbox it is in; without '--yes', print what "
+             "it would do" ),
+    parents = [ port_option ] )
+  receipt_parser . add_argument ( "item", help = "the ID of the mailed item" )
+  receipt_parser . add_argument (
+    "text", help = ( "the receipt's body, one line: how you processed the "
+                     "item; it may hold links '[[id:ID][LABEL]]'" ))
+  receipt_parser . add_argument (
+    "--title", default = "Read.", help = "the receipt's title (default: 'Read.')" )
+  receipt_parser . add_argument (
+    "--mailbox", metavar = "ID", default = None,
+    help = ( "the mailbox to hide ITEM from, or your fork of it, when ITEM is "
+             "in several you read (default: the one it is in)" ))
+  receipt_parser . add_argument (
+    "--fork-into", metavar = "REPO", default = None,
+    help = ( "the owned skgrepo of a new fork of ITEM (default: that of your "
+             "fork of the mailbox, when ITEM is homed where the mailbox is)" ))
+  receipt_parser . add_argument (
+    "--no-hide", action = "store_true", help = "write the receipt, hiding nothing" )
+  receipt_parser . add_argument (
+    "--out-dir", default = None,
+    help = "the folder whose daemon to run through, if one runs there" )
+  receipt_parser . add_argument (
+    "--yes", action = "store_true", help = "write the receipt and the hide" )
   restrict_parser = commands . add_parser (
     "restrict",
     help = ( "show the daemon's skgrepo restriction and the rungs, or set "
@@ -1255,6 +1288,68 @@ def command_delete_references (arguments):
           " membership(s) in " + response_text_field (response, "changed-nodes") +
           " node(s)." )
   print ( response_text_field (response, "content") . rstrip ("\n") )
+
+def command_receipt (arguments):
+  """Send "receipt" for ITEM, as the Emacs command 'skg-receipt' does:
+  the server writes the note TEXT (titled '--title') as the first
+  child of your fork of ITEM, forking it first if you hold none, and
+  hides ITEM from your fork of the mailbox it is in, all in one write,
+  then rerenders the views that show them. Without '--yes' it asks the
+  server what it would do, and writes nothing. A refusal names what
+  to choose: '--mailbox' or '--fork-into'. Like the clients, it
+  refuses while a view the daemon holds has unsaved edits."""
+  if "\n" in arguments . text or "\n" in arguments . title:
+    raise SkgToolError ( "Nothing was sent: a receipt's text and title are "
+                         "one line each." )
+  fields = [ ( "item", arguments . item ), ( "text", arguments . text ),
+             ( "title", arguments . title ) ]
+  if arguments . mailbox is not None:
+    fields . append (( "mailbox", arguments . mailbox ))
+  if arguments . fork_into is not None:
+    fields . append (( "fork-into", arguments . fork_into ))
+  if arguments . no_hide:
+    fields . append (( "hide", "false" ))
+  if not arguments . yes:
+    fields . append (( "preview", "true" ))
+  connection = connect_to_server (arguments . port)
+  try:
+    if arguments . yes:
+      refuse_while_held_views_have_edits ( connection, "the receipt" )
+    response = connection . request_then_rerender_stream (
+      request_line ( "receipt", *fields ))
+    if response_type (response) != "receipt":
+      raise SkgToolError (
+        "The server refused: " + response_text_field (response, "content") )
+    refusal = response_field (response, "refusal")
+    if refusal is not None:
+      raise SkgToolError ( "Nothing was written: " + sexp_to_text (refusal) +
+                           receipt_choices_text (response) )
+    if arguments . yes:
+      connection . log_event ( "wrote a receipt for " + arguments . item )
+  finally:
+    connection . close ()
+  if arguments . yes:
+    print ( "Server: wrote the receipt " +
+            response_text_field (response, "receipt-id") + " under " +
+            response_text_field (response, "holder-id") + "." )
+  else:
+    print ( "Not written. The receipt would do this; run again with '--yes':" )
+  for line in response_field (response, "lines") or []:
+    print ( sexp_to_text (line) )
+
+def receipt_choices_text (response):
+  """The choices a receipt's refusal offers, as a sentence, or ""."""
+  skgrepos = response_field (response, "choose-skgrepo")
+  if skgrepos:
+    return ( " Run again with '--fork-into' one of: " +
+             ", " . join ( sexp_to_text (s) for s in skgrepos ) + "." )
+  mailboxes = response_field (response, "choose-mailbox")
+  if mailboxes:
+    titles = response_field (response, "choose-mailbox-titles") or []
+    return ( " Run again with '--mailbox' one of: " + ", " . join (
+      f"{sexp_to_text (pid)} ('{sexp_to_text (title)}')"
+      for pid, title in zip (mailboxes, titles) ) + "." )
+  return ""
 
 def refuse_while_held_views_have_edits (connection, what):
   """Refuse WHAT while a view CONNECTION holds has unsaved edits, as

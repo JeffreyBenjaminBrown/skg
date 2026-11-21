@@ -87,6 +87,10 @@ the save asks before it forks ("Placing an existing node" and
 gestures, 'write-protect', 'detach' or 'repo:NAME' among them ("Words
 in a handle").
 
+To mark a mailed item handled, 'receipt ITEM TEXT --yes' writes the
+note TEXT under your fork of ITEM and hides ITEM from your fork of its
+mailbox, in one write ("Read receipts").
+
 Then save with the report: 'save DIR/view_ID.view.json' prints, line
 by line, what the save would do, and changes nothing. Read it. For
 each new node it names the parent, "New: 'TITLE', under ...": as in
@@ -327,6 +331,10 @@ restriction, and, like the clients, refuses while a view the daemon
 holds has unsaved edits; the daemon rewrites the views that showed a
 removed reference.
 
+'receipt ITEM TEXT' writes a read receipt, as the Emacs command
+'skg-receipt' ('C-c m a') does; see "Read receipts" under
+"Writing".
+
 'restrict' prints the connection's skgrepo restriction and the rungs
 it may take, as the clients' 'skg-list-repo-sets' does: 'Skgrepo
 restriction: main; available: main, private (no restriction).'.
@@ -362,9 +370,10 @@ Options, after the command: '--port N' for every command ('save',
 command run through a daemon's folder talks to the daemon's server
 unless it names one);
 '--yes' for
-'save', 'commit' and 'delete-references'; '--keep-ids' or '--all-new'
+'save', 'commit', 'delete-references' and 'receipt'; '--keep-ids' or '--all-new'
 for 'save' (see "Retyped headlines"); '--fork-into REPO' for 'save'
-(see "Forking"); '--hoist', '--delete-from visible|all' and
+(see "Forking") and 'receipt'; '--title TITLE', '--mailbox ID' and
+'--no-hide' for 'receipt' (see "Read receipts"); '--hoist', '--delete-from visible|all' and
 '--strandeds reset|keep' for 'save', answering the server's questions
 (see "The server's answer"); '--show-overPrivateText' for the view
 commands, 'save', 'restrict' and 'perspective' (see "The skgrepo
@@ -375,7 +384,7 @@ view commands also '--out-dir DIR', '--name BASE' to name the files
 'BASE.full.org' and so on instead of 'COMMAND_ARGUMENT', and
 '--no-summary' to leave the summary out of the compact view;
 '--out-dir DIR' for 'linkstack' (its file's folder), and for
-'delete-references' and 'restrict' (the folder whose daemon to run
+'delete-references', 'receipt' and 'restrict' (the folder whose daemon to run
 through).
 Every command that writes a view fetches the server's herald rule
 table once, with the 'herald rules' request.
@@ -1107,7 +1116,7 @@ without '--yes', shows the server's warning with it, and with
 '--leave-links' removes the membership, leaves the link, and the
 daemon rewrites the view of the node that named it.
 
-Last, on an eighth server over a copy of the data of
+On an eighth server over a copy of the data of
 'tests/integration/perspective/' (R, in foreign "foreign", contains
 M, in foreign "origin", and K; A, in "foreign", U, in owned "main",
 and B, in foreign "third", each fork M; P, in "main", contains M), it
@@ -1125,6 +1134,16 @@ perspective; after 'daemon --stop' the sidecar still has it, a save
 on the command's own connection names it, and 'root homes' on that
 connection shows A. Offline, it checks that a sidecar holding an
 older perspective name is read as the root homes.
+
+Last, on a ninth server over mail (fred's mailboxes 'box', holding
+'letter' and 'aside', and 'box2', holding 'aside', which the reader's
+'boxfork' and 'boxfork2' fork; 'loner' in none; the reader owning
+'mine' and 'private'), it checks 'receipt': without '--yes' it prints
+the fork and the hide it would make and writes nothing; with it, the
+fork goes into 'mine' and 'boxfork' hides 'letter'; a second receipt
+for 'letter' goes under the same fork and says 'boxfork' already hides
+it; 'loner' asks for '--fork-into', and with it hides nothing; 'aside'
+asks for '--mailbox', and with 'boxfork2' is hidden there.
 
 It prints PASS or each failure, and keeps the scratch files when
 something fails. '--update-expected' rewrites the expected
@@ -1606,6 +1625,51 @@ to fork from a buffer with unsaved changes, so that the clone is the
 node as saved, a 'fork' beside any other edit of the compact view is
 an error: save the other edits first. The confirmation and its
 approval are those of an implicit fork.
+** Read receipts
+When you have handled an item someone mailed you (a child of their
+note addressed to you, which a note of yours forks: your fork of
+their mailbox), 'receipt ITEM TEXT' says how, and files the item away,
+in one write, as the clients' 'skg-receipt' does
+('docs/forks.org', "Read receipts"). It writes a new note, titled
+'--title' (default 'Read.'), its body TEXT (one line, which may hold
+links '[[id:ID][LABEL]]'; none when TEXT is empty or equals the
+title), as the first child of your fork of ITEM: the fork you hold,
+or, if you hold none, a new one, which forks ITEM as an edit would
+(the receipt asks no fork confirmation: asking for it approves the
+fork). An item you own takes the receipt itself. Then it hides ITEM
+from your fork of its mailbox, as removing ITEM's headline there would.
+
+Without '--yes' it asks the server what it would do, prints that, and
+writes nothing:
+
+: Not written. The receipt would do this; run again with '--yes':
+: Forks 'a letter' (letter, of 'fred') into 'mine', and writes the receipt 'Read.' as the first child of the fork.
+: Hides 'a letter' from 'my box', as content of 'the box'.
+
+With '--yes' it prints 'Server: wrote the receipt ID under ID.' and
+the same lines, and the daemon rewrites the views that show the
+item, the notes written, or the mailbox.
+
+The mailbox is the note of another owner that holds ITEM (or a
+mirror of it, a reply forked from your note, say: the hide lands on
+the member its list names) and that a note of yours forks. When there
+is one it is found; when there are several, the receipt is refused,
+naming them, and '--mailbox ID' names one (the mailbox, or your fork
+of it). When there is none, the receipt is still written, and it says
+"Hides nothing:" and why; so it does when the fork of the mailbox
+already hides ITEM. '--no-hide' writes the receipt alone.
+
+A new fork goes into '--fork-into REPO'. Without it, it goes where
+your fork of the mailbox is, but only when ITEM is homed in the
+mailbox's skgrepo: an item from another of its owner's skgrepos may be
+more private than the mailbox, so the receipt is refused, naming your
+skgrepos, and so it is for an item in no mailbox. With one owned
+skgrepo there is no choice. '--fork-into' naming another skgrepo than
+the existing fork's is refused.
+
+The writes are one batch, in the order receipt, fork, fork of the
+mailbox; a failure says which files were written. Refused while a
+view the daemon holds has unsaved edits.
 ** Handles across saves
 The server keeps a view per connection, and without a daemon the
 tool's connection ends with each command, so a save names a view the
@@ -1880,6 +1944,7 @@ round and its answer reads as it is.
 |                            | its delete-from question                         | 'save --delete-from visible' or 'all'; '--yes' alone cancels                                                                                                  |
 | C-u C-c <backspace>        | skg-delete-recursive                             | 'delete subtree' in the handle                                                                                                                                |
 | C-c d a                    | skg-delete-references-to-absent-node             | 'delete-references ID --yes', its confirmation approved by '--leave-links'                                                                                    |
+| C-c m a                    | skg-receipt                                      | 'receipt ITEM TEXT --yes'; '--mailbox ID' and '--fork-into REPO' answer its refusals (see "Read receipts")                                                    |
 | C-c f RET                  | skg-search                                       | 'search TERMS'                                                                                                                                                |
 | C-c f i                    | skg-search-interactive                           | 'search TERMS' with '--regex', '--body', '--operators'                                                                                                        |
 | C-c f l                    | skg-search-make-link                             | 'search', then type '[[id:ID][label]]', the ID from the full view                                                                                             |
