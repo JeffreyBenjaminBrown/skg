@@ -6,6 +6,7 @@ pub mod delete_references_to_absent_node;
 pub mod dbs;
 pub mod diff_view;
 pub mod export_org;
+pub mod obsidian;
 pub mod from_text;
 pub mod git_ops;
 pub mod graph_straddle;
