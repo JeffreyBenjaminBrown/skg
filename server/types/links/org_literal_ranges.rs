@@ -6,10 +6,12 @@
 use std::fmt;
 use std::ops::Range;
 
-/// Characters Org accepts just before an opening '=' or '~'.
-const VERBATIM_PRE : &str = "-('\"{";
-/// Characters Org accepts just after a closing '=' or '~'.
-const VERBATIM_POST : &str = "-.,:!?;'\")}\\[";
+/// Characters Org accepts just before an opening '=' or '~' (and any
+/// other emphasis marker).
+pub const VERBATIM_PRE : &str = "-('\"{";
+/// Characters Org accepts just after a closing '=' or '~' (and any
+/// other emphasis marker).
+pub const VERBATIM_POST : &str = "-.,:!?;'\")}\\[";
 
 /// The literal ranges of 'text':
 /// - '#+begin_X' ... '#+end_X' blocks (any X), delimiters included,

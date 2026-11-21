@@ -5,7 +5,7 @@
 //! section, odd titles (links, slashes, colons, list markers, length,
 //! duplicates, case-only differences, leading blanks, backticks) and
 //! bodies with Org and Markdown markup, code, and text the escapes
-//! cannot carry. Shared by the export and import tests.
+//! cannot carry, and Org markup that converts to Markdown, or does not. Shared by the export and import tests.
 
 use crate::telescope::types::ListItem;
 use crate::types::misc::{ID, SkgrepoName};
@@ -172,4 +172,32 @@ pub fn fixture_sections () -> Vec<GraphnodeOnDisk> {
   { let mut s : GraphnodeOnDisk = section (205, "Body that is only a fence");
     s . body = Some ("````md\n```\ninner\n```\n````" . to_string ());
     out . push (s); }
+  { let mut s : GraphnodeOnDisk = section (206, "Org markup body");
+    s . body = Some ( [
+      "*Bold*, /italic/, =verbatim=, ~code~, and *bold with =code= inside*.",
+      "A [[https://example.com/a_(b)][web link]], [[https://example.com]] and [[file:x.org][a file]].",
+      "| Field | Type |",
+      "|-------+------|",
+      "| =pid= | =ID= |",
+      "",
+      "#+BEGIN_SRC rust",
+      "fn main () {}",
+      "#+END_SRC",
+      "#+begin_example",
+      ",* an escaped headline",
+      "~~~",
+      "#+end_example",
+      ": fixed one",
+      ":",
+      ": fixed three",
+      "#+begin_quote",
+      "a /quote/",
+      "#+end_quote",
+      "#+begin_src sh",
+      "echo mismatched",
+      "#+END_SRC",
+      "=has a ` tick= and `markdown code`",
+    ] . join ("\n") );
+    out . push (s); }
+  out . push (section (207, "A *bold* /title/ with =code="));
   out }

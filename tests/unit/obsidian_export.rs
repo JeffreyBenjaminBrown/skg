@@ -52,7 +52,17 @@ fn the_report_counts_what_could_not_be_written_plainly () {
   assert_eq! (report . title_fallbacks, 1, "the title with leading blanks");
   assert_eq! (report . body_fallbacks, 2, "the carriage return and the leading blank lines");
   assert_eq! (report . absent_members, 1);
-  assert_eq! (report . links_left_as_text, 1, "the label with a bar"); }
+  assert_eq! (report . links_left_as_text, 1, "the label with a bar");
+  let bodies : &MarkupCounts = &report . bodies_markup;
+  assert_eq! ((bodies . wholly, bodies . partly, bodies . none), (0, 2, 0),
+              "Threads and the Org markup body; {:?}", bodies);
+  assert_eq! (bodies . reasons . get (org_markup::WHY_LINK_NOT_WEB), Some (&2));
+  for reason in [ org_markup::WHY_BLOCK_KIND, org_markup::WHY_BLOCK_END, org_markup::WHY_VERBATIM_TICK ] {
+    assert_eq! (bodies . reasons . get (reason), Some (&1), "{}", reason); }
+  assert_eq! (bodies . converted . get (org_markup::KIND_SRC_BLOCK), Some (&2));
+  assert_eq! (bodies . converted . get (org_markup::KIND_TABLE_RULE), Some (&1));
+  let titles : &MarkupCounts = &report . titles_markup;
+  assert_eq! ((titles . wholly, titles . partly, titles . none), (2, 0, 0), "{:?}", titles); }
 
 #[test]
 fn a_note_with_two_containers_is_written_once_and_embedded_elsewhere () {
@@ -141,14 +151,55 @@ fn code_is_copied_and_everything_else_escaped () {
   let (_, threads) = file_starting (&vault, "Threads (00000001)");
   for expected in [
     "\\# an Org comment line", "Prices: \\$5, 50\\%\\% off, x\\^2 and a trailing \\^word",
-    "A \\#tag, \\[\\[https://example.com][a web link]]",
+    "A \\#tag, [a web link](https://example.com), and [[",
+    "~~~sh\necho [[id:", // an Org block: a fence of tildes, its link Org text
     "```text\n- x ^notanid\n[[id:", // a fence: copied
+    "``verbatim [[id:",
     "after a blank line, \\%\\% and \\[\\[not a link]] and !\\[\\[nor an embed]]" ] {
     assert! (threads . contains (expected), "missing {:?} in\n{}", expected, threads); }
   let (_, markdownish) = file_starting (&vault, "Markdown-ish body");
-  for expected in [ "\\```\nunclosed fence", "\\<!-- an unclosed", "\\<div>",
-                    "- item \\^looks-like-an-id", "\\$\\$" ] {
+  for expected in [ "\\`\\`\\`\nunclosed fence", "\\<!-- an unclosed", "\\<div>",
+                    "- item \\^looks-like-an-id", "| a | b |\n|---|---|\n", "\\$\\$" ] {
     assert! (markdownish . contains (expected), "missing {:?} in\n{}", expected, markdownish); }}
+
+/// Each conversion of 'org_markup.rs', and markup left as Org text.
+#[test]
+fn org_markup_becomes_markdown_where_it_reads_back () {
+  let vault : RenderedVault = render_fixture ();
+  let (_, body) = file_starting (&vault, "Org markup body");
+  assert_eq! (body, "---
+skg-id: \"000000ce-0000-4000-8000-0000000000ce\"
+---
+# Org markup body
+
+**Bold**, *italic*, ``verbatim``, `` code ``, and **bold with ``code`` inside**.
+A [web link](<https://example.com/a_(b)>), <https://example.com> and \\[\\[file:x.org][a file]].
+| Field | Type |
+|:------|:-----|
+| ``pid`` | ``ID`` |
+
+~~~rust skg-upper
+fn main () {}
+~~~
+~~~~
+,* an escaped headline
+~~~
+~~~~
+~~~skg-fixed
+fixed one
+
+fixed three
+~~~
+\\#+begin_quote
+a /quote/
+\\#+end_quote
+\\#+begin_src sh
+echo mismatched
+\\#+END_SRC
+=has a ` tick= and `markdown code\\`
+");
+  let (_, title) = file_starting (&vault, "A bold title with");
+  assert! (title . ends_with ("\n# A **bold** *title* with ``code``\n"), "{}", title); }
 
 #[test]
 fn bodies_the_escapes_cannot_carry_go_in_a_verbatim_fence () {
@@ -287,7 +338,7 @@ fn the_readme_describes_the_vault_in_its_properties () {
   let vault : RenderedVault = render_fixture ();
   assert! (vault . files ["README.md"] . starts_with (
 "---
-skg-format: \"skg-obsidian 2\"
+skg-format: \"skg-obsidian 3\"
 skg-folders:
   - \"main\"
 skg-skgrepos:

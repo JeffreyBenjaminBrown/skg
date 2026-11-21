@@ -132,14 +132,22 @@ fn arb_plain (
   one_line : bool,
 ) -> impl Strategy<Value = String> {
   let class : &'static str =
-    if one_line { "[a-z \\[\\]%^#$!`~<>+*.)\\\\\\-|=:/\t]{0,12}" }
-    else { "[a-z \\[\\]%^#$!`~<>+*.)\\\\\\-|=:/\t\n]{0,24}" };
+    if one_line { "[a-z \\[\\]%^#$!`~<>+*.()\\\\\\-|=:/\t]{0,12}" }
+    else { "[a-z \\[\\]%^#$!`~<>+*.()\\\\\\-|=:/\t\n]{0,24}" };
+  let org_markup : Vec<&'static str> = vec! [
+    " *b* ", " /i/ ", " =v= ", " ~c~ ", " *a /b/ c* ", " =a`b= ", "`code`", "**", "*",
+    "[[https://x.org/a(b)][l]]", "[[https://y]]", "[[file:z][f]]", "<https://q>", "[a](b)",
+    "\n#+begin_src sh\necho *x* ~~~\n#+end_src\n", "\n#+BEGIN_EXAMPLE\n~~~\n#+END_EXAMPLE\n",
+    "\n  #+begin_src\nx\n  #+end_src\n", "\n#+begin_quote\nq\n#+end_quote\n",
+    "\n#+begin_src a\nunclosed\n", "\n: fixed\n:\n: \n", "\n| a | b |\n|---+---|\n| c | d |\n",
+    "\n|:-|\n", "\n| a |\n|---|\n" ];
   prop_oneof! [
     4 => class . prop_map ( |s| s ),
     1 => Just ("\n```\ncode ^x [[y]]\n```\n" . to_string ()),
     1 => Just ("```\n" . to_string ()),
     1 => Just ("\n- item ^id-like\n" . to_string ()),
     1 => Just ("%%skg section%%" . to_string ()),
+    4 => prop::sample::select (org_markup) . prop_map ( |s| s . to_string () ),
   ] . prop_map ( move |s| if one_line { s . replace ('\n', " ") } else { s } ) }
 
 fn arb_text (

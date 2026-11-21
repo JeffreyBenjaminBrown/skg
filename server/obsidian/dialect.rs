@@ -13,16 +13,33 @@
 //! character that would change the file's structure or hide text
 //! (a wikilink, a comment, a block ID, a heading, a tag, math, a fence
 //! or an HTML block that swallows what follows, a list marker opening a
-//! title); 'unescape_text' undoes it. A backslash is doubled exactly
-//! when the character after it is one 'unescape_text' would read as
-//! escaped, so the pair is a bijection on text.
+//! title), and before each character that the inverse of the
+//! conversions below would read as Markdown made from Org (a backtick,
+//! an asterisk, a '[' or '<' that would open a link, a table rule);
+//! 'unescape_text' undoes it. A backslash is doubled exactly when the
+//! character after it is one 'unescape_text' would read as escaped, so
+//! the pair is a bijection on text.
+//!
+//! Conversions ('TODO/export-obsidian/progress.org', Slice 3). Org
+//! markup the exporter turns into Markdown is written in forms that
+//! text, once escaped, cannot take, so 'read_text.rs' can turn it back:
+//! - '=verbatim=' as a code span of two backticks, '~code~' as one of
+//!   two backticks padded by a space (a code span from the text itself,
+//!   of one backtick, is copied);
+//! - '*bold*' as '**bold**' and '/italic/' as '*italic*';
+//! - '[[URL][label]]' as '[label](URL)', '[[URL]]' as '<URL>';
+//! - a table's rule under its first row, '|---+---|', as '|:--|:--|';
+//! - '#+begin_src' and '#+begin_example' blocks, and runs of
+//!   fixed-width lines (': ...'), as fences of tildes, whose info
+//!   string says what they were ('fence_info_of_org_block'). A fence
+//!   of backticks is one the text itself holds, and is copied.
 
 use crate::types::misc::ID;
 
 use std::ops::Range;
 
 /// The version of these conventions, a property of the README.
-pub const VAULT_FORMAT : &str = "skg-obsidian 2";
+pub const VAULT_FORMAT : &str = "skg-obsidian 3";
 /// What every version of 'VAULT_FORMAT' begins with.
 pub const VAULT_FORMAT_FAMILY : &str = "skg-obsidian ";
 pub const README_STEM : &str = "README";
@@ -37,6 +54,11 @@ pub const KEY_COMMITS       : &str = "skg-commits";
 /// The README heading that a link to a note outside the vault points
 /// to, when the vault lacks the "Some links might be broken" note.
 pub const OUTSIDE_VAULT_HEADING : &str = "Links to notes outside this vault";
+
+/// Marks in the info string of a tilde fence made from Org.
+pub const FIXED_WIDTH_FENCE_INFO : &str = "skg-fixed";
+pub const SRC_WITHOUT_ARGUMENTS_MARK : &str = "skg-src";
+pub const UPPERCASE_BLOCK_MARK : &str = "skg-upper";
 
 /// A '%%skg {JSON}%%' comment carries a note's metadata.
 pub const META_COMMENT_OPEN  : &str = "%%skg ";
@@ -154,7 +176,7 @@ pub enum Piece<'a> {
 /// Characters that a backslash before them escapes.
 const ESCAPABLE : &[char] = &[
   '\\', '[', '%', '^', '$', '#', '!', '`', '~', '<',
-  '-', '+', '*', '>', '.', ')' ];
+  '-', '+', '*', '>', '.', ')', '|' ];
 
 fn is_escapable (
   c : char,
@@ -176,18 +198,33 @@ pub fn escape_pieces (
       Piece::Produced (t) => t . chars () . map ( |c| (c, false) ) . collect (), }} )
     . collect ();
   let chars : Vec<char> = logical . iter () . map ( |(c, _)| *c ) . collect ();
+  let opens_a_link : Vec<bool> = brackets_that_would_open_a_link (&chars);
   let mut out : String = String::with_capacity (chars . len () + 16);
   for (i, (c, is_text)) in logical . iter () . enumerate () {
-    if *is_text && needs_escape (&chars, &logical, i, is_title) {
+    if *is_text && needs_escape (&chars, &logical, &opens_a_link, i, is_title) {
       out . push ('\\'); }
     out . push (*c); }
   out }
 
+/// For each '[', whether the first ']' after it is followed by '(':
+/// the inverse would try to read a Markdown link there.
+fn brackets_that_would_open_a_link (
+  chars : &[char],
+) -> Vec<bool> {
+  let mut out : Vec<bool> = vec! [ false; chars . len () ];
+  let mut next_close : Option<usize> = None;
+  for i in (0 .. chars . len ()) . rev () {
+    if chars [i] == '[' {
+      out [i] = next_close . is_some_and ( |j| chars . get (j + 1) == Some (&'(') ); }
+    if chars [i] == ']' { next_close = Some (i); }}
+  out }
+
 fn needs_escape (
-  chars    : &[char],
-  logical  : &[(char, bool)],
-  i        : usize,
-  is_title : bool,
+  chars       : &[char],
+  logical     : &[(char, bool)],
+  opens_a_link : &[bool],
+  i           : usize,
+  is_title    : bool,
 ) -> bool {
   let c : char = chars [i];
   let prev : Option<char> = if i > 0 { Some (chars [i - 1]) } else { None };
@@ -200,22 +237,41 @@ fn needs_escape (
         '\n' => break true,
         ' ' | '\t' => j -= 1,
         _ => break false, }}};
+  let at_column_zero : bool = prev . is_none_or ( |p| p == '\n' );
   match c {
     '\\' => next . is_some_and (is_escapable),
-    '['  => prev == Some ('[') || next == Some ('['),
+    '['  => prev == Some ('[') || next == Some ('[') || opens_a_link [i],
     '%'  => prev == Some ('%') || next == Some ('%'),
     '^' | '$' => true,
     '#'  => prev . is_none_or ( |p| p . is_whitespace () ),
     '!'  => next == Some ('[')
             && logical . get (i + 1) . is_some_and ( |(_, is_text)| ! is_text ),
-    '`' | '~' => at_line_start && run_length (chars, i) >= 3,
-    '<'  => at_line_start && next . is_some_and (
+    '`'  => true, // a code span of the text is a piece of its own
+    '~'  => at_line_start && run_length (chars, i) >= 3,
+    '<'  => next . is_some_and ( // HTML, which would hide text or swallow lines
               |n| n . is_ascii_alphabetic () || n == '/' || n == '!' || n == '?' ),
-    '-' | '+' | '*' => is_title && at_line_start
-                       && next . is_none_or ( |n| n == ' ' || n == '\t' ),
+    '*'  => is_title || ! at_line_start
+            || ! next . is_none_or ( |n| n == ' ' || n == '\t' || n == '\n' ),
+    '|'  => at_column_zero && is_table_rule_written ( &line_from (chars, i) ),
+    '-' | '+' => is_title && at_line_start
+                 && next . is_none_or ( |n| n == ' ' || n == '\t' ),
     '>'  => is_title && at_line_start,
     '.' | ')' => is_title && title_starts_with_ordered_marker_ending_at (chars, i),
     _ => false, }}
+
+/// The characters from 'i' to the end of its line.
+fn line_from (
+  chars : &[char],
+  i     : usize,
+) -> String {
+  chars [i ..] . iter () . take_while ( |c| **c != '\n' ) . collect () }
+
+/// Whether 'rest' begins 'http://' or 'https://'.
+pub fn starts_a_web_address (
+  rest : &[char],
+) -> bool {
+  let head : String = rest . iter () . take (8) . collect ();
+  head . starts_with ("http://") || head . starts_with ("https://") }
 
 fn run_length (
   chars : &[char],
@@ -249,6 +305,130 @@ pub fn unescape_text (
           continue; }}}
     out . push (c); }
   out }
+
+//
+// Table rules
+//
+
+/// Whether 'line' is a table rule as the exporter writes it:
+/// '|:--|:---|', each cell a colon and at least one dash.
+pub fn is_table_rule_written (
+  line : &str,
+) -> bool {
+  let Some (inner) = line . strip_prefix ('|') . and_then ( |l| l . strip_suffix ('|') )
+    else { return false; };
+  inner . split ('|') . all ( |cell| cell . len () >= 2 && cell . starts_with (':')
+                                      && cell [1 ..] . chars () . all ( |c| c == '-' ) ) }
+
+/// The Markdown rule for an Org table's rule '|---+----|' under a
+/// first row of 'cells' cells; None if it is not of that form.
+pub fn table_rule_written_for (
+  org_rule : &str,
+  cells    : usize,
+) -> Option<String> {
+  let inner : &str = org_rule . strip_prefix ('|') ? . strip_suffix ('|') ?;
+  let segments : Vec<&str> = inner . split ('+') . collect ();
+  if segments . len () != cells
+     || segments . iter () . any ( |s| s . len () < 2 || ! s . chars () . all ( |c| c == '-' ) ) {
+    return None; }
+  Some ( format! ("|{}|", segments . iter () . map ( |s| format! (":{}", &s [1 ..]) )
+                  . collect::<Vec<String>> () . join ("|") )) }
+
+/// The inverse of 'table_rule_written_for'.
+pub fn org_table_rule_of (
+  written : &str,
+) -> String {
+  let inner : &str = &written [1 .. written . len () - 1];
+  format! ("|{}|", inner . replace (':', "-") . replace ('|', "+")) }
+
+//
+// Org blocks as tilde fences
+//
+
+/// What a tilde fence the exporter writes stands for.
+#[derive(Debug, PartialEq)]
+pub enum OrgBlock {
+  /// '#+begin_src ARGUMENTS' ... '#+end_src', or in capitals.
+  Src { arguments : String, uppercase : bool },
+  /// '#+begin_example' ... '#+end_example', or in capitals.
+  Example { uppercase : bool },
+  /// Lines that each begin ': ', or are ':'.
+  FixedWidth,
+}
+
+/// The info string of the fence for 'block'; None if the fence
+/// cannot say it exactly.
+pub fn fence_info_of_org_block (
+  block : &OrgBlock,
+) -> Option<String> {
+  let (base, uppercase) : (String, bool) = match block {
+    OrgBlock::FixedWidth => return Some (FIXED_WIDTH_FENCE_INFO . to_string ()),
+    OrgBlock::Example { uppercase } => (String::new (), *uppercase),
+    OrgBlock::Src { arguments, uppercase } => {
+      if arguments . contains ("skg-") || arguments . starts_with ('~')
+         || arguments . contains ('\n') { return None; }
+      ( if arguments . is_empty () { SRC_WITHOUT_ARGUMENTS_MARK . to_string () }
+        else { arguments . clone () },
+        *uppercase ) }, };
+  Some ( match (base . is_empty (), uppercase) {
+    (_, false)    => base,
+    (true, true)  => UPPERCASE_BLOCK_MARK . to_string (),
+    (false, true) => format! ("{} {}", base, UPPERCASE_BLOCK_MARK), } ) }
+
+/// The inverse of 'fence_info_of_org_block'.
+pub fn org_block_of_fence_info (
+  info : &str,
+) -> OrgBlock {
+  if info == FIXED_WIDTH_FENCE_INFO { return OrgBlock::FixedWidth; }
+  let (base, uppercase) : (&str, bool) =
+    if info == UPPERCASE_BLOCK_MARK { ("", true) }
+    else { match info . strip_suffix ( &format! (" {}", UPPERCASE_BLOCK_MARK) ) {
+      Some (base) => (base, true),
+      None        => (info, false), }};
+  match base {
+    "" => OrgBlock::Example { uppercase },
+    _ if base == SRC_WITHOUT_ARGUMENTS_MARK =>
+      OrgBlock::Src { arguments : String::new (), uppercase },
+    _ => OrgBlock::Src { arguments : base . to_string (), uppercase }, }}
+
+/// The Org lines that open and close 'block' (None for fixed-width
+/// lines, which have none).
+pub fn org_block_delimiters (
+  block : &OrgBlock,
+) -> Option<(String, String)> {
+  let (kind, arguments, uppercase) : (&str, &str, bool) = match block {
+    OrgBlock::FixedWidth => return None,
+    OrgBlock::Src { arguments, uppercase } => ("src", arguments . as_str (), *uppercase),
+    OrgBlock::Example { uppercase } => ("example", "", *uppercase), };
+  let case = |s : String| -> String { if uppercase { s . to_uppercase () } else { s } };
+  let begin : String = case ( format! ("#+begin_{}", kind) );
+  let end   : String = case ( format! ("#+end_{}", kind) );
+  Some ((
+    if arguments . is_empty () { begin } else { format! ("{} {}", begin, arguments) },
+    end )) }
+
+/// The content line a fixed-width line becomes, and back.
+pub fn fixed_width_content (
+  org_line : &str,
+) -> Option<&str> {
+  if org_line == ":" { Some ("") }
+  else { org_line . strip_prefix (": ") . filter ( |rest| ! rest . is_empty () ) }}
+
+pub fn fixed_width_line (
+  content : &str,
+) -> String {
+  if content . is_empty () { ":" . to_string () }
+  else { format! (": {}", content) }}
+
+/// A fence of tildes longer than any run that begins a line of
+/// 'lines', however indented.
+pub fn tilde_fence_for (
+  lines : &[&str],
+) -> String {
+  let longest : usize = lines . iter ()
+    . map ( |line| line . trim_start () . chars () . take_while ( |c| *c == '~' ) . count () )
+    . max () . unwrap_or (0);
+  "~" . repeat ( (longest + 1) . max (3) ) }
 
 //
 // Code fences

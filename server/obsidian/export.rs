@@ -25,6 +25,7 @@ use crate::export_org::BROKEN_LINK_SINK_ID;
 use crate::git_ops::read_gitrepo::open_gitrepo;
 use crate::obsidian::dialect::*;
 use crate::obsidian::import::{VaultReadme, frontmatter_of, read_readme};
+use crate::obsidian::org_markup::{self, MarkupTally, Span, WHY_GUARD};
 use crate::obsidian::read_text::unrender_text;
 use crate::types::links::{links_with_ranges_from_text, replace_each_link_with_its_label};
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
@@ -34,7 +35,7 @@ use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::telescope::types::ListItem;
 
 use serde_json::{Map, Value};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::fs;
 use std::ops::Range;
@@ -63,6 +64,53 @@ pub struct RenderedVault {
   pub report : ObsidianExportReport,
 }
 
+/// Of the titles (or bodies) that hold Org markup the export writes as
+/// Markdown: how many had all of it converted, some, or none.
+#[derive(Debug, Default)]
+pub struct MarkupCounts {
+  pub wholly  : usize,
+  pub partly  : usize,
+  pub none    : usize,
+  pub converted : BTreeMap<&'static str, usize>, // constructs, by kind
+  pub reasons   : BTreeMap<&'static str, usize>, // texts, by why markup was left as text
+}
+
+impl MarkupCounts {
+  fn add (
+    &mut self,
+    tally : &MarkupTally,
+  ) {
+    let converted : bool = ! tally . converted . is_empty ();
+    match (converted, tally . declined . is_empty ()) {
+      (false, true)  => return,
+      (true, true)   => self . wholly += 1,
+      (true, false)  => self . partly += 1,
+      (false, false) => self . none += 1, }
+    for (kind, n) in &tally . converted {
+      * self . converted . entry (kind) . or_insert (0) += n; }
+    for reason in &tally . declined {
+      * self . reasons . entry (reason) . or_insert (0) += 1; }}
+
+  fn summary (
+    &self,
+    what  : &str,
+    total : usize,
+  ) -> String {
+    let with_markup : usize = self . wholly + self . partly + self . none;
+    if with_markup == 0 { return String::new (); }
+    let mut s : String = format! (
+      "{} with Org markup: {} of {}; converted wholly {}, partly {}, not at all {}.\n",
+      what, with_markup, total, self . wholly, self . partly, self . none );
+    if ! self . converted . is_empty () {
+      s . push_str ( & format! ("  Converted: {}.\n", self . converted . iter ()
+        . map ( |(kind, n)| format! ("{} {}", n, kind) ) . collect::<Vec<String>> () . join (", ") )); }
+    let mut reasons : Vec<(&&str, &usize)> = self . reasons . iter () . collect ();
+    reasons . sort_by ( |a, b| b . 1 . cmp (a . 1) . then (a . 0 . cmp (b . 0)) );
+    for (reason, n) in reasons {
+      s . push_str ( & format! ("  Left as Org text in {} {}: {}.\n", n, what . to_lowercase (), reason )); }
+    s }
+}
+
 #[derive(Debug, Default)]
 pub struct ObsidianExportReport {
   pub skgrepo           : String,
@@ -74,6 +122,9 @@ pub struct ObsidianExportReport {
   pub links_left_as_text : usize, // whose label a wikilink cannot carry
   pub title_fallbacks   : usize, // titles kept in 'skg-title'
   pub body_fallbacks    : usize, // bodies in a 'skg-verbatim' fence
+  pub bodies            : usize,
+  pub bodies_markup     : MarkupCounts,
+  pub titles_markup     : MarkupCounts,
   pub absent_members    : usize, // 'contains' entries not in this skgrepo
   pub files_removed     : Vec<String>,
   pub warnings          : Vec<String>,
@@ -90,6 +141,8 @@ impl ObsidianExportReport {
       self . notes, self . skgrepo, self . documents,
       self . embeds, self . links, self . links_outside, self . links_left_as_text,
       self . title_fallbacks, self . body_fallbacks );
+    s . push_str ( &self . bodies_markup . summary ("Bodies", self . bodies) );
+    s . push_str ( &self . titles_markup . summary ("Titles", self . notes) );
     if self . absent_members > 0 {
       s . push_str ( & format! (
         "{} contains entries name notes outside this skgrepo.\n",
@@ -560,9 +613,9 @@ fn render_title (
     title . trim () == title && ! title . is_empty ()
     && ! title . chars () . any ( |c| c . is_control () && c != '\t' );
   if is_plain {
-    let (rendered, counts) : (String, LinkCounts) = render_text (title, true, addresses);
-    if unrender_for_check (&rendered, addresses) . as_deref () == Some (title) {
+    if let Some ((rendered, counts, tally)) = render_text_guarded (title, true, addresses) {
       counts . add_to (report);
+      report . titles_markup . add (&tally);
       return (rendered, None); }}
   report . title_fallbacks += 1;
   let shown : String = title . chars ()
@@ -570,7 +623,7 @@ fn render_title (
     . collect::<String> () . trim () . to_string ();
   let shown : String =
     if shown . is_empty () { "(blank title)" . to_string () }
-    else { render_text (&shown, true, addresses) . 0 };
+    else { render_text (&shown, true, false, addresses) . 0 };
   (shown, Some (title . to_string ())) }
 
 /// The body's lines, unindented; None if it has none.
@@ -580,13 +633,14 @@ fn render_body (
   report    : &mut ObsidianExportReport,
 ) -> Option<Vec<String>> {
   let body : &str = section . body . as_deref () ?;
+  report . bodies += 1;
   let is_normal : bool =
     normalize_body (Some (body . to_string ())) . as_deref () == Some (body)
     && ! body . chars () . any ( |c| c . is_control () && c != '\n' && c != '\t' );
   if is_normal {
-    let (rendered, counts) : (String, LinkCounts) = render_text (body, false, addresses);
-    if unrender_for_check (&rendered, addresses) . as_deref () == Some (body) {
+    if let Some ((rendered, counts, tally)) = render_text_guarded (body, false, addresses) {
       counts . add_to (report);
+      report . bodies_markup . add (&tally);
       return Some ( rendered . split ('\n') . map (String::from) . collect () ); }}
   report . body_fallbacks += 1;
   let has_awkward_chars : bool = body . chars ()
@@ -625,42 +679,73 @@ impl LinkCounts {
     report . links_left_as_text += self . links_left_as_text; }
 }
 
-/// 'text' (a title, or a body) as Markdown: each link the graph counts
-/// becomes a wikilink, balanced code fences (in a body) are copied, and
-/// everything else is escaped.
-fn render_text (
+/// 'text' rendered with its Org markup converted, if that reads back
+/// exactly, else without; None if neither does.
+fn render_text_guarded (
   text      : &str,
   is_title  : bool,
   addresses : &Addresses,
-) -> (String, LinkCounts) {
+) -> Option<(String, LinkCounts, MarkupTally)> {
+  let reads_back = |rendered : &str| -> bool {
+    unrender_for_check (rendered, addresses) . as_deref () == Some (text) };
+  let (rendered, counts, tally) = render_text (text, is_title, true, addresses);
+  if reads_back (&rendered) { return Some ((rendered, counts, tally)); }
+  let (rendered, counts, mut plain_tally) = render_text (text, is_title, false, addresses);
+  if ! reads_back (&rendered) { return None; }
+  plain_tally . declined = tally . declined . into_iter ()
+    . chain ( (! tally . converted . is_empty ()) . then_some (WHY_GUARD) )
+    . collect::<BTreeSet<&'static str>> ();
+  Some ((rendered, counts, plain_tally)) }
+
+/// 'text' (a title, or a body) as Markdown: each link the graph counts
+/// becomes a wikilink, the text's own code fences and code spans are
+/// copied, Org markup becomes Markdown if 'convert'
+/// ('org_markup.rs'), and everything else is escaped.
+fn render_text (
+  text      : &str,
+  is_title  : bool,
+  convert   : bool,
+  addresses : &Addresses,
+) -> (String, LinkCounts, MarkupTally) {
   let mut counts : LinkCounts = LinkCounts::default ();
-  let fences : Vec<Range<usize>> =
-    if is_title { Vec::new () } else { balanced_fence_ranges (text) };
-  let mut spans : Vec<(Range<usize>, Option<String>)> = // None: a fence
-    fences . iter () . map ( |fence| (fence . clone (), None) ) . collect ();
+  let mut tally : MarkupTally = MarkupTally::default ();
+  let mut spans : Vec<(Range<usize>, Span)> =
+    if is_title { Vec::new () }
+    else { org_markup::block_spans (text, convert, &mut tally) };
+  let ranges_of = |spans : &[(Range<usize>, Span)]| -> Vec<Range<usize>> {
+    spans . iter () . map ( |(range, _)| range . clone () ) . collect () };
+  let blocks : Vec<Range<usize>> = ranges_of (&spans);
   for (range, link) in links_with_ranges_from_text (text) {
-    let in_a_fence : bool = fences . iter ()
-      . any ( |fence| fence . start < range . end && range . start < fence . end );
-    if in_a_fence { continue; } // code, not a link
+    let in_a_block : bool = blocks . iter ()
+      . any ( |block| block . start < range . end && range . start < block . end );
+    if in_a_block { continue; } // code, not a link
     match wikilink_for (&link . gnid, &link . label, addresses) {
       Some ((wikilink, is_outside)) => {
         counts . links += 1;
         if is_outside { counts . links_outside += 1; }
-        spans . push ((range, Some (wikilink))); },
+        spans . push ((range, Span::Written (wikilink))); },
       None => counts . links_left_as_text += 1, }}
+  if convert {
+    let taken : Vec<Range<usize>> = ranges_of (&spans);
+    spans . extend (org_markup::inline_org_spans (text, &taken, &mut tally)); }
+  { let taken : Vec<Range<usize>> = ranges_of (&spans);
+    spans . extend (org_markup::code_spans (text, &taken)); }
+  if convert {
+    let taken : Vec<Range<usize>> = ranges_of (&spans);
+    spans . extend (org_markup::emphasis_spans (text, &taken, &mut tally)); }
   spans . sort_by_key ( |(range, _)| range . start );
   let mut pieces : Vec<Piece> = Vec::new ();
   let mut copied_to : usize = 0;
-  for (range, wikilink) in spans {
+  for (range, span) in spans {
     if copied_to < range . start {
       pieces . push (Piece::Text (&text [copied_to .. range . start])); }
-    pieces . push ( match wikilink {
-      Some (wikilink) => Piece::Produced (wikilink),
-      None            => Piece::Verbatim (&text [range . clone ()]), } );
+    pieces . push ( match span {
+      Span::Written (written) => Piece::Produced (written),
+      Span::Copied            => Piece::Verbatim (&text [range . clone ()]), } );
     copied_to = range . end; }
   if copied_to < text . len () {
     pieces . push (Piece::Text (&text [copied_to ..])); }
-  (escape_pieces (&pieces, is_title), counts) }
+  (escape_pieces (&pieces, is_title), counts, tally) }
 
 /// The wikilink for '[[id:RAW][LABEL]]', and whether its note is
 /// outside the vault; None when the label or ID cannot ride in one.
@@ -845,7 +930,9 @@ Each file is a *document*: a note that no other note in the skgrepo contains (or
 
 Every other note is a bullet. The bullet ends with the note's ID as a block ID (`^...`), its body is indented beneath it, and the notes it contains are nested beneath that. A note contained in several places is written once, where it is first reached, and shown elsewhere as an embed (`![[...]]`), which stays current.
 
-Links are written as `[[File#^ID|label]]`, so they survive renamed files. Metadata Obsidian has no place for (extra IDs, flags, attributions, hidden notes) rides in comments, `%%skg {{...}}%%`, which Reading view hides. A backslash before a character keeps it from being read as Markdown structure; the character itself is what the note says.
+Links are written as `[[File#^ID|label]]`, so they survive renamed files. Metadata Obsidian has no place for (extra IDs, flags, attributions, hidden notes) rides in comments, `%%skg {{...}}%%`, which Reading view hides.
+
+The notes are written in Org, and their markup is shown as Markdown where that can be undone exactly: Org's bold and italic, verbatim and code, links to web pages, source and example blocks (as code blocks fenced by tildes, whose first line says what they were), fixed-width lines, and the rule under a table's first row. Other Org markup shows as the note has it. A backslash before a character keeps it from being read as Markdown; the character itself is what the note says.
 
 Please do not edit these files in place: the next export overwrites them, and removes those it no longer writes. Files of your own, and copies of exported files, are left alone.
 
