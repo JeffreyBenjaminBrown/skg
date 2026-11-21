@@ -1,0 +1,661 @@
+#+title: Export to Obsidian: a plan
+#+date: 2026-11-21
+
+* What this plan is for
+Jeff's note "export to Obsidian" asks for three things. The first is a
+lossless export of the graph into Obsidian, one command for all of it
+and one for what is marked. The second is a way for an Obsidian user to
+answer it, using all of skg's operations. The third is a view on what
+Obsidian cannot do. The aim behind it is to reach people who already
+use Obsidian: they should be able to read Jeff's graph there and answer
+it without installing skg.
+
+This is a plan only; nothing is built. Each numbered part below settles
+one of the questions it was asked to settle. The last part holds the
+questions only Jeff can answer, each with the default taken if he says
+nothing.
+
+* What the mapping has to carry
+** A note's fields
+A note is one ID, recorded in .skg files. Each file is a *section*: the
+part of the note recorded in one skgrepo (a skgrepo is a folder of .skg
+files at one privacy level). The section in the most public skgrepo is
+the note's *home*, and only it carries the title and body.
+'GraphnodeOnDisk' in 'server/types/nodes/fs.rs' defines the fields, in
+the order a file writes them.
+- 'title': one line, no newlines.
+- 'aliases': a list of strings; each section may add some.
+- 'pid': the ID. It is also the filename.
+- 'extra_ids': IDs this note acquired by merging.
+- 'body': text, possibly many lines.
+- 'contains': an ordered list of child IDs. It may hold '- anchor: ID'
+  lines, which place a more private section's children among a more
+  public one's.
+- 'forks': an ordered list, also with anchors.
+- 'hides': an unordered list.
+- 'flags': 'Had_ID_Before_Import', 'Was_Overloaded', 'NoSearchMatching'.
+- 'attribution': a small mapping a fork records of what it forked
+  (original, skgrepo, remote_hash, commit, uncommitted).
+Which skgrepo records a relationship, its *relRepo*, is simply the
+skgrepo of the file that lists it.
+** Links live in the text
+Links are not a field. They are Org links, '[[id:ID][label]]', in titles
+and bodies, and the graph derives 'linksTo' from them. Titles and bodies
+are Org text. Markdown imported by the md/Org importer stays Markdown
+text, so a body can be either.
+** Jeff's graph in numbers
+I measured these on 2026-11-21, reading the files directly.
+- The 'public' skgrepo has 31,178 notes. All six owned skgrepos together
+  have 56,416, of which 60 have more than one section.
+- In 'public', 10,733 notes have a body. The median body is 97
+  characters and the largest is 1.15 MB. 21% of titles contain a link,
+  29% contain a colon and 2% a slash. 5,685 notes share their title with
+  another note, for example 78 notes titled "see also".
+- A *root* is a note nothing contains. Counting containment within
+  'public' alone, there are 2,745 roots; a root's tree has a median of 4
+  notes, at most 383, and is at most 9 levels deep. Counting it across
+  all owned skgrepos, there are 4,462 roots, with trees of at most 578
+  notes. 232 notes have more than one container. Every note can be
+  reached from some root, so cycles are rare or absent.
+- One ID, '21c9d917-f75a-4983-bc0e“-a95d31384856', holds a curly quote.
+  Every other ID is a UUID.
+- 'skg-system/', the skgrepo that holds skg's documentation, has 1,267
+  notes.
+** What the Org export already does
+'server/export_org.rs', run by 'skg export-org' or the "export to org"
+request, finds *export roots*. An export root is a note one of whose
+children, an *export marker*, has a title that links to
+'3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f' and a body with a
+'target_filepath = ...' line. It writes each root's tree to
+'<target_filepath>.org', limited to one skgrepo restriction, stripped of
+metadata. A note with several containers is written once, in the first
+file that reaches it, and linked from the others ('build_homes'). Links
+to notes that were not exported point to the note
+'9ff04e25-01e8-4634-8aa5-f5849bc1eb81' ("Some links might be broken").
+Before writing anything, it asks for confirmation if a public note's text
+comes from a private section ('export_candidate_pids').
+It is meant for reading, not for round trips: it drops IDs and
+relationships.
+** What the importer already does
+'server/import_md_and_org/' parses Markdown with pulldown_cmark and
+keeps byte ranges into the original text. It reads front-matter
+'title' and 'aliases', and Org ':ID:' properties. It turns headings into
+notes, gives fresh UUIDs to notes that had no ID, and refuses any ID
+that already exists anywhere. It writes into an owned skgrepo through a
+preview and an approval. That suits importing someone's notes once, but
+not a round trip, which must reproduce existing IDs.
+
+* What Obsidian offers
+These are facts as of Obsidian 1.15.1 (November 2026). The sources are
+listed at the end.
+** Files and links
+A vault is a folder of Markdown files; settings live in '.obsidian/'.
+Files that are not Markdown, such as '.skg', are hidden unless "Detect
+all file extensions" is on, and even then Obsidian cannot open them.
+Links are '[[Note]]', '[[Note|shown text]]', '[[Note#Heading]]' and
+'[[Note#^blockid]]'. Obsidian resolves a link by filename, ignoring
+case, and falls back to a path when two files share a name. Following a
+link to a missing note creates that note. Core Obsidian cannot link to
+a property or an ID.
+** Block IDs and embeds
+A *block ID* is '^id' at the end of a paragraph or of a list item.
+Obsidian's rule is "Block identifiers can only consist of the letters
+A-Z and a-z, the digits 0-9, and dashes", so a UUID qualifies. They are
+matched without regard to case, and no length limit is documented.
+Putting one on a heading is not documented; one forum report says that
+embedding it then shows only the heading line.
+An *embed*, '![[Note]]' or '![[Note#^id]]', shows the target in place
+and stays current. Nested embeds render. Users report a depth limit of
+about 5 or 6, which is also what stops loops; this is not documented.
+Core Obsidian cannot edit an embed in place.
+** Properties and comments
+In Obsidian, *properties* are YAML front matter. Their types are text, list, number,
+checkbox, date, date and time, and tags; 'aliases', 'tags' and
+'cssclasses' are built in. A link inside a property, quoted as
+'"[[X]]"', shows in backlinks. Nested maps are not shown in the
+Properties panel. Editing properties through that panel rewrites the
+YAML: it drops quotes and comments and turns '[a, b]' into one item per
+line.
+A *comment*, '%% ... %%', may be inline or span several lines. Reading
+view hides it; the editing views show it; the file keeps it.
+** Filenames
+The app refuses '* " \ / < > : | ?' (the Windows rules) and '# ^ [ ]'
+(which break links). No official list exists. Paths should stay under
+Windows' 260 characters.
+** Scale
+There are no official figures. Users report a 100,000-note vault that
+worked except for the global graph view, and 35,000 files taking about
+ten minutes to index.
+** Sharing
+Obsidian Sync shares a vault among up to 20 paying users, with no
+co-editing. The Obsidian Git plugin commits, pulls and pushes. Publish
+turns notes into a website, with no replies. Nothing built in lets two
+people respond to each other's vaults.
+** Plugins
+Plugins are written in TypeScript. They can register views
+('registerView'), file extensions ('registerExtensions', which could
+show '.skg' files), processors for Markdown and code blocks, and
+editor extensions. They read each note's metadata, including block IDs,
+list items, embeds and links. Since May 2026 plugins are submitted
+through community.obsidian.md, with an automated review that usually
+takes minutes; BRAT installs beta plugins straight from GitHub. Several
+plugins (Compare, Side-by-Side Diff, File Diff) compare two notes as
+text. None compares them by structure.
+
+* 1. The mapping
+** Recommendation: one Markdown file per document, one bullet per note
+In this plan a *document* is a root together with the tree it contains.
+Each document becomes one Markdown file. Inside it, every contained
+note is a list item (a *bullet*) that ends with the note's ID as a block
+ID.
+*** A file
+#+begin_example
+---
+skg-id: 6f3e…
+aliases: [threads]
+---
+# Threads
+The root's body, as paragraphs.
+
+- First child's title ^0a1b2c3d-…
+  The first child's body, indented to sit inside the bullet.
+  - A grandchild ^1b2c…
+- Second child, with a [[Feelings (41ec1d8d)#^41ec…|link]] ^2c3d…
+  %%skg aliases: [x], forks: [5d6e…]%%
+- ![[Other document (77aa01b2)#^9f8e…]]
+#+end_example
+The root's title is the H1 line, and its ID and file-level metadata are
+properties. Each child is a bullet: its title, then ' ^ID'. Its body
+follows, indented to the bullet's content column, and its children
+nest below. A bullet that holds nothing but an embed means "contains
+that note, which is written elsewhere".
+*** Why bullets, not headings
+Jeff asked for an ID on every paragraph, and Obsidian puts IDs on
+bullets and paragraphs, not on headings. Bullets also nest without the
+six-level limit of headings (Jeff's trees reach nine levels). Embedding
+a bullet's block ID brings its children along, which is exactly how a
+contained subtree should look. Jeff's titles are mostly sentences, so a
+document reads naturally as an outline.
+I rejected headings with the ID on a comment line under each one. Links
+to headings are made from heading text, which breaks on the 5,685
+repeated titles and on titles that hold links. It also adds a line per
+note.
+*** Why not one file per note
+One file per note would mean 31,000 small files named after sentences,
+78 of them "see also", with every document stitched together from
+embeds. Obsidian stops nested embeds at about five levels, can't edit
+them in place, and readers would open fragments instead of documents.
+Files per document give 2,745 files for 'public', a median of 4 notes
+each.
+A note does get its own file in exactly three cases: it is a root; it
+forks something (see "Forks and attributions get their own file"); or
+it is an export root under the marked export.
+** Notes with several containers, and cycles
+A note with several containers is written once, inside the document of
+its first container, using the Org export's 'build_homes' rule with a
+stable order. Every other container gets a bullet holding the embed
+'![[Thatdoc#^ID]]', so the note shows in full everywhere it belongs.
+A containment that closes a cycle is written the same way, as an embed.
+Obsidian's depth limit stops the loop, and the importer reads it as a
+'contains' entry like any other. A cycle that no root reaches gets a
+document rooted at its smallest ID.
+The importer reads the embed, not the rendering, so how Obsidian draws
+it does not matter to correctness.
+** Links
+'[[id:X][label]]' becomes '[[Doc#^X|label]]', or '[[Doc|label]]' when X
+is a document's root. The label is always written, so it comes back
+exactly as it was.
+When X is an extra ID, or is not a legal block ID, the link targets the
+note's ID and the comment after it records the raw ID.
+A link to a note that is not in the vault points to the vault's copy of
+the "Some links might be broken" note, as the Org export does. The ID
+goes along with it, so nothing is lost and following the link opens an
+explanation rather than an empty new file.
+** Metadata
+Obsidian has a home for aliases and nothing more, so everything else
+goes where Obsidian keeps it out of the way but leaves it in the file.
+*** For a file's root: properties
+The properties are 'skg-id', 'aliases' (Obsidian's own, which
+autocomplete and search already use, as skg uses aliases),
+'skg-extra-ids', 'skg-forks' and 'skg-hides' (lists of quoted links,
+so they show in backlinks), 'skg-flags', 'skg-attribution' (a small
+mapping, shown in source mode only), 'skg-skgrepo', and 'skg-title'
+when the title cannot be rendered exactly.
+*** For a bullet: one comment
+A bullet whose note has any of the same metadata carries one comment,
+'%%skg {...}%%', with the same keys in YAML's one-line form. Reading
+view hides it. In 'public', about 12% of notes would carry one, mostly
+for the import flags.
+*** Forks and attributions get their own file
+A note that forks something becomes its own file, so that 'skg-forks'
+is a real property link. Obsidian then shows "R' forks R" in R''s
+Properties panel and in R's backlinks, which is the visibility Jeff's
+"shortcomings" paragraph assumes. 'public' has only 75 such notes. In a
+responder's vault they are the main event (see part 4).
+*** Anchors and sections
+A '- anchor: ID' entry becomes a bullet holding only the comment
+'%%skg anchor: ID%%'. Only two exist.
+** Bodies: Org text in a Markdown viewer
+Bodies are Org (sometimes Markdown) text, and Obsidian renders
+Markdown. Some Org constructs would change the structure of the file:
+- '# ' starts an Org comment line but a Markdown heading (137 bodies);
+- '[[...]]' that is not an ID link would become a wikilink to a missing
+  note (72 bodies);
+- '%%' would hide the rest of the text (9 bodies);
+- a trailing ' ^word' would become a block ID (76 bodies hold '^').
+Some would only look wrong: '$' read as math (141 bodies), '=='
+highlights, '#word' tags.
+*** A reversible rewrite
+The exporter applies a rewrite E to each body and title, and the
+importer applies its inverse. Slice 1 has only escapes: backslashes
+before structural characters, with existing backslashes doubled so the
+rewrite can be undone. Slice 3 adds readable conversions where they
+can be undone: Org bracket links to Markdown links, '#+begin_src' blocks
+to fenced code, '=code=' to backticks.
+*** A fallback that keeps it lossless
+After writing a note, the exporter parses its output back and compares
+it to the note. If they differ, it writes the body in a fence marked
+'skg-verbatim', or the title in 'skg-title', and counts it in the
+report. Losslessness therefore holds by construction, and the fallback
+count measures how readable the output is.
+** Filenames
+A file's name is its root's title made safe: links reduced to their
+labels; the forbidden characters '* " \ / < > : | ? # ^ [ ]' replaced
+by a space or a similar character; cut at a word boundary near 80
+characters; then followed by the first 8 hex digits of the ID, as in
+'Feelings (41ec1d8d).md'. The suffix lengthens if it collides.
+The true title is the H1 line, or 'skg-title' when the H1 cannot hold
+it exactly.
+I recommend the ID suffix always, not only when names collide, for
+three reasons. A name then never changes because some other note was
+added. Bare-name links stay unique across the vault. And links written
+by responders keep resolving after Jeff re-exports. The cost is eight
+hex digits in every name, so this is a question for Jeff.
+** Privacy: one folder per skgrepo
+The vault has one folder per exported skgrepo, for example
+'jeff-public/'. Each folder holds that skgrepo's sections and nothing
+else, so the relRepo of every relationship is just the folder it is
+written in.
+A section in a more private folder, for a note whose home is more
+public, becomes a bullet with no title of its own. It shows an embed of
+the home and the comment '%%skg section%%', and the private children
+nest under it. Only 60 notes have such sections.
+I rejected one merged vault: it reads better, but it cannot be shared
+one privacy level at a time, which is how skg shares. Merging sections
+for reading is what skg is for.
+** The manifest and the README
+The vault's top level holds '.skg-export.toml'. Obsidian ignores it.
+It records the format version, each folder's skgrepo name, its remote
+hash and commit (needed to attribute a responder's forks), the
+"broken links" note, and a map from ID to file. It holds no timestamps,
+so two exports of the same data are identical byte for byte.
+'README.md' explains the format to readers and to responders.
+
+* 2. Lossless, defined as a test
+** The definition
+Take a skgrepo S. Its *normal form* is each of its .skg files parsed
+and written again by skg's own writer, 'GraphnodeOnDisk::to_yaml'
+(which already normalizes the body). The test has two halves:
+- import(export(S)) writes exactly the normal-form files of S, byte for
+  byte, and no others;
+- export(import(V)) = V, byte for byte, for every vault V the exporter
+  wrote. The vault is therefore a normal form too, and re-exports
+  produce clean diffs.
+For a marked export, the first half holds for the sections of every
+note the export shows, in the skgrepos it shows.
+Files written by skg are already in normal form. A hand-edited file
+may differ only in YAML quoting. Obsidian's rewriting of front matter
+(dropping quotes, turning '[a, b]' into one item per line) does not
+matter, because the importer parses the YAML instead of comparing it.
+** What the importer needs
+The existing md/Org importer is the wrong base for this path, for
+three reasons. It mints IDs where it finds none. It refuses IDs that
+already exist. And it writes through the server's preview and approval
+into a live graph.
+The lossless importer is a pure function from a vault folder to a
+folder of .skg files, a CLI subcommand that needs no server. It needs
+six new parts:
+- a parser for the dialect: properties, H1, bullets ending in block
+  IDs, indented bodies, embed bullets, '%%skg%%' comments,
+  'skg-verbatim' fences;
+- the inverse of the link rendering, resolved by block ID and the
+  manifest rather than by filename;
+- the inverse of the body rewrite E;
+- a reader for the metadata keys;
+- one 'GraphnodeOnDisk' per section, written with 'to_yaml';
+- an ordering rule, in which a bullet's children are its 'contains',
+  in order.
+Inside a bullet, the body ends at the first child bullet that carries
+an ID or an embed. Bullets with no ID before that point belong to the
+body, so lists in bodies survive.
+** Test corpora
+- Hand-made fixtures, one for each field and each hard case: extra IDs,
+  anchors, sections, attributions, an ID that is not a legal block ID,
+  a cycle, a body that needs the fallback.
+- 'skg-system/' (1,267 notes), run by 'bash/all-tests.sh'.
+- Jeff's 'public' skgrepo, run by hand, reporting how many notes took
+  the fallback.
+- Random graphs from a property-based test.
+
+* 3. The two commands
+** Export everything
+'skg export-obsidian CONFIG SKGREPO-RESTRICTION OUTPUT-DIR' writes
+the vault. Its skgrepo restriction is named as the Org export's is, by
+its most private owned skgrepo.
+*** Which skgrepos
+By default it exports only the most public owned skgrepo. A more
+private one is exported only when named, and then it behaves as the
+Org export does: under a restriction it refuses to write anything that
+would release private text, unless the flag
+'--include-overPrivateText-telescopes' is given; it reuses
+'export_candidate_pids'. Foreign skgrepos (Claude's and the team's)
+are left out unless asked for (question 3).
+*** Privacy holds by construction
+Each folder is written only from its own skgrepo's files. A test
+plants marker strings in the private titles and bodies of the fixtures
+and fails if any of them appears anywhere in a public-only vault. A
+link from public text to a private note keeps its label, which is
+already public text, and the ID, which the public .skg file already
+holds, and points to the broken-links note.
+*** Scale
+For 'public' the vault is about 2,745 files and roughly 7 MB of
+Markdown: 3.1 MB of bodies, about 1.4 MB of titles, 1.2 MB of IDs, plus
+indentation. For all owned skgrepos it is roughly 5,000 to 8,000 files
+and about 12 MB, because the private folders split some documents.
+Obsidian's reported comfort zone is well above both, and indexing
+should take a minute or two. Reading the files is what the Org export
+already does; I expect seconds, and slice 1 measures it. The global
+graph view is the only part of Obsidian reported to struggle, and only
+at about 100,000 notes.
+** Export what is marked
+Use the same export markers, so that one marker means "publish this
+document", whichever command runs. 'skg export-obsidian --marked'
+reuses 'discover_roots' and 'parse_target_filepath' and writes
+'<target_filepath>.md'. A marker body may add 'formats = org' or
+'formats = obsidian' to limit a document to one format; when the line
+is absent, the marker means both.
+'root_headline = false' omits the H1 and keeps the title in
+'skg-title'. A nested export root becomes an embed of its own file,
+where the Org export writes a link.
+The marker itself is kept as an ordinary bullet; unlike in the Org
+export, dropping it would lose a note.
+I rejected a second instruction node for Obsidian: it would mean two
+markers per document, duplicated discovery code, and the existing
+"several markers" warning firing on purpose.
+
+* 4. The response protocol
+** What "a .skg file protocol" can mean
+Jeff wrote: "a .skg file protocol by which an Obsidian user could
+respond to my data, using the full skg operation vocabulary". I see
+three readings.
+*** (a) The responder's folder becomes their own skgrepo (recommended)
+The *responder* is the Obsidian user who answers. Their vault holds
+Jeff's export, unedited, in one folder, and their own writing in
+another. A converter turns their folder into a skgrepo of their own,
+whose notes contain, link to, fork and hide Jeff's notes by ID. The
+response is that skgrepo: .skg files, shareable by Git, which Jeff adds
+as a foreign skgrepo, exactly as he adds Claude's and the team's today.
+"A .skg file protocol" then means that the wire format of an answer is
+.skg files, and the Markdown conventions are how a person writes them.
+I recommend this reading because every skg operation is defined by the
+files it leaves behind. If the response is files, the whole vocabulary
+is available, and each operation needs only a Markdown way to write
+its resulting state.
+*** (b) A file format the responder or a plugin writes directly
+The responder, or a plugin, writes .skg YAML files in the vault. This
+is exact, but people do not write YAML with UUIDs by hand, and Obsidian
+cannot even open such files without a plugin. It is a good format for
+a later plugin to write, and reading (a) already produces it.
+*** (c) An operation log
+A file of commands ("fork R as R'; hide E from R'"). skg has no
+operation log: saves are diffs of state. Replaying a log against a
+graph that changed since would need conflict rules skg does not have.
+Rejected.
+** How a responder works under (a)
+The responder clones Jeff's vault into their own, as 'jeff/' (a Git
+submodule or a plain clone), and writes in 'mine/'. They write in the
+same dialect: bullets are notes, embeds are containment, wikilinks are
+links. Then the converter runs:
+'skg obsidian-response VAULT/mine --export VAULT/jeff --out SKGREPO-DIR'.
+It reads 'mine/' and Jeff's manifest, and writes the skgrepo.
+The converter is a pure function of the responder's folder, so a
+deleted note is simply absent the next time it runs. There are no
+requests to replay.
+** IDs for new notes: stamping
+A new bullet has no ID. Its ID must stay the same across conversions,
+or Jeff's view of the conversation breaks each time it is run. So the
+converter *stamps* the responder's folder: it adds a UUID block ID to
+each new bullet and 'skg-id' to each new file, writes those files, and
+reports which ones it changed. The stamps must reach the responder's
+copy, through a commit or a pull request (question 4). Short block IDs
+that Obsidian generates itself, like '^a1b2c3', are kept as they are
+when unique within the responder's skgrepo. They are legal skg IDs.
+** The vocabulary, one operation at a time
+*** Create a note
+Write a bullet, or a new file. It is stamped on conversion. Jeff sees a
+new note in the responder's skgrepo.
+*** Edit a title or body
+Edit the text. This applies to the responder's own notes; editing one
+of Jeff's is a fork, below.
+*** Contain, reorder, move
+Nesting is containment and order is order. To contain one of Jeff's
+notes, write a bullet holding '![[JeffDoc#^E]]'. To move a note, cut
+and paste its bullet; the ID goes with it.
+*** Link
+'[[JeffDoc#^E|label]]' becomes '[[id:E][label]]'. The converter
+resolves the link by the block ID, so it survives Jeff renaming a file.
+*** Fork, explicitly
+A file whose 'skg-forks' property lists '"[[JeffDoc#^R]]"', with
+bullets of its own. This is R', the responder's version of R.
+*** Fork, by copying and editing
+Copy Jeff's file into 'mine/' and edit it. In the copy, a bullet that
+keeps Jeff's ID is that note of Jeff's.
+- Unchanged, it is a reference: the parent contains Jeff's note.
+- If its title, body or list of children changed, the converter does
+  what skg's save does for an edit to a foreign note. It mints a clone,
+  re-stamps the bullet with the clone's ID, and adds
+  'forks: [that note]' and an attribution, taken from the manifest's
+  remote hash and commit.
+- Children removed from the clone become 'skg-hides', unless the
+  responder keeps them somewhere else in 'mine/'. Moving E out of R and
+  into another note is therefore "R' hides nothing; E is kept
+  elsewhere", exactly as in Jeff's "move" example.
+- Unchanged children are rewritten as embeds, so the clone stays a
+  shallow copy that follows Jeff's later edits.
+After this one conversion, the implicit fork is written out explicitly
+in the files, as skg's save rewrites a buffer.
+*** Hide
+List the hidden note in 'skg-hides' on the forker, or remove it from a
+copied fork.
+*** Alias
+Obsidian's own 'aliases' property on a file. On a bullet, put it in the
+'%%skg%%' comment.
+*** Merge
+Among the responder's own notes only. Delete B, and add B's ID to A's
+'skg-extra-ids'. The converter checks that nothing else still claims
+B's ID.
+A responder cannot merge one of Jeff's notes: acquiring his ID would
+create a second section of his note in their skgrepo.
+*** Delete, detach
+Delete the bullet. If its ID appears nowhere else in 'mine/', the note
+is gone; if it appears elsewhere, it was only detached. One of Jeff's
+notes cannot be deleted, only hidden by a fork, as in skg.
+*** Flags, strip attribution
+'skg-flags: [NoSearchMatching]', or delete the 'skg-attribution'
+property.
+*** Privacy
+A second folder, 'mine-private/', becomes a second, more private
+skgrepo. The responder simply does not share it. Sections that one
+note keeps at several privacy levels are out of scope for responders
+in the first version.
+** What Jeff does with a response
+He pulls the responder's vault and runs the converter, which writes a
+skgrepo in a Git repository of its own. He adds it to 'skgconfig.toml'
+with 'foreign = true'. Then he views R from the responder's
+perspective ('C-c v o'): R' stands in R's place, and its forks folder
+shows what R' adds and what it hides, in one view, without duplication.
+That is the comparison Jeff's note says Obsidian lacks. Later responses
+are new commits to that skgrepo, so the diff view ('C-c v d') shows
+what changed.
+** What plain Obsidian cannot show
+These need a plugin:
+- Jeff's later additions to R showing under R' as unintegrated content;
+- R' shown in R's place inside Jeff's documents (mirror substitution);
+- R and R' in one deduplicated view;
+- warnings while typing, such as a cycle or a note that both forks and
+  contains the same note (the converter reports these instead);
+- stamping IDs while typing.
+Plain Obsidian still shows the fork link both ways (Properties and
+backlinks), and embeds stay current.
+
+* 5. The shortcoming: R and R' in one view
+** Can a plugin do it?
+Yes. A plugin can register a custom view, read both files, and use
+Obsidian's metadata cache, which already knows every list item and
+block ID. Because every bullet in both files carries an ID, the merge
+is a join on IDs: one tree, with each node marked as in both, only in
+R, only in R', or changed. Text is rendered with Obsidian's own
+Markdown renderer. That is skg's forks folder, computed on the
+responder's machine.
+** How large?
+The plugin needs a parser for this dialect (or the Rust one compiled to
+WebAssembly), the tree join, the view and navigation. I estimate 1,500
+to 3,000 lines of TypeScript and one to three weeks with agents.
+Publishing takes the new automated review, which usually finishes in
+minutes; BRAT can serve testers before that.
+** Not in the first version
+I agree with the coordinator. The plugin is built on the format, so the
+format must settle first, through the round-trip test and real
+responses. Readers with plain Obsidian are the audience to reach first.
+And Jeff already has the merged view, inside skg.
+The format already makes the plugin cheap: IDs on every bullet, and
+forks as property links.
+** A partial answer without a plugin
+Once Jeff holds a response as a foreign skgrepo, his export could write
+the fork comparison as static Markdown: a bullet list under R of what
+each fork adds and hides, computed by skg. Responders would then see
+the merged view after Jeff's next export, with no plugin. This is an
+optional slice after the core.
+
+* 6. Slices
+Each slice ends with something Jeff can open or run.
+** Slice 1: a vault Jeff can open
+'skg export-obsidian' for one owned skgrepo. It covers the H1 and
+bullets with block IDs, the properties and comments, links and embeds
+for notes with several containers, the escapes-only rewrite with its
+fallback, filenames, the manifest and the README.
+Tested: one fixture per field; determinism, meaning two runs are equal
+byte for byte; the fallback count.
+Jeff tries: export 'skg-system/' (skg's own documentation) and then
+'public', open each in Obsidian, follow links, and judge how the IDs
+and comments look in Reading view and in Live Preview.
+Live Preview probably shows the block IDs, which is unverified. A CSS
+snippet could dim them; that is a small follow-up.
+** Slice 2: the round trip
+'skg import-obsidian VAULT-FOLDER OUT-DIR' is the pure importer,
+together with both halves of the round-trip test.
+Tested: fixtures, 'skg-system/' in 'bash/all-tests.sh', and the
+property-based graphs.
+Jeff tries: the round trip on 'public', expecting an empty
+'diff -r'.
+** Slice 3: bodies that read well
+Reversible conversions of Org links, comment lines, source blocks and
+'=code=', each checked by the parse-back guard. The aim is a fallback
+count near zero on 'public'.
+Jeff tries: reading his bodies in Obsidian.
+** Slice 4: several skgrepos and privacy
+Folders per skgrepo, sections, the broken-links note, the
+confirmation for public notes whose text is private, and the
+planted-marker test that no private text leaks.
+Jeff tries: a two-skgrepo export.
+** Slice 5: the marked export
+'--marked' with the shared markers and the 'formats' line.
+Jeff tries: 'docs/' as an Obsidian vault.
+** Slice 6: responses, written explicitly
+The converter for 'mine/' covering the whole vocabulary except
+copy-and-edit, plus stamping and validation against Jeff's graph.
+Tested: one fixture vault per operation, compared with the expected
+.skg files.
+Jeff tries: play the responder himself in Obsidian, convert, add the
+result as a foreign skgrepo, and view R' from its perspective.
+** Slice 7: responses by copying and editing
+Implicit forks: clones, hides, notes kept elsewhere, rewriting
+unchanged children as embeds, attributions.
+Jeff tries: his own "move E out of R" example.
+** Slice 8: client commands
+A server request and Emacs and Neovim commands, as the Org export has.
+This is optional; the CLI is enough to start.
+** Later
+The plugin (part 5), and the static fork comparisons in the export.
+** What is reused
+- From 'server/export_org.rs': 'discover_roots',
+  'parse_target_filepath' and 'parse_root_headline' (markers);
+  'collect_events' (the tree walk under a restriction, with a visited
+  set); 'build_homes' (one home per note with several containers);
+  'export_candidate_pids' (the privacy preflight); the broken-links
+  note; the CLI plumbing of 'skg export-org'.
+- From 'server/types/links.rs': link parsing, and its
+  'org_literal_ranges', which says where link syntax is only an example.
+- From 'server/types/nodes/fs.rs': 'GraphnodeOnDisk' and 'to_yaml',
+  which define the normal form.
+- From 'server/import_md_and_org/parse.rs': pulldown_cmark parsing with
+  byte ranges and front-matter reading, for files the responder writes
+  freely, with headings.
+- The graph validator ('validate_complete_graph') to check a response
+  against Jeff's graph; 'server/from_text/fork.rs' as the reference for
+  what an edit to a foreign note means; 'server/attribution.rs' for
+  remote hashes.
+
+* 7. Questions for Jeff
+** Put a short ID in every filename?
+Yes or no. Default: yes, as in 'Feelings (41ec1d8d).md'.
+** Should one export marker serve both formats?
+Yes or no. Default: yes, with an optional 'formats =' line to limit it.
+** Should "export everything" include foreign skgrepos (Claude's, the team's)?
+Yes or no. Default: no; only owned skgrepos, starting from the most
+public.
+** Should a responder need only Obsidian and Git?
+Yes or no. Default: yes. Jeff runs the converter, and the ID stamps go
+back to the responder as a pull request.
+** Should in-place edits of Jeff's files count as forks?
+Yes or no. Default: no. The converter reads only the responder's own
+folder and warns about edits inside Jeff's, which would conflict with
+his next export when the responder pulls it.
+** Should the first version include the comparison plugin?
+Yes or no. Default: no.
+
+* Sources
+- File formats: https://obsidian.md/help/file-formats
+- Configuration folder: https://obsidian.md/help/configuration-folder
+- Showing all files: https://forum.obsidian.md/t/show-all-files-in-file-explorer/71369
+- Links and block IDs: https://obsidian.md/help/links
+- Link format setting: https://forum.obsidian.md/t/settings-new-link-format-what-is-shortest-path-when-possible/6748
+- Case in links: https://forum.obsidian.md/t/case-sensitivity/52331
+- Case in block IDs: https://forum.obsidian.md/t/custom-block-references-containing-capital-letters-fail-and-fall-back-to-whole-page-matches/8140
+- MetadataCache API: https://docs.obsidian.md/Reference/TypeScript+API/MetadataCache
+- Aliases: https://obsidian.md/help/aliases
+- Embeds: https://obsidian.md/help/embeds
+- Embed depth: https://forum.obsidian.md/t/make-rendering-limit-of-nested-embedded-notes-adjustable/89866
+- Editing embeds: https://forum.obsidian.md/t/edit-transcluded-embedded-notes-blocks-in-place-likely-requires-wyswyg-first/15339
+- Properties: https://obsidian.md/help/properties
+- Links in properties: https://obsidian.md/changelog/2023-08-31-desktop-v1.4.5
+- Property rewriting: https://forum.obsidian.md/t/yaml-properties-api-processfrontmatter-removes-alters-string-quotes-comments-types-formatting/65851
+- Comments and syntax: https://obsidian.md/help/syntax
+- Filenames: https://forum.obsidian.md/t/valid-characters-for-file-names/55307
+- Scale: https://forum.obsidian.md/t/maximum-number-of-notes-in-vault/1509?page=5
+- Many links: https://forum.obsidian.md/t/performance-improve-support-for-vaults-with-more-than-1-million-links/88602
+- Bases: https://obsidian.md/help/bases
+- JSON Canvas: https://jsoncanvas.org/
+- URIs: https://obsidian.md/help/uri
+- Sync collaboration: https://obsidian.md/help/sync/collaborate
+- Obsidian Git: https://github.com/Vinzent03/obsidian-git
+- Publish: https://obsidian.md/help/publish
+- InterVaults: https://community.obsidian.md/plugins/intervaults
+- Building a plugin: https://docs.obsidian.md/Plugins/Getting+started/Build+a+plugin
+- Plugin API: https://docs.obsidian.md/Reference/TypeScript+API/Plugin
+- Submitting a plugin: https://docs.obsidian.md/Plugins/Releasing/Submit+your+plugin
+- The future of plugins: https://obsidian.md/blog/future-of-plugins/
+- BRAT: https://github.com/TfTHacker/obsidian42-brat
+- Compare plugin: https://community.obsidian.md/plugins/compare
+- Obsidian-flavored Markdown: https://obsidian.md/help/obsidian-flavored-markdown
+- Changelog: https://obsidian.md/changelog/

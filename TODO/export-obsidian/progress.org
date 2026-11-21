@@ -1,0 +1,10 @@
+#+title: Export to Obsidian: progress
+
+This records how the build departs from [[file:plan.org]], slice by
+slice. Jeff has not yet answered the plan's questions (its part 7); the
+build takes their defaults.
+
+* Slice 1: a vault Jeff can open
+Not started.
+* Slice 2: the round trip
+Not started.
