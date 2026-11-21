@@ -156,6 +156,10 @@
 (skg node (gnid 4) (viewRequests (folder aliases) (folder containers) flags))
 ---- text: req:folder:aliases req:folder:containers req:flags
 ---- styles: nonstandard*18 -*1 nonstandard*21 -*1 nonstandard*9
+==== view requests: a fork
+(skg node (gnid 1) (viewRequests fork))
+---- text: req:fork
+---- styles: nonstandard*8
 ==== flags: had ID before import
 (skg (flag hadId))
 ---- text: ☮ had ID before import

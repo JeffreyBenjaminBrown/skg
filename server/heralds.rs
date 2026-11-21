@@ -380,7 +380,8 @@ fn view_request_rules (
     rule ("flags", vec! [ s ("req:flags") ]),
     rule ("editableView", vec! [ s ("req:editable") ]),
     rule ("writeProtectedView", vec! [ s ("req:write-protected") ]),
-    rule ("writeProtectedSubtreeView", vec! [ s ("req:write-protected-subtree") ]) ]) }
+    rule ("writeProtectedSubtreeView", vec! [ s ("req:write-protected-subtree") ]),
+    rule ("fork", vec! [ s ("req:fork") ]) ]) }
 
 /// (ANY children...)
 fn any (
