@@ -119,7 +119,7 @@ describe('skg.metadata commands', function ()
     assert.are.equal('org', vim.bo.filetype)
   end)
 
-  it('set_repo replaces repo and writes nothing else', function ()
+  it('set_repo replaces repo and marks the home skgrepo boundary', function ()
     -- Mirrors test-skg-set-repo.
     buffer_with('* (skg node (gnid 1) (skgRepos (nodeRepo public))) title')
     local original = picker.prompt_for_repo_change
@@ -132,8 +132,10 @@ describe('skg.metadata commands', function ()
     local result = first_metadata_sexp()
     assert.is_true(subtree_p(result,
       '(skg node (gnid 1) (skgRepos (nodeRepo private)))'))
-    -- The save recomputes '(view repoBoundary)'.
-    assert.is_nil(metadata.sexp_cdr_at_path(result, { 'skg', 'view' }))
+    -- The herald shows the pending move until the save recomputes
+    -- '(view repoBoundary)'.
+    assert.are.same({ sexpr.symbol('repoBoundary') },
+                    metadata.sexp_cdr_at_path(result, { 'skg', 'view' }))
     assert.is_false(subtree_p(result, '(skg node (skgRepos (nodeRepo public)))'))
   end)
 
@@ -162,8 +164,9 @@ describe('skg.metadata commands', function ()
                           'public-under-mismatch' }) do
       assert.is_true(subtree_p(metadata_sexp_by_id(gnid),
         '(skg node (skgRepos (nodeRepo private)))'), gnid)
-      assert.is_nil(metadata.sexp_cdr_at_path(metadata_sexp_by_id(gnid),
-                                              { 'skg', 'view' }), gnid)
+      assert.are.same({ sexpr.symbol('repoBoundary') },
+                      metadata.sexp_cdr_at_path(metadata_sexp_by_id(gnid),
+                                                { 'skg', 'view' }), gnid)
     end
     assert.is_true(subtree_p(metadata_sexp_by_id('mismatched-content'),
       '(skg node (skgRepos (nodeRepo foreign)))'))

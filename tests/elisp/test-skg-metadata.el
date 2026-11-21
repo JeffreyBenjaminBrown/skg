@@ -184,8 +184,9 @@ change is. The cases the server pinned when it computed this."
                 'unprocessed))))
 
 (ert-deftest test-skg-set-repo ()
-  "Test skg-set-repo replaces the node repo field, and writes no
-derived fact: the save recomputes '(view repoBoundary)'."
+  "Test skg-set-repo replaces the node repo field, and marks the
+headline '(view repoBoundary)', so that its herald shows the pending
+move until the save recomputes the boundary."
   (with-temp-buffer
     (org-mode)
     (insert "* (skg node (gnid 1) (skgRepos (nodeRepo public))) title")
@@ -199,14 +200,14 @@ derived fact: the save recomputes '(view repoBoundary)'."
       (should (skg-sexp-subtree-p
                result
                '(skg node (gnid 1) (skgRepos (nodeRepo private)))))
-      (should-not (assq 'view (cdr result)))
+      (should (equal (assq 'view (cdr result)) '(view repoBoundary)))
       (should-not (skg-sexp-subtree-p
                    result
                    '(skg node (skgRepos (nodeRepo public))))))))
 
-(ert-deftest test-skg-set-repo-leaves-the-repo-boundary-to-the-save ()
-  "Test skg-set-repo leaves the node's '(view repoBoundary)', and so
-its herald, as they were: the save recomputes them."
+(ert-deftest test-skg-set-repo-keeps-one-repo-boundary ()
+  "Test skg-set-repo on a node already at a home skgrepo boundary keeps
+its one '(view repoBoundary)', its herald naming the new skgrepo."
   (with-temp-buffer
     (org-mode)
     (insert "* (skg node (gnid 1) (skgRepos (nodeRepo public)) (view repoBoundary)) title")
@@ -227,7 +228,9 @@ its herald, as they were: the save recomputes them."
       (should (equal (test-skg--extract-metadata-sexp)
                      '(skg node (gnid 1) (skgRepos (nodeRepo private))
                            (view repoBoundary))))
-      (should (string-match-p "⌂" (overlay-get display-overlay 'display))))))
+      (should (equal (substring-no-properties
+                      (overlay-get display-overlay 'display))
+                     "⌂:private")))))
 
 (ert-deftest test-skg-set-merge-request-with-bare-id ()
   "Test skg-set-merge-request adds a merge editRequest."
@@ -323,7 +326,8 @@ its herald, as they were: the save recomputes them."
       (should (skg-sexp-subtree-p
                (test-skg--metadata-sexp-by-id gnid)
                '(skg node (skgRepos (nodeRepo private)))))
-      (should-not (assq 'view (cdr (test-skg--metadata-sexp-by-id gnid)))))
+      (should (equal (assq 'view (cdr (test-skg--metadata-sexp-by-id gnid)))
+                     '(view repoBoundary))))
     (should (skg-sexp-subtree-p
              (test-skg--metadata-sexp-by-id "mismatched-content")
              '(skg node (skgRepos (nodeRepo foreign)))))

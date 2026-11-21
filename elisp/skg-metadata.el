@@ -1306,12 +1306,16 @@ or a restricted viewnode."
   (skg-sexp-subtree-p metadata-sexp '(skg node writeProtected)))
 
 (defun skg--change-repo-at-point (new-skgrepo)
-  "Set the repo at point to NEW-SKGREPO.
-Returns 1 if the current line was edited. The headline's derived
-'(view repoBoundary)' is left as it is: the save recomputes it."
+  "Set the repo at point to NEW-SKGREPO, and mark the headline a home
+skgrepo boundary ('(view repoBoundary)'), so that until the save its
+herald shows the pending move as \"⌂:NEW\". The server skips '(view
+...)' when it reads a buffer, and the save redraws the headline with
+the boundary it computes. Returns 1 if the current line was edited."
   (skg-edit-metadata-at-point
    `(skg (skgRepos)
-         (skgRepos (ENSURE (nodeRepo ,(intern new-skgrepo))))))
+         (skgRepos (ENSURE (nodeRepo ,(intern new-skgrepo))))
+         (view)
+         (view (ENSURE repoBoundary))))
   1)
 
 (defun skg--remove-fork-from-viewrequests (host-sexp)

@@ -883,14 +883,18 @@ function M.change_repo_recursive (old_skgrepo, new_skgrepo)
                         writeProtected_gnids)
 end
 
----Set the skgrepo at LINE_NUMBER to NEW_SKGREPO. The save recomputes the
----headline's '(view repoBoundary)'.
+---Set the skgrepo at LINE_NUMBER to NEW_SKGREPO, and mark the headline a
+---home skgrepo boundary ('(view repoBoundary)'), so that until the save
+---its herald shows the pending move as "⌂:NEW". The server skips
+---'(view ...)' when it reads a buffer, and the save redraws the
+---headline with the boundary it computes.
 ---@param line_number integer
 ---@param new_skgrepo string
 ---@return integer 1
 function M.change_repo_at_line (line_number, new_skgrepo)
   M.edit_metadata_at_line(line_number, sexpr.read(string.format(
-    '(skg (skgRepos (ENSURE (nodeRepo %s))))', new_skgrepo)))
+    '(skg (skgRepos (ENSURE (nodeRepo %s))) (view) (view (ENSURE repoBoundary)))',
+    new_skgrepo)))
   return 1
 end
 
