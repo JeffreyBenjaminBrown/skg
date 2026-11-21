@@ -180,9 +180,10 @@ T_TEAM_TOOLS=$SECONDS
 echo -n "  Team tool tests ... "
 if (
   cd "$PROJECT_ROOT"
-  # The scripts in tools/team/ that the AI team runs; each test makes
-  # its own data, and needs no server.
-  for test_script in tools/team/test_*.py; do
+  # The scripts in tools/team/ that the AI team runs, and those of
+  # bash/ that have tests; each test makes its own data, and needs no
+  # server.
+  for test_script in tools/team/test_*.py bash/test_*.py; do
     echo "== $test_script"
     skg_low_priority python3 "$test_script" || exit 1
   done
