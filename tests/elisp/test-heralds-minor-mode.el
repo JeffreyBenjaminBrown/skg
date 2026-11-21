@@ -3,6 +3,8 @@
 (require 'ert)
 (require 'heralds-minor-mode)
 (require 'skg-request-herald-rules) ;; self-heal: skg-herald-rules-ensure
+(require 'skg-request-views)      ;; the view-request gestures
+(require 'skg-request-flag-state) ;; skg--stamp-search-matching-request
 (skg-test-install-herald-rules)
 
 ;; (NAME METADATA TEXT STYLES CONTEXT) for each case in the file, which
@@ -176,6 +178,187 @@ unwarranted, it shows no request."
                     (list editable "** (skg containerFolder) containers"
                           "*** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim writeProtected) c"))
                    "☮"))))
+
+;; Every request a gesture stages for the next save shows in the
+;; herald of its headline before the save ('docs/heralds.org',
+;; "Other heralds"). Each test below runs the gesture itself on the last
+;; headline of a buffer whose heralds are on, and reads that
+;; headline's herald.
+
+(defconst test-heralds--editable-root
+  "* (skg node (gnid r) (skgRepos (nodeRepo main)) (view repoBoundary)) r"
+  "An editable root in the skgrepo 'main', labeled \"m\".")
+
+(defconst test-heralds--child-at-home
+  "** (skg node (gnid c) (skgRepos (nodeRepo main))) c"
+  "A child of `test-heralds--editable-root' in its skgrepo, so drawn
+with no home herald.")
+
+(defun test-heralds--last-line-display-after (lines gesture)
+  "The herald of the last of LINES, with heralds on, before and after
+GESTURE runs with point at the start of that line, as (BEFORE AFTER).
+The gestures that save are kept from saving."
+  (with-temp-buffer
+    (org-mode)
+    (insert (mapconcat #'identity lines "\n") "\n")
+    (heralds-minor-mode 1)
+    (let ((display
+           (lambda ()
+             (save-excursion
+               (goto-char (point-max))
+               (forward-line -1)
+               (search-forward "(skg")
+               (let ((ov (cl-find-if (lambda (ov) (overlay-get ov 'display))
+                                     (overlays-at (match-beginning 0)))))
+                 (and ov (substring-no-properties
+                          (overlay-get ov 'display))))))))
+      (list (funcall display)
+            (progn
+              (goto-char (point-max))
+              (forward-line -1)
+              (cl-letf (((symbol-function 'skg-request-save-buffer) #'ignore))
+                (funcall gesture))
+              (funcall display))))))
+
+(defun test-heralds--shows-after (lines gesture expected)
+  "Assert that GESTURE on the last of LINES makes its herald show
+EXPECTED, which it did not show before."
+  (let ((before-and-after
+         (test-heralds--last-line-display-after lines gesture)))
+    (should-not (and (car before-and-after)
+                     (string-match-p (regexp-quote expected)
+                                     (car before-and-after))))
+    (should (cadr before-and-after))
+    (should (string-match-p (regexp-quote expected)
+                            (cadr before-and-after)))))
+
+(ert-deftest test-heralds-a-pending-home-skgrepo-move-shows ()
+  "C-c s s on a child in its parent's skgrepo, which the server drew with
+no home herald, shows the move as \"⌂:LABEL\" before the save."
+  (should (equal (test-heralds--last-line-display-after
+                  (list test-heralds--editable-root test-heralds--child-at-home)
+                  (lambda ()
+                    (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
+                               (lambda (_current) "pub")))
+                      (skg-set-repo))))
+                 '(nil "⌂:public"))))
+
+(ert-deftest test-heralds-a-pending-home-skgrepo-move-shows-on-a-boundary ()
+  "C-c s s on a root, drawn at a home skgrepo boundary already, shows
+the new skgrepo's label in place of the old."
+  (should (equal (test-heralds--last-line-display-after
+                  (list test-heralds--editable-root)
+                  (lambda ()
+                    (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
+                               (lambda (_current) "pub")))
+                      (skg-set-repo))))
+                 '("⌂:m" "⌂:public"))))
+
+(ert-deftest test-heralds-a-pending-recursive-home-skgrepo-move-shows ()
+  "C-c s S shows the move on every headline it moves."
+  (with-temp-buffer
+    (org-mode)
+    (insert test-heralds--editable-root "\n"
+            test-heralds--child-at-home "\n")
+    (heralds-minor-mode 1)
+    (goto-char (point-min))
+    (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
+               (lambda (_current) "pub")))
+      (skg-set-repo-recursive))
+    (goto-char (point-min))
+    (dolist (_line '(root child))
+      (search-forward "(skg")
+      (should (equal (substring-no-properties
+                      (overlay-get (cl-find-if (lambda (ov) (overlay-get ov 'display))
+                                               (overlays-at (match-beginning 0)))
+                                   'display))
+                     "⌂:public"))
+      (forward-line 1))))
+
+(ert-deftest test-heralds-a-pending-attribution-strip-shows ()
+  (test-heralds--shows-after
+   (list test-heralds--editable-root test-heralds--child-at-home)
+   #'skg-strip-attribution "request:strip attribution"))
+
+(ert-deftest test-heralds-a-pending-delete-shows ()
+  (test-heralds--shows-after
+   (list test-heralds--editable-root test-heralds--child-at-home)
+   #'skg-delete "delete"))
+
+(ert-deftest test-heralds-a-pending-merge-shows ()
+  (test-heralds--shows-after
+   (list test-heralds--editable-root test-heralds--child-at-home)
+   (lambda () (skg-set-merge-request "acquiree")) "merge:acquiree"))
+
+(ert-deftest test-heralds-a-pending-relRepo-request-shows ()
+  "The request 'skg-set-relRepo' writes, on a node, an alias and an
+unknown viewnode."
+  (let ((write (lambda () (skg--write-edit-request '(relRepo pub)))))
+    (test-heralds--shows-after
+     (list test-heralds--editable-root test-heralds--child-at-home)
+     write "request:~pub")
+    (test-heralds--shows-after
+     (list test-heralds--editable-root "** (skg aliasFolder) aliases"
+           "*** (skg alias) an alias")
+     write "request:~pub")
+    (test-heralds--shows-after
+     (list test-heralds--editable-root "** (skg unknown (gnid u)) u")
+     write "request:~pub")))
+
+(ert-deftest test-heralds-a-pending-flag-request-shows ()
+  (test-heralds--shows-after
+   (list test-heralds--editable-root test-heralds--child-at-home)
+   (lambda () (skg--stamp-search-matching-request t))
+   "request:no search matching")
+  (test-heralds--shows-after
+   (list test-heralds--editable-root test-heralds--child-at-home)
+   (lambda () (skg--stamp-search-matching-request nil))
+   "request:search matching"))
+
+(ert-deftest test-heralds-a-pending-detach-shows ()
+  (test-heralds--shows-after
+   (list test-heralds--editable-root test-heralds--child-at-home)
+   #'skg-detach "detach"))
+
+(ert-deftest test-heralds-a-pending-restore-node-shows ()
+  (test-heralds--shows-after
+   (list test-heralds--editable-root
+         "** (skg ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel))) g")
+   #'skg-restore-deleted-node "restore node"))
+
+(ert-deftest test-heralds-a-pending-restore-membership-shows ()
+  (test-heralds--shows-after
+   (list test-heralds--editable-root
+         "** (skg node (gnid c) (skgRepos (nodeRepo main)) noClaim (diff (rel removed) (leaves 1 rel))) c")
+   #'skg-restore-removed-membership "restore membership"))
+
+(ert-deftest test-heralds-a-pending-processed-request-shows ()
+  "What the processed gestures write, before the save they start."
+  (test-heralds--shows-after
+   (list test-heralds--editable-root
+         "** (skg node (gnid c) (skgRepos (nodeRepo main)) (diff (node added) (leaves 1 node))) c")
+   (lambda () (skg-edit-metadata-at-point
+               '(skg (editRequest (processed node)))))
+   "request:processed:node"))
+
+(ert-deftest test-heralds-a-pending-view-request-shows ()
+  "Each view request, from the gesture that writes it."
+  (dolist (gesture-and-text
+           '((skg-request-editable-view . "req:editable")
+             (skg-request-write-protected . "req:write-protected")
+             (skg-request-write-protected-recursive . "req:write-protected-subtree")
+             (skg-show-folderOf-containers . "req:folder:containers")
+             (skg-show-folderOf-flags . "req:flags")))
+    (test-heralds--shows-after
+     (list test-heralds--editable-root test-heralds--child-at-home)
+     (car gesture-and-text) (cdr gesture-and-text)))
+  ;; 'skg-fork-node' saves at once; the request stays in the buffer
+  ;; while the fork confirmation is open, and the metadata editor
+  ;; (C-c v m) can write it without saving.
+  (test-heralds--shows-after
+   (list test-heralds--editable-root test-heralds--child-at-home)
+   (lambda () (skg-edit-metadata-at-point '(skg node (viewRequests fork))))
+   "req:fork"))
 
 (ert-deftest test-heralds-minor-mode-toggle ()
   "Test that heralds-minor-mode properly adds and removes overlays."

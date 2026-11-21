@@ -306,4 +306,117 @@ describe('skg.heralds', function ()
       '*** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim'
       .. ' writeProtected) c' }))
   end)
+  -- Every request a gesture stages for the next save shows in the
+  -- herald of its headline before the save. Mirrors the
+  -- test-heralds-a-pending-*-shows tests of
+  -- tests/elisp/test-heralds-minor-mode.el: each runs the gesture on the
+  -- last headline of a buffer whose heralds are on.
+  local editable_root =
+    '* (skg node (gnid r) (skgRepos (nodeRepo main)) (view repoBoundary)) r'
+  local child_at_home = '** (skg node (gnid c) (skgRepos (nodeRepo main))) c'
+
+  ---The herald of the last of LINES, with heralds on, before and after
+  ---GESTURE runs with the cursor on that line. The gestures that save
+  ---are kept from saving.
+  local function last_line_display_after (lines, gesture)
+    local buf = helpers.buffer_with(lines, #lines)
+    heralds.enable(buf)
+    local function read ()
+      local marks = vim.api.nvim_buf_get_extmarks(
+        buf, heralds.namespace, { #lines - 1, 0 }, { #lines - 1, -1 },
+        { details = true })
+      return marks[1] and heralds.chunks_text(marks[1][4].virt_text)
+    end
+    local before = read()
+    local save = require('skg.save')
+    local original_save = save.request_save_buffer
+    local original_notify = vim.notify
+    save.request_save_buffer = function () end
+    vim.notify = function () end
+    local ok, err = pcall(gesture)
+    save.request_save_buffer = original_save
+    vim.notify = original_notify
+    assert(ok, err)
+    vim.wait(200, function () return read() ~= before end, 10)
+    local after = read()
+    heralds.disable(buf)
+    return before, after
+  end
+
+  ---Assert that GESTURE on the last of LINES makes its herald show
+  ---EXPECTED, which it did not show before.
+  local function shows_after (lines, gesture, expected)
+    local before, after = last_line_display_after(lines, gesture)
+    assert.is_falsy(before and before:find(expected, 1, true))
+    assert.is_truthy(after and after:find(expected, 1, true),
+                     tostring(after) .. ' lacks ' .. expected)
+  end
+
+  it('shows a pending home skgrepo move', function ()
+    local metadata = require('skg.metadata')
+    local picker = require('skg.picker')
+    local original = picker.prompt_for_repo_change
+    picker.prompt_for_repo_change = function () return 'pub' end
+    local child_before, child_after = last_line_display_after(
+      { editable_root, child_at_home }, function () metadata.set_repo() end)
+    local root_before, root_after = last_line_display_after(
+      { editable_root }, function () metadata.set_repo() end)
+    picker.prompt_for_repo_change = original
+    assert.is_nil(child_before)
+    assert.are.equal('⌂:public', child_after)
+    assert.are.equal('⌂:m', root_before)
+    assert.are.equal('⌂:public', root_after)
+  end)
+
+  it('shows each pending edit request', function ()
+    local metadata = require('skg.metadata')
+    local sexpr = require('skg.sexpr.parse')
+    local home = { editable_root, child_at_home }
+    shows_after(home, metadata.delete, 'delete')
+    shows_after(home, metadata.strip_attribution, 'request:strip attribution')
+    shows_after(home, function () metadata.set_merge_request('acquiree') end,
+                'merge:acquiree')
+    shows_after(home, metadata.detach, 'detach')
+    shows_after(home, function ()
+      metadata.write_edit_request(sexpr.read('(flag noSearchMatching true)'),
+                                  'node') end,
+      'request:no search matching')
+    local relRepo = function ()
+      metadata.write_edit_request(sexpr.read('(relRepo pub)')) end
+    shows_after(home, relRepo, 'request:~pub')
+    shows_after({ editable_root, '** (skg aliasFolder) aliases',
+                  '*** (skg alias) an alias' }, relRepo, 'request:~pub')
+    shows_after({ editable_root, '** (skg unknown (gnid u)) u' },
+                relRepo, 'request:~pub')
+    shows_after({ editable_root,
+                  '** (skg ghost (gnid g) (skgRepos (nodeRepo main))'
+                  .. ' (diff (node removed) (rel removed) (leaves 2 node rel))) g' },
+                metadata.restore_deleted_node, 'restore node')
+    shows_after({ editable_root,
+                  '** (skg node (gnid c) (skgRepos (nodeRepo main)) noClaim'
+                  .. ' (diff (rel removed) (leaves 1 rel))) c' },
+                metadata.restore_removed_membership, 'restore membership')
+    shows_after({ editable_root,
+                  '** (skg node (gnid c) (skgRepos (nodeRepo main))'
+                  .. ' (diff (node added) (leaves 1 node))) c' },
+                function ()
+                  metadata.edit_metadata_at_line(metadata.current_line_number(), sexpr.read(
+                    '(skg (editRequest (processed node)))')) end,
+                'request:processed:node')
+  end)
+
+  it('shows each pending view request', function ()
+    local views = require('skg.views')
+    local home = { editable_root, child_at_home }
+    shows_after(home, views.request_editable_view, 'req:editable')
+    shows_after(home, views.request_write_protected, 'req:write-protected')
+    shows_after(home, views.request_write_protected_recursive,
+                'req:write-protected-subtree')
+    shows_after(home, views.show_folderOf_containers, 'req:folder:containers')
+    shows_after(home, views.show_folderOf_flags, 'req:flags')
+    -- fork_node saves at once; the request stays in the buffer while
+    -- the fork confirmation is open.
+    shows_after(home, function () views.request_view_and_save('fork') end,
+                'req:fork')
+  end)
 end)
