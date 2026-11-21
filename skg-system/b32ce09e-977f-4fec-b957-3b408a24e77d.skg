@@ -1,0 +1,14 @@
+title: importing an exported vault back
+pid: b32ce09e-977f-4fec-b957-3b408a24e77d
+body: |2-
+  : cargo run --bin skg -- import-obsidian VAULT-DIR OUT-DIR
+  reads a vault that =export-obsidian= wrote back into =.skg= files,
+  writing each skgrepo folder of the vault to the folder of that name in
+  =OUT-DIR=, which must be absent or empty. It needs no server and
+  touches no configured skgrepo; it reads IDs from block IDs, properties
+  and comments, and mints none. Importing an export gives back the
+  skgrepo's files as skg writes them, byte for byte, and exporting that
+  import gives back the vault; the tests check both on
+  =skg-system/= and on random skgrepos. It reads only what the exporter
+  writes, and stops at the first line it cannot place, naming its file
+  and line, so it is not yet a way to read notes written in Obsidian.
