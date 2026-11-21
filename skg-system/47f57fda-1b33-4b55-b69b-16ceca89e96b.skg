@@ -1,9 +1,12 @@
 title: what the vault holds
 pid: 47f57fda-1b33-4b55-b69b-16ceca89e96b
 body: |2-
-  The vault holds a folder named after the skgrepo, a =README.md= that
-  explains the format to readers, and =.skg-export.toml=, a manifest
-  (which Obsidian ignores) mapping each note's ID to its file.
+  The vault holds a folder named after the skgrepo and a =README.md=
+  that explains the format to readers. The README's properties say the
+  version of the format (=skg-format=) and, for each folder, the
+  skgrepo it holds, that skgrepo's remote hash and its commit
+  (=skg-folders=, =skg-skgrepos=, =skg-remote-hashes=, =skg-commits=,
+  lists with one entry per folder). There is no hidden manifest.
   Each file of the folder is a /document/: a note that no other note of
   the skgrepo contains, or one that forks something, with the tree it
   contains. A cycle that no such note reaches makes a document of its

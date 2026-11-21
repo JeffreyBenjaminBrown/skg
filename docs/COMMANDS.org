@@ -1941,14 +1941,21 @@ command runs it yet:
 A foreign skgrepo is refused. Only the files of the skgrepo named are
 read, so no text of another skgrepo can reach the vault.
 The output directory must be absent, empty, or a vault an earlier
-export wrote. Files that earlier export wrote and this one does not
-are removed; nothing else there is touched.
+export wrote (its =README.md= says so). Files that earlier export
+wrote and this one does not are removed: in each folder that README
+lists, a file whose =skg-id= property names a note and whose name ends
+in that note's ID suffix. Nothing else there is touched: not a file of
+your own, a copy made in Obsidian, a file renamed by hand, nor a
+folder the README does not list.
 The plan, and how the build departs from it, are in
 =TODO/export-obsidian/=.
 **** what the vault holds
-The vault holds a folder named after the skgrepo, a =README.md= that
-explains the format to readers, and =.skg-export.toml=, a manifest
-(which Obsidian ignores) mapping each note's ID to its file.
+The vault holds a folder named after the skgrepo and a =README.md=
+that explains the format to readers. The README's properties say the
+version of the format (=skg-format=) and, for each folder, the
+skgrepo it holds, that skgrepo's remote hash and its commit
+(=skg-folders=, =skg-skgrepos=, =skg-remote-hashes=, =skg-commits=,
+lists with one entry per folder). There is no hidden manifest.
 Each file of the folder is a /document/: a note that no other note of
 the skgrepo contains, or one that forks something, with the tree it
 contains. A cycle that no such note reaches makes a document of its
@@ -1978,14 +1985,17 @@ naming no single file, or a block ID or heading that file lacks; a
 repeated or ill-formed block ID; front matter that is not YAML, or
 whose values Obsidian has no property type for; an unclosed code fence
 or comment; a filename some system refuses, a path too long for
-Windows, or two names that differ only in case; a note the manifest
-places in a file that lacks it. It exits 1 if it finds any. It has not
+Windows, or two names that differ only in case; a README without
+=skg-format=; a file of a folder the README lists that has no
+=skg-id=, or a note written twice in such a folder. It exits 1 if it
+finds any. It has not
 been checked against Obsidian itself.
 **** importing an exported vault back
 : cargo run --bin skg -- import-obsidian VAULT-DIR OUT-DIR
 reads a vault that =export-obsidian= wrote back into =.skg= files,
-writing each skgrepo folder of the vault to the folder of that name in
-=OUT-DIR=, which must be absent or empty. It needs no server and
+writing each skgrepo folder its =README.md= lists to the folder of
+that name in =OUT-DIR=, which must be absent or empty. It refuses a
+vault whose =skg-format= is not the one it reads. It needs no server and
 touches no configured skgrepo; it reads IDs from block IDs, properties
 and comments, and mints none. Importing an export gives back the
 skgrepo's files as skg writes them, byte for byte, and exporting that

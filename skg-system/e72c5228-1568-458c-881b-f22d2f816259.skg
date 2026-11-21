@@ -8,6 +8,8 @@ body: |2-
   repeated or ill-formed block ID; front matter that is not YAML, or
   whose values Obsidian has no property type for; an unclosed code fence
   or comment; a filename some system refuses, a path too long for
-  Windows, or two names that differ only in case; a note the manifest
-  places in a file that lacks it. It exits 1 if it finds any. It has not
+  Windows, or two names that differ only in case; a README without
+  =skg-format=; a file of a folder the README lists that has no
+  =skg-id=, or a note written twice in such a folder. It exits 1 if it
+  finds any. It has not
   been checked against Obsidian itself.
