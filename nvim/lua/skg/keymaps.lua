@@ -108,6 +108,8 @@ M.commands = {
                              desc = 'Turn the link at point into content (saves)' },
   Fork = { module = 'skg.views', fn = 'fork_node',
            desc = 'Fork the owned node at point into a private clone' },
+  Receipt = { module = 'skg.receipt', fn = 'receipt',
+              desc = 'Write a read receipt for the mailed item at point, and hide it' },
   ReplaceContentWithLink = { module = 'skg.modify_graph', fn = 'replace_content_with_link',
                              desc = 'Turn the branch at point into a link (saves)' },
   DiffViewOpen = { module = 'skg.diff_view', fn = 'diffView_open',
@@ -409,6 +411,7 @@ M.content_view_bindings = {
   { 'mhU', 'MarkHomeSkgrepoMoveUnprocessedRecursive' }, -- C-u C-c m h u
   { 'mc', 'ReplaceLinkWithContent' },    -- C-c m c
   { 'mf', 'Fork' },                      -- C-c m f
+  { 'ma', 'Receipt' },                   -- C-c m a
   { 'ml', 'ReplaceContentWithLink' },    -- C-c m l
   { 'vb', 'OrgBodyToggle' },             -- C-c v b
   { 'vd', 'DiffViewOpen' },              -- C-c v d
