@@ -107,6 +107,20 @@ fn a_hand_edit_the_dialect_cannot_place_is_named () {
   let error : String = read_vault_files (&vault . files) . err () . unwrap () . to_string ();
   assert! (error . contains ("main/Threads"), "{}", error); }
 
+#[test]
+fn the_import_reads_the_folders_the_readme_lists_in_its_format () {
+  let mut vault : RenderedVault = render_vault (
+    &SkgrepoName::from ("main"), &fixture_sections (), &SkgrepoGitFacts::default () ) . unwrap ();
+  let some_file : String = vault . files . keys () . find ( |p| p . starts_with ("main/") ) . unwrap () . clone ();
+  let copy : String = vault . files [&some_file] . clone ();
+  vault . files . insert ( some_file . replacen ("main/", "mine/", 1), copy );
+  let imported : ImportedVault = read_vault_files (&vault . files) . unwrap ();
+  assert_eq! (imported . keys () . collect::<Vec<_>> (), vec! [ "main" ], "mine/ is not listed");
+  let readme : String = vault . files ["README.md"] . replace (VAULT_FORMAT, "skg-obsidian 0");
+  vault . files . insert ("README.md" . to_string (), readme);
+  let error : String = read_vault_files (&vault . files) . err () . unwrap () . to_string ();
+  assert! (error . contains ("skg-obsidian 0"), "{}", error); }
+
 //
 // Random skgrepos
 //

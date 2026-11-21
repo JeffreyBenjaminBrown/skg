@@ -21,9 +21,19 @@ use crate::types::misc::ID;
 
 use std::ops::Range;
 
-pub const VAULT_FORMAT : &str = "skg-obsidian 1";
-pub const MANIFEST_FILENAME : &str = ".skg-export.toml";
+/// The version of these conventions, a property of the README.
+pub const VAULT_FORMAT : &str = "skg-obsidian 2";
+/// What every version of 'VAULT_FORMAT' begins with.
+pub const VAULT_FORMAT_FAMILY : &str = "skg-obsidian ";
 pub const README_STEM : &str = "README";
+/// The README's properties describe the vault. Each list has one entry
+/// per skgrepo folder, in the same order; an unknown remote hash or
+/// commit is the empty text.
+pub const KEY_FORMAT        : &str = "skg-format";
+pub const KEY_FOLDERS       : &str = "skg-folders";
+pub const KEY_SKGREPOS      : &str = "skg-skgrepos";
+pub const KEY_REMOTE_HASHES : &str = "skg-remote-hashes";
+pub const KEY_COMMITS       : &str = "skg-commits";
 /// The README heading that a link to a note outside the vault points
 /// to, when the vault lacks the "Some links might be broken" note.
 pub const OUTSIDE_VAULT_HEADING : &str = "Links to notes outside this vault";
@@ -101,6 +111,14 @@ pub fn pid_of_block_id (
         . map ( |i| u8::from_str_radix (&hex [i .. i + 2], 16) . ok () )
         . collect ();
       String::from_utf8 (bytes ?) . ok () . map (ID::from) }, }}
+
+/// Whether 'name' can be a skgrepo folder of a vault: one path
+/// component, not hidden.
+pub fn is_vault_folder_name (
+  name : &str,
+) -> bool {
+  ! name . is_empty () && ! name . starts_with ('.')
+  && ! name . contains ('/') && ! name . contains ('\\') }
 
 /// The characters 'block_id_of_pid' writes: a subset of Obsidian's.
 pub fn is_written_block_id (

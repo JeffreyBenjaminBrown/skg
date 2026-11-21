@@ -48,35 +48,67 @@ struct ParsedNote {
 // Entry points
 //
 
-/// Read every skgrepo folder of the vault at 'vault_dir': each folder
-/// at its top that holds Markdown files and whose name does not begin
-/// with a dot.
+/// What a vault's README says of the vault, in its properties.
+pub struct VaultReadme {
+  pub format  : String,
+  pub folders : Vec<String>,
+}
+
+/// The properties of a vault's README ('README.md' at its top).
+pub fn read_readme (
+  text : &str,
+) -> Result<VaultReadme, String> {
+  let properties : Map<String, Value> = frontmatter_of (text) ? . 0;
+  let format : String = text_of (&properties, KEY_FORMAT)
+    . ok_or_else ( || format! ("it has no {} property", KEY_FORMAT) ) ? . to_string ();
+  let folders : Vec<String> = texts_of (&properties, KEY_FOLDERS) ?;
+  if let Some (bad) = folders . iter () . find ( |f| ! is_vault_folder_name (f) ) {
+    return Err ( format! ("{} lists {:?}, which is no folder of the vault", KEY_FOLDERS, bad) ); }
+  Ok (VaultReadme { format, folders }) }
+
+/// Read every skgrepo folder of the vault at 'vault_dir': those its
+/// README lists.
 pub fn read_vault (
   vault_dir : &Path,
 ) -> Result<ImportedVault, Box<dyn Error>> {
+  let readme_name : String = format! ("{}.md", README_STEM);
+  let readme_text : String = fs::read_to_string (vault_dir . join (&readme_name))
+    . map_err ( |e| format! ("{}: {}", vault_dir . join (&readme_name) . display (), e) ) ?;
+  let readme : VaultReadme = read_readme (&readme_text)
+    . map_err ( |e| format! ("{}: {}", readme_name, e) ) ?;
   let mut files : BTreeMap<String, String> = BTreeMap::new (); // "FOLDER/STEM.md" -> text
-  for folder in fs::read_dir (vault_dir) ? {
-    let folder : PathBuf = folder ? . path ();
-    let name : String = folder . file_name () . unwrap () . to_string_lossy () . to_string ();
-    if ! folder . is_dir () || name . starts_with ('.') { continue; }
+  for name in &readme . folders {
+    let folder : PathBuf = vault_dir . join (name);
+    if ! folder . is_dir () { continue; } // an empty skgrepo
     for entry in fs::read_dir (&folder) ? {
       let path : PathBuf = entry ? . path ();
       let Some (file_name) = path . file_name () . and_then ( |n| n . to_str () ) else { continue; };
       if ! file_name . ends_with (".md") || ! path . is_file () { continue; }
       files . insert ( format! ("{}/{}", name, file_name), fs::read_to_string (&path) ? ); }}
+  files . insert (readme_name, readme_text);
   read_vault_files (&files) }
 
 /// Like 'read_vault', of a vault's files as texts by relative path
-/// (what 'render_vault' returns). Files at the top are not read.
+/// (what 'render_vault' returns). Only the README and the files of the
+/// folders it lists are read.
 pub fn read_vault_files (
   files : &BTreeMap<String, String>,
 ) -> Result<ImportedVault, Box<dyn Error>> {
-  let mut folders : BTreeMap<&str, Vec<(&str, &str)>> = BTreeMap::new (); // folder -> [(stem, text)]
+  let readme_name : String = format! ("{}.md", README_STEM);
+  let readme : VaultReadme = read_readme (
+    files . get (&readme_name) . ok_or_else ( || format! ("the vault has no {}", readme_name) ) ? )
+    . map_err ( |e| format! ("{}: {}", readme_name, e) ) ?;
+  if readme . format != VAULT_FORMAT {
+    return Err ( format! ("{} says the vault is in the format {:?}; this skg reads {:?}",
+                          readme_name, readme . format, VAULT_FORMAT) . into () ); }
+  let mut folders : BTreeMap<&str, Vec<(&str, &str)>> = // folder -> [(stem, text)]
+    readme . folders . iter () . map ( |f| (f . as_str (), Vec::new ()) ) . collect ();
   for (relative, text) in files {
     let Some ((folder, file_name)) = relative . split_once ('/') else { continue; };
     let Some (stem) = file_name . strip_suffix (".md") else { continue; };
-    if folder . starts_with ('.') || stem . contains ('/') { continue; }
-    folders . entry (folder) . or_default () . push ((stem, text . as_str ())); }
+    if stem . contains ('/') { continue; }
+    if let Some (folder_files) = folders . get_mut (folder) {
+      folder_files . push ((stem, text . as_str ())); }}
   let mut roots_by_stem : RootsByStem = HashMap::new ();
   for (folder, folder_files) in &folders {
     for (stem, text) in folder_files {
@@ -122,7 +154,7 @@ pub fn write_imported_vault (
 //
 
 /// The properties, and the lines after the front matter.
-fn frontmatter_of (
+pub(crate) fn frontmatter_of (
   text : &str,
 ) -> Result<(Map<String, Value>, Vec<&str>), String> {
   let lines : Vec<&str> = text . strip_suffix ('\n') . unwrap_or (text) . split ('\n') . collect ();

@@ -17,10 +17,11 @@
 //!   refuse, paths stay well under Windows' 260 characters, and no
 //!   two files differ only in case (nor share a name, which makes a
 //!   bare link ambiguous);
-//! - each note the manifest lists is in its file: as the root, or as
-//!   a block ID.
+//! - the README's properties name the format, and every file of each
+//!   skgrepo folder they list is a document (it has an 'skg-id'), and
+//!   no note is written twice in a folder (as a root or a block ID).
 
-use crate::obsidian::dialect::{MANIFEST_FILENAME, block_id_of_pid};
+use crate::obsidian::dialect::{KEY_FOLDERS, KEY_FORMAT, README_STEM, VAULT_FORMAT, block_id_of_pid};
 use crate::types::misc::ID;
 
 use regex::Regex;
@@ -57,7 +58,7 @@ pub struct VaultCheckReport {
   pub links     : usize,
   pub embeds    : usize,
   pub block_ids : usize,
-  pub manifest_notes : usize,
+  pub notes     : usize, // in the folders the README lists
   pub problems  : Vec<String>,
 }
 
@@ -67,9 +68,9 @@ impl VaultCheckReport {
   ) -> String {
     let mut s : String = format! (
       "{} Markdown files ({:.1} MB), {} links, {} embeds, {} block IDs; \
-       {} notes of the manifest found.\n{} problem(s).\n",
+       {} notes in the skgrepo folders the README lists.\n{} problem(s).\n",
       self . files, self . bytes as f64 / 1_000_000.0, self . links,
-      self . embeds, self . block_ids, self . manifest_notes,
+      self . embeds, self . block_ids, self . notes,
       self . problems . len () );
     for problem in self . problems . iter () . take (50) {
       s . push_str ( & format! ("  {}\n", problem) ); }
@@ -84,6 +85,8 @@ struct FileFacts {
   block_ids : HashSet<String>, // lowercased
   headings  : HashSet<String>, // lowercased
   skg_id    : Option<String>,
+  format    : Option<String>, // the README's properties
+  folders   : Vec<String>,
   links     : Vec<(usize, bool, String)>, // (line, is an embed, inside of [[...]])
 }
 
@@ -109,7 +112,7 @@ pub fn check_vault (
     facts . insert (relative, file_facts); }
   check_collisions (&facts, &mut report . problems);
   check_links (&facts, &mut report);
-  check_manifest (vault, &facts, &mut report) ?;
+  check_readme (&facts, &mut report);
   Ok (report) }
 
 //
@@ -323,6 +326,8 @@ fn read_frontmatter (
       yaml_serde::Value::Sequence (items) => items . iter () . filter_map ( |i| i . as_str () ) . collect (),
       _ => Vec::new (), };
     if name == "skg-id" { facts . skg_id = texts . first () . map ( |s| s . to_string () ); }
+    if name == KEY_FORMAT { facts . format = texts . first () . map ( |s| s . to_string () ); }
+    if name == KEY_FOLDERS { facts . folders = texts . iter () . map ( |s| s . to_string () ) . collect (); }
     for text in texts {
       for (is_embed, inside) in wikilinks_in (text) {
         facts . links . push ((0, is_embed, inside)); }}}}
@@ -371,29 +376,36 @@ fn check_links (
   report . problems . extend (problems); }
 
 //
-// The manifest
+// The README
 //
 
-fn check_manifest (
-  vault  : &Path,
+fn check_readme (
   facts  : &BTreeMap<String, FileFacts>,
   report : &mut VaultCheckReport,
-) -> Result<(), Box<dyn Error>> {
-  let path = vault . join (MANIFEST_FILENAME);
-  if ! path . exists () { return Ok (( )); }
-  let manifest : toml::Table = fs::read_to_string (&path) ? . parse () ?;
-  let Some (files) = manifest . get ("files") . and_then ( |f| f . as_table () ) else {
-    report . problems . push ( format! ("{}: no [files] table", MANIFEST_FILENAME ));
-    return Ok (( )); };
-  for (id, file) in files {
-    let Some (file) = file . as_str () else { continue; };
-    let Some (file_facts) = facts . get (file) else {
-      report . problems . push ( format! ("{}: {} is in {}, which does not exist", MANIFEST_FILENAME, id, file ));
-      continue; };
-    let is_root : bool = file_facts . skg_id . as_deref () == Some (id . as_str ());
-    let has_block : bool = file_facts . block_ids . contains (
-      & block_id_of_pid (&ID::from (id . as_str ())) . to_lowercase () );
-    if is_root || has_block { report . manifest_notes += 1; }
-    else {
-      report . problems . push ( format! ("{}: {} is said to be in {}, but is not", MANIFEST_FILENAME, id, file )); }}
-  Ok (( )) }
+) {
+  let readme_name : String = format! ("{}.md", README_STEM);
+  let Some (readme) = facts . get (&readme_name) else {
+    report . problems . push ( format! ("no {} at the top of the vault", readme_name ));
+    return; };
+  match &readme . format {
+    None => {
+      report . problems . push ( format! ("{}: no {} property", readme_name, KEY_FORMAT ));
+      return; },
+    Some (format) if format != VAULT_FORMAT =>
+      report . problems . push ( format! (
+        "{}: the format is {:?}; this checker knows {:?}", readme_name, format, VAULT_FORMAT )),
+    Some (_) => {}, }
+  for folder in &readme . folders {
+    let mut file_of_note : HashMap<String, &str> = HashMap::new (); // lowercased block ID -> file
+    for (relative, file_facts) in facts . range ( format! ("{}/", folder) .. ) {
+      let Some (name) = relative . strip_prefix ( &format! ("{}/", folder) ) else { break; };
+      if name . contains ('/') { continue; }
+      let Some (skg_id) = &file_facts . skg_id else {
+        report . problems . push ( format! ("{}: a file of a skgrepo folder with no skg-id", relative ));
+        continue; };
+      let root : String = block_id_of_pid (&ID::from (skg_id . as_str ())) . to_lowercase ();
+      for note in std::iter::once (&root) . chain (file_facts . block_ids . iter ()) {
+        if let Some (other) = file_of_note . insert (note . clone (), relative) {
+          report . problems . push ( format! (
+            "{}: the note ^{} is written twice, in {} and {}", folder, note, other, relative )); }}}
+    report . notes += file_of_note . len (); }}

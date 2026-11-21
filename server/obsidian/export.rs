@@ -24,6 +24,7 @@ use crate::dbs::filesystem::multiple_nodes::read_skg_sections_from_folder;
 use crate::export_org::BROKEN_LINK_SINK_ID;
 use crate::git_ops::read_gitrepo::open_gitrepo;
 use crate::obsidian::dialect::*;
+use crate::obsidian::import::{VaultReadme, frontmatter_of, read_readme};
 use crate::obsidian::read_text::unrender_text;
 use crate::types::links::{links_with_ranges_from_text, replace_each_link_with_its_label};
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
@@ -49,7 +50,7 @@ const FILENAME_TITLE_BYTES : usize = 200;
 // Public types
 //
 
-/// What the vault's manifest records of the skgrepo's gitrepo.
+/// What the vault's README records of the skgrepo's gitrepo.
 #[derive(Clone, Debug, Default)]
 pub struct SkgrepoGitFacts {
   pub remote_hash : Option<String>,
@@ -153,7 +154,6 @@ struct Addresses<'a> {
   homes        : HashMap<ID, Home>,
   documents    : &'a [Document],
   root_of_stem : HashMap<&'a str, &'a ID>,
-  folder       : String,
 }
 
 //
@@ -202,8 +202,7 @@ pub fn render_vault (
     . map ( |document| (document . stem . as_str (), &document . root) )
     . collect ();
   let addresses : Addresses = Addresses {
-    index : &index, homes, documents : &documents, root_of_stem,
-    folder : folder . clone () };
+    index : &index, homes, documents : &documents, root_of_stem };
   let mut report : ObsidianExportReport = ObsidianExportReport {
     skgrepo   : folder . clone (),
     notes     : index . by_pid . len (),
@@ -215,38 +214,42 @@ pub fn render_vault (
       format! ("{}/{}.md", folder, document . stem),
       render_document (document, &addresses, &mut report) ); }
   files . insert (
-    MANIFEST_FILENAME . to_string (),
-    render_manifest (&addresses, git_facts) ? );
-  files . insert (
     format! ("{}.md", README_STEM),
-    render_readme (&folder) );
+    render_readme (&folder, git_facts) );
   Ok (RenderedVault { files, report }) }
 
 /// Write 'vault' into 'vault_dir'. The folder must be absent, empty,
-/// or a vault an earlier export wrote (it holds the manifest); files
-/// that earlier export listed and this one does not are removed.
+/// or a vault an earlier export wrote (its README says so). Files that
+/// earlier export wrote and this one does not are removed; nothing
+/// else is ('is_file_an_export_wrote').
 pub fn write_vault (
   vault     : &mut RenderedVault,
   vault_dir : &Path,
 ) -> Result<(), Box<dyn Error>> {
-  let manifest_path : PathBuf = vault_dir . join (MANIFEST_FILENAME);
-  if vault_dir . exists () {
-    let is_empty : bool = fs::read_dir (vault_dir) ? . next () . is_none ();
-    if ! is_empty && ! manifest_path . exists () {
+  let readme_path : PathBuf = vault_dir . join ( format! ("{}.md", README_STEM) );
+  let mut previous_folders : Vec<String> = Vec::new ();
+  if vault_dir . exists () && fs::read_dir (vault_dir) ? . next () . is_some () {
+    let readme : Option<VaultReadme> = fs::read_to_string (&readme_path) . ok ()
+      . and_then ( |text| read_readme (&text) . ok () )
+      . filter ( |readme| readme . format . starts_with (VAULT_FORMAT_FAMILY) );
+    let Some (readme) = readme else {
       return Err ( format! (
-        "{} is neither empty nor a vault skg exported (it has no {}); \
+        "{} is neither empty nor a vault skg exported (its {}.md has no {} property); \
          refusing to write there",
-        vault_dir . display (), MANIFEST_FILENAME ) . into () ); }}
-  let previous_files : Vec<String> =
-    if manifest_path . exists () {
-      files_listed_in_manifest (& fs::read_to_string (&manifest_path) ?) }
-    else { Vec::new () };
-  for relative in previous_files {
-    let stays_inside : bool = ! relative . starts_with ('/')
-      && relative . split ('/') . all ( |part| ! part . is_empty () && part != ".." );
-    if vault . files . contains_key (&relative) || ! stays_inside { continue; }
-    let path : PathBuf = vault_dir . join (&relative);
-    if path . exists () {
+        vault_dir . display (), README_STEM, KEY_FORMAT ) . into () ); };
+    previous_folders = readme . folders; }
+  for folder in previous_folders {
+    let dir : PathBuf = vault_dir . join (&folder);
+    if ! dir . is_dir () { continue; }
+    let mut stale : Vec<(String, PathBuf)> = Vec::new ();
+    for entry in fs::read_dir (&dir) ? {
+      let path : PathBuf = entry ? . path ();
+      let Some (file_name) = path . file_name () . and_then ( |n| n . to_str () ) else { continue; };
+      let relative : String = format! ("{}/{}", folder, file_name);
+      if ! vault . files . contains_key (&relative) && is_file_an_export_wrote (&path) {
+        stale . push ((relative, path)); }}
+    stale . sort ();
+    for (relative, path) in stale {
       fs::remove_file (&path) ?;
       vault . report . files_removed . push (relative); }}
   for (relative, content) in &vault . files {
@@ -256,18 +259,22 @@ pub fn write_vault (
     fs::write (&path, content) ?; }
   Ok (( )) }
 
-fn files_listed_in_manifest (
-  manifest : &str,
-) -> Vec<String> {
-  let Ok (table) = manifest . parse::<toml::Table> () else { return Vec::new (); };
-  let Some (files) = table . get ("files") . and_then ( |f| f . as_table () )
-    else { return Vec::new (); };
-  let mut listed : Vec<String> = files . values ()
-    . filter_map ( |v| v . as_str () . map (String::from) )
-    . collect ();
-  listed . sort ();
-  listed . dedup ();
-  listed }
+/// Whether the file at 'path' (in a skgrepo folder of a vault) is one
+/// an export wrote: a Markdown file whose 'skg-id' property is a
+/// document's ID, under the name the exporter gives it, which ends in
+/// a suffix of that ID. A file the user wrote, or a copy of an
+/// exported file ("... 1.md", as Obsidian names a copy), is not.
+fn is_file_an_export_wrote (
+  path : &Path,
+) -> bool {
+  let Some (stem) = path . file_name () . and_then ( |n| n . to_str () )
+    . and_then ( |n| n . strip_suffix (".md") ) else { return false; };
+  if ! path . is_file () { return false; }
+  let Ok (text) = fs::read_to_string (path) else { return false; };
+  let Ok ((properties, _)) = frontmatter_of (&text) else { return false; };
+  let Some (pid) = properties . get (KEY_ID) . and_then ( |v| v . as_str () ) else { return false; };
+  id_suffixes (&ID::from (pid)) . iter ()
+    . any ( |suffix| stem . ends_with ( &format! (" ({})", suffix) )) }
 
 //
 // Documents and homes
@@ -816,39 +823,23 @@ fn render_frontmatter (
 // Manifest and README
 //
 
-fn render_manifest (
-  addresses : &Addresses,
-  git_facts : &SkgrepoGitFacts,
-) -> Result<String, Box<dyn Error>> {
-  let mut skgrepo : toml::Table = toml::Table::new ();
-  skgrepo . insert ("name" . into (), addresses . folder . clone () . into ());
-  skgrepo . insert ("folder" . into (), addresses . folder . clone () . into ());
-  if let Some (hash) = &git_facts . remote_hash {
-    skgrepo . insert ("remote_hash" . into (), hash . clone () . into ()); }
-  if let Some (commit) = &git_facts . commit {
-    skgrepo . insert ("commit" . into (), commit . clone () . into ()); }
-  let mut files : toml::Table = toml::Table::new ();
-  for (pid, home) in &addresses . homes {
-    files . insert (
-      pid . as_str () . to_string (),
-      format! ("{}/{}.md", addresses . folder,
-               addresses . documents [home . document] . stem) . into () ); }
-  let mut manifest : toml::Table = toml::Table::new ();
-  manifest . insert ("format" . into (), VAULT_FORMAT . into ());
-  manifest . insert ("broken_links_note" . into (), BROKEN_LINK_SINK_ID . into ());
-  manifest . insert ("skgrepos" . into (), toml::Value::Array (vec! [ skgrepo . into () ]));
-  manifest . insert ("files" . into (), files . into ());
-  Ok ( format! (
-    "# Written by 'skg export-obsidian'. Obsidian ignores this file.\n\
-     # 'files' maps each note's ID to the file that holds it.\n{}",
-    toml::to_string (&manifest) ? )) }
-
+/// The README: its properties describe the vault (the format, and
+/// for each skgrepo folder its skgrepo, remote hash and commit, which
+/// attribute a responder's forks); its text explains the format.
 fn render_readme (
-  folder : &str,
+  folder    : &str,
+  git_facts : &SkgrepoGitFacts,
 ) -> String {
+  let one = |text : &str| -> PropertyValue { PropertyValue::List (vec! [ text . to_string () ]) };
+  let properties : Vec<(String, PropertyValue)> = vec! [
+    (KEY_FORMAT . to_string (), PropertyValue::Text (VAULT_FORMAT . to_string ())),
+    (KEY_FOLDERS . to_string (), one (folder)),
+    (KEY_SKGREPOS . to_string (), one (folder)),
+    (KEY_REMOTE_HASHES . to_string (), one (git_facts . remote_hash . as_deref () . unwrap_or (""))),
+    (KEY_COMMITS . to_string (), one (git_facts . commit . as_deref () . unwrap_or (""))) ];
   format! (
-"# About this vault
-This vault was exported from skg, a knowledge-graph editor whose notes live in '.skg' files. Each folder holds one *skgrepo*, a set of notes at one privacy level; this export holds the skgrepo `{folder}`.
+"{frontmatter}# About this vault
+This vault was exported from skg, a knowledge-graph editor whose notes live in '.skg' files. Each folder holds one *skgrepo*, a set of notes at one privacy level; this export holds the skgrepo `{folder}`. The properties above say which version of the format this is, and for each folder which skgrepo it holds and the Git commit it was exported from.
 
 Each file is a *document*: a note that no other note in the skgrepo contains (or one that forks another note), with everything it contains. Its title is the heading at the top, and its ID and other metadata are the properties above it.
 
@@ -856,11 +847,12 @@ Every other note is a bullet. The bullet ends with the note's ID as a block ID (
 
 Links are written as `[[File#^ID|label]]`, so they survive renamed files. Metadata Obsidian has no place for (extra IDs, flags, attributions, hidden notes) rides in comments, `%%skg {{...}}%%`, which Reading view hides. A backslash before a character keeps it from being read as Markdown structure; the character itself is what the note says.
 
-Please do not edit these files in place: the next export overwrites them.
+Please do not edit these files in place: the next export overwrites them, and removes those it no longer writes. Files of your own, and copies of exported files, are left alone.
 
 ## {heading}
 A link that points here leads to a note that is not in this vault, usually because it is private. The link keeps its label, and the comment after it (`%%skg-id ...%%`) keeps the note's ID.
 ",
+    frontmatter = render_frontmatter (&properties),
     folder = folder,
     heading = OUTSIDE_VAULT_HEADING ) }
 

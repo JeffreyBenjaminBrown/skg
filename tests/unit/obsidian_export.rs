@@ -38,7 +38,7 @@ fn the_fixture_vault_passes_the_checker () {
   write_vault (&mut vault, dir . path ()) . unwrap ();
   let report : VaultCheckReport = check_vault (dir . path ()) . unwrap ();
   assert! (report . problems . is_empty (), "{}", report . summary ());
-  assert_eq! (report . manifest_notes, fixture_sections () . len ());
+  assert_eq! (report . notes, fixture_sections () . len ());
   assert! (report . embeds >= 4, "{}", report . summary ()); }
 
 #[test]
@@ -283,6 +283,25 @@ fn a_foreign_skgrepo_is_refused () {
   assert! (result . is_err ()); }
 
 #[test]
+fn the_readme_describes_the_vault_in_its_properties () {
+  let vault : RenderedVault = render_fixture ();
+  assert! (vault . files ["README.md"] . starts_with (
+"---
+skg-format: \"skg-obsidian 2\"
+skg-folders:
+  - \"main\"
+skg-skgrepos:
+  - \"main\"
+skg-remote-hashes:
+  - \"r\"
+skg-commits:
+  - \"c\"
+---
+# About this vault
+"), "{}", vault . files ["README.md"]);
+  assert! (vault . files . keys () . all ( |path| ! path . starts_with ('.') )); }
+
+#[test]
 fn a_re_export_removes_files_it_no_longer_writes_and_nothing_else () {
   let dir : TempDir = TempDir::new () . unwrap ();
   let vault_dir : PathBuf = dir . path () . join ("vault");
@@ -290,22 +309,28 @@ fn a_re_export_removes_files_it_no_longer_writes_and_nothing_else () {
     render_vault (&SkgrepoName::from ("main"), &[ section (1, title) ],
                   &SkgrepoGitFacts::default ()) . unwrap () };
   write_vault (&mut render ("Old name"), &vault_dir) . unwrap ();
+  let old : String = fs::read_to_string (vault_dir . join ("main/Old name (00000001).md")) . unwrap ();
   fs::create_dir_all (vault_dir . join (".obsidian")) . unwrap ();
   fs::write (vault_dir . join ("main/mine.md"), "a responder's note") . unwrap ();
+  fs::write (vault_dir . join ("main/Old name (00000001) 1.md"), &old) . unwrap (); // Obsidian's copy
+  fs::write (vault_dir . join ("main/Renamed by hand.md"), &old) . unwrap ();
+  fs::create_dir_all (vault_dir . join ("mine")) . unwrap ();
+  fs::write (vault_dir . join ("mine/Old name (00000001).md"), &old) . unwrap (); // an unlisted folder
   let mut renamed : RenderedVault = render ("New name");
   write_vault (&mut renamed, &vault_dir) . unwrap ();
   assert_eq! (renamed . report . files_removed, vec! [ "main/Old name (00000001).md" . to_string () ]);
-  assert! (vault_dir . join ("main/New name (00000001).md") . exists ());
-  assert! (vault_dir . join ("main/mine.md") . exists ());
-  { // a manifest naming a path outside the vault removes nothing there
-    let manifest : PathBuf = vault_dir . join (MANIFEST_FILENAME);
-    let text : String = fs::read_to_string (&manifest) . unwrap ();
-    fs::write (dir . path () . join ("outside.md"), "x") . unwrap ();
-    fs::write (&manifest, text . replace ("\"main/New name (00000001).md\"", "\"../outside.md\"")) . unwrap ();
-    write_vault (&mut render ("New name"), &vault_dir) . unwrap ();
-    assert! (dir . path () . join ("outside.md") . exists ()); }
+  for kept in [ "main/New name (00000001).md", "main/mine.md", "main/Old name (00000001) 1.md",
+                "main/Renamed by hand.md", "mine/Old name (00000001).md", ".obsidian" ] {
+    assert! (vault_dir . join (kept) . exists (), "{} is gone", kept); }
+  { // a README listing a folder outside the vault is not a vault's
+    let readme : PathBuf = vault_dir . join ("README.md");
+    let text : String = fs::read_to_string (&readme) . unwrap ();
+    fs::write (&readme, text . replacen ("  - \"main\"", "  - \"../outside\"", 1)) . unwrap ();
+    fs::create_dir_all (dir . path () . join ("outside")) . unwrap ();
+    fs::write (dir . path () . join ("outside/x (00000001).md"), &old) . unwrap ();
+    assert! (write_vault (&mut render ("New name"), &vault_dir) . is_err ());
+    assert! (dir . path () . join ("outside/x (00000001).md") . exists ()); }
   let elsewhere : PathBuf = dir . path () . join ("not-a-vault");
   fs::create_dir_all (&elsewhere) . unwrap ();
   fs::write (elsewhere . join ("x.txt"), "x") . unwrap ();
   assert! (write_vault (&mut render ("A"), &elsewhere) . is_err ()); }
-
