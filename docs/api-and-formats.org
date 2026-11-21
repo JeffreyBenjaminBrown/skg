@@ -1485,6 +1485,58 @@ one automatically.
     followed by an empty rerender stream, in place of the answer; the
     view keeps its choice. A retry with those PIDs is released.
   - =server/serve/handlers/perspective.rs=.
+** Receipt
+  - Request: =((request . "receipt") (item . ID) (text . TEXT)
+    (title . TITLE) (mailbox . ID) (fork-into . SKGREPO) (hide .
+    "false") (preview . "true") (exclude-view-ids "VIEW_ID" ...))=.
+    =item= is required; =text= defaults to empty, =title= to
+    ="Read."=; the rest are optional. =exclude-view-ids= names the
+    client's views with unsaved edits, which the rerender leaves
+    alone.
+  - Writes a read receipt ('docs/forks.org', "Read receipts";
+    'server/receipt.rs'): a new note, titled TITLE, its body TEXT
+    unless TEXT is empty or equals TITLE, as the first child of the
+    user's fork of ITEM (ITEM itself, where the user owns it; else the
+    owned note that forks it, 'existing_owned_fork_of'; else a new
+    fork, built as a save's fork is, with no fork confirmation, in
+    =fork-into=); and the hide of ITEM in the user's fork of its
+    mailbox, a note of another owner that holds ITEM or a mirror of
+    it and that an owned note forks. The hide names the member the
+    mailbox's list names, at the relRepo a save would give it; where
+    the fork of the mailbox holds a mirror of that member, it leaves
+    the fork's content too. =mailbox= names the mailbox, or the
+    user's fork of it; it is inferred where there is one.
+    =(hide . "false")= writes the receipt alone.
+  - A new fork without =fork-into= goes into the home of the user's
+    fork of the mailbox, where ITEM is homed in the mailbox's own
+    skgrepo; into the one owned skgrepo the skgrepo restriction
+    shows, where there is one; else the request is refused, naming
+    the choices.
+  - The writes are one batch, in the order receipt, holder, fork of
+    the mailbox, planned and written under the mutation gate. A
+    failed write is refused with the files in that order: those
+    before the failing one were written, the in-Rust graph is
+    unchanged.
+  - Response: =((response-type receipt) (preview true|false) (lines
+    ("..." ...)) (receipt-id ID) (holder-id ID) (holder-is-new-fork
+    true|false))=: =lines= say what it writes, the first the
+    receipt's place, the rest what it hides, as a save's hide lines
+    do ("Hides 'X' from 'F', as content of 'M'."), or "Hides nothing:"
+    and why. A preview writes nothing, and an empty rerender stream
+    follows; otherwise a rerender stream (see "Rerender all views")
+    of every open view, but those excluded, that shows ITEM or a
+    mirror of it, or a mirror of a note written. A view whose
+    rerender the text-release policy would challenge is left out,
+    unlocked, with a warning in =rerender-done=: the receipt is
+    written, so the request cannot be retried with an approval.
+  - Refusals: =((response-type receipt) (refusal "..."))=, with
+    =(choose-skgrepo ("SKGREPO" ...))= where the user must name the
+    fork's skgrepo, or =(choose-mailbox ("ID" ...))
+    (choose-mailbox-titles ("TITLE" ...))= where ITEM is in several
+    mailboxes, followed by an empty rerender stream. Nothing is
+    written. The clients ask for the choice and send the request
+    again with it.
+  - =server/serve/handlers/receipt.rs=.
 ** skgrepo-sets
   - Skgrepo-sets are the prefixes of the config's privacy ladder, the
     owned skgrepos (see "skgconfig.toml > skgrepo-sets" below): each

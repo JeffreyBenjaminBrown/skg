@@ -1136,6 +1136,27 @@ same two skgrepos.
 *** C-c m h u : skg-mark-homeSkgrepo-move-unprocessed
 As C-c m h p, but unmarks.
 ** C-c m : other graph modifications
+*** C-c m a : skg-receipt
+On the headline of an item in a view of someone's mailbox to you
+(or anywhere in its body), write a read receipt: say how you handled
+the item, and file it away. It asks for one line, "Read." by default
+(RET), and then the server, in one write, puts a new note titled
+"Read.", that line its body, as the first child of your fork of the
+item (forking it first if you hold no fork of it; no fork
+confirmation is asked), and hides the item from your fork of the
+mailbox, so that it leaves the unread items. The echo area says what
+it wrote and hid; the views that show them are redrawn.
+
+Where the item is in several mailboxes you read, it asks which to
+hide it from; where it is in none it hides nothing, and says so, as
+where it is already hidden. A new fork goes where your fork of the
+mailbox is, if the item is homed in the mailbox's skgrepo; otherwise
+it asks for the skgrepo, so that an item from a more private skgrepo
+of its owner is not forked into a public one by default.
+
+Refuses while the buffer has unsaved edits, which the redraw would
+replace; other buffers with unsaved edits are not redrawn. See
+=docs/forks.org=, "Read receipts".
 *** C-c m c : skg-replace-link-with-content
 Replace the leaf at point with a content relationship to the
 node it links to, then save the buffer.

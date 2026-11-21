@@ -1,0 +1,23 @@
+title: '<localleader>ma : :SkgReceipt'
+pid: ea239e3b-8336-4814-aa9b-20f3f802c33a
+body: |2-
+  On the headline of an item in a view of someone's mailbox to you
+  (or anywhere in its body), write a read receipt: say how you handled
+  the item, and file it away. It asks for one line, "Read." by default
+  (an empty answer), and then the server, in one write, puts a new note titled
+  "Read.", that line its body, as the first child of your fork of the
+  item (forking it first if you hold no fork of it; no fork
+  confirmation is asked), and hides the item from your fork of the
+  mailbox, so that it leaves the unread items. A notification says what
+  it wrote and hid; the views that show them are redrawn.
+
+  Where the item is in several mailboxes you read, it asks which to
+  hide it from; where it is in none it hides nothing, and says so, as
+  where it is already hidden. A new fork goes where your fork of the
+  mailbox is, if the item is homed in the mailbox's skgrepo; otherwise
+  it asks for the skgrepo, so that an item from a more private skgrepo
+  of its owner is not forked into a public one by default.
+
+  Refuses while the buffer has unsaved edits, which the redraw would
+  replace; other buffers with unsaved edits are not redrawn. See
+  =docs/forks.org=, "Read receipts".

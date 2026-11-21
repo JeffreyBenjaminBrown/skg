@@ -1,0 +1,44 @@
+title: Read receipts
+pid: 1e1892ad-7198-425b-9420-98f887c5623f
+body: |2-
+  Mail between two people runs through forks: each has a note
+  addressed to the other, a /mailbox/, and the reader holds a fork of
+  it, whose forks folder shows what the mailbox holds that the reader
+  has neither filed nor hidden: the unread items. A /read receipt/
+  says how the reader handled an item and files it away, in one
+  gesture: =skg-receipt= (=C-c m a=, on the item's headline; in Neovim
+  =<localleader>ma=, =:SkgReceipt=; in skg-for-ai =receipt ITEM TEXT=).
+  It asks for one line, how the item was handled (="Read."= by
+  default), and then, in one write:
+
+  - writes a new note, titled =Read.=, its body that line (none when
+    the line is the title), as the first child of the reader's fork of
+    the item: the fork the reader holds, else a new one, made as an
+    edit of the item would make it, and with no confirmation, since
+    the command asked for it. The author sees the receipt as
+    unintegrated content under their item;
+  - hides the item from the reader's fork of the mailbox, as removing
+    its headline there would, so it leaves the unread items.
+
+  The mailbox is a note of another owner that holds the item, or a
+  mirror of it, and that a note of the reader's forks. Where the item
+  is a mirror (the author's reply, forked from the reader's own
+  message, say), the hide lands on the member the mailbox's list
+  names, as a save's would ("Editing the clone"). With one mailbox it
+  is found; with several the command asks which. With none the
+  receipt is written and nothing hidden, and so where the fork of the
+  mailbox already hides the item. An item the reader owns takes the
+  receipt itself.
+
+  A new fork goes into the skgrepo of the reader's fork of the
+  mailbox, but only where the item is homed in the mailbox's own
+  skgrepo: an item from another of its owner's skgrepos may be more
+  private than the mailbox, and so than the reader's fork of it, which
+  may be public. Then, and for an item in no mailbox, the command asks
+  for the skgrepo, unless the reader owns only one the skgrepo
+  restriction shows.
+
+  The server does it all ('server/receipt.rs'), as the request
+  "receipt" ('docs/api-and-formats.org'): the receipt, the fork and
+  the fork of the mailbox are written as one batch, then the views
+  that show them are redrawn, but those with unsaved edits.
