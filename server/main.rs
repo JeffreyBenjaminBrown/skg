@@ -17,6 +17,7 @@ use skg::heralds::herald_styles_inconsistencies;
 use skg::export_org::{
   export_candidate_pids, export_to_org, ExportReport};
 use skg::obsidian::export::{RenderedVault, export_skgrepo_to_vault};
+use skg::obsidian::import::{ImportedVault, read_vault, write_imported_vault};
 use skg::obsidian::vault_check::{VaultCheckReport, check_vault};
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::telescope::dependencies_manifest::foreign_section_warnings;
@@ -61,6 +62,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
   if args . len() > 1 && args[1] == "export-obsidian" {
     return run_export_obsidian (&args); }
+
+  if args . len() > 1 && args[1] == "import-obsidian" {
+    return run_import_obsidian (&args); }
 
   if args . len() > 1 && args[1] == "check-obsidian-vault" {
     return run_check_obsidian_vault (&args); }
@@ -496,6 +500,23 @@ fn run_export_obsidian (
     export_skgrepo_to_vault (&config, &skgrepo, &output_dir) ?;
   print! ("{}", vault . report . summary ());
   println! ("Wrote {} files to {}.", vault . files . len (), output_dir . display ());
+  Ok (( )) }
+
+/// Read a vault that export-obsidian wrote back into .skg files, one
+/// folder of OUT-DIR per skgrepo folder of the vault
+/// ('server/obsidian/import.rs'). Each such folder must be absent or
+/// empty. It needs no server, and touches no configured skgrepo.
+///
+/// USAGE: cargo run --bin skg -- import-obsidian VAULT-DIR OUT-DIR
+fn run_import_obsidian (
+  args : &[String],
+) -> Result<(), Box<dyn Error>> {
+  let (Some (vault_dir), Some (out_dir)) = (args . get (2), args . get (3))
+    else { return Err ("usage: skg import-obsidian VAULT-DIR OUT-DIR" . into ()); };
+  let vault : ImportedVault = read_vault (Path::new (vault_dir)) ?;
+  let written : usize = write_imported_vault (&vault, Path::new (out_dir)) ?;
+  println! ("Wrote {} .skg files, for the skgrepo folder(s) {}, into {}.",
+            written, vault . keys () . cloned () . collect::<Vec<String>> () . join (", "), out_dir);
   Ok (( )) }
 
 /// Check a vault against Obsidian's rules ('server/obsidian/vault_check.rs').
