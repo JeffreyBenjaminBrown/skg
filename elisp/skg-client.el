@@ -25,6 +25,7 @@
 (require 'skg-request-rebuild-session-lifetime-stores)
 (require 'skg-request-rerender-all-views)
 (require 'skg-request-perspective)
+(require 'skg-request-receipt)
 (require 'skg-recovery)
 (require 'skg-request-save)
 (require 'skg-repo-files-reloaded)

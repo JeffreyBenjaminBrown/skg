@@ -128,6 +128,7 @@ the old one open beside the one it makes on its next request."
      skg-request-single-root-content-view
      skg-request-repo-sets
      skg-request-perspective
+     skg-request-receipt
      skg-request-extend-diff-view
      skg-request-stage-and-commit
      skg-request-strip-body-whitespace

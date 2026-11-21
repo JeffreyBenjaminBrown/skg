@@ -172,6 +172,7 @@ and hide INTERNAL from M-x completion."
   (progn;; graph modifications
     (define-key map (kbd "C-c m c") #'skg-replace-link-with-content)
     (define-key map (kbd "C-c m f") #'skg-fork-node)
+    (define-key map (kbd "C-c m a") #'skg-receipt) ;; a read receipt: acknowledge the mailed item at point
     (define-key map (kbd "C-c m l") #'skg-replace-content-with-link))
   (progn;; view (buffer-level view state)
     (define-key map (kbd "C-c v b") #'skg-org-body-toggle)
