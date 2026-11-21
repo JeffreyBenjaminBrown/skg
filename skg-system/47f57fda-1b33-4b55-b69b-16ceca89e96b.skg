@@ -24,7 +24,19 @@ body: |2-
   Links become =[[File#^ID|label]]=. A link to a note outside the vault
   points to the note "Some links might be broken." when the vault has
   it, else to the README, and keeps the ID in a comment after it.
+  Titles and bodies are Org, and their markup is written as the
+  Markdown that shows it: bold and italic, verbatim and code as code
+  spans, links to web pages as Markdown links, =#+begin_src= and
+  =#+begin_example= blocks and fixed-width lines as code blocks fenced
+  by tildes (whose first line says what the block was), and the rule
+  under a table's first row as a Markdown table's. A body's own Markdown
+  code spans, fences of backticks and tables are kept. Other Org markup
+  (links to files, tables without a rule, other blocks) stays as text.
   Characters that Markdown would read as structure (=[[=, =%%=, =^=,
-  =#=, =$= and a few more) are escaped with a backslash. A body or title
+  =#=, =$= and a few more), or as markup made from Org (backticks,
+  asterisks), are escaped with a backslash.
+  Each title and body is read back before it is written. One whose
+  conversions do not read back exactly is written without them; one
   the escapes cannot give back exactly is written verbatim in a fenced
-  block, or a property; the summary counts them.
+  block, or a property. The summary counts the markup converted, what
+  was left as text and why, and the verbatim fallbacks.
