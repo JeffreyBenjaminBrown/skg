@@ -120,3 +120,53 @@ Backslashes show inside inline code. Org markup ('*bold*', '=code=',
 '#+begin_src' blocks, '[[https://...][label]]') shows as text, and
 some bodies' Markdown lists merge with the bullets that follow. Slice
 3's conversions are for these.
+* Slice 2: the round trip
+** What's done and went well
+'skg import-obsidian VAULT-DIR OUT-DIR' reads a vault the exporter
+wrote back into .skg files, one folder of OUT-DIR per skgrepo folder of
+the vault ('server/obsidian/import.rs'). It is a pure function of the
+vault: no server, no configured skgrepo touched, no ID minted.
+'tests/unit/obsidian_import.rs' checks both halves of the plan's
+definition of lossless (import(export(S)) is S's files in normal form,
+byte for byte and no others; export(import(V)) = V) on the fixture, on
+'skg-system/' (so 'bash/all-tests.sh' runs it), and on 300 random
+skgrepos from a property-based test whose titles, bodies and labels
+mix every escaped character with links, fences and the section mark.
+By hand, read-only, on 2026-11-21:
+- 'skg-system/' (1,270 notes): the import of its export equals the
+  folder; 'diff -r' is empty.
+- A copy of Jeff's 'public' (31,180 notes): 31,179 files are equal;
+  the last differs only because the original lacks a final newline,
+  which skg's writer adds, so it equals the normal form. Exporting
+  that import gives the same 2,751 Markdown files byte for byte; the
+  manifest differs only in its git commit and remote hash, which the
+  scratch folder had none of. Import took about 2 seconds.
+The tests can fail: with the importer made to ignore an embed's
+'skg-ref', or to read a 'skg-verbatim' fence as text, they do.
+** Deviations from the plan
+*** A strict reader of the dialect, not of Obsidian Markdown
+The importer parses lines, not CommonMark, and reads only what the
+exporter writes. A line it cannot place stops the import with the
+file and line. Reading notes written freely in Obsidian (headings,
+unstamped bullets) is the responder converter's job, slices 6 and 7.
+*** Properties are read as YAML, so Obsidian's rewriting is harmless
+The front matter goes through a YAML parser, so unquoted values and
+one-item-per-line lists, as Obsidian's Properties panel rewrites
+them, read the same.
+*** The README and manifest are not read
+The importer finds documents by the 'skg-id' of each file; a link or
+embed to a document root is resolved by its file's name, every other
+by its block ID. The manifest is for the responder converter.
+** What's imperfect
+*** Obsidian's property editor can change types
+Edited through Obsidian's Properties panel, front matter loses its
+quotes, and a value like an alias '2022-01-25' may come back as a
+date. The importer then refuses it ("holds something other than
+text"). That matters once people edit exported files, which the
+README asks them not to; the responder converter will need to read
+such values as text.
+*** Escape bugs fall back rather than fail
+The exporter's guard writes any text it cannot read back into a
+verbatim fence, so a wrong escape shows up as a fallback count, not
+as a failed round trip. The dialect's own tests and the checker are
+what catch an escape that leaves structure for Obsidian to misread.
