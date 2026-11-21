@@ -104,3 +104,6 @@ mod view_stats_sharing;
 
 #[path = "mirror_in_place_of_an_extra_id.rs"]
 mod mirror_in_place_of_an_extra_id;
+
+#[path = "receipt.rs"]
+mod receipt;

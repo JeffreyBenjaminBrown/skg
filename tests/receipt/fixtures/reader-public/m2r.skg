@@ -1,0 +1,4 @@
+pid: m2r
+title: message two, as the reader forked it
+forks:
+- m2

@@ -1,0 +1,4 @@
+pid: m2x
+title: message two, as its author forked it
+forks:
+- m2y

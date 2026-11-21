@@ -28,3 +28,4 @@ pub mod titles_by_gnids;
 pub mod diff_view;
 pub mod link_statuses;
 pub mod perspective;
+pub mod receipt;

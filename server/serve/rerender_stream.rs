@@ -157,6 +157,35 @@ pub(crate) fn authorize_prepared_rerenders (
   }
 }
 
+/// Leave out of 'prepared' each view whose rerender the text-release
+/// policy would challenge under 'restriction', saying so in its
+/// warnings: a request that has already written, and so cannot be
+/// retried, redraws only what it may release unasked. A view left
+/// out keeps its old text, unlocked; a rerender the user asks for
+/// later asks first.
+pub(crate) fn leave_out_views_needing_text_release (
+  prepared    : &mut PreparedRerenders,
+  restriction : &SkgrepoRestriction,
+  operation   : &str,
+) {
+  let mut left_out : Vec<ViewforestId> = Vec::new ();
+  let graph = &prepared . runtime . graph;
+  prepared . views . retain ( |view| {
+    let release = decide_text_release (
+      operation, restriction,
+      &release_candidates ( std::iter::once (&view . viewforest) ),
+      graph, &HashSet::new () );
+    let challenged : bool = matches! ( release, TextReleaseDecision::Challenge { .. } );
+    if challenged { left_out . push ( view . viewforest_id . clone () ); }
+    ! challenged } );
+  prepared . viewforest_ids . retain ( |id| ! left_out . contains (id) );
+  for viewforest_id in left_out {
+    prepared . warnings . push ( format! (
+      "View {} was not redrawn: it would show title or body text selected \
+       below a note's home skgrepo, which the skgrepo restriction keeps out. \
+       Rerender it to be asked.",
+      viewforest_id . repr_in_client () )); }}
+
 pub(crate) fn stream_prepared_rerenders (
   stream      : &mut TcpStream,
   views_state : &mut ViewsState,

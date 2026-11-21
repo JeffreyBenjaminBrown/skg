@@ -2,6 +2,7 @@ pub mod telescope;
 pub mod attribution;
 pub mod consts;
 pub mod prominence;
+pub mod receipt;
 pub mod delete_references_to_absent_node;
 pub mod dbs;
 pub mod diff_view;
