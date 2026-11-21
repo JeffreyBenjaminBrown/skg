@@ -75,7 +75,11 @@ body: |2-
   own skgrepo reads =⌂:<jeff/claude>=. Folders between them do not
   count: the node above is the nearest node occurrence. LABEL is the skgrepo's skgrepo label,
   its =abbreviation= in the config or else its name, from the label
-  table the server sends beside the herald rules. A =~NAME= immediately
+  table the server sends beside the herald rules. A pending move of the
+  node's home skgrepo (=C-c s s=; =:SkgSetRepo=) marks the headline
+  =repoBoundary= too, so until the save it reads =⌂:NEW=, NEW the
+  label of the skgrepo it moves to; the save draws the boundaries it
+  computes. A =~NAME= immediately
   before it reports a relationship stored at a more private relRepo than
   its default (never one stored in a foreign skgrepo, which has no
   privacy rank); =request:~NAME= is an explicit pending request to change
@@ -86,7 +90,8 @@ body: |2-
   positions. The flags folder spells out =had ID before import=, =was
   overloaded during org-roam import=, and =no search matching= when true.
   =req:folder:...=, =req:flags=, =req:editable=,
-  =req:write-protected= and =req:write-protected-subtree= request a view.
+  =req:write-protected=, =req:write-protected-subtree= and =req:fork=
+  request a view.
   =delete=, =merge:...=, =request:strip attribution=, =request:no search matching=
   or =request:search matching=, and in the diff view =restore membership=
   and =restore node=, are save requests.

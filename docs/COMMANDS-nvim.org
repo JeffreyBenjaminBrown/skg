@@ -688,6 +688,8 @@ the same thing: an org buffer listing every configured skgrepo name
 as a headline, with that skgrepo's path as the headline body.
 
 The command only edits the node's metadata in the current buffer.
+Until the save, the headline's herald shows the move,
+as =⌂:NEW= ([[./heralds.org][the heralds docs]], "Other heralds").
 Save the view afterward (':w') to apply the move.
 
 A write-protected occurrence is not changed -- the save would
