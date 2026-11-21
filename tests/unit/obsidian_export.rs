@@ -297,6 +297,13 @@ fn a_re_export_removes_files_it_no_longer_writes_and_nothing_else () {
   assert_eq! (renamed . report . files_removed, vec! [ "main/Old name (00000001).md" . to_string () ]);
   assert! (vault_dir . join ("main/New name (00000001).md") . exists ());
   assert! (vault_dir . join ("main/mine.md") . exists ());
+  { // a manifest naming a path outside the vault removes nothing there
+    let manifest : PathBuf = vault_dir . join (MANIFEST_FILENAME);
+    let text : String = fs::read_to_string (&manifest) . unwrap ();
+    fs::write (dir . path () . join ("outside.md"), "x") . unwrap ();
+    fs::write (&manifest, text . replace ("\"main/New name (00000001).md\"", "\"../outside.md\"")) . unwrap ();
+    write_vault (&mut render ("New name"), &vault_dir) . unwrap ();
+    assert! (dir . path () . join ("outside.md") . exists ()); }
   let elsewhere : PathBuf = dir . path () . join ("not-a-vault");
   fs::create_dir_all (&elsewhere) . unwrap ();
   fs::write (elsewhere . join ("x.txt"), "x") . unwrap ();

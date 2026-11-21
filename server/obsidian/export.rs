@@ -242,7 +242,9 @@ pub fn write_vault (
       files_listed_in_manifest (& fs::read_to_string (&manifest_path) ?) }
     else { Vec::new () };
   for relative in previous_files {
-    if vault . files . contains_key (&relative) { continue; }
+    let stays_inside : bool = ! relative . starts_with ('/')
+      && relative . split ('/') . all ( |part| ! part . is_empty () && part != ".." );
+    if vault . files . contains_key (&relative) || ! stays_inside { continue; }
     let path : PathBuf = vault_dir . join (&relative);
     if path . exists () {
       fs::remove_file (&path) ?;
