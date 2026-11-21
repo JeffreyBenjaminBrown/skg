@@ -13,6 +13,7 @@
 
 use crate::git_ops::read_gitrepo::{open_gitrepo, skgrepo_git_remote};
 use crate::git_ops::misc::path_relative_to_gitrepo;
+use crate::subcommands::skg_command_for_user;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::attribution::Attribution;
 use crate::types::nodes::complete::Graphnode;
@@ -253,11 +254,11 @@ fn attribution_problem (
     . then ( || remote_hash_of_skgrepo (config, name) );
   let fix = |old : &str| -> String { match config . skgrepos . contains_key (name) {
     true => format! (
-      " If '{}' is the skgrepo forked from, run 'skg fix-attributions {} {} {}'.",
-      name, config_path, old, name ),
+      " If '{}' is the skgrepo forked from, run: {}",
+      name, skg_command_for_user (&[ "fix-attributions", config_path, old, &name . 0 ]) ),
     false => format! (
-      " If it is loaded under another name, run 'skg fix-attributions {} {} NAME'.",
-      config_path, old ) } };
+      " If it is loaded under another name, run, with that name for NAME: {}",
+      skg_command_for_user (&[ "fix-attributions", config_path, old, "NAME" ]) ) } };
   match &attribution . remote_hash {
     Some (hash) => {
       let loaded : AttributedSkgrepo = attributed_skgrepo (config, attribution);

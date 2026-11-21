@@ -25,6 +25,7 @@ pub mod save;
 pub mod serve;
 pub mod sexp_string;
 pub mod skgrepo_sets;
+pub mod subcommands;
 pub mod test_utils;
 pub mod types;
 pub mod update_buffer;

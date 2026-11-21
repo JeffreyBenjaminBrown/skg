@@ -70,6 +70,9 @@ mod skgrepo_path_validation;
 #[path = "server_warnings.rs"]
 mod server_warnings;
 
+#[path = "subcommand_usage.rs"]
+mod subcommand_usage;
+
 #[path = "forks_folder_by_default.rs"]
 mod forks_folder_by_default;
 

@@ -20,6 +20,9 @@ use skg::obsidian::export::{RenderedVault, export_skgrepo_to_vault};
 use skg::obsidian::import::{ImportedVault, read_vault, write_imported_vault};
 use skg::obsidian::vault_check::{VaultCheckReport, check_vault};
 use skg::skgrepo_sets::SkgrepoRestriction;
+use skg::subcommands::{
+  Subcommand, asks_for_help, running_executable_for_user, subcommand_named,
+  usage_text, usage_text_of_every_form};
 use skg::telescope::dependencies_manifest::foreign_section_warnings;
 use skg::dbs::init::{InitContextHandoff, initialize_dbs};
 use skg::types::env::SkgEnv;
@@ -43,6 +46,15 @@ use tracing_subscriber::util::SubscriberInitExt;
 
 fn main() -> Result<(), Box<dyn Error>> {
   let args: Vec<String> = env::args() . collect();
+
+  if args . len () == 2 && asks_for_help (&args[1..]) {
+    print! ("{}", usage_text_of_every_form (&running_executable_for_user ()));
+    return Ok (( )); }
+
+  if let Some (subcommand) = args . get (1) . and_then ( |name| subcommand_named (name) ) {
+    if asks_for_help (&args[2..]) {
+      print! ("{}", usage_text (&running_executable_for_user (), subcommand));
+      return Ok (( )); }}
 
   if args . len() > 1 && args[1] == "import-org-roam" {
     tracing_subscriber::fmt()
@@ -232,33 +244,45 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn run_attribution_command (
   args : &[String],
 ) -> Result<(), Box<dyn Error>> {
-  let usage : &str = "Usage: skg check-attributions CONFIG | \
-                      skg fix-attributions CONFIG OLD SKGREPO | \
-                      skg show-forked-original CONFIG FORK_ID";
-  let config_path : &str = args . get (2) . ok_or (usage) ?;
+  let argument_count : usize = match args[1] . as_str () {
+    "check-attributions" => 3,
+    "fix-attributions"   => 5,
+    _                    => 4, }; // show-forked-original
+  if args . len () != argument_count {
+    exit_with_usage (&args[1]); }
+  let config_path : &str = &args[2];
   let (config, _warnings) : (SkgConfig, Vec<String>) =
     match load_config (config_path) {
       Ok (loaded) => loaded,
       Err (e)     => die_bad_config (config_path, e) };
-  match ( args[1] . as_str (), args . len () ) {
-    ("check-attributions", 3) => {
+  match args[1] . as_str () {
+    "check-attributions" => {
       let files = owned_attributed_files (&config) ?;
       let problems : Vec<String> = attribution_problems (
         &config, files . iter () . filter_map ( |(_, _, node_fs)| node_fs . attribution . as_ref () ));
       println! ( "{} attributed forks in the owned skgrepos.", files . len () );
       for problem in &problems { println! ("{}", problem); }
       Ok (( )) },
-    ("fix-attributions", 5) => {
+    "fix-attributions" => {
       let rewritten = rewrite_attributions (
         &config, &args[3], &SkgrepoName::from (args[4] . as_str ()) ) ?;
       for path in &rewritten { println! ("Rewrote {}", path . display ()); }
       println! ( "{} files rewritten.", rewritten . len () );
       Ok (( )) },
-    ("show-forked-original", 4) => {
+    _ => { // show-forked-original
       print! ( "{}", forked_original_at_fork_time (
         &config, &ID::from (args[3] . as_str ()) ) ? );
-      Ok (( )) },
-    _ => Err (usage . into ()), }}
+      Ok (( )) }, }}
+
+/// Print a subcommand's usage to stderr, and exit(2): the arguments
+/// given it do not fit it.
+fn exit_with_usage (
+  subcommand_name : &str,
+) -> ! {
+  let subcommand : &Subcommand = subcommand_named (subcommand_name)
+    . expect ("exit_with_usage is called only for a subcommand");
+  eprint! ("{}", usage_text (&running_executable_for_user (), subcommand));
+  std::process::exit (2); }
 
 /// Report a config-load failure and exit(1). Bold red when stderr is a
 /// terminal; plain text otherwise (e.g. the start script's log), so the
@@ -396,8 +420,7 @@ fn run_import (
   args : &[String],
 ) -> Result<(), Box<dyn Error>> {
   if args . len() < 5 {
-    tracing::error! ("Usage: cargo run -- import-org-roam <org-dir> <skg-output-dir> <repo-name>");
-    std::process::exit (1); }
+    exit_with_usage (&args[1]); }
   let org_dir    : &Path       = Path::new (&args[2]);
   let output_dir : &Path       = Path::new (&args[3]);
   let skgrepo    : SkgrepoName  = SkgrepoName::from (&args[4]);
@@ -512,7 +535,7 @@ fn run_import_obsidian (
   args : &[String],
 ) -> Result<(), Box<dyn Error>> {
   let (Some (vault_dir), Some (out_dir)) = (args . get (2), args . get (3))
-    else { return Err ("usage: skg import-obsidian VAULT-DIR OUT-DIR" . into ()); };
+    else { exit_with_usage (&args[1]); };
   let vault : ImportedVault = read_vault (Path::new (vault_dir)) ?;
   let written : usize = write_imported_vault (&vault, Path::new (out_dir)) ?;
   println! ("Wrote {} .skg files, for the skgrepo folder(s) {}, into {}.",
@@ -526,7 +549,8 @@ fn run_import_obsidian (
 fn run_check_obsidian_vault (
   args : &[String],
 ) -> Result<(), Box<dyn Error>> {
-  let vault : &String = args . get (2) . ok_or ("usage: skg check-obsidian-vault VAULT-DIR") ?;
+  let Some (vault) : Option<&String> = args . get (2)
+    else { exit_with_usage (&args[1]); };
   let report : VaultCheckReport = check_vault (Path::new (vault)) ?;
   print! ("{}", report . summary ());
   if ! report . problems . is_empty () { std::process::exit (1); }

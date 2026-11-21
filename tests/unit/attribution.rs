@@ -178,6 +178,10 @@ fn doubtful_attributions_are_reported_and_rewritten () {
   assert_eq! ( problems . len (), 1, "{:?}", problems );
   assert! ( problems [0] . starts_with ("2 attributions of forks in your skgrepos: they name 'theirs', which the config lacks"),
             "{}", problems [0] );
+  assert! ( problems [0] . ends_with ( &format! (
+              " If it is loaded under another name, run, with that name for NAME: {}",
+              skg_command_for_user (&[ "fix-attributions", "", "theirs", "NAME" ]) )),
+            "the advice ends in a command that runs as pasted: {}", problems [0] );
   let fine : Attribution = Attribution {
     skgrepo : SkgrepoName::from ("eds-notes"),
     remote_hash : Some ( remote_hash_of_url (THEIR_URL) ), .. lost . clone () };
