@@ -209,3 +209,73 @@ property; a copy made in Obsidian ('NAME 1.md') or a file renamed by
 hand has not that name; a folder the README does not list is not
 looked in. All of these stay. An edited exported file is still
 overwritten, as before.
+
+* Slice 3: bodies that read well
+** What's done and went well
+Titles and bodies are read as Org, and its markup is written as the
+Markdown that shows it, wherever the inverse can tell it apart from
+text ('server/obsidian/org_markup.rs' finds it; 'dialect.rs' lists the
+forms; 'read_text.rs' reads them back):
+- '*bold*' as '**bold**', '/italic/' as '*italic*';
+- '=verbatim=' as a code span of two backticks, '~code~' as one of
+  two backticks padded by spaces (both show as code);
+- '[[URL][label]]' to a web page as '[label](URL)', '[[URL]]' as
+  '<URL>';
+- '#+begin_src' and '#+begin_example' blocks, and runs of fixed-width
+  lines (': ...'), as code blocks fenced by tildes, whose info string
+  is the source block's language and arguments, or a mark:
+  'skg-src' (no arguments), nothing (an example), 'skg-fixed', and
+  'skg-upper' after it when the keywords were in capitals;
+- a table's rule under its first row, '|---+---|', as '|:--|:--|',
+  which makes it a Markdown table.
+The text's own Markdown keeps working: a code span of one backtick and
+a fence of backticks are copied, so what is inside shows without
+backslashes, and a Markdown table is left as it is.
+Each conversion is tried and then read back; a text that does not read
+back exactly is written without conversions, as Slice 2 wrote it, and
+only if that fails too in a verbatim fence. The fallback count of
+Slice 1 therefore still only counts texts the escapes cannot carry.
+The format is now "skg-obsidian 3".
+** On the real corpora, 2026-11-21
+- 'skg-system/': 463 of 1,119 bodies hold Org markup. 442 convert
+  wholly, 17 partly, 4 not at all; no body fails the read-back. 27
+  titles hold markup and all convert. Converted: 2,810 verbatim or code
+  spans, 423 bold, 77 italic, 52 example and 17 source blocks, 13
+  tables, 10 fixed-width runs, 7 web links.
+- Jeff's 'public': 455 of 10,738 bodies hold Org markup. 378 convert
+  wholly, 77 not at all, none partly; no body fails the read-back. 183
+  titles hold markup; 172 convert wholly.
+- Why markup stays Org text, in bodies: an Org link to a file or other
+  non-web target (15 in 'skg-system/', 47 in 'public', mostly links to
+  local files); a table with no rule under its first row (23, all in
+  'public'); a block whose end line is not its begin line's partner (6,
+  e.g. '#+END_SRC bash'); verbatim holding a backtick (3) or '%%' (1);
+  an indented block or fixed-width run (2); mixed-case keywords (1).
+  The next effort would pay most on links to files, then on tables
+  without a rule.
+Both vaults pass the checker, and both halves of the round trip hold
+on both, as in Slice 2.
+** Deviations from the plan
+*** Org comment lines stay visible
+The plan lists comment lines ('# ...') among the conversions. Written
+as Obsidian comments they would vanish from Reading view, but in
+Jeff's notes they are mostly shell comments in code that has no block,
+or Markdown headings, which a reader wants to see. They stay escaped
+text, as Emacs shows them.
+*** Lists need nothing
+Org's plain lists are Markdown lists already. A body that ends in a
+list still merges with the bullets of the notes that follow; that is
+display only, and not addressed.
+*** '<' is escaped before anything that could open HTML
+Slice 1 escaped it only at a line's start. Inline, '<hash>' would be
+read as an HTML tag and hidden.
+** What's imperfect
+- Unverified against Obsidian, as before: in particular that a code
+  span of two backticks, and one padded by spaces, show as plain code,
+  and that a tilde fence's info string after the language is ignored.
+- Escaping every backtick and asterisk of the text adds backslashes
+  that Live Preview shows. A '*' at the start of a body's line,
+  followed by a space, is a list marker and is left alone.
+- A title kept in 'skg-title' holds Org text in a property; when it
+  holds a link, the checker reads that as a wikilink naming no file.
+  This predates Slice 3; none of the real corpora has such a title.
