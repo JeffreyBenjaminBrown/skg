@@ -170,3 +170,7 @@ The exporter's guard writes any text it cannot read back into a
 verbatim fence, so a wrong escape shows up as a fallback count, not
 as a failed round trip. The dialect's own tests and the checker are
 what catch an escape that leaves structure for Obsidian to misread.
+
+* Settled with Jeff, 2026-11-21
+A link whose label holds a backtick or a '|' stays as Org
+text. Jeff: "seems fine until someone complains".
