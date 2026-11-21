@@ -2,9 +2,121 @@
 
 This records how the build departs from [[file:plan.org]], slice by
 slice. Jeff has not yet answered the plan's questions (its part 7); the
-build takes their defaults.
+build takes their defaults: an ID suffix in every filename, owned
+skgrepos only, no plugin.
 
 * Slice 1: a vault Jeff can open
-Not started.
-* Slice 2: the round trip
-Not started.
+** What's done and went well
+'skg export-obsidian [CONFIG] [SKGREPO] [OUTPUT-DIR]' writes one owned
+skgrepo as a vault, reading that skgrepo's folder and no other;
+'skg check-obsidian-vault VAULT' checks a vault against Obsidian's
+rules. The code is in 'server/obsidian/': 'dialect.rs' (block IDs,
+escapes, fences, metadata keys), 'export.rs', 'read_text.rs' (the
+inverse of the text rendering, which the export's guard runs) and
+'vault_check.rs'. The fixture in 'tests/unit/obsidian_fixture.rs'
+holds every hard case the task named.
+
+On real data the checker finds no problem: 'skg-system/' (1,267 notes)
+becomes 74 files, and Jeff's 'public' (31,180 notes) 2,750 files and
+6.3 MB, in about 2 seconds with a debug build.
+** Deviations from the plan
+*** The metadata comment follows a blank line
+The plan's example puts '%%skg ...%%' on the line after a bullet's
+title. Indented there, Markdown reads it as a continuation of the
+title's paragraph, so the block ID would no longer end its block and
+Obsidian would not see it. The comment follows a blank line instead,
+as its own paragraph inside the list item; the body follows another.
+*** The attribution is five flat properties
+A nested map is no Obsidian property type: the Properties panel cannot
+show it, and Obsidian may rewrite it. So 'skg-attribution' becomes
+'skg-attribution-original', '-skgrepo', '-remote-hash', '-commit' and
+'-uncommitted' (a checkbox, written only when true).
+*** No 'skg-skgrepo' property
+The folder is the skgrepo, and the manifest says so; a property on
+every file would repeat it 2,750 times. The folder is the skgrepo's
+name in the config ('public'), not the plan's 'jeff-public'.
+*** Links in properties only where they are exact
+'skg-forks' and 'skg-hides' entries are links when they name a note
+in the vault by its PID, so they show in backlinks; otherwise (an
+extra ID, a note elsewhere) the raw ID, and an anchor is the text
+'skg-anchor ID'. In a bullet's comment they are always IDs.
+*** Bullet comments are JSON
+'%%skg {...}%%' holds a JSON object, which is YAML's one-line form
+too, with every '%' written '%' so the comment cannot end early.
+*** What has no ID of its own
+- A 'contains' member not in the skgrepo is a bullet
+  '[[README#Links to notes outside this vault|(a note outside this vault)]]'
+  followed by '%%skg {"skg-absent": ID}%%'. 'public' has 69, mostly
+  hidden notes of a fork.
+- A link to a note outside the vault points to the "Some links might
+  be broken" note when the vault has it ('public' does), else to that
+  README heading, and its comment '%%skg-id ID%%' keeps the ID.
+- A link whose label a wikilink cannot carry (one holding ']]', '[[',
+  '|', '%%', a backtick or a line break, or ending in ']') stays Org
+  text, escaped. 'public' has 143 of these against 6,660 wikilinks.
+  Backticks are the main cause: inline code takes precedence over
+  link syntax, as the checker found on the first run of 'public'.
+*** Block IDs for IDs Obsidian refuses
+A PID of anything but lowercase letters, digits and dashes is written
+as 'skgid-' and the hex of its bytes; it reads back without the
+manifest. Only the curly-quote ID needs it in Jeff's data.
+*** The escapes
+'dialect.rs' lists them. Beyond the plan's: '$' and '^' always; '#'
+after a blank or at a line's start (headings and tags); '!' before a
+wikilink; at a line's start, a fence that would not close and '<'
+before a letter, '/', '!' or '?' (an HTML block that would swallow the
+bullets after it); and at the start of a title, a list or quote
+marker, which would nest the bullet. Balanced code fences in bodies
+are copied, escapes and links untouched. A backslash is doubled only
+before a character the inverse would read as escaped, so plain
+backslashes stay single.
+*** The fallbacks
+A body the escapes cannot give back exactly (leading or trailing
+blank lines, a trailing newline) goes in a 'skg-verbatim' fence of raw
+lines; one with a control character other than a tab, such as a
+carriage return, in a 'skg-verbatim-json' fence holding one JSON
+string. A title with leading or trailing blanks or control characters
+keeps its exact text in 'skg-title' and shows a cleaned one. In
+'public' neither is needed: 0 titles, 0 bodies.
+*** The guard checks text, not files
+The plan has the exporter parse each written note back. Slice 1's
+guard reads each title and body back through 'read_text.rs' and
+checks that the escapes cannot be misread structurally; Slice 2's
+importer then parses whole files, and its round-trip test is the
+check of the layout.
+*** Filenames
+Besides the plan's characters, '%' and backticks are replaced, leading
+dots dropped (a dot file is hidden from Obsidian), and the title cut
+to 200 bytes as well as about 80 characters, for Linux's and macOS's
+255-byte limit. The suffix is the ID's first eight letters and digits,
+longer on a case-insensitive collision, the whole ID in hex at last.
+*** Its own walk, not 'collect_events' and 'build_homes'
+The Org export's walk works on composed Graphnodes under a skgrepo
+restriction, and skips anchors and members it cannot find. A lossless
+export of one skgrepo needs its sections exactly, anchors and absent
+members included, so 'export.rs' walks the sections with the same
+rules (iterative, preorder, first reach wins, roots by PID). That is a
+quasi-duplicate of 'collect_events' and 'build_homes'.
+*** Writing into a folder
+The output folder must be absent, empty, or a vault an earlier export
+wrote (it holds '.skg-export.toml'). Files the earlier manifest listed
+that this export does not write are removed; nothing else is.
+*** The checker is Rust
+No YAML library exists here for Python or Node, so the checker is
+'server/obsidian/vault_check.rs', run by the tests and by 'skg
+check-obsidian-vault'. It reads the Markdown its own way, sharing
+with the exporter only the block-ID encoding, to check the manifest.
+** What's imperfect
+*** Unverified against Obsidian itself
+Nothing here has been opened in Obsidian. The format rests on these
+unverified readings:
+- a block ID at the end of a list item's first line names the item,
+  when a blank line and paragraphs follow inside it;
+- inline code and comments behave as CommonMark and Obsidian's help
+  say, and a comment-only paragraph leaves only a little space;
+- '[[File#^id]]' embeds a bullet with its children.
+*** Rendering, not losslessness
+Backslashes show inside inline code. Org markup ('*bold*', '=code=',
+'#+begin_src' blocks, '[[https://...][label]]') shows as text, and
+some bodies' Markdown lists merge with the bullets that follow. Slice
+3's conversions are for these.
