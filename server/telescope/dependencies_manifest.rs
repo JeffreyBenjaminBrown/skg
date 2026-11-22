@@ -243,71 +243,96 @@ pub fn foreign_section_warnings (
         m . entry ( pid . clone () ) . or_default () . push ( skgrepo . clone () ); }}
     m . retain ( |_, skgrepos| skgrepos . len () > 1 );
     m };
+  let mut warnings : Vec<String> =
+    illegal_section_warnings (config, &skgrepos_by_pid);
+  warnings . extend (
+    disputed_foreign_order_warnings (config, &skgrepos_by_pid) );
+  warnings }
+
+/// Illegal sections, by the skgrepo holding them: the first kind of
+/// 'foreign_section_warnings', in the configured order of skgrepos.
+/// 'skgrepos_by_pid' lists, for each node with sections in more than
+/// one skgrepo, those skgrepos.
+fn illegal_section_warnings (
+  config          : &SkgConfig,
+  skgrepos_by_pid : &BTreeMap<ID, Vec<SkgrepoName>>,
+) -> Vec<String> {
   let home_owner_of = |skgrepos : &[SkgrepoName]| -> Option<SkgrepoOwner> {
     home_owner_of_sections (config, skgrepos . iter ()) };
   let mut warnings : Vec<String> = Vec::new ();
-  { // Illegal sections, by the skgrepo holding them.
-    let mut illegal_pids_by_skgrepo : BTreeMap<SkgrepoName, Vec<(ID, SkgrepoName)>> =
-      BTreeMap::new ();
-    for (pid, skgrepos) in &skgrepos_by_pid {
-      let Some (home_owner) = home_owner_of (skgrepos) else { continue; };
-      let Some (home) : Option<&SkgrepoName> = skgrepos . iter ()
-        . find ( |skgrepo| config . skgrepo_owner (skgrepo) == home_owner )
-        else { continue; };
-      for skgrepo in skgrepos {
-        if config . skgrepo_owner (skgrepo) != home_owner {
-          illegal_pids_by_skgrepo . entry ( skgrepo . clone () ) . or_default ()
-            . push (( pid . clone (), home . clone () )); }} }
-    for skgrepo in config . ordered_skgrepos () {
-      let Some (pids) = illegal_pids_by_skgrepo . get (&skgrepo) else { continue; };
-      let (example_pid, home) : &(ID, SkgrepoName) = &pids [0];
+  let mut illegal_pids_by_skgrepo : BTreeMap<SkgrepoName, Vec<(ID, SkgrepoName)>> =
+    BTreeMap::new ();
+  for (pid, skgrepos) in skgrepos_by_pid {
+    let Some (home_owner) = home_owner_of (skgrepos) else { continue; };
+    let Some (home) : Option<&SkgrepoName> = skgrepos . iter ()
+      . find ( |skgrepo| config . skgrepo_owner (skgrepo) == home_owner )
+      else { continue; };
+    for skgrepo in skgrepos {
+      if config . skgrepo_owner (skgrepo) != home_owner {
+        illegal_pids_by_skgrepo . entry ( skgrepo . clone () ) . or_default ()
+          . push (( pid . clone (), home . clone () )); }} }
+  for skgrepo in config . ordered_skgrepos () {
+    let Some (pids) = illegal_pids_by_skgrepo . get (&skgrepo) else { continue; };
+    let (example_pid, home) : &(ID, SkgrepoName) = &pids [0];
+    warnings . push ( format! (
+      "Node {}{} has a section in {} '{}', but its home '{}' has another owner: an illegal edit to a foreign node. {}",
+      node_named (config, example_pid, home), more_nodes (pids . len ()),
+      if config . skgrepo_is_owned (&skgrepo) { "your repo" } else { "foreign repo" },
+      skgrepo, home,
+      if config . skgrepo_is_owned (&skgrepo) {
+        "Skg shows that section only under the node, as an ILLEGAL EDIT TO FOREIGN NODE child; move what it says into a node of your own and delete the file." }
+      else {
+        "Skg ignores that section." } )); }
+  warnings }
+
+/// Disputed orders within one foreign owner's telescopes: the second
+/// kind of 'foreign_section_warnings', one per unsettled pair of that
+/// owner's skgrepos that some node of the owner spans, in fold order.
+/// 'skgrepos_by_pid' is as for 'illegal_section_warnings'.
+fn disputed_foreign_order_warnings (
+  config          : &SkgConfig,
+  skgrepos_by_pid : &BTreeMap<ID, Vec<SkgrepoName>>,
+) -> Vec<String> {
+  let home_owner_of = |skgrepos : &[SkgrepoName]| -> Option<SkgrepoOwner> {
+    home_owner_of_sections (config, skgrepos . iter ()) };
+  let mut warnings : Vec<String> = Vec::new ();
+  let fold_order : Vec<SkgrepoName> =
+    config . ordered_skgrepos () . into_iter ()
+    . filter ( |name| config . skgrepos . contains_key (name)
+                      && ! config . skgrepo_is_owned (name) )
+    . collect ();
+  for (i, first) in fold_order . iter () . enumerate () {
+    for second in &fold_order [i + 1 ..] {
+      if config . skgrepo_owner (first) != config . skgrepo_owner (second) {
+        continue; }
+      let pair_order : ForeignPairOrder =
+        config . foreign_pair_order (first, second);
+      let unsettled : bool = match &pair_order {
+        ForeignPairOrder::Disputed { .. } => true,
+        // Agreed, yet folded the other way: the manifests form a cycle.
+        ForeignPairOrder::Agreed { first : agreed } => agreed != first,
+        ForeignPairOrder::Unlisted => false, };
+      if ! unsettled { continue; }
+      let spanning_pids : Vec<&ID> = skgrepos_by_pid . iter ()
+        . filter ( |(_, skgrepos)| skgrepos . contains (first)
+                   && skgrepos . contains (second)
+                   && home_owner_of (skgrepos)
+                      == Some ( config . skgrepo_owner (first) ))
+        . map ( |(pid, _)| pid )
+        . collect ();
+      if spanning_pids . is_empty () { continue; }
+      let why : String = match &pair_order {
+        ForeignPairOrder::Disputed { first_by, second_by, .. } => format! (
+          "The OTHER_SKGREPO_DEPENDENCIES.toml of foreign repo '{}' lists '{}' first, but that of '{}' lists '{}' first",
+          first_by, first, second_by, second ),
+        _ => format! (
+          "The foreign repos' OTHER_SKGREPO_DEPENDENCIES.toml files order '{}' and '{}' in a cycle with other repos",
+          first, second ), };
       warnings . push ( format! (
-        "Node {}{} has a section in {} '{}', but its home '{}' has another owner: an illegal edit to a foreign node. {}",
-        node_named (config, example_pid, home), more_nodes (pids . len ()),
-        if config . skgrepo_is_owned (&skgrepo) { "your repo" } else { "foreign repo" },
-        skgrepo, home,
-        if config . skgrepo_is_owned (&skgrepo) {
-          "Skg shows that section only under the node, as an ILLEGAL EDIT TO FOREIGN NODE child; move what it says into a node of your own and delete the file." }
-        else {
-          "Skg ignores that section." } )); }}
-  { // Disputed orders within one foreign owner's telescopes.
-    let fold_order : Vec<SkgrepoName> =
-      config . ordered_skgrepos () . into_iter ()
-      . filter ( |name| config . skgrepos . contains_key (name)
-                        && ! config . skgrepo_is_owned (name) )
-      . collect ();
-    for (i, first) in fold_order . iter () . enumerate () {
-      for second in &fold_order [i + 1 ..] {
-        if config . skgrepo_owner (first) != config . skgrepo_owner (second) {
-          continue; }
-        let pair_order : ForeignPairOrder =
-          config . foreign_pair_order (first, second);
-        let unsettled : bool = match &pair_order {
-          ForeignPairOrder::Disputed { .. } => true,
-          // Agreed, yet folded the other way: the manifests form a cycle.
-          ForeignPairOrder::Agreed { first : agreed } => agreed != first,
-          ForeignPairOrder::Unlisted => false, };
-        if ! unsettled { continue; }
-        let spanning_pids : Vec<&ID> = skgrepos_by_pid . iter ()
-          . filter ( |(_, skgrepos)| skgrepos . contains (first)
-                     && skgrepos . contains (second)
-                     && home_owner_of (skgrepos)
-                        == Some ( config . skgrepo_owner (first) ))
-          . map ( |(pid, _)| pid )
-          . collect ();
-        if spanning_pids . is_empty () { continue; }
-        let why : String = match &pair_order {
-          ForeignPairOrder::Disputed { first_by, second_by, .. } => format! (
-            "The OTHER_SKGREPO_DEPENDENCIES.toml of foreign repo '{}' lists '{}' first, but that of '{}' lists '{}' first",
-            first_by, first, second_by, second ),
-          _ => format! (
-            "The foreign repos' OTHER_SKGREPO_DEPENDENCIES.toml files order '{}' and '{}' in a cycle with other repos",
-            first, second ), };
-        warnings . push ( format! (
-          "Node {}{} has sections in foreign repos '{}' and '{}'. {}, so this server folds '{}' first, as the manifest of the more private one says. Its publisher's server may fold it otherwise.",
-          node_named (config, spanning_pids [0], first),
-          more_nodes (spanning_pids . len ()),
-          first, second, why, first )); }} }
+        "Node {}{} has sections in foreign repos '{}' and '{}'. {}, so this server folds '{}' first, as the manifest of the more private one says. Its publisher's server may fold it otherwise.",
+        node_named (config, spanning_pids [0], first),
+        more_nodes (spanning_pids . len ()),
+        first, second, why, first )); }}
   warnings }
 
 /// " (and N more nodes)", for COUNT nodes in all.
