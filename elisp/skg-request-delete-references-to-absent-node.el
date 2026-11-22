@@ -41,7 +41,7 @@
 token once the empty rerender stream that follows is done."
   ;; The confirmation replaces the result response for this request.
   ;; Balance its one-shot registration before the empty-stream retry.
-  (skg--delete-absent-remove-unfired-handlers
+  (skg--unregister-response-handlers
    '(delete-references-result error))
   (let* ((response (read payload))
          (content (format "%s" (cadr (assoc 'content response))))
@@ -61,7 +61,7 @@ token once the empty rerender stream that follows is done."
   "Show the cleanup report in PAYLOAD."
   (let* ((response (read payload))
          (content (format "%s" (cadr (assoc 'content response)))))
-    (skg--delete-absent-remove-unfired-handlers '(error))
+    (skg--unregister-response-handlers '(error))
     (skg-big-nonfatal-message "*skg absent-reference cleanup*"
                               "Absent-reference cleanup complete" content)))
 
@@ -71,16 +71,8 @@ token once the empty rerender stream that follows is done."
          (content (format "%s" (cadr (assoc 'content response)))))
     ;; The dispatcher removes `error' itself.  Remove only its mutually
     ;; exclusive terminal handlers, balancing their pending counts.
-    (skg--delete-absent-remove-unfired-handlers
+    (skg--unregister-response-handlers
      '(delete-references-confirmation delete-references-result))
     (message "skg absent-reference cleanup: %s" content)))
-
-(defun skg--delete-absent-remove-unfired-handlers (types)
-  "Remove unfired one-shot response TYPES and balance their pending count."
-  (dolist (type types)
-    (when (assoc type skg-response-handler-map)
-      (setq skg-response-handler-map
-            (assoc-delete-all type skg-response-handler-map)
-            skg-lp--pending-count (max 0 (1- skg-lp--pending-count))))))
 
 (provide 'skg-request-delete-references-to-absent-node)

@@ -43,6 +43,20 @@ Replaces any existing handler for the same type."
   (when one-shot
     (setq skg-lp--pending-count (1+ skg-lp--pending-count))))
 
+(defun skg--unregister-response-handlers (response-types)
+  "Remove the handler of each of RESPONSE-TYPES, balancing the pending
+count for each one-shot handler removed.
+PITFALL: The dispatcher removes a one-shot handler, and decrements the
+count, after calling it; so a handler must not name its own type here."
+  (dolist (type response-types)
+    (let ((entry (assoc type skg-response-handler-map)))
+      (when entry
+        (when (cddr entry)
+          (setq skg-lp--pending-count
+                (max 0 (1- skg-lp--pending-count))))
+        (setq skg-response-handler-map
+              (assoc-delete-all type skg-response-handler-map))))))
+
 (progn ;; Length-prefixed (Content-Length) receiver state
   (defvar skg-lp--buf (unibyte-string)
     "Unibyte byte accumulator for length-prefixed responses.")

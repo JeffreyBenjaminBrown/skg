@@ -127,18 +127,6 @@ here are removed, the stream ends and the buffers unlock."
        (skg--unlock-all-save-locked)
        (signal (car err) (cdr err))))))
 
-(defun skg--unregister-response-handlers (response-types)
-  "Remove the handler of each of RESPONSE-TYPES, balancing the pending
-count for each one-shot handler removed."
-  (dolist (type response-types)
-    (let ((entry (assoc type skg-response-handler-map)))
-      (when entry
-        (when (cddr entry)
-          (setq skg-lp--pending-count
-                (max 0 (1- skg-lp--pending-count))))
-        (setq skg-response-handler-map
-              (assoc-delete-all type skg-response-handler-map))))))
-
 (defun skg--response-errors-line (response)
   "The errors of RESPONSE, an alist with an (errors (...)) entry,
 joined into one line, or nil when it has none."
@@ -156,16 +144,9 @@ request replaced; remove it and balance its pending count."
   (skg-register-response-handler
    'overPrivateText-telescope-confirmation
    (lambda (_tcp-proc payload)
-     (setq skg-response-handler-map
-           (assoc-delete-all 'overPrivateText-telescope-confirmation
-                             skg-response-handler-map))
-     (when (and unfired-response-type
-                (assoc unfired-response-type skg-response-handler-map))
-       (setq skg-response-handler-map
-             (assoc-delete-all unfired-response-type
-                               skg-response-handler-map))
-       (setq skg-lp--pending-count
-             (max 0 (1- skg-lp--pending-count))))
+     (skg--unregister-response-handlers
+      (cons 'overPrivateText-telescope-confirmation
+            (when unfired-response-type (list unfired-response-type))))
      (let* ((response (read payload))
             (prompt (format "%s" (cadr (assoc 'prompt response))))
             (pids (mapcar (lambda (pid) (format "%s" pid))

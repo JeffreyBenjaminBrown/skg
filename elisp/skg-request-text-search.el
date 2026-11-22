@@ -129,11 +129,7 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
 (defun skg--forget-search-results-handler ()
   "Drop the one-shot `search-results' handler, if it is still waiting,
 and the response it was counted as."
-  (when (assoc 'search-results skg-response-handler-map)
-    (setq skg-response-handler-map
-          (assoc-delete-all 'search-results skg-response-handler-map))
-    (setq skg-lp--pending-count
-          (max 0 (1- skg-lp--pending-count)))))
+  (skg--unregister-response-handlers '(search-results)))
 
 (defun skg--cancel-locally-failed-search ()
   "Unwind the search handlers after a local send failure."
