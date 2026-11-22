@@ -13,6 +13,7 @@
 //!   leaf records;
 //! - 'processed_store.rs': the marks the user set;
 //! - 'processed_requests.rs': where the store meets a viewforest;
+//! - 'named_leaf_set.rs': what a processed request names;
 //! - 'restore_requests.rs': what a save writes for the two restore
 //!   requests.
 
@@ -20,6 +21,7 @@ pub mod buffer_rerender;
 pub mod change_leaves;
 pub mod change_viewnodes;
 pub mod changes;
+pub mod named_leaf_set;
 pub mod pruned_change_view;
 pub mod processed_requests;
 pub mod processed_store;

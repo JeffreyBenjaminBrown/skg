@@ -4,8 +4,9 @@ use super::*;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::viewnode::{OrderedList, OtherChange};
+use crate::diff_view::named_leaf_set::{LeafKinds, NamedLeafSet};
 use crate::diff_view::processed_requests::{
-  LeafKinds, NamedLeafSet, RequestedProcessed, apply_processed_requests};
+  RequestedProcessed, apply_processed_requests};
 use crate::types::errors::HeadlineName;
 use crate::types::misc::{MSV, RelPartner, SkgConfig, Skgrepo};
 use crate::types::nodes::attribution::Attribution;

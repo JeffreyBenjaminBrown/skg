@@ -15,7 +15,7 @@ use skg::types::views_state::Perspective;
 use skg::types::errors::HeadlineName;
 use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
 use skg::types::viewnode::ViewnodeId;
-use skg::diff_view::processed_requests::NamedLeafSet;
+use skg::diff_view::named_leaf_set::NamedLeafSet;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use skg::test_utils::run_with_test_stores;

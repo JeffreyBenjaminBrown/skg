@@ -1,5 +1,5 @@
 use super::misc::{ID, SkgrepoName};
-use crate::diff_view::processed_requests::NamedLeafSet;
+use crate::diff_view::named_leaf_set::NamedLeafSet;
 use super::viewnode::ViewnodeId;
 use std::error::Error;
 use std::fmt;

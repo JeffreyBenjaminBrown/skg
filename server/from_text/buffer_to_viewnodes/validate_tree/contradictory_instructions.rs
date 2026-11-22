@@ -1,6 +1,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::diff_view::named_leaf_set::NamedLeafSet;
 use crate::diff_view::processed_requests::{
-  NamedLeafSet, RequestedProcessed, processed_requests_in_viewforest};
+  RequestedProcessed, processed_requests_in_viewforest};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::NodeEditRequest;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
