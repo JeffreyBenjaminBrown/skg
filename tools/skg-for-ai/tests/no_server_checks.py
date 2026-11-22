@@ -19,6 +19,7 @@ import compact_view
 import heralds
 import views
 import edited_compact_view
+import outline_words
 import save_dialogue
 import retyped_headlines
 import view_commands
@@ -95,11 +96,11 @@ def failures_of_forks_folder_claims ():
         metadata (handle), metadata ("0b"), metadata ("0a") ) != pending:
       failures . append ( f"the forks folder's member {handle} should "
                           f"{'' if pending else 'not '}be a pending detachment" )
-  refusal = edited_compact_view . relRepo_problems (
+  refusal = outline_words . relRepo_problems (
     edited, 2, headline_of_handle, { "main" : True } )
   if not ( len (refusal) == 1 and "claims nothing" in refusal [0] ):
     failures . append ( f"'relRepo:main' on a forker claiming nothing gave {refusal!r}" )
-  allowed = edited_compact_view . relRepo_problems (
+  allowed = outline_words . relRepo_problems (
     edited, 5, headline_of_handle, { "main" : True } )
   if allowed:
     failures . append ( f"'relRepo:main' on a claiming forkee gave {allowed!r}" )

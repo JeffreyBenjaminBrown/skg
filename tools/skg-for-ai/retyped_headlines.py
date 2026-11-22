@@ -10,7 +10,8 @@ The fuzzy match: 'titles_probably_reworded', on the words
 import difflib
 import re
 
-from edited_compact_view import NEW_NODE_HANDLE_WORD, described_handle
+from edited_compact_view import NEW_NODE_HANDLE_WORD
+from outline_words import described_handle
 
 # ------------------------------------------------------------
 # Retyped headlines: a new headline whose title is, or resembles, a

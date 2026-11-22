@@ -116,8 +116,9 @@ from daemon import command_daemon
 #       'restrict'.
 #     'headline_commands': 'chain', 'describe', 'linkstack'.
 #     'daemon': 'daemon'; 'daemon_client': how a command reaches one.
-#   Below the commands: 'edited_compact_view' (an edited compact view,
-#   read for a save); 'views' (fetching a view, writing its three files,
+#   Below the commands: 'outline_words' (a handle's words read against
+#   the outline, and 'subtree' expanded) and 'edited_compact_view' (an
+#   edited compact view, read for a save); 'views' (fetching a view, writing its three files,
 #   reading them back); 'compact_view' (the compact view and its
 #   summary); 'heralds' (a headline's heralds as text, and change
 #   facts); 'full_view' (the full view parsed, and the facts of a

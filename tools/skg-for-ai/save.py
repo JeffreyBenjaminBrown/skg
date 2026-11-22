@@ -25,13 +25,14 @@ from views import (
   SavedView, load_saved_view, metadata_text_with_part,
   perspective_of_sidecar, require_port_of_sidecar )
 from edited_compact_view import (
-  MERGE_WORD_PREFIX, NEW_NODE_HANDLE_WORD, OutlineWordCheck,
-  RELREPO_WORD_PREFIX, REPO_WORD_PREFIX, VIEW_REQUEST_TOKENS,
-  WRITE_PROTECT_SUBTREE_REQUEST, compact_handle_text,
-  descendant_indices, described_handle, edit_request_part_of_word,
-  edit_request_text, edited_outline, handle_bracket_title_error_lines,
-  handle_error_lines, outline_of_full_view, outline_word_check,
-  processed_request_text, unmarked_leaf_count, word_parameter )
+  MERGE_WORD_PREFIX, NEW_NODE_HANDLE_WORD, RELREPO_WORD_PREFIX,
+  REPO_WORD_PREFIX, VIEW_REQUEST_TOKENS, WRITE_PROTECT_SUBTREE_REQUEST,
+  compact_handle_text, edit_request_part_of_word, edited_outline,
+  handle_bracket_title_error_lines, handle_error_lines,
+  outline_of_full_view, word_parameter )
+from outline_words import (
+  OutlineWordCheck, descendant_indices, described_handle, edit_request_text,
+  outline_word_check, processed_request_text, unmarked_leaf_count )
 from retyped_headlines import (
   give_new_headlines_their_removed_handles, retyped_headline_error_lines,
   reworded_headline_pairs, reworded_question_lines )
