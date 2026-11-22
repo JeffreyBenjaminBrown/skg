@@ -40,34 +40,35 @@ pub fn set_viewnodestats_in_viewforest (
   relRepos              : &mut RelRepoLookup,
   is_diff_view          : bool, // where a member as such counts what the user keeps elsewhere among its content ('what_the_member_shows')
 ) {
-  let multi_skgrepo : bool = config . skgrepos . len () > 1;
+  let mut pass : ViewnodestatsPass = ViewnodestatsPass {
+    graph, config, restriction, relRepos,
+    container_to_contents, content_to_containers, is_diff_view,
+    multi_skgrepo : config . skgrepos . len () > 1, };
   let mut ancestor_gnids : HashSet<ID> = HashSet::new ();
   let root_treeid : NodeId = viewforest . root () . id ();
   set_viewnodestats_recursive (
-    viewforest,
-    root_treeid,
-    multi_skgrepo,
-    graph,
-    config,
-    restriction,
-    &mut ancestor_gnids,
-    relRepos,
-    container_to_contents,
-    content_to_containers,
-    is_diff_view ); }
+    viewforest, root_treeid, &mut ancestor_gnids, &mut pass ); }
+
+/// What the stats pass reads at every occurrence, and the relRepo
+/// lookup it shares across them: the arguments of
+/// 'set_viewnodestats_in_viewforest', and whether more than one
+/// skgrepo is configured.
+struct ViewnodestatsPass<'a, 'g> {
+  graph                 : &'a InRustGraph,
+  config                : &'a SkgConfig,
+  restriction           : &'a SkgrepoRestriction,
+  relRepos              : &'a mut RelRepoLookup<'g>,
+  container_to_contents : &'a HashMap<ID, HashSet<ID>>,
+  content_to_containers : &'a HashMap<ID, HashSet<ID>>,
+  is_diff_view          : bool,
+  multi_skgrepo         : bool,
+}
 
 fn set_viewnodestats_recursive (
-  tree                  : &mut Tree<Viewnode>,
-  treeid                : NodeId,
-  multi_skgrepo         : bool,
-  graph                 : &InRustGraph,
-  config                : &SkgConfig,
-  restriction           : &SkgrepoRestriction,
-  ancestor_gnids       : &mut HashSet<ID>,
-  relRepos              : &mut RelRepoLookup,
-  container_to_contents : &HashMap<ID, HashSet<ID>>,
-  content_to_containers : &HashMap<ID, HashSet<ID>>,
-  is_diff_view          : bool,
+  tree           : &mut Tree<Viewnode>,
+  treeid         : NodeId,
+  ancestor_gnids : &mut HashSet<ID>,
+  pass           : &mut ViewnodestatsPass,
 ) {
   let opt_pid : Option<ID> =
     if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
@@ -75,20 +76,20 @@ fn set_viewnodestats_recursive (
     { let node_pid : ID = t . gnid . clone ();
       detect_and_mark_cycle (
         tree, treeid, &node_pid, ancestor_gnids );
-      set_attribution (tree, treeid, &node_pid, graph, config);
-      set_skgrepo_at_boundary (tree, treeid, multi_skgrepo);
+      set_attribution (tree, treeid, &node_pid, pass . graph, pass . config);
+      set_skgrepo_at_boundary (tree, treeid, pass . multi_skgrepo);
       let fork_roles : Option<ForksFolderMemberRoles> =
-        forks_folder_member_roles (tree, treeid, graph, restriction, relRepos);
+        forks_folder_member_roles (
+          tree, treeid, pass . graph, pass . restriction, pass . relRepos );
       let stands_as_member_here : bool = match &fork_roles {
         Some (roles) => roles . as_forkee || roles . as_forker,
         None => stands_as_member (tree, treeid), };
       set_herald_strings_in_viewnode (
         tree, treeid, &node_pid, stands_as_member_here, fork_roles . as_ref (),
-        graph, config, restriction, relRepos, container_to_contents, content_to_containers,
-        is_diff_view );
-      set_omitted_body (tree, treeid, &node_pid, graph);
+        pass );
+      set_omitted_body (tree, treeid, &node_pid, pass . graph);
       set_relRepo (tree, treeid, stands_as_member_here, fork_roles . as_ref (),
-                   graph, relRepos, config);
+                   pass . graph, pass . relRepos, pass . config);
       Some (node_pid)
     } else { None };
   let was_new : bool =
@@ -100,17 +101,7 @@ fn set_viewnodestats_recursive (
     . children () . map ( |c| c . id () ) . collect ();
   for child_treeid in child_treeids {
     set_viewnodestats_recursive (
-      tree,
-      child_treeid,
-      multi_skgrepo,
-      graph,
-      config,
-      restriction,
-      ancestor_gnids,
-      relRepos,
-      container_to_contents,
-      content_to_containers,
-      is_diff_view ); }
+      tree, child_treeid, ancestor_gnids, pass ); }
   if was_new {
     if let Some ( ref pid ) = opt_pid
     { ancestor_gnids . remove (pid); } } }
@@ -197,14 +188,11 @@ fn set_herald_strings_in_viewnode (
   node_pid              : &ID,
   stands_as_member_here : bool, // see 'stands_as_member'
   fork_roles            : Option<&ForksFolderMemberRoles>,
-  graph                 : &InRustGraph,
-  config                : &SkgConfig,
-  restriction           : &SkgrepoRestriction,
-  relRepos              : &mut RelRepoLookup,
-  container_to_contents : &HashMap<ID, HashSet<ID>>,
-  content_to_containers : &HashMap<ID, HashSet<ID>>,
-  is_diff_view          : bool,
+  pass                  : &mut ViewnodestatsPass,
 ) {
+  let ViewnodestatsPass { graph, config, restriction, ref mut relRepos,
+                          container_to_contents, content_to_containers,
+                          is_diff_view, .. } = *pass;
   let (gstats, in_place_of)
     : (GraphnodeStats, Option<ID>) = {
     let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
