@@ -37,6 +37,7 @@
 (require 'org)
 (require 'seq)
 (require 'skg-metadata)
+(require 'skg-change-facts)
 (require 'skg-modify-graph) ; for skg--immediate-viewchildren
 
 ;; The save module shows the processed summary formatted here, so it

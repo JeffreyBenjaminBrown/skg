@@ -8,6 +8,8 @@
 (require 'org)
 (require 'skg-keymaps-and-aliases)
 (require 'skg-metadata)
+(require 'skg-change-facts)
+(require 'skg-restore-requests)
 (require 'skg-request-views)
 (require 'skg-id-search)
 (require 'skg-modify-graph)

@@ -11,6 +11,7 @@
 (require 'org)
 (require 'skg-length-prefix)
 (require 'skg-metadata)
+(require 'skg-change-facts)
 
 (defconst skg-describe-buffer-name "*skg describe*"
   "The help buffer `skg-describe-at-point' shows long descriptions in.")

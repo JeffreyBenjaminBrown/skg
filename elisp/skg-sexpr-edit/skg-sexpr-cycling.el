@@ -12,6 +12,7 @@
 (require 'cl-lib)
 (require 'skg-config)
 (require 'skg-metadata)
+(require 'skg-restore-requests) ; for skg--removed-membership-p
 (require 'skg-metadata-fields)
 (require 'skg-state)
 

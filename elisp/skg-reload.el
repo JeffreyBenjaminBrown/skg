@@ -106,6 +106,8 @@ the old one open beside the one it makes on its next request."
      skg-lens
      skg-lock-buffers
      skg-metadata
+     skg-change-facts
+     skg-restore-requests
      skg-modify-graph
      skg-view-new-empty
      skg-org-fold

@@ -288,116 +288,16 @@ Does not save; call `skg-request-save-buffer' afterward."
     (message "Merge request set for acquiree %s. Save to apply."
              acquiree-gnid)))
 
-;;; The diff view's restore requests ('docs/diff-view.org',
-;;; "Restoring what a change removed"). The server refuses them on the
-;;; wrong kind of headline with the same texts, except that its refusal of
-;;; a restoreRel without a removed membership goes on to say where a
-;;; restoreRel belongs.
-
-(defconst skg--restore-rel-on-a-deleted-node
-  "This node is deleted; restore it first (skg-restore-deleted-node)"
-  "Why a removed membership cannot be restored on a ghost.")
-
-(defconst skg--restore-node-on-a-node-not-deleted
-  "Only a node deleted since HEAD can be restored; restoreNode belongs on a ghost (skg-restore-deleted-node)"
-  "Why `skg-restore-deleted-node' refuses anything but a ghost.")
-
-(defconst skg--restore-rel-without-a-removed-membership
-  "Only a removed membership can be restored"
-  "Why `skg-restore-removed-membership' refuses a headline.")
-
-(defun skg-restore-deleted-node ()
-  "Ask the next save to write back the deleted node at point.
-The headline must be a ghost: a node of the diff view deleted since
-HEAD. The save writes its file as HEAD had it, and
-re-adds it to the lists of the nodes that recorded it at HEAD.
-Does not save; call `skg-request-save-buffer' afterward."
-  (interactive)
-  (unless (skg--ghost-sexp-p (skg--metadata-sexp-at-point-or-nil))
-    (user-error "%s" skg--restore-node-on-a-node-not-deleted))
-  (skg--write-edit-request 'restoreNode 'ghost)
-  (message "Restore request set. Save to apply."))
-
-(defun skg-restore-removed-membership ()
-  "Ask the next save to re-add the removed relationship at point.
-The headline must be a removed member, or a member of a partner
-folder carrying '(rel removed)': its relationship to its viewparent
-(in a folder, to the folder's viewparent) existed at HEAD and is gone.
-Which of the two it is, and whether it is either, depends on where it
-stands (`skg--restoreRel-position-at-point-p').
-The save re-adds it as HEAD recorded it.
-Does not save; call `skg-request-save-buffer' afterward."
-  (interactive)
-  (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
-    (cond ((skg--ghost-sexp-p metadata)
-           (user-error "%s" skg--restore-rel-on-a-deleted-node))
-          ((not (and (skg--removed-membership-p metadata)
-                     (skg--restoreRel-position-at-point-p)))
-           (user-error "%s" skg--restore-rel-without-a-removed-membership)))
-    (skg--write-edit-request 'restoreRel 'node)
-    (message "Restore request set. Save to apply.")))
-
-(defun skg--removed-membership-p (metadata-sexp)
-  "Non-nil when METADATA-SEXP is an occurrence whose
-'(diff ...)' says its relationship was removed. Whether a restoreRel
-may sit on it depends also on where it stands
-(`skg--restoreRel-position-at-point-p')."
-  (and (skg--occurrence-sexp-p metadata-sexp)
-       (skg--relationship-removed-p metadata-sexp)))
+;;; Folders and removed relationships, which the diff view's
+;;; restore requests ('skg-restore-requests.el') and change facts
+;;; ('skg-change-facts.el') read, as do the heralds and the pending
+;;; detachment below.
 
 (defun skg--relationship-removed-p (metadata-sexp)
   "Non-nil when METADATA-SEXP's '(diff ...)' says its relationship was
 removed, by a '(rel removed)'."
   (equal (skg-sexp-cdr-at-path metadata-sexp '(skg diff rel))
          '(removed)))
-
-(defun skg--restoreRel-position-at-point-p ()
-  "Non-nil iff the headline at point stands where a restoreRel may:
-under a partner folder (whose removed members claim nothing), or as
-a removed member, a child claiming nothing under a vognode that is no node of the
-containerward chain. The save checks the same
-('restoreRel_stands_where_it_may', server/from_text/
-buffer_to_viewnodes/local.rs)."
-  (let ((metadata (skg--metadata-sexp-at-point-or-nil))
-        (parent-sexp (save-excursion
-                       (and (org-up-heading-safe)
-                            (skg--metadata-sexp-at-point-or-nil)))))
-    (cond ((skg--partner-folder-atom parent-sexp) t)
-          ((skg--vognode-sexp-p parent-sexp)
-           (and (not (skg--claims-membership-p metadata))
-                (not (skg--containerward-chain-node-at-point-p))))
-          (t nil))))
-
-(defun skg--containerward-chain-node-at-point-p ()
-  "Non-nil iff the headline at point is a node of the containerward
-chain as the diff view, whose request restoreRel is, draws it: a
-vognode claiming nothing under a member of a partner folder whose
-members carry the chain there (every one but the two acquisition
-folders and the illegal-edit folder),
-or under another such node ('stands_in_containerward_chain',
-server/types/tree/forest.rs)."
-  (save-excursion
-    (catch 'answer
-      (while t
-        (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
-          (unless (and (skg--vognode-sexp-p metadata)
-                       (or (not (skg--occurrence-sexp-p metadata))
-                           (not (skg--claims-membership-p metadata))))
-            (throw 'answer nil))
-          (unless (and (org-up-heading-safe)
-                       (skg--vognode-sexp-p
-                        (skg--metadata-sexp-at-point-or-nil)))
-            (throw 'answer nil))
-          (let ((grandparent-folder
-                 (save-excursion
-                   (and (org-up-heading-safe)
-                        (skg--partner-folder-atom
-                         (skg--metadata-sexp-at-point-or-nil))))))
-            (when (and grandparent-folder
-                       (not (memq grandparent-folder
-                                  '(acquiredByFolder acquiredFolder
-                                    illegalEditFolder))))
-              (throw 'answer t))))))))
 
 (defconst skg--property-folder-atoms
   '(aliasFolder idFolder flagsFolder)
@@ -412,39 +312,6 @@ aliases, IDs and flags. Every other folder is a partner folder.")
          (not (memq folder skg--property-folder-atoms))
          folder)))
 
-;;; A headline's change facts
-
-(defun skg--processed-diff-form (metadata-sexp)
-  "The '(diff ...)' form of METADATA-SEXP, or nil. Every kind's
-'(diff ...)' stands at the top level of '(skg ...)', beside its kind
-atom."
-  (assq 'diff (cdr metadata-sexp)))
-
-(defun skg--processed-form (metadata-sexp key)
-  "The (KEY ...) part of METADATA-SEXP's '(diff ...)' form, or nil."
-  (assq key (cdr (skg--processed-diff-form metadata-sexp))))
-
-(defun skg--processed-leaves (metadata-sexp)
-  "The '(leaves N OBJECT...)' fact of the headline with METADATA-SEXP,
-as (N . OBJECTS), or nil when it names no leaf."
-  (cdr (skg--processed-form metadata-sexp 'leaves)))
-
-(defun skg--objects-processed-p (metadata-sexp objects)
-  "Non-nil when every one of OBJECTS is processed on METADATA-SEXP's headline:
-when it carries a '(processed ...)' that names each of them. A headline
-that lists no object (one naming a single leaf) is processed when it
-carries any '(processed ...)'."
-  (let ((processed (skg--processed-form metadata-sexp 'processed)))
-    (and processed
-         (seq-every-p (lambda (object) (memq object (cdr processed)))
-                      objects))))
-
-;;; A changed folder
-;;; The server writes every folder as its bare atom. Whether the diff
-;;; view shows it because of a change, and whether that change is
-;;; processed, follows from its members (its child headlines), as computed
-;;; here ('folder_change_facts' did it on the server before).
-
 (defun skg--folder-atom (metadata-sexp)
   "The folder's atom if METADATA-SEXP is a folder's (a kind 'folder'
 in 'shared/metadata-fields.json'), else nil."
@@ -456,77 +323,6 @@ in 'shared/metadata-fields.json'), else nil."
                                "folder")
                         item))
                  (cdr metadata-sexp))))
-
-(defun skg--membership-change-processed (member-sexp child-sexps)
-  "Whether the folder member with metadata MEMBER-SEXP, whose child
-headlines carry CHILD-SEXPS, carries a change of its relationship to
-the folder's viewparent, and whether that change is processed: nil when
-it carries none, else `processed' or `unprocessed'. It carries one when its
-'(diff ...)' has a '(rel ...)', or when a child is a
-'(relRepoMove ...)'. The change is processed when both hold: a '(rel ...)'
-comes with a '(processed ...)' that names 'rel' if the member's
-'(leaves ...)' lists 'rel'; every '(relRepoMove ...)' child carries
-'(diff (processed ...))'."
-  (let ((rel-change (skg--processed-form member-sexp 'rel))
-        (relRepo-moves
-         (seq-filter (lambda (child-sexp)
-                       (assq 'relRepoMove (cdr child-sexp)))
-                     child-sexps)))
-    (when (or rel-change relRepo-moves)
-      (if (and (or (not rel-change)
-                   (skg--objects-processed-p
-                    member-sexp
-                    (and (memq 'rel (cdr (skg--processed-leaves member-sexp)))
-                         '(rel))))
-               (seq-every-p (lambda (relRepo-move)
-                              (skg--processed-form relRepo-move 'processed))
-                            relRepo-moves))
-          'processed
-        'unprocessed))))
-
-(defun skg--folder-change-processed (members)
-  "Whether a folder whose MEMBERS are as given is changed, and whether
-that change is processed: nil when no member carries a change of its
-relationship to the folder's viewparent, `processed' when every such
-change is processed, else `unprocessed'. Each of MEMBERS is (MEMBER-SEXP
-. CHILD-SEXPS), as `skg--membership-change-processed' takes them."
-  (let ((changes (delq nil (mapcar (lambda (member)
-                                     (skg--membership-change-processed
-                                      (car member) (cdr member)))
-                                   members))))
-    (when changes
-      (if (memq 'unprocessed changes) 'unprocessed 'processed))))
-
-(defun skg--folder-change-processed-at-point ()
-  "`skg--folder-change-processed' of the folder headline on the line
-at point, or nil when that line is no folder's headline. Reads
-headline levels by their stars, so it works in any buffer."
-  (save-excursion
-    (beginning-of-line)
-    (let ((level (skg--headline-level-on-line)))
-      (when (and level
-                 (skg--folder-atom (skg--metadata-sexp-at-point-or-nil)))
-        (skg--folder-change-processed
-         (skg--folder-members-below level))))))
-
-(defun skg--folder-members-below (folder-level)
-  "The members of the folder whose headline, at FOLDER-LEVEL, is on the
-line at point: for each headline one level below it, (MEMBER-SEXP
-. CHILD-SEXPS), the metadata of the member and of its own child
-headlines, nil where a headline carries none. Moves point."
-  (let ((members '())
-        (done nil))
-    (while (and (not done) (zerop (forward-line 1)) (not (eobp)))
-      (let ((level (skg--headline-level-on-line)))
-        (cond ((null level))
-              ((<= level folder-level) (setq done t))
-              ((= level (1+ folder-level))
-               (push (list (skg--metadata-sexp-at-point-or-nil)) members))
-              ((and members (= level (+ 2 folder-level)))
-               (setcdr (car members)
-                       (append (cdar members)
-                               (list (skg--metadata-sexp-at-point-or-nil))))))))
-    (nreverse members)))
 
 
 ;;; A pending detachment

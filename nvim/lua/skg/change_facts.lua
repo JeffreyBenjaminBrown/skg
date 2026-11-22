@@ -8,8 +8,8 @@
 -- the herald descriptions and the processed gestures (skg.processed)
 -- read them. The gestures themselves are skg.processed's; writing a
 -- processed request is skg.metadata's
--- ('metadata_with_processed_request'). The Lua port of the
--- change-facts part of elisp/skg-metadata.el.
+-- ('metadata_with_processed_request'). The Lua port of
+-- elisp/skg-change-facts.el.
 
 local metadata = require('skg.metadata')
 

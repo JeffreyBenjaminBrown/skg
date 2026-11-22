@@ -28,8 +28,7 @@
 -- processed is skg.processed's; editing the metadata as an org tree
 -- (':SkgViewMetadata') is skg.sexpr_edit's; drawing it as heralds is
 -- skg.heralds'; the s-expression reader is skg.sexpr.parse.
--- The Lua port of elisp/skg-metadata.el, but for its change-facts,
--- restore and relRepo sections, ported in those three modules.
+-- The Lua port of elisp/skg-metadata.el.
 --
 -- The elisp file's biggest hazard -- org-fold's fragility check
 -- crashing on programmatic edits to folded headline lines, worked

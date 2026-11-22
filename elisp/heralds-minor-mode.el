@@ -14,7 +14,8 @@
 ;;; where a list would be scanned whole at every edit.
 
 (require 'cl-lib)
-(require 'skg-metadata) ;; for skg--folder-change-processed-at-point and skg--pending-detachment-at-point-p
+(require 'skg-metadata) ;; for skg--pending-detachment-at-point-p
+(require 'skg-change-facts) ;; for skg--folder-change-processed-at-point
 (require 'skg-sexpr-search)
 (require 'skg-shared)
 (require 'skg-fork-dedup)
