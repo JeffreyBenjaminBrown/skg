@@ -80,11 +80,15 @@
   - A rerender of a stored view can leave a member of a forks or alias
     folder 'noClaim' after its occurrence turns editable again:
     'ensure_editableOccurrences_exist'
-    ('server/diff_view/buffer_rerender.rs' ~262) resets only direct
+    ('server/diff_view/buffer_rerender.rs' ~255) resets only direct
     children, 'merge_editability' ('server/refresh/editability.rs'
-    ~465) and a ghost turned occurrence ('server/refresh/id_rule.rs'
+    ~450) and a ghost turned occurrence ('server/refresh/id_rule.rs'
     ~228) reset nothing; the next save would then delete that alias or
     end that fork.
+  Checked 2026-11-22: could not confirm the first case still holds,
+  because "~871" in 'server/types/viewnode.rs' no longer points at
+  where claims are read, and the ID property member
+  ('PropertyMember::ID', ~545) now carries a 'claimsMembership' field.
 * Skg does not count a link whose label wraps across lines (2026-11-20)
   Org reads =[[id:X][a label\nthat wraps]]= as a link (a blank line
   ends it), and filling a paragraph makes such links. The server's
@@ -137,26 +141,28 @@
   (TODO/every-mirror/progress.org, plan 4), on lines the branch did
   not change; none fixed or reproduced. Each compares
   a side that may hold an extra ID (after a nodeMerge) with a pid.
-  - 'NodeSaveIntent::apply_hiderel_delta' ('lower.rs') dedups the
+  - 'NodeSaveIntent::apply_hiderel_delta'
+    ('server/from_text/local_fieldintent_collection/lower.rs') dedups the
     hides and removes unhides raw. Every caller filters by pid first,
     so a hide is written twice only if the contains-removal step hides
     a child the note already hides by another of its IDs (a note that
     contains and hides one child). Resolving needs the graph passed in.
   - The save's distinctness validators ('claiming_children_have_distinct_gnids',
     'partnerFolder_children_have_distinct_gnids' in
-    'buffer_to_viewnodes/local.rs') and 'dedup_members_by_gnid'
-    ('traverse.rs') compare collected gnids raw: an occurrence of K
+    'server/from_text/buffer_to_viewnodes/local.rs') and 'dedup_members_by_gnid'
+    ('server/from_text/local_fieldintent_collection/traverse.rs') compare collected gnids raw: an occurrence of K
     beside a mirror '(inPlaceOf X)', X an extra ID of K, pass as
     distinct, and the parent's contains would list K and X.
-  - 'id_rule' ('refresh/id_rule.rs'), the restricted branch: a buffer
+  - 'id_rule' ('server/refresh/id_rule.rs'), the restricted branch: a buffer
     gnid against the goal's pids. A restricted member a stale buffer
     names by an extra ID is tombstoned and reinstated rather than kept.
-  - 'relationship_at_head' ('diff_view/restore_requests.rs') resolves
+  - 'relationship_at_head' ('server/diff_view/restore_requests.rs') resolves
     HEAD's members through the graph at HEAD and the key through the
     live graph: after a nodeMerge since HEAD folded m into k, a
     restore of a record naming m may be dropped as one HEAD lacks.
   - The "investigate unknown node" request finds a note in history by
-    its file name ('<id>.skg', 'sight_gnids_in_gitrepo'), so an
+    its file name ('<id>.skg', 'sight_gnids_in_gitrepo' in
+    'server/git_ops/vanished.rs'), so an
     unknown ID that was an extra ID of a vanished note is reported as
     never present.
 * A headline whose 'writeProtected' mark is gone is read as the node's whole content (2026-11-17)
@@ -260,15 +266,21 @@
   them, so their check heralds and derived folder readiness lie.
   Found while measuring the mark gesture; see
   'TODO/general-fast-diffView/1_discussion.org'.
+  Names since: a readiness mark is now called processed. The gesture
+  is one of 'skg-mark-node-processed' and its siblings
+  ('elisp/skg-processed.el'), and the facts are '(processed ...)'.
+  Checked 2026-11-22: could not confirm it still holds, because I did
+  not trace whether a save that consumes processed requests now
+  redraws the other diff buffers.
 * Every small server response waits about 40 ms for Nagle (2026-11-06)
-  'send_response_with_length_prefix' ('server/serve/util.rs:63')
+  'send_response_with_length_prefix' ('server/serve/util.rs:61')
   writes the length header and the payload in two 'write_all'
   calls on a stream without 'set_nodelay', so the payload waits
   for the client's delayed ACK. Measured: 41 ms round trips for
   5-8 ms of server work. One write per message, or
   'set_nodelay(true)' on accepted streams, removes it. Also
-  noted: 'ReadinessStore::save' uses 'fs::write', which is not
-  atomic.
+  noted: 'ProcessedStore::save' ('server/diff_view/processed_store.rs',
+  formerly 'ReadinessStore') uses 'fs::write', which is not atomic.
 * The save handler's checks depend on their position in it (2026-11-05)
   In 'update_from_and_rerender_buffer_with_approvals'
   ('server/serve/handlers/save_buffer.rs') one vector,
@@ -282,7 +294,7 @@
   provenance tag on NodeInstruction, or separate vectors until
   the final concatenation, would make such checks
   position-independent. Deferred by Jeff (2026-11-05); see
-  'TODO/merge-save-refused/3_principles.org', "The checks are
+  'TODO/merge-save-refused/2_1_principles.org', "The checks are
   defined by their position in the handler".
 * Problems noticed while executing plan 10, slice 5 (2026-10-31)
 ** The server reads a title that starts "(skg" as metadata
@@ -311,7 +323,8 @@
 * Problems noticed while executing plan 10, slice 2 (2026-10-31)
   Found by repeating the search of
   'TODO/simplify-refresh/09_1_review-reports/restriction-edits.org'
-  after the slice's fixes (read, not run, unless said).
+  (no longer in the tree) after the slice's fixes (read, not run,
+  unless said).
 ** A strandeds reset can move a hide across the skgrepo restriction
   'stranded_relationships' ('server/from_text/strandeds.rs') runs
   after the save's check of records landing restricted, takes no
@@ -385,6 +398,10 @@ relationships missed. Also, relationships INTO a node moved more private
 keep their more public repo, leaving its ID there; that one is a server
 gap too. Details, options and questions:
 [[file:repo-move-graph-logic/1_discussion.org][Repo moves do graph logic in the client]].
+Checked 2026-11-22: could not confirm it still holds. The client part
+looks gone: 0fcd22704 (2026-10-17) dropped Emacs's own analysis, and
+the clients now answer the server's strand confirmation. I did not
+check the server gap (relationships into a node moved more private).
 * Findings from the simplification reconnaissance (2026-09-25)
   Research and proposed slices: [[file:astra-cleans-up.org][Making Skg easier to change]].
   These are source-inspection findings; no application changes or runtime
@@ -403,10 +420,17 @@ gap too. Details, options and questions:
    tables ('skg--writable-folder-relations',
    'skg--relRepo-unsupported-folder-atoms' in 'elisp/skg-request-relRepo-info.el')
    should then be served or shared, not copied into Neovim (noted from
-   [[file:herald-colors/2_plan.org][the herald-colors plan]], 2026-10-04).
+   [[file:DONE/herald-colors/2_plan.org][the herald-colors plan]], 2026-10-04).
+   Checked 2026-11-22: could not confirm it still holds.
+   'skg--set-repo-and-handle-stuck-edges' is gone: Emacs's 'skg-set-repo'
+   ('elisp/skg-metadata.el') and Neovim's 'set_repo' both skip
+   write-protected occurrences, and the server decides what a move
+   strands (0fcd22704). The two policy tables are now copied into
+   'nvim/lua/skg/relRepo_info.lua' ("Mirrors ...").
 ** Graph updates rediscover identity-change facts across several consumers
    'GraphChangeSet' in 'server/dbs/in_rust_graph/prepared_update.rs' and
-   'apply_definenodes_to_inRustGraph' independently compute affected IDs
+   'apply_nodeInstructions_to_inRustGraph' ('server/dbs/in_rust_graph.rs')
+   independently compute affected IDs
    and recorders. Override/telescope scope builders perform related old/new
    identity walks. Share immutable identity-transition facts while retaining
    distinct index, validation, write, and view dependency scopes and an
@@ -419,7 +443,7 @@ gap too. Details, options and questions:
    ignores", now in TODO/DONE/problems.org; the copy is
    'complete_from_rust'.)
 ** Ordinary saves and node merges have different index application policies
-   'server/save.rs::apply_defineNodes' queues Tantivy updates with computed
+   'server/save.rs::apply_nodeInstructions' queues Tantivy updates with computed
    context types. 'server/nodeMerge.rs::apply_prepared_nodeMerges' writes
    synchronously with an empty context map and rebuild-on-failure behavior;
    its comment defers context refresh to rebuild. A common application
@@ -459,11 +483,12 @@ gap too. Details, options and questions:
    This is the big one: it is the difference between a 30-second fix
    and a manual scan of 54,566 files.
    'read_skg_sections_from_folder'
-   (server/dbs/filesystem/multiple_nodes.rs:203) calls
-   'read_nodecomplete (&path) ?' and lets '?' propagate the serde error
-   with the path DROPPED. The caller (same file, line 39-44) then
-   records 'source . path . display ()' -- the folder -- into a tuple
-   slot whose own comment (line 24) says "// filename". So the report
+   (server/dbs/filesystem/multiple_nodes.rs:262) calls
+   'read_graphnode (&path)' ('one_node.rs':396, whose serde error at
+   line 409 carries no path) and propagates that error with the path
+   DROPPED ('return Err (e)'). The caller (same file, lines 113-118) then
+   records 'skgrepo . path . display ()' -- the folder -- into a tuple
+   slot whose own comment (line 88) says "// filename". So the report
    reads:
      * /home/ubuntu/host/data/owned/personal-proc
      ** pers-p
@@ -478,14 +503,17 @@ gap too. Details, options and questions:
    ('RetiredKeysInFiles', 'server/dbs/filesystem/retired_keys.rs').
    Every other unreadable file still names the folder and ends the
    read, as below.
-   Suggested fix: at line 203, '. map_err' the error to attach
+   Suggested fix: at 'one_node.rs' line 409, '. map_err' the error to attach
    'path . display ()' before propagating; and either collect per-file
    errors instead of aborting the folder, or rename the count to say
    "repo" so it stops lying.
 ** A titleless single-section node makes the whole server unbootable
    After the empty file got a valid 'pid', init failed again, further
    in, with "Telescope '...' has no home: no section carries a title."
-   (multiple_nodes.rs:133). One contentless node -- no title, body,
+   (multiple_nodes.rs:133; checked 2026-11-22, still so: the message
+   now reads "Telescope '...' has no title in any section."
+   ('server/telescope/compose.rs':70), and 'compose_grouped_sections'
+   in 'multiple_nodes.rs' propagates it with '?'). One contentless node -- no title, body,
    contains, or aliases, referenced only as the first child of
    'doing' -- blocks the entire database from loading, and this failure
    path writes NO report file at all (unlike the unreadable-file path),
@@ -522,12 +550,17 @@ gap too. Details, options and questions:
    (The recursive walker added 2026-07-22,
    'skg--set-relRepo-recursive-walk', checks parentIs and
    parent editability; the single-relationship command still does not.)
+   Checked 2026-11-22: could not confirm it still holds in full.
+   'skg--rel-at-point' ('elisp/skg-request-relRepo-info.el') now
+   refuses under a write-protected parent and in write-protected
+   folders, and the birth is gone from the server (663a4bba6); a
+   content child that claims nothing ('noClaim') is still not refused.
+** start-servers.sh misreports a LINK failure as a COMPILE failure
   Context: Jeff's machine overheated and cut power mid-'cargo build',
   truncating 3 of 501 rlibs in target/. Servers then refused to start,
   permanently and identically, on unchanged code and unchanged data.
   Fixed by 'cargo clean -p skg -p tantivy -p typedb-driver'. Written up
   in docs/troubleshooting/build-artifacts-corrupted-by-power-loss.org.
-** start-servers.sh misreports a LINK failure as a COMPILE failure
    'preflight_check_config' (bash/start-servers.sh) wraps
    'cargo build -q --bin skg' and, on failure, prints "ERROR: skg
    failed to compile (see errors above)". In the 2026-07-14 incident the
@@ -557,11 +590,15 @@ gap too. Details, options and questions:
    client; if other clients appear (nvim/), consider having the
    server refuse an approved save whose fork_repos map does not
    cover every fork spec.
+   Checked 2026-11-22: still holds. The Neovim client exists now and
+   refuses the placeholder too ('nvim/lua/skg/save/confirmations.lua');
+   the server's fallback is in 'server/from_text/fork.rs'.
 ** Cosmetic: api-and-formats.org says search filters "before grouping"
-   The text-search section says the active skgrepo-set is applied
+   The text-search section says the skgrepo restriction is applied
    "before grouping, ranking, alias/title selection, and display
-   truncation". In code, 'group_matches_by_id' runs first and
-   'filter_match_groups_to_active_repos' then filters the groups,
+   truncation". In code ('server/serve/handlers/text_search.rs'),
+   'group_matches_by_gnid' runs first and
+   'filter_match_groups_to_unrestricted_skgrepos' then filters the groups,
    before ranking and truncation. Behaviorally identical (groups are
    per-ID and skgrepo is a function of ID), so this is a doc wording
    nit only.
@@ -586,6 +623,10 @@ gap too. Details, options and questions:
    deliberately ignored rather than rejected: a Delete or nodeMerge
    request on a subscribee-as-such is silently dropped, which validation
    could instead flag.
+   Checked 2026-11-22: could not confirm the residual still holds,
+   because 'collect_savenode_candidates' is gone and no server code
+   says "subscribee" any more (a member as such of a forks folder is
+   the nearest successor); I did not test a Delete request there.
 * Two Graphnode parses per modified file in 'compute_diff_for_skgrepo'
   'server/git_ops/diff.rs', which only 'titles-by-ids' calls, for
   nodes the search index lacks. Only added and deleted files name
@@ -625,6 +666,10 @@ gap too. Details, options and questions:
    '(setq skg-port ...)', so reinitializing with a replaced config will
    not update an already-bound port variable. That is harmless when the
    port stays 1730, but surprising when switching configs.
+   Checked 2026-11-22: the related note no longer holds:
+   'skg-client-init' now 'setq's 'skg-port' ('elisp/skg-client.el':66).
+   The rest still holds: 'skg-tcp-connect-to-rust' does not retry a
+   failed send.
 ** Initialization warning files can be easy to miss
    On 2026-05-06, startup completed and logged "Server ready", but
    data/ also contained:
@@ -641,6 +686,12 @@ gap too. Details, options and questions:
    any node with a privatized relationship, not a defect. The entry's point --
    init warning files are easy to miss -- still stands; only the
    illustration is stale. See [[../dup-ids-maybe-bad.org]].
+   Checked 2026-11-22: still holds. The duplicate-id report is now
+   'initialization-error_ids-claimed-by-two-nodes.org'
+   ('server/dbs/filesystem/multiple_nodes.rs'). Since 869bef743
+   (2026-10-20) the clients show the server's startup warnings in a
+   buffer ('skg-request-server-warnings.el'), but those warnings
+   do not include these report files.
 ** Replacing data/skgconfig.toml can leave server and client on different ports
    Observed 2026-05-06: data/skgconfig.toml said 'port = 1731',
    but the already-running server process was still listening on 1730.
@@ -655,6 +706,10 @@ gap too. Details, options and questions:
    Possible fixes: watch the config file too, log the active port and
    config path in a user-visible way, or add a client diagnostic that
    explicitly says "config wants port X but no server is listening".
+   Checked 2026-11-22: still holds. The config is now the path given
+   to 'bash/start-servers.sh' (default 'data/jeff/skgconfig.toml'),
+   and cargo-watch runs only with '--hot-reload', watching server/;
+   the rerun loop rereads the config only when the server restarts.
 * Performance: the save-buffer pathway (see profiling-save.org)
   Profiling the save of an insert-a-child edit (node 846207ef, 'doing')
   found four inefficiencies, in impact order. Full evidence, numbers,
@@ -668,6 +723,11 @@ gap too. Details, options and questions:
    entry in TODO/DONE/problems.org); also consider debouncing commits
    (Tantivy is a rebuildable cache) and dropping the forced per-commit
    'reader.reload()' in production.
+   Checked 2026-11-22: could not confirm it still holds. Since
+   dd117a31b (2026-06-05) the Tantivy commit runs in the background,
+   off the save's response; each commit still forces
+   'reader.reload()' ('server/dbs/tantivy/write.rs':175). The
+   top-level 'profiling-save.org' was deleted (f30dc06f8).
 * Problems found while investigating test-suite speed (2026-06-12)
   See TODO/DONE/faster-tests.org for the full investigation.
 ** (mostly fixed) Six near-duplicate test-db setup paths
@@ -682,7 +742,7 @@ gap too. Details, options and questions:
    They differ only in whether config comes from a TOML file and
    whether fixtures are copied to /tmp. Quasi-duplication worth
    collapsing -- and the natural moment is the shared-db-session
-   refactor proposed in TODO/faster-tests.org.
+   refactor proposed in TODO/DONE/faster-tests.org.
    Mostly fixed 2026-06-12: hidden_from_subscriptions' and
    move_source's private helpers are deleted (their tests use
    SharedDbSession). Still alive on 2026-11-22 (the TypeDB-era names
@@ -705,7 +765,8 @@ gap too. Details, options and questions:
    each such skgrepo, double-counting them across skgrepos. This is
    harmless under the apparent deployment model (one gitrepo per
    skgrepo) and only bites if a gitrepo spans multiple skgrepos.
-   'find_and_stage_moves.rs' avoids the issue by scoping its HEAD
+   'find_and_stage_moves.rs' (removed with stage moves, c70192bb0,
+   2026-10-19) avoided the issue by scoping its HEAD
    scan to each skgrepo's own subtree ('head_skg_ids' /
    'path_relative_to_gitrepo'); the older diff path does not. If
    multi-Skg-repo gitrepos are to be supported, the diff helpers should
@@ -785,6 +846,13 @@ gap too. Details, options and questions:
    the retained telescope's ownership distinction; warning about a
    removable unresolved relationship is different from claiming the
    filesystem is invalid.
+
+   Checked 2026-11-22: still holds; no init or rebuild check reports a
+   dangling member. The audit cited above
+   ('server/dbs/in_rust_graph/audit.rs') went with TypeDB (773d0506d),
+   and 'apply_delete_propagation_cleanup' is now at 'server/save.rs':465,
+   so the save.rs line numbers above are stale. An offline scan lives
+   in 'tools/find-danglers/'.
 * Problems found while researching cross-owner deletion (2026-09-10)
   Found while writing TODO/DONE/delete-shared-node/.  The first is the
   reported bug; the others are pre-existing gaps exposed by making
@@ -802,6 +870,12 @@ gap too. Details, options and questions:
    recorder could remove most non-content dangling relationships. These
    paths need raw-ID-aware enumeration and a true Unknown case if the
    deletion policy covers all four structured outbound fields.
+   Checked 2026-11-22: could not confirm it still holds. Raw-ID
+   accessors now exist ('outbound_gnids_for_relation_gated'), beside
+   'outbound_pids_for_relation' and its gated form, which still
+   'filter_map' through 'pid_of' ('relation_accessors.rs' ~514, ~565);
+   the structured relations are now contains, forks and hides, and I
+   did not trace which accessor each folder draws from.
 * Herald rule-table retirement remains separate (reviewed 2026-09-23)
   The September herald audit rewrote 'api-and-formats.org' to document
   semantic '(rels ...)' facts and linked the user legend in
