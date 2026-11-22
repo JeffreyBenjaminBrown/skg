@@ -166,6 +166,7 @@ def main (argv):
   failures += failures_of_shared_herald_cases ()
   failures += failures_of_forks_folder_claims ()
   failures += failures_of_chains ()
+  failures += failures_of_describe_requests ()
   failures += failures_of_perspective_names ()
   failures += failures_against_scratch_servers (update_expected)
   shutil . rmtree ( os . environ [ "XDG_RUNTIME_DIR" ], ignore_errors = True )
@@ -313,6 +314,42 @@ def failures_of_chains ():
     failures . append ( f"'chain' printed {printed . stdout!r} {printed . stderr!r}" )
   shutil . rmtree (folder, ignore_errors = True)
   return failures
+
+# ============================================================
+# What heralds mean ('describe VIEW HANDLE')
+# ============================================================
+
+def failures_of_describe_requests ():
+  """'describe' sends the headline's metadata as the full view holds
+  it, with 'pendingDetachment' on a pending detachment."""
+  view = skg_for_ai . parse_full_view (
+    CHAIN_VIEW + "** (skg (vnid 0i) node (gnid d) noClaim) d\n" )
+  failures = []
+  for handle, expected in [
+      ( "0d", '((request . "describe heralds") (metadata . "(skg (vnid 0d) '
+              'node (gnid c) (view (rels (forks (in 1 (ancestors 2)))) '
+              '(birth (forks in 2))))"))' ),
+      ( "0i", '((request . "describe heralds") (metadata . "(skg (vnid 0i) '
+              'node (gnid d) noClaim pendingDetachment)"))' ) ]:
+    actual = skg_for_ai . describe_request_line (view, handle)
+    if actual != expected:
+      failures . append ( f"the describe request of {handle} is {actual!r}, not {expected!r}" )
+  return failures
+
+def check_describe (scratch):
+  """'describe' prints the server's sentences for a handle of a view:
+  a note's heralds, most informative first, and what a folder is."""
+  folder = os . path . join (scratch, "describe")
+  require_tool_run ([ "view", "root-id", "--out-dir", folder, "--no-summary" ])
+  view_files = os . path . join (folder, "view_root-id.view.json")
+  require_output (
+    run_tool ([ "describe", view_files, "0a" ]),
+    "1C2: 1 note contains this one; this note contains 2 notes.\n"
+    "L2: this note links to 2 notes.\n"
+    "⌂:main: it lives in your skgrepo 'main'.\n" )
+  folder_lines = run_tool ([ "describe", view_files, "0b" ]) . stdout
+  if not folder_lines . startswith ("☮ These also contain it.: the other notes"):
+    raise CaseFailure ( f"'describe' of a folder printed {folder_lines!r}" )
 
 # ============================================================
 # The save envelope
@@ -721,7 +758,8 @@ def failures_of_reading (scratch, data_root, update_expected):
       base_name, tool_arguments, view_id, output_folder, update_expected )
   failures += failures_of_raw_and_import (scratch)
   for check in [ check_search_options, check_missing_id, check_linkstack,
-                 check_restriction_on_a_command_s_own_connection ]:
+                 check_restriction_on_a_command_s_own_connection,
+                 check_describe ]:
     try:
       check (scratch)
     except CaseFailure as failure:

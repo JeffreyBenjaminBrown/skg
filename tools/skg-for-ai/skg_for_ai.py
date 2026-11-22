@@ -189,7 +189,7 @@ def command_needs_named_port (arguments):
     return False
   if arguments . command == "linkstack":
     return arguments . action == "push"
-  if arguments . command == "chain":
+  if arguments . command in ( "chain", "describe" ):
     return False
   if arguments . command == "delete-references":
     return arguments . yes
@@ -238,6 +238,9 @@ def run_command (arguments):
     return
   if arguments . command == "chain":
     command_chain (arguments)
+    return
+  if arguments . command == "describe":
+    command_describe (arguments)
     return
   connection = connect_to_server (arguments . port)
   try:
@@ -550,6 +553,19 @@ def parse_command_line (argv):
     help = ( "the view's BASE.view.json, BASE.full.org or BASE.compact.org, "
              "or a directory holding only one view" ))
   chain_parser . add_argument (
+    "handle", help = "the headline's handle: its viewnode ID, as '0d'" )
+  describe_parser = commands . add_parser (
+    "describe",
+    help = ( "print what the headline HANDLE in VIEW is, when it is a "
+             "folder, and what each of its heralds means, one sentence a "
+             "line, most informative first, as the clients' 'C-c v ?' "
+             "shows them; it asks the server the view's sidecar names" ),
+    parents = [ port_option ] )
+  describe_parser . add_argument (
+    "view_files",
+    help = ( "the view's BASE.view.json, BASE.full.org or BASE.compact.org, "
+             "or a directory holding only one view" ))
+  describe_parser . add_argument (
     "handle", help = "the headline's handle: its viewnode ID, as '0d'" )
   linkstack_parser = commands . add_parser (
     "linkstack",
@@ -1593,6 +1609,55 @@ def ancestry_sides (metadata, relation, generation):
   return [ side for side in ( "in", "out" )
            if generation in ( relation_side (metadata, relation, side)
                               or ( 0, [] ) ) [1] ]
+
+# ============================================================
+# What a headline's heralds mean ('describe VIEW HANDLE'): the
+# sentences the server writes ('server/herald_descriptions.rs') for
+# the clients' 'skg-describe-at-point' ('C-c v ?').
+# ============================================================
+
+def command_describe (arguments):
+  """Print the sentences saying what the headline whose handle is
+  HANDLE in VIEW is, when it is a folder, and what each of its heralds
+  means, one a line, most informative first, from the server the
+  view's sidecar names."""
+  saved_view = load_saved_view (arguments . view_files)
+  require_port_of_sidecar (arguments . port, saved_view . sidecar)
+  connection = SkgConnection ( saved_view . sidecar [ "port" ] )
+  try:
+    response = connection . request (
+      describe_request_line ( saved_view . parsed_view, arguments . handle ))
+  finally:
+    connection . close ()
+  require_response_type (response, "describe-heralds")
+  error = response_field (response, "error")
+  if error is not None:
+    raise SkgToolError ( "The server could not describe it: " + sexp_to_text (error) )
+  lines = response_field (response, "lines") or []
+  for line in ( lines if isinstance (lines, list) else [ lines ] ):
+    print ( sexp_to_text (line) )
+
+def describe_request_line (parsed_view, handle):
+  """The "describe heralds" request for the headline of PARSED_VIEW
+  whose handle is HANDLE: its metadata as the full view holds it, with
+  'pendingDetachment' when it is a pending detachment, and, for a
+  folder of the diff view whose members' relationships changed,
+  whether every such change is processed ('herald_contexts')."""
+  headline = next ( ( line for line in parsed_view
+                      if line . is_headline and line . metadata is not None
+                      and headline_viewnode_id (line . metadata) == handle ),
+                    None )
+  if headline is None:
+    raise SkgToolError ( f"No headline of the view has the handle {handle}." )
+  context = herald_contexts (parsed_view) [ headline . line_number ]
+  metadata_text = headline . metadata_text
+  if context . pending_detachment:
+    metadata_text = metadata_text [ : -1 ] + " pendingDetachment)"
+  fields = [ ( "metadata", metadata_text ) ]
+  if context . folder_change is not None:
+    fields . append ( ( "folder-change",
+                        "processed" if context . folder_change else "unprocessed" ))
+  return request_line ("describe heralds", *fields)
 
 def linkstack_entry_to_push (argument, port):
   """(ID, LABEL) for ARGUMENT, a link (its label, else the node's title)
@@ -5420,10 +5485,12 @@ SIDECAR_COMMANDS = ( "save", "extend", "close", "perspective" )
 # The commands that always run in their own process: 'raw' speaks the
 # protocol directly, 'import' binds its approval to a connection of
 # its own, 'linkstack' keeps a file, asking the server at most for
-# a title, and 'chain' reads a view's files alone. ('commit --all'
+# a title, 'chain' reads a view's files alone, and 'describe' asks
+# the server only about text it reads from them. ('commit --all'
 # runs here too unless '--yes' answers for it: only a commit of
 # everything can ask for a typed yes.)
-COMMANDS_NEVER_SENT_TO_A_DAEMON = ( "raw", "import", "linkstack", "chain" )
+COMMANDS_NEVER_SENT_TO_A_DAEMON = ( "raw", "import", "linkstack", "chain",
+                                    "describe" )
 
 def command_daemon (arguments):
   """Run a daemon for the folder '--out-dir' until it is stopped, or

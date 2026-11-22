@@ -68,7 +68,9 @@ cites it ('links-here ID'), 'K' that it forks or is forked ('forest
 forks ID'), '1H' that a note hides it, so that its forks folder no
 longer shows it. That ID is the node's: the '(gnid ID)' on the line
 that 'grep "(vnid 4w)"' finds in the full view. "The heralds in the
-handle" explains the rarer heralds.
+handle" explains the rarer heralds, and 'describe VIEW 4w' says in a
+sentence each what this handle's heralds mean, its counts and letters
+read out.
 
 To change the graph, edit the compact file in place. Change a title
 or a body by editing its text. Add a node by writing a new headline,
@@ -385,6 +387,15 @@ whose '(rels ...)' names the note above among its ancestors. Where no
 edge joins a note to the one above (an indirect member of a forks
 folder, say), it refuses, naming both. It needs no server, and keeps
 no stack: write what it prints where the chain is wanted.
+
+'describe VIEW HANDLE' prints, a sentence a line, what the headline
+HANDLE in VIEW is, when it is a folder, and what each of its heralds
+means, the most informative first, with its own counts, ancestor
+letters and skgrepos read out: '2/5L: 5 notes link to this one; 2 of
+them are substantive (...)'. These are the sentences the clients'
+'skg-describe-at-point' ('C-c v ?') shows; the server the view's
+sidecar names writes them ('docs/api-and-formats.org', "Describe
+heralds"), from the headline's metadata in the full view.
 
 Options, after the command: '--port N' for every command ('save',
 'extend', 'close' and 'perspective' require the sidecar's; a
@@ -2010,6 +2021,7 @@ round and its answer reads as it is.
 | C-c U                      | skg-push-ancestry                                | 'chain VIEW HANDLE' prints the chain a paste would insert; the tool's stack keeps none                                                                        |
 | C-c o i, O i; C-c o l, O l | skg-paste-id, skg-pop-id, -link                  | 'linkstack paste id' or 'link', 'linkstack pop id' or 'link' print what to write                                                                              |
 | C-c o n, C-c O n           | skg-paste-node, skg-pop-node                     | 'linkstack paste node', 'linkstack pop node' print 'LABEL ⟨node:ID⟩'                                                                                          |
+| C-c v ?                    | skg-describe-at-point                            | 'describe VIEW HANDLE'                                                                                                                                        |
 | C-c v w                    | skg-view-without-metadata                        | needs nothing: the compact view, but for its handles                                                                                                          |
 | C-c i n, C-c i p           | skg-id-next, skg-id-prev                         | Emacs-only by nature                                                                                                                                          |
 | (keys outside views)       | the global, magit and minibuffer keys            | Emacs-only by nature                                                                                                                                          |
