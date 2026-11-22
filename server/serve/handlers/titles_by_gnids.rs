@@ -50,28 +50,12 @@ pub fn handle_titles_by_gnids_request_with_skgrepo_set (
   restriction       : &SkgrepoRestriction,
   graph             : &InRustGraph,
 ) {
-  let parsed : Sexp =
-    match sexp::parse (request) {
-      Ok (s) => s,
-      Err (e) => {
-        tracing::error! (
-          "titles_by_ids: failed to parse request: {}", e );
-        send_error_response (stream, &format! (
-          "Failed to parse request: {}", e ));
-        return; } };
-  let id_strings : Vec<String> =
-    match extract_string_list_from_sexp (&parsed, "ids") {
-      Ok (gnids) => gnids,
-      Err (e) => {
-        tracing::error! (
-          "titles_by_ids: failed to extract ids: {}", e );
-        send_error_response (stream, &format! (
-          "Failed to extract ids: {}", e ));
-        return; } };
   let gnids : Vec<ID> =
-    id_strings . into_iter ()
-    . map (ID)
-    . collect ();
+    match requested_gnids_else_logged_error (request) {
+      Ok (gnids) => gnids,
+      Err (error) => {
+        send_error_response (stream, &error);
+        return; } };
   let mut title_map : HashMap<ID, String> =
     titles_by_gnids (tantivy_index, &gnids);
   let skgrepo_diffs : Option<HashMap<SkgrepoName, SkgrepoDiff>> =
@@ -83,31 +67,10 @@ pub fn handle_titles_by_gnids_request_with_skgrepo_set (
       &mut title_map, &gnids, skgrepo_diffs );
     add_deleted_node_titles_by_gnids (
       &mut title_map, &gnids, skgrepo_diffs ); }
-  title_map . retain ( |gnid, _| {
-    restriction . is_unrestricted () // a gnid no store resolves (a deleted node's) keeps its title
-    || match graph . gnid_presence_gated (gnid, restriction) {
-         GnidPresence::Present    => true,
-         GnidPresence::Restricted => false,
-         GnidPresence::Absent     => // the graph lacks it: the other stores' home
-           title_and_skgrepo_by_gnid (tantivy_index, gnid)
-           . map (|(_, skgrepo)| skgrepo)
-           . or_else (|| home_from_disk (gnid, config))
-           . is_some_and ( |home| ! SkgrepoRestriction::node_is_restricted (
-             restriction, &home )), }} );
-  let requested : HashSet<ID> = gnids . iter () . cloned () . collect ();
-  let mut overPrivateText_pids : Vec<ID> = gnids . iter ()
-    . filter_map ( |gnid| graph . pid_of (gnid) )
-    . filter ( |pid| graph . get (pid)
-      . map ( |node| node . overPrivateText_telescope )
-      . unwrap_or (false) )
-    . collect ();
-  if let Some (skgrepo_diffs) = &skgrepo_diffs {
-    for skgrepo_diff in skgrepo_diffs . values () {
-      for node in skgrepo_diff . added_nodes . values ()
-        . chain (skgrepo_diff . deleted_nodes . values ()) {
-        if node . overPrivateText_telescope
-           && node . all_gnids () . any ( |gnid| requested . contains (gnid) ) {
-          overPrivateText_pids . push (node . pid . clone ()); }}}}
+  retain_titles_the_restriction_shows (
+    &mut title_map, graph, tantivy_index, config, restriction );
+  let overPrivateText_pids : Vec<ID> =
+    overPrivateText_pids_requested (graph, &gnids, &skgrepo_diffs);
   let release = decide_for_overPrivateText_pids (
     "titles-by-ids", restriction, overPrivateText_pids,
     &approved_pids_from_request (request) );
@@ -118,6 +81,84 @@ pub fn handle_titles_by_gnids_request_with_skgrepo_set (
   let warnings : Vec<String> = match release {
     TextReleaseDecision::AllowWithWarning { warning } => vec! [warning],
     _ => Vec::new (), };
+  send_response_with_length_prefix (
+    stream, &titles_by_ids_response (&title_map, &warnings) ); }
+
+/// The IDs a request asks titles for; else the error to send, which
+/// is logged first.
+fn requested_gnids_else_logged_error (
+  request : &str,
+) -> Result<Vec<ID>, String> {
+  let parsed : Sexp =
+    match sexp::parse (request) {
+      Ok (s) => s,
+      Err (e) => {
+        tracing::error! (
+          "titles_by_ids: failed to parse request: {}", e );
+        return Err ( format! (
+          "Failed to parse request: {}", e )); } };
+  let id_strings : Vec<String> =
+    match extract_string_list_from_sexp (&parsed, "ids") {
+      Ok (gnids) => gnids,
+      Err (e) => {
+        tracing::error! (
+          "titles_by_ids: failed to extract ids: {}", e );
+        return Err ( format! (
+          "Failed to extract ids: {}", e )); } };
+  Ok ( id_strings . into_iter ()
+       . map (ID)
+       . collect () ) }
+
+/// Keep only the titles of nodes the skgrepo restriction shows.
+fn retain_titles_the_restriction_shows (
+  title_map     : &mut HashMap<ID, String>,
+  graph         : &InRustGraph,
+  tantivy_index : &TantivyIndex,
+  config        : &SkgConfig,
+  restriction   : &SkgrepoRestriction,
+) {
+  title_map . retain ( |gnid, _| {
+    restriction . is_unrestricted () // a gnid no store resolves (a deleted node's) keeps its title
+    || match graph . gnid_presence_gated (gnid, restriction) {
+         GnidPresence::Present    => true,
+         GnidPresence::Restricted => false,
+         GnidPresence::Absent     => // the graph lacks it: the other stores' home
+           title_and_skgrepo_by_gnid (tantivy_index, gnid)
+           . map (|(_, skgrepo)| skgrepo)
+           . or_else (|| home_from_disk (gnid, config))
+           . is_some_and ( |home| ! SkgrepoRestriction::node_is_restricted (
+             restriction, &home )), }} ); }
+
+/// The pids of the overPrivateText nodes among those requested: in
+/// the graph, then among the nodes the git diff shows added or
+/// deleted, when it was read.
+fn overPrivateText_pids_requested (
+  graph         : &InRustGraph,
+  gnids         : &[ID],
+  skgrepo_diffs : &Option<HashMap<SkgrepoName, SkgrepoDiff>>,
+) -> Vec<ID> {
+  let requested : HashSet<ID> = gnids . iter () . cloned () . collect ();
+  let mut overPrivateText_pids : Vec<ID> = gnids . iter ()
+    . filter_map ( |gnid| graph . pid_of (gnid) )
+    . filter ( |pid| graph . get (pid)
+      . map ( |node| node . overPrivateText_telescope )
+      . unwrap_or (false) )
+    . collect ();
+  if let Some (skgrepo_diffs) = skgrepo_diffs {
+    for skgrepo_diff in skgrepo_diffs . values () {
+      for node in skgrepo_diff . added_nodes . values ()
+        . chain (skgrepo_diff . deleted_nodes . values ()) {
+        if node . overPrivateText_telescope
+           && node . all_gnids () . any ( |gnid| requested . contains (gnid) ) {
+          overPrivateText_pids . push (node . pid . clone ()); }}}}
+  overPrivateText_pids }
+
+/// The 'titles-by-ids' answer: an alist of (id . title) pairs, and
+/// the warnings.
+fn titles_by_ids_response (
+  title_map : &HashMap<ID, String>,
+  warnings  : &[String],
+) -> String {
   let content_pairs : Vec<String> =
     title_map . iter ()
     . map ( |(gnid, title)|
@@ -126,15 +167,13 @@ pub fn handle_titles_by_gnids_request_with_skgrepo_set (
         quote_sexp_string (gnid . as_str ()),
         quote_sexp_string (title)) )
     . collect ();
-  let response : String =
-    format! (
-      "((response-type {}) (content ({})) (warnings ({})))",
-      TcpToClient::TitlesByIds . repr_in_client (),
-      content_pairs . join (" "),
-      warnings . iter ()
-      . map ( |warning| quote_sexp_string (warning) )
-      . collect::<Vec<String>> () . join (" ") );
-  send_response_with_length_prefix (stream, &response); }
+  format! (
+    "((response-type {}) (content ({})) (warnings ({})))",
+    TcpToClient::TitlesByIds . repr_in_client (),
+    content_pairs . join (" "),
+    warnings . iter ()
+    . map ( |warning| quote_sexp_string (warning) )
+    . collect::<Vec<String>> () . join (" ") ) }
 
 pub fn add_deleted_node_titles_by_gnids (
   title_map     : &mut HashMap<ID, String>,
