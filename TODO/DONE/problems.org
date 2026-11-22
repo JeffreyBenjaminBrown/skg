@@ -22,15 +22,6 @@
   'mk_removed_child_viewnode', is gone; the diff view is now drawn
   over the graph straddle ('docs/diff-view.org'), with no per-stage
   axes.
-* Three Graphnode parses per changed file in 'compute_diff_for_repo' (fixed 2026-11-22)
-  server/git_ops/diff.rs.
-  For each changed file we now load HEAD, index, and worktree YAML
-  blobs and parse them into Graphnodes. A small skgrepo with N changed
-  files does 3N parses. At current sizes this is fine but worth
-  measuring on a larger garden.
-  Fixed: 'compute_diff_for_skgrepo' ('server/git_ops/diff.rs') now
-  reads one side of each added or deleted file only, and no modified
-  file; nothing read the per-stage diffs it used to build.
 * 'NotInGit' is per-repo but stamped per-vognode (obsolete 2026-11-22)
   server/to_org/render/diff.rs / process_truenode_diff.
   Every active vognode in a non-gitrepo gets 'not_in_git = true'. The

@@ -42,7 +42,8 @@ enum Stage { Staged, Unstaged }
 /// 'stage' adds, as the stage leaves it (the index for staged, the
 /// worktree for unstaged), and of each it deletes, as the stage found
 /// it (HEAD for staged, the index for unstaged). A modified file adds
-/// and deletes no node, so it is not read.
+/// and deletes no node; both its sides are read only so that one that
+/// fails to parse is warned about.
 fn add_nodes_added_and_deleted_by_stage (
   skgrepo_path : &Path,
   gitrepo      : &git2::Repository,
@@ -56,20 +57,25 @@ fn add_nodes_added_and_deleted_by_stage (
     let rel_path : PathBuf =
       path_relative_to_gitrepo ( gitrepo, &abs_path )
         . unwrap_or_else ( || entry . path . clone() );
+    let load_before = || -> Option<Graphnode> {
+      match stage {
+        Stage::Staged   => load_from_head  (gitrepo, &rel_path),
+        Stage::Unstaged => load_from_index (gitrepo, &rel_path), } };
+    let load_after = || -> Option<Graphnode> {
+      match stage {
+        Stage::Staged   => load_from_index (gitrepo, &rel_path),
+        Stage::Unstaged => load_from_disk  (&abs_path), } };
     match entry . status {
       GitDiffStatus::Added => {
-        let added : Option<Graphnode> = match stage {
-          Stage::Staged   => load_from_index (gitrepo, &rel_path),
-          Stage::Unstaged => load_from_disk  (&abs_path), };
-        if let Some (node) = added {
+        if let Some (node) = load_after () {
           skgrepo_diff . added_nodes . insert ( node . pid . clone(), node ); }},
       GitDiffStatus::Deleted => {
-        let deleted : Option<Graphnode> = match stage {
-          Stage::Staged   => load_from_head  (gitrepo, &rel_path),
-          Stage::Unstaged => load_from_index (gitrepo, &rel_path), };
-        if let Some (node) = deleted {
+        if let Some (node) = load_before () {
           skgrepo_diff . deleted_nodes . insert ( node . pid . clone(), node ); }},
-      GitDiffStatus::Modified => {}, }} }
+      GitDiffStatus::Modified => {
+        // Read for the warning a side that fails to parse logs.
+        let _ : Option<Graphnode> = load_before ();
+        let _ : Option<Graphnode> = load_after (); }, }} }
 
 /// Parses a GraphnodeOnDisk from a YAML blob, then attaches a default
 /// (empty) skgrepo to produce a Graphnode. This preserves today's

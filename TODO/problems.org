@@ -597,6 +597,16 @@ gap too. Details, options and questions:
    deliberately ignored rather than rejected: a Delete or nodeMerge
    request on a subscribee-as-such is silently dropped, which validation
    could instead flag.
+* Two Graphnode parses per modified file in 'compute_diff_for_skgrepo'
+  'server/git_ops/diff.rs', which only 'titles-by-ids' calls, for
+  nodes the search index lacks. Only added and deleted files name
+  nodes it wants, and each of those is read on one side. But a
+  modified file is read and parsed on both sides of each stage (HEAD
+  and the git index for staged, the git index and the worktree for
+  unstaged) and the nodes dropped, only so that a side that fails to
+  parse is warned about in the server log. Dropping those reads would
+  drop that warning. At current sizes this is fine but worth measuring
+  on a larger garden.
 * Other problems
 ** Windows packaging request names scripts as top-level =bash/= scripts, but they live in =data/bash/=
    The requested files =pull-all.sh=, =push-all.sh=, =remote-all.sh=,

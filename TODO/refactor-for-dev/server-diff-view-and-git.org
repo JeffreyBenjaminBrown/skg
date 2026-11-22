@@ -18,8 +18,8 @@
    diffs and an 'is_gitrepo' flag that nothing read, and
    'compute_diff_for_skgrepo' ('server/git_ops/diff.rs') parsed both
    sides of every modified file only to drop them. It now reads one
-   side of each added or deleted file. Only the server log differs: a
-   modified file that fails to parse is no longer warned about there.
+   side of each added or deleted file, and both sides of a modified
+   one only for the warning a side that fails to parse logs.
 ** The IDs a merge re-resolves are found by 'reresolved_extra_ids_of' alone
    'recorders_of_reresolved_members' ('server/diff_view/change_leaves.rs')
    repeated the search and its two closures.
@@ -29,9 +29,10 @@
    'server/diff_view/named_leaf_set.rs' takes the set algebra that
    validation reads too, out of 'processed_requests.rs' (736 lines,
    now 483).
-** Three problem entries went to 'TODO/DONE/problems.org'
-   Two named 'server/to_org/', which is gone; the third, three parses
-   per changed file, is the first item above. The entry on the
+** Two problem entries went to 'TODO/DONE/problems.org'
+   Both named 'server/to_org/', which is gone. The entry on parses
+   per changed file now says what is left: a modified file's two
+   sides are read only for their parse warnings. The entry on the
    repo-wide pathspec names today's files, and records a latent slip
    of the same kind in 'diff.rs' (a gitrepo-relative path joined to
    the skgrepo's path).
