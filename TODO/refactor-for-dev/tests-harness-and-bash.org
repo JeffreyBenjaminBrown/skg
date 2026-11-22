@@ -1,0 +1,78 @@
+* Refactoring the test harness and 'bash/' for the next agent
+  The territory: the runners ('bash/all-tests.sh',
+  'bash/test-runner-lib.sh', 'bash/emacs-tests.sh',
+  'bash/nvim-tests.sh', 'bash/quiet-test.sh', 'bash/integration-tests.sh',
+  a symlink to 'tests/integration/run-all-tests.sh'), the integration
+  harness ('tests/integration/test-lib.sh', 'test-nvim-lib.lua',
+  'test-wait.el'), the Rust support ('server/test_utils.rs',
+  'server/test_utils/', 'tests/shared/'), 'tests/nvim/minimal_init.lua',
+  and the rest of 'bash/' except 'start-servers.sh', 'stop-servers.sh'
+  and 'run-skg-rerunning-on-exit.sh', which live servers run. What a
+  test checks, a fixture's content and which tests run are not yours.
+  To try a change to 'all-tests.sh' without the twenty-minute run,
+  copy it beside a copy of 'test-runner-lib.sh' in a scratch tree
+  whose 'tests/integration/' holds two stub 'run-test.sh' (one
+  failing), and 'sed' each 'suite_*' function into 'echo ok; return
+  0' or a failure; 'bash/all-tests.sh' then runs in a second.
+* Done
+** 'all-tests.sh' runs each suite through 'run_suite', from one table
+   Seven copies of the run/time/record block, and seven of its summary
+   and ALL.org lines, became one function per suite ('suite_emacs' and
+   so on) and one 'run_suite LABEL LOG FUNCTION PATTERN' line each; the
+   summary and ALL.org loop over the 'SUITE_*' arrays.
+   'integration_log_name' names an integration log.
+** In a linked worktree, the AI reader's test port comes from the worktree's path
+   'skg_port_for_this_checkout' ('test-runner-lib.sh'): the main
+   checkout keeps 1793; a linked worktree gets an even port in
+   18000-19998 hashed from its path. 'all-tests.sh' uses it when
+   'SKG_FOR_AI_TEST_PORT' is unset, and prints the port.
+** The Neovim unit tests' nvims leave the user's ShaDa file alone
+   '-i NONE' in 'nvim-tests.sh', 'shadafile' 'NONE' in
+   'minimal_init.lua'. The integration tests' 'nvim -l' already skipped
+   ShaDa.
+** ALL.org quotes the failure lines of a failed suite and integration test
+   'failure_lines_of_log' greps the suite's pattern (ERT's FAILED,
+   plenary's Fail, nextest's FAIL and Summary, ...), or takes the log's
+   tail, into an example block under the FAIL headline; an integration
+   test that fails its retry gets its FAIL, TIMEOUT, ERROR and "Last
+   phase:" lines.
+** problems.org brought up to date for this territory
+   The git_diff_view matcher entry is obsolete (that suite is gone);
+   the near-duplicate setup entry names today's helpers; a new entry
+   says the completion sound never plays.
+* Candidates left, best first
+** Give the integration tests' 'run-test.sh' a shared prologue
+   40 files, 80 to 160 lines each, repeat the same prologue: find a
+   port, make 'TEMP_CONFIG' inside 'data/', write a config whose first
+   three lines are always the same, start the server, run the client
+   test, exit. 35 of them write the same three header lines; 22 define
+   an 'enhanced_cleanup' that differs per test in what it restores. A
+   helper in 'test-lib.sh' (say 'write_test_config_header' and
+   'run_server_and_client_test') would cut each file to its test's own
+   parts and make a new test cheaper to write. Safe if mechanical, but
+   the diff is wide and the variants (config outside 'data/', custom
+   traps, 'import-md-and-org' with no config) need care; run both
+   client passes of every directory.
+** Unify 'run_with_skgrepo_set_test_db' with 'run_with_test_stores'
+   'server/test_utils.rs'. The skgrepo-set runner neither takes
+   'TEST_STORE_GROUPS_MUTEX' nor catches a panic to clean up, so its
+   temporary folders leak when a test panics. Sharing the guard and
+   cleanup path would change behaviour only on panic, and only for the
+   better; four test files call it. Also: 'setup_test_stores' in
+   'tests/collateral_repo_move.rs' and the one-line wrappers of
+   'tests/forks_folder_by_default.rs' (problems.org, "Six
+   near-duplicate test-db setup paths").
+** Make 'run-all-tests.sh' share 'all-tests.sh''s integration loop
+   'bash/integration-tests.sh' (that symlink) runs the integration
+   tests in parallel, Emacs only, writing 'tests.log' beside them;
+   'all-tests.sh' runs them sequentially per client with a retry. Two
+   loops over the same directories, with different log places. Which
+   one Jeff still uses decides whether to merge or delete; ask.
+** ? Give the team tools' 'test_pacer.py' a longer timeout under load
+   'tools/team/' is off-limits to this territory. Its 15-second waits
+   timed out when three suites ran at once. If Jeff says nothing, it
+   stays as it is.
+** ? Fix the completion sound
+   problems.org, "all-tests.sh never plays its completion sound". A
+   bug fix, so it needs Jeff's yes; if he says nothing, it stays
+   silent.
