@@ -25,9 +25,7 @@ local response_types = {
 }
 
 local function cleanup ()
-  for _, kind in ipairs(response_types) do
-    state.response_handler_map[kind] = nil
-  end
+  state.unregister_response_handlers(response_types)
 end
 
 local function send (fields, input_directory, destination_skgrepo)

@@ -198,7 +198,8 @@ function M.register_rerender_stream_handlers ()
   state.register_response_handler('rerender-lock',
     function (_payload_text, response)
       if not M.overPrivateText_challenged then
-        state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
+        state.unregister_response_handlers(
+          { 'overPrivateText-telescope-confirmation' })
       end
       local ok, err = pcall(function ()
         local lock_views = payload.field(response, 'lock-views')
@@ -222,7 +223,7 @@ function M.register_rerender_stream_handlers ()
     end, false) -- non-one-shot: fires for each streamed view
   state.register_response_handler('rerender-done',
     function (_payload_text, response)
-      state.response_handler_map['rerender-view'] = nil
+      state.unregister_response_handlers({ 'rerender-view' })
       lock.end_stream()
       lock.unlock_all_save_locked() -- safety net
       local ok, err = pcall(function ()

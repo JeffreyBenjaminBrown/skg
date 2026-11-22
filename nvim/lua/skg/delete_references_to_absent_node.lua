@@ -19,15 +19,6 @@ local state = require('skg.state')
 
 local M = {}
 
-local function remove_unfired_handlers (types)
-  for _, response_type in ipairs(types) do
-    if state.response_handler_map[response_type] then
-      state.response_handler_map[response_type] = nil
-      state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-    end
-  end
-end
-
 local function send (gnid, approved_preview)
   local request = { sexpr.pair(sexpr.symbol('request'), 'delete references to absent node'),
                     sexpr.pair(sexpr.symbol('id'), gnid) }
@@ -36,7 +27,8 @@ local function send (gnid, approved_preview)
   rerender.send_streaming_request('delete absent references',
     'delete-references-confirmation', request,
     function (_text, response)
-      remove_unfired_handlers({ 'delete-references-result', 'error' })
+      state.unregister_response_handlers(
+        { 'delete-references-result', 'error' })
       local content = messages.with_neovim_bindings(
         payload.field_text(response, 'content') or '')
       local approval = payload.field_text(response, 'approved-preview') or ''
@@ -50,15 +42,15 @@ local function send (gnid, approved_preview)
         rerender.after_empty_stream = function () send(gnid, approval) end end
     end,
     { ['delete-references-result'] = function (_text, response)
-        remove_unfired_handlers({ 'error' })
+        state.unregister_response_handlers({ 'error' })
         vim.notify(payload.field_text(response, 'content') or
                    'Absent-reference cleanup complete')
       end,
       ['error'] = function (_text, response)
         -- The dispatcher removes `error' itself.  Remove only terminal
         -- alternatives that can no longer arrive.
-        remove_unfired_handlers({ 'delete-references-confirmation',
-                         'delete-references-result' })
+        state.unregister_response_handlers({ 'delete-references-confirmation',
+                                           'delete-references-result' })
         vim.notify('skg absent-reference cleanup: ' ..
                    (payload.field_text(response, 'content') or 'server error'),
                    vim.log.levels.ERROR)

@@ -47,7 +47,8 @@ function M.request_single_root_content_view_from_id (node_gnid,
   local view_id = existing_view_id or buffer.generate_uuid()
   state.register_response_handler('content-view',
     function (payload_text, response)
-      state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
+      state.unregister_response_handlers(
+        { 'overPrivateText-telescope-confirmation' })
       M.handle_content_view_sexp(payload_text, response, view_id)
     end, true)
   -- Alternative to content-view. It is non-one-shot so the pending

@@ -114,12 +114,14 @@ function M.send_text_search_request (search_terms, regex, body, operators,
   local request = sexpr.to_string(request_form) .. '\n'
   state.register_response_handler('search-results',
     function (_payload_text, response)
-      state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
+      state.unregister_response_handlers(
+        { 'overPrivateText-telescope-confirmation' })
       M.display_search_results(response, search_terms)
     end, true)
   state.register_response_handler('overPrivateText-telescope-confirmation',
     function (_payload_text, response)
-      state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
+      state.unregister_response_handlers(
+        { 'overPrivateText-telescope-confirmation' })
       M.forget_search_results_handler()
       local prompt = payload.field_text(response, 'prompt') or
         'Include overPrivateText telescopes in this search?'
@@ -135,15 +137,14 @@ end
 ---Drop the one-shot 'search-results' handler, if it is still waiting,
 ---and the response it was counted as.
 function M.forget_search_results_handler ()
-  if state.response_handler_map['search-results'] then
-    state.response_handler_map['search-results'] = nil
-    state.lp_pending_count = math.max(0, state.lp_pending_count - 1) end
+  state.unregister_response_handlers({ 'search-results' })
 end
 
 ---Unwind the search handlers after a local send failure.
 function M.cancel_locally_failed_search ()
   M.forget_search_results_handler()
-  state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
+  state.unregister_response_handlers(
+    { 'overPrivateText-telescope-confirmation' })
 end
 
 ---Display the search buffer: a view buffer registered under the

@@ -41,7 +41,8 @@ function M.export_some_to_org (repo_set, output_dir, approved_pids)
   end
   state.register_response_handler('export-to-org',
     function (_payload_text, response)
-      state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
+      state.unregister_response_handlers(
+        { 'overPrivateText-telescope-confirmation' })
       M.export_to_org_handler(response)
     end, true)
   length_prefix.register_overPrivateText_confirmation_instead_of(
