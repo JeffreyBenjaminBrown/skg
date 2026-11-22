@@ -14,6 +14,9 @@
 #   steps write elsewhere: the .elc files beside their sources in
 #   elisp/, the server binary under target/.) The script's own files:
 #   - stop-servers.sh, which stops this start (rewritten at every start).
+#     It signals this script's process group, and records, in a comment,
+#     this script's start time as the kernel states it, by which
+#     bash/stop-servers.sh knows the PID still names this start.
 #   - start-servers.START.log, one per start, START its UTC time
 #     (YYYY-MM-DDTHH-MM-SSZ): the output of the rerun loop, and of
 #     cargo-watch with --hot-reload.
@@ -38,8 +41,9 @@
 #   - If foregrounded at command line, use
 #     Ctrl-C
 #   - If in background at command line, run
-#       CONFIG.running/stop-servers.sh
-#     or do it yourself:
+#       bash/stop-servers.sh [CONFIG]
+#     which runs CONFIG.running/stop-servers.sh after checking that
+#     its PID still names this start, or do it yourself:
 #       kill -TERM -PID # kills the whole group
 #     If you do it yourself, the PID was printed when it started,
 #       and if that printout is buried, can be found running `ps -af`.
@@ -235,6 +239,20 @@ run_skg_without_hot_reload() {
   fi
 }
 
+start_time_in_clock_ticks_since_boot() {
+  # Prints the start time of the process whose PID is $1, as the kernel
+  # states it: field 22 of /proc/PID/stat. With the PID it identifies
+  # the process, and it never changes while the process lives.
+  # PITFALL: field 2, the command name, may contain spaces and
+  # parentheses, so the fields are counted from after the last ')',
+  # where field 3 begins.
+  local stat
+  local -a fields_from_the_third
+  stat="$( cat "/proc/$1/stat" 2>/dev/null )" || return 1
+  read -r -a fields_from_the_third <<< "${stat##*) }"
+  echo "${fields_from_the_third[19]}"
+}
+
 cleanup() { # trap handler for graceful shutdown
   echo ""
   echo "Shutting down skg server..."
@@ -260,11 +278,14 @@ echo "Process group: $(ps -o pgid= -p $$)"
 mkdir -p "$RUN_FOLDER"
 echo "Run folder: $RUN_FOLDER/"
 
-# Create kill script for easy shutdown
-echo "#!/bin/bash" >     "$RUN_FOLDER/stop-servers.sh"
-echo "kill -TERM -$$" >> "$RUN_FOLDER/stop-servers.sh"
-chmod +x                 "$RUN_FOLDER/stop-servers.sh"
-echo "Created $RUN_FOLDER/stop-servers.sh - run it to stop all servers"
+# Create kill script for easy shutdown. bash/stop-servers.sh reads both
+# the PID and the start time from it, by the exact form of these lines.
+{ echo "#!/bin/bash"
+  echo "# start time in clock ticks since boot: $( start_time_in_clock_ticks_since_boot $$ )"
+  echo "kill -TERM -$$"
+} >      "$RUN_FOLDER/stop-servers.sh"
+chmod +x "$RUN_FOLDER/stop-servers.sh"
+echo "Created $RUN_FOLDER/stop-servers.sh - bash/stop-servers.sh $CONFIG runs it to stop all servers"
 
 # The script log, created now, so it exists even if the start stops early.
 : >> "$SCRIPT_LOG"
