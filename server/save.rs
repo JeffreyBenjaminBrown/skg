@@ -55,9 +55,8 @@ fn graph_preparation_save_error (
 ///   1) Filesystem (source of truth)
 ///   2) immutable in-Rust graph swap-in
 ///   3) Tantivy background update
-/// Always returns `None`: the search-index update is queued, and a
-/// background failure is logged, never answered by a rebuild here
-/// ('enqueue_tantivy_delta').
+/// The search-index update is queued, and a background failure is
+/// logged, never answered by a rebuild here ('enqueue_tantivy_delta').
 pub async fn update_graph_minus_nodeMerges (
   node_defs     : Vec<NodeInstruction>,
   skgrepo_moves : &[SkgrepoMove],
@@ -65,7 +64,7 @@ pub async fn update_graph_minus_nodeMerges (
   tantivy_index : &TantivyIndex,
   graph         : &InRustGraphHandle,
   mutation_gate : &MutationGate,
-) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
+) -> Result < (), Box<dyn Error> > {
   let _mutation_guard = mutation_gate . lock () . await;
   update_graph_minus_nodeMerges_with_hoist_approval (
     node_defs, skgrepo_moves, config, tantivy_index, graph,
@@ -79,7 +78,7 @@ pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
   tantivy_index       : &TantivyIndex,
   graph               : &InRustGraphHandle,
   approved_hoist_pids : &HashSet<ID>,
-) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
+) -> Result < (), Box<dyn Error> > {
   tracing::info!("Updating filesystem, in-Rust graph, and Tantivy ...");
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "apply_delete_propagation_cleanup" ). entered();
@@ -103,7 +102,7 @@ pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
                            tantivy_index,
                            graph ) ?;
   emit_telescope_warnings (&telescope_warnings);
-  Ok (None) }
+  Ok (( )) }
 
 fn apply_nodeInstructions (
   prepared      : PreparedGraphUpdate,

@@ -121,7 +121,7 @@ async fn exercise_rejected_revocation (
   let mut saved : Graphnode = graphnode_from_gnid (config, &ID::from ("P")) ?;
   saved . extra_ids . clear ();
 
-  let result : Result<Option<TantivyIndex>, Box<dyn Error>> =
+  let result : Result<(), Box<dyn Error>> =
     update_graph_minus_nodeMerges (
     vec![NodeInstruction::Save (SaveNode (saved))], &[], config . clone (),
     tantivy, &graph, &new_mutation_gate ()) . await;

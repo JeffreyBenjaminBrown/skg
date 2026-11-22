@@ -111,13 +111,10 @@ async fn test_move_node_to_another_owned_skgrepo (
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
-    let replacement : Option<TantivyIndex> =
-      update_graph_minus_nodeMerges (
-        save_plan . node_instructions, &save_plan . skgrepo_moves,
-        config . clone(), &tantivy_index,
-        &graph, &skg::types::env::new_mutation_gate () ) . await?;
-    if let Some (new_idx) = replacement {
-      *tantivy_index = new_idx; }
+    update_graph_minus_nodeMerges (
+      save_plan . node_instructions, &save_plan . skgrepo_moves,
+      config . clone(), &tantivy_index,
+      &graph, &skg::types::env::new_mutation_gate () ) . await?;
     audit_inrustgraph_or_panic (&graph)?;
 
     { // FS: old file should be gone, new file should exist
@@ -202,13 +199,10 @@ async fn test_move_node_referenced_by_extra_id (
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
-    let replacement : Option<TantivyIndex> =
-      update_graph_minus_nodeMerges (
-        save_plan . node_instructions, &save_plan . skgrepo_moves,
-        config . clone(), &tantivy_index,
-        &graph, &skg::types::env::new_mutation_gate () ) . await?;
-    if let Some (new_idx) = replacement {
-      *tantivy_index = new_idx; }
+    update_graph_minus_nodeMerges (
+      save_plan . node_instructions, &save_plan . skgrepo_moves,
+      config . clone(), &tantivy_index,
+      &graph, &skg::types::env::new_mutation_gate () ) . await?;
     audit_inrustgraph_or_panic (&graph)?;
 
     { // FS: old file gone, new file present
@@ -266,13 +260,10 @@ async fn test_move_multiple_nodes (
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
-    let replacement : Option<TantivyIndex> =
-      update_graph_minus_nodeMerges (
-        save_plan . node_instructions, &save_plan . skgrepo_moves,
-        config . clone(), &_tantivy_index,
-        &graph, &skg::types::env::new_mutation_gate () ) . await?;
-    if let Some (new_idx) = replacement {
-      *_tantivy_index = new_idx; }
+    update_graph_minus_nodeMerges (
+      save_plan . node_instructions, &save_plan . skgrepo_moves,
+      config . clone(), &_tantivy_index,
+      &graph, &skg::types::env::new_mutation_gate () ) . await?;
     audit_inrustgraph_or_panic (&graph)?;
 
     { // FS
@@ -444,13 +435,10 @@ async fn test_skgrepo_only_change_with_populated_pool (
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
-    let replacement : Option<TantivyIndex> =
-      update_graph_minus_nodeMerges (
-        save_plan . node_instructions, &save_plan . skgrepo_moves,
-        config . clone(), &tantivy_index,
-        &graph, &skg::types::env::new_mutation_gate () ) . await?;
-    if let Some (new_idx) = replacement {
-      *tantivy_index = new_idx; }
+    update_graph_minus_nodeMerges (
+      save_plan . node_instructions, &save_plan . skgrepo_moves,
+      config . clone(), &tantivy_index,
+      &graph, &skg::types::env::new_mutation_gate () ) . await?;
     audit_inrustgraph_or_panic (&graph)?;
 
     { // FS: old file gone, new file present
