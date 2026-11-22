@@ -109,7 +109,151 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
   perspective        : Perspective,
   is_diff_view       : bool,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
-  let ( mut viewforest, parsing_errors, parsing_warnings, supplied )
+  let ( mut viewforest, parsing_warnings, supplied )
+    : ( ViewForest, Vec<String>, WhatTheParseSupplied )
+    = parse_and_validate_buffer (
+        buffer_text, graph, config, skgrepo_restriction, baseline,
+        &perspective ) ?;
+  let refusal = |errors : Vec<BufferValidationError>| -> SaveError {
+    // Warnings always accompany errors (decided 2026-06-12): the
+    // parse-time warnings collected so far ride out with the abort.
+    SaveError::BufferValidationErrors {
+      errors, warnings : parsing_warnings . clone () } };
+  let refuse_unless_empty = |errors : Vec<BufferValidationError>|
+  -> Result<(), SaveError> {
+    if errors . is_empty () { Ok (()) } else { Err (refusal (errors)) } };
+  let ( nonmerge_plan, nodeMerge_acquisitions )
+    : ( NonmergeSavePlan, Vec<(ID, ID)> )
+    = crate::from_text::local_fieldintent_collection
+      ::extract_nonmergeSavePlan_locally_in_graph (
+        &viewforest, graph, config, skgrepo_restriction, is_diff_view )
+ . map_err (SaveError::DatabaseError) ?;
+  let ( nonmerge_plan, unedited_stale_graphnodes )
+    : ( NonmergeSavePlan, Vec<UneditedStaleGraphnode> ) =
+  { // Before any validator judges them: an unedited stale graphnode
+    // is neither forked nor moved back, and never refuses the save.
+    let (node_instructions, skgrepo_moves, unedited)
+      : (Vec<NodeInstruction>, Vec<SkgrepoMove>, Vec<UneditedStaleGraphnode>) =
+      without_unedited_stale_saves (
+        graph, &baseline . writes,
+        nonmerge_plan . node_instructions, nonmerge_plan . skgrepo_moves );
+    ( NonmergeSavePlan { node_instructions, skgrepo_moves, .. nonmerge_plan },
+      unedited ) };
+  refuse_unless_empty (
+    // A flag preference is never an implicit-fork gesture.
+    // Validate while its side-channel identity is still available; the
+    // ordinary foreign-write filter below sees only supplemented SaveNodes.
+    errors_for_flag_edits (&nonmerge_plan . flag_targets, graph, config) ) ?;
+  let nodeMerge_pairs : Vec<(ID, ID)> =
+    // A merge request only plans mutations; it does not mutate the saved
+    // viewforest. After a successful skgsave-commit, the common edit-request
+    // consumption boundary in update_views_after_save clears this request
+    // together with every other `(editRequest ...)` carrier.
+    // The acquiree is resolved from the ID as written (possibly an
+    // extra ID) to its pid, so every later comparison is by pid.
+    nodeMerge_acquisitions . into_iter ()
+    . map ( |(acquirer, acquiree)| (
+      graph . pid_else_raw_id (&acquirer),
+      graph . pid_else_raw_id (&acquiree) ))
+    . collect ();
+  let ( clone_skgrepo_inputs, adopt_clone_skgrepo )
+    : ( CloneSkgrepoInputs, HashMap<ID, ID> ) =
+    clone_skgrepo_inputs_from_viewforest (
+      &viewforest, &supplied, config, skgrepo_restriction, fork_skgrepos );
+  let ( mut node_instructions, fork_specs )
+    : ( Vec<NodeInstruction>, Vec<ForkSpec> ) =
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "validate_and_filter_foreign_instructions" ). entered();
+      validate_and_filter_foreign_instructions (
+        nonmerge_plan . node_instructions,
+        &nodeMerge_pairs,
+        graph,
+        &clone_skgrepo_inputs,
+        &adopt_clone_skgrepo,
+        config,
+        skgrepo_restriction )
+ } . map_err (refusal) ?;
+  // A reply typed in the unread list files the message it answers in
+  // the forker, now that the forks are known; before the checks
+  // below, which judge that write too. The saved view moves the
+  // message there too, so the rerender draws it where it now lives.
+  file_what_is_written_in::file_forkee_members_written_in (
+    &mut viewforest, graph, config, skgrepo_restriction, &fork_specs,
+    & unedited_stale_graphnodes . iter ()
+      . map ( |node| node . pid . clone () ) . collect (),
+    &mut node_instructions )
+    . map_err ( |error| refusal (
+      vec! [ BufferValidationError::Other (error) ] )) ?;
+  refuse_unless_empty (
+    // A record that would land where the skgrepo restriction keeps
+    // it out of sight is refused, before anything is written.
+    refuse_records_landing_restricted (
+      &node_instructions, graph, skgrepo_restriction )) ?;
+  validate_no_simultaneous_move_and_nodeMerge (
+    &nonmerge_plan . skgrepo_moves, &nodeMerge_pairs )
+    . map_err (refusal) ?;
+  validate_no_simultaneous_delete_and_nodeMerge (
+    &node_instructions, &nodeMerge_pairs, graph )
+    . map_err (refusal) ?;
+  let fork_specs : Vec<ForkSpec> = {
+    // Explicit 'skg-fork-node' gesture: a node carrying ViewRequest::Fork
+    // is an owned node the user asked to fork. Unlike the implicit
+    // foreign fork (where N's own save is dropped), N keeps its own save
+    // (it is owned); we only add the clone C, which forks N. C copies N's
+    // saved state on disk -- the client refuses to fork a dirty buffer,
+    // so disk == what the user sees. These specs join the implicit ones
+    // for the shared confirmation / skgsave-commit pipeline below.
+    let mut specs : Vec<ForkSpec> = fork_specs;
+    specs . extend (
+      explicit_fork_specs_from_viewforest (
+        &viewforest, graph, config, &clone_skgrepo_inputs,
+        skgrepo_restriction )
+      . map_err (refusal) ? );
+    specs };
+  refuse_unless_empty (
+    // Reject forks the fork operation's guard or the skgrepo restriction
+    // forbids (before any skgsave-commit). The guard reads the live
+    // graph; the other check reads the skgrepo restriction.
+    validate_fork_specs_in_graph (
+      &fork_specs, graph, config, skgrepo_restriction) ) ?;
+  let warnings : Vec<String> = {
+    let mut warnings : Vec<String> = parsing_warnings;
+    warnings . extend ( nonmerge_plan . warnings );
+    warnings . extend (
+      dead_link_warnings ( graph, &node_instructions, &fork_specs ) );
+    warnings . extend (
+      fork::forks_the_view_will_not_show (
+        &viewforest, graph, config, skgrepo_restriction, &perspective,
+        &fork_specs ) );
+    warnings };
+  let hide_report : Vec<String> =
+    hide_report::hide_report_lines (
+      graph, config, skgrepo_restriction, &node_instructions, &fork_specs );
+  Ok (( viewforest,
+        SavePlan {
+          node_instructions,
+          nodeMerge_pairs,
+          skgrepo_moves : nonmerge_plan . skgrepo_moves,
+          fork_specs,
+          post_skgsave_commit_notice_candidates :
+            nonmerge_plan . post_skgsave_commit_notice_candidates,
+          unedited_stale_graphnodes,
+          hide_report },
+        warnings )) }
+
+/// The first stages of save preparation: parse the raw buffer, then
+/// refuse it if its structure, or an edit of a write-protected
+/// occurrence, makes saving impossible. Returns the parsed viewforest,
+/// the parse's nonfatal warnings, and what the parse supplied.
+fn parse_and_validate_buffer (
+  buffer_text         : &str,
+  graph               : &crate::dbs::in_rust_graph::InRustGraph,
+  config              : &SkgConfig,
+  skgrepo_restriction : &SkgrepoRestriction,
+  baseline            : &WhatTheBaselineShows,
+  perspective         : &Perspective,
+) -> Result<(ViewForest, Vec<String>, WhatTheParseSupplied), SaveError> {
+  let ( viewforest, parsing_errors, parsing_warnings, supplied )
     : ( ViewForest, Vec<BufferValidationError>, Vec<String>,
         WhatTheParseSupplied )
     = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -141,58 +285,44 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       return Err ( SaveError::BufferValidationErrors {
         errors,
         warnings : parsing_warnings, } ); }}
-  let ( nonmerge_plan, nodeMerge_acquisitions )
-    : ( NonmergeSavePlan, Vec<(ID, ID)> )
-    = crate::from_text::local_fieldintent_collection
-      ::extract_nonmergeSavePlan_locally_in_graph (
-        &viewforest, graph, config, skgrepo_restriction, is_diff_view )
- . map_err (SaveError::DatabaseError) ?;
-  let ( nonmerge_plan, unedited_stale_graphnodes )
-    : ( NonmergeSavePlan, Vec<UneditedStaleGraphnode> ) =
-  { // Before any validator judges them: an unedited stale graphnode
-    // is neither forked nor moved back, and never refuses the save.
-    let (node_instructions, skgrepo_moves, unedited)
-      : (Vec<NodeInstruction>, Vec<SkgrepoMove>, Vec<UneditedStaleGraphnode>) =
-      without_unedited_stale_saves (
-        graph, &baseline . writes,
-        nonmerge_plan . node_instructions, nonmerge_plan . skgrepo_moves );
-    ( NonmergeSavePlan { node_instructions, skgrepo_moves, .. nonmerge_plan },
-      unedited ) };
-  { // A flag preference is never an implicit-fork gesture.
-    // Validate while its side-channel identity is still available; the
-    // ordinary foreign-write filter below sees only supplemented SaveNodes.
-    let mut errors : Vec<BufferValidationError> = Vec::new ();
-    for target in &nonmerge_plan . flag_targets {
-      match graph . pid_and_skgrepo (target) {
-        None => errors . push (
-          BufferValidationError::FlagEditOnUnknownNode (
-            target . clone () )),
-        Some ((_pid, skgrepo)) if ! config . skgrepo_is_owned (&skgrepo) =>
-          errors . push (
-            BufferValidationError::FlagEditOnForeignNode (
-              target . clone (), skgrepo )),
-        Some (_) => {}, }}
-    if ! errors . is_empty () {
-      return Err (SaveError::BufferValidationErrors {
-        errors, warnings : parsing_warnings . clone (), }); }}
-  let nodeMerge_pairs : Vec<(ID, ID)> =
-    // A merge request only plans mutations; it does not mutate the saved
-    // viewforest. After a successful skgsave-commit, the common edit-request
-    // consumption boundary in update_views_after_save clears this request
-    // together with every other `(editRequest ...)` carrier.
-    // The acquiree is resolved from the ID as written (possibly an
-    // extra ID) to its pid, so every later comparison is by pid.
-    nodeMerge_acquisitions . into_iter ()
-    . map ( |(acquirer, acquiree)| (
-      graph . pid_else_raw_id (&acquirer),
-      graph . pid_else_raw_id (&acquiree) ))
-    . collect ();
+  Ok (( viewforest, parsing_warnings, supplied )) }
+
+/// One error per flag edit on a node the graph lacks or the user does
+/// not own.
+fn errors_for_flag_edits (
+  flag_targets : &HashSet<ID>,
+  graph        : &crate::dbs::in_rust_graph::InRustGraph,
+  config       : &SkgConfig,
+) -> Vec<BufferValidationError> {
+  let mut errors : Vec<BufferValidationError> = Vec::new ();
+  for target in flag_targets {
+    match graph . pid_and_skgrepo (target) {
+      None => errors . push (
+        BufferValidationError::FlagEditOnUnknownNode (
+          target . clone () )),
+      Some ((_pid, skgrepo)) if ! config . skgrepo_is_owned (&skgrepo) =>
+        errors . push (
+          BufferValidationError::FlagEditOnForeignNode (
+            target . clone (), skgrepo )),
+      Some (_) => {}, }}
+  errors }
+
+/// What decides each fork clone's skgrepo, and which bare new
+/// headlines ride a foreign node's fork, adopting its clone's skgrepo
+/// (each new node's pid, to the pid of the foreign node it rides).
+fn clone_skgrepo_inputs_from_viewforest (
+  viewforest          : &ViewForest,
+  supplied            : &WhatTheParseSupplied,
+  config              : &SkgConfig,
+  skgrepo_restriction : &SkgrepoRestriction,
+  fork_skgrepos       : &HashMap<ID, SkgrepoName>,
+) -> (CloneSkgrepoInputs, HashMap<ID, ID>) {
   // C's repo is inferred from N's nearest owned vognode ancestor in
   // the view. The flat NodeInstructions have lost that ancestry, so resolve
   // it here, where the placed viewforest is live, keyed by foreign pid.
   let owned_ancestor_skgrepo : HashMap<ID, SkgrepoName> =
     owned_ancestor_skgrepos_for_foreign_vognodes (
-      &viewforest,
+      viewforest,
       & supplied . writeProtected_skgrepos_after_save,
       config );
   let adopt_clone_skgrepo : HashMap<ID, ID> = {
@@ -205,7 +335,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       . intersection (& supplied . inherited_skgrepo_nodes)
       . cloned () . collect ();
     new_foreign_nodes_adopting_clone_skgrepos (
-      &viewforest, & new_with_inherited_skgrepo, config ) };
+      viewforest, & new_with_inherited_skgrepo, config ) };
   let explicit_child_skgrepo : HashMap<ID, SkgrepoName> = {
     // A clone skgrepo the user already specified, via explicit owned
     // skgrepos on the forked node's new children:
@@ -215,121 +345,35 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       . difference (& supplied . inherited_skgrepo_nodes)
       . cloned () . collect ();
     explicit_new_child_skgrepos_for_foreign_vognodes (
-      &viewforest, & new_with_explicit_skgrepo, config ) };
-  let default_clone_skgrepo : Option<SkgrepoName> = {
-    // The active-aware default for a fork whose skgrepo can be neither
-    // user-set nor inferred: prefer the first-declared owned skgrepo that
-    // is unrestricted under the restricted set, so the fork reaches the
-    // confirmation buffer (where the user can rotate it) instead of
-    // dead-ending on ForkRepoRestricted when a restricted owned skgrepo
-    // happens to sort first. Falls back to the first-declared owned skgrepo
-    // -- then ForkRepoRestricted fires only when the user owns no unrestricted
-    // skgrepo at all (the genuine "activate one first" case), and
-    // ForkRepoUnresolved only when the user owns no skgrepo at all.
-    let owned_in_order : Vec<SkgrepoName> =
-      config . privacy_ladder ();
-    let unrestricted_owned : Option<SkgrepoName> =
-      owned_in_order . iter ()
-      . find ( |name| skgrepo_restriction . contains_skgrepo (name) )
-      . cloned ();
-    unrestricted_owned . or_else ( || owned_in_order . into_iter () . next () ) };
-  let clone_skgrepo_inputs : CloneSkgrepoInputs = CloneSkgrepoInputs {
-    user_set          : fork_skgrepos . clone (),
-    explicit_child    : explicit_child_skgrepo,
-    inferred_ancestor : owned_ancestor_skgrepo,
-    default           : default_clone_skgrepo, };
-  let ( mut node_instructions, fork_specs )
-    : ( Vec<NodeInstruction>, Vec<ForkSpec> ) =
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "validate_and_filter_foreign_instructions" ). entered();
-      validate_and_filter_foreign_instructions (
-        nonmerge_plan . node_instructions,
-        &nodeMerge_pairs,
-        graph,
-        &clone_skgrepo_inputs,
-        &adopt_clone_skgrepo,
-        config,
-        skgrepo_restriction )
- } . map_err ( |errors| SaveError::BufferValidationErrors {
-        errors, warnings : parsing_warnings . clone () } ) ?;
-  // A reply typed in the unread list files the message it answers in
-  // the forker, now that the forks are known; before the checks
-  // below, which judge that write too. The saved view moves the
-  // message there too, so the rerender draws it where it now lives.
-  file_what_is_written_in::file_forkee_members_written_in (
-    &mut viewforest, graph, config, skgrepo_restriction, &fork_specs,
-    & unedited_stale_graphnodes . iter ()
-      . map ( |node| node . pid . clone () ) . collect (),
-    &mut node_instructions )
-    . map_err ( |error| SaveError::BufferValidationErrors {
-        errors   : vec! [ BufferValidationError::Other (error) ],
-        warnings : parsing_warnings . clone () } ) ?;
-  { // A record that would land where the skgrepo restriction keeps
-    // it out of sight is refused, before anything is written.
-    let errors : Vec<BufferValidationError> =
-      refuse_records_landing_restricted (
-        &node_instructions, graph, skgrepo_restriction );
-    if ! errors . is_empty () {
-      return Err ( SaveError::BufferValidationErrors {
-        errors, warnings : parsing_warnings . clone () } ); }}
-  validate_no_simultaneous_move_and_nodeMerge (
-    &nonmerge_plan . skgrepo_moves, &nodeMerge_pairs )
-    . map_err ( |errors| SaveError::BufferValidationErrors {
-      errors, warnings : parsing_warnings . clone () } ) ?;
-  validate_no_simultaneous_delete_and_nodeMerge (
-    &node_instructions, &nodeMerge_pairs, graph )
-    . map_err ( |errors| SaveError::BufferValidationErrors {
-      errors, warnings : parsing_warnings . clone () } ) ?;
-  let fork_specs : Vec<ForkSpec> = {
-    // Explicit 'skg-fork-node' gesture: a node carrying ViewRequest::Fork
-    // is an owned node the user asked to fork. Unlike the implicit
-    // foreign fork (where N's own save is dropped), N keeps its own save
-    // (it is owned); we only add the clone C, which forks N. C copies N's
-    // saved state on disk -- the client refuses to fork a dirty buffer,
-    // so disk == what the user sees. These specs join the implicit ones
-    // for the shared confirmation / skgsave-commit pipeline below.
-    let mut specs : Vec<ForkSpec> = fork_specs;
-    specs . extend (
-      explicit_fork_specs_from_viewforest (
-        &viewforest, graph, config, &clone_skgrepo_inputs,
-        skgrepo_restriction )
-      . map_err ( |errors| SaveError::BufferValidationErrors {
-          errors, warnings : parsing_warnings . clone () } ) ? );
-    specs };
-  { // Reject forks the fork operation's guard or the skgrepo restriction
-    // forbids (before any skgsave-commit). The guard reads the live
-    // graph; the other check reads the skgrepo restriction.
-    let fork_errors : Vec<BufferValidationError> =
-      validate_fork_specs_in_graph (
-        &fork_specs, graph, config, skgrepo_restriction);
-    if ! fork_errors . is_empty () {
-      return Err ( SaveError::BufferValidationErrors {
-        errors   : fork_errors,
-        warnings : parsing_warnings . clone () } ); }}
-  let warnings : Vec<String> = {
-    let mut warnings : Vec<String> = parsing_warnings;
-    warnings . extend ( nonmerge_plan . warnings );
-    warnings . extend (
-      dead_link_warnings ( graph, &node_instructions, &fork_specs ) );
-    warnings . extend (
-      fork::forks_the_view_will_not_show (
-        &viewforest, graph, config, skgrepo_restriction, &perspective,
-        &fork_specs ) );
-    warnings };
-  let hide_report : Vec<String> =
-    hide_report::hide_report_lines (
-      graph, config, skgrepo_restriction, &node_instructions, &fork_specs );
-  Ok (( viewforest,
-        SavePlan {
-          node_instructions,
-          nodeMerge_pairs,
-          skgrepo_moves : nonmerge_plan . skgrepo_moves,
-          fork_specs,
-          post_skgsave_commit_notice_candidates :
-            nonmerge_plan . post_skgsave_commit_notice_candidates,
-          unedited_stale_graphnodes,
-          hide_report },
-        warnings )) }
+      viewforest, & new_with_explicit_skgrepo, config ) };
+  ( CloneSkgrepoInputs {
+      user_set          : fork_skgrepos . clone (),
+      explicit_child    : explicit_child_skgrepo,
+      inferred_ancestor : owned_ancestor_skgrepo,
+      default           : default_clone_skgrepo (
+                            config, skgrepo_restriction ), },
+    adopt_clone_skgrepo ) }
+
+/// The active-aware default for a fork whose skgrepo can be neither
+/// user-set nor inferred: prefer the first-declared owned skgrepo that
+/// is unrestricted under the restricted set, so the fork reaches the
+/// confirmation buffer (where the user can rotate it) instead of
+/// dead-ending on ForkRepoRestricted when a restricted owned skgrepo
+/// happens to sort first. Falls back to the first-declared owned skgrepo
+/// -- then ForkRepoRestricted fires only when the user owns no unrestricted
+/// skgrepo at all (the genuine "activate one first" case), and
+/// ForkRepoUnresolved only when the user owns no skgrepo at all.
+fn default_clone_skgrepo (
+  config              : &SkgConfig,
+  skgrepo_restriction : &SkgrepoRestriction,
+) -> Option<SkgrepoName> {
+  let owned_in_order : Vec<SkgrepoName> =
+    config . privacy_ladder ();
+  let unrestricted_owned : Option<SkgrepoName> =
+    owned_in_order . iter ()
+    . find ( |name| skgrepo_restriction . contains_skgrepo (name) )
+    . cloned ();
+  unrestricted_owned . or_else ( || owned_in_order . into_iter () . next () ) }
 
 /// Transitional compatibility for callers not yet carrying a generation.
 pub fn buffer_to_validated_saveplan (
