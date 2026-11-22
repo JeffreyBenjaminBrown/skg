@@ -115,6 +115,7 @@ the old one open beside the one it makes on its next request."
      skg-request-herald-rules
      skg-request-investigate-unknown-node
      skg-request-delete-references-to-absent-node
+     skg-request-describe-heralds
      skg-request-relRepo-info
      skg-request-flag-state
      skg-request-export-org
