@@ -185,18 +185,8 @@ async fn test_editable_view_ample_budget (
         * (skg node (gnid 2) (skgRepos (nodeRepo main))) 2
       "};
 
-      let result = {
-        let mut config = config . clone();
-        config . initial_node_limit = 20;
-        let graph : InRustGraphHandle =
-          (
-            graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = empty_views_state ();
-        let response = save_ignoring_streamed_messages (
-          input_org_text, &config, tantivy, &graph,
-
-          &Err ( String::new () ), &mut views_state ) . await ?;
-        response . saved_view };
+      let result : String = saved_view_under_initial_node_limit (
+        input_org_text, config, tantivy, 20 ) . await ?;
 
       println!("Result with ample budget (20):\n{}", result);
 
@@ -249,30 +239,10 @@ async fn test_editable_view_limit_5_or_6 (
         * (skg node (gnid 2) (skgRepos (nodeRepo main))) 2
       "};
 
-      let result_5 = {
-        let mut config5 = config . clone();
-        config5 . initial_node_limit = 5;
-        let graph : InRustGraphHandle =
-          (
-            graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = empty_views_state ();
-        let response_5 = save_ignoring_streamed_messages (
-          input_org_text, &config5, tantivy, &graph,
-
-          &Err ( String::new () ), &mut views_state ) . await ?;
-        response_5 . saved_view };
-      let result_6 = {
-        let mut config6 = config . clone();
-        config6 . initial_node_limit = 6;
-        let graph : InRustGraphHandle =
-          (
-            graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = empty_views_state ();
-        let response_6 = save_ignoring_streamed_messages (
-          input_org_text, &config6, tantivy, &graph,
-
-          &Err ( String::new () ), &mut views_state ) . await ?;
-        response_6 . saved_view };
+      let result_5 : String = saved_view_under_initial_node_limit (
+        input_org_text, config, tantivy, 5 ) . await ?;
+      let result_6 : String = saved_view_under_initial_node_limit (
+        input_org_text, config, tantivy, 6 ) . await ?;
 
       println!("Result with limit=5:\n{}", result_5);
       println!("Result with limit=6:\n{}", result_6);
@@ -344,28 +314,10 @@ async fn test_editable_view_limit_1_to_4 (
         * (skg node (gnid 2) (skgRepos (nodeRepo main))) 2
       "};
 
-      let result_1 = {
-        let mut config1 = config . clone();
-        config1 . initial_node_limit = 1;
-        let graph : InRustGraphHandle =
-          (
-            graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = empty_views_state ();
-        let response_1 = save_ignoring_streamed_messages (
-          input_org_text, &config1, tantivy, &graph,
-          &Err ( String::new () ), &mut views_state ) . await ?;
-        response_1 . saved_view };
-      let result_4 = {
-        let mut config4 = config . clone();
-        config4 . initial_node_limit = 4;
-        let graph : InRustGraphHandle =
-          (
-            graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = empty_views_state ();
-        let response_4 = save_ignoring_streamed_messages (
-          input_org_text, &config4, tantivy, &graph,
-          &Err ( String::new () ), &mut views_state ) . await ?;
-        response_4 . saved_view };
+      let result_1 : String = saved_view_under_initial_node_limit (
+        input_org_text, config, tantivy, 1 ) . await ?;
+      let result_4 : String = saved_view_under_initial_node_limit (
+        input_org_text, config, tantivy, 4 ) . await ?;
 
       println!("Result with limit=1:\n{}", result_1);
       println!("Result with limit=4:\n{}", result_4);
@@ -417,17 +369,8 @@ async fn test_editable_view_conflicting (
         * (skg node (gnid 12) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) 12
       "};
 
-      let result = {
-        let mut config = config . clone();
-        config . initial_node_limit = 100;
-        let graph : InRustGraphHandle =
-          (
-            graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = empty_views_state ();
-        let response = save_ignoring_streamed_messages (
-          input_org_text, &config, tantivy, &graph,
-          &Err ( String::new () ), &mut views_state ) . await ?;
-        response . saved_view };
+      let result : String = saved_view_under_initial_node_limit (
+        input_org_text, config, tantivy, 100 ) . await ?;
 
       println!("Result with conflict:\n{}", result);
 
@@ -467,17 +410,8 @@ async fn test_editable_view_with_cycle (
         * (skg node (gnid cyc-a) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) cyc-a
       "};
 
-      let result = {
-        let mut config = config . clone();
-        config . initial_node_limit = 100;
-        let graph : InRustGraphHandle =
-          (
-            graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = empty_views_state ();
-        let response = save_ignoring_streamed_messages (
-          input_org_text, &config, tantivy, &graph,
-          &Err ( String::new () ), &mut views_state ) . await ?;
-        response . saved_view };
+      let result : String = saved_view_under_initial_node_limit (
+        input_org_text, config, tantivy, 100 ) . await ?;
 
       println!("Result with cycle:\n{}", result);
 
@@ -510,17 +444,8 @@ async fn test_editable_view_with_repeat (
         * (skg node (gnid 12) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) 12
       "};
 
-      let result = {
-        let mut config = config . clone();
-        config . initial_node_limit = 100;
-        let graph : InRustGraphHandle =
-          (
-            graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = empty_views_state ();
-        let response = save_ignoring_streamed_messages (
-          input_org_text, &config, tantivy, &graph,
-          &Err ( String::new () ), &mut views_state ) . await ?;
-        response . saved_view };
+      let result : String = saved_view_under_initial_node_limit (
+        input_org_text, config, tantivy, 100 ) . await ?;
 
       println!("Result with repeat:\n{}", result);
 
@@ -562,17 +487,8 @@ async fn test_editable_view_request_cleared (
         * (skg node (gnid 12) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) 12
       "};
 
-      let result = {
-        let mut config = config . clone();
-        config . initial_node_limit = 100;
-        let graph : InRustGraphHandle =
-          (
-            graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = empty_views_state ();
-        let response = save_ignoring_streamed_messages (
-          input_org_text, &config, tantivy, &graph,
-          &Err ( String::new () ), &mut views_state ) . await ?;
-        response . saved_view };
+      let result : String = saved_view_under_initial_node_limit (
+        input_org_text, config, tantivy, 100 ) . await ?;
 
       println!("Result:\n{}", result);
 
@@ -807,17 +723,8 @@ async fn test_budget_aliasfolder_is_neutral (
         ** (skg node (gnid c1) (skgRepos (nodeRepo main))) c1
         *** (skg node (gnid c2) (skgRepos (nodeRepo main))) c2
       "};
-      let result = {
-        let mut config = config . clone();
-        config . initial_node_limit = 3;
-        let graph : InRustGraphHandle =
-          (
-            graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = empty_views_state ();
-        let response = save_ignoring_streamed_messages (
-          input_org_text, &config, tantivy, &graph,
-          &Err ( String::new () ), &mut views_state ) . await ?;
-        response . saved_view };
+      let result : String = saved_view_under_initial_node_limit (
+        input_org_text, config, tantivy, 3 ) . await ?;
 
       println!("alias-budget (budget 3):\n{}", result);
 
@@ -849,6 +756,26 @@ async fn save_view (
   assert! ( response . errors . is_empty (),
             "the buffer must save, got {:?}\n\nbuffer:\n{}",
             response . errors, buffer );
+  Ok (response . saved_view) }
+
+/// Save 'buffer' as no registered view, under a copy of 'config'
+/// whose 'initial_node_limit' is the one given, over a graph and an
+/// empty views state of its own; return the saved view. The graph is
+/// read from the copy's skgrepos, the same as 'config''s: the limit
+/// does not bear on reading them.
+async fn saved_view_under_initial_node_limit (
+  buffer             : &str,
+  config             : &SkgConfig,
+  tantivy            : &TantivyIndex,
+  initial_node_limit : usize,
+) -> Result<String, Box<dyn Error>> {
+  let mut config : SkgConfig = config . clone ();
+  config . initial_node_limit = initial_node_limit;
+  let graph : InRustGraphHandle = graph_handle_from_config (&config) ?;
+  let mut views_state : ViewsState = empty_views_state ();
+  let response : SaveResponse = save_ignoring_streamed_messages (
+    buffer, &config, tantivy, &graph,
+    &Err ( String::new () ), &mut views_state ) . await ?;
   Ok (response . saved_view) }
 
 // ===================================================
