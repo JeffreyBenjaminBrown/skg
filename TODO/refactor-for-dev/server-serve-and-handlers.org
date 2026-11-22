@@ -1,0 +1,60 @@
+* Refactoring for dev: 'server/serve.rs' and 'server/serve/'
+  The territory: 'server/serve.rs' and everything under 'server/serve/'
+  (the connection loop, 'protocol.rs', 'util.rs', 'rerender_stream.rs',
+  'parse_metadata_sexp.rs' and the handlers). The wire protocol must not
+  change by a byte. Every refactor below was checked by 'bash/nextest.sh'
+  (the whole Rust suite, including 'tests/unit/serve_util.rs') and the
+  whole suite before merge.
+* Done
+** One function dispatches a request to its handler
+   'dispatch_request' ('server/serve.rs') holds the match on request
+   type; 'handle_emacs' only reads requests and, between them, tells the
+   client what the repo watcher reloaded. Its stale doc comment (naming
+   two handlers that do not exist) is gone.
+** The shutdown handler exits the process itself
+   'cleanup_and_shutdown' cleaned nothing up and ignored its env; its two
+   lines joined 'handle_shutdown_request'.
+** The save handler sends its answer and its refusals through one function each
+   'send_save_response' ('handlers/save_buffer.rs') holds the order in
+   which a finished save's answer is chosen; 'send_save_refusal' replaced
+   four copies of the refused save-result. A doc comment that sat above
+   the wrong function moved to 'fork_approved_from_request'.
+** A response's (KEY "VALUE") entry is built by one function
+   'string_atom_sexp' and 'string_entry_sexp' ('server/serve/util.rs')
+   replaced three private 'atom'/'pair' pairs (text_release, telescope_hoist,
+   receipt), two closures in save_buffer and util's own hand-built entries.
+* Candidates left, best first
+** Move the save request's field readers out of 'save_buffer.rs'
+   'handlers/save_buffer.rs' (~1450 lines) holds, from
+   'parse_save_request_envelope' to 'fork_skgrepos_from_request', about
+   400 lines that only read the request line and the envelope. A
+   'save_buffer/request.rs' (precedent: 'text_search.rs' with
+   'text_search/coverage.rs') would leave the handler file to the
+   pipeline. A pure move, but the moved functions need 'pub(super)';
+   'tests' reach 'parse_save_request_envelope' by path, so check them.
+** Split 'update_from_and_rerender_buffer_with_approvals_or_preview' (~340 lines)
+   'handlers/save_buffer.rs'. The longest function in the territory. Its
+   confirmations (strandeds, delete-from, hoist, fork, text release) are
+   each checked at a fixed point; extracting them changes nothing a client
+   sees, but the order is load-bearing (see 'TODO/problems.org', "The save
+   handler's checks depend on their position in it", which Jeff deferred:
+   tagging a NodeInstruction's provenance needs his yes; extracting the
+   steps in place does not). Read the whole function first; medium work.
+** Request-field readers repeat one shape
+   Three '(KEY . "true")' readers in save_buffer ('preview_from_request',
+   'fork_approved_from_request', the strandeds flag) and about fifteen
+   'sexp::parse (request)' walks across the handlers. A
+   'bool_from_request (key, request)' in 'util.rs' is small and safe.
+** 'parse_metadata_sexp.rs' (1106 lines)
+   Metadata types (to ~250), the viewnode builders, the element
+   classifier, and the edit-request parsers (from ~895). The
+   edit-request parsing is a clear seam. Not surveyed closely.
+** 'send_import_response' ('handlers/import_md_and_org.rs', ~160 lines)
+   and 'handle_text_search_request' (~145 lines) are the next longest;
+   not read.
+* Leads checked
+** "Requests holding a raw newline break the line-based protocol"
+   Report only, as the brief said; nothing added. Fixing it changes what
+   the server accepts, so it is not a refactor.
+** "Repo '...' not found in config across ~9 sites"
+   Gone from the territory; one copy remains in 'server/test_utils.rs'.
