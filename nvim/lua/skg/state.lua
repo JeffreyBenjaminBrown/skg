@@ -40,6 +40,19 @@ function M.register_response_handler (response_type, handler, one_shot)
     M.lp_pending_count = M.lp_pending_count + 1 end
 end
 
+---Remove the handler of each of RESPONSE_TYPES, balancing the pending
+---count for each one-shot handler removed.
+---@param response_types string[]
+function M.unregister_response_handlers (response_types)
+  for _, response_type in ipairs(response_types) do
+    local entry = M.response_handler_map[response_type]
+    if entry and entry.one_shot then
+      M.lp_pending_count = math.max(0, M.lp_pending_count - 1)
+    end
+    M.response_handler_map[response_type] = nil
+  end
+end
+
 -- Length-prefixed (Content-Length) receiver state. Lua strings are
 -- byte strings, so the accumulator needs no unibyte special-casing.
 do

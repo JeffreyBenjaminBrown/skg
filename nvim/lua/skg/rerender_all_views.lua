@@ -151,23 +151,10 @@ function M.send_streaming_request (label, response_type, request,
       table.insert(registered_types, response_type) end
     for other_type in pairs(other_handlers or {}) do
       table.insert(registered_types, other_type) end
-    M.unregister_response_handlers(registered_types)
+    state.unregister_response_handlers(registered_types)
     lock.end_stream()
     lock.unlock_all_save_locked()
     error(err, 0)
-  end
-end
-
----Remove the handler of each of RESPONSE_TYPES, balancing the pending
----count for each one-shot handler removed.
----@param response_types string[]
-function M.unregister_response_handlers (response_types)
-  for _, response_type in ipairs(response_types) do
-    local entry = state.response_handler_map[response_type]
-    if entry and entry.one_shot then
-      state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-    end
-    state.response_handler_map[response_type] = nil
   end
 end
 
