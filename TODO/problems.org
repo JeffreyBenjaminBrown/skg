@@ -375,13 +375,6 @@ gap too. Details, options and questions:
    'skg--relRepo-unsupported-folder-atoms' in 'elisp/skg-metadata.el')
    should then be served or shared, not copied into Neovim (noted from
    [[file:herald-colors/2_plan.org][the herald-colors plan]], 2026-10-04).
-** New relationship folders are populated before their completion visit
-   'server/to_org/complete/partner_folder/mod.rs' eagerly builds child data
-   and reconciles newly created folders. 'complete_viewforest' subsequently
-   visits those folders and invokes their reconcilers again. Candidate
-   simplification: creation owns non-vognode existence/order/folding, and the
-   completion visit owns members. Preserve forced empty editable folders,
-   HEAD-only diff membership, hidden-folder folding, and Unknown members.
 ** Graph updates rediscover identity-change facts across several consumers
    'GraphChangeSet' in 'server/dbs/in_rust_graph/prepared_update.rs' and
    'apply_definenodes_to_inRustGraph' independently compute affected IDs

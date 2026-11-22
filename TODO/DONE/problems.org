@@ -1,3 +1,14 @@
+* New relationship folders were populated before their completion visit (noted 2026-09-25; obsolete 2026-11-22)
+  'server/to_org/complete/partner_folder/mod.rs' eagerly builds child data
+  and reconciles newly created folders. 'complete_viewforest' subsequently
+  visits those folders and invokes their reconcilers again. Candidate
+  simplification: creation owns non-vognode existence/order/folding, and the
+  completion visit owns members. Preserve forced empty editable folders,
+  HEAD-only diff membership, hidden-folder folding, and Unknown members.
+  Obsolete: the refresh rewrite deleted 'server/to_org/'. A folder the
+  refresh adds now starts empty ('add_folders' in
+  'server/refresh/visit.rs'); its members are drawn at its own visit,
+  by the rungs that draw every parent's children.
 * Quasi-duplication: "Repo '...' not found in config" across ~9 sites (fixed 2026-11-22)
   The plan asked to consolidate the duplicated "repo not found"
   error into one 'RepoValidationError'. The recon found the
