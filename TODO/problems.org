@@ -24,6 +24,16 @@
   name the subshell's pid once, outside the substitution
   ('me=$BASHPID; echo "$me $(proc_field "$me" 20) $stamp"'). Not
   made: the pacer was in use, and its behaviour was not to change.
+** 'skg_filenames_match_pids' reads a key no '.skg' file has
+  'tools/introspect/skg_filenames_match_pids.rs' takes a file's IDs
+  from 'ids', but a '.skg' file names them 'pid' and 'extra_ids', so
+  it can find nothing. Its default folder, 'data/skg', is gone, and
+  its header names it by two bin names. It still builds, as a [[bin]]
+  of the root 'Cargo.toml'.
+** 'bench-prominence-inmemory' defaults to a config that is gone
+  'tools/bench-prominence-inmemory.rs' reads 'data/real/skgconfig.toml'
+  when given no config; its siblings 'top-contents' and
+  'top-contentward-descendants' moved to 'data/jeff/skgconfig.toml'.
 * Problems noticed while writing the Neovim client's module headers (2026-11-22)
   Found reading 'nvim/' for its headers; none reproduced, none fixed.
 ** The "and close this" gotos discard the left buffer's unsaved edits

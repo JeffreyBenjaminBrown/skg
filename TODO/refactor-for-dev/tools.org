@@ -1,0 +1,60 @@
+* Refactoring 'tools/' for the next agent
+  The territory: 'tools/' except 'tools/skg-for-ai/' (its own
+  territory) and 'tools/team-processing/' (the pacer's and the
+  spending account's running state: never touch it, nor run a tool
+  against it; tests make their own state folders). 'tools/team/pacer.sh'
+  runs unattended and live sessions run its 'hold' and 'holds', so its
+  behaviour and output must not change without Jeff's yes; Jeff may
+  have uncommitted edits in 'tools/team/push-graphs-to-github.sh'.
+  'bash/all-tests.sh' runs every 'tools/team/test_*.py' (the suite
+  "Team tool tests") and no other tool's test.
+  Which of the other tools are alive, finished or abandoned is in the
+  graph note "refactoring for cheaper development", part "tools/:
+  which are alive".
+* Done
+** 'test_pacer.py' waits up to two minutes, and fails at once when a pacer starts instead of refusing
+   Its 15-second waits were too short at nice 15 under load (one test
+   took 18 seconds with three busy loops on its core). The other cause
+   of its timeouts is a race in 'pacer.sh', in 'TODO/problems.org'
+   ("the pacer records its session's start time from the wrong
+   process"); unfixed, so the second test can still fail under heavy
+   load, now quickly and with the log. To reproduce: start three
+   'taskset -c 7 bash -c "while :; do :; done" &' and run
+   'taskset -c 7 nice -n 15 python3 tools/team/test_pacer.py'.
+** 'check_jeffs_files.py' has a test, and its 'check' only reports
+   'test_check_jeffs_files.py' builds a scratch 'data/jeff/' and a
+   transcript, and checks each kind of writer, UNPLACED, GONE, STAGED
+   and the log. 'server_events', 'reflog_entries', 'our_writes' and
+   'writer_of' were 'check''s three numbered sections and its inner
+   'placed', moved unchanged.
+** 'specialist.sh' reads the ports file through 'recorded_port' and 'recorded_home'
+   They replace five copies of one awk program. Checked by running
+   every path that reads the file in a scratch root, before and after.
+** call-graph's README and rust-field-tags' header say what they are for and what runs them
+* Left, best first
+** Fix the pacer's start-time race (needs Jeff's yes: the pacer is live)
+   'session' in 'pacer.sh': one line, 'me=$BASHPID' before the 'echo'.
+   Then the second test of 'test_pacer.py' passes under any load. Safe
+   in itself, but a running 'pacer.sh run' keeps the old text until it
+   is restarted, which only Jeff should do.
+** A test that the pacer's wake prompt starts as the spending account expects
+   'PACER_PROMPT_START' in 'spending_account.py' must be the start of
+   'WAKE_PROMPT' in 'pacer.sh'; 'test_spending_account.py' checks the
+   account against its own copy of the constant, not against the
+   pacer. A test can 'grep' the pacer's line. Safe; a few lines.
+   ('specialist.sh prompt' is already checked that way.)
+** 'pacer.sh': 'hold' and 'release' write a hold file by the same two lines
+   A 'write_hold PID START SINCE WHO WHAT' would name the file's
+   format once, beside 'read_hold'. Small; but the pacer is live, so
+   only with Jeff's yes, and 'test_pacer.py' does not cover holds: add
+   a test of 'hold', 'holds' and 'release' first ('HOLDER_PID' stands
+   in for a Claude process).
+** 'check_jeffs_files.py': the report's four sections could be functions too
+   'check' still builds the files, reflog, deletions and tool-call
+   sections inline, sharing 'out' and 'flagged'. Worth it only if it
+   grows; the new test covers it.
+** 'spending_account.py': 'dollars_of_request' lists the four usage keys again
+   'token_counts' maps the same keys to columns. Small gain.
+** The '?' proposals of the graph's "tools/: which are alive"
+   Deleting a finished migration or an abandoned tool needs Jeff's yes;
+   each proposal there says what its evidence is.
