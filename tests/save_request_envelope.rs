@@ -1,4 +1,4 @@
-use skg::serve::handlers::save_buffer::parse_save_request_envelope;
+use skg::serve::handlers::save_buffer::request::parse_save_request_envelope;
 use skg::types::views_state::ViewforestId;
 
 #[test]
