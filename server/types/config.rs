@@ -1,3 +1,12 @@
+//! The config file's contents: 'SkgConfig' and its skgrepos ('Skgrepo'),
+//! and the orders the skgrepos stand in. 'ordered_skgrepos' is the fold
+//! order a telescope's sections compose in; 'privacy_ladder' ranks the
+//! owned skgrepos, most public first ('is_strictly_more_public',
+//! 'more_private_of', 'default_relRepo'); 'skgrepo_owner' says whose a
+//! skgrepo is. Also where a run writes its logs ('logs_dir', 'RUN_FOLDER')
+//! and the processed marks. Reading the file is
+//! 'dbs/filesystem/not_nodes.rs' ('load_config').
+
 use serde::{Serialize, Deserialize, Deserializer};
 use std::collections::HashMap;
 use std::ffi::OsString;

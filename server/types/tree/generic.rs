@@ -1,3 +1,8 @@
+//! Generic helpers for any 'ego_tree' tree: mutating a node or its
+//! ancestor by ID ('write_at_node_in_tree', 'with_node_mut'),
+//! depth-first walks ('do_everywhere_in_tree_dfs' and its read-only
+//! and prunable forms), and 'eq_trees'.
+
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 
 /// Write to an ancestor of a node in a tree, applying a mutating function to it.

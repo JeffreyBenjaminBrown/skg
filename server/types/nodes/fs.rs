@@ -1,7 +1,7 @@
 //! GraphnodeOnDisk: the on-disk shape of one telescope section.
 //!
 //! One node = one ID = one privacy telescope: same-ID .skg files, at
-//! most one per skgrepo, each an "telescope section" holding the
+//! most one per skgrepo, each a "telescope section" holding the
 //! slice of the node recorded at that privacy level. The most public
 //! section (the home) alone carries title and body. Ordered
 //! relations are one flat sequence of 'ListItem's -- members render

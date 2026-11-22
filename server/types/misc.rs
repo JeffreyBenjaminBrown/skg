@@ -1,3 +1,9 @@
+//! The small types every part of the server names: 'ID' (a node's
+//! UUID), 'SkgrepoName', 'MSV' (a list a save may leave unspecified),
+//! 'RelPartner' (a relationship's member with its relRepo, and the
+//! helpers that read lists of them), 'RelationshipMemberKey',
+//! 'SkgrepoChange' and 'TantivyIndex'.
+
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use std::fmt;
 use std::ops::Deref;

@@ -1,3 +1,11 @@
+//! The errors a save reports to the user: 'SaveError',
+//! 'BufferValidationError' (what makes a buffer unsavable), stale
+//! graphnodes ('StaleGraphnodeReport'), and 'LinkParseError'. Also how
+//! a message names a headline ('HeadlineName', 'org_subheadline').
+//! Rendering a save error as Org is 'types/save.rs'
+//! ('format_save_error_as_org'); finding buffer errors is
+//! 'from_text/validate.rs' and the rest of 'from_text/'.
+
 use super::misc::{ID, SkgrepoName};
 use crate::diff_view::named_leaf_set::NamedLeafSet;
 use super::viewnode::ViewnodeId;

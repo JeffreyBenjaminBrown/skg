@@ -1,3 +1,11 @@
+//! What a save plans and then does. 'SavePlan' is a validated buffer's
+//! plan: one 'NodeInstruction' per node to write ('SaveNode') or delete
+//! ('DeleteNode'), plus the nodeMerges ('NodeMerge'), skgrepo moves
+//! ('SkgrepoMove') and forks ('ForkSpec') the buffer asks for. Also
+//! stale graphnodes ('UneditedStaleGraphnode') and
+//! 'format_save_error_as_org'. Building a plan is 'from_text.rs';
+//! carrying it out is 'save.rs'.
+
 use super::misc::{ID, SkgrepoChange, SkgrepoName};
 use super::nodes::complete::Graphnode;
 use super::errors::{SaveError, BufferValidationError, StaleGraphnodeReport, HeadlineName, rendered_under_another_skgrepo_restriction_text, with_org_subheadlines};

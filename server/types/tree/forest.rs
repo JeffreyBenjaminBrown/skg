@@ -1,3 +1,9 @@
+//! 'Forest': an 'ego_tree' tree whose root is hidden, so that its
+//! children act as a list of trees that viewnodes can move between.
+//! 'ViewForest', a view's forest of viewnodes, and questions asked of
+//! one ('editable_gnids', 'in_content_position',
+//! 'holds_containerward_chain').
+
 use crate::types::misc::ID;
 use crate::types::viewnode::{
   Viewnode, ViewnodeKind, Vognode, viewforest_root_viewnode};

@@ -1,3 +1,9 @@
+//! Org links to nodes ('[[id:ID][label]]') in a node's title and body:
+//! 'Link', and finding them in text ('links_from_text',
+//! 'links_with_ranges_from_text', 'links_from_node') except where Org
+//! shows text literally ('org_literal_ranges'), and
+//! 'replace_each_link_with_its_label'.
+
 pub mod org_literal_ranges;
 
 use regex::{Captures, Regex, Match};

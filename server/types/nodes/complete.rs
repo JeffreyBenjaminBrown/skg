@@ -1,17 +1,11 @@
-//! Graphnode: the full in-Rust-graphnode.
-//!
-//! Carries every field a node has: the on-disk fields (mirrored
-//! from GraphnodeOnDisk) plus 'home_repo', which is inferred from file
-//! location and held only in the in-Rust graph.
-//!
-//! Graphnode itself is not Serialize/Deserialize. The on-disk
-//! round-trip goes through 'GraphnodeOnDisk'
-//! ([[./fs.rs][server/types/nodes/fs.rs]]):
-//! read YAML as 'GraphnodeOnDisk', then attach skgrepo via
-//! 'GraphnodeOnDisk::into_complete_as_single_section (repo)' to get a 'Graphnode'. To
-//! write, convert 'Graphnode' -> 'GraphnodeOnDisk' via 'From' (dropping
-//! 'home_repo'), then serialize the 'GraphnodeOnDisk'. This way the type
-//! system enforces that 'home_repo' never appears in YAML.
+//! 'Graphnode': one whole node, its telescope's sections composed:
+//! title, body, aliases, ids, relations, flags, attribution, and
+//! 'home_skgrepo', which comes from where its files are, not from
+//! any file. It is not Serialize: on disk a node is its sections, each
+//! a 'GraphnodeOnDisk' ('fs.rs'), composed by 'telescope/compose.rs'
+//! and split by 'telescope/decompose.rs'. The in-Rust graph holds it as
+//! a 'GraphnodeInRust' ('rust.rs'). Also 'Flag', 'flag_is_true',
+//! 'set_flag' and 'empty_graphnode'.
 
 use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName};
 use crate::skgrepo_sets::SkgrepoRestriction;
@@ -86,7 +80,7 @@ pub struct Graphnode {
   // There is a 1-to-1 correspondence between Graphnodes and privacy telescopes (families of same-pid .skg files, one section per skgrepo; see docs/telescopes.org). Reading folds the sections into a Graphnode; writing unfolds it back into sections, byte-stably. The files are the only permanent data. Graphnode initializes the in-memory graph and Tantivy index.
   // The graph indexes this complete record for structural queries. Tantivy
   // receives the searchable subset. The filesystem remains authoritative.
-  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/flags.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when combining several Graphnodes (e.g. an instructionMerge, 'instructionMerge_fieldIntent', and 'supplement_unspecified_fields_from_disk'). PITFALL: since telescopes, the distinction is meaningful on disk too: a section that omits a field has no opinion about it (Unspecified), while under decompose each section records exactly the relationships recorded there -- so what a given section file shows is not the node's whole list, and an absent field in one section says nothing about the composition.
+  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/misc.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when combining several Graphnodes (e.g. an instructionMerge, 'instructionMerge_fieldIntent', and 'supplement_unspecified_fields_from_disk'). PITFALL: since telescopes, the distinction is meaningful on disk too: a section that omits a field has no opinion about it (Unspecified), while under decompose each section records exactly the relationships recorded there -- so what a given section file shows is not the node's whole list, and an absent field in one section says nothing about the composition.
 
   pub title: String,
   /// True when the selected title or body came from below the home.

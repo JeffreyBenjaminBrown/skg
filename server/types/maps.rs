@@ -1,3 +1,5 @@
+//! 'add_v_to_map_if_absent': fetch a map's missing value, once.
+
 use std::collections::HashMap;
 use std::error::Error;
 use std::future::Future;

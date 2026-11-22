@@ -1,3 +1,10 @@
+//! What one connection knows of the views its client has open.
+//! 'OpenViews' maps each buffer ('ViewforestId') to its 'ViewState':
+//! its viewforest, the pids in it, its perspective ('Perspective'), and
+//! its viewnode IDs ('ViewnodeIdRecord'). Also the diff view's buffer
+//! kinds ('DiffViewBufferKind'). The connection that holds it is
+//! 'serve.rs'.
+
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::many_to_many::ManyToMany;
