@@ -15,9 +15,19 @@
   target, and an early return is still the caller's.
   Each split was checked by the whole Rust suite
   ('cargo test --no-fail-fast'), and the round by 'bash/all-tests.sh'.
+** A second round: four more in the server, two in each client
+   The server was measured again the same way (no length had moved
+   but the six split), and four more seam functions were split; see
+   "the measured list". The clients were then measured the same way:
+   a top-level 'defun' of 'elisp/' from its open paren to its close
+   (docstring included), a Lua function of 'nvim/' from its
+   'function' line to its 'end' (counting 'function', 'do', 'if' and
+   'repeat' against 'end' and 'until'); see "the clients, measured".
+   Two seams were split there, each in both clients at once, so the
+   twins keep matching.
 * The measured list
   Lines before; after, for the ones split.
-** 333 'update_from_and_rerender_buffer_with_approvals_or_preview': seam, done in part (now 247)
+** 333 'update_from_and_rerender_buffer_with_approvals_or_preview': seam, done in part (now 220)
    'server/serve/handlers/save_buffer.rs'. Six steps are functions now,
    called where their code stood:
    'error_unless_unrestricted_for_restore_and_processed_requests',
@@ -26,7 +36,13 @@
    'reset_strandeds_unless_asking' (each returns a 'ControlFlow' whose
    'Break' the caller turns into its early confirmation response),
    'error_if_dirty_views_conflict', and
-   'send_relaxed_lock_and_log_collateral_views'. See "left" for the rest.
+   'send_relaxed_lock_and_log_collateral_views'. The second round
+   named five more: 'error_unless_unheld_buffer_leaves_room_past_its_viewnode_ids'
+   and 'error_if_buffer_writes_stale_graphnodes' (each returns the
+   refusal for the caller's '?'), 'fork_confirmation_response',
+   'with_fork_clones_saved', and 'save_warnings_in_the_order_shown'
+   (the order the user reads the warnings in, in one place). See
+   "left" for the rest.
 ** 213 'herald_rule_table': flat
    'server/heralds.rs'. One rule-tree literal.
 ** 157 'hide_report_lines': seam, left
@@ -45,10 +61,12 @@
    its comment; what remains inline is a few lines per stage and the
    'refusal' closure they share. Splitting would scatter the stage
    list the module header promises.
-** 133 'handle_save_buffer_request': seam, left
-   'server/serve/handlers/save_buffer.rs'. Reads eleven request fields,
-   sends the early lock, and answers the pipeline's error three ways;
-   see "left".
+** 133 'handle_save_buffer_request': seam, done (now 94)
+   'server/serve/handlers/save_buffer.rs'. 'send_early_broad_save_lock'
+   sends the early lock; a pipeline error is answered by
+   'send_preview_refusal_of_pipeline_error' or
+   'send_save_refusal_of_pipeline_error'. Left: reading the eleven
+   request fields, and the match on the payload; see "left".
 ** 132 'validate_identity_and_derive_changes': seam, done (now 47)
    'server/dbs/in_rust_graph/prepared_update.rs'. Six steps, each a
    function: 'gnids_the_batch_affects', 'carriers_claiming_each_gnid',
@@ -61,9 +79,14 @@
 ** 122 'sentences_for_path': flat
    'server/herald_descriptions.rs'. One match from metadata path to
    sentence, mostly literal text.
-** 120 'text_search_response': seam, left
-   'server/serve/handlers/text_search.rs'. Reading the request
-   (S-expression, search choice, terms) is a unit; see "left".
+** 120 'text_search_response': seam, done (now 84)
+   'server/serve/handlers/text_search.rs'.
+   'text_search_request_else_response' reads the request into a
+   'TextSearchRequest', 'visible_match_groups_else_response' searches
+   and groups the hits the restriction shows, and
+   'register_search_view' registers the drawn buffer. The first two
+   return the 'search-results' refusal as their 'Err', which the
+   caller returns.
 ** 117 'buffer_validation_error_text': flat
    'server/types/errors.rs'. One match on the error's variant.
 ** 109 'handle_single_root_view_request': seam, done (now 56)
@@ -92,28 +115,82 @@
    'server/org_to_text.rs'. Already split into nested functions
    ('node_parts' and its own); long only because they are counted
    inside it.
+** 95 'prepare_save_under_mutation_gate': seam, left (second round)
+   'server/save.rs'. See "left".
+** 95 'infer_hides_from_contains_removals': not read (second round)
+   'server/from_text/local_fieldintent_collection/resolve_visibility.rs'.
+** 94 'resolve_link': not read (second round)
+   'server/import_md_and_org/resolve.rs'.
+** 93 'handle_titles_by_gnids_request_with_skgrepo_set': seam, done (now 41)
+   'server/serve/handlers/titles_by_gnids.rs'. Its stages are
+   'requested_gnids_else_logged_error' (logs, then returns the text
+   the caller sends), 'retain_titles_the_restriction_shows',
+   'overPrivateText_pids_requested' and 'titles_by_ids_response'.
+* The clients, measured
+  Lines before; after, for the ones split. "Flat" here also covers a
+  function long only by its docstring.
+** Emacs ('elisp/')
+*** 127 'skg-transform-sexp-flat': flat
+    'elisp/skg-sexpr/skg-lens.el'. Nearly all docstring: the rule
+    grammar.
+*** 123 'skg--send-save-buffer': seam, done (now 34)
+    'elisp/skg-request-save.el'. The nine handler registrations are
+    'skg--register-save-response-handlers' (89 lines: one registration
+    after another, each with its comment).
+*** 84 'skg-reload': left
+    'elisp/skg-reload.el'. The reload machinery itself, which
+    'tests/elisp/test-skg-reload.el' guards; not worth the risk.
+*** 79 'skg--parse-rule-header': flat
+    'elisp/skg-sexpr/skg-lens.el'. One 'cond' over the rule grammar,
+    and a long docstring.
+*** 75 'skg-validate-linkstack-buffer': seam, left
+    'elisp/skg-linkstack.el'. See "left".
+*** 71 'skg--rel-at-point': not read
+    'elisp/skg-request-relRepo-info.el'; its twin 'rel_at_line' is 55.
+*** 66 'skg--register-rerender-stream-handlers': seam, done (now 22)
+    'elisp/skg-request-rerender-all-views.el'. The lock and done
+    lambdas call 'skg--rerender-lock-handler' and
+    'skg--rerender-done-handler'.
+*** 66 'skg--import-md-and-org-send': not read
+    'elisp/skg-request-import-md-and-org.el'; its twin is 'send' (58)
+    in 'import_md_and_org.lua'.
+** Neovim ('nvim/')
+*** 84 'send_save_buffer': seam, done (now 25)
+    'nvim/lua/skg/save.lua'. The twin of the Emacs split:
+    'register_save_response_handlers' (63).
+*** 64 'register_rerender_stream_handlers': seam, done (now 15)
+    'nvim/lua/skg/rerender_all_views.lua'. 'rerender_lock_handler' and
+    'rerender_done_handler', as in Emacs.
+*** 59 'show_fork_confirmation': not read
+    'nvim/lua/skg/save/confirmations.lua'.
+*** 59 'open_plain_diff_at': not read
+    'nvim/lua/skg/goto_git.lua'.
+*** 58 'configure_view_buffer': not read
+    'nvim/lua/skg/buffer.lua'.
 * Left, best first
-** The rest of 'update_from_and_rerender_buffer_with_approvals_or_preview' (247 lines)
-   'save_buffer.rs'. Still the longest. Natural next pieces: the
-   viewnode-ID room check for a buffer the connection does not hold,
-   the stale-write refusal, the fork confirmation, and the final
-   warning assembly (whose order is the user's: parse, rerender,
-   strandeds, stale, restore, processed, hidden-outside). Safe the
-   same way; the steps' positions are load-bearing ('TODO/problems.org',
-   "The save handler's checks depend on their position in it"), so
-   extract in place, never reorder. Small work each.
-** 'handle_save_buffer_request' (133 lines)
-   'save_buffer.rs'. Its three answers to a pipeline error (preview
-   refusal, 'SaveError' refusal, other error logged and refused) could be
-   one 'send_pipeline_error'. The '(Err (err), _)' arms that read the
-   payload have their own text ("Error reading save payload"), which
-   must stay. Safe, small. Gathering the eleven request fields into one
-   struct would also shorten the pipeline's seventeen arguments, but
-   touches every test that calls the '_with_approvals' entry points.
-** 'text_search_response' (120 lines)
-   'text_search.rs'. Reading the request could return '(Sexp, choice,
-   terms)' or the response to send; each refusal keeps its text and its
-   'tracing::error!'. Safe, small.
+** The save request's eleven fields as one struct
+   'save_buffer.rs'. 'handle_save_buffer_request' (94 lines) still reads
+   eleven request fields into locals and passes them on; one struct
+   would also shorten the pipeline's seventeen arguments, but touches
+   every test that calls the '_with_approvals' entry points. Medium.
+** 'skg-validate-linkstack-buffer' (75 lines) and its Neovim twin
+   'elisp/skg-linkstack.el'. Reading one headline and its body
+   (returning its entry or its error) is the loop's unit; the error
+   texts must stay word for word. Do the Neovim twin in the same pass.
+   Safe, small.
+** The tail of 'prepare_save_under_mutation_gate' (95 lines)
+   'server/save.rs'. The pids saved and gnids affected by both phases,
+   the telescope warnings from them, and the final write identities
+   are pure computations over the two 'PreparedGraphUpdate's; two
+   functions would name them. Safe, small; less to gain than the rest.
+** The rest of 'update_from_and_rerender_buffer_with_approvals_or_preview' (220 lines)
+   'save_buffer.rs'. Still the longest, but what is left is the
+   sequence itself: each step a call, a 'ControlFlow' match or a
+   tracing span. The last block (consume the processed requests,
+   rerender, gather the warnings) could be one function, but it would
+   take a dozen arguments. The steps' positions are load-bearing
+   ('TODO/problems.org', "The save handler's checks depend on their
+   position in it"); extract in place, never reorder.
 ** 'hide_report_lines' and 'apply_sticky_relRepos_in_graph_with_prospective_homes'
    Both are long because their units share closures over many locals.
    Turning the closures into a small struct with methods ('label',
