@@ -125,7 +125,7 @@ pub struct ForkSpec {
 #[derive(Debug, Clone)]
 pub struct NodeMerge {
   pub acquiree_text_preserver : SaveNode, // new node with acquiree's title and body
-  pub updated_acquirer        : SaveNode, // acquirer with acquiree's IDs, contents, and relationships merged in. (This is complex; see 'three_nodeMerged_graphnodes'.)
+  pub updated_acquirer        : SaveNode, // acquirer with acquiree's IDs, contents, and relationships merged in. (This is complex; see 'acquirer_after_nodeMerge'.)
   pub acquiree_to_delete      : DeleteNode,
 }
 

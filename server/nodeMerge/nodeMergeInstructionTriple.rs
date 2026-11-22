@@ -63,14 +63,14 @@ fn nodeMerge_from_acquirer_and_acquiree (
   graph          : &InRustGraph,
   config         : &SkgConfig,
 ) -> Result<NodeMerge, Box<dyn Error>> {
-  let acquirer_from_disk : Graphnode =
+  let acquirer_before_nodeMerge : Graphnode =
     graphnode_by_gnid (
       graph, config, acquirer_gnid )?;
-  let acquiree_from_disk : Graphnode =
+  let acquiree_before_nodeMerge : Graphnode =
     graphnode_by_gnid (
       graph, config, &acquiree_gnid )?;
   let acquiree_text_preserver : Graphnode =
-    create_acquiree_text_preserver (&acquiree_from_disk);
+    create_acquiree_text_preserver (&acquiree_before_nodeMerge);
   let shown_pre_merge : HashSet<ID> = {
     // Whatever either member showed as unintegrated content of its
     // fork partners before the merge, the merged node must keep showing,
@@ -78,18 +78,18 @@ fn nodeMerge_from_acquirer_and_acquiree (
     // hides below.
     let mut shown : HashSet<ID> =
       gnids_shown_through_forks_folder_members (
-        &acquirer_from_disk, graph, config ) ?;
+        &acquirer_before_nodeMerge, graph, config ) ?;
     shown . extend (
       gnids_shown_through_forks_folder_members (
-        &acquiree_from_disk, graph, config ) ? );
+        &acquiree_before_nodeMerge, graph, config ) ? );
     shown };
   let updated_acquirer : Graphnode =
-    three_nodeMerged_graphnodes( config,
-                           graph,
-                           &acquirer_from_disk,
-                           &acquiree_from_disk,
-                           &acquiree_text_preserver,
-                           &shown_pre_merge)?;
+    acquirer_after_nodeMerge( config,
+                              graph,
+                              &acquirer_before_nodeMerge,
+                              &acquiree_before_nodeMerge,
+                              &acquiree_text_preserver,
+                              &shown_pre_merge)?;
   Ok(NodeMerge {
     acquiree_text_preserver :
       SaveNode (acquiree_text_preserver),
@@ -97,8 +97,8 @@ fn nodeMerge_from_acquirer_and_acquiree (
       SaveNode (updated_acquirer),
     acquiree_to_delete :
       DeleteNode {
-        gnid           : acquiree_from_disk . pid . clone(), // the pid, even if the merge request named an extra ID
-        home_skgrepo : acquiree_from_disk . home_skgrepo . clone() }} ) }
+        gnid           : acquiree_before_nodeMerge . pid . clone(), // the pid, even if the merge request named an extra ID
+        home_skgrepo : acquiree_before_nodeMerge . home_skgrepo . clone() }} ) }
 
 /// Computes the updated acquirer node with all fields properly merged.
 /// Returns a new Graphnode with:
@@ -113,16 +113,16 @@ fn nodeMerge_from_acquirer_and_acquiree (
 /// in 'graph', from before the nodeMerge): a list may name a note by an
 /// extra ID. Each record is kept as its list names it, the first of
 /// two naming one note.
-fn three_nodeMerged_graphnodes(
+fn acquirer_after_nodeMerge(
   config: &SkgConfig,
   graph: &InRustGraph,
-  acquirer_from_disk: &Graphnode,
-  acquiree_from_disk: &Graphnode,
+  acquirer_before_nodeMerge: &Graphnode,
+  acquiree_before_nodeMerge: &Graphnode,
   acquiree_text_preserver: &Graphnode,
   shown_pre_merge: &HashSet<ID>,
 ) -> Result<Graphnode, String> {
   let mut updated_acquirer: Graphnode =
-    acquirer_from_disk . clone();
+    acquirer_before_nodeMerge . clone();
   // Search exclusion is conservative across a merge: the surviving node is
   // excluded only when both inputs were excluded.  The acquiree's original
   // text is preserved separately below, with its own value unchanged.
@@ -130,16 +130,16 @@ fn three_nodeMerged_graphnodes(
     &mut updated_acquirer . flags,
     Flag::NoSearchMatching,
     flag_is_true (
-      &acquirer_from_disk . flags, Flag::NoSearchMatching)
+      &acquirer_before_nodeMerge . flags, Flag::NoSearchMatching)
     && flag_is_true (
-      &acquiree_from_disk . flags, Flag::NoSearchMatching));
+      &acquiree_before_nodeMerge . flags, Flag::NoSearchMatching));
   { // Append acquiree's IDs (esp. its PID) to acquirer's extra_ids.
     let mut combined_extra_ids : Vec<ID> =
-      acquirer_from_disk . extra_ids . clone();
+      acquirer_before_nodeMerge . extra_ids . clone();
     combined_extra_ids . push(
-      acquiree_from_disk . pid . clone() );
+      acquiree_before_nodeMerge . pid . clone() );
     combined_extra_ids . extend(
-      acquiree_from_disk . extra_ids . clone() );
+      acquiree_before_nodeMerge . extra_ids . clone() );
     updated_acquirer . extra_ids =
       dedup_vector (combined_extra_ids); }
   // Combining lists of relation partners (compose both, concatenate
@@ -166,8 +166,8 @@ fn three_nodeMerged_graphnodes(
               skgrepo, m . member . clone () )), }} }
       out };
   let new_contains : HashSet<ID> = // acquirer's old content + acquiree's old content, by pid (the preserver is new, and hidden by neither)
-    members_of (& acquirer_from_disk . contains) . iter ()
-    . chain ( members_of (& acquiree_from_disk . contains) . iter () )
+    members_of (& acquirer_before_nodeMerge . contains) . iter ()
+    . chain ( members_of (& acquiree_before_nodeMerge . contains) . iter () )
     . map (key) . collect ();
   let own_gnids : Vec<ID> = // the merged note's IDs, the acquiree's among them: it may not contain, fork or hide any of them
     updated_acquirer . all_gnids() . cloned() . collect::<Vec<_>>();
@@ -177,15 +177,15 @@ fn three_nodeMerged_graphnodes(
     let mut combined : Vec<RelPartner<ID>> = combine_rel_partners (
       & [ & rel_partners_at_relRepo ( & updated_acquirer . home_skgrepo,
                             vec! [ acquiree_text_preserver . pid . clone() ] ),
-          & acquirer_from_disk . contains,
-          & acquiree_from_disk . contains ] );
+          & acquirer_before_nodeMerge . contains,
+          & acquiree_before_nodeMerge . contains ] );
     combined . retain (not_own);
     combined };
   { // Union aliases (parallel to extra_ids): a merged node should
     // still be findable by the acquiree's old aliases.
     let mut combined : Vec<RelPartner<String>> = Vec::new ();
-    for list in [ acquirer_from_disk . aliases . or_default (),
-                  acquiree_from_disk . aliases . or_default () ] {
+    for list in [ acquirer_before_nodeMerge . aliases . or_default (),
+                  acquiree_before_nodeMerge . aliases . or_default () ] {
       for m in list {
         let skgrepo : SkgrepoName = config . more_private_of (
           m . relRepo . clone (),
@@ -201,8 +201,8 @@ fn three_nodeMerged_graphnodes(
       MSV::Specified (combined); }
   { // Combine forks
     let mut combined : Vec<RelPartner<ID>> = combine_rel_partners (
-      & [ acquirer_from_disk . forks . or_default (),
-          acquiree_from_disk . forks . or_default () ] );
+      & [ acquirer_before_nodeMerge . forks . or_default (),
+          acquiree_before_nodeMerge . forks . or_default () ] );
     combined . retain (not_own);
     updated_acquirer . forks =
       MSV::Specified (combined); }
@@ -215,9 +215,9 @@ fn three_nodeMerged_graphnodes(
     // like the intersection": exactly the intersection when both
     // members could see the id through some forkee.)
     let mut combined : Vec<RelPartner<ID>> = combine_rel_partners (
-      & [ acquirer_from_disk . hides
+      & [ acquirer_before_nodeMerge . hides
             . or_default (),
-          acquiree_from_disk . hides
+          acquiree_before_nodeMerge . hides
             . or_default () ] );
     combined . retain ( // if it's in 'new_contains', then it's not here
       |m| ! new_contains . contains ( &key (&m . member) ));
@@ -335,7 +335,7 @@ mod flag_tests {
       if acquiree_value {
         acquiree . flags . push (Flag::NoSearchMatching); }
       let preserver : Graphnode = create_acquiree_text_preserver (&acquiree);
-      let merged : Graphnode = three_nodeMerged_graphnodes (
+      let merged : Graphnode = acquirer_after_nodeMerge (
         &config (),
         &InRustGraph::from_graphnodes (&[ acquirer . clone (), acquiree . clone () ]),
         &acquirer, &acquiree, &preserver, &HashSet::new ())

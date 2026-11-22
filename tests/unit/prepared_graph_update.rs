@@ -406,7 +406,7 @@ fn a_nodeMerge_leaving_two_owned_forks_of_one_note_is_prepared () {
 
 #[test]
 fn an_acquirer_left_forking_its_acquiree_is_refused_as_a_self_fork () {
-  // The nodeMerge drops such a relationship ('three_nodeMerged_graphnodes');
+  // The nodeMerge drops such a relationship ('acquirer_after_nodeMerge');
   // a save that keeps one is refused here.
   let skgrepo : SkgrepoName = SkgrepoName::from ("main");
   let mut a : Graphnode = node ("A");

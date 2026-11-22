@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_saves -E 'test(merge::merge_compares_ids_by_pid)'
 //
 // A nodeMerge compares the members of its lists by pid: a list may
-// name a note by an extra ID ('three_nodeMerged_graphnodes').
+// name a note by an extra ID ('acquirer_after_nodeMerge').
 //
 // Fixture: k has the extra ID m, f has g, p has q, r has s.
 // - a contains k and forks f; b contains m and forks g.

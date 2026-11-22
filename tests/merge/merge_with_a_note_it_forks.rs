@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_saves -E 'test(merge_with_a_note_it_forks)'
 //
 // A nodeMerge of a note with a note it forks saves, and the merged
-// note neither forks nor hides itself: 'three_nodeMerged_graphnodes'
+// note neither forks nor hides itself: 'acquirer_after_nodeMerge'
 // drops the merged note's own IDs from its 'forks' and 'hides', as from
 // its contents.
 //
