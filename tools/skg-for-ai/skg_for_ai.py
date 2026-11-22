@@ -196,52 +196,32 @@ def command_needs_named_port (arguments):
   return True
 
 def run_command (arguments):
-  """Run the command ARGUMENTS names, in this process."""
-  if arguments . command == "close":
-    command_close (arguments)
-    return
-  if arguments . command == "raw":
-    command_raw (arguments)
-    return
-  if arguments . command == "import":
-    command_import (arguments)
-    return
-  if arguments . command == "save":
-    command_save (arguments)
-    return
-  if arguments . command == "new":
-    command_new (arguments)
-    return
-  if arguments . command == "diff":
-    command_diff (arguments)
-    return
-  if arguments . command == "commit":
-    command_commit (arguments)
-    return
-  if arguments . command == "extend":
-    command_extend (arguments)
-    return
-  if arguments . command == "perspective":
-    command_perspective (arguments)
-    return
-  if arguments . command == "delete-references":
-    command_delete_references (arguments)
-    return
-  if arguments . command == "receipt":
-    command_receipt (arguments)
-    return
-  if arguments . command == "restrict":
-    command_restrict (arguments)
-    return
-  if arguments . command == "linkstack":
-    command_linkstack (arguments)
-    return
-  if arguments . command == "chain":
-    command_chain (arguments)
-    return
-  if arguments . command == "describe":
-    command_describe (arguments)
-    return
+  """Run the command ARGUMENTS names, in this process: a view command
+  by 'run_view_command', every other by its own function. ('daemon'
+  never comes here: 'main' runs it, and a daemon refuses it.)"""
+  command_function = {
+    "close"             : command_close,
+    "raw"               : command_raw,
+    "import"            : command_import,
+    "save"              : command_save,
+    "new"               : command_new,
+    "diff"              : command_diff,
+    "commit"            : command_commit,
+    "extend"            : command_extend,
+    "perspective"       : command_perspective,
+    "delete-references" : command_delete_references,
+    "receipt"           : command_receipt,
+    "restrict"          : command_restrict,
+    "linkstack"         : command_linkstack,
+    "chain"             : command_chain,
+    "describe"          : command_describe,
+  } . get (arguments . command, run_view_command)
+  command_function (arguments)
+
+def run_view_command (arguments):
+  """Run 'view', 'search', 'forest' or a forest alias ('contains',
+  'links-here'): fetch the view, write its three files and print their
+  paths."""
   connection = connect_to_server (arguments . port)
   try:
     show = arguments . show_overPrivateText
