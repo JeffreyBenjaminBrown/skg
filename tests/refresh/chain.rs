@@ -86,9 +86,9 @@ fn a_chain_under_an_editable_occurrence_claims_nothing () {
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph : &graph, config : &config,
                               restriction : &restriction };
-  let walk : Walk = Walk::new (&truth, RefreshMode::ContentView, 0, Perspective::RootHomes);
+  let mut walk : Walk = Walk::new (&truth, RefreshMode::ContentView, 0, Perspective::RootHomes);
   let m : NodeId = forest . roots () . next () . unwrap () . id ();
-  draw_containerward_chain ( forest . as_internal_tree_mut (), m, &walk ) . unwrap ();
+  draw_containerward_chain ( forest . as_internal_tree_mut (), m, &mut walk ) . unwrap ();
   assert_eq! ( outline (&forest), "\
 node m
   node a wp noClaim
@@ -196,3 +196,146 @@ node s
       containerFolder
         node q wp noClaim folded",
     "a content view puts the chain in a containers folder" ); }
+
+/// n, in 'main', is contained by c, contained by top. c forks t, in
+/// 'theirs', which u, in 'theirs' too, forks: c, t and u are mirrors,
+/// across two skgrepos. tt contains t, and uu contains u.
+fn n_whose_container_has_mirrors () -> InRustGraph {
+  graph (&nodes_of_n_whose_container_has_mirrors ()) }
+
+fn nodes_of_n_whose_container_has_mirrors () -> Vec<Graphnode> {
+  vec! [
+    node ("n"),
+    Graphnode { contains : ids (&["n"]), forks : msv_ids (&["t"]), .. node ("c") },
+    Graphnode { contains : ids (&["c"]), .. node ("top") },
+    node_in ("theirs", "t"),
+    Graphnode { forks : msv_ids (&["t"]), .. node_in ("theirs", "u") },
+    Graphnode { contains : ids (&["t"]), .. node_in ("theirs", "tt") },
+    Graphnode { contains : ids (&["u"]), .. node_in ("theirs", "uu") }, ] }
+
+/// The chain passes through mirrors: c, n's container, holds its
+/// forks folder, first, before its own containers; there t and u,
+/// write-protected, each carry their containers in a containers
+/// folder, as every forks folder's members do.
+#[test]
+fn a_chain_node_with_mirrors_holds_its_forks_folder () {
+  let input : String = formatdoc! ("
+    * {} n
+    ** (skg containerFolder)
+    ", occurrence_metadata ("n", "writeProtected") );
+  assert_eq! ( run_asserting_fixpoint (&input, &n_whose_container_has_mirrors ())
+               . outline (), "\
+node n wp
+  containerFolder
+    node c wp noClaim
+      forksFolder
+        node t wp noClaim
+          containerFolder
+            node tt wp noClaim folded
+        node u wp noClaim
+          containerFolder
+            node uu wp noClaim folded
+      node top wp noClaim" ); }
+
+/// A class of mirrors is listed once in a view. With c's forks folder
+/// already in the buffer (a root's, here), c in n's chain holds none.
+#[test]
+fn a_class_listed_elsewhere_in_the_view_is_not_listed_again () {
+  let input : String = formatdoc! ("
+    * {} c
+    ** (skg forksFolder)
+    * {} n
+    ** (skg containerFolder)
+    ", occurrence_metadata ("c", "writeProtected"),
+       occurrence_metadata ("n", "writeProtected") );
+  let run : Run = run_asserting_fixpoint (&input, &n_whose_container_has_mirrors ());
+  assert! ( run . outline () . ends_with ( "\
+node n wp
+  containerFolder
+    node c wp noClaim
+      node top wp noClaim" ),
+    "{}", run . outline () ); }
+
+/// m is contained by a, a by b. b forks b2, which a2 contains, and a2
+/// forks a: a cycle of containment and forks, which a chain through
+/// mirrors would walk forever if it listed a class twice.
+#[test]
+fn a_cycle_through_mirrors_ends () {
+  let graph : InRustGraph = graph (&[
+    node ("m"),
+    Graphnode { contains : ids (&["m"]), .. node ("a") },
+    Graphnode { contains : ids (&["a"]), forks : msv_ids (&["b2"]), .. node ("b") },
+    node ("b2"),
+    Graphnode { contains : ids (&["b2"]), forks : msv_ids (&["a"]), .. node ("a2") }, ]);
+  let input : String = formatdoc! ("
+    * {} m
+    ** (skg containerFolder)
+    ", occurrence_metadata ("m", "writeProtected") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
+node m wp
+  containerFolder
+    node a wp noClaim
+      forksFolder
+        node a2 wp noClaim
+      node b wp noClaim
+        forksFolder
+          node b2 wp noClaim
+            containerFolder
+              node a2 wp noClaim folded" ); }
+
+/// A mirror the skgrepo restriction keeps out is not drawn, nor is a
+/// forks folder for it: c's fork p is private, and records its fork
+/// in 'private'. (A visible record of a restricted fork would draw it
+/// as a restricted headline, titleless, as the chain draws any.)
+#[test]
+fn a_restricted_mirror_makes_no_forks_folder_in_the_chain () {
+  let graph : InRustGraph = graph (&[
+    node ("n"),
+    Graphnode { contains : ids (&["n"]), .. node ("c") },
+    Graphnode { title    : "p's secret title" . to_string (),
+                forks    : MSV::Specified ( rel_partners_at_relRepo (
+                  &SkgrepoName::from ("private"), vec! [ ID::from ("c") ] )),
+                .. node_in ("private", "p") },
+    Graphnode { contains : ids (&["p"]), .. node_in ("private", "pc") }, ]);
+  let input : String = formatdoc! ("
+    * {} n
+    ** (skg containerFolder)
+    ", occurrence_metadata ("n", "writeProtected") );
+  let run : Run = run_asserting_fixpoint_in (
+    &input, &graph, &main_only (), RefreshMode::ContentView, 100 );
+  assert_eq! ( run . outline (), "\
+node n wp
+  containerFolder
+    node c wp noClaim" );
+  assert! ( ! run . text . contains ("secret"), "{}", run . text );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
+node n wp
+  containerFolder
+    node c wp noClaim
+      forksFolder
+        node p wp noClaim
+          containerFolder
+            node pc wp noClaim folded",
+    "unrestricted, the private fork is listed" ); }
+
+/// The diff view's chain does not pass through mirrors: c, n's
+/// container, holds no forks folder there.
+#[test]
+fn the_diff_views_chain_lists_no_mirrors () {
+  let graph_nodes : Vec<Graphnode> = nodes_of_n_whose_container_has_mirrors ();
+  let straddle : GraphStraddle = straddle (&graph_nodes, &graph_nodes);
+  let processed_store : ProcessedStore = ProcessedStore::default ();
+  let input : String = formatdoc! ("
+    * {} n
+    ** (skg containerFolder)
+    ", occurrence_metadata ("n", "writeProtected") );
+  assert_eq! ( run_asserting_fixpoint_in (
+    &input, &straddle . after, &unrestricted (),
+    RefreshMode::DiffView { straddle        : &straddle,
+                            buffer_kind     : DiffViewBufferKind::AllChanges,
+                            processed_store : &processed_store },
+    100 ) . outline (), "\
+node n wp
+  containerFolder
+    node c wp noClaim
+      node top wp noClaim" ); }

@@ -955,9 +955,9 @@ pub fn draw_containerward_chains_under_members (
   truth   : &Truth,
   mode    : RefreshMode,
 ) -> Result<(), Box<dyn Error>> {
-  let walk : Walk = Walk::new (truth, mode, 0, Perspective::RootHomes);
+  let mut walk : Walk = Walk::new (truth, mode, 0, Perspective::RootHomes);
   for member in members {
-    draw_containerward_chain (tree, *member, &walk) ?; }
+    draw_containerward_chain (tree, *member, &mut walk) ?; }
   Ok (( )) }
 
 pub fn single_root_view (

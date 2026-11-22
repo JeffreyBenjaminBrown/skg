@@ -100,6 +100,7 @@ pub fn refresh_viewforest (
   let mut walk : Walk = Walk::new (truth, mode, node_budget, perspective);
   { let tree : &mut Tree<Viewnode> = viewforest . as_internal_tree_mut ();
     editability::settle_before_the_walk (tree, &mut walk);
+    walk . pids_whose_mirrors_are_listed = chain::mirrors_listed_in (tree, &walk);
     walk_in_level_order (tree, &mut walk) ?; }
   tail::finish (viewforest, viewnode_id_record, walk) }
 
@@ -132,6 +133,13 @@ pub(crate) struct Walk<'a> {
   /// The view's perspective
   /// ('perspective_skgrepo_of_tree_containing').
   pub perspective              : Perspective,
+  /// The pid of every mirror of every note whose forks folder the
+  /// view holds: what the buffer held when the walk began, and each
+  /// forks folder the walk adds ('add_folders' in 'visit.rs'). A note
+  /// of the containerward chain whose mirrors are not among them gets
+  /// a forks folder of its own ('list_mirrors_of_chain_occurrence' in
+  /// 'chain.rs'), so that each class of mirrors is listed once.
+  pub pids_whose_mirrors_are_listed : HashSet<ID>,
 }
 
 impl<'a> Walk<'a> {
@@ -144,7 +152,8 @@ impl<'a> Walk<'a> {
     Walk { truth, mode, node_budget, perspective,
            editable_occurrence_of : HashMap::new (),
            folders_whose_drawn_members_are_folded : HashSet::new (),
-           unrestricted : SkgrepoRestriction::unrestricted (truth . config), } }
+           unrestricted : SkgrepoRestriction::unrestricted (truth . config),
+           pids_whose_mirrors_are_listed : HashSet::new (), } }
 
   pub fn is_diff_view (
     &self,

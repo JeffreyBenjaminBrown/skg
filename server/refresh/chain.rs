@@ -4,7 +4,12 @@
 //! under each of those, its containers; and so on breadth-first to
 //! 'max_roleTree_depth', up to the roots.
 //! A node the walk met before (a cycle or a diamond) is shown once
-//! more, as a leaf ('ContainerwardRoleTree::Repeated'). Each chain
+//! more, as a leaf ('ContainerwardRoleTree::Repeated'). The chain
+//! passes through mirrors: the member and each chain node that
+//! occurs, where it has a fork partner and the view lists none of its
+//! mirrors yet, holds its forks folder, whose members carry their own
+//! containers in a containers folder, as every forks folder's do
+//! ('list_mirrors_of_chain_occurrence'). Each chain
 //! node is what the ID rule makes of its gnid under its parent's chain
 //! goal ('chain_goal'), built as the refresh builds that kind, from the
 //! truth and with no disk read; the chain goes on only under an
@@ -19,14 +24,16 @@
 
 use crate::dbs::in_rust_graph::containerward_role_tree::{
   ContainerwardRoleTree, containers_in_inRustGraph, full_containerward_role_tree};
+use crate::dbs::in_rust_graph::mirrors::mirrors_of;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::refresh::Walk;
 use crate::refresh::editability::{DrawnEditability, EditabilityAndClaim};
-use crate::refresh::goal::{Goal, GoalItem, GoalMember, chain_goal};
+use crate::refresh::goal::{Goal, GoalItem, GoalMember, chain_goal, has_a_fork_partner};
 use crate::refresh::id_rule::{WhereTheHeadlineStands, id_rule, vognode_for_answer};
 use crate::refresh::mode::RefreshMode;
+use crate::refresh::visit::add_folders;
 use crate::types::misc::ID;
-use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
+use crate::types::viewnode::{Folder, Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::HashSet;
@@ -34,15 +41,17 @@ use std::error::Error;
 
 /// Draw the chain under the occurrence at 'member': its containers'
 /// role trees, each prepended so that the first container comes
-/// first. The role tree gives the chain its shape (the order, the
-/// depth, a node met before shown as a leaf); the chain goal of each
-/// chain node's parent says which of its containers stand
-/// ('chain_goal'), and the ID rule what each is. Anything but an
-/// occurrence at 'member' is skipped.
+/// first, and, where the member and each chain node have mirrors the
+/// view lists nowhere, their forks folders
+/// ('list_mirrors_of_chain_occurrence'). The role tree gives the chain
+/// its shape (the order, the depth, a node met before shown as a
+/// leaf); the chain goal of each chain node's parent says which of its
+/// containers stand ('chain_goal'), and the ID rule what each is.
+/// Anything but an occurrence at 'member' is skipped.
 pub(crate) fn draw_containerward_chain (
   tree   : &mut Tree<Viewnode>,
   member : NodeId,
-  walk   : &Walk,
+  walk   : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
   let Some (pid) : Option<ID> = tree . get (member) . and_then ( |node|
     match &node . value () . kind {
@@ -53,7 +62,51 @@ pub(crate) fn draw_containerward_chain (
   if let ContainerwardRoleTree::Inner ( _, containers ) =
     containerward_role_tree (&pid, walk)
   { insert_containers (tree, member, &pid, &containers, walk) ?; }
+  list_mirrors_of_chain_occurrence (tree, member, &pid, walk);
   Ok (( )) }
+
+/// Under the occurrence at 'occurrence', of 'pid', a member carrying
+/// the containerward chain or a node of it, its forks folder, first
+/// among its children, as 'add_folders' adds any: where 'pid' has a
+/// fork partner the skgrepo restriction shows ('has_a_fork_partner')
+/// and no forks folder of the view lists its mirrors yet
+/// ('Walk::pids_whose_mirrors_are_listed'), so that each class of
+/// mirrors is listed once, at the first of its notes the walk reaches.
+/// The refresh fills the folder, its members write-protected, each
+/// with its containers in a containers folder whose members carry
+/// their chains in turn. Not in the diff view, which draws no forks
+/// folder unasked.
+fn list_mirrors_of_chain_occurrence (
+  tree       : &mut Tree<Viewnode>,
+  occurrence : NodeId,
+  pid        : &ID,
+  walk       : &mut Walk,
+) {
+  if walk . is_diff_view ()
+     || walk . pids_whose_mirrors_are_listed . contains (
+          &walk . truth . graph . pid_else_raw_id (pid) )
+     || ! has_a_fork_partner (walk . truth . graph, walk . truth . restriction, pid)
+  { return; }
+  add_folders (tree, occurrence, &[ Folder::Forks ], walk); }
+
+/// The pid of every mirror of every occurrence in 'tree' that holds a
+/// forks folder, under the walk's skgrepo restriction
+/// ('Walk::pids_whose_mirrors_are_listed').
+pub(crate) fn mirrors_listed_in (
+  tree : &Tree<Viewnode>,
+  walk : &Walk,
+) -> HashSet<ID> {
+  let mut listed : HashSet<ID> = HashSet::new ();
+  for node in tree . nodes () {
+    let ViewnodeKind::Folder (Folder::Forks) = &node . value () . kind
+      else { continue; };
+    let Some (note) : Option<&ID> =
+      node . parent () . and_then ( |parent| parent . value () . occurrence_gnid () )
+      else { continue; };
+    if listed . contains ( &walk . truth . graph . pid_else_raw_id (note) ) { continue; }
+    listed . extend ( mirrors_of (
+      walk . truth . graph, walk . truth . restriction, note, None ) . pids () ); }
+  listed }
 
 /// The containerward role tree of 'pid', over the live graph, or in
 /// the diff view over the union of the straddle.
@@ -77,13 +130,14 @@ fn containerward_role_tree (
 /// Prepend under 'parent', an occurrence of 'parent_pid', each of
 /// 'containers' that stands ('prepend_containerward_chain_node'), in
 /// reverse so that they keep their order; and under each that is an
-/// occurrence, its own containers.
+/// occurrence, its own containers and, where it lists mirrors no
+/// other forks folder lists, its forks folder.
 fn insert_containers (
   tree       : &mut Tree<Viewnode>,
   parent     : NodeId,
   parent_pid : &ID,
   containers : &[ContainerwardRoleTree],
-  walk       : &Walk,
+  walk       : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
   let goal : Goal = chain_goal (parent_pid, walk);
   for container in containers . iter () . rev () {
@@ -91,9 +145,10 @@ fn insert_containers (
       prepend_containerward_chain_node (
         tree, parent, container . gnid (), &goal, walk ) ?
       else { continue; };
-    if let ( Some (pid), ContainerwardRoleTree::Inner ( _, its_containers )) =
-      (pid, container)
-    { insert_containers (tree, chain_node, &pid, its_containers, walk) ?; }}
+    let Some (pid) : Option<ID> = pid else { continue; };
+    if let ContainerwardRoleTree::Inner ( _, its_containers ) = container
+    { insert_containers (tree, chain_node, &pid, its_containers, walk) ?; }
+    list_mirrors_of_chain_occurrence (tree, chain_node, &pid, walk); }
   Ok (( )) }
 
 /// Prepend under 'parent' the chain node for 'container', if 'goal',

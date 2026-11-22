@@ -324,8 +324,10 @@ fn a_tightened_restriction_re_kinds_an_occurrence_of_a_restricted_node_in_place 
 /// s1 claiming under it. Its containers folder, which may stand under
 /// an occurrence alone, became a tombstone at the skgrepo narrowing,
 /// as under any occurrence re-kinded to a Restricted vognode, and
-/// keeps r. The widened view of h, tombstone and all, saved back
-/// unrestricted, changes no file.
+/// keeps r, with the forks folder that lists r's fork hs, since the
+/// containerward chain passes through mirrors: narrowed, hs there is a
+/// Restricted vognode too. The widened view of h, tombstone and all,
+/// saved back unrestricted, changes no file.
 #[test]
 fn a_switch_and_its_reverse_draw_these_buffers (
 ) -> Result<(), Box<dyn Error>> {
@@ -422,21 +424,27 @@ const VIEW_OF_H_UNDER_ALL : &str = "\
 * (skg (vnid 0a) node (gnid h) (skgRepos (nodeRepo private)) (view (rels (contains (in 1) (out 1))) (props (aliases 1)) repoBoundary)) h secret
 ** (skg (vnid 0b) containerFolder)
 *** (skg (vnid 0c) node (gnid r) (skgRepos (nodeRepo public) (relRepo public)) writeProtected (view (rels (contains (out 3 (ancestors 2))) (forks (out 1))) (birth (contains out 2)) repoBoundary)) r
-** (skg (vnid 0d) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
+**** (skg (vnid 0d) forksFolder)
+***** (skg (vnid 0e) node (gnid hs) (skgRepos (nodeRepo private) (relRepo public)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) hs secret
+** (skg (vnid 0f) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
 ";
 
 const VIEW_OF_H_SWITCHED_TO_PUBLIC : &str = "\
 * (skg (vnid 0a) restricted (gnid h))
 ** (skg (vnid 0b) tombstone)
 *** (skg (vnid 0c) node (gnid r) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (out 2))) noWarrant repoBoundary)) r
-** (skg (vnid 0d) node (gnid s1) (skgRepos (nodeRepo public)) (view repoBoundary)) s1
+**** (skg (vnid 0d) forksFolder)
+***** (skg (vnid 0e) restricted (gnid hs))
+** (skg (vnid 0f) node (gnid s1) (skgRepos (nodeRepo public)) (view repoBoundary)) s1
 ";
 
 const VIEW_OF_H_SWITCHED_BACK_TO_ALL : &str = "\
 * (skg (vnid 0a) node (gnid h) (skgRepos (nodeRepo private)) (view (rels (contains (in 1) (out 1))) (props (aliases 1)) repoBoundary)) h secret
 ** (skg (vnid 0b) tombstone)
 *** (skg (vnid 0c) node (gnid r) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (out 3)) (forks (out 1))) noWarrant repoBoundary)) r
-** (skg (vnid 0d) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
+**** (skg (vnid 0d) forksFolder)
+***** (skg (vnid 0e) node (gnid hs) (skgRepos (nodeRepo private) (relRepo public)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)) repoBoundary)) hs secret
+** (skg (vnid 0f) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
 ";
 
 /// A skgrepo narrowing and the skgrepo widening after it give the

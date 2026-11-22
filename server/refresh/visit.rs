@@ -7,7 +7,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::mirrors::{
-  mirror_shown, perspective_skgrepo_of_tree_containing};
+  mirror_shown, mirrors_of, perspective_skgrepo_of_tree_containing};
 use crate::refresh::editability::{
   DrawnEditability, EditabilityAndClaim, carries_editableView_request,
   consume_editableView_request,
@@ -1404,8 +1404,10 @@ fn folders_of_relation (
 
 /// Add each of 'folders' the occurrence at 'treeid' lacks, ahead of
 /// its other children, in the order given, and to a forks folder its
-/// hidden-outside folder ('add_hidden_outside_folder').
-fn add_folders (
+/// hidden-outside folder ('add_hidden_outside_folder'). A forks folder
+/// lists the mirrors of the occurrence's node
+/// ('Walk::pids_whose_mirrors_are_listed').
+pub(crate) fn add_folders (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
   folders : &[Folder],
@@ -1424,6 +1426,8 @@ fn add_folders (
       let forker : Option<ID> =
         tree . get (treeid) . unwrap () . value () . occurrence_gnid () . cloned ();
       if let Some (forker) = forker {
+        walk . pids_whose_mirrors_are_listed . extend ( mirrors_of (
+          walk . truth . graph, walk . truth . restriction, &forker, None ) . pids () );
         add_hidden_outside_folder (tree, folder_treeid, &forker, walk); }}}
   for folder_treeid in added . into_iter () . rev () {
     move_to_first_child (tree, treeid, folder_treeid)
