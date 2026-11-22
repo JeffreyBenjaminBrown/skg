@@ -10,12 +10,15 @@
 # server/, it signals this script, which stops the binary and exits,
 # and cargo-watch starts a fresh copy.
 #
-# A run that ends quickly (a bad config, say, or a port still held, or
-# a skgrepo the server refuses) doubles the pause before the next. After
-# QUICK_EXITS_BEFORE_GIVING_UP quick runs in a row, this script stops
-# trying and exits with status 1, rather than retrying forever a server
-# that cannot start; the server's last error is just above, in the same
-# log. A run that lasts resets both the pause and the count.
+# A run that ends quickly with a non-zero status (a bad config, say, or
+# a port still held, or a skgrepo the server refuses) doubles the pause
+# before the next. After QUICK_FAILURES_BEFORE_GIVING_UP such runs in a
+# row, this script stops trying and exits with status 1, rather than
+# retrying forever a server that cannot start; the server's last error
+# is just above, in the same log. A run that lasts resets both the pause
+# and the count. A run that ends quickly with status 0 (the 'shutdown'
+# request, by which a user rereads the config, or a plain kill, which
+# the server catches) is rerun and changes neither.
 
 PROFILE_DIR="$1"
 SKG_CONFIG="$2"
@@ -24,8 +27,8 @@ if [ -z "$PROFILE_DIR" ] || [ -z "$SKG_CONFIG" ]; then
   exit 2
 fi
 
-QUICK_EXIT_SECONDS=30 # a run shorter than this counts as failing to start
-QUICK_EXITS_BEFORE_GIVING_UP=5 # pausing 2, 4, 8 and 16 s between them
+QUICK_EXIT_SECONDS=30 # a shorter run that exits non-zero failed to start
+QUICK_FAILURES_BEFORE_GIVING_UP=5 # pausing 2, 4, 8 and 16 s between them
 skg_pid=""
 pause_pid=""
 
@@ -40,7 +43,7 @@ stop_skg_and_exit() {
 trap stop_skg_and_exit TERM INT HUP
 
 pause_seconds=1
-quick_exits_in_a_row=0
+quick_failures_in_a_row=0
 while true; do
   started_at=$SECONDS
   "$PROFILE_DIR/skg" "$SKG_CONFIG" &
@@ -48,15 +51,15 @@ while true; do
   wait "$skg_pid"
   status=$?
   skg_pid=""
-  if (( SECONDS - started_at < QUICK_EXIT_SECONDS )); then
-    quick_exits_in_a_row=$(( quick_exits_in_a_row + 1 ))
-    pause_seconds=$(( pause_seconds * 2 ))
-  else
-    quick_exits_in_a_row=0
+  if (( SECONDS - started_at >= QUICK_EXIT_SECONDS )); then
+    quick_failures_in_a_row=0
     pause_seconds=1
-  fi
-  if (( quick_exits_in_a_row >= QUICK_EXITS_BEFORE_GIVING_UP )); then
-    echo "skg exited with status $status; $quick_exits_in_a_row runs in a row each ended within $QUICK_EXIT_SECONDS s, so giving up. Its error is above."
+  elif (( status != 0 )); then
+    quick_failures_in_a_row=$(( quick_failures_in_a_row + 1 ))
+    pause_seconds=$(( pause_seconds * 2 ))
+  fi # a quick run that exited 0 was stopped, not failing: it changes neither
+  if (( quick_failures_in_a_row >= QUICK_FAILURES_BEFORE_GIVING_UP )); then
+    echo "skg exited with status $status; $quick_failures_in_a_row runs in a row each failed within $QUICK_EXIT_SECONDS s, so giving up. Its error is above."
     exit 1
   fi
   echo "skg exited with status $status; running it again in $pause_seconds s."

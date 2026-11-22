@@ -29,8 +29,9 @@
 #   The rerun loop, bash/run-skg-rerunning-on-exit.sh, runs the server,
 #   and runs it again whenever it exits, so killing the server (by its
 #   PID, or with the 'shutdown' request) reruns it, rereading the config.
-#   It gives up after 5 runs in a row that each end within 30 s (a
-#   server that cannot start); without --hot-reload this script then
+#   It gives up after 5 runs in a row that each end within 30 s with a
+#   non-zero status (a server that cannot start; a 'shutdown' or a kill
+#   exits 0, and does not count); without --hot-reload this script then
 #   exits too, printing where the error is.
 #   Hot reload is off unless given --hot-reload: nothing watches server/,
 #   and an edit there takes effect only when this script is run again.
