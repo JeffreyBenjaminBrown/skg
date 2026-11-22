@@ -1,0 +1,94 @@
+* Refactoring the Rust tests for the next agent
+  The territory: the Rust test code under 'tests/' (the files the
+  grouped binaries 'tests/grouped_*.rs' and 'tests/new.rs' declare,
+  the unit tests in 'tests/unit/' that server modules include by
+  '#[path]', and 'tests/shared/*.rs'), plus 'server/test_utils.rs'
+  and 'server/test_utils/'. Not the fixtures, the shell integration
+  tests, nor the harness scripts ('tests-harness-and-bash.org' covers
+  those). What a test checks, a fixture's content, and which tests
+  run are not yours.
+  To find the most-copied blocks, measure: a script that slides a
+  window of four stripped lines over every '.rs' under 'tests/' and
+  counts repeats ranks them in a second; so does grouping local
+  helper functions by their whitespace-stripped bodies. A test that
+  calls a helper from 'server/test_utils.rs' imports it as
+  'skg::test_utils::NAME' (or 'crate::test_utils::NAME' from
+  'tests/unit/', which compiles inside the server crate); a helper in
+  'tests/shared/' is visible only in the grouped binaries that
+  declare its module.
+* Done
+** 'empty_views_state' builds a connection's empty views state
+   'server/test_utils.rs'. It replaced over a hundred hand-written
+   'ViewsState { open_views : OpenViews::new (), graph_straddle : None }'
+   and four local copies ('fresh_views_state' in three files,
+   'empty_views_state' in one).
+** 'save_ignoring_streamed_messages' saves when only the response matters
+   'server/test_utils.rs'. It makes its own stream pair and calls
+   'update_from_and_rerender_buffer_test'; 61 sites that made a pair,
+   never read it, and saved once now call it. 'mk_test_tcp_stream_pair'
+   moved from 'tests/shared/tcp_stream_pair.rs' (deleted) into
+   'server/test_utils.rs', so every binary has it.
+** Save-plan lookups live once in test_utils
+   'saved_node_by_gnid', 'opt_saved_node_by_gnid', 'save_gnids' (saves
+   only) and 'instruction_gnids' (saves and deletes) replaced eleven
+   local copies. Two copies had misleading names: an Option-returning
+   'saved_node_by_gnid', and a 'save_gnids' that counted deletes.
+** 'line_containing' lives once, in 'tests/shared/view_and_save_helpers.rs'
+   Three partner-folder test files had identical copies.
+** 'graphnode_at' and 'owned_skgrepos_config_in_order' build unit-test inputs
+   'server/test_utils.rs'. They replaced three identical 'node_at',
+   'complete_validation.rs''s 'node', two identical
+   'config_with_order', and the body of 'telescope_invariants.rs''s
+   'two_skgrepo_config'.
+** Two local save-and-read-collateral helpers call 'save_and_read_collateral'
+   ('tests/shared/git_fixture_helpers.rs'), from 'hidden_from_forks.rs'
+   and 'partner_folder_order.rs'.
+* Candidates left, best first
+** Give 'single_root_view''s callers that want only the text a helper
+   56 of its 75 call sites write
+   'let (view, _pids, _) : (String, Vec<ID>, _) = single_root_view (...) ?;'
+   and use only the text. A 'single_root_view_text' in test_utils
+   would make each a one-liner. Safe and mechanical (a regex over
+   the destructuring, the compiler catching the rest); 'view_of' in
+   'view_and_save_helpers.rs' is not it, since it strips viewnode IDs.
+** Move 'save_and_read_collateral' into 'server/test_utils.rs'
+   It lives in 'tests/shared/git_fixture_helpers.rs', which not every
+   grouped binary declares, so about ten sites ('collateral_delete.rs',
+   'collateral_repo_move.rs', 'strandeds.rs', 'save_dirty_conflicts.rs',
+   'viewnode_ids.rs', 'pruned_change_view/editing.rs',
+   'what_the_refresh_keeps.rs') still make a stream pair, save, drop
+   the write end and filter the messages by hand. Check each: some
+   keep the save-relax-lock message, some take only the first
+   collateral view, some use the low-level handler rather than the
+   '_test' shim. Moderate work; safe where the shapes truly match.
+** Fold the one-shot saves of 'editable_view_cascade_and_budget.rs'
+   Twelve blocks each build a graph from the config, an empty views
+   state, and call 'save_ignoring_streamed_messages' with
+   '&Err ( String::new () )', returning the saved view. A local
+   helper taking the buffer and config would cut each to two lines.
+   Note that several build the graph from 'config' but save with a
+   clone whose 'initial_node_limit' differs; the helper must keep
+   that (pass both, or argue the graph does not depend on it).
+** ? Shorten the 'all_tests' sub-test dispatch
+   41 files run sub-tests as 's . reset ("NAME", "FIXTURES") ?;
+   NAME (&s . config, &mut s . tantivy) . await ?;' (282 resets),
+   repeating each name. A 'SharedStoreSession' method taking the test
+   function (Rust 2024 'AsyncFnOnce' accepts async fn items) or a
+   'macro_rules!' using 'stringify!' would halve the lines and keep
+   the printed name from drifting from the function. But call shapes
+   vary (sync sub-tests, sub-tests that take only the config,
+   'reset_from_config', 'reset_with_fixture_prep'), and a macro hides
+   what runs; ask Jeff whether he wants it. If he says nothing, it
+   stays.
+** Share the dummy-config builders that include a foreign skgrepo
+   'tests/unit/telescope_invariants.rs'
+   ('foreign_then_two_owned_skgrepo_config'),
+   'tests/unit/types_disk_home.rs', 'tests/unit/repos.rs',
+   'tests/unit/strandeds.rs', 'tests/unit/telescope.rs' and
+   'tests/repo_inheritance_for_non_content.rs' each build an
+   'SkgConfig::dummyFromSkgrepos' by hand with different names,
+   paths and ownership. A builder taking (name, path, owned) triples
+   would explain them; the paths differ, so each must keep its own.
+** Unify 'run_with_skgrepo_set_test_db' with 'run_with_test_stores'
+   Left by 'tests-harness-and-bash.org' too: the skgrepo-set runner
+   takes neither the group mutex nor a panic guard.
