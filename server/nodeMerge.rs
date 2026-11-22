@@ -16,7 +16,8 @@ use crate::telescope::invariants::{
   TelescopeViolation, affected_telescope_warnings,
 };
 use crate::types::env::MutationGate;
-use crate::types::misc::{ID, SkgConfig, TantivyIndex};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, TantivyIndex};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::save::{NodeInstruction, NodeMerge};
 use std::error::Error;

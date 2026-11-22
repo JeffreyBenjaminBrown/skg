@@ -1,6 +1,6 @@
 use super::*;
 use std::collections::HashMap;
-use super::super::misc::Skgrepo;
+use super::super::config::Skgrepo;
 
 fn skgrepo_name (s: &str) -> SkgrepoName { SkgrepoName ( s . to_string () ) }
 fn gnid        (s: &str) -> ID         { ID ( s . to_string () ) }

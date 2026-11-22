@@ -10,7 +10,8 @@ use skg::dbs::filesystem::multiple_nodes::error_unless_each_gnid_names_one_node;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::one_node::write_graphnode_to_skgrepo;
 use skg::test_utils::set_skgrepo_retagging_relRepos;
-use skg::types::misc::{Skgrepo, SkgConfig, ID, SkgrepoName};
+use skg::types::config::{Skgrepo, SkgConfig};
+use skg::types::misc::{ID, SkgrepoName};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 
 /// Helper to create a minimal SkgConfig for tests.

@@ -14,7 +14,8 @@
 use crate::git_ops::read_gitrepo::{open_gitrepo, skgrepo_git_remote};
 use crate::git_ops::misc::path_relative_to_gitrepo;
 use crate::subcommands::skg_command_for_user;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::attribution::Attribution;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::fs::GraphnodeOnDisk;

@@ -7,7 +7,7 @@ use crate::types::misc::ID;
 use crate::types::nodes::complete::Flag;
 
 use crate::dbs::filesystem::not_nodes::load_config;
-use crate::types::misc::SkgConfig;
+use crate::types::config::SkgConfig;
 
 use std::fs;
 use std::os::unix::fs::symlink;

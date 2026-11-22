@@ -8,7 +8,8 @@ use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Editabili
 use crate::types::viewnode::ChangesetMarkerKind;
 use crate::types::errors::HeadlineName;
 use crate::serve::parse_metadata_sexp::RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP;
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::config::SkgConfig;
+use crate::types::misc::ID;
 use crate::refresh::ancestry::parent_reads_claims;
 use crate::types::tree::forest::stands_in_containerward_chain;
 use crate::types::tree::viewnode_graphnode::{

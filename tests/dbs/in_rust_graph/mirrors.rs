@@ -10,8 +10,8 @@ use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::mirrors::{
   is_mirror_of, mirror_shown, mirrors_of};
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName, rel_partners_at_relRepo};
+use skg::types::config::{SkgConfig, Skgrepo};
+use skg::types::misc::{ID, MSV, RelPartner, SkgrepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 
 use std::collections::HashMap;

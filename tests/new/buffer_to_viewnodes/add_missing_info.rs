@@ -11,7 +11,8 @@ use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo
 use skg::types::viewnode::{
   PropertyMember, Viewnode, ViewnodeKind, Vognode};
 use skg::from_text::buffer_to_viewnodes::add_missing_info::WhatTheParseSupplied;
-use skg::types::misc::{SkgConfig, ID, SkgrepoName, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
 use skg::types::tree::forest::{
   ViewForest,
   tree_forest_root_gnids};

@@ -8,7 +8,8 @@ use skg::serve::handlers::investigate_unknown_node::handle_investigate_unknown_n
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{graph_handle_from_config, read_lp_message, skg_env_from_parts};
 use skg::types::env::{RuntimeGeneration, SkgEnv};
-use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
+use skg::types::config::{SkgConfig, Skgrepo};
+use skg::types::misc::{SkgrepoName, TantivyIndex};
 
 use git2::Repository;
 use std::collections::HashMap;

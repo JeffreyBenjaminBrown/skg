@@ -11,7 +11,8 @@ use skg::test_utils::update_from_and_rerender_buffer_test
   as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::errors::{BufferValidationError, SaveError};
-use skg::types::misc::{members_of, ID, SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{members_of, ID, TantivyIndex};
 use skg::types::nodes::complete::{
   Graphnode, Flag, flag_is_true};
 use skg::types::views_state::{OpenViews, ViewforestId};

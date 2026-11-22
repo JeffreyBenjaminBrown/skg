@@ -5,7 +5,9 @@ use std::error::Error;
 use skg::dbs::filesystem::one_node::optgraphnode_from_gnid;
 use skg::from_text::supplement_from_disk::{ canonicalize_gnids_from_disk, detect_skgrepo_move, supplement_unspecified_fields_from_disk, };
 use skg::test_utils::run_with_shared_test_stores;
-use skg::types::misc::{ID, MSV, SkgConfig, SkgrepoName, TantivyIndex, members_msv, rel_partners_at_relRepo_msv};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{
+  ID, MSV, SkgrepoName, TantivyIndex, members_msv, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::save::SkgrepoMove;
 

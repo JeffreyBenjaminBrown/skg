@@ -14,7 +14,7 @@
 //! subcommand both call it.
 
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::SkgConfig;
+use crate::types::config::SkgConfig;
 use crate::types::misc::ID;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::links::org_literal_ranges::org_literal_ranges;

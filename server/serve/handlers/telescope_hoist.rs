@@ -9,7 +9,8 @@
 use crate::dbs::filesystem::one_node::telescope_from_disk;
 use crate::serve::util::sexp_to_client_string;
 use crate::telescope::compose::compose_telescope_collecting_warnings;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::sexp::extract_string_list_from_sexp;
 
@@ -154,7 +155,7 @@ mod tests {
   use super::*;
   use crate::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
   use crate::save::update_fs_from_nodeInstructions_with_hoist_approval;
-  use crate::types::misc::Skgrepo;
+  use crate::types::config::Skgrepo;
   use crate::types::nodes::fs::GraphnodeOnDisk;
   use std::collections::HashMap;
   use std::fs;

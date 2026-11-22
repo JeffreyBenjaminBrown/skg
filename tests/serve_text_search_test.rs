@@ -5,7 +5,9 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::serve::parse_metadata_sexp::MetadataKind;
 use skg::org_to_text::viewforest_to_string;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName, TantivyIndex, rel_partners_at_relRepo_msv};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{
+  ID, MSV, RelPartner, SkgrepoName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::test_utils::remove_test_dir;

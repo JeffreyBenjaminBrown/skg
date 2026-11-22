@@ -23,7 +23,8 @@ use crate::serve::util::{
 use crate::sexp_string::quote_sexp_string;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode, Warrant};
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::{Perspective, ViewState, ViewforestId, ViewnodeIdRecord};

@@ -168,7 +168,8 @@ mod tests {
   use crate::dbs::init::empty_in_ram_tantivy_index;
   use crate::dbs::in_rust_graph::InRustGraph;
   use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
-  use crate::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
+  use crate::types::config::{SkgConfig, Skgrepo};
+  use crate::types::misc::SkgrepoName;
   use std::collections::HashMap;
   use std::fs;
   use std::io::{BufRead, BufReader, Read};

@@ -287,7 +287,8 @@ mod tests {
   use crate::from_text::buffer_to_viewnodes::uninterpreted
     ::org_to_viewforest;
   use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
-  use crate::types::misc::{MSV, SkgConfig, rel_partners_at_relRepo};
+  use crate::types::config::SkgConfig;
+  use crate::types::misc::{MSV, rel_partners_at_relRepo};
   use std::collections::HashMap;
   use crate::types::nodes::complete::empty_graphnode;
   use indoc::indoc;

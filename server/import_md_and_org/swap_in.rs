@@ -9,7 +9,8 @@ use crate::dbs::in_rust_graph::prepared_update::{
 use crate::repo_watch::own_writes::{record_own_removal, record_own_write};
 use crate::save::enqueue_tantivy_delta;
 use crate::types::env::SkgEnv;
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::config::SkgConfig;
+use crate::types::misc::ID;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::save::{NodeInstruction, SaveNode};
 use std::collections::{HashMap, HashSet};

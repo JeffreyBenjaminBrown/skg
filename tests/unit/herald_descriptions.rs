@@ -2,7 +2,7 @@ use super::*;
 
 use crate::heralds::rule_texts_at_path;
 use crate::serve::handlers::describe_heralds::describe_heralds_response;
-use crate::types::misc::Skgrepo;
+use crate::types::config::Skgrepo;
 
 use std::collections::HashMap;
 use std::path::PathBuf;

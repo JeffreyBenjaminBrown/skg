@@ -24,7 +24,8 @@ use skg::test_utils::{
   load_config_with_overrides, read_all_lp_messages, skg_env_from_parts};
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::types::env::SkgEnv;
-use skg::types::misc::{SkgConfig, SkgrepoName, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{SkgrepoName, TantivyIndex};
 use skg::types::views_state::{OpenViews, Perspective, ViewforestId};
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;

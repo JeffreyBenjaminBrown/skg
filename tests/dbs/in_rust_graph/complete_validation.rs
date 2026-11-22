@@ -5,9 +5,8 @@ use skg::dbs::in_rust_graph::complete_validation::{
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::fork_rules::ForkRuleViolation;
 use skg::telescope::invariants::TelescopeViolation;
-use skg::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName,
-};
+use skg::types::config::{SkgConfig, Skgrepo};
+use skg::types::misc::{ID, MSV, RelPartner, SkgrepoName};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::save::{NodeInstruction, SaveNode};
 

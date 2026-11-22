@@ -16,7 +16,8 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::rebuild_session_lifetime_stores::rebuild_session_lifetime_stores_in_place;
 use skg::test_utils::{copy_dir_all, graph_handle_from_config, skg_env_from_parts};
 use skg::types::env::{RuntimeGeneration, SkgEnv};
-use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
 use skg::types::views_state::OpenViews;
 use skg::types::viewnode::Existence;
 

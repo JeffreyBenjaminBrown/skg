@@ -3,7 +3,8 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::many_to_many::ManyToMany;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewnodeId, Viewnode, ViewnodeKind, Vognode};
-use super::misc::{ID, SkgConfig, SkgrepoName};
+use super::config::SkgConfig;
+use super::misc::{ID, SkgrepoName};
 
 use ego_tree::{NodeId, NodeMut, Tree};
 use std::collections::{HashMap, HashSet};

@@ -5,7 +5,8 @@
 // even if the parent ignores it.
 
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::types::misc::{ ID, SkgrepoName, SkgConfig, Skgrepo };
+use skg::types::config::{SkgConfig, Skgrepo};
+use skg::types::misc::{ID, SkgrepoName};
 use skg::types::viewnode::{ Viewnode, ViewnodeKind, viewforest_root_viewnode, mk_editable_viewnode, mk_writeProtected_viewnode };
 use skg::types::viewnode::Vognode;
 use skg::refresh::viewnodestats::set_viewnodestats_in_viewforest;

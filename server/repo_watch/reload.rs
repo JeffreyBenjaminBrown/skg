@@ -27,7 +27,8 @@ use crate::telescope::invariants::{TelescopeViolation, affected_telescope_warnin
 use crate::telescope::types::{
   CompositionWarning, IllegalEdit, IllegalSections, Telescope, separate_illegal_sections};
 use crate::types::env::{MutationGate, RuntimeGeneration, SkgEnv};
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::save::{DeleteNode, NodeInstruction, SaveNode};

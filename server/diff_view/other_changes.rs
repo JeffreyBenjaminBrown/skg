@@ -23,7 +23,8 @@ use crate::git_ops::stage_and_commit::{
   ChangedSkgPath, blob_text, blobs_at_head_and_in_worktree};
 use crate::telescope::decompose::{
   DecomposedTelescope, DecompositionInput, decompose_node};
-use crate::types::misc::{ID, RelPartner, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, RelPartner, SkgrepoName};
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{OrderedList, OtherChange};

@@ -22,7 +22,8 @@ use skg::from_text::validate::validate_and_filter_foreign_instructions;
 use skg::test_utils::extract_graphnode_if_save_else_error;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config, graph_from_config};
 use skg::types::errors::BufferValidationError;
-use skg::types::misc::{ID, MSV, SkgConfig, SkgrepoName, members_of, members_msv};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, MSV, SkgrepoName, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode, DeleteNode};
 use skg::types::viewnode::{
@@ -123,7 +124,7 @@ fn unknown_members_write_their_editable_relationship_recorders_only () {
 
 async fn nodeInstructions_from_org_with_disk (
   org_text : &str,
-  config   : &skg::types::misc::SkgConfig,
+  config   : &skg::types::config::SkgConfig,
 
 ) -> Result<Vec<NodeInstruction>, Box<dyn Error>> {
   let (viewforest, _parsing_errors, _warnings, _supplied)

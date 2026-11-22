@@ -19,7 +19,8 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::filesystem::multiple_nodes::error_unless_each_gnid_names_one_node;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::init::create_empty_tantivy_index;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, TantivyIndex};
 use skg::types::nodes::tantivy::GraphnodeInTantivy;
 use skg::types::nodes::complete::Graphnode;
 

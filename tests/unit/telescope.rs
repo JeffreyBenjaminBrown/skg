@@ -12,9 +12,8 @@
 use super::compose::{ComposedNode, compose_sections, graphnode_from_composition};
 use super::types::{CompositionWarning, ListItem, SectionSlices, Telescope};
 use super::decompose::{DecompositionInput, decompose_node};
-use crate::types::misc::{
-  ID, RelPartner, SkgConfig, Skgrepo, SkgrepoName,
-};
+use crate::types::config::{SkgConfig, Skgrepo};
+use crate::types::misc::{ID, RelPartner, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 
 use proptest::prelude::*;

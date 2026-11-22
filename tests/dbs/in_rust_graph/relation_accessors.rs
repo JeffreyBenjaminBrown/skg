@@ -7,7 +7,9 @@ use skg::dbs::in_rust_graph::relation_accessors::{
   RelationRole,
   UPDATE_RELEVANT_ORDINARY_RELATIONS,
 };
-use skg::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName, rel_partners_at_relRepo};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{
+  ID, MSV, RelPartner, RelationshipMemberKey, SkgrepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::skgrepo_sets::SkgrepoRestriction;
 

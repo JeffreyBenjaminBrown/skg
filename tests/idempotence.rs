@@ -23,7 +23,8 @@ use std::error::Error;
 
 use skg::test_utils::run_with_test_stores;
 use skg::test_utils::multi_root_view;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, TantivyIndex};
 
 use skg::test_utils::load_config_with_overrides;
 use skg::dbs::init::empty_in_ram_tantivy_index;

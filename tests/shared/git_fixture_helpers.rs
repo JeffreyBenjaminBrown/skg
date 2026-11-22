@@ -22,7 +22,8 @@ use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
   copy_dir_all, extract_string_field_from_sexp, read_all_lp_messages,
   update_from_and_rerender_buffer_test};
-use skg::types::misc::{SkgConfig, SkgrepoName, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{SkgrepoName, TantivyIndex};
 use skg::types::views_state::ViewforestId;
 use skg::types::nodes::complete::Graphnode;
 use skg::types::nodes::fs::GraphnodeOnDisk;

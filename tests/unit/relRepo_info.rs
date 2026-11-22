@@ -6,8 +6,8 @@
 use super::{relRepo_info, relation_from_client_string};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::types::misc::{
-  ID, RelPartner, SkgConfig, Skgrepo, SkgrepoName};
+use crate::types::config::{SkgConfig, Skgrepo};
+use crate::types::misc::{ID, RelPartner, SkgrepoName};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 
 use std::collections::HashMap;

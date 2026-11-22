@@ -47,7 +47,8 @@ use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{multi_root_view_with_skgrepo_set, run_with_shared_test_stores};
-use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
 
 const FIXTURES : &str = "tests/hides_by_integration/fixtures";
 

@@ -7,7 +7,8 @@ use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};
 
 use skg::dbs::filesystem::not_nodes::{load_config, validate_skgrepo_paths_creating_owned_ones_if_needed};
-use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
+use skg::types::config::{SkgConfig, Skgrepo};
+use skg::types::misc::SkgrepoName;
 
 #[test]
 fn test_validate_existing_owned_skgrepo() {

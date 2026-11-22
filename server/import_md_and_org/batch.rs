@@ -9,7 +9,8 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::export_org::claimed_export_targets;
 use crate::types::env::SkgEnv;
 use crate::types::links::org_literal_ranges::HEADLINES_INSIDE_BLOCKS_EXPLANATION;
-use crate::types::misc::{ID, MSV, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, MSV, SkgrepoName};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 use std::collections::HashMap;
 use std::collections::BTreeMap;
@@ -356,7 +357,7 @@ mod tests {
   use crate::dbs::tantivy::search::{SearchOptions, search_index};
   use crate::export_org::{export_header_length, export_to_org};
   use crate::skgrepo_sets::SkgrepoRestriction;
-  use crate::types::misc::Skgrepo;
+  use crate::types::config::Skgrepo;
   use std::fs;
 
   fn environment (

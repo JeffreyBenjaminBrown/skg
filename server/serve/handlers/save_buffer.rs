@@ -56,7 +56,8 @@ use crate::from_text::fork::build_fork_confirmation_buffer;
 use crate::types::env::SkgEnv;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::git::SkgrepoDiff;
-use crate::types::misc::{ID, SkgrepoName, SkgConfig};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::save::{
   NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan, format_save_error_as_org };
 use crate::types::tree::forest::ViewForest;
@@ -1446,7 +1447,7 @@ fn viewforest_ids_of_views_to_lock (
 #[cfg(test)]
 mod perspective_tests {
   use super::*;
-  use crate::types::misc::Skgrepo;
+  use crate::types::config::Skgrepo;
   use std::path::PathBuf;
 
   #[test]

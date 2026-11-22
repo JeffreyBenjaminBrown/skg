@@ -23,7 +23,8 @@ use skg::serve::handlers::stage_and_commit::{
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{cleanup_test_tantivy, graph_handle_from_config, skg_env_from_parts};
 use skg::types::env::SkgEnv;
-use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
+use skg::types::config::{SkgConfig, Skgrepo};
+use skg::types::misc::{ID, SkgrepoName};
 use skg::types::views_state::OpenViews;
 
 use git2::{Index, IndexAddOption, ObjectType, Repository, Signature, Status, StatusOptions, Tree, TreeWalkMode, TreeWalkResult};

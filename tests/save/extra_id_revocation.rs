@@ -7,7 +7,8 @@ use skg::save::{update_graph_including_nodeMerges,
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores,
                       tantivy_contains_gnid};
 use skg::types::env::new_mutation_gate;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex, SkgrepoName};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, TantivyIndex, SkgrepoName};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, DeleteNode, NodeMerge, SaveNode};
 

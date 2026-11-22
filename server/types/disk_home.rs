@@ -3,7 +3,8 @@
 
 use std::path::PathBuf;
 
-use super::misc::{ID, SkgConfig, Skgrepo, SkgrepoName, SkgrepoOwner};
+use super::config::{SkgConfig, Skgrepo, SkgrepoOwner};
+use super::misc::{ID, SkgrepoName};
 use crate::telescope::types::home_owner_of_sections;
 
 /// A node's home read from disk: the first skgrepo in fold order

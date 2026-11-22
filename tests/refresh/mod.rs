@@ -15,8 +15,8 @@ use crate::diff_view::processed_store::ProcessedStore;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::test_utils::refresh_reaches_fixpoint;
-use crate::types::misc::{
-  MSV, RelPartner, Skgrepo, SkgrepoName, rel_partners_at_relRepo};
+use crate::types::config::Skgrepo;
+use crate::types::misc::{MSV, RelPartner, SkgrepoName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 use crate::types::viewnode::{
   ChangeViewnode, Editability, PropertyMember, ViewnodeId, ViewnodeKind,

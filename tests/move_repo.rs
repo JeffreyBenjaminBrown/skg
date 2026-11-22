@@ -12,7 +12,8 @@ use skg::save::update_graph_minus_nodeMerges;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::errors::{SaveError, BufferValidationError};
 
-use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex, members_of};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, SkgrepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::NodeInstruction;
 use std::error::Error;

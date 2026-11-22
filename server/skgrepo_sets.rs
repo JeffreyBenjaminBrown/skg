@@ -6,7 +6,8 @@
 //! did not edit, so no write may change a record, a section or a node
 //! file it keeps out, nor act on the buffer's silence about one.
 
-use crate::types::misc::{RelPartner, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{RelPartner, SkgrepoName};
 
 use std::collections::BTreeSet;
 use std::error::Error;

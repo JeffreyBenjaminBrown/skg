@@ -30,7 +30,8 @@ use crate::view_and_save_helpers::{depth, hides_of, ids, line_of, save, view_of}
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::run_with_shared_test_stores;
-use skg::types::misc::{SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::TantivyIndex;
 
 const FIXTURES : &str = "tests/hides_apply_to_every_fork_partner/fixtures";
 

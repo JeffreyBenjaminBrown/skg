@@ -3,7 +3,8 @@
 // order is public, private, trusted.
 
 use super::*;
-use crate::types::misc::{Skgrepo, SkgrepoChange};
+use crate::types::config::Skgrepo;
+use crate::types::misc::SkgrepoChange;
 use crate::types::nodes::complete::empty_graphnode;
 
 use std::path::PathBuf;

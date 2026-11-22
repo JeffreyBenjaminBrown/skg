@@ -16,7 +16,8 @@ use crate::dbs::in_rust_graph::fork_rules::{
   validate_fork_rules,
 };
 use crate::telescope::invariants::{TelescopeViolation, validate_all_telescopes};
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
 

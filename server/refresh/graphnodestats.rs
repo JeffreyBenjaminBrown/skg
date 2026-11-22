@@ -4,7 +4,8 @@ use crate::dbs::in_rust_graph::stats::{
   AllGraphnodeStats};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::dbs::in_rust_graph::relation_accessors::RelRepoLookup;
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::config::SkgConfig;
+use crate::types::misc::ID;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::nodes::complete::Graphnode;

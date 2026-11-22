@@ -15,7 +15,8 @@
 //! then sets each committed path's git index entry to the commit's.
 //! Nothing in the worktree is written.
 
-use crate::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
+use crate::types::config::{SkgConfig, Skgrepo};
+use crate::types::misc::{ID, SkgrepoName};
 
 use super::git_snapshot::{path_is_skgrepo_skg, repo_prefix_in_gitrepo};
 use super::read_gitrepo::open_gitrepo;

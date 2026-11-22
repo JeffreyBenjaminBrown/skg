@@ -1,4 +1,5 @@
-use crate::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
+use crate::types::config::{SkgConfig, Skgrepo};
+use crate::types::misc::{ID, SkgrepoName};
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::path::PathBuf;

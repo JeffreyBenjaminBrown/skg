@@ -37,7 +37,8 @@ use crate::view_and_save_helpers::{
   save, save_cleanly, skg_files, view_of, with_line_after_subtree_of};
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::run_with_shared_test_stores;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, TantivyIndex};
 
 const FIXTURES : &str = "tests/moved_headlines_whose_content_was_not_drawn/fixtures";
 

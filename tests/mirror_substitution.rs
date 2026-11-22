@@ -54,7 +54,8 @@ use skg::test_utils::{
 use skg::test_utils::{
   multi_root_view, multi_root_view_from_perspective, multi_root_view_with_skgrepo_set};
 use skg::types::errors::{BufferValidationError, SaveError};
-use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex, members_of};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, SkgrepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
 use skg::types::views_state::{OpenViews, Perspective, ViewforestId};

@@ -5,7 +5,8 @@ use skg::assert_metadata_eq;
 use skg::test_utils::load_config_with_overrides;
 use skg::test_utils::remove_test_dir;
 use skg::test_utils::single_root_view;
-use skg::types::misc::{SkgConfig, ID};
+use skg::types::config::SkgConfig;
+use skg::types::misc::ID;
 
 use futures::executor::block_on;
 use std::error::Error;

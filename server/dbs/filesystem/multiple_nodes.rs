@@ -10,7 +10,8 @@ use crate::dbs::filesystem::one_node::{
 use crate::dbs::filesystem::retired_keys::{
   RetiredKeysInFiles, quoted_keys, what_to_do_about_retired_keys,
 };
-use crate::types::misc::{SkgConfig, Skgrepo, ID, SkgrepoName};
+use crate::types::config::{SkgConfig, Skgrepo};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::complete::Graphnode;
 

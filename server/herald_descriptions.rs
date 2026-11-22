@@ -23,7 +23,8 @@
 //! before them all.
 
 use crate::heralds::{emittable_kind_atoms, herald_styles, text_emitting_rule_paths};
-use crate::types::misc::{SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::SkgrepoName;
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{ChangesetMarkerKind, Folder, OtherChange};
 

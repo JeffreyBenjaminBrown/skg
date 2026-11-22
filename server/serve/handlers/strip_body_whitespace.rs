@@ -15,7 +15,8 @@ use crate::dbs::tantivy::write::update_index_with_nodes;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
 use crate::types::env::SkgEnv;
-use crate::types::misc::{SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::SkgrepoName;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::tantivy::GraphnodeInTantivy;
 

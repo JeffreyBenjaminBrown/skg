@@ -8,7 +8,7 @@ use skg::refresh::mode::RefreshMode;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
-use skg::types::misc::SkgConfig;
+use skg::types::config::SkgConfig;
 use skg::types::viewnode::Viewnode;
 
 use skg::org_to_text::viewforest_to_string;

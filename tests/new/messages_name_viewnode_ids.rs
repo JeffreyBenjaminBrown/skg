@@ -17,7 +17,8 @@ use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructio
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::test_utils::run_with_test_stores;
 use skg::types::errors::{BufferValidationError, HeadlineName, SaveError};
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, TantivyIndex};
 use skg::types::save::format_save_error_as_org;
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::ViewnodeId;

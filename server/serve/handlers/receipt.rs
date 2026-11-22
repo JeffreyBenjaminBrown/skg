@@ -155,7 +155,7 @@ fn refuse (
 /// notices them, the files that were written.
 fn what_a_failed_write_left (
   plan   : &ReceiptPlan,
-  config : &crate::types::misc::SkgConfig,
+  config : &crate::types::config::SkgConfig,
   error  : &str,
 ) -> String {
   let files : Vec<String> = [

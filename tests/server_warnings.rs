@@ -11,7 +11,7 @@ use skg::serve::handlers::server_warnings::handle_server_warnings_request;
 use skg::serve::protocol::RequestType;
 use skg::telescope::dependencies_manifest::foreign_section_warnings;
 use skg::test_utils::read_lp_message;
-use skg::types::misc::SkgConfig;
+use skg::types::config::SkgConfig;
 
 use std::io::BufReader;
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;

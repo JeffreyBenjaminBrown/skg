@@ -14,7 +14,7 @@ use skg::test_utils::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::complete_validation::validated_graph;
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::types::misc::SkgConfig;
+use skg::types::config::SkgConfig;
 use skg::types::nodes::complete::Graphnode;
 use std::fs;
 use tempfile::TempDir;

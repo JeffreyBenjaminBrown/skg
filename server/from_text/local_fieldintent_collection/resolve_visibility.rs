@@ -71,7 +71,8 @@ use crate::from_text::local_fieldintent_collection::types::{
   ForksFolderMembers, HiddenOutsideEdit, MemberAsSuch, MemberAsSuchVisibility };
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, members_of};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, MSV, RelPartner, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::save::PostSkgsaveCommitNoticeCandidate;
 

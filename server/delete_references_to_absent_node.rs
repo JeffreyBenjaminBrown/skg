@@ -5,7 +5,8 @@
 //! that same graph snapshot rather than from client-supplied text.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, RelPartner, MSV, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, RelPartner, MSV, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::links::links_with_ranges_from_text;
@@ -216,7 +217,7 @@ fn remove_exact (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::types::misc::{Skgrepo};
+  use crate::types::config::Skgrepo;
   use crate::types::nodes::complete::{empty_graphnode, Graphnode};
   use std::collections::HashMap;
   use std::path::PathBuf;

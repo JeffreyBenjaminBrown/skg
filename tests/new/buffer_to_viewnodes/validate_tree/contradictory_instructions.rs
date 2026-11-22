@@ -13,7 +13,8 @@ use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_s
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::types::views_state::Perspective;
 use skg::types::errors::HeadlineName;
-use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
+use skg::types::config::{SkgConfig, Skgrepo};
+use skg::types::misc::SkgrepoName;
 use skg::types::viewnode::ViewnodeId;
 use skg::diff_view::named_leaf_set::NamedLeafSet;
 use std::collections::HashMap;

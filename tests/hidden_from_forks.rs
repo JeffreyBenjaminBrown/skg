@@ -21,7 +21,8 @@ use skg::test_utils::{
   save_preview_test,
   update_from_and_rerender_buffer_test as update_from_and_rerender_buffer };
 use skg::test_utils::single_root_view;
-use skg::types::misc::{SkgConfig, ID, TantivyIndex, members_of};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 
 use skg::serve::ViewsState;

@@ -20,7 +20,8 @@ use crate::dbs::in_rust_graph::fork_rules::{
   ForkRuleViolation, derive_fork_rule_scope,
   validate_fork_rules_of_affected_notes,
 };
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::config::SkgConfig;
+use crate::types::misc::ID;
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::telescope::invariants::derive_affected_telescope_recorders;
 

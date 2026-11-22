@@ -21,7 +21,8 @@ use skg::test_utils::{
   read_all_lp_messages, run_with_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::test_utils::multi_root_view;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, TantivyIndex};
 use skg::types::viewnode::{
   Folder, ViewnodeId, Viewnode, viewforest_root_viewnode,
   viewnode_of, ViewnodeKind};

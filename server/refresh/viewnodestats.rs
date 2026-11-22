@@ -8,7 +8,8 @@ use crate::herald_tokens::{
   AncestorFlags, BirthFact, RelationshipHeralds, Side, relationship_heralds_sexp };
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::refresh::ancestry::parent_reads_claims;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::viewnode::{
   GraphnodeStats, Folder, Viewnode, ViewnodeKind, Vognode, Warrant };
 use crate::refresh::ancestry::{
@@ -612,7 +613,8 @@ fn relationship_member_stands_for (
 #[cfg(test)]
 mod relationship_default_tests {
   use super::*;
-  use crate::types::misc::{RelPartner, Skgrepo};
+  use crate::types::config::Skgrepo;
+  use crate::types::misc::RelPartner;
   use crate::types::nodes::complete::{empty_graphnode, Graphnode};
   use crate::types::viewnode::{
     mk_editable_viewnode, viewforest_root_viewnode};
@@ -818,7 +820,7 @@ fn detect_and_mark_cycle (
 #[cfg(test)]
 mod home_voice_tests {
   use super::*;
-  use crate::types::misc::Skgrepo;
+  use crate::types::config::Skgrepo;
   use crate::types::nodes::attribution::Attribution;
   use crate::types::nodes::complete::{empty_graphnode, Graphnode};
   use crate::types::viewnode::{

@@ -1,5 +1,5 @@
 use super::*;
-use crate::types::misc::Skgrepo;
+use crate::types::config::Skgrepo;
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 
 use std::collections::HashMap;

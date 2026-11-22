@@ -27,7 +27,8 @@ use skg::test_utils::{
   graph_handle_from_config, read_lp_message, run_with_shared_test_stores,
   single_root_view, skg_env_from_parts};
 use skg::types::env::SkgEnv;
-use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex, members_of};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, SkgrepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::views_state::{OpenViews, ViewforestId};
 

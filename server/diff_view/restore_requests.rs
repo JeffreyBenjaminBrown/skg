@@ -25,7 +25,8 @@ use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKe
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::types::errors::{HeadlineName, with_org_subheadlines};
-use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::tree::forest::ViewForest;

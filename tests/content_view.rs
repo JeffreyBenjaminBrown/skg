@@ -14,7 +14,8 @@ use skg::serve::handlers::single_root_view::handle_single_root_view_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{extract_string_field_from_sexp, graph_handle_from_config, read_all_lp_messages, run_with_shared_test_stores, skg_env_from_parts};
 use skg::types::env::{RuntimeGeneration, SkgEnv};
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, TantivyIndex};
 use skg::types::viewnode::Viewnode;
 use skg::types::views_state::{DiffViewBufferKind, OpenViews, ViewforestId};
 

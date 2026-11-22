@@ -29,7 +29,8 @@ use skg::types::env::SkgEnv;
 use skg::import_org_roam::{ImportStats, import_org_roam_directory};
 use skg::repo_watch::watcher::{RepoWatcherHandle, start_repo_watcher};
 use skg::serve::serve;
-use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex, set_run_folder_from_config_path_as_given};
+use skg::types::config::{SkgConfig, set_run_folder_from_config_path_as_given};
+use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
 use skg::types::nodes::complete::Graphnode;
 
 use std::collections::HashSet;

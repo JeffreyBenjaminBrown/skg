@@ -20,7 +20,8 @@ use skg::serve::handlers::stage_and_commit::{
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{graph_handle_from_config, skg_env_from_parts};
 use skg::types::env::SkgEnv;
-use skg::types::misc::{Skgrepo, SkgrepoName};
+use skg::types::config::Skgrepo;
+use skg::types::misc::SkgrepoName;
 use skg::types::views_state::DiffViewBufferKind;
 
 use git2::{Index, Oid, Repository, Status, StatusOptions, Tree};

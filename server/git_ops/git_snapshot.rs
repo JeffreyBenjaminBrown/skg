@@ -15,8 +15,8 @@ use crate::git_ops::git_snapshot_types::{GraphSnapshot, GitSnapshotKind};
 use crate::git_ops::misc::path_relative_to_gitrepo;
 use crate::git_ops::stage_and_commit::skg_paths_differing_from_head;
 use crate::git_ops::read_gitrepo::open_gitrepo;
-use crate::types::misc::{
-  ID, SkgConfig, Skgrepo, SkgrepoName};
+use crate::types::config::{SkgConfig, Skgrepo};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::fs::GraphnodeOnDisk;
 

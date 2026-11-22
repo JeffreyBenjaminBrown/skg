@@ -13,9 +13,8 @@
 use crate::telescope::types::{
   ListItem, SectionSlices, Telescope, TelescopeConstructionError,
 };
-use crate::types::misc::{
-  ID, RelPartner, SkgConfig, SkgrepoName,
-};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, RelPartner, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::attribution::Attribution;
 use crate::types::nodes::fs::{GraphnodeOnDisk, graphnode_on_disk_from_section};

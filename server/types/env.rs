@@ -6,7 +6,8 @@
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use crate::diff_view::processed_store::ProcessedStore;
 use crate::repo_watch::reload::RepoChangeNotice;
-use crate::types::misc::{SkgConfig, TantivyIndex};
+use crate::types::config::SkgConfig;
+use crate::types::misc::TantivyIndex;
 
 use std::sync::{Arc, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};

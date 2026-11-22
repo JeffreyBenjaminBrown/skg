@@ -31,7 +31,8 @@ use skg::test_utils::run_with_test_stores;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
-use skg::types::misc::{SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::TantivyIndex;
 use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 
 #[test]

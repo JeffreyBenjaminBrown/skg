@@ -13,7 +13,8 @@ use skg::test_utils::{
   copy_dir_all, extract_string_field_from_sexp, graph_handle_from_config,
   load_config_with_overrides, read_all_lp_messages, skg_env_from_parts};
 use skg::types::env::SkgEnv;
-use skg::types::misc::{SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::TantivyIndex;
 use skg::types::views_state::OpenViews;
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;

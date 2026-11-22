@@ -16,7 +16,7 @@ use crate::sexp_string::quote_sexp_string;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgrepoName;
-use crate::types::misc::SkgConfig;
+use crate::types::config::SkgConfig;
 
 use std::net::TcpStream;
 use std::sync::Arc;

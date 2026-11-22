@@ -1,6 +1,7 @@
 use skg::test_utils::load_config_with_overrides;
 use skg::test_utils::single_root_view;
-use skg::types::misc::{ID, SkgConfig};
+use skg::types::config::SkgConfig;
+use skg::types::misc::ID;
 use std::error::Error;
 
 #[test]

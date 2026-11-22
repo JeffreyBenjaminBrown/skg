@@ -4,7 +4,8 @@
 use super::{strip_body_whitespace_on_disk,
             strip_trailing_whitespace_from_body};
 use crate::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
-use crate::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
+use crate::types::config::{SkgConfig, Skgrepo};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 
 use std::collections::{HashMap, HashSet};

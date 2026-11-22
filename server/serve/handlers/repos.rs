@@ -13,7 +13,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_sexp_response};
 use crate::sexp_string::quote_sexp_string;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{SkgConfig, Skgrepo};
+use crate::types::config::{SkgConfig, Skgrepo};
 
 use std::net::TcpStream;
 use std::path::Path;

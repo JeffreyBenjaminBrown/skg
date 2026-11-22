@@ -27,7 +27,8 @@ use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text::local_fieldintent_collection::resolve_visibility::member_it_stands_for;
 use crate::refresh::goal::{ContainsAfterSave, forks_folder_members_shown, owned_notes_containing};
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, MSV, RelPartner, SkgConfig};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, MSV, RelPartner};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::save::{ForkSpec, NodeInstruction};
 

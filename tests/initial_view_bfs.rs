@@ -6,7 +6,8 @@ use std::error::Error;
 use skg::test_utils::multi_root_view;
 use skg::assert_metadata_eq;
 use skg::test_utils::run_with_shared_test_stores;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, TantivyIndex};
 
 
 

@@ -7,7 +7,8 @@ use crate::serve::util::{send_response_with_length_prefix, value_from_request_se
 use crate::sexp_string::quote_sexp_string;
 use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::sexp::extract_string_list_from_sexp;
 use sexp::Sexp;
 use std::net::TcpStream;

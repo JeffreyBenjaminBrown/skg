@@ -22,7 +22,8 @@ use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex, SkgrepoName, members_of};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, TantivyIndex, SkgrepoName, members_of};
 use skg::types::nodes::complete::Graphnode;
 
 #[test]

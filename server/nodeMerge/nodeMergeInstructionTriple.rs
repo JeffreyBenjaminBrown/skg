@@ -6,7 +6,9 @@ use crate::from_text::local_fieldintent_collection::types::CollectedFieldIntents
 use crate::refresh::goal::{forks_folder_members_shown, owned_notes_containing};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::save::{NodeMerge, SaveNode, DeleteNode};
-use crate::types::misc::{MSV, RelPartner, SkgConfig, SkgrepoName, ID, members_of, rel_partners_at_relRepo};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{
+  MSV, RelPartner, SkgrepoName, ID, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
   Flag, Graphnode, flag_is_true, set_flag};
 use crate::types::list::dedup_vector;
@@ -293,7 +295,7 @@ fn create_acquiree_text_preserver(acquiree: &Graphnode) -> Graphnode {
 #[cfg(test)]
 mod flag_tests {
   use super::*;
-  use crate::types::misc::Skgrepo;
+  use crate::types::config::Skgrepo;
   use crate::types::nodes::complete::{empty_graphnode, flag_is_true};
   use std::collections::HashMap;
   use std::path::PathBuf;

@@ -212,7 +212,8 @@ pub(crate) fn mentioner_is_substantive (
 mod tests {
   use super::*;
   use crate::types::nodes::complete::{Flag, empty_graphnode};
-  use crate::types::misc::{RelPartner, SkgConfig, SkgrepoName};
+  use crate::types::config::SkgConfig;
+  use crate::types::misc::{RelPartner, SkgrepoName};
   use crate::dbs::filesystem::not_nodes::load_config;
   use std::collections::HashMap;
 

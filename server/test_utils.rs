@@ -34,7 +34,9 @@ use crate::serve::handlers::save_buffer::{
 use crate::serve::parse_metadata_sexp::{MetadataKind, ViewnodeMetadata};
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::{OpenViews, Perspective, ViewforestId, ViewnodeIdRecord};
-use crate::types::misc::{MSV, SkgConfig, Skgrepo, ID, TantivyIndex, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
+use crate::types::config::{SkgConfig, Skgrepo};
+use crate::types::misc::{
+  MSV, ID, TantivyIndex, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind };

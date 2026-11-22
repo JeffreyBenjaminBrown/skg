@@ -14,7 +14,8 @@
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::filesystem::multiple_nodes::error_unless_each_gnid_names_one_node;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
-use skg::types::misc::{ID, SkgConfig, members_of};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, members_of};
 use skg::types::nodes::complete::Graphnode;
 
 use std::collections::{HashMap, HashSet, VecDeque};

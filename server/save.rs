@@ -19,7 +19,8 @@ use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, tantivy_commit
 use crate::repo_watch::own_writes::remove_skg_file;
 use crate::types::env::MutationGate;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, TantivyIndex};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, MSV, RelPartner, TantivyIndex};
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::nodes::tantivy::GraphnodeInTantivy;

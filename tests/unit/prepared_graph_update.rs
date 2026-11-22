@@ -10,9 +10,8 @@ use crate::dbs::in_rust_graph::fork_rules::ForkRuleViolation;
 use crate::dbs::in_rust_graph::internal_index_validation::{
   LocalIndexValidation, validate_local_internal_indexes,
 };
-use crate::types::misc::{
-  ID, MSV, SkgConfig, Skgrepo, SkgrepoName, rel_partners_at_relRepo,
-};
+use crate::types::config::{SkgConfig, Skgrepo};
+use crate::types::misc::{ID, MSV, SkgrepoName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
 

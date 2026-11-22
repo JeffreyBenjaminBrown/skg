@@ -6,7 +6,8 @@ use crate::git_ops::git_snapshot::{
 use crate::git_ops::git_snapshot_types::GraphSnapshot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::telescope::invariants::TelescopeViolation;
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::config::SkgConfig;
+use crate::types::misc::ID;
 use crate::types::nodes::complete::Graphnode;
 
 use std::sync::Arc;

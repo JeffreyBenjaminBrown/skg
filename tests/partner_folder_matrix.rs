@@ -37,7 +37,8 @@ use skg::test_utils::{
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::views_state::{OpenViews, ViewforestId};
-use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, members_of, members_msv};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, MSV, TantivyIndex, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
 use skg::dbs::in_rust_graph::InRustGraphHandle;

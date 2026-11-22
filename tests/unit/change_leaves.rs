@@ -8,7 +8,8 @@ use crate::diff_view::named_leaf_set::{LeafKinds, NamedLeafSet};
 use crate::diff_view::processed_requests::{
   RequestedProcessed, apply_processed_requests};
 use crate::types::errors::HeadlineName;
-use crate::types::misc::{MSV, RelPartner, SkgConfig, Skgrepo};
+use crate::types::config::{SkgConfig, Skgrepo};
+use crate::types::misc::{MSV, RelPartner};
 use crate::types::nodes::attribution::Attribution;
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 

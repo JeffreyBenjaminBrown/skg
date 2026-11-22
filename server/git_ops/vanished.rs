@@ -10,7 +10,8 @@
 use crate::git_ops::git_snapshot::{
   parse_blob_node, path_is_skgrepo_skg, repo_prefix_in_gitrepo};
 use crate::git_ops::read_gitrepo::open_gitrepo;
-use crate::types::misc::{ID, MSV, SkgConfig, SkgrepoName, members_msv, members_of};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, MSV, SkgrepoName, members_msv, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::links::links_from_node;
 

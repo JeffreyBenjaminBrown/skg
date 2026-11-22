@@ -8,8 +8,8 @@ use super::{
   foreign_section_warnings, read_foreign_manifest_orders,
   write_dependencies_manifests};
 use crate::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
-use crate::types::misc::{
-  ForeignManifestOrder, ID, SkgConfig, Skgrepo, SkgrepoName};
+use crate::types::config::{ForeignManifestOrder, SkgConfig, Skgrepo};
+use crate::types::misc::{ID, SkgrepoName};
 
 use std::collections::HashMap;
 use std::path::PathBuf;

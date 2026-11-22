@@ -20,7 +20,9 @@ use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::org_to_text::skgRepos_form;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName, members_of, rel_partners_at_relRepo};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{
+  ID, MSV, RelPartner, SkgrepoName, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
   Flag, Graphnode, flag_is_true};
 use crate::types::save::{ForkSpec, SaveNode};

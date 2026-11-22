@@ -18,7 +18,8 @@ use skg::test_utils::{
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::types::env::{RuntimeGeneration, SkgEnv};
-use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
 
 use crate::save_handler_helpers::new_connection;
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;

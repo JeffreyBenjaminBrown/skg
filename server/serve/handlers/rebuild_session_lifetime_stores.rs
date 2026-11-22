@@ -15,7 +15,8 @@ use crate::types::env::SkgEnv;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
-use crate::types::misc::{ID, SkgConfig, TantivyIndex};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, TantivyIndex};
 use crate::types::nodes::complete::Graphnode;
 
 use futures::executor::block_on;

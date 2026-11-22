@@ -21,7 +21,8 @@ use std::error::Error;
 
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::test_utils::multi_root_view;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, TantivyIndex};
 
 
 #[test]

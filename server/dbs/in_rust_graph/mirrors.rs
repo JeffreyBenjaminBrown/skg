@@ -9,7 +9,8 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::herald_tokens::Side;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
 use crate::types::views_state::Perspective;
 

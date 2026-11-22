@@ -7,7 +7,8 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, value_from_request_sexp};
 use crate::sexp_string::quote_sexp_string;
 use crate::types::env::SkgEnv;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::{
   Flag, flag_is_true};
 

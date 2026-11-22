@@ -16,7 +16,8 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::types::misc::{ID, SkgConfig, SkgrepoName, SkgrepoOwner};
+use crate::types::config::{SkgConfig, SkgrepoOwner};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::attribution::Attribution;
 use crate::types::nodes::fs::GraphnodeOnDisk;
@@ -450,8 +451,8 @@ impl std::fmt::Display for CompositionWarning {
 #[cfg(test)]
 mod telescope_construction_tests {
   use super::{Telescope, TelescopeConstructionError};
-  use crate::types::misc::{
-    ID, SkgConfig, Skgrepo, SkgrepoName};
+  use crate::types::config::{SkgConfig, Skgrepo};
+  use crate::types::misc::{ID, SkgrepoName};
   use crate::types::nodes::fs::GraphnodeOnDisk;
 
   use std::collections::HashMap;

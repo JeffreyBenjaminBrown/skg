@@ -11,7 +11,7 @@ use crate::heralds::{herald_rules_sexp, skgrepo_labels_sexp};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_sexp_response};
 use crate::sexp_string::quote_sexp_string;
-use crate::types::misc::SkgConfig;
+use crate::types::config::SkgConfig;
 
 use std::net::TcpStream;
 

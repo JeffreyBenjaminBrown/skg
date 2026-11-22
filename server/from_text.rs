@@ -18,7 +18,8 @@ pub mod validate;
 
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::{BufferValidationError, SaveError};
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::config::SkgConfig;
+use crate::types::misc::ID;
 use crate::types::save::{NodeInstruction, SavePlan, SkgrepoMove, UneditedStaleGraphnode};
 use crate::serve::handlers::save_staleness::{
   WhatTheBaselineShows, without_unedited_stale_saves};

@@ -5,7 +5,8 @@ use crate::telescope::types::{
 use crate::telescope::decompose::{
   DecompositionInput, DecomposedTelescope, decompose_node,
 };
-use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_msv};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName, members_msv};
 use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::nodes::complete::Graphnode;
 use crate::dbs::in_rust_graph::InRustGraph;

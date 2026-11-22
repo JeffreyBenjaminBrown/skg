@@ -1,8 +1,8 @@
 pub mod parse;
 
+use crate::types::config::{SkgConfig, Skgrepo};
 use crate::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName,
-  members_msv, rel_partners_at_relRepo_msv};
+  ID, MSV, RelPartner, SkgrepoName, members_msv, rel_partners_at_relRepo_msv};
 use crate::telescope::decompose::{
   DecompositionInput, DecomposedTelescope, decompose_node,
 };

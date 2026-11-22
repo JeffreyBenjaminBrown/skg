@@ -16,7 +16,8 @@ use skg::from_text::local_fieldintent_collection::{
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config, graph_from_config};
 use skg::types::errors::BufferValidationError;
-use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, members_of, members_msv};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, MSV, TantivyIndex, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, NodeMerge, SaveNode, DeleteNode};
 use skg::types::tree::forest::ViewForest;

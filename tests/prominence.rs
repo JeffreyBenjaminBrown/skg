@@ -15,7 +15,8 @@ use skg::prominence::{
 };
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::InRustGraph;
-use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName, rel_partners_at_relRepo};
+use skg::types::config::{SkgConfig, Skgrepo};
+use skg::types::misc::{ID, SkgrepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Flag, Graphnode, empty_graphnode};
 use skg::types::save::{NodeInstruction, SaveNode};
 

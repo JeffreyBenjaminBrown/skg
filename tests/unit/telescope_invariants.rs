@@ -7,9 +7,8 @@ use super::{TelescopeViolation, affected_telescope_warnings,
             derive_affected_telescope_recorders, telescope_violations_of,
             validate_all_telescopes};
 use crate::dbs::in_rust_graph::{InRustGraph, apply_nodeInstructions_to_inRustGraph};
-use crate::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName,
-  rel_partners_at_relRepo};
+use crate::types::config::{SkgConfig, Skgrepo};
+use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
 

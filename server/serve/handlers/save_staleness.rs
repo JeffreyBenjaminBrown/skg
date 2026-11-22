@@ -59,7 +59,8 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::{
   BufferValidationError, StaleGraphnodeReport, StaleAspect, HeadlineName};
 use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
-use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::save::{

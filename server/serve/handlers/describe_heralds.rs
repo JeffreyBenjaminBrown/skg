@@ -12,7 +12,7 @@ use crate::herald_descriptions::describe_heralds;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, value_from_request_sexp};
 use crate::sexp_string::quote_sexp_string;
-use crate::types::misc::SkgConfig;
+use crate::types::config::SkgConfig;
 
 use std::net::TcpStream;
 

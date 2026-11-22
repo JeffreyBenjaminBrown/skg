@@ -35,7 +35,8 @@ use crate::view_and_save_helpers::{
   contains_of, content_of, forks_of, hides_of, ids, line_of, save_cleanly,
   skg_files, view_of, with_line_after_subtree_of, without_subtree_of};
 use skg::test_utils::run_with_shared_test_stores;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, TantivyIndex};
 
 const FIXTURES : &str = "tests/members_typed_into_a_forks_folder/fixtures";
 

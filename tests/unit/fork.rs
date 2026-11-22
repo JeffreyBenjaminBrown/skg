@@ -9,7 +9,8 @@
 // one.
 
 use super::*;
-use crate::types::misc::{Skgrepo, members_of, rel_partners_at_relRepo};
+use crate::types::config::Skgrepo;
+use crate::types::misc::{members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
   Flag, empty_graphnode};
 use crate::types::tree::forest::ViewForest;

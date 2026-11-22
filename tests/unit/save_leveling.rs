@@ -9,8 +9,8 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::from_text::local_fieldintent_collection::lower::{
   NodeIntent, RequestedRelRepos};
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName};
+use crate::types::config::{SkgConfig, Skgrepo};
+use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName};
 use crate::types::nodes::complete::{
   Flag, Graphnode, empty_graphnode};
 use crate::types::save::{NodeInstruction, SaveNode};

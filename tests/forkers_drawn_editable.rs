@@ -49,7 +49,8 @@ use crate::view_and_save_helpers::{
 use skg::metadata_canon::without_viewnode_ids;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::run_with_shared_test_stores;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex, members_of};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 
 const FIXTURES : &str = "tests/forkers_drawn_editable/fixtures";

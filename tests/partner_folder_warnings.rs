@@ -21,7 +21,8 @@ use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rer
 use skg::test_utils::multi_root_view;
 use skg::serve::ViewsState;
 use skg::types::views_state::{OpenViews, ViewforestId};
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, TantivyIndex};
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::errors::{SaveError, BufferValidationError};
 

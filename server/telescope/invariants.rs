@@ -15,7 +15,8 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::telescope::types::{CompositionWarning, IllegalSections};
-use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
 
 use std::collections::HashSet;

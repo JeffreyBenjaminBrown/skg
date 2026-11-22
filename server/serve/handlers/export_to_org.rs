@@ -13,7 +13,8 @@ use crate::serve::util::{
   tag_sexp_response,
   value_from_request_sexp};
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::SkgrepoName;
 use crate::types::nodes::complete::Graphnode;
 
 use std::net::TcpStream;

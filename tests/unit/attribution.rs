@@ -80,7 +80,7 @@ fn a_reader_without_the_field_reads_the_file_and_ignores_it () {
 // The git facts, on a gitrepo made here
 // ------------------------------------------------------------
 
-use crate::types::misc::Skgrepo;
+use crate::types::config::Skgrepo;
 use std::collections::HashMap;
 
 const THEIR_URL : &str = "git@github.com:Ed/notes.git";

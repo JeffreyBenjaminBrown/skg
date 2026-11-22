@@ -133,7 +133,8 @@ fn the_position_glyphs_come_first_in_the_table () {
 // symbol with spaces stays a string.
 #[test]
 fn skgrepo_labels_name_each_skgrepo_by_its_herald_label () {
-  use crate::types::misc::{Skgrepo, SkgrepoName};
+  use crate::types::config::Skgrepo;
+  use crate::types::misc::SkgrepoName;
   use std::collections::HashMap;
   let skgrepo = |name : &str, abbreviation : Option<&str>| -> (SkgrepoName, Skgrepo) {
     ( SkgrepoName::from (name),

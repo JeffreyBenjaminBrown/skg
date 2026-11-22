@@ -33,7 +33,8 @@ use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::types::errors::SaveError;
-use skg::types::misc::{SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::TantivyIndex;
 use skg::types::views_state::{OpenViews, ViewforestId};
 
 const FIXTURES : &str = "tests/forks_folder/fixtures";

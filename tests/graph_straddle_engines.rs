@@ -11,7 +11,8 @@ use skg::dbs::init::create_empty_tantivy_index;
 use skg::graph_straddle::types::GraphStraddle;
 use skg::test_utils::draw_containerward_chains_under_members;
 use skg::types::env::{RuntimeGeneration, SkgEnv};
-use skg::types::misc::{ID, RelPartner, SkgConfig, Skgrepo, SkgrepoName};
+use skg::types::config::{SkgConfig, Skgrepo};
+use skg::types::misc::{ID, RelPartner, SkgrepoName};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::viewnode::{
   DiffChange, Existence, Folder, Viewnode, ViewnodeKind,

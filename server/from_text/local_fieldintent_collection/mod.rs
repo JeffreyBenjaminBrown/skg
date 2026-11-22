@@ -29,7 +29,8 @@ use crate::from_text::supplement_from_disk::{
 use crate::from_text::validate::{buffernode_differs_from_disknode, suppress_writes_to_restricted_nodes};
 use crate::refresh::ancestry::parent_reads_claims;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::config::SkgConfig;
+use crate::types::misc::ID;
 use crate::types::save::{
   NodeInstruction, PostSkgsaveCommitNoticeCandidate, SaveNode, SkgrepoMove };
 use crate::types::tree::forest::ViewForest;

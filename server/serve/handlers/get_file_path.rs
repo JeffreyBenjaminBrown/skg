@@ -4,7 +4,8 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   tag_text_response};
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName};
 use crate::util::path_from_pid_and_skgrepo;
 
 use std::fs;

@@ -67,7 +67,7 @@ fn relRepo_info_response_body (
 /// member.  This lets an unknown edit a stored dangling relationship.
 pub fn relRepo_info (
   graph    : &crate::dbs::in_rust_graph::InRustGraph,
-  config   : &crate::types::misc::SkgConfig,
+  config   : &crate::types::config::SkgConfig,
   recorder : &ID,
   member   : &ID,
   relation : NodeRelation,

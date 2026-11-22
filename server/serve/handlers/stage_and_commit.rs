@@ -56,7 +56,8 @@ use crate::serve::util::{
 use crate::sexp_string::quote_sexp_string;
 use crate::skgrepo_sets::{SkgrepoRestriction, require_unrestricted};
 use crate::types::env::{MutationGate, RuntimeGeneration, SkgEnv};
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::sexp::extract_string_list_from_sexp;
 

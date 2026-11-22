@@ -33,7 +33,8 @@ use skg::test_utils::{extract_string_field_from_sexp, graph_handle_from_config,
                       skg_env_from_parts};
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::env::SkgEnv;
-use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex, rel_partners_at_relRepo};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, SkgrepoName, TantivyIndex, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::nodes::tantivy::GraphnodeInTantivy;
 use skg::types::tree::forest::ViewForest;

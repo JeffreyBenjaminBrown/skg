@@ -4,7 +4,8 @@ use skg::dbs::init::{
   rebuild_tantivy_as_generation,
 };
 use skg::types::env::SharedRuntime;
-use skg::types::misc::{ID, SkgConfig};
+use skg::types::config::SkgConfig;
+use skg::types::misc::ID;
 use skg::types::nodes::complete::empty_graphnode;
 
 use std::sync::Arc;

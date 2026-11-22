@@ -13,7 +13,8 @@ use crate::sexp_string::quote_sexp_string;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::disk_home::home_from_disk;
 use crate::types::git::SkgrepoDiff;
-use crate::types::misc::{ID, SkgrepoName, SkgConfig, TantivyIndex};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName, TantivyIndex};
 use crate::types::sexp::extract_string_list_from_sexp;
 
 use sexp::{Sexp, Atom};

@@ -10,7 +10,8 @@ use skg::dbs::in_rust_graph::stats::{
   AllGraphnodeStats, fetch_all_graphnodestats_with_skgrepo_set, graphnodestats_for_pid};
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{graph_handle_from_config, run_with_test_stores};
-use skg::types::misc::{ID, SkgConfig};
+use skg::types::config::SkgConfig;
+use skg::types::misc::ID;
 
 use std::collections::HashMap;
 use skg::types::viewnode::RelationCounts;

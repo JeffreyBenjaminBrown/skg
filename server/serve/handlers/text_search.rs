@@ -32,7 +32,8 @@ use crate::serve::handlers::text_release::{
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::views_state::{ViewforestId, ViewnodeIdRecord, pids_from_viewforest};
-use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{TantivyIndex, ID, SkgrepoName};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;

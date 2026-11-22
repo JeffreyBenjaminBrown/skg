@@ -11,7 +11,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::types::tree::forest::ViewForest;
 use skg::types::errors::{BufferValidationError, SaveError};
-use skg::types::misc::SkgConfig;
+use skg::types::config::SkgConfig;
 
 use skg::dbs::filesystem::not_nodes::load_config;
 use std::error::Error;

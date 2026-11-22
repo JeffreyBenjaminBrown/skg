@@ -13,7 +13,8 @@ use skg::dbs::in_rust_graph::fork_rules::{
   validate_fork_rules_of_affected_notes,
   validate_fork_rules,
 };
-use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName, rel_partners_at_relRepo};
+use skg::types::config::{SkgConfig, Skgrepo};
+use skg::types::misc::{ID, MSV, RelPartner, SkgrepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::save::{NodeInstruction, DeleteNode, SaveNode};
 

@@ -5,7 +5,8 @@ use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::errors::{SaveError, BufferValidationError};
-use skg::types::misc::{SkgConfig, ID, SkgrepoName};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, SkgrepoName};
 
 use skg::types::save::{NodeInstruction, SaveNode, DeleteNode};
 use std::error::Error;

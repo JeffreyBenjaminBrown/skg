@@ -5,7 +5,8 @@ use crate::dbs::in_rust_graph::mirrors::{
   is_mirror_of, mirror_shown, perspective_skgrepo_of_tree_containing};
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text::fork::existing_owned_fork_of;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Folder, PropertyMember, ViewRequest};
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
 use crate::types::viewnode::{Vognode, Occurrence};

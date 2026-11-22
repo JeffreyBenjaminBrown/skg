@@ -23,7 +23,8 @@ use skg::serve::handlers::text_search::{
   suppressed_result_gnids};
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
-use skg::types::misc::{ID, SkgConfig, SkgrepoName};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, SkgrepoName};
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{Folder, GnidOnlyKind, Viewnode, ViewnodeKind, Vognode};
 use skg::types::views_state::ViewnodeIdRecord;

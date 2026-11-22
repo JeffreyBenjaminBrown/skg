@@ -23,7 +23,8 @@ use crate::diff_view::processed_store::ProcessedStore;
 use crate::diff_view::other_changes::{
   hash_other_changes_values, other_changes_between};
 use crate::serve::util::format_string_list_sexp;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::OtherChange;

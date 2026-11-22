@@ -27,7 +27,8 @@ use crate::view_and_save_helpers::{
   content_of, first_forks_folders_members, ids, is_a_fixpoint, line_of, node,
   save_cleanly, skg_files, under, view_of, without_subtree_of};
 use skg::test_utils::run_with_shared_test_stores;
-use skg::types::misc::{SkgConfig, TantivyIndex, members_of};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 
 const FIXTURES : &str = "tests/flat_forks_folders/fixtures";

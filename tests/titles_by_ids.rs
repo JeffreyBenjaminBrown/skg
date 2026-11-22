@@ -9,7 +9,8 @@ use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::test_utils::{IndexFolderForThisProcess, read_lp_message};
 use skg::types::git::SkgrepoDiff;
-use skg::types::misc::{ID, MSV, SkgConfig, Skgrepo, SkgrepoName, TantivyIndex, rel_partners_at_relRepo_msv};
+use skg::types::config::{SkgConfig, Skgrepo};
+use skg::types::misc::{ID, MSV, SkgrepoName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::{empty_graphnode, Graphnode};
 
 use std::collections::HashMap;

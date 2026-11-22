@@ -16,7 +16,8 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
-use skg::types::misc::{SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::TantivyIndex;
 use skg::types::views_state::OpenViews;
 
 #[test]

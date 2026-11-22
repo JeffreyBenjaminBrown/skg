@@ -1,5 +1,6 @@
 use crate::telescope::dependencies_manifest::read_foreign_manifest_orders;
-use crate::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
+use crate::types::config::{SkgConfig, Skgrepo};
+use crate::types::misc::SkgrepoName;
 
 use serde::Deserialize;
 use std::collections::HashMap;

@@ -27,7 +27,8 @@ use crate::view_and_save_helpers::{
   contains_of, content_of, depth, hides_of, ids, is_a_fixpoint, line_of, refusal_of,
   save_cleanly, skg_files, under, view_of, without_subtree_of};
 use skg::test_utils::run_with_shared_test_stores;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, TantivyIndex};
 
 const FIXTURES : &str = "tests/forkee_content_named_by_an_extra_id/fixtures";
 

@@ -1,6 +1,7 @@
 pub mod sexp;
 pub mod links;
 pub mod misc;
+pub mod config;
 pub mod env;
 pub mod errors;
 pub mod git;

@@ -22,7 +22,8 @@ use crate::view_and_save_helpers::{contains_of, depth, ids, line_of, save};
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
   multi_root_view_from_perspective, run_with_shared_test_stores, single_root_view};
-use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
 use skg::types::views_state::Perspective;
 
 const FIXTURES : &str = "tests/mirror_in_place_of_an_extra_id/fixtures";

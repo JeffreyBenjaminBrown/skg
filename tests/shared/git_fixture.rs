@@ -24,7 +24,8 @@ use skg::test_utils::{
   update_from_and_rerender_buffer_test};
 use skg::test_utils::multi_root_view_with_skgrepo_set;
 use skg::types::env::SkgEnv;
-use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
+use skg::types::config::{SkgConfig, Skgrepo};
+use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
 use skg::types::viewnode::Viewnode;
 use skg::types::views_state::{OpenViews, Perspective, ViewforestId};
 

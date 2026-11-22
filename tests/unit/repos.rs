@@ -7,7 +7,8 @@
 use super::repos_response;
 use crate::serve::protocol::RequestType;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
+use crate::types::config::{SkgConfig, Skgrepo};
+use crate::types::misc::SkgrepoName;
 
 use std::collections::HashMap;
 use std::path::PathBuf;

@@ -34,8 +34,9 @@
 use crate::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
 use crate::git_ops::read_gitrepo::skgrepo_git_remote;
 use crate::telescope::types::home_owner_of_sections;
-use crate::types::misc::{
-  ForeignManifestOrder, ForeignPairOrder, ID, SkgConfig, SkgrepoName, SkgrepoOwner};
+use crate::types::config::{
+  ForeignManifestOrder, ForeignPairOrder, SkgConfig, SkgrepoOwner};
+use crate::types::misc::{ID, SkgrepoName};
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io;

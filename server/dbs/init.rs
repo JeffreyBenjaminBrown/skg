@@ -7,7 +7,8 @@ use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos_col
 use crate::dbs::tantivy::{mk_tantivy_schema, tantivy_index_from_index};
 use crate::dbs::tantivy::write::update_index_with_nodes;
 use crate::types::env::SkgEnv;
-use crate::types::misc::{ID, SkgConfig, TantivyIndex};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, TantivyIndex};
 use crate::types::nodes::tantivy::GraphnodeInTantivy;
 use crate::types::nodes::complete::Graphnode;
 use crate::telescope::dependencies_manifest::write_dependencies_manifests;

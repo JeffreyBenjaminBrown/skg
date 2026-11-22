@@ -43,7 +43,8 @@
 //! 'folder_heralds' in 'shared/herald-styles.json'.
 
 use crate::sexp_string::quote_sexp_string;
-use crate::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
+use crate::types::config::SkgConfig;
+use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Folder, GraphnodeStats,

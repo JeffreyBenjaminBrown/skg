@@ -22,7 +22,8 @@ use skg::test_utils::{
   read_all_lp_messages, skg_env_from_parts};
 use skg::test_utils::multi_root_view;
 use skg::types::env::SkgEnv;
-use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
+use skg::types::config::SkgConfig;
+use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::views_state::{OpenViews, Perspective, ViewforestId};
 use skg::types::viewnode::Viewnode;

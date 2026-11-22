@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::obsidian::vault_check::{VaultCheckReport, check_vault};
-use crate::types::misc::{SkgConfig, Skgrepo};
+use crate::types::config::{SkgConfig, Skgrepo};
 
 #[path = "obsidian_fixture.rs"]
 mod fixture;

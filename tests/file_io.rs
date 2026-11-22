@@ -12,10 +12,8 @@ use skg::test_utils::load_config_with_overrides;
 use skg::save::update_fs_from_nodeInstructions;
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::nodes::fs::GraphnodeOnDisk;
-use skg::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, Skgrepo, SkgrepoName,
-  rel_partners_at_relRepo_msv,
-};
+use skg::types::config::{SkgConfig, Skgrepo};
+use skg::types::misc::{ID, MSV, RelPartner, SkgrepoName, rel_partners_at_relRepo_msv};
 use skg::types::save::{NodeInstruction, SaveNode};
 use skg::test_utils::set_skgrepo_retagging_relRepos;
 use skg::test_utils::{run_with_test_stores, graphnode_example};
@@ -189,7 +187,7 @@ pub fn reverse_some_of_node(node: &Graphnode) -> Graphnode {
 #[test]
 fn test_links_extracted_during_read() -> std::io::Result<()> {
   use std::collections::HashMap;
-  use skg::types::misc::Skgrepo;
+  use skg::types::config::Skgrepo;
   use tempfile::tempdir;
 
   // Create a temporary directory
