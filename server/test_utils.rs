@@ -57,7 +57,7 @@ use std::any::Any;
 use std::collections::{BTreeSet, HashMap};
 use std::error::Error;
 use std::fs;
-use std::io::ErrorKind;
+use std::io::{BufReader, ErrorKind};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::future::Future;
 use std::panic::{AssertUnwindSafe, resume_unwind};
@@ -532,6 +532,28 @@ pub async fn save_ignoring_streamed_messages (
   update_from_and_rerender_buffer_test (
     &mut stream, org_buffer_text, config, tantivy_index, graph,
     viewforest_id_from_request_result, views_state ) . await }
+
+/// 'update_from_and_rerender_buffer_test' over a stream pair of its
+/// own, returning the response and every message the save streamed
+/// before it (collateral views, the lock's release), in order.
+pub async fn save_and_read_streamed_messages (
+  org_buffer_text             : &str,
+  config                      : &SkgConfig,
+  tantivy_index               : &TantivyIndex,
+  graph                       : &InRustGraphHandle,
+  viewforest_id_from_request_result : &Result<ViewforestId, String>,
+  views_state                 : &mut ViewsState,
+) -> Result<(SaveResponse, Vec<String>), Box<dyn Error>> {
+  let (mut stream, read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  let response : SaveResponse =
+    update_from_and_rerender_buffer_test (
+      &mut stream, org_buffer_text, config, tantivy_index, graph,
+      viewforest_id_from_request_result, views_state ) . await ?;
+  drop (stream); // so that reading the stream ends
+  let messages : Vec<String> =
+    read_all_lp_messages ( &mut BufReader::new (read_end) );
+  Ok (( response, messages )) }
 
 /// Save 'buffer' through the full pipeline, as a client's save of a
 /// view no other buffer shares, and return the rerendered saved view.

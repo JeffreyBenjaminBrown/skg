@@ -9,20 +9,14 @@
 
 use std::error::Error;
 
-use std::io::BufReader;
-use std::net::TcpStream;
-
-
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle};
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::test_utils::{
-  mk_test_tcp_stream_pair,
   empty_views_state,
   run_with_test_stores, graph_handle_from_config,
-  read_all_lp_messages};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+  save_and_read_streamed_messages};
 use skg::test_utils::{
   multi_root_view, single_root_view};
 use skg::serve::ViewsState;
@@ -101,14 +95,9 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       let delete_buffer : String =
         "* (skg node (gnid L) (skgRepos (nodeRepo main)) (editRequest delete)) [[id:X][to X]]\n"
         . to_string ();
-      let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
-      let response : SaveResponse =
-        update_from_and_rerender_buffer (
-          &mut stream, &delete_buffer, config, tantivy, &graph, &Ok (l_viewforest_id . clone ()), &mut views_state ) . await ?;
-      drop (stream);
-      let msgs : Vec<String> = {
-        let mut reader : BufReader<TcpStream> = BufReader::new (read_end);
-        read_all_lp_messages (&mut reader) };
+      let (response, msgs) : (SaveResponse, Vec<String>) =
+        save_and_read_streamed_messages (
+          &delete_buffer, config, tantivy, &graph, &Ok (l_viewforest_id . clone ()), &mut views_state ) . await ?;
       assert! ( response . errors . is_empty (),
         "deleting L must not error, even with L visible in P's open view; got {:?}\ncollateral stream: {:?}",
         response . errors, msgs );
@@ -162,15 +151,10 @@ fn a_deleted_root_vanishes_and_a_buffer_may_end_with_no_roots
       let delete_buffer : String =
         "* (skg node (gnid L) (skgRepos (nodeRepo main)) (editRequest delete)) [[id:X][to X]]\n"
         . to_string ();
-      let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
-      let response : SaveResponse =
-        update_from_and_rerender_buffer (
-          &mut stream, &delete_buffer, config, tantivy, &graph,
+      let (response, msgs) : (SaveResponse, Vec<String>) =
+        save_and_read_streamed_messages (
+          &delete_buffer, config, tantivy, &graph,
           &Ok (l_viewforest_id . clone ()), &mut views_state ) . await ?;
-      drop (stream);
-      let msgs : Vec<String> = {
-        let mut reader : BufReader<TcpStream> = BufReader::new (read_end);
-        read_all_lp_messages (&mut reader) };
       assert! ( response . errors . is_empty (), "{:?}", response . errors );
       assert_eq! ( response . saved_view, "",
         "the saved view of L alone has no roots left" );

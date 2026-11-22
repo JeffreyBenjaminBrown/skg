@@ -13,13 +13,11 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
   save_ignoring_streamed_messages,
-  mk_test_tcp_stream_pair,
   empty_views_state,
   cleanup_test_tantivy,
   copy_dir_all,
   extract_string_field_from_sexp,
-  read_all_lp_messages,
-  update_from_and_rerender_buffer_test as update_from_and_rerender_buffer};
+  save_and_read_streamed_messages};
 use skg::test_utils::multi_root_view;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
@@ -29,8 +27,6 @@ use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
 use std::error::Error;
-use std::io::BufReader;
-use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -84,26 +80,20 @@ fn test_skgrepo_move_updates_collateral_view_metadata (
         initial_buffer . replace (
           "(gnid b) (skgRepos (nodeRepo public))",
           "(gnid b) (skgRepos (nodeRepo private))" );
-      let (mut stream, read_end) : (TcpStream, TcpStream) =
-        mk_test_tcp_stream_pair ();
-      let save_response : SaveResponse =
-        update_from_and_rerender_buffer (
-          &mut stream,
+      let (save_response, streamed_messages) : (SaveResponse, Vec<String>) =
+        save_and_read_streamed_messages (
           &save_input,
           &config,
           &tantivy,
           &graph,
           &Ok ( viewforest_id_1 . clone() ),
           &mut views_state ) . await?;
-      drop (stream);
 
-      let mut reader : BufReader<TcpStream> =
-        BufReader::new (read_end);
       // The stream now also carries a save-relax-lock message
       // before the collateral-view(s); select the collateral-view by its
       // response-type.
       let collateral_msgs : Vec<String> =
-        read_all_lp_messages (&mut reader)
+        streamed_messages
         . into_iter ()
         . filter ( |m| m . contains ("collateral-view") )
         . collect ();

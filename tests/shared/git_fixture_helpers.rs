@@ -1,6 +1,6 @@
-// Git, stream and viewnode helpers for the tests over git fixtures
+// Git, save and viewnode helpers for the tests over git fixtures
 // (the graph straddle and the diff view) and for other tests that need
-// a gitrepo, a stream pair, a save's collateral views or a viewnode
+// a gitrepo, a save's collateral views or a viewnode
 // carrying change facts.
 // Declared once per test target that uses it, in
 // 'tests/grouped_repos.rs', 'tests/grouped_unit.rs',
@@ -10,8 +10,6 @@
 use git2::Repository;
 use std::error::Error;
 use std::fs;
-use std::io::BufReader;
-use std::net::TcpStream;
 use std::path::Path;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
@@ -19,9 +17,8 @@ use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
-  mk_test_tcp_stream_pair,
-  copy_dir_all, extract_string_field_from_sexp, read_all_lp_messages,
-  update_from_and_rerender_buffer_test};
+  copy_dir_all, extract_string_field_from_sexp,
+  save_and_read_streamed_messages};
 use skg::types::config::SkgConfig;
 use skg::types::misc::{SkgrepoName, TantivyIndex};
 use skg::types::views_state::ViewforestId;
@@ -116,16 +113,12 @@ pub async fn save_and_read_collateral (
   graph         : &InRustGraphHandle,
   views_state   : &mut ViewsState,
 ) -> Result<(SaveResponse, Vec<String>), Box<dyn Error>> {
-  let (mut stream, read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response : SaveResponse =
-    update_from_and_rerender_buffer_test (
-      &mut stream, buffer, config, tantivy, graph,
+  let (response, messages) : (SaveResponse, Vec<String>) =
+    save_and_read_streamed_messages (
+      buffer, config, tantivy, graph,
       &Ok (viewforest_id . clone ()), views_state ) . await ?;
-  drop (stream);
-  let mut reader : BufReader<TcpStream> = BufReader::new (read_end);
   let collateral_views : Vec<String> =
-    read_all_lp_messages (&mut reader)
+    messages
     . into_iter ()
     // Skip the save-relax-lock message; only collateral-views
     // carry a content field.

@@ -15,9 +15,8 @@ use skg::org_to_text::viewforest_to_string;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
   save_ignoring_streamed_messages,
-  mk_test_tcp_stream_pair,
-  extract_string_field_from_sexp, read_all_lp_messages,
-  update_from_and_rerender_buffer_test};
+  save_and_read_streamed_messages,
+  extract_string_field_from_sexp};
 use skg::test_utils::multi_root_view;
 use skg::types::misc::ID;
 use skg::types::nodes::complete::Graphnode;
@@ -28,8 +27,6 @@ use ego_tree::Tree;
 use futures::executor::block_on;
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::io::BufReader;
-use std::net::TcpStream;
 
 /// Deleting the changed ID folders changes nothing: the save writes
 /// no file, and the refreshed buffer shows the folders again.
@@ -172,17 +169,13 @@ fn a_collateral_buffer_shows_the_new_change_and_keeps_the_old (
       f, "ct", &content_viewforest_id ) ?;
     let edited : String = insert_after_line_starting (
       &content_view, "* (skg node (gnid ct)", "** a new child" );
-    let (mut stream, read_end) : (TcpStream, TcpStream) =
-      mk_test_tcp_stream_pair ();
-    let response : SaveResponse = block_on (
-      update_from_and_rerender_buffer_test (
-        &mut stream, &edited, &f . config, &f . tantivy, &f . graph,
+    let (response, streamed) : (SaveResponse, Vec<String>) = block_on (
+      save_and_read_streamed_messages (
+        &edited, &f . config, &f . tantivy, &f . graph,
         &Ok (content_viewforest_id), &mut f . views_state )) ?;
     assert! ( response . errors . is_empty (),
               "the save must succeed, got {:?}", response . errors );
-    drop (stream); // so that reading the stream ends
-    let collateral : String = read_all_lp_messages (
-      &mut BufReader::new (read_end) ) . into_iter ()
+    let collateral : String = streamed . into_iter ()
       . find ( |message| message . contains ("collateral-view")
                && message . contains (
                  &viewforest_id_of (DiffViewBufferKind::AllChanges) . repr_in_client () ))

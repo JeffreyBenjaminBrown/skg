@@ -17,11 +17,10 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
   save_ignoring_streamed_messages,
-  mk_test_tcp_stream_pair,
+  save_and_read_streamed_messages,
   empty_views_state,
   extract_string_field_from_sexp, graph_handle_from_config,
-  read_all_lp_messages, run_with_test_stores};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+  run_with_test_stores};
 use skg::test_utils::multi_root_view;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
@@ -34,8 +33,6 @@ use skg::types::views_state::{
 use ego_tree::{NodeId, Tree};
 use std::collections::HashSet;
 use std::error::Error;
-use std::io::BufReader;
-use std::net::TcpStream;
 
 const FIXTURES : &str = "tests/viewnode_ids/fixtures";
 
@@ -94,15 +91,11 @@ async fn save_view (
   views_state : &mut ViewsState,
   view_name   : &str,
 ) -> Result<(SaveResponse, Vec<String>), Box<dyn Error>> {
-  let (mut stream, read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response : SaveResponse = update_from_and_rerender_buffer (
-    &mut stream, buffer, config, tantivy, graph,
-    &Ok ( ViewforestId::ContentView (view_name . to_string ()) ),
-    views_state ) . await ?;
-  drop (stream);
-  let streamed : Vec<String> =
-    read_all_lp_messages ( &mut BufReader::new (read_end) );
+  let (response, streamed) : (SaveResponse, Vec<String>) =
+    save_and_read_streamed_messages (
+      buffer, config, tantivy, graph,
+      &Ok ( ViewforestId::ContentView (view_name . to_string ()) ),
+      views_state ) . await ?;
   assert! ( response . errors . is_empty (),
             "the buffer must save, got {:?}\n\nbuffer:\n{}",
             response . errors, buffer );
