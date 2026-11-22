@@ -7,3 +7,8 @@ body: |2-
   look for similar-looking ("quasi-duplicate") code,
   and try to deduplicate it.
   If you can't, report the quasi-duplication.
+
+  'TODO/refactor-for-dev/' holds, one file per part of the code,
+  the refactoring candidates earlier agents saw and left, each with
+  why it is worth doing and what makes it risky. Consult the file of
+  the part you work in, and strike from it what you do.

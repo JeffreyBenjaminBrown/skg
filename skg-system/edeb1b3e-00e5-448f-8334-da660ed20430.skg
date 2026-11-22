@@ -1,0 +1,12 @@
+title: A behaviour-preserving change preserves what the tests do not check
+pid: edeb1b3e-00e5-448f-8334-da660ed20430
+body: |2-
+  Besides what the tests assert, a refactor keeps: log lines and
+  their tracing targets (a 'tracing' call moved to another module
+  logs under that module, so a 'RUST_LOG' naming the old one no
+  longer reaches it); the text of errors and warnings; exit
+  statuses; and how a script runs under 'python3 -I' (a Python
+  script split into modules no longer finds them, since '-I' keeps
+  the script's folder off 'sys.path'). Before merging copies into
+  one, diff them: near-duplicates differ in exactly these things,
+  and the merge silently keeps one copy's version.

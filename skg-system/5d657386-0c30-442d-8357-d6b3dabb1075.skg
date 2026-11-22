@@ -1,0 +1,17 @@
+title: Agents that work at once
+pid: 5d657386-0c30-442d-8357-d6b3dabb1075
+body: |2-
+  Each agent works in a git worktree of its own, with its own 'target/',
+  never shared or symlinked: a shared one lets one agent's build
+  replace the binary another's tests are running. Each sets
+  'SKG_FOR_AI_TEST_PORT' to a port of its own before running the AI
+  reader's tests or the suite, and no other agent may use the port
+  after it, where those tests start a second server; their default,
+  1793, collides.
+  None runs 'git stash': worktrees share one stash list, and Jeff's
+  stashes are in it. None runs 'pkill' or 'killall' by name, which
+  kills other agents' servers and Jeff's; each kills only PIDs it
+  started. An agent lands its branch under one lock ('flock'),
+  holding it while it rebases on 'main', runs the whole suite and
+  fast-forwards 'main'; without the lock, two agents each test a
+  'main' the other is about to change.

@@ -1,7 +1,19 @@
 title: Read from narrow to broad
 pid: 6c499fdc-e718-4331-96ec-c9f7c2ff3ef7
 body: |2-
-  Start with =rg= to locate definitions and callers, then read the relevant
+  To find the file that does something, descend by headers before
+  grepping: two or three short reads reach it. Every module of
+  =server/= opens with a =//!= header saying what it is for and listing
+  its children, and =server/lib.rs= lists the top-level modules by what
+  a user does. The clients' files open with headers likewise, indexed
+  by =elisp/skg-init.el= and by "Where things live" in
+  =nvim/README.org=; =tools/skg-for-ai/skg_for_ai.py= indexes the
+  modules beside it. Whoever moves, splits or adds a file keeps its
+  header and its parent's list true, by the conventions in
+  =TODO/refactor-for-dev/module-headers.org=: a stale list sends the
+  next reader to the wrong file.
+
+  Then use =rg= to locate definitions and callers, and read the relevant
   ranges and follow the call graph as correctness requires.  Let an exact
   symbol, wire field, invariant, or failing test define the initial question;
   avoid rereading large files or diffs when the relevant region has not changed.

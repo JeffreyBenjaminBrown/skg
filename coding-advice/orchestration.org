@@ -19,8 +19,8 @@ plan and should not need to. The brief holds:
   what earlier slices built that this one relies on, names that
   changed since the plan was written, pitfalls found since;
 - the suites to run, each named with its command, with the
-  instruction to serialize full runs (two at once collide on
-  fixed temp paths and the Tantivy writer). List every suite
+  instruction to serialize full runs in one worktree (each run
+  wipes 'tests/results/'). List every suite
   whose assertions could depend on the slice's behavior, not
   only those whose code the slice touches: the AI tool's tests
   assert the server's behavior, and plan 4's briefs left them
@@ -31,6 +31,21 @@ plan and should not need to. The brief holds:
 - where the record goes: the progress file's top-level headline
   for this plan, one subheadline per slice.
 Note the launch time before launching, for the cost record.
+* Agents that work at once
+Each agent works in a git worktree of its own, with its own 'target/',
+never shared or symlinked: a shared one lets one agent's build
+replace the binary another's tests are running. Each sets
+'SKG_FOR_AI_TEST_PORT' to a port of its own before running the AI
+reader's tests or the suite, and no other agent may use the port
+after it, where those tests start a second server; their default,
+1793, collides.
+None runs 'git stash': worktrees share one stash list, and Jeff's
+stashes are in it. None runs 'pkill' or 'killall' by name, which
+kills other agents' servers and Jeff's; each kills only PIDs it
+started. An agent lands its branch under one lock ('flock'),
+holding it while it rebases on 'main', runs the whole suite and
+fast-forwards 'main'; without the lock, two agents each test a
+'main' the other is about to change.
 * The report shape
 The agent ends with a report of fixed shape, and the same shape
 goes into 'progress.org' under a headline per slice:

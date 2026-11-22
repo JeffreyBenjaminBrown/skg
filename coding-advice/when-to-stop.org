@@ -36,6 +36,17 @@ If a question turns out to be trivial, do not stop for it. If you are
 uncertain but the choice is easy to reverse, use your best judgment.
 If there are no substantive questions and agreed work remains, keep going.
 Once the work and verification are complete, report completion.
+* Unattended, nobody answers
+An agent that runs unattended has no human to approve a command
+the harness asks one about, so such a command hangs it for good:
+one agent sat two hours on 'rm -rf ../../../zt'. Keep temporary
+files under your worktree's 'target/', remove them with 'rm FILE',
+and never 'rm -rf' a path that leaves the worktree or is written
+with '..'. Nor does anyone resume a turn that ends: run the whole
+suite in the foreground (five to fifteen minutes; give the call a
+ten-minute timeout and, if it runs out, wait on the same PID,
+never starting a second run), and do not end your turn while it
+runs.
 * Reporting a substantive stop
 Report what's new in the task's progress.org under these headlines:
 ** What's done and went well

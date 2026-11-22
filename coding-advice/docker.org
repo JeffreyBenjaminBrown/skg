@@ -68,6 +68,13 @@
   - Source of truth is the =.skg= files on disk. The in-Rust graph and Tantivy
     are derived and rebuilt from disk on startup. Any change that
     correctly lands on the filesystem is recoverable.
+  - Disk: the project, its worktrees' build folders included, must
+    stay under 30 GB. In every shell that runs cargo or a test,
+    =export CARGO_PROFILE_DEV_DEBUG=line-tables-only CARGO_INCREMENTAL=0=:
+    a debug build is then a third the size. Test binaries of earlier
+    builds pile up in =target/debug/deps= and nothing removes them;
+    when =target/debug= passes 5 GB, delete it while none of your
+    builds or tests runs.
 * Modifying the image
   - Add packages to the =contents= list in =docker.nix=. To bundle an
     editor together with its plugins, follow the existing patterns:
