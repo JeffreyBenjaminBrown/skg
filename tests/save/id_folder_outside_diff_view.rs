@@ -7,15 +7,12 @@
 //
 // Fixture: two unrelated nodes, n and x.
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::error::Error;
-use std::net::TcpStream;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::test_utils::{empty_views_state, run_with_shared_test_stores, graph_handle_from_config};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, run_with_shared_test_stores, graph_handle_from_config};
 use skg::types::config::SkgConfig;
 use skg::types::misc::TantivyIndex;
 
@@ -39,10 +36,8 @@ async fn save_buffer (
   graph       : &InRustGraphHandle,
   views_state : &mut ViewsState,
 ) -> Result<String, Box<dyn Error>> {
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response : SaveResponse = update_from_and_rerender_buffer (
-    &mut stream, buffer, config, tantivy, graph,
+  let response : SaveResponse = save_ignoring_streamed_messages (
+    buffer, config, tantivy, graph,
     &Err ( String::new () ), views_state ) . await ?;
   assert! ( response . errors . is_empty (),
             "the buffer must save, got {:?}\n\nbuffer:\n{}",

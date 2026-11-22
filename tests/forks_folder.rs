@@ -20,8 +20,6 @@
 // - a relRepo request on F, which claims nothing, is refused.
 
 use std::error::Error;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
-use std::net::TcpStream;
 use std::collections::BTreeMap;
 
 use crate::view_and_save_helpers::{
@@ -30,8 +28,7 @@ use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::test_utils::{empty_views_state, graph_handle_from_config, run_with_shared_test_stores};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, graph_handle_from_config, run_with_shared_test_stores};
 use skg::types::errors::SaveError;
 use skg::types::config::SkgConfig;
 use skg::types::misc::TantivyIndex;
@@ -271,10 +268,8 @@ async fn a_relRepo_request_on_a_forker_is_refused (
     f, &f . replacen (" noClaim", " noClaim (editRequest (relRepo main))", 1) );
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = empty_views_state ();
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let refusal : String = match update_from_and_rerender_buffer (
-    &mut stream, &requested, config, tantivy, &graph,
+  let refusal : String = match save_ignoring_streamed_messages (
+    &requested, config, tantivy, &graph,
     &Ok ( ViewforestId::ContentView ("view of N" . to_string ()) ),
     &mut views_state ) . await {
     Ok (response) => response . errors . join ("\n"),

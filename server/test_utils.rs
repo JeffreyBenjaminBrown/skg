@@ -58,7 +58,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::error::Error;
 use std::fs;
 use std::io::ErrorKind;
-use std::net::{TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::future::Future;
 use std::panic::{AssertUnwindSafe, resume_unwind};
 use std::path::{Path, PathBuf};
@@ -438,6 +438,23 @@ pub fn graph_from_config (
   graph . record_illegal_edits (&violations);
   Ok (graph) }
 
+/// A connected pair of TCP streams on the loopback interface, for a
+/// test that hands a handler a stream and reads what it sent.
+/// Returns (write_end, read_end). The write_end is passed
+/// to 'update_from_and_rerender_buffer'; the read_end can
+/// be used to read streamed collateral-view messages.
+pub fn mk_test_tcp_stream_pair ()
+  -> (TcpStream, TcpStream)
+{ let listener : TcpListener =
+    TcpListener::bind ("127.0.0.1:0") . unwrap ();
+  let addr : SocketAddr =
+    listener . local_addr () . unwrap ();
+  let write_end : TcpStream =
+    TcpStream::connect (addr) . unwrap ();
+  let (read_end, _) =
+    listener . accept () . unwrap ();
+  (write_end, read_end) }
+
 /// The views state of a connection that has opened no view and drawn
 /// no diff view.
 pub fn empty_views_state () -> ViewsState {
@@ -481,6 +498,24 @@ pub async fn update_from_and_rerender_buffer_test (
     viewforest_id_from_request_result, views_state,
     /* approved_forks = */ true ) . await }
 
+/// 'update_from_and_rerender_buffer_test' over a stream pair of its
+/// own, whose read end nobody reads: for a test that wants the
+/// response, not the messages (collateral views, the lock's
+/// release) the save streams before it.
+pub async fn save_ignoring_streamed_messages (
+  org_buffer_text             : &str,
+  config                      : &SkgConfig,
+  tantivy_index               : &TantivyIndex,
+  graph                       : &InRustGraphHandle,
+  viewforest_id_from_request_result : &Result<ViewforestId, String>,
+  views_state                 : &mut ViewsState,
+) -> Result<SaveResponse, Box<dyn Error>> {
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  update_from_and_rerender_buffer_test (
+    &mut stream, org_buffer_text, config, tantivy_index, graph,
+    viewforest_id_from_request_result, views_state ) . await }
+
 /// Save 'buffer' through the full pipeline, as a client's save of a
 /// view no other buffer shares, and return the rerendered saved view.
 /// The save must succeed without errors.
@@ -492,12 +527,7 @@ pub async fn save_and_rerender (
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = empty_views_state ();
-  let listener : TcpListener =
-    TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let mut stream : TcpStream =
-    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
-  let response : SaveResponse = update_from_and_rerender_buffer_test (
-    &mut stream,
+  let response : SaveResponse = save_ignoring_streamed_messages (
     buffer, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),

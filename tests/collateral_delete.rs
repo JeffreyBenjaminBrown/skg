@@ -9,7 +9,6 @@
 
 use std::error::Error;
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::io::BufReader;
 use std::net::TcpStream;
 
@@ -19,6 +18,7 @@ use skg::dbs::in_rust_graph::{
   InRustGraphHandle};
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::test_utils::{
+  mk_test_tcp_stream_pair,
   empty_views_state,
   run_with_test_stores, graph_handle_from_config,
   read_all_lp_messages};

@@ -13,15 +13,12 @@
 
 use std::error::Error;
 use crate::parse_helpers::{occurrences_titled, viewnode_tree_as_written};
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
-use std::net::TcpStream;
 
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::test_utils::{empty_views_state, run_with_test_stores, graph_handle_from_config};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, run_with_test_stores, graph_handle_from_config};
 use skg::test_utils::single_root_view;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
@@ -183,10 +180,8 @@ async fn save_view_of_four (
   assert_eq! ( rendered, four );
   views_state . open_views . register_view (
     &graph . load_full (), view_of_four . clone (), viewforest, &pids, &SkgrepoRestriction::unrestricted (config) );
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  update_from_and_rerender_buffer (
-    &mut stream, typed, config, tantivy, &graph,
+  save_ignoring_streamed_messages (
+    typed, config, tantivy, &graph,
     &Ok (view_of_four), &mut views_state ) . await }
 
 fn orphan_warnings (

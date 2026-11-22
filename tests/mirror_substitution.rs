@@ -41,7 +41,6 @@
 use skg::test_utils::{save_added_forks, save_and_rerender};
 use indoc::indoc;
 use std::error::Error;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 
 use skg::from_text::buffer_to_validated_saveplan;
@@ -49,6 +48,7 @@ use skg::assert_metadata_eq;
 use skg::serve::ViewsState;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
+  mk_test_tcp_stream_pair,
   empty_views_state,
   run_with_shared_test_stores,
   graph_handle_from_config};

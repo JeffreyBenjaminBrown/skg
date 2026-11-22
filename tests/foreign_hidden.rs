@@ -17,11 +17,11 @@ use skg::save::DeleteFrom;
 use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
+  mk_test_tcp_stream_pair,
   extract_string_field_from_sexp, read_all_lp_messages, skg_env_from_parts};
 use skg::types::env::SkgEnv;
 use skg::types::misc::SkgrepoName;
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;

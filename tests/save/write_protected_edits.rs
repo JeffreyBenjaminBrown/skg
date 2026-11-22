@@ -6,7 +6,7 @@ use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted
   ::org_to_viewforest;
-use skg::test_utils::{empty_views_state, graph_handle_from_config, run_with_test_stores};
+use skg::test_utils::{mk_test_tcp_stream_pair, empty_views_state, graph_handle_from_config, run_with_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test
   as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
@@ -18,7 +18,6 @@ use skg::types::nodes::complete::{
 use skg::types::views_state::ViewforestId;
 
 use std::error::Error;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 
 #[test]

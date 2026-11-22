@@ -10,7 +10,6 @@
 // Fixture: m contains r; b and c contain m; d contains b and c (a
 // diamond above m). x and y contain each other (a cycle).
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
@@ -18,8 +17,7 @@ use skg::metadata_canon::without_viewnode_ids;
 use skg::rerender_pass::NO_OTHER_CONTAINERS;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::test_utils::{empty_views_state, graph_handle_from_config, run_with_test_stores};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, graph_handle_from_config, run_with_test_stores};
 use skg::test_utils::multi_root_view;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
@@ -29,7 +27,6 @@ use skg::types::views_state::ViewforestId;
 use ego_tree::Tree;
 use indoc::indoc;
 use std::error::Error;
-use std::net::TcpStream;
 
 const FIXTURES : &str = "tests/containerward_chain/fixtures";
 
@@ -96,10 +93,8 @@ async fn save_view_responding (
   views_state : &mut ViewsState,
   view_name   : &str,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response : SaveResponse = update_from_and_rerender_buffer (
-    &mut stream, buffer, config, tantivy, graph,
+  let response : SaveResponse = save_ignoring_streamed_messages (
+    buffer, config, tantivy, graph,
     &Ok ( ViewforestId::ContentView (view_name . to_string ()) ),
     views_state ) . await ?;
   assert! ( response . errors . is_empty (),

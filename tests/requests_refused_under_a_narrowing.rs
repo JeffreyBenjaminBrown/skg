@@ -12,12 +12,12 @@
 
 use crate::git_fixture::{
   edit_line, everything_written, open_content_view, save_under, skg_files, under_public};
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 
 use skg::save::DeleteFrom;
 use skg::serve::handlers::delete_references_to_absent_node::
   handle_delete_references_to_absent_node_request;
 use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::test_utils::mk_test_tcp_stream_pair;
 use skg::test_utils::skg_env_from_parts;
 use skg::types::env::SkgEnv;
 use skg::types::errors::SaveError;

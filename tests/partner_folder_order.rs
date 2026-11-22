@@ -18,10 +18,10 @@ use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::save_and_rerender;
 use std::error::Error;
 use std::io::BufReader;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 
 use skg::test_utils::{
+  mk_test_tcp_stream_pair,
   empty_views_state,
   extract_string_field_from_sexp, graph_handle_from_config,
   read_all_lp_messages, run_with_test_stores};

@@ -2,7 +2,6 @@
 //
 // Tests of skgrepo-sets ('docs/api-and-formats.org', "skgrepo-sets").
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use crate::parse_helpers::{first_root, occurrence_children_gnids, viewnode_tree_as_written};
 use indoc::indoc;
 use ego_tree::{NodeId, Tree};
@@ -16,6 +15,7 @@ use skg::sexp_string::quote_sexp_string;
 use skg::serve::handlers::text_search::TitleOrAlias;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
+  mk_test_tcp_stream_pair,
   empty_views_state,
   run_with_skgrepo_set_test_db, search_gnids_for_skgrepo_set_for_test,
   titles_for_skgrepo_set_for_test};

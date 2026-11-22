@@ -9,11 +9,12 @@
 
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::metadata_canon::without_viewnode_ids;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use crate::view_and_save_helpers::node_from_disk;
 use indoc::indoc;
 use skg::assert_metadata_eq;
 use skg::test_utils::{
+  save_ignoring_streamed_messages,
+  mk_test_tcp_stream_pair,
   empty_views_state,
   extract_string_field_from_sexp,
   graph_handle_from_config,
@@ -44,10 +45,7 @@ async fn save_buffer_for_hidden_from_forks_test (
   graph       : &InRustGraphHandle,
   views_state : &mut ViewsState,
 ) -> Result<String, Box<dyn Error>> {
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream,
+  let response = save_ignoring_streamed_messages (
     buffer, config, tantivy, graph,
 
     &Err ( String::new () ), views_state
@@ -383,10 +381,8 @@ async fn test_deleting_foreign_forkee_content_infers_hide (
       ) . await?;
     let edited : String =
       extended_forkee_edit_view (&extended, "delete");
-    let (mut stream, _read_end) : (TcpStream, TcpStream) =
-      mk_test_tcp_stream_pair ();
-    let response = update_from_and_rerender_buffer (
-      &mut stream, &edited, config, tantivy, &graph,
+    let response = save_ignoring_streamed_messages (
+      &edited, config, tantivy, &graph,
       &Err (String::new ()), &mut views_state ) . await ?;
     let rerendered : String = response . saved_view;
 
@@ -538,10 +534,8 @@ async fn save_and_return_hides (
   graph       : &InRustGraphHandle,
   views_state : &mut ViewsState,
 ) -> Result<Vec<String>, Box<dyn Error>> {
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream, buffer, config, tantivy, graph,
+  let response = save_ignoring_streamed_messages (
+    buffer, config, tantivy, graph,
     &Err ( String::new () ), views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "the save must succeed: {:?}", response . errors );
@@ -986,10 +980,7 @@ async fn test_forkee_and_compound_partner_folders (
         (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = empty_views_state ();
-      let (mut stream, _read_end) : (TcpStream, TcpStream) =
-        mk_test_tcp_stream_pair ();
-      let response = update_from_and_rerender_buffer (
-          &mut stream,
+      let response = save_ignoring_streamed_messages (
           &modified_view, &config, tantivy, &graph,
 
           &Err ( String::new () ), &mut views_state
@@ -1048,10 +1039,7 @@ async fn test_hidden_within_but_none_without (
         (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = empty_views_state ();
-      let (mut stream, _read_end) : (TcpStream, TcpStream) =
-        mk_test_tcp_stream_pair ();
-      let response = update_from_and_rerender_buffer (
-          &mut stream,
+      let response = save_ignoring_streamed_messages (
           &modified_view, &config, tantivy, &graph,
 
           &Err ( String::new () ), &mut views_state
@@ -1263,10 +1251,7 @@ async fn test_hidden_without_but_none_within (
         (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = empty_views_state ();
-      let (mut stream, _read_end) : (TcpStream, TcpStream) =
-        mk_test_tcp_stream_pair ();
-      let response = update_from_and_rerender_buffer (
-        &mut stream,
+      let response = save_ignoring_streamed_messages (
         &modified_view, &config, tantivy, &graph,
 
         &Err ( String::new () ), &mut views_state ) . await ?;
@@ -1294,10 +1279,8 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
           &ID ("R" . to_string()) )?;
     let edited : String =
       add_e11_to_hiddenoutside_folder (&initial_view);
-    let (mut stream, _read_end) : (TcpStream, TcpStream) =
-      mk_test_tcp_stream_pair ();
-    let response = update_from_and_rerender_buffer (
-      &mut stream, &edited, config, tantivy, &graph,
+    let response = save_ignoring_streamed_messages (
+      &edited, config, tantivy, &graph,
       &Err (String::new ()), &mut views_state ) . await ?;
     let rerendered : String = response . saved_view;
 
@@ -1396,10 +1379,7 @@ async fn test_overlapping_hidden_within (
         (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = empty_views_state ();
-      let (mut stream, _read_end) : (TcpStream, TcpStream) =
-        mk_test_tcp_stream_pair ();
-      let response = update_from_and_rerender_buffer (
-        &mut stream,
+      let response = save_ignoring_streamed_messages (
         &modified_view, &config, tantivy, &graph,
 
         &Err ( String::new () ), &mut views_state ) . await ?;

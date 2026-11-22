@@ -7,7 +7,6 @@
 // 'tests/grouped_views.rs', 'tests/grouped_forks.rs' and
 // 'tests/grouped_saves.rs'.
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use git2::Repository;
 use std::error::Error;
 use std::fs;
@@ -20,6 +19,7 @@ use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
+  mk_test_tcp_stream_pair,
   copy_dir_all, extract_string_field_from_sexp, read_all_lp_messages,
   update_from_and_rerender_buffer_test};
 use skg::types::config::SkgConfig;

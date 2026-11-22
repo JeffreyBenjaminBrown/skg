@@ -13,11 +13,8 @@
 // test places inside that folder.
 
 use std::error::Error;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
-use std::net::TcpStream;
 
-use skg::test_utils::{empty_views_state, run_with_shared_test_stores, graph_handle_from_config};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, run_with_shared_test_stores, graph_handle_from_config};
 use skg::test_utils::multi_root_view;
 use skg::serve::ViewsState;
 use skg::types::views_state::ViewforestId;
@@ -53,10 +50,7 @@ async fn save_buffer (
   graph       : &InRustGraphHandle, // must be the explicit handle, or the save's coherence debug-assert reads a stale graph
   views_state : &mut ViewsState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  update_from_and_rerender_buffer (
-    &mut stream,
+  save_ignoring_streamed_messages (
     buf, config, tantivy, graph,
     &Ok ( ViewforestId::ContentView ("view of n" . to_string ()) ),
     views_state ) . await }

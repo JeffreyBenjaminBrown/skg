@@ -1,13 +1,12 @@
 // cargo nextest run --test grouped_views -E 'test(content_view::)'
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use indoc::indoc;
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
 use std::sync::Arc;
 
-use skg::test_utils::{empty_views_state, multi_root_view, single_root_view};
+use skg::test_utils::{mk_test_tcp_stream_pair, empty_views_state, multi_root_view, single_root_view};
 use skg::assert_metadata_eq;
 use skg::serve::ViewsState;
 use skg::serve::handlers::single_root_view::handle_single_root_view_request;

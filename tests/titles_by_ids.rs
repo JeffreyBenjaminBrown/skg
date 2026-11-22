@@ -1,5 +1,4 @@
 use crate::git_fixture_helpers::{commit_all, configure_git_user};
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::titles_by_gnids::{
   add_deleted_node_titles_by_gnids,
@@ -7,7 +6,7 @@ use skg::serve::handlers::titles_by_gnids::{
   handle_titles_by_gnids_request_with_skgrepo_set};
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::InRustGraph;
-use skg::test_utils::{IndexFolderForThisProcess, read_lp_message};
+use skg::test_utils::{mk_test_tcp_stream_pair, IndexFolderForThisProcess, read_lp_message};
 use skg::types::git::SkgrepoDiff;
 use skg::types::config::{SkgConfig, Skgrepo};
 use skg::types::misc::{ID, MSV, SkgrepoName, TantivyIndex, rel_partners_at_relRepo_msv};

@@ -5,7 +5,6 @@
 use crate::git_fixture::{
   Fixture, OwnedSkgrepos, graph_straddle, save_view, skg_files,
   with_git_fixture};
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 
 use skg::diff_view::change_leaves::LeafKey;
 use skg::metadata_canon::without_viewnode_ids;
@@ -22,6 +21,7 @@ use skg::diff_view::buffer_rerender::RenderedDiffViewBuffer;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::test_utils::{
+  mk_test_tcp_stream_pair,
   extract_string_field_from_sexp, skg_env_from_parts,
   update_from_and_rerender_buffer_test};
 use skg::test_utils::multi_root_view;

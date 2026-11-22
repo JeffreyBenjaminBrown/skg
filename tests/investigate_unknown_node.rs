@@ -6,7 +6,7 @@
 use skg::dbs::init::empty_in_ram_tantivy_index;
 use skg::serve::handlers::investigate_unknown_node::handle_investigate_unknown_node_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::{graph_handle_from_config, read_lp_message, skg_env_from_parts};
+use skg::test_utils::{mk_test_tcp_stream_pair, graph_handle_from_config, read_lp_message, skg_env_from_parts};
 use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::config::{SkgConfig, Skgrepo};
 use skg::types::misc::{SkgrepoName, TantivyIndex};
@@ -16,7 +16,6 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::io::BufReader;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

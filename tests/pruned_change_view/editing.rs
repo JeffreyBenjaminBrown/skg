@@ -10,11 +10,12 @@ use crate::pruned_change_view::common::{
   insert_after_line_starting, open_all_changes_buffer, save, viewforest_id_of,
   with_fixture, without_subtree_starting};
 use crate::git_fixture_helpers::{read_graphnode, without_lines_containing};
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 
 use skg::org_to_text::viewforest_to_string;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
+  save_ignoring_streamed_messages,
+  mk_test_tcp_stream_pair,
   extract_string_field_from_sexp, read_all_lp_messages,
   update_from_and_rerender_buffer_test};
 use skg::test_utils::multi_root_view;
@@ -254,10 +255,9 @@ fn a_diff_view_rerendered_as_collateral_draws_the_child_a_save_added (
       multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from ("n") ] ) ?;
     f . views_state . open_views . register_view (
       &f . graph . load_full (), view_of_n . clone (), tree, &pids, &SkgrepoRestriction::unrestricted (&f . config) );
-    let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
     let response : SaveResponse = block_on (
-      update_from_and_rerender_buffer_test (
-        &mut stream, &format! ("{}** new child\n", text),
+      save_ignoring_streamed_messages (
+        &format! ("{}** new child\n", text),
         &f . config, &f . tantivy, &f . graph,
         &Ok (view_of_n), &mut f . views_state )) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );

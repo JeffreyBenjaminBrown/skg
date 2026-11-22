@@ -10,13 +10,10 @@
 // nonempty hiddenInForkPartnerFolder.
 
 use std::error::Error;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
-use std::net::TcpStream;
 
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle};
-use skg::test_utils::{empty_views_state, run_with_test_stores, graph_handle_from_config};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, run_with_test_stores, graph_handle_from_config};
 use skg::test_utils::multi_root_view;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -33,10 +30,8 @@ async fn save (
   graph   : &InRustGraphHandle,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut views_state : ViewsState = empty_views_state ();
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  update_from_and_rerender_buffer (
-    &mut stream, buf, config, tantivy, graph,
+  save_ignoring_streamed_messages (
+    buf, config, tantivy, graph,
     &Err ( String::new () ), &mut views_state ) . await }
 
 fn subtree_for_node_in_folder (

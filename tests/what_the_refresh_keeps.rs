@@ -19,7 +19,6 @@ use std::io::BufReader;
 use std::net::TcpStream;
 
 use crate::git_fixture_helpers::without_lines_containing;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
@@ -29,6 +28,7 @@ use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
+  mk_test_tcp_stream_pair,
   empty_views_state,
   extract_string_field_from_sexp, graph_handle_from_config,
   read_all_lp_messages, run_with_shared_test_stores, skg_env_from_parts};

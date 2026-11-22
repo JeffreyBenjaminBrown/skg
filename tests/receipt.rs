@@ -13,7 +13,6 @@
 // forks 't' and already hides m4; 'g' forks 'u'; 'm2r' forks m2. The
 // note n is in no mailbox.
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
@@ -24,6 +23,7 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::receipt::handle_receipt_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
+  mk_test_tcp_stream_pair,
   empty_views_state,
   graph_handle_from_config, read_lp_message, run_with_shared_test_stores,
   single_root_view, skg_env_from_parts};

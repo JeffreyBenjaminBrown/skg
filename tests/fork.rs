@@ -9,7 +9,6 @@
 // forksFolder content read it), so it belongs among the
 // grouped_forks installers.
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use crate::view_and_save_helpers::node_from_disk;
 use std::error::Error;
 use std::net::TcpStream;
@@ -27,8 +26,7 @@ use skg::from_text::buffer_to_validated_saveplan_with_fork_skgrepos;
 use skg::org_to_text::viewforest_to_string;
 use skg::serve::ViewsState;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::{empty_views_state, graph_handle_from_config, run_with_shared_test_stores};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::test_utils::{save_ignoring_streamed_messages, mk_test_tcp_stream_pair, empty_views_state, graph_handle_from_config, run_with_shared_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_approval_test;
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_skgrepos_test;
 use skg::test_utils::single_root_view;
@@ -284,10 +282,8 @@ async fn reader_view_with_unread_list (
               line . contains ("(gnid t) (skgRepos (nodeRepo sender)) contentInPart (view") ),
     "the fresh view must draw t editable:\n{}", f_view );
   let editable : String = f_view . clone ();
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream, &editable, config, tantivy, graph,
+  let response = save_ignoring_streamed_messages (
+    &editable, config, tantivy, graph,
     &Ok (view_id . clone ()), views_state ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   let unread : Vec<&str> = subtree_of (&response . saved_view, "t");
@@ -345,10 +341,8 @@ async fn a_reply_under_an_unread_message_integrates_it (
       "the reply forks m1, which asks first: {:?}", asked . errors );
     assert_eq! ( members_of (& node_from_disk (config, "f") ? . contains),
                  vec! [ ID::from ("d") ], "an unapproved round files nothing" ); }
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream, &replied, config, tantivy, &graph,
+  let response = save_ignoring_streamed_messages (
+    &replied, config, tantivy, &graph,
     &Ok (view_id . clone ()), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   assert! ( response . warnings . is_empty (),
@@ -439,10 +433,8 @@ async fn a_headline_typed_under_the_foreign_forkee_itself_is_refused (
     config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
   let typed : String = with_child_typed_under (
     &unread_shown, "t", "(skg node (skgRepos (nodeRepo reader))) not a message" );
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let refusal : String = match update_from_and_rerender_buffer (
-    &mut stream, &typed, config, tantivy, &graph,
+  let refusal : String = match save_ignoring_streamed_messages (
+    &typed, config, tantivy, &graph,
     &Ok (view_id . clone ()), &mut views_state ) . await {
     Ok (response) => format! ("{:?}", response . errors),
     Err (error) => error . to_string (), };
@@ -470,10 +462,8 @@ async fn a_reply_deeper_in_an_unread_message_integrates_the_message (
   let unread_shown : String = reader_view_with_unread_list (
     config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
   let replied : String = with_child_typed_under (&unread_shown, "q1", "my answer");
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream, &replied, config, tantivy, &graph,
+  let response = save_ignoring_streamed_messages (
+    &replied, config, tantivy, &graph,
     &Ok (view_id . clone ()), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   let clone : Graphnode = clone_forking_on_disk (config, "q1") ?;
@@ -511,10 +501,8 @@ async fn a_third_partys_reply_in_anothers_unread_list_warns (
   let unread_shown : String = reader_view_with_unread_list (
     config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
   let replied : String = with_child_typed_under (&unread_shown, "m1", "a third party's reply");
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream, &replied, config, tantivy, &graph,
+  let response = save_ignoring_streamed_messages (
+    &replied, config, tantivy, &graph,
     &Ok (view_id . clone ()), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (), "{:?}", response . errors );
   assert_eq! ( clone_forking_on_disk (config, "m1") ? . home_skgrepo,
@@ -673,10 +661,8 @@ async fn fork_no_owned_ancestor_defaults (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = empty_views_state ();
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream, FORK_ROOT_BUFFER, config, tantivy, &graph,
+  let response = save_ignoring_streamed_messages (
+    FORK_ROOT_BUFFER, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "a fork with no owned ancestor must complete: {:?}", response . errors );
@@ -962,10 +948,8 @@ async fn forking_a_note_one_already_forks_is_refused (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = empty_views_state ();
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  update_from_and_rerender_buffer (
-    &mut stream, FORK_BUFFER, config, tantivy, &graph,
+  save_ignoring_streamed_messages (
+    FORK_BUFFER, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   let c1 : ID = clone_on_disk (config) ? . pid;
 
@@ -1058,10 +1042,8 @@ async fn fork_fixture_files (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = empty_views_state ();
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream, FORK_BUFFER, config, tantivy, &graph,
+  let response = save_ignoring_streamed_messages (
+    FORK_BUFFER, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "fork save must not error: {:?}", response . errors );
@@ -1096,10 +1078,8 @@ async fn fork_round_trip (
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = empty_views_state ();
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  update_from_and_rerender_buffer (
-    &mut stream, FORK_BUFFER, config, tantivy, &graph,
+  save_ignoring_streamed_messages (
+    FORK_BUFFER, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
 
   let clone_gnid : ID = clone_on_disk (config) ? . pid;
@@ -1147,11 +1127,9 @@ async fn fork_collateral_rerender_substitutes_too (
   views_state . open_views . register_view (
     &graph_snap, collateral_viewforest_id . clone (), p_view, &pids, &SkgrepoRestriction::unrestricted (config) );
 
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
   let buffer : String = FORK_BUFFER . replace ("P-container", "P-edited");
-  let response = update_from_and_rerender_buffer (
-    &mut stream, &buffer, config, tantivy, &graph,
+  let response = save_ignoring_streamed_messages (
+    &buffer, config, tantivy, &graph,
     &Ok (saved_viewforest_id), &mut views_state ) . await ?;
   assert! ( response . saved_view . contains ("(inPlaceOf N)"),
     "the saved view must substitute the clone:\n{}", response . saved_view );

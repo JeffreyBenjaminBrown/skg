@@ -14,7 +14,6 @@ use indoc::indoc;
 use std::collections::HashSet;
 use std::error::Error;
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::io::BufReader;
 use std::net::TcpStream;
 
@@ -28,7 +27,7 @@ use skg::serve::handlers::text_search::{
   MatchGroups, TitleOrAlias, build_search_viewforest, draw_search_buffer,
   handle_text_search_request};
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::{empty_views_state, extract_string_field_from_sexp, graph_handle_from_config,
+use skg::test_utils::{mk_test_tcp_stream_pair, empty_views_state, extract_string_field_from_sexp, graph_handle_from_config,
                       read_all_lp_messages, set_skgrepo_retagging_relRepos,
                       skg_env_from_parts};
 use skg::test_utils::run_with_shared_test_stores;

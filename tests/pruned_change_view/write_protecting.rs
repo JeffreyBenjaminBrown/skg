@@ -12,10 +12,9 @@ use crate::git_fixture::{Fixture, skg_files};
 use crate::pruned_change_view::common::{
   line_start_of, node_lines, open_all_changes_buffer, requesting_editable_at, save,
   with_fixture};
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::test_utils::update_from_and_rerender_buffer_test;
+use skg::test_utils::save_ignoring_streamed_messages;
 use skg::test_utils::multi_root_view;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::ID;
@@ -26,7 +25,6 @@ use ego_tree::Tree;
 use std::collections::BTreeMap;
 use futures::executor::block_on;
 use std::error::Error;
-use std::net::TcpStream;
 
 const N_UNDER_Y : &str = "** (skg node (gnid n) (skgRepos (nodeRepo main)) writeProtected ";
 
@@ -202,13 +200,11 @@ fn in_a_content_view_write_protecting_an_occurrence_with_content_saves (
               && ! text . lines () . next () . unwrap () . contains ("writeProtected")
               && node_lines (&text, "a") . len () == 1,
               "n must be the editable root, with a under it:\n{}", text );
-    let (mut stream, _read_end) : (TcpStream, TcpStream) =
-      mk_test_tcp_stream_pair ();
     let write_protected : String = text . replacen (
       "(skgRepos (nodeRepo main)) ", "(skgRepos (nodeRepo main)) writeProtected ", 1 );
     let response : SaveResponse = block_on (
-      update_from_and_rerender_buffer_test (
-        &mut stream, &write_protected,
+      save_ignoring_streamed_messages (
+        &write_protected,
         &f . config, &f . tantivy, &f . graph,
         &Ok (viewforest_id), &mut f . views_state )) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );

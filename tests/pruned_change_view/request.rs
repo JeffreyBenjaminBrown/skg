@@ -5,7 +5,6 @@
 // summary its save would. A rerender-all writes back the straddle it
 // brought up to date.
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use crate::git_fixture::{Fixture, edit_line, everything_written, save_view};
 use crate::pruned_change_view::common::{open_all_changes_buffer, with_fixture};
 
@@ -21,7 +20,7 @@ use skg::serve::handlers::close_view::handle_close_view_request;
 use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use skg::serve::handlers::diff_view::handle_diffView_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::{empty_views_state, graph_handle_from_config, skg_env_from_parts};
+use skg::test_utils::{mk_test_tcp_stream_pair, empty_views_state, graph_handle_from_config, skg_env_from_parts};
 use skg::types::env::SkgEnv;
 use skg::types::views_state::{DiffViewBufferKind, ViewforestId};
 

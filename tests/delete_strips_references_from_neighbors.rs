@@ -24,7 +24,6 @@ use indoc::indoc;
 use std::error::Error;
 use std::fs;
 use std::io::BufReader;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 use std::path::Path;
 
@@ -33,10 +32,9 @@ use skg::dbs::filesystem::one_node::{
   graphnode_from_pid_and_skgrepo as load_nc};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::save::update_graph_minus_nodeMerges;
-use skg::test_utils::{empty_views_state, run_with_shared_test_stores, graph_handle_from_config,
+use skg::test_utils::{save_ignoring_streamed_messages, mk_test_tcp_stream_pair, empty_views_state, run_with_shared_test_stores, graph_handle_from_config,
                       read_lp_message, extract_string_field_from_sexp,
                       skg_env_from_parts};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::serve::handlers::delete_references_to_absent_node::
   handle_delete_references_to_absent_node_request;
@@ -216,14 +214,12 @@ async fn delete_preserves_foreign_referencer (
   let foreign_before : Vec<u8> = fs::read (&foreign_path) ?;
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = empty_views_state ();
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
   let input_org_text : &str = indoc! {"
     * (skg node (gnid cheese) (skgRepos (nodeRepo foreign))) cheese
     ** (skg node (gnid victim) (skgRepos (nodeRepo owned)) (editRequest delete)) victim
   "};
-  let response = update_from_and_rerender_buffer (
-    &mut stream, input_org_text, config, tantivy, &graph,
+  let response = save_ignoring_streamed_messages (
+    input_org_text, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   let saved_root : &str = response . saved_view . lines () . next ()
     . ok_or ("the saved view must not be empty") ?;
@@ -257,13 +253,11 @@ async fn delete_in_foreign_forkee_rerenders_as_unknown (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = empty_views_state ();
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response = update_from_and_rerender_buffer (
+  let response = save_ignoring_streamed_messages (
     // A member of a forks folder ignores a delete request (a member
     // as such saves only its title and body), so the victim is deleted
     // as a root of its own.
-    &mut stream, indoc! {"
+    indoc! {"
       * (skg node (gnid forker) (skgRepos (nodeRepo foreign))) foreign forker
       ** (skg forksFolder)
       *** (skg node (gnid victim) (skgRepos (nodeRepo owned)) noClaim writeProtected) victim
@@ -289,10 +283,8 @@ async fn delete_in_foreign_hiddenoutside_rerenders_as_unknown (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = empty_views_state ();
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream, indoc! {"
+  let response = save_ignoring_streamed_messages (
+    indoc! {"
       * (skg node (gnid hide-forker) (skgRepos (nodeRepo foreign))) foreign hide forker
       ** (skg forksFolder)
       *** (skg node (gnid hide-forkee) (skgRepos (nodeRepo foreign))) foreign hide forkee
@@ -330,10 +322,7 @@ async fn delete_strips_references_impl (
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = empty_views_state ();
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let _response = update_from_and_rerender_buffer (
-    &mut stream,
+  let _response = save_ignoring_streamed_messages (
     input_org_text, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
 
@@ -477,10 +466,7 @@ async fn strip_pass_handles_extra_ids_impl (
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = empty_views_state ();
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let _response = update_from_and_rerender_buffer (
-    &mut stream,
+  let _response = save_ignoring_streamed_messages (
     input_org_text, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
   let main       : SkgrepoName = SkgrepoName::from ("main");

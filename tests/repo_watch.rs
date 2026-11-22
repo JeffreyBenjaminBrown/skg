@@ -18,6 +18,7 @@ use skg::serve::handlers::save_buffer::handle_save_buffer_request;
 use skg::serve::handlers::single_root_view::handle_single_root_view_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
+  mk_test_tcp_stream_pair,
   copy_dir_all, extract_string_field_from_sexp, graph_handle_from_config,
   load_config_with_overrides, read_all_lp_messages, skg_env_from_parts};
 use skg::dbs::init::create_empty_tantivy_index;
@@ -26,7 +27,6 @@ use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
 
 use crate::save_handler_helpers::new_connection;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::error::Error;
 use std::fs;
 use std::io::{BufReader, Write};

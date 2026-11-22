@@ -13,13 +13,12 @@ use skg::serve::handlers::rebuild_session_lifetime_stores::rebuild_session_lifet
 use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use skg::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::{extract_string_field_from_sexp, read_all_lp_messages};
+use skg::test_utils::{mk_test_tcp_stream_pair, extract_string_field_from_sexp, read_all_lp_messages};
 use skg::types::views_state::ViewforestId;
 
 use crate::save_handler_helpers::{
   Fixture, errors_of, fixture_from, left_as_the_graph_has_it, new_connection,
   open_view, save, saved};
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::fs;

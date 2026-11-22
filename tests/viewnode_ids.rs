@@ -9,7 +9,6 @@
 // view of a shows p in a's containers folder, b and c as members, and
 // c's forks folder holding d.
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
@@ -17,6 +16,8 @@ use skg::metadata_canon::{viewnode_id_atom_of, without_viewnode_ids};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
+  save_ignoring_streamed_messages,
+  mk_test_tcp_stream_pair,
   empty_views_state,
   extract_string_field_from_sexp, graph_handle_from_config,
   read_all_lp_messages, run_with_test_stores};
@@ -352,9 +353,8 @@ async fn a_view_not_held_carrying_a_huge_viewnode_id_is_refused (
     & b_line . replacen ( viewnode_id_atom_of (b_line) . unwrap (),
                           &format! ("(vnid {})", huge), 1 ),
     1 );
-  let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
-  let refused = update_from_and_rerender_buffer (
-    &mut stream, &edited, config, tantivy, &graph,
+  let refused = save_ignoring_streamed_messages (
+    &edited, config, tantivy, &graph,
     &Ok ( ViewforestId::ContentView (VIEW_OF_A . to_string ()) ),
     &mut empty_views_state () ) . await;
   let message : String = match refused {

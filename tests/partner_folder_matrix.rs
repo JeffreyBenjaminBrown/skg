@@ -24,15 +24,13 @@
 
 use skg::metadata_canon::without_viewnode_ids;
 use std::error::Error;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
-use std::net::TcpStream;
 
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{run_with_skgrepo_set_test_db, save_added_forks};
 use skg::types::misc::SkgrepoName;
 use skg::test_utils::graph_handle_from_config;
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::test_utils::{
+  save_ignoring_streamed_messages,
   empty_views_state,
   multi_root_view, multi_root_view_with_skgrepo_set};
 use skg::serve::ViewsState;
@@ -121,10 +119,8 @@ async fn save (
   graph   : &InRustGraphHandle,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut views_state : ViewsState = empty_views_state ();
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  update_from_and_rerender_buffer (
-    &mut stream, buf, config, tantivy, graph,
+  save_ignoring_streamed_messages (
+    buf, config, tantivy, graph,
     // The saved view's ID.
     &Ok ( ViewforestId::ContentView ("matrix view" . to_string ()) ),
     &mut views_state ) . await }

@@ -5,7 +5,6 @@
 // 'tests/grouped_forks.rs' for the fixpoint in 'tests/idempotence.rs'.
 
 use crate::git_fixture_helpers::setup_gitrepo_with_fixtures;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::init::create_empty_tantivy_index;
@@ -19,10 +18,11 @@ use skg::serve::handlers::save_buffer::{
 use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
+  save_ignoring_streamed_messages,
+  mk_test_tcp_stream_pair,
   empty_views_state,
   cleanup_test_tantivy, copy_dir_all, extract_string_field_from_sexp,
-  graph_handle_from_config, read_all_lp_messages, skg_env_from_parts,
-  update_from_and_rerender_buffer_test};
+  graph_handle_from_config, read_all_lp_messages, skg_env_from_parts};
 use skg::test_utils::multi_root_view_with_skgrepo_set;
 use skg::types::env::SkgEnv;
 use skg::types::config::{SkgConfig, Skgrepo};
@@ -132,10 +132,8 @@ pub fn save_view (
   viewforest_id : &ViewforestId,
   text    : &str,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  Ok ( block_on ( update_from_and_rerender_buffer_test (
-    &mut stream, text, &f . config, &f . tantivy, &f . graph,
+  Ok ( block_on ( save_ignoring_streamed_messages (
+    text, &f . config, &f . tantivy, &f . graph,
     &Ok ( viewforest_id . clone () ), &mut f . views_state )) ? ) }
 
 /// Save 'text' as the view 'viewforest_id'; it must save without errors.

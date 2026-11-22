@@ -1,6 +1,5 @@
 use std::error::Error;
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::fs;
 use std::io::BufReader;
 
@@ -10,6 +9,7 @@ use skg::dbs::node_lookup::graphnode_from_graph;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::ClientViewSnapshot;
 use skg::test_utils::{
+  mk_test_tcp_stream_pair,
   empty_views_state,
   extract_string_field_from_sexp, graph_handle_from_config,
   read_all_lp_messages, run_with_test_stores,

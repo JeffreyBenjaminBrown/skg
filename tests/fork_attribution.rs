@@ -8,7 +8,6 @@
 // the save. The git facts (remote hash, commit) are in
 // 'tests/unit/attribution.rs'.
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::error::Error;
 use std::net::TcpStream;
 
@@ -18,8 +17,7 @@ use std::collections::HashMap;
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::test_utils::{empty_views_state, graph_handle_from_config, run_with_shared_test_stores, single_root_view};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::test_utils::{save_ignoring_streamed_messages, mk_test_tcp_stream_pair, empty_views_state, graph_handle_from_config, run_with_shared_test_stores, single_root_view};
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_skgrepos_test;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
@@ -152,9 +150,8 @@ async fn a_plain_child_of_an_attributed_fork_says_its_home (
   let clone_line : &str = line_naming (&p_view, &clone . pid);
   let buffer : String = p_view . replacen (
     clone_line, &format! ( "{}\n*** plain child", clone_line ), 1 );
-  let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream, &buffer, config, tantivy, &graph,
+  let response = save_ignoring_streamed_messages (
+    &buffer, config, tantivy, &graph,
     &Err ( String::new () ), &mut empty_views_state () ) . await ?;
   assert! ( response . errors . is_empty (), "the child must save: {:?}", response . errors );
   let child_line : &str = response . saved_view . lines ()
@@ -181,9 +178,8 @@ async fn stripping_an_attribution_removes_it_and_its_herald (
     "(skgRepos (nodeRepo owned)) (editRequest stripAttribution)", 1 );
   assert_ne! ( stripped_line, clone_line, "the request is written:\n{}", clone_line );
   let buffer : String = p_view . replacen (clone_line, &stripped_line, 1);
-  let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream, &buffer, config, tantivy, &graph,
+  let response = save_ignoring_streamed_messages (
+    &buffer, config, tantivy, &graph,
     &Err ( String::new () ), &mut empty_views_state () ) . await ?;
   assert! ( response . errors . is_empty (), "the strip must save: {:?}", response . errors );
   let after : Graphnode = fork_of (config, "N") ?;

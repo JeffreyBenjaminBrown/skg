@@ -13,11 +13,8 @@
 
 use indoc::indoc;
 use std::error::Error;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
-use std::net::TcpStream;
 
-use skg::test_utils::{empty_views_state, run_with_shared_test_stores, graph_handle_from_config};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, run_with_shared_test_stores, graph_handle_from_config};
 use skg::serve::ViewsState;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
@@ -61,10 +58,7 @@ async fn empty_forks_folder_persists_impl (
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = empty_views_state ();
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream,
+  let response = save_ignoring_streamed_messages (
     input_org_text, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
 
@@ -104,10 +98,7 @@ async fn empty_hider_folder_removed_impl (
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = empty_views_state ();
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream,
+  let response = save_ignoring_streamed_messages (
     input_org_text, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
 

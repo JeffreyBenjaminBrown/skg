@@ -18,6 +18,7 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::{
   SaveResponse, update_from_and_rerender_buffer_with_approvals};
 use skg::test_utils::{
+  mk_test_tcp_stream_pair,
   empty_views_state,
   cleanup_test_tantivy, copy_dir_all, extract_string_field_from_sexp,
   read_all_lp_messages, skg_env_from_parts};
@@ -34,7 +35,6 @@ use futures::executor::block_on;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::io::BufReader;
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 use std::path::Path;
 use tempfile::TempDir;

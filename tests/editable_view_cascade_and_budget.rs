@@ -4,10 +4,8 @@
 // These tests verify that when a node has a "Editable" view request,
 // its content children are extended from disk using BFS with truncation.
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use indoc::indoc;
 use std::error::Error;
-use std::net::TcpStream;
 
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::{
@@ -15,8 +13,7 @@ use skg::dbs::in_rust_graph::{
   };
 use skg::assert_metadata_eq;
 use skg::metadata_canon::{viewnode_id_atom_of, with_viewnode_id_atom, without_viewnode_ids};
-use skg::test_utils::{empty_views_state, run_with_test_stores, graph_handle_from_config};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, run_with_test_stores, graph_handle_from_config};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::org_to_text::viewforest_to_string;
@@ -195,10 +192,7 @@ async fn test_editable_view_ample_budget (
           (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = empty_views_state ();
-        let (mut stream, _read_end) : (TcpStream, TcpStream) =
-          mk_test_tcp_stream_pair ();
-        let response = update_from_and_rerender_buffer (
-          &mut stream,
+        let response = save_ignoring_streamed_messages (
           input_org_text, &config, tantivy, &graph,
 
           &Err ( String::new () ), &mut views_state ) . await ?;
@@ -262,10 +256,7 @@ async fn test_editable_view_limit_5_or_6 (
           (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = empty_views_state ();
-        let (mut stream, _read_end) : (TcpStream, TcpStream) =
-          mk_test_tcp_stream_pair ();
-        let response_5 = update_from_and_rerender_buffer (
-          &mut stream,
+        let response_5 = save_ignoring_streamed_messages (
           input_org_text, &config5, tantivy, &graph,
 
           &Err ( String::new () ), &mut views_state ) . await ?;
@@ -277,10 +268,7 @@ async fn test_editable_view_limit_5_or_6 (
           (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = empty_views_state ();
-        let (mut stream, _read_end) : (TcpStream, TcpStream) =
-          mk_test_tcp_stream_pair ();
-        let response_6 = update_from_and_rerender_buffer (
-          &mut stream,
+        let response_6 = save_ignoring_streamed_messages (
           input_org_text, &config6, tantivy, &graph,
 
           &Err ( String::new () ), &mut views_state ) . await ?;
@@ -363,10 +351,7 @@ async fn test_editable_view_limit_1_to_4 (
           (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = empty_views_state ();
-        let (mut stream, _read_end) : (TcpStream, TcpStream) =
-          mk_test_tcp_stream_pair ();
-        let response_1 = update_from_and_rerender_buffer (
-          &mut stream,
+        let response_1 = save_ignoring_streamed_messages (
           input_org_text, &config1, tantivy, &graph,
           &Err ( String::new () ), &mut views_state ) . await ?;
         response_1 . saved_view };
@@ -377,10 +362,7 @@ async fn test_editable_view_limit_1_to_4 (
           (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = empty_views_state ();
-        let (mut stream, _read_end) : (TcpStream, TcpStream) =
-          mk_test_tcp_stream_pair ();
-        let response_4 = update_from_and_rerender_buffer (
-          &mut stream,
+        let response_4 = save_ignoring_streamed_messages (
           input_org_text, &config4, tantivy, &graph,
           &Err ( String::new () ), &mut views_state ) . await ?;
         response_4 . saved_view };
@@ -442,10 +424,7 @@ async fn test_editable_view_conflicting (
           (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = empty_views_state ();
-        let (mut stream, _read_end) : (TcpStream, TcpStream) =
-          mk_test_tcp_stream_pair ();
-        let response = update_from_and_rerender_buffer (
-          &mut stream,
+        let response = save_ignoring_streamed_messages (
           input_org_text, &config, tantivy, &graph,
           &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
@@ -495,10 +474,7 @@ async fn test_editable_view_with_cycle (
           (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = empty_views_state ();
-        let (mut stream, _read_end) : (TcpStream, TcpStream) =
-          mk_test_tcp_stream_pair ();
-        let response = update_from_and_rerender_buffer (
-          &mut stream,
+        let response = save_ignoring_streamed_messages (
           input_org_text, &config, tantivy, &graph,
           &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
@@ -541,10 +517,7 @@ async fn test_editable_view_with_repeat (
           (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = empty_views_state ();
-        let (mut stream, _read_end) : (TcpStream, TcpStream) =
-          mk_test_tcp_stream_pair ();
-        let response = update_from_and_rerender_buffer (
-          &mut stream,
+        let response = save_ignoring_streamed_messages (
           input_org_text, &config, tantivy, &graph,
           &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
@@ -596,10 +569,7 @@ async fn test_editable_view_request_cleared (
           (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = empty_views_state ();
-        let (mut stream, _read_end) : (TcpStream, TcpStream) =
-          mk_test_tcp_stream_pair ();
-        let response = update_from_and_rerender_buffer (
-          &mut stream,
+        let response = save_ignoring_streamed_messages (
           input_org_text, &config, tantivy, &graph,
           &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
@@ -716,10 +686,8 @@ async fn test_editable_view_request_on_an_editable_node (
       let result : String = {
         let mut config : SkgConfig = config . clone ();
         config . initial_node_limit = 3;
-        let (mut stream, _read_end) : (TcpStream, TcpStream) =
-          mk_test_tcp_stream_pair ();
-        let response : SaveResponse = update_from_and_rerender_buffer (
-          &mut stream, &requested, &config, tantivy, &graph,
+        let response : SaveResponse = save_ignoring_streamed_messages (
+          &requested, &config, tantivy, &graph,
           &Ok (viewforest_id), &mut views_state ) . await ?;
         assert! ( response . errors . is_empty (),
                   "the request must save, got {:?}", response . errors );
@@ -766,10 +734,8 @@ async fn test_editable_view_request_moves_editability_back (
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["1", "12"] ) ?;
       let mut save = async | buffer : &str | -> Result<String, Box<dyn Error>> {
-        let (mut stream, _read_end) : (TcpStream, TcpStream) =
-          mk_test_tcp_stream_pair ();
-        let response : SaveResponse = update_from_and_rerender_buffer (
-          &mut stream, buffer, &config, tantivy, &graph,
+        let response : SaveResponse = save_ignoring_streamed_messages (
+          buffer, &config, tantivy, &graph,
           &Ok (viewforest_id . clone ()), &mut views_state ) . await ?;
         assert! ( response . errors . is_empty (),
                   "the buffer must save, got {:?}\n\nbuffer:\n{}",
@@ -848,10 +814,7 @@ async fn test_budget_aliasfolder_is_neutral (
           (
             graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = empty_views_state ();
-        let (mut stream, _read_end) : (TcpStream, TcpStream) =
-          mk_test_tcp_stream_pair ();
-        let response = update_from_and_rerender_buffer (
-          &mut stream,
+        let response = save_ignoring_streamed_messages (
           input_org_text, &config, tantivy, &graph,
           &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
@@ -880,10 +843,8 @@ async fn save_view (
   viewforest_id : &ViewforestId,
   views_state : &mut ViewsState,
 ) -> Result<String, Box<dyn Error>> {
-  let (mut stream, _read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response : SaveResponse = update_from_and_rerender_buffer (
-    &mut stream, buffer, config, tantivy, graph,
+  let response : SaveResponse = save_ignoring_streamed_messages (
+    buffer, config, tantivy, graph,
     &Ok (viewforest_id . clone ()), views_state ) . await ?;
   assert! ( response . errors . is_empty (),
             "the buffer must save, got {:?}\n\nbuffer:\n{}",
@@ -1202,10 +1163,8 @@ async fn test_a_request_claimed_elsewhere_leaves_no_member (
       let mut saved : Vec<String> = Vec::new ();
       for buffer_index in 0 .. 2 {
         let buffer : &str = if buffer_index == 0 { input } else { &saved [0] };
-        let (mut stream, _read_end) : (TcpStream, TcpStream) =
-          mk_test_tcp_stream_pair ();
-        let response : SaveResponse = update_from_and_rerender_buffer (
-          &mut stream, buffer, &config, tantivy, &graph,
+        let response : SaveResponse = save_ignoring_streamed_messages (
+          buffer, &config, tantivy, &graph,
           &Err ( String::new () ), &mut views_state ) . await ?;
         assert! ( response . errors . is_empty (),
                   "the buffer must save, got {:?}\n\nbuffer:\n{}",

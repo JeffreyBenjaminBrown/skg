@@ -1,6 +1,5 @@
 // cargo nextest run --test grouped_forks -E 'test(collateral_repo_move::)'
 
-use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use futures::executor::block_on;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
@@ -13,6 +12,8 @@ use skg::dbs::in_rust_graph::{
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
+  save_ignoring_streamed_messages,
+  mk_test_tcp_stream_pair,
   empty_views_state,
   cleanup_test_tantivy,
   copy_dir_all,
@@ -157,9 +158,8 @@ fn successful_save_consumes_relRepo_edit_request (
       "fixture rendering should expose b's unrestricted-node metadata");
 
     let mut views_state : ViewsState = empty_views_state ();
-    let (mut stream, _read_end) = mk_test_tcp_stream_pair ();
-    let response : SaveResponse = update_from_and_rerender_buffer (
-      &mut stream, &save_input, &config, &tantivy, &graph,
+    let response : SaveResponse = save_ignoring_streamed_messages (
+      &save_input, &config, &tantivy, &graph,
       &Err (String::new ()), &mut views_state ) . await ?;
     assert! (response . errors . is_empty (),
       "relRepo save should succeed: {:?}", response . errors);
