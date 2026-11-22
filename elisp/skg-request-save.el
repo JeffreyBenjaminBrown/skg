@@ -273,19 +273,41 @@ accept."
              `((view-id ,skg-view-id) (dirty false)))
            result))))))
 
+(defconst skg--save-response-types-not-one-shot
+  '(save-relax-lock collateral-view
+    fork-confirmation strandeds-confirmation delete-from-confirmation
+    telescope-hoist-confirmation overPrivateText-telescope-confirmation)
+  "The response types `skg--send-save-buffer' registers without ONE-SHOT:
+the streamed ones, which can fire any number of times, and the
+alternatives to save-result, which the server sends instead of it. The
+dispatcher never removes these, so the message that ends the save does.
+The other two, save-lock and save-result, are one-shot.")
+
 (defun skg--cancel-locally-failed-save ()
   "Unwind handlers, pending counts, stream state and locks after local failure."
   (dolist (response-type '(save-lock save-result))
     (when (assoc response-type skg-response-handler-map)
       (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count)))))
   (dolist (response-type
-           '(save-lock save-relax-lock collateral-view save-result
-             fork-confirmation strandeds-confirmation
-             delete-from-confirmation
-             telescope-hoist-confirmation
-             overPrivateText-telescope-confirmation))
+           (append '(save-lock save-result)
+                   skg--save-response-types-not-one-shot))
     (setq skg-response-handler-map
           (assoc-delete-all response-type skg-response-handler-map)))
+  (skg--end-stream)
+  (skg--unlock-all-save-locked))
+
+(defun skg--end-save-without-save-result ()
+  "End a save that an alternative to save-result ended (a confirmation
+message): remove the save's handlers, end the stream, and unlock."
+  (dolist (response-type skg--save-response-types-not-one-shot)
+    (setq skg-response-handler-map
+          (assoc-delete-all response-type skg-response-handler-map)))
+  (when (assoc 'save-result skg-response-handler-map)
+    ;; save-result was registered one-shot but will never fire; remove it
+    ;; and decrement the pending count it bumped, or the next save hangs.
+    (setq skg-response-handler-map
+          (assoc-delete-all 'save-result skg-response-handler-map))
+    (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count))))
   (skg--end-stream)
   (skg--unlock-all-save-locked))
 
@@ -653,24 +675,11 @@ then processes the save response.
 Unlock must happen before `skg-handle-save-sexp' because
 `skg-replace-buffer-with-new-content' calls erase-buffer + insert,
 which would trigger overlay modification-hooks if still present."
-  (setq skg-response-handler-map
-        (assoc-delete-all 'collateral-view skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'save-relax-lock skg-response-handler-map))
-  ;; The fork-confirmation alternative did not fire; drop it. It is
+  ;; The alternatives to save-result did not fire; drop them. They are
   ;; non-one-shot, so no pending-count adjustment is needed.
-  (setq skg-response-handler-map
-        (assoc-delete-all 'fork-confirmation skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'strandeds-confirmation skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'delete-from-confirmation skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'telescope-hoist-confirmation
-                          skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'overPrivateText-telescope-confirmation
-                          skg-response-handler-map))
+  (dolist (response-type skg--save-response-types-not-one-shot)
+    (setq skg-response-handler-map
+          (assoc-delete-all response-type skg-response-handler-map)))
   (skg--end-stream)
   (unwind-protect
       (progn
@@ -799,30 +808,7 @@ and the unfired save-result one-shot (decrementing the pending count for
 it), end the stream, and unlock. STRANDEDS-REVIEW and DELETE-FROM are the
 review and the delete-from choice the save carried, which the approving
 re-save carries again."
-  (setq skg-response-handler-map
-        (assoc-delete-all 'collateral-view skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'save-relax-lock skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'fork-confirmation skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'strandeds-confirmation skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'delete-from-confirmation skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'telescope-hoist-confirmation
-                          skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'overPrivateText-telescope-confirmation
-                          skg-response-handler-map))
-  (when (assoc 'save-result skg-response-handler-map)
-    ;; save-result was registered one-shot but will never fire; remove it
-    ;; and decrement the pending count it bumped, or the next save hangs.
-    (setq skg-response-handler-map
-          (assoc-delete-all 'save-result skg-response-handler-map))
-    (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count))))
-  (skg--end-stream)
-  (skg--unlock-all-save-locked)
+  (skg--end-save-without-save-result)
   (let ((confirm-buf
          ;; The condition-case guards only response parsing/display.
          ;; The interactive flow below runs outside it: a refusal
@@ -870,19 +856,7 @@ skgrepo restriction keeps out name a graphnode the save deletes, and
 nothing was skgsave-committed. Ask \"Delete from: (c)ancel, (v)isible
 records only, (a)ll owned records\", and re-issue the same save with the
 choice, carrying the other approvals along. Cancel saves nothing."
-  (dolist (response-type
-           '(collateral-view save-relax-lock fork-confirmation
-             strandeds-confirmation delete-from-confirmation
-             telescope-hoist-confirmation
-             overPrivateText-telescope-confirmation))
-    (setq skg-response-handler-map
-          (assoc-delete-all response-type skg-response-handler-map)))
-  (when (assoc 'save-result skg-response-handler-map)
-    (setq skg-response-handler-map
-          (assoc-delete-all 'save-result skg-response-handler-map))
-    (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count))))
-  (skg--end-stream)
-  (skg--unlock-all-save-locked)
+  (skg--end-save-without-save-result)
   (condition-case err
       (let* ((response (read payload))
              (count (cadr (assoc 'count response)))
@@ -928,19 +902,7 @@ prompt: \"visible\" for ?v, \"all\" for ?a, nil (cancel) otherwise."
 skgrepo moves would strand the relationships it lists, and nothing was
 skgsave-committed. Show them, ask which to reset to default, and re-issue the
 same save with that review, carrying the other approvals along."
-  (dolist (response-type
-           '(collateral-view save-relax-lock fork-confirmation
-             strandeds-confirmation delete-from-confirmation
-             telescope-hoist-confirmation
-             overPrivateText-telescope-confirmation))
-    (setq skg-response-handler-map
-          (assoc-delete-all response-type skg-response-handler-map)))
-  (when (assoc 'save-result skg-response-handler-map)
-    (setq skg-response-handler-map
-          (assoc-delete-all 'save-result skg-response-handler-map))
-    (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count))))
-  (skg--end-stream)
-  (skg--unlock-all-save-locked)
+  (skg--end-save-without-save-result)
   (condition-case err
       (let* ((response (read payload))
              (strandeds (skg--strandeds-from-response response))
@@ -1035,28 +997,7 @@ the exact candidate PIDs; on Abort, leave the buffer and every .skg file
 untouched.  FORK-APPROVED and FORK-REPOS survive if this challenge arose
 on a retry that had already received fork authority, STRANDEDS-REVIEW
 if it had already been reviewed, and DELETE-FROM if it had been chosen."
-  (setq skg-response-handler-map
-        (assoc-delete-all 'collateral-view skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'strandeds-confirmation skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'delete-from-confirmation skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'save-relax-lock skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'fork-confirmation skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'telescope-hoist-confirmation
-                          skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'overPrivateText-telescope-confirmation
-                          skg-response-handler-map))
-  (when (assoc 'save-result skg-response-handler-map)
-    (setq skg-response-handler-map
-          (assoc-delete-all 'save-result skg-response-handler-map))
-    (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count))))
-  (skg--end-stream)
-  (skg--unlock-all-save-locked)
+  (skg--end-save-without-save-result)
   (condition-case err
       (let* ((response (read payload))
              (telescopes (cadr (assoc 'telescopes response)))
@@ -1095,18 +1036,7 @@ since it would apply a second time (creating a new root of the view
 again, or refused because a container it gave a new child would be an
 edited stale graphnode).
 Declining leaves the buffers as they are."
-  (dolist (response-type
-           '(collateral-view save-relax-lock fork-confirmation
-             strandeds-confirmation delete-from-confirmation
-             telescope-hoist-confirmation overPrivateText-telescope-confirmation))
-    (setq skg-response-handler-map
-          (assoc-delete-all response-type skg-response-handler-map)))
-  (when (assoc 'save-result skg-response-handler-map)
-    (setq skg-response-handler-map
-          (assoc-delete-all 'save-result skg-response-handler-map))
-    (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count))))
-  (skg--end-stream)
-  (skg--unlock-all-save-locked)
+  (skg--end-save-without-save-result)
   (condition-case err
       (let* ((response (read payload))
              (approved-pids
