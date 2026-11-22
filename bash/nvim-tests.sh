@@ -69,8 +69,11 @@ fi
 echo -e "${YELLOW}Running tests...${NC}"
 
 # PlenaryBustedDirectory spawns one child nvim per spec file and exits
-# nonzero if any spec fails.
-if skg_low_priority "$NVIM_CMD" --headless \
+# nonzero if any spec fails. '-i NONE' here, and 'shadafile' in
+# minimal_init.lua for the children, keep every test nvim off the
+# user's ShaDa file: test runs at once would otherwise write it
+# concurrently and could truncate it.
+if skg_low_priority "$NVIM_CMD" --headless -i NONE \
      -c "PlenaryBustedDirectory $TEST_DIR {minimal_init = '$TEST_DIR/minimal_init.lua'}" \
      2>&1; then
     echo -e "${GREEN}All tests passed!${NC}"

@@ -13,6 +13,9 @@ vim.cmd('packloadall!')
 -- Many spec processes run concurrently; swap files only cause
 -- spurious E303s for their throwaway buffers.
 vim.o.swapfile = false
+-- Nor do they read or write the user's ShaDa file, which concurrent
+-- writers can truncate (the parent nvim gets '-i NONE').
+vim.o.shadafile = 'NONE'
 
 ---Where the skgrepo lives, for specs that need fixtures.
 ---@return string
