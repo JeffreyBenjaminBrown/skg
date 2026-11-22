@@ -214,10 +214,7 @@ and acts on the atoms only when a save redraws the buffer."
       (test-fail "Y should stand in N's own content"))
     (message "✓ PASS [phase 3]: T is a mutual, first, and Y is N's")))
 
-(let ((test-port (getenv "SKG_TEST_PORT")))
-  (when test-port
-    (setq skg-port (string-to-number test-port))
-    (message "Using test port: %d" skg-port)))
+(skg-test-use-test-port)
 
 (run-at-time 60 nil (lambda ()
                       (message "TIMEOUT: Integration test timed out!")

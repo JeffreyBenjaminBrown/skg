@@ -38,8 +38,7 @@ Fails the test if it is not found."
 (defun integration-test-fork-owned ()
   "Drive the explicit fork: dirty-refusal, approve, and decline."
   (message "Starting explicit-fork integration test...")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port (setq skg-port (string-to-number test-port))))
+  (skg-test-use-test-port)
 
   ;; 1. Open the owned container Q; its content is the owned node M.
   (skg-request-single-root-content-view-from-id "Q")

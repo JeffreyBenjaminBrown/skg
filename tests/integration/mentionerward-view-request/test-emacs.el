@@ -70,9 +70,7 @@ LINE-NUMBER is zero-based."
 
 (defun run-mentionerward-view-test ()
   (message "=== SKG Mentionerward View Request Integration Test ===")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))))
+  (skg-test-use-test-port)
 
   (let ((expected-line0
          (concat "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2))))) 1\n"

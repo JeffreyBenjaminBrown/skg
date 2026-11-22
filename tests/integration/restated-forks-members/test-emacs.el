@@ -45,8 +45,7 @@
 (defconst restated-body "A long body\nthat its forks restate.")
 
 (defun run-test ()
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port (setq skg-port (string-to-number test-port))))
+  (skg-test-use-test-port)
   (message "=== PHASE 1: F's view ===")
   (skg-request-single-root-content-view-from-id "F")
   (let ((buffer (skg-test-wait-for-buffer "*Same words*" 15)))

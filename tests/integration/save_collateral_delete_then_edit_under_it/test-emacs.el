@@ -316,11 +316,7 @@ the headline carries (skgRepos (nodeRepo main))."
   "Main orchestrator."
   (message "=== SKG Collateral Delete Then Edit Under It Integration Test ===")
 
-  ;; Set the port from environment variable if available
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
+  (skg-test-use-test-port)
 
   (phase-1-open-buffer-1)
   (phase-2-extend-buffer-1-with-second-root-and-alias)

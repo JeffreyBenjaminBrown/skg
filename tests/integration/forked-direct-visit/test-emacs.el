@@ -15,10 +15,7 @@
 (defun integration-test-forked-direct-visit ()
   "Keep same-title raw views distinct, then revisit Z."
   (message "Starting forked direct-visit integration test...")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
+  (skg-test-use-test-port)
   (let (public-buf cheese-buf reopened-public)
     (skg-request-single-root-content-view-from-id "Z")
     (setq public-buf

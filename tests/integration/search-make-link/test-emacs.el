@@ -124,10 +124,7 @@ line's trailing newline."
 
 (defun run-test ()
   (message "=== SKG search-make-link blank-line Integration Test ===")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
+  (skg-test-use-test-port)
   (let* ((source-buf (open-parent-content-view))
          (_pos (park-point-on-blank-line-between-headlines source-buf)))
     (invoke-search-make-link "target")

@@ -13,10 +13,7 @@
 
 (defun run-all-tests ()
   (message "=== SKG Root-Folded-Save Integration Test ===")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
+  (skg-test-use-test-port)
   (test-root-folded-save)
   (let ((timeout 0))
     (while (and (not integration-test-completed) (< timeout 100))

@@ -12,11 +12,7 @@
   "Integration test for verify connection functionality."
   (message "Starting integration test...")
 
-  ;; Set the port from environment variable if available
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
+  (skg-test-use-test-port)
 
   ;; Send the request using the standard function
   (skg-connection-verify)

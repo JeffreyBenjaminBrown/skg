@@ -33,10 +33,7 @@
 (defun integration-test-search-buffer ()
   (message "=== SKG Search In One Message Integration Test ===")
 
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
+  (skg-test-use-test-port)
 
   (message "=== search for 'bravo' ===")
   (skg--request-text-search "bravo" nil nil nil)

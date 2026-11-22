@@ -56,10 +56,7 @@
 
 (defun run-test ()
   (message "=== SKG content-view-from-non-root Integration Test ===")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
+  (skg-test-use-test-port)
   (let ((buf (open-child-content-view)))
     (verify-ancestry-prepended buf))
   (message "✓ PASS: Integration test successful!")

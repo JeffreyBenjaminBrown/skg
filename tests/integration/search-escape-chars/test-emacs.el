@@ -34,10 +34,7 @@
 (defun integration-test-escape-chars ()
   "Run each of the three escape-character literal searches."
   (message "=== SKG Search Escape-Chars Integration Test ===")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
+  (skg-test-use-test-port)
   (test-one-escape-query "C++ tips"     "c_plus")
   (test-one-escape-query "[draft] plan" "brackets")
   (test-one-escape-query "cat:dog"      "colons")

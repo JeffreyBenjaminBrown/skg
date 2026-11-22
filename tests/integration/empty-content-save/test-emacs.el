@@ -12,9 +12,7 @@
   (kill-emacs 1))
 
 (defun run-empty-content-save-test ()
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))))
+  (skg-test-use-test-port)
 
   ;; Ensure we start from a clean state
   (setq integration-test-phase "open-empty-buffer")

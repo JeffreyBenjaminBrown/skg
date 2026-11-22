@@ -19,6 +19,15 @@ bugs caused by normal interactive fontification."
   (advice-add 'skg-request-save-buffer
               :before #'skg-test-fontify-before-save))
 
+(defun skg-test-use-test-port ()
+  "Point the client at the test server: when $SKG_TEST_PORT is set,
+make it 'skg-port' and say so. The analog of what
+'test-nvim-lib.lua' does on load."
+  (let ((test-port (getenv "SKG_TEST_PORT")))
+    (when test-port
+      (setq skg-port (string-to-number test-port))
+      (message "Using test port: %d" skg-port))))
+
 (defun skg-test-without-viewnode-ids (text)
   "TEXT without its viewnode IDs: every '(vnid X)' atom, and the space
 before it. A literal of expected buffer text does not spell them."

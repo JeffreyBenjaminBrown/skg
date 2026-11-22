@@ -17,11 +17,7 @@
   "Main orchestrator function that runs all integration tests."
   (message "=== SKG Fold Preservation Integration Test ===")
 
-  ;; Set the port from environment variable if available
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
+  (skg-test-use-test-port)
 
   ;; Run the test
   (test-fold-preservation)

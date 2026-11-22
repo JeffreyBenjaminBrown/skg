@@ -34,8 +34,7 @@
   "Drive edit -> confirm -> rotate clone repo -> approve, then assert
 the clone landed in the rotated repo."
   (message "Starting fork repo-rotation integration test...")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port (setq skg-port (string-to-number test-port))))
+  (skg-test-use-test-port)
 
   ;; 1. Open owned P; its content is the foreign node N.
   (skg-request-single-root-content-view-from-id "P")

@@ -9,10 +9,7 @@
 (defun integration-test-herald-rules ()
   "Fetch the herald rule table over TCP and verify it installs."
   (message "Starting herald-rules integration test...")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
+  (skg-test-use-test-port)
   (skg-request-herald-rules)
   (message "Sent herald rules request...")
   (if (not (skg-test-wait-for-response 10))

@@ -38,8 +38,7 @@
 (defun integration-test-fork-chain ()
   "Drive the foreign-fork -> fork-the-substitute -> chain flow."
   (message "Starting chain-of-forks integration test...")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port (setq skg-port (string-to-number test-port))))
+  (skg-test-use-test-port)
 
   ;; 1. Open P (public); its content is the foreign N.
   (let ((p-buf (chain-test--reopen-P)))

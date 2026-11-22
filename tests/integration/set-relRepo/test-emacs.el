@@ -25,8 +25,7 @@
        (line-beginning-position) (line-end-position)))))
 
 (defun integration-test-main ()
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port (setq skg-port (string-to-number test-port))))
+  (skg-test-use-test-port)
   (let ((config-file (getenv "SKG_CONFIG_FILE")))
     (when config-file
       (setq skg-config-file-path (expand-file-name config-file))

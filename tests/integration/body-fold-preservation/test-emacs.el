@@ -164,9 +164,7 @@ Returns a short diagnostic string on failure, nil on success."
 
 (defun run-all-tests ()
   (message "=== SKG Body-Fold-Preservation Integration Test ===")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))))
+  (skg-test-use-test-port)
 
   (let* ((diff-a (bfp-run-scenario
                   "A-subtree"

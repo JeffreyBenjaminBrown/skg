@@ -30,8 +30,7 @@ mirrors there too, as forkers of M."
       found)))
 
 (defun integration-test-perspective ()
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port (setq skg-port (string-to-number test-port))))
+  (skg-test-use-test-port)
   (skg-request-single-root-content-view-from-id "R")
   (let ((buf (skg-test-wait-for
               (lambda ()

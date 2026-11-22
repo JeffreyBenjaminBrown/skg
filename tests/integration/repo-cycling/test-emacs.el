@@ -106,10 +106,7 @@
 
 (defun integration-test-main ()
   (message "=== SKG Repo Cycling Integration Test ===")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
+  (skg-test-use-test-port)
   (let ((config-file (getenv "SKG_CONFIG_FILE")))
     (when config-file
       (setq skg-config-file-path (expand-file-name config-file))

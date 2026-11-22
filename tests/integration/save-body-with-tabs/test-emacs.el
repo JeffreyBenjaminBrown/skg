@@ -18,10 +18,7 @@
 
 (defun run-all-tests ()
   (message "=== SKG Save-Body-With-Tabs Integration Test ===")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
+  (skg-test-use-test-port)
   (test-save-body-with-tabs)
   (let ((timeout 0))
     (while (and (not integration-test-completed) (< timeout 120))

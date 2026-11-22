@@ -170,11 +170,7 @@ and the new child c."
   "Main orchestrator function that runs all integration tests."
   (message "=== SKG Collateral Add Content Integration Test ===")
 
-  ;; Set the port from environment variable if available
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
+  (skg-test-use-test-port)
 
   (phase-1-open-buffer-a)
   (phase-2-open-buffer-b)

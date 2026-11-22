@@ -129,10 +129,7 @@ truly-non-collateral view *solo* is genuinely editable."
 (defun run-all-tests ()
   "Main orchestrator."
   (message "=== SKG Save-Lock Lifecycle Integration Test ===")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))
-      (message "Using test port: %d" skg-port)))
+  (skg-test-use-test-port)
 
   (phase-1-open-three-views)
   (phase-2-edit-and-save-a)

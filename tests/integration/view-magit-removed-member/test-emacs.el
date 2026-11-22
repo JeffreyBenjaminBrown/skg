@@ -40,9 +40,7 @@
 
 (defun phase-1-open-the-diff-view ()
   (setq integration-test-phase "phase-1")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port
-      (setq skg-port (string-to-number test-port))))
+  (skg-test-use-test-port)
   (setq skg-config-dir
         (expand-file-name "data/" (file-name-directory load-file-name)))
   (skg-diffView-open)
