@@ -56,87 +56,120 @@ pub fn resolve_document_links (
   let index : AddressIndex =
     build_address_index (documents, built, existing_gnids);
   for (document_index, document) in documents . iter_mut () . enumerate () {
-    let links : Vec<ParsedLink> = document . links . clone ();
-    for link in links {
-      match resolve_link (
-        document_index, &link, document, &index,
-        input_directory, host_root) {
-        LinkTarget::Node (gnid, warning) => {
-          if let Some (warning) = warning {
-            document . diagnostics . push (Diagnostic {
-              range : link . range . clone (), message : warning }); }
-          if document . source_edits . iter () . any (|edit|
-            ranges_overlap (&edit . range, &link . range)) {
-            document . diagnostics . push (Diagnostic {
-              range : link . range . clone (),
-              message : "Link overlaps another repo conversion; left unchanged"
-                . to_string (), });
-            continue; }
-          document . source_edits . push (SourceEdit {
-            range : link . range . clone (),
-            replacement : format! ("[[id:{}][{}]]", gnid, link . label),
-          }); }
-        LinkTarget::External => {
-          if let Some (reference_id) = &link . reference_id {
-            if let Some (definition_offset) =
-              markdown_reference_definition_offset (document, reference_id) {
-              if section_at_offset (document, definition_offset) !=
-                section_at_offset (document, link . range . start) {
-                document . diagnostics . push (Diagnostic {
-                  range : link . range . clone (),
-                  message : format! (
-                    "External reference {:?} stays in Markdown syntax, but its definition is in another imported node",
-                    reference_id), }); } } } }
-        LinkTarget::ExternalFile (replacement) => {
-          if ! document . source_edits . iter () . any (|edit|
-            ranges_overlap (&edit . range, &link . range)) {
-            document . source_edits . push (SourceEdit {
-              range : link . range . clone (), replacement }); } }
-        LinkTarget::Unresolved (message) => {
+    // In order: links, then footnotes (whose edits give way to links'),
+    // then each section's text with every edit applied.
+    convert_links (document_index, document, &index,
+      input_directory, host_root);
+    convert_footnotes (document, &mut built [document_index]);
+    render_sections_into_nodes (document, &mut built [document_index]); }
+}
+
+/// Each link of 'document' becomes a source edit, a diagnostic, or both.
+fn convert_links (
+  document_index : usize,
+  document : &mut ParsedDocument,
+  index : &AddressIndex,
+  input_directory : &Path,
+  host_root : Option<&Path>,
+) {
+  let links : Vec<ParsedLink> = document . links . clone ();
+  for link in links {
+    match resolve_link (
+      document_index, &link, document, index,
+      input_directory, host_root) {
+      LinkTarget::Node (gnid, warning) => {
+        if let Some (warning) = warning {
           document . diagnostics . push (Diagnostic {
-            range : link . range . clone (), message }); } } }
-    for reference in &document . footnote_references {
-      let Some (node_index) = built [document_index] . footnote_node_indices
-        . get (&reference . name) else { continue; };
-      if document . source_edits . iter () . any (|edit|
-        ranges_overlap (&edit . range, &reference . range)) {
-        document . diagnostics . push (Diagnostic {
-          range : reference . range . clone (),
-          message : "Footnote reference overlaps another conversion; left unchanged"
-            . to_string (), });
-        continue; }
-      let gnid : &ID = &built [document_index] . nodes [*node_index] . pid;
-      document . source_edits . push (SourceEdit {
-        range : reference . range . clone (),
-        replacement : format! ("[[id:{}][Footnote {}]]", gnid, reference . name),
-      }); }
-    document . source_edits . sort_by_key (|edit| edit . range . start);
-    for definition in &document . footnote_definitions {
-      let Some (node_index) = built [document_index] . footnote_node_indices
-        . get (&definition . name) else { continue; };
-      built [document_index] . nodes [*node_index] . body = normalize_body (
-        Some (rendered_range (document, definition . range . clone ()))); }
-    document . source_edits . retain (|edit|
-      ! document . footnote_definitions . iter () . any (|definition|
-        ! definition . ambiguous &&
-        edit . range . start >= definition . range . start &&
-        edit . range . end <= definition . range . end));
-    for definition in &document . footnote_definitions {
-      if ! definition . ambiguous {
+            range : link . range . clone (), message : warning }); }
+        if document . source_edits . iter () . any (|edit|
+          ranges_overlap (&edit . range, &link . range)) {
+          document . diagnostics . push (Diagnostic {
+            range : link . range . clone (),
+            message : "Link overlaps another repo conversion; left unchanged"
+              . to_string (), });
+          continue; }
         document . source_edits . push (SourceEdit {
-          range : definition . range . clone (), replacement : String::new (),
-        }); } }
-    document . source_edits . sort_by_key (|edit| edit . range . start);
-    for (section_index, section) in document . sections . iter () . enumerate () {
-      built [document_index] . nodes [section_index] . body =
-        normalize_body (Some (rendered_range (document, section . body . clone ())));
-      if section_index > 0 {
-        let heading : &str = &document . text [section . heading . clone ()];
-        if let Some (relative) = heading . find (&section . title) {
-          let start : usize = section . heading . start + relative;
-          let end : usize = start + section . title . len ();
-          built [document_index] . nodes [section_index] . title =
-            rendered_range (document, start..end); } } } }
+          range : link . range . clone (),
+          replacement : format! ("[[id:{}][{}]]", gnid, link . label),
+        }); }
+      LinkTarget::External => {
+        if let Some (reference_id) = &link . reference_id {
+          if let Some (definition_offset) =
+            markdown_reference_definition_offset (document, reference_id) {
+            if section_at_offset (document, definition_offset) !=
+              section_at_offset (document, link . range . start) {
+              document . diagnostics . push (Diagnostic {
+                range : link . range . clone (),
+                message : format! (
+                  "External reference {:?} stays in Markdown syntax, but its definition is in another imported node",
+                  reference_id), }); } } } }
+      LinkTarget::ExternalFile (replacement) => {
+        if ! document . source_edits . iter () . any (|edit|
+          ranges_overlap (&edit . range, &link . range)) {
+          document . source_edits . push (SourceEdit {
+            range : link . range . clone (), replacement }); } }
+      LinkTarget::Unresolved (message) => {
+        document . diagnostics . push (Diagnostic {
+          range : link . range . clone (), message }); } } }
+}
+
+/// Each footnote reference becomes a link to its footnote's node, which
+/// takes the definition's text; an unambiguous definition is cut from
+/// the text around it.
+fn convert_footnotes (
+  document : &mut ParsedDocument,
+  built : &mut BuiltDocument,
+) {
+  for reference in &document . footnote_references {
+    let Some (node_index) = built . footnote_node_indices
+      . get (&reference . name) else { continue; };
+    if document . source_edits . iter () . any (|edit|
+      ranges_overlap (&edit . range, &reference . range)) {
+      document . diagnostics . push (Diagnostic {
+        range : reference . range . clone (),
+        message : "Footnote reference overlaps another conversion; left unchanged"
+          . to_string (), });
+      continue; }
+    let gnid : &ID = &built . nodes [*node_index] . pid;
+    document . source_edits . push (SourceEdit {
+      range : reference . range . clone (),
+      replacement : format! ("[[id:{}][Footnote {}]]", gnid, reference . name),
+    }); }
+  document . source_edits . sort_by_key (|edit| edit . range . start);
+  for definition in &document . footnote_definitions {
+    let Some (node_index) = built . footnote_node_indices
+      . get (&definition . name) else { continue; };
+    built . nodes [*node_index] . body = normalize_body (
+      Some (rendered_range (document, definition . range . clone ()))); }
+  document . source_edits . retain (|edit|
+    ! document . footnote_definitions . iter () . any (|definition|
+      ! definition . ambiguous &&
+      edit . range . start >= definition . range . start &&
+      edit . range . end <= definition . range . end));
+  for definition in &document . footnote_definitions {
+    if ! definition . ambiguous {
+      document . source_edits . push (SourceEdit {
+        range : definition . range . clone (), replacement : String::new (),
+      }); } }
+  document . source_edits . sort_by_key (|edit| edit . range . start);
+}
+
+/// Each section's body (and, below the root, its title) as rendered
+/// with the document's source edits, written into its node.
+fn render_sections_into_nodes (
+  document : &ParsedDocument,
+  built : &mut BuiltDocument,
+) {
+  for (section_index, section) in document . sections . iter () . enumerate () {
+    built . nodes [section_index] . body =
+      normalize_body (Some (rendered_range (document, section . body . clone ())));
+    if section_index > 0 {
+      let heading : &str = &document . text [section . heading . clone ()];
+      if let Some (relative) = heading . find (&section . title) {
+        let start : usize = section . heading . start + relative;
+        let end : usize = start + section . title . len ();
+        built . nodes [section_index] . title =
+          rendered_range (document, start..end); } } }
 }
 
 fn section_at_offset (
