@@ -36,6 +36,22 @@
    tail, into an example block under the FAIL headline; an integration
    test that fails its retry gets its FAIL, TIMEOUT, ERROR and "Last
    phase:" lines.
+** Run alone in a linked worktree, the AI reader's tests take the same derived port
+   'tools/skg-for-ai/tests/harness.py' asks 'skg_port_for_this_checkout'
+   for its default port, as 'all-tests.sh' does, so a bare
+   'python3 tools/skg-for-ai/test_skg_for_ai.py' in a worktree no
+   longer takes 1793. The main checkout and 'SKG_FOR_AI_TEST_PORT'
+   behave as before.
+** 'tests/file_io.rs''s node-io test writes in a temporary folder of its own
+   It wrote in the fixed '/tmp/file_io_test', which two suites run at
+   once from separate worktrees shared and emptied under each other.
+   Its assertions are unchanged.
+** A failed run's ALL.org names each failure and its log in its first lines
+   'org_list_of_failures' lists them under the title; a failed build
+   now writes an ALL.org quoting its error lines (before, it left
+   none); nextest's quoted lines include 'panicked at'. A passing run's
+   ALL.org is byte-identical to before, shown with stub suites as the
+   territory note above describes.
 ** problems.org brought up to date for this territory
    The git_diff_view matcher entry is obsolete (that suite is gone);
    the near-duplicate setup entry names today's helpers; a new entry
