@@ -55,8 +55,9 @@ fn graph_preparation_save_error (
 ///   1) Filesystem (source of truth)
 ///   2) immutable in-Rust graph swap-in
 ///   3) Tantivy background update
-/// Returns `None` for the ordinary queued search-index path.
-/// Returns `Some(new_index)` when Tantivy had to be rebuilt.
+/// Always returns `None`: the search-index update is queued, and a
+/// background failure is logged, never answered by a rebuild here
+/// ('enqueue_tantivy_delta').
 pub async fn update_graph_minus_nodeMerges (
   node_defs     : Vec<NodeInstruction>,
   skgrepo_moves : &[SkgrepoMove],
@@ -96,15 +97,13 @@ pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
     affected_telescope_warnings (
       &config, &base, prepared . candidate (),
       prepared . saved_pids (), prepared . affected_gnids ());
-  let result : Result<Option<TantivyIndex>, Box<dyn Error>> =
-    apply_nodeInstructions ( prepared,
-                        prepared_filesystem,
-                        config,
-                        tantivy_index,
-                        graph );
-  if result . is_ok () {
-    emit_telescope_warnings (&telescope_warnings); }
-  result }
+  apply_nodeInstructions ( prepared,
+                           prepared_filesystem,
+                           config,
+                           tantivy_index,
+                           graph ) ?;
+  emit_telescope_warnings (&telescope_warnings);
+  Ok (None) }
 
 fn apply_nodeInstructions (
   prepared      : PreparedGraphUpdate,
@@ -112,7 +111,7 @@ fn apply_nodeInstructions (
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   graph         : &InRustGraphHandle,
-) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
+) -> Result < (), Box<dyn Error> > {
   prepared . verify_base (graph)
     . map_err ( |message| -> Box<dyn Error> { message . into () } ) ?;
 
@@ -139,7 +138,7 @@ fn apply_nodeInstructions (
 
   enqueue_tantivy_delta (
     &candidate, tantivy_index, node_defs );
-  Ok (None) }
+  Ok (( )) }
 
 pub(crate) fn enqueue_tantivy_delta (
   candidate     : &InRustGraph,
@@ -169,8 +168,8 @@ pub(crate) fn enqueue_tantivy_delta (
 }
 
 /// Runs 'update_graph_minus_nodeMerges' and then 'merge_nodes' in that
-/// order, applying any Tantivy rebuild from either step to the
-/// caller's '&mut TantivyIndex'. The sole place the save pipeline
+/// order, applying any Tantivy rebuild (which only the nodeMerge step
+/// does, on a failed search-index write) to the caller's '&mut TantivyIndex'. The sole place the save pipeline
 /// should call when it has both nodeInstructions and
 /// merge pairs in hand. The NodeMerges are built from the graph as
 /// the nodeInstructions leave it ('prepare_save_under_mutation_gate').
@@ -256,15 +255,11 @@ impl PreparedSave {
   ) -> Result<(), Box<dyn Error>> {
     if let Some ((prepared, prepared_filesystem)) =
       self . prepared_save . zip (self . prepared_save_filesystem)
-    {
-      let save_replacement : Option<TantivyIndex> =
-        { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-            "apply_ordinary_nodeInstructions" ). entered();
-          apply_nodeInstructions (
-            prepared, prepared_filesystem, config . clone (),
-            tantivy_index, graph ) } ?;
-      if let Some (new_index) = save_replacement {
-        *tantivy_index = new_index; }}
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "apply_ordinary_nodeInstructions" ). entered();
+      apply_nodeInstructions (
+        prepared, prepared_filesystem, config . clone (),
+        tantivy_index, graph ) ?; }
     let nodeMerge_replacement : Option<TantivyIndex> =
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "apply_nodeMerge_nodeInstructions" ). entered();
