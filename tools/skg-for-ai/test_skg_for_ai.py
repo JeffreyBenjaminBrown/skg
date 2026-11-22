@@ -118,6 +118,7 @@ import edited_compact_view
 import save
 import view_commands
 import diff_and_commit
+import headline_commands
 import skg_for_ai
 
 FIXTURE_FOLDER = os . path . join (TOOL_FOLDER, "test-fixture")
@@ -299,7 +300,7 @@ def failures_of_chains ():
     index = next ( i for i, line in enumerate (headlines)
                    if full_view . headline_viewnode_id (line . metadata) == handle )
     try:
-      return skg_for_ai . chain_text (headlines, index)
+      return headline_commands . chain_text (headlines, index)
     except server_connection . SkgToolError as error:
       return "refused: " + str (error)
   failures = []
@@ -340,7 +341,7 @@ def failures_of_describe_requests ():
               '(birth (forks in 2))))"))' ),
       ( "0i", '((request . "describe heralds") (metadata . "(skg (vnid 0i) '
               'node (gnid d) noClaim pendingDetachment)"))' ) ]:
-    actual = skg_for_ai . describe_request_line (view, handle)
+    actual = headline_commands . describe_request_line (view, handle)
     if actual != expected:
       failures . append ( f"the describe request of {handle} is {actual!r}, not {expected!r}" )
   return failures
