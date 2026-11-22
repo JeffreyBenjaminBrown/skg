@@ -196,7 +196,7 @@ fn dispatch_request (
         stream ),
     Ok (RequestType::Shutdown) =>
       // Never returns - exits process
-      handle_shutdown_request ( stream, env ),
+      handle_shutdown_request ( stream ),
     Ok (RequestType::GetFilePath) =>
       handle_get_file_path_request_with_skgrepo_set (
         stream, request_header, &runtime . config, skgrepo_restriction ),
@@ -315,18 +315,14 @@ fn handle_verify_connection_request (
       & format! ( "((content \"{}\") (supports (\"save preview\")))",
                   "This is the skg server verifying the connection." ))); }
 
+/// Finish the process. Authoritative files are already durable and derived
+/// stores require no shutdown-time cleanup.
 fn handle_shutdown_request (
   stream : &mut std::net::TcpStream,
-  env    : &SkgEnv,
 ) {
   send_response_with_length_prefix (
     stream,
     & tag_text_response (
       TcpToClient::Shutdown, "Server shutting down..." ));
-  cleanup_and_shutdown (env); }
-
-/// Finish the process. Authoritative files are already durable and derived
-/// stores require no shutdown-time cleanup.
-fn cleanup_and_shutdown (_env : &SkgEnv) {
   tracing::info! ("Shutdown complete.");
   std::process::exit (0); }
