@@ -101,11 +101,7 @@ echo "Using port $AVAILABLE_PORT for test server..."
 # lives one directory below $TEST_DIR so that a relative-config-path
 # launch yields config.data_root = "data" (also relative) -- the
 # scenario this test is designed to exercise.
-cat > "$TEMP_CONFIG" << EOF
-tantivy_folder = "$TEST_DIR/data/.index.tantivy"
-port = $AVAILABLE_PORT
-beep_when_server_becomes_available = false
-
+write_test_config "$TEST_DIR/data/.index.tantivy" << EOF
 [[repos]]
 name = "main"
 path = "owned/skg-data"

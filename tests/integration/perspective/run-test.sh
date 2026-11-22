@@ -32,11 +32,7 @@ AVAILABLE_PORT=$(find_available_port)
 echo "Using port $AVAILABLE_PORT for test server..."
 
 TEMP_CONFIG="$WORK_DIR/skgconfig.toml"
-cat > "$TEMP_CONFIG" << EOF2
-tantivy_folder = "$WORK_DIR/.index.tantivy"
-port = $AVAILABLE_PORT
-beep_when_server_becomes_available = false
-
+write_test_config "$WORK_DIR/.index.tantivy" << EOF
 [[repos]]
 name = "foreign"
 path = "$WORK_DIR/foreign"
@@ -55,7 +51,7 @@ foreign = true
 name = "origin"
 path = "$WORK_DIR/origin"
 foreign = true
-EOF2
+EOF
 
 start_skg_server
 

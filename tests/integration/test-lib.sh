@@ -101,6 +101,35 @@ find_available_port() {
   exit 1
 }
 
+# Write $TEMP_CONFIG: the lines every test config begins with (the
+# Tantivy folder TANTIVY_FOLDER, the port $AVAILABLE_PORT, no beep),
+# a blank line, then this function's standard input, which holds the
+# test's own tables ('[[repos]]' and so on). Call it with a here-doc.
+write_test_config() {
+  local tantivy_folder="$1"
+  {
+    echo "tantivy_folder = \"$tantivy_folder\""
+    echo "port = $AVAILABLE_PORT"
+    echo "beep_when_server_becomes_available = false"
+    echo ""
+    cat
+  } > "$TEMP_CONFIG"
+}
+
+# The usual config: set AVAILABLE_PORT to a free port, make TEMP_CONFIG
+# a new file inside the test's data/ folder (the data root is the
+# config file's folder, so it contains the skgrepos under data/), and
+# write it as 'write_test_config' does, its Tantivy index in
+# data/.index.tantivy and its tables read from standard input.
+# 'cleanup' deletes it.
+make_temp_config_in_data_folder() {
+  AVAILABLE_PORT=$(find_available_port)
+  echo ""
+  echo "Using port $AVAILABLE_PORT for test server..."
+  TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml")
+  write_test_config "$TEST_DIR/data/.index.tantivy"
+}
+
 # Function to start skg server with test config
 start_skg_server() {
   echo ""

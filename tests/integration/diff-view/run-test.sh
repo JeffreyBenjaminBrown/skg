@@ -110,11 +110,7 @@ AVAILABLE_PORT=$(find_available_port)
 echo "Using port $AVAILABLE_PORT for test server..."
 
 TEMP_CONFIG="$DATA/skgconfig.toml"
-cat > "$TEMP_CONFIG" << EOF
-tantivy_folder = ".index.tantivy"
-port = $AVAILABLE_PORT
-beep_when_server_becomes_available = false
-
+write_test_config ".index.tantivy" << EOF
 [[repos]]
 name = "gamma"
 path = "foreign/gamma"

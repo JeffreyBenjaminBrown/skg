@@ -25,8 +25,11 @@ export SKG_TEST_REPO_DIR="$TEMP_ROOT/owned/repo"
 
 AVAILABLE_PORT="$(find_available_port)"
 TEMP_CONFIG="$(mktemp "$TEMP_ROOT/skgconfig-XXXXXX.toml")"
-printf 'tantivy_folder = "%s"\nport = %s\nbeep_when_server_becomes_available = false\n\n[[repos]]\nname = "main"\npath = "owned/repo"\n' \
-  "$TEMP_ROOT/index" "$AVAILABLE_PORT" > "$TEMP_CONFIG"
+write_test_config "$TEMP_ROOT/index" << EOF
+[[repos]]
+name = "main"
+path = "owned/repo"
+EOF
 
 start_skg_server
 run_client_test

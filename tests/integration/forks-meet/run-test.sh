@@ -36,19 +36,11 @@ trap 'cleanup; restore_forks_meet_fixtures' EXIT
 restore_forks_meet_fixtures
 
 
-AVAILABLE_PORT=$(find_available_port)
-echo "Using port $AVAILABLE_PORT for test server..."
-
-TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the main/ folder
-cat > "$TEMP_CONFIG" << EOF2
-tantivy_folder = "$TEST_DIR/data/.index.tantivy"
-port = $AVAILABLE_PORT
-beep_when_server_becomes_available = false
-
+make_temp_config_in_data_folder << EOF
 [[repos]]
 name = "main"
 path = "$TEST_DIR/data/main"
-EOF2
+EOF
 
 start_skg_server
 
