@@ -1,3 +1,19 @@
+//! Importing a directory of Markdown and Org files as new nodes of one
+//! owned skgrepo, from a running server (the "import md and org"
+//! request, 'serve/handlers/import_md_and_org.rs'): a preview first,
+//! the writes once the client approves it. Each file becomes a tree of
+//! nodes, one per heading, and its links to the imported files and
+//! headings become links to their nodes. 'discover_documents' (here)
+//! reads the files.
+//! - 'parse': one document's outline, keeping its source text.
+//! - 'build': a parsed document's nodes.
+//! - 'resolve': the documents' links to each other, once IDs exist.
+//! - 'batch': one import, prepared without writing, and checked again
+//!   under the mutation gate ('prepare_import_batch').
+//! - 'swap_in': writing the new files and swapping in the graph.
+//! Org-roam's import is 'server/import_org_roam.rs'; Obsidian's is
+//! 'server/obsidian/'.
+
 pub mod parse;
 pub mod build;
 pub mod resolve;

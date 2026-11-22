@@ -1,3 +1,11 @@
+//! The 'skg import-org-roam' subcommand ('import_org_roam_directory'):
+//! convert a directory of org-roam '.org' files into '.skg' files in an
+//! output folder, whose existing '.skg' files it first deletes. Nodes
+//! that share an ID across files are merged. It runs without a server.
+//! - 'parse': one org-roam file to its nodes.
+//! Importing Markdown and Org into a running server is
+//! 'server/import_md_and_org/'.
+
 pub mod parse;
 
 use crate::types::config::{SkgConfig, Skgrepo};
