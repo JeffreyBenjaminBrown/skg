@@ -14,7 +14,7 @@ T.arm_timeout(60)
 
 local content_view = require('skg.single_root_content_view')
 local metadata = require('skg.metadata')
-local save = require('skg.save')
+local save_confirmations = require('skg.save.confirmations')
 local view_requests = require('skg.views')
 
 ---Return a live skg view buffer whose text mentions (gnid ID).
@@ -107,7 +107,7 @@ T.check(T.buffer_text(confirm_buf):find('(gnid M)', 1, true),
         'confirmation buffer does not list M')
 print('fork_node produced a fork-confirmation listing M')
 -- Approving before picking a skgrepo is refused.
-local approved_early_ok = pcall(save.approve_fork)
+local approved_early_ok = pcall(save_confirmations.approve_fork)
 T.check(not approved_early_ok,
         'approve must be refused until a repo is picked')
 print('approve refused until a repo is picked')
@@ -115,7 +115,7 @@ print('approve refused until a repo is picked')
 local clone_line = goto_line_starting_with('* (skg node (skgRepos (nodeRepo ',
   'could not find the clone-to-be headline')
 metadata.change_repo_at_line(clone_line, 'owned')
-save.approve_fork()
+save_confirmations.approve_fork()
 
 -- 5. Reopen Q fresh: the clone, in M's skgrepo, where M stands as
 --    itself, is shown in M's forks folder, forking it.
@@ -145,7 +145,7 @@ view_requests.fork_node()
 local decline_confirm_buf = T.wait_for_buffer('skg://fork-confirmation', 10)
 T.check(decline_confirm_buf, 'no fork-confirmation buffer for M2 appeared')
 vim.api.nvim_set_current_buf(decline_confirm_buf)
-save.decline_fork()
+save_confirmations.decline_fork()
 
 -- The source buffer's M2 headline no longer carries a fork request.
 T.check(vim.api.nvim_buf_is_valid(q2_buf),

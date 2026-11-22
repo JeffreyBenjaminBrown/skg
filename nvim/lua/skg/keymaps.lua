@@ -443,7 +443,7 @@ M.content_view_bindings = {
 }
 
 ---The keys, under <localleader>, of the fork-confirmation buffer
----(skg.save.show_fork_confirmation): Emacs's C-c C-c and C-c C-k there.
+---(skg.save.confirmations.show_fork_confirmation): Emacs's C-c C-c and C-c C-k there.
 M.fork_confirmation_bindings = { approve = 'cc', decline = 'ck' }
 
 ---The subset used by .skg file buffers (the file-minor-mode analog).

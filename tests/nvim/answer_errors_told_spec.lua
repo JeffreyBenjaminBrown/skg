@@ -12,6 +12,7 @@ local lock = require('skg.lock')
 local payload = require('skg.payload')
 local rerender_all_views = require('skg.rerender_all_views')
 local save = require('skg.save')
+local save_confirmations = require('skg.save.confirmations')
 local state = require('skg.state')
 
 local CONFIRMATION_FAILED =
@@ -99,26 +100,26 @@ describe('a handler that fails on the server answer says so', function ()
 
   it('fork-confirmation', function ()
     assert_told(told_by(function ()
-                  save.fork_confirmation_handler(0, {}) end),
+                  save_confirmations.fork_confirmation_handler(0, {}) end),
                 'fork-confirmation',
                 'nothing was saved, and the fork confirmation was not shown')
   end)
 
   it('telescope-hoist-confirmation', function ()
     assert_told(told_by(function ()
-                  save.telescope_hoist_confirmation_handler(0, {}) end),
+                  save_confirmations.telescope_hoist_confirmation_handler(0, {}) end),
                 'telescope-hoist-confirmation', CONFIRMATION_FAILED)
   end)
 
   it('delete-from-confirmation', function ()
     assert_told(told_by(function ()
-                  save.delete_from_confirmation_handler(0, {}) end),
+                  save_confirmations.delete_from_confirmation_handler(0, {}) end),
                 'delete-from-confirmation', CONFIRMATION_FAILED)
   end)
 
   it('strandeds-confirmation', function ()
     assert_told(told_by(function ()
-                  save.strandeds_confirmation_handler(0, {}) end),
+                  save_confirmations.strandeds_confirmation_handler(0, {}) end),
                 'strandeds-confirmation', CONFIRMATION_FAILED)
   end)
 

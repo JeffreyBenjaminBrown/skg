@@ -60,7 +60,7 @@ end
 ---The Emacs chords that server messages name, each with the Neovim
 ---binding that plays it, from skg.keymaps.
 M.neovim_bindings_of_emacs_chords = {
-  -- the fork-confirmation buffer's own keys (save.show_fork_confirmation)
+  -- the fork-confirmation buffer's own keys (save.confirmations.show_fork_confirmation)
   ['C-c C-c'] = '<localleader>' .. keymaps.fork_confirmation_bindings.approve,
   ['C-c C-k'] = '<localleader>' .. keymaps.fork_confirmation_bindings.decline,
 }

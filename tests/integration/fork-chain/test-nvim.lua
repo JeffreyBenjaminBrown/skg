@@ -16,6 +16,7 @@ local lock = require('skg.lock')
 local metadata = require('skg.metadata')
 local perspective = require('skg.perspective')
 local save = require('skg.save')
+local save_confirmations = require('skg.save.confirmations')
 local view_requests = require('skg.views')
 
 ---Return a live skg view buffer whose text mentions (gnid ID).
@@ -94,7 +95,7 @@ vim.api.nvim_set_current_buf(confirm_buf_1)
 local clone_line_1 = goto_line_starting_with('* (skg node (skgRepos (nodeRepo ',
   'could not find the clone-to-be headline')
 metadata.change_repo_at_line(clone_line_1, 'public')
-save.approve_fork()
+save_confirmations.approve_fork()
 print('foreign N forked into a public clone')
 
 -- 4. Reopen P: the public clone C is shown in N's place.
@@ -118,7 +119,7 @@ vim.api.nvim_set_current_buf(confirm_buf_2)
 local clone_line_2 = goto_line_starting_with('* (skg node (skgRepos (nodeRepo ',
   'could not find the clone-to-be headline')
 metadata.change_repo_at_line(clone_line_2, 'private')
-save.approve_fork()
+save_confirmations.approve_fork()
 print('the public clone was forked into a private clone (skgRepos (nodeRepo rotated))')
 
 -- 7. Reopen P (all skgrepos unrestricted): drawn from P's home,

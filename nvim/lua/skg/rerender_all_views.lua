@@ -89,7 +89,7 @@ end
 
 ---Ask the server to rerender the open views VIEW_IDS, approving the
 ---text of APPROVED_PIDS. This releases a save's withheld rerender
----('save.save_text_release_confirmation_handler'); it writes nothing.
+---('save.confirmations.save_text_release_confirmation_handler'); it writes nothing.
 ---A challenge accepted asks again with the PIDs it lists.
 ---@param view_ids string[]
 ---@param approved_pids string[]

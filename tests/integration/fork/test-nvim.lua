@@ -11,6 +11,7 @@ T.arm_timeout(40)
 local content_view = require('skg.single_root_content_view')
 local metadata = require('skg.metadata')
 local save = require('skg.save')
+local save_confirmations = require('skg.save.confirmations')
 
 ---Return a live skg view buffer whose text mentions (gnid ID).
 local function buffer_showing (gnid)
@@ -90,7 +91,7 @@ print('fork-confirmation buffer lists N')
 local clone_line = goto_line_starting_with('* (skg node (skgRepos (nodeRepo ',
   'could not find the clone-to-be headline')
 metadata.change_repo_at_line(clone_line, 'owned')
-save.approve_fork()
+save_confirmations.approve_fork()
 
 -- 6. The fork commits and P immediately replaces N with the clone.
 -- The clone itself now carries its outbound fork. Match the

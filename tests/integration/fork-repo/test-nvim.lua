@@ -12,6 +12,7 @@ T.arm_timeout(40)
 local content_view = require('skg.single_root_content_view')
 local metadata = require('skg.metadata')
 local save = require('skg.save')
+local save_confirmations = require('skg.save.confirmations')
 
 ---Return a live skg view buffer whose text mentions (gnid ID).
 local function buffer_showing (gnid)
@@ -108,7 +109,7 @@ T.check(T.buffer_text(confirm_buf):find('(skgRepos (nodeRepo owned2))', 1, true)
 print("rotated the clone's repo to owned2")
 
 -- 5. Approve: re-save the source buffer with the chosen skgrepo.
-save.approve_fork()
+save_confirmations.approve_fork()
 
 -- 6. The clone must land in owned2 (rotated), not owned (inferred).
 local committed = T.wait_for(function ()

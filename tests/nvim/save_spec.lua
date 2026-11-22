@@ -13,6 +13,7 @@ local folds = require('skg.folds')
 local lock = require('skg.lock')
 local metadata = require('skg.metadata')
 local save = require('skg.save')
+local save_confirmations = require('skg.save.confirmations')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -99,12 +100,12 @@ describe('skg.save strandeds review requests', function ()
       { relation = 'contains', recorder = 'q', member = 'n' },
       { relation = 'contains', recorder = 'r', member = 'n' } }
     assert.are.same({ { 'contains', 'q', 'n' }, { 'contains', 'r', 'n' } },
-                    save.strandeds_review_from_choice(strandeds, 'all'))
-    assert.are.same({}, save.strandeds_review_from_choice(strandeds, 'none'))
+                    save_confirmations.strandeds_review_from_choice(strandeds, 'all'))
+    assert.are.same({}, save_confirmations.strandeds_review_from_choice(strandeds, 'none'))
     assert.are.same({ { 'contains', 'r', 'n' } },
-      save.strandeds_review_from_choice(strandeds, 'choose', function (question)
+      save_confirmations.strandeds_review_from_choice(strandeds, 'choose', function (question)
         return question:find('^Reset r ') ~= nil end))
-    assert.is_nil(save.strandeds_review_from_choice(strandeds, nil))
+    assert.is_nil(save_confirmations.strandeds_review_from_choice(strandeds, nil))
   end)
 end)
 
@@ -268,10 +269,10 @@ describe('skg.save delete-from confirmation', function ()
   end)
 
   it('turns each button into a choice', function ()
-    assert.is_nil(save.delete_from_of_choice(1))
-    assert.are.equal('visible', save.delete_from_of_choice(2))
-    assert.are.equal('all', save.delete_from_of_choice(3))
-    assert.is_nil(save.delete_from_of_choice(0))
+    assert.is_nil(save_confirmations.delete_from_of_choice(1))
+    assert.are.equal('visible', save_confirmations.delete_from_of_choice(2))
+    assert.are.equal('all', save_confirmations.delete_from_of_choice(3))
+    assert.is_nil(save_confirmations.delete_from_of_choice(0))
   end)
 
   local function resaves_after_choosing (button)
@@ -903,7 +904,7 @@ describe('skg.save fork confirmation', function ()
       '** (skg node (gnid orig-2)) original two' })
     assert.are.same(
       { { 'orig-1', 'src-one' }, { 'orig-2', 'src-two' } },
-      save.fork_repos_from_confirmation_buffer(buf))
+      save_confirmations.fork_repos_from_confirmation_buffer(buf))
     vim.api.nvim_buf_delete(buf, { force = true })
   end)
 
@@ -922,7 +923,7 @@ describe('skg.save fork confirmation', function ()
   it('refuses approval while the placeholder repo remains',
      function ()
     save_and_get_confirmation()
-    local ok, err = pcall(save.approve_fork)
+    local ok, err = pcall(save_confirmations.approve_fork)
     assert.is_false(ok)
     assert.is_truthy(tostring(err):find('Pick a repo'))
   end)
@@ -933,7 +934,7 @@ describe('skg.save fork confirmation', function ()
     local confirm = vim.api.nvim_get_current_buf()
     vim.api.nvim_win_set_cursor(0, { 1, 0 })
     metadata.change_repo_at_line(1, 'my-repo')
-    save.approve_fork()
+    save_confirmations.approve_fork()
     vim.wait(3000, function () return #requests >= 2 end, 10)
     assert.are.equal(2, #requests)
     assert.is_truthy(requests[2]:find(
@@ -962,7 +963,7 @@ describe('skg.save fork confirmation', function ()
 
   it('declining strips the fork atom from the source buffer', function ()
     local source = save_and_get_confirmation()
-    save.decline_fork()
+    save_confirmations.decline_fork()
     local text = table.concat(
       vim.api.nvim_buf_get_lines(source, 0, -1, false), '\n')
     assert.is_falsy(text:find('fork', 1, true))
