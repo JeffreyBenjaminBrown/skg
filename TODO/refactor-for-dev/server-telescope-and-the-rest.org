@@ -68,12 +68,10 @@
    'text_search.rs': after the field reads moved out it is still about
    eighty lines; the per-document score (coverage times prominence
    multiplier) is a natural function.
-** Split 'run_server' further
-   'server/main.rs': the busy-signal spawn and the repo-watcher start
-   (each about fifteen lines, each with a warning path) could be named.
-   The order of the start is load-bearing (the listener binds before
-   'initialize_dbs' so clients get the busy signal), so keep it in one
-   visible sequence.
+** Done: split 'run_server' further
+   'spawn_busysignal_thread' and 'start_repo_watcher_else_warning' are
+   named, called in the same place of the start's one sequence; see
+   'server-longest-functions.org'.
 ** 'search_buffer_for_skgrepo_set_for_test' is a test helper in production code
    'text_search.rs'; one test ('tests/repo_sets.rs') calls it. Moving it
    to that test is safe and small.

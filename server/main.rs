@@ -162,18 +162,8 @@ fn run_server (
   // The "busy signal". See definition of 'busysignal_accept_loop'.
   let init_done: Arc<AtomicBool> =
     Arc::new (AtomicBool::new (false));
-  let init_done_clone: Arc<AtomicBool> =
-    Arc::clone (&init_done);
-  let busysignal_listener: TcpListener =
-    listener . try_clone () ?;
-  let logs_dir_for_busysignal : String =
-    config . logs_dir () . display () . to_string ();
   let busysignal_handle: std::thread::JoinHandle<()> =
-    std::thread::spawn ( move || {
-      busysignal_accept_loop (
-        busysignal_listener,
-        init_done_clone,
-        &logs_dir_for_busysignal ); } );
+    spawn_busysignal_thread (&listener, &init_done, &config) ?;
 
   install_shutdown_signal_handler ();
 
@@ -206,11 +196,7 @@ fn run_server (
     mentioned_gnids, map_to_content, map_to_containers );
   let (_repo_watcher, watcher_warnings) : (Option<RepoWatcherHandle>, Vec<String>) =
     // Files changed on disk are reloaded as they change, while the server serves.
-    match start_repo_watcher ( env . clone () ) {
-      Ok (handle) => (Some (handle), Vec::new ()),
-      Err (e) => (None, vec! [ format! (
-        "The server cannot watch the skgrepo directories, so files changed on disk are not reloaded until a rebuild: {}",
-        e ) ] ), };
+    start_repo_watcher_else_warning ( env . clone () );
   for warning in &watcher_warnings {
     tracing::warn! ("{}", warning); }
   env . runtime . record_startup_warnings (
@@ -230,6 +216,37 @@ fn run_server (
     . map_err ( |e| Box::new (e)
                  as Box<dyn Error>) ?;
   Ok (( )) }
+
+/// Spawn the thread that answers, on a clone of 'listener', each
+/// connection arriving before 'init_done' is set
+/// ('busysignal_accept_loop').
+fn spawn_busysignal_thread (
+  listener  : &TcpListener,
+  init_done : &Arc<AtomicBool>,
+  config    : &SkgConfig,
+) -> Result<std::thread::JoinHandle<()>, Box<dyn Error>> {
+  let init_done_clone: Arc<AtomicBool> =
+    Arc::clone (init_done);
+  let busysignal_listener: TcpListener =
+    listener . try_clone () ?;
+  let logs_dir_for_busysignal : String =
+    config . logs_dir () . display () . to_string ();
+  Ok ( std::thread::spawn ( move || {
+    busysignal_accept_loop (
+      busysignal_listener,
+      init_done_clone,
+      &logs_dir_for_busysignal ); } )) }
+
+/// Start the repo watcher. If it cannot start, the server runs
+/// without it, and the second value is the warning saying so.
+fn start_repo_watcher_else_warning (
+  env : SkgEnv,
+) -> (Option<RepoWatcherHandle>, Vec<String>) {
+  match start_repo_watcher (env) {
+    Ok (handle) => (Some (handle), Vec::new ()),
+    Err (e) => (None, vec! [ format! (
+      "The server cannot watch the skgrepo directories, so files changed on disk are not reloaded until a rebuild: {}",
+      e ) ] ), } }
 
 /// shared/herald-styles.json is embedded at compile time, so an
 /// inconsistency in it is a build defect, not a runtime condition.
