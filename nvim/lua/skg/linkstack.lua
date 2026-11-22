@@ -26,7 +26,7 @@ end
 ---Push an ID and its title/label onto the stack: an inline link's id
 ---and label when point is on one, else the headline's metadata id and
 ---title.
-function M.id_push ()
+function M.push_id ()
   local link_hit = id_search.point_in_link_p()
   if link_hit then
     table.insert(state.linkstack, 1, { link_hit.id, link_hit.label })

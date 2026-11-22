@@ -1,5 +1,6 @@
-title: 'C-c u : skg-id-push'
+title: 'C-c u : skg-push-id'
 pid: 5187d911-498d-4dcd-a602-3e27e44b31b1
 body: |2-
   Stores, in the linkstack,
   a link to the node the cursor is on.
+  Its old name, skg-id-push, still works.

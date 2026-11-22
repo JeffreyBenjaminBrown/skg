@@ -1549,10 +1549,54 @@ but a title can include multiple or no links.
 *** C-c i p : skg-id-prev
 See skg-id-next, above.
 *** the linkstack
-C-c u for push, C-c o _ for paste, C-c O _ for pop
-**** C-c u : skg-id-push
+C-c u or C-c U for push, C-c o _ for paste, C-c O _ for pop.
+The stack is a list of trees, the most recently pushed first: a
+tree of one note, which C-c u pushes, or a chain, which C-c U
+pushes. A paste uses the first tree, unless you pick another
+(see skg-paste-link).
+**** C-c u : skg-push-id
 Stores, in the linkstack,
 a link to the node the cursor is on.
+Its old name, skg-id-push, still works.
+**** C-c U : skg-push-ancestry
+Stores, in the linkstack, the chain of notes from the top of the
+view down to the node the cursor is on, and how each is joined in
+the graph to the one above it. Folder headlines are skipped; the
+forks folder's members, for instance, are joined to its note by a
+fork. Pushed from c in
+
+: * a
+: ** b
+: *** Its mirrors are these.
+: **** c
+
+where a contains b and b forks c, the stack holds the tree (each
+headline's ID, its body, left out here)
+
+: * a
+: ** (aC) b
+: *** (aK) c
+
+whose child headlines begin with the edge to the note above, written
+as heralds write it, 'a' standing for that note: =aC= it contains
+this one, =Ca= this one contains it; likewise =L= links to, =K= forks
+(=aKa= each forks the other) and =H= hides.
+
+skg-paste-link (=C-c o l=) pastes it as a chain of links, the top
+first, joined by what joins them:
+
+: [[id:A][a]] / [[id:B][b]] ~ [[id:C][c]]
+
+"/" reads "contains" and "\" "is contained by"; "~" forks or is
+forked by; "->" links to and "<-" is linked to by; "hides" and "is
+hidden by" say themselves. Only the last label, c's, is asked for.
+skg-paste-id and skg-paste-node use the last note, c.
+
+If some note is joined to the one above it by no edge of the graph
+(a mirror joined to the folder's note only through other mirrors,
+say, or a node shown in the place of one it forks), nothing is
+pushed, and Emacs names the two notes. The stack keeps what the
+graph was when you pushed; it does not follow later edits.
 **** C-c o i : skg-paste-id
 Inserts the ID at the top of the linkstack at the cursor.
 Does not modify the stack.
@@ -1563,9 +1607,17 @@ but also removes the node from the stack.
 Inserts, at the cursor, a link to the node
 whose ID is at the top of the linkstack.
 Does not modify the stack.
+
+It asks for the link's label, starting from the node's title.
+In that prompt, shift-left and shift-right show the tree above or
+below in the stack instead, cycling; the tree shown when you press
+RET is the one pasted. A chain (see skg-push-ancestry) pastes as
+links joined by its edges, and the prompt shows all of it but the
+last label, which is the only one you can edit.
+In the minibuffer it asks nothing, and pastes the top tree.
 **** C-c O l : skg-pop-link
 Like skg-paste-link,
-but also removes the node from the stack.
+but also removes from the stack the tree it pasted.
 **** C-c o n : skg-paste-node
 This is the easiest way to give a node multiple containers --
 push it to the stack, then paste it as a node somewhere else.
@@ -1590,6 +1642,9 @@ but also removes the node from the stack.
 **** C-c v s : skg-view-linkstack
 repeated here; described earlier in this doc.
 In the linkstack buffer, =C-x C-s= saves your edits to the stack.
+A chain shows as nested headlines, each child's title beginning
+with its edge to its parent, "(aC) "; keep that edge when editing
+one (see skg-push-ancestry).
 ** C-c z : skg-zippy-mode, typing without C-c
 In zippy mode, typing a key sequence K runs what C-c K runs, and
 typing inserts no text: 'r r' cycles the processed mark, 'v d' opens the

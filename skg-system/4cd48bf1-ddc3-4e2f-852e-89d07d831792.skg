@@ -4,3 +4,11 @@ body: |2-
   Inserts, at the cursor, a link to the node
   whose ID is at the top of the linkstack.
   Does not modify the stack.
+
+  It asks for the link's label, starting from the node's title.
+  In that prompt, shift-left and shift-right show the tree above or
+  below in the stack instead, cycling; the tree shown when you press
+  RET is the one pasted. A chain (see skg-push-ancestry) pastes as
+  links joined by its edges, and the prompt shows all of it but the
+  last label, which is the only one you can edit.
+  In the minibuffer it asks nothing, and pastes the top tree.

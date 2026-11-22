@@ -26,7 +26,7 @@ Steps:
 *** Put point on one of the nodes.
 We call this node the 'acquiree'.
 *** "Get" that node's ID.
-It's easiest to use 'skg-id-push'.
+It's easiest to use 'skg-push-id'.
 
 You could, however, also do this "manually",
 by visiting a metadata buffer for the node ('skg-view-metadata')

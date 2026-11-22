@@ -39,18 +39,18 @@ describe('skg.linkstack push', function ()
     for _, gnid in ipairs({ '1', '3', '6' }) do
       cursor_on(string.format('(gnid %s)', gnid), 2)
       local before = #state.linkstack
-      linkstack.id_push()
+      linkstack.push_id()
       assert.are.equal(before + 1, #state.linkstack)
       assert.are.equal(gnid, state.linkstack[1][1])
     end
     -- From the title area, still finds the metadata id.
     cursor_on('just a title', 3)
-    linkstack.id_push()
+    linkstack.push_id()
     assert.are.same({ '6', 'just a title' }, state.linkstack[1])
     -- Fake metadata must not push.
     local before = #state.linkstack
     cursor_on('fake metadata', 2)
-    linkstack.id_push()
+    linkstack.push_id()
     assert.are.equal(before, #state.linkstack)
   end)
 
@@ -58,7 +58,7 @@ describe('skg.linkstack push', function ()
     buffer_with('* (skg node (gnid outer-id)) outer with'
                 .. ' [[id:inner-id][inner label]] inside')
     cursor_on('inner label', 3)
-    linkstack.id_push()
+    linkstack.push_id()
     assert.are.equal(1, #state.linkstack)
     assert.are.same({ 'inner-id', 'inner label' }, state.linkstack[1])
   end)
@@ -69,13 +69,13 @@ describe('skg.linkstack push', function ()
       '** (skg node (gnid b)) b has a [[id:a][link to a]]',
       '* (skg node (gnid c)) c' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 1, 0 })
-    linkstack.id_push()
+    linkstack.push_id()
     -- From the title area of line 2, off the inline link. (The elisp
     -- test stood at end-of-line, a past-the-last-character position
     -- normal mode does not have; on the link's final bracket the
     -- inline link would win here.)
     vim.api.nvim_win_set_cursor(0, { 2, 24 })
-    linkstack.id_push()
+    linkstack.push_id()
     assert.are.equal(2, #state.linkstack)
     assert.are.same({ 'b', 'b has a [[id:a][link to a]]' },
                     state.linkstack[1])

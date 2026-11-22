@@ -147,7 +147,7 @@ M.commands = {
              desc = 'Hop to the next id (metadata or inline link)' },
   IdPrev = { module = 'skg.id_search', fn = 'id_prev',
              desc = 'Hop to the previous id' },
-  IdPush = { module = 'skg.linkstack', fn = 'id_push',
+  PushId = { module = 'skg.linkstack', fn = 'push_id',
              desc = 'Push a link to the node at point onto the linkstack' },
   PasteId = { module = 'skg.linkstack', fn = 'paste_id',
               desc = 'Insert the top-of-stack id at the cursor' },
@@ -429,7 +429,7 @@ M.content_view_bindings = {
   { 'vw', 'ViewWithoutMetadata' },       -- C-c v w
   { 'in', 'IdNext' },                    -- C-c i n
   { 'ip', 'IdPrev' },                    -- C-c i p
-  { 'u', 'IdPush' },                     -- C-c u
+  { 'u', 'PushId' },                     -- C-c u
   { 'oi', 'PasteId' },                   -- C-c o i
   { 'ol', 'PasteLink' },                 -- C-c o l
   { 'on', 'PasteNode' },                 -- C-c o n
@@ -462,7 +462,7 @@ M.report_bindings = {
   { 've', 'ViewNewEmpty' }, { 'vl', 'RestrictRepoSet' },
   { 'vs', 'ViewLinkstack' },
   { 'in', 'IdNext' }, { 'ip', 'IdPrev' },
-  { 'u', 'IdPush' },
+  { 'u', 'PushId' },
   { 'oi', 'PasteId' }, { 'ol', 'PasteLink' }, { 'on', 'PasteNode' },
   { 'Oi', 'PopId' }, { 'Ol', 'PopLink' }, { 'On', 'PopNode' },
 }

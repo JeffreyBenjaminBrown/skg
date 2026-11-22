@@ -101,6 +101,7 @@ the old one open beside the one it makes on its next request."
      skg-compare-sexpr
      skg-config
      skg-id-search
+     skg-push-ancestry
      skg-length-prefix
      skg-lens
      skg-lock-buffers

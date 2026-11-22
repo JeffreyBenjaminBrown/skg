@@ -3,3 +3,6 @@ pid: 94d34ac8-ab27-459c-9986-c59f91cafec7
 body: |2-
   repeated here; described earlier in this doc.
   In the linkstack buffer, =C-x C-s= saves your edits to the stack.
+  A chain shows as nested headlines, each child's title beginning
+  with its edge to its parent, "(aC) "; keep that edge when editing
+  one (see skg-push-ancestry).

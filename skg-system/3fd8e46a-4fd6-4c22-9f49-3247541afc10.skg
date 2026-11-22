@@ -1,9 +1,14 @@
 title: the linkstack
 pid: 3fd8e46a-4fd6-4c22-9f49-3247541afc10
 body: |2-
-  C-c u for push, C-c o _ for paste, C-c O _ for pop
+  C-c u or C-c U for push, C-c o _ for paste, C-c O _ for pop.
+  The stack is a list of trees, the most recently pushed first: a
+  tree of one note, which C-c u pushes, or a chain, which C-c U
+  pushes. A paste uses the first tree, unless you pick another
+  (see skg-paste-link).
 contains:
 - 5187d911-498d-4dcd-a602-3e27e44b31b1
+- 3d3fd161-04a3-4419-8724-b86386b194d5
 - a5d27083-fd36-47e8-a1f4-4e9cf2106078
 - ca84d7f4-308e-4d56-9072-bc9cdae7ac08
 - 4cd48bf1-ddc3-4e2f-852e-89d07d831792

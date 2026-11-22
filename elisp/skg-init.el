@@ -44,6 +44,7 @@
   (require 'skg-buffer)
   (require 'skg-client)
   (require 'skg-id-search)
+  (require 'skg-push-ancestry)
   (require 'skg-request-text-search)
   (require 'skg-request-views)
   (require 'skg-sexpr-edit)

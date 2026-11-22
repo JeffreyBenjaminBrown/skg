@@ -1,7 +1,7 @@
 title: '"Get" that node''s ID.'
 pid: bf7d2a77-fa19-4f7d-b5ea-8e36679a45f4
 body: |2-
-  It's easiest to use 'skg-id-push'.
+  It's easiest to use 'skg-push-id'.
 
   You could, however, also do this "manually",
   by visiting a metadata buffer for the node ('skg-view-metadata')

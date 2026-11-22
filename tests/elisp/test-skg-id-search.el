@@ -69,8 +69,8 @@
       (skg-id-prev)
       (should (equal (point) pos-before)) )))
 
-(ert-deftest test-skg-id-push ()
-  "Test that skg-id-push pushes the metadata ID from the current line."
+(ert-deftest test-skg-push-id ()
+  "Test that skg-push-id pushes the metadata ID from the current line."
   (setq skg-linkstack nil)
   (with-temp-buffer
     (insert "* (skg node (gnid 1)) [[id:2][link to 2]]\n")
@@ -88,7 +88,7 @@
           (let (( len-before (length skg-linkstack) ))
             (goto-char (point-min))
             (search-forward (format "(skg node (gnid %s))" gnid))
-            (skg-id-push)
+            (skg-push-id)
             (should (equal (length skg-linkstack) (1+ len-before)))
             (should (equal (caar skg-linkstack) gnid)) )) )
       (progn ;; From the title area, still finds metadata ID
@@ -96,19 +96,19 @@
           (goto-char (point-min))
           (search-forward "just a title")
           (backward-char 5)
-          (skg-id-push)
+          (skg-push-id)
           (should (equal (length skg-linkstack) (1+ len-before)))
           (should (equal (car skg-linkstack) '("6" "just a title"))) ))
       (let (( len-before (length skg-linkstack) )) ;; Line 3: fake metadata — should not push
         (dotimes (_ 3)
           (goto-char (+ line3-start
                         (random (- line3-end line3-start))))
-          (skg-id-push)
+          (skg-push-id)
           (should (equal (length skg-linkstack) len-before)) )) )))
 
-(ert-deftest test-skg-id-push-on-inline-link ()
+(ert-deftest test-skg-push-id-on-inline-link ()
   "When point is on an inline [[id:X][label]] link inside a headline,
-skg-id-push should push the link's ID and the link's label,
+skg-push-id should push the link's ID and the link's label,
 not the headline's metadata ID and title."
   (setq skg-linkstack nil)
   (with-temp-buffer
@@ -118,12 +118,12 @@ not the headline's metadata ID and title."
     (goto-char (point-min))
     (search-forward "inner label")
     (backward-char 5) ;; somewhere inside the label
-    (skg-id-push)
+    (skg-push-id)
     (should (equal (length skg-linkstack) 1))
     (should (equal (car skg-linkstack)
                    '("inner-id" "inner label"))) ))
 
-(ert-deftest test-skg-id-push-and-view-stack ()
+(ert-deftest test-skg-push-id-and-view-stack ()
   "Test pushing IDs from a buffer and viewing the stack."
   (setq skg-linkstack nil)
   (with-temp-buffer
@@ -133,12 +133,12 @@ not the headline's metadata ID and title."
     (insert "* (skg node (gnid c)) c\n")
     (progn ;; Push from start of buffer (line 1, id=a)
       (goto-char (point-min))
-      (skg-id-push))
+      (skg-push-id))
     (progn ;; Push from last char of line 2 (id=b)
       (goto-char (point-min))
       (forward-line 1)
       (end-of-line)
-      (skg-id-push))
+      (skg-push-id))
     (should (equal (length skg-linkstack) 2))
     (should (equal (car skg-linkstack) '("b" "b has a [[id:a][link to a]]")))
     (should (equal (cadr skg-linkstack) '("a" "a"))) ))

@@ -261,10 +261,12 @@ Otherwise return nil."
                (skg--metadata-sexp-contains-id-p (nth 2 metadata)) )
       (nth 0 metadata) )))
 
-(defun skg-id-push ()
-  "Push an ID and its title/label to `skg-linkstack'.
+(defun skg-push-id ()
+  "Push an ID and its title/label to `skg-linkstack', as a tree of one
+note (see `skg-linkstack').
 If point is on an inline [[id:X][label]] link, push that link's
-ID and label. Otherwise push the headline's metadata ID and title."
+ID and label. Otherwise push the headline's metadata ID and title.
+`skg-push-ancestry' pushes the headline's whole view-ancestry instead."
   (interactive)
   (let (( link-hit (skg--point-in-link-p) ))
     (if link-hit
@@ -283,22 +285,179 @@ ID and label. Otherwise push the headline's metadata ID and title."
               (message "No ID in metadata on this line") )
           (message "No metadata on this line") )) )))
 
+(define-obsolete-function-alias 'skg-id-push #'skg-push-id "2026-11-22")
+
+;;
+;; The linkstack's trees
+;;
+
+(defun skg--linkstack-tree (gnid label &optional edge children)
+  "A tree of `skg-linkstack': the note GNID labelled LABEL, joined to
+its tree-parent by EDGE (nil at a root), with the trees CHILDREN.
+Trailing nils are dropped, so a tree of one note is (GNID LABEL)."
+  (cond (children (list gnid label edge children))
+        (edge     (list gnid label edge))
+        (t        (list gnid label))))
+
+(defun skg--linkstack-tree-edge (tree)
+  "The edge joining TREE's root to its tree-parent, or nil."
+  (nth 2 tree))
+
+(defun skg--linkstack-tree-children (tree)
+  "The trees under TREE's root."
+  (nth 3 tree))
+
+(defun skg--linkstack-tree-chain (tree)
+  "TREE's chain: its root, then each first child, down to a leaf."
+  (cons tree (let (( first-child (car (skg--linkstack-tree-children tree)) ))
+               (when first-child
+                 (skg--linkstack-tree-chain first-child)) )))
+
+(defun skg--linkstack-tree-leaf (tree)
+  "The last note of TREE's chain: the one its push started from."
+  (car (last (skg--linkstack-tree-chain tree))))
+
+(defconst skg--linkstack-relation-letters
+  '((contains . "C") (linksTo . "L") (forks . "K") (hides . "H"))
+  "Each relation an ancestry edge can be, and its herald letter
+\='docs/heralds.org', \"Letters and sides\").")
+
+(defun skg--linkstack-edge-herald (edge)
+  "EDGE, a (RELATION SIDE...), as the herald-like token the stack view
+shows before a child's label: the relation's letter, with the
+tree-parent's ancestor flag \='a' before it when the parent relates
+to the child (side \='in') and after it when the child relates to
+the parent (side \='out'), as the heralds of a view do. So \='aC':
+the parent contains the child; \='Ka': the child forks the parent;
+\='aKa': each forks the other."
+  (concat (if (memq 'in (cdr edge)) "a" "")
+          (or (alist-get (car edge) skg--linkstack-relation-letters)
+              (error "No herald letter for the relation %s" (car edge)))
+          (if (memq 'out (cdr edge)) "a" "")))
+
+(defun skg--linkstack-edge-from-herald (herald)
+  "The edge (RELATION SIDE...) HERALD writes (see
+`skg--linkstack-edge-herald'), or nil if it writes none."
+  (when (string-match "\\`\\(a?\\)\\([CLKH]\\)\\(a?\\)\\'" herald)
+    (let (( relation (car (rassoc (match-string 2 herald)
+                                  skg--linkstack-relation-letters)) )
+          ( sides (append (and (> (length (match-string 1 herald)) 0) '(in))
+                          (and (> (length (match-string 3 herald)) 0) '(out)) )))
+      (when sides (cons relation sides)) )))
+
+(defun skg--linkstack-edge-text (edge)
+  "What EDGE, joining a tree-parent (written first) to its child, reads
+as between their links in a pasted chain: \"/\" the parent contains
+the child, \"\\\" the child contains the parent; \"~\" one forks the
+other; \"->\" the parent links to the child, \"<-\" the child to
+the parent; \"hides\" the parent hides the child, \"is hidden by\"
+the child hides the parent."
+  (let (( in (memq 'in (cdr edge)) ))
+    (pcase (car edge)
+      ('contains (if in "/" "\\"))
+      ('forks    "~")
+      ('linksTo  (if in "->" "<-"))
+      ('hides    (if in "hides" "is hidden by"))
+      (_ (error "No text for the relation %s" (car edge))) )))
+
+(defun skg--linkstack-tree-text (tree leaf-label)
+  "TREE as a paste inserts it: each note of its chain a link, joined by
+its edge's text (`skg--linkstack-edge-text'), the root first, the leaf
+labelled LEAF-LABEL. A tree of one note is just its link."
+  (let (( chain (skg--linkstack-tree-chain tree) ))
+    (mapconcat
+     (lambda (node)
+       (let (( link (format "[[id:%s][%s]]"
+                            (car node)
+                            (if (eq node (car (last chain)))
+                                leaf-label (cadr node))) )
+             ( edge (skg--linkstack-tree-edge node) ))
+         (if edge
+             (concat (skg--linkstack-edge-text edge) " " link)
+           link) ))
+     chain " " )))
+
+(defun skg--linkstack-tree-prefix-for-prompt (tree)
+  "TREE's chain but its leaf, as labels and edge texts, ending in the
+leaf's edge text and a space: \"a / b ~ \". Empty for a tree of one note."
+  (mapconcat
+   (lambda (node)
+     (let (( edge (skg--linkstack-tree-edge node) ))
+       (concat (if edge (concat (skg--linkstack-edge-text edge) " ") "")
+               (if (eq node (skg--linkstack-tree-leaf tree))
+                   ""
+                 (concat (cadr node) " ")) )))
+   (skg--linkstack-tree-chain tree) "" ))
+
+;;
+;; Choosing the tree to paste, and its leaf's label
+;;
+
+(defun skg--linkstack-label-prompt (index)
+  "The prompt for the leaf label of the INDEXth tree of `skg-linkstack'
+(0 is the top): its position when the stack holds more than one, then
+its chain but the leaf (`skg--linkstack-tree-prefix-for-prompt')."
+  (let (( count (length skg-linkstack) ))
+    (concat "Link label"
+            (if (> count 1)
+                (format " (%d/%d; S-left/right: another tree)" (1+ index) count)
+              "")
+            ": "
+            (skg--linkstack-tree-prefix-for-prompt (nth index skg-linkstack)) )))
+
+(defun skg--linkstack-read-leaf-label (index)
+  "Read, in the minibuffer, the leaf label of the INDEXth tree of
+`skg-linkstack', its own as the initial input. S-left and S-right
+throw -1 or 1 to the tag `skg--linkstack-cycle', for
+`skg--linkstack-choose-tree-and-label' to show another tree."
+  (minibuffer-with-setup-hook
+      (lambda ()
+        (let (( map (copy-keymap (current-local-map)) ))
+          (define-key map (kbd "S-<left>")
+                      (lambda () (interactive) (throw 'skg--linkstack-cycle -1)))
+          (define-key map (kbd "S-<right>")
+                      (lambda () (interactive) (throw 'skg--linkstack-cycle 1)))
+          (use-local-map map) ))
+    (read-string (skg--linkstack-label-prompt index)
+                 (cadr (skg--linkstack-tree-leaf (nth index skg-linkstack)))) ))
+
+(defun skg--linkstack-choose-tree-and-label ()
+  "Return (INDEX . LABEL): which tree of `skg-linkstack' to paste (0 is
+the top) and its leaf's label. In the minibuffer, the top tree and its
+leaf's own label, unasked. Elsewhere it asks for the label, starting at
+the top tree; S-left and S-right show the tree above or below it,
+cycling, and start the label over from that tree's leaf."
+  (if (minibufferp)
+      (cons 0 (cadr (skg--linkstack-tree-leaf (car skg-linkstack))))
+    (let (( index 0 )
+          ( chosen nil ))
+      (while (not chosen)
+        (let (( answer (catch 'skg--linkstack-cycle
+                         (list (skg--linkstack-read-leaf-label index))) ))
+          (if (consp answer)
+              (setq chosen (cons index (car answer)))
+            (setq index (mod (+ index answer) (length skg-linkstack)))) ))
+      chosen )))
+
 (defun skg--linkstack-top-or-message ()
-  "If possible, return the top entry (id title) of `skg-linkstack'.
+  "If possible, return the leaf (id title) of the top tree of
+`skg-linkstack': for a tree of one note, that note.
 Othewrise (because the stack is empty) print a message and return nil."
   (if (null skg-linkstack)
       (progn (message "Linkstack is empty") nil)
-    (car skg-linkstack) ))
+    (skg--linkstack-tree-leaf (car skg-linkstack)) ))
 
-(defun skg--insert-link-from-entry (entry)
-  "Insert an org link at point, using ENTRY, a (id title) pair.
-Prompts for the link label, defaulting to the title."
-  (let* (( gnid (car entry) )
-         ( title (cadr entry) )
-         ( label (if (minibufferp)
-                     title
-                   (read-string "Link label: " title))) )
-    (insert (format "[[id:%s][%s]]" gnid label)) ))
+(defun skg--insert-link-from-stack (pop)
+  "Insert at point a tree of `skg-linkstack' as links
+\=(`skg--linkstack-tree-text'), asking which tree and its leaf's label
+\=(`skg--linkstack-choose-tree-and-label'). If POP, remove that tree
+from the stack."
+  (let* (( choice (skg--linkstack-choose-tree-and-label) )
+         ( tree (nth (car choice) skg-linkstack) ))
+    (when pop
+      (setq skg-linkstack (append (seq-take skg-linkstack (car choice))
+                                  (nthcdr (1+ (car choice)) skg-linkstack))))
+    (insert (skg--linkstack-tree-text tree (cdr choice))) ))
 
 (defun skg--org-stars-for-node-insertion ()
   "Return headline stars for inserting a node at point."
@@ -377,11 +536,15 @@ Does not modify the stack."
 (defun skg-paste-link ()
   "Insert an org link at point, using the top of `skg-linkstack'.
 Does not modify the stack.
-Prompts for the link label, defaulting to the title from the stack."
+Prompts for the link label, defaulting to the title from the stack.
+A tree that `skg-push-ancestry' pushed pastes as a chain of links,
+the root first, joined by what joins them in the graph
+\=(`skg--linkstack-tree-text'); only the last link's label is asked for.
+In the prompt, S-left and S-right paste another tree of the stack
+instead (`skg--linkstack-choose-tree-and-label')."
   (interactive)
-  (let (( entry (skg--linkstack-top-or-message) ))
-    (when entry
-      (skg--insert-link-from-entry entry) )))
+  (when (skg--linkstack-top-or-message)
+    (skg--insert-link-from-stack nil) ))
 
 (defun skg-paste-node ()
   "Insert a write-protected occurrence headline from the top of `skg-linkstack'.
@@ -403,12 +566,12 @@ and `writeProtected`, and maybe a editable view request (see
 
 (defun skg-pop-link ()
   "Pop the top of `skg-linkstack' and insert an org link at point.
-Prompts for the link label, defaulting to the title from the stack."
+Prompts for the link label, defaulting to the title from the stack.
+Like `skg-paste-link', a chain pastes as one, and S-left and S-right
+choose another tree: the tree pasted is the one popped."
   (interactive)
-  (let (( entry (skg--linkstack-top-or-message) ))
-    (when entry
-      (pop skg-linkstack)
-      (skg--insert-link-from-entry entry) )))
+  (when (skg--linkstack-top-or-message)
+    (skg--insert-link-from-stack t) ))
 
 (defun skg-pop-node ()
   "Pop the top of `skg-linkstack' and insert a write-protected occurrence headline.
@@ -548,14 +711,17 @@ by `skg-linkstack-mode'."
 (defun skg-validate-linkstack-buffer ()
   "Validate current buffer as an linkstack buffer and return the stack.
 Each headline must have a non-empty title and exactly one body line (the ID).
-Returns (success RESULT) where RESULT is a list of (id label) pairs,
-with the first headline last in the list.
+A headline below another is a child of it in its tree (see
+`skg-linkstack'): one level deeper at most, and its title begins with
+its edge to it, as `skg--format-linkstack-as-org' writes it, \"(aC) \".
+Returns (success RESULT) where RESULT is a list of trees,
+with the first top-level headline's first in the list.
 Returns (error MESSAGE) if validation fails."
   (save-excursion
     (goto-char (point-min))
-    (let ( ( result nil )
+    (let ( ( headlines nil ) ;; (LEVEL ID LABEL EDGE), the last first
            ( error-msg nil )
-           ( headline-regex "^\\*+ +\\([^ \n].*\\)$" ))
+           ( headline-regex "^\\(\\*+\\) +\\([^ \n].*\\)$" ))
       (progn ;; Check no content before first headline
         (skip-chars-forward " \t\n")
         (when (and (not (eobp))
@@ -564,9 +730,11 @@ Returns (error MESSAGE) if validation fails."
       (while (and (not error-msg) (not (eobp)))
         (if (looking-at headline-regex)
             ;; Current line is a headline with non-empty title.
-            (let ( ( label (match-string 1) )
-                   ( body-start (1+ (line-end-position)) )
-                   ( body-end nil ))
+            (let* ( ( level (length (match-string 1)) )
+                    ( title (match-string 2) )
+                    ( above-level (if headlines (car (car headlines)) 0) )
+                    ( body-start (1+ (line-end-position)) )
+                    ( body-end nil ))
               (progn ;; Find where the body ends:
                 ;; either at the next headline or at end of buffer.
                 (forward-line 1)
@@ -580,15 +748,29 @@ Returns (error MESSAGE) if validation fails."
                                     (lambda (line)
                                       (not (string-empty-p
                                             (string-trim line) )))
-                                    (split-string body-text "\n") )))
-                (if (= (length body-lines) 1)
-                    (push (list
-                           (string-trim (car body-lines)) ;; the id
-                           label)
-                          result)
+                                    (split-string body-text "\n") ))
+                      ( edge-and-label
+                        (if (= level 1)
+                            (cons nil title)
+                          (skg--linkstack-edge-and-label-of-title title)) ))
+                (cond
+                 ((> level (1+ above-level))
+                  (setq error-msg
+                        (format "headline '%s' is more than one level below the headline above it"
+                                title) ))
+                 ((not edge-and-label)
+                  (setq error-msg
+                        (format "headline '%s' must begin with its edge to the headline above it, such as (aC)"
+                                title) ))
+                 ((/= (length body-lines) 1)
                   (setq error-msg
                         (format "headline '%s' must have exactly one body line"
-                                label) )) ))
+                                title) ))
+                 (t (push (list level
+                                (string-trim (car body-lines)) ;; the id
+                                (cdr edge-and-label)
+                                (car edge-and-label))
+                          headlines) )) ))
           (;; Not a headline with a valid title.
            ;; Could be a blank line, or a headline with empty title.
            if (looking-at "^\\*")
@@ -599,7 +781,32 @@ Returns (error MESSAGE) if validation fails."
       (if error-msg
           (list 'error error-msg)
         ;; nreverse so first headline in buffer = head of stack
-        (list 'success (nreverse result)) )) ))
+        (list 'success (skg--linkstack-forest-of-headlines
+                        (nreverse headlines) )) )) ))
+
+(defun skg--linkstack-edge-and-label-of-title (title)
+  "(EDGE . LABEL) of TITLE, the title of a linkstack buffer's headline
+below another: \"(HERALD) LABEL\", HERALD an edge as
+`skg--linkstack-edge-herald' writes it. Nil if TITLE is not that."
+  (when (string-match "\\`(\\([^)]*\\)) +\\([^ ].*\\)\\'" title)
+    (let* (( label (match-string 2 title) )
+           ( edge (skg--linkstack-edge-from-herald (match-string 1 title)) ))
+      (when edge (cons edge label)) )))
+
+(defun skg--linkstack-forest-of-headlines (headlines)
+  "The trees of HEADLINES, (LEVEL ID LABEL EDGE) in buffer order, each
+headline the child of the nearest one above it at a lesser level."
+  (let (( trees nil ))
+    (while headlines
+      (let* (( headline (pop headlines) )
+             ( below nil ))
+        (while (and headlines (> (car (car headlines)) (car headline)))
+          (push (pop headlines) below))
+        (push (skg--linkstack-tree
+               (nth 1 headline) (nth 2 headline) (nth 3 headline)
+               (skg--linkstack-forest-of-headlines (nreverse below)))
+              trees) ))
+    (nreverse trees) ))
 
 ;; skg-linkstack-mode-map is defined in skg-keymaps-and-aliases.el.
 
@@ -622,15 +829,31 @@ without writing to disk."
 
 (defun skg--format-linkstack-as-org ()
   "Format `skg-linkstack' as org-mode text.
-Each (id label) pair becomes a headline with label as title and id as body.
+Each tree's note becomes a headline, the label its title and the id its
+body; a child's headline is one level below its parent's, its title
+starting with its edge to it (`skg--linkstack-edge-herald'), \"(aC) \".
 Head of stack (most recently pushed) appears at top of buffer."
-  (mapconcat
-   (lambda (entry)
-     (let (( gnid (car entry) )
-           ( label (cadr entry) ))
-       (format "* %s\n%s" label gnid) ))
-   skg-linkstack
-   "\n" ))
+  (mapconcat (lambda (tree) (skg--format-linkstack-tree-as-org tree 1))
+             skg-linkstack
+             "\n" ))
+
+(defun skg--format-linkstack-tree-as-org (tree level)
+  "TREE as `skg--format-linkstack-as-org' writes it, its root a headline
+of LEVEL."
+  (let (( edge (skg--linkstack-tree-edge tree) ))
+    (mapconcat
+     #'identity
+     (cons (format "%s %s%s\n%s"
+                   (make-string level ?*)
+                   (if edge
+                       (format "(%s) " (skg--linkstack-edge-herald edge))
+                     "")
+                   (cadr tree)
+                   (car tree))
+           (mapcar (lambda (child)
+                     (skg--format-linkstack-tree-as-org child (1+ level)))
+                   (skg--linkstack-tree-children tree)))
+     "\n" )))
 
 (define-minor-mode skg-linkstack-mode
   "Minor mode for editing the skg linkstack.

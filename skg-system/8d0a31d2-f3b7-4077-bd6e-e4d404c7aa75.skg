@@ -4,6 +4,10 @@ body: |2-
   <localleader>u for push, <localleader>o _ for paste,
   <localleader>O _ for pop.
 
+  Neovim has no skg-push-ancestry (Emacs's C-c U) yet: its stack holds
+  only single notes, and a paste cannot choose another entry than the
+  top.
+
   Inside a Vim command-line prompt (search, an Ex command's argument,
   ...), <localleader> chords aren't available, so paste and pop also
   ride cmdline-mode mappings: <C-x>i pastes the top id, <C-x>l pastes
