@@ -149,75 +149,69 @@ pub fn update_views_after_save (
     env, runtime, skgrepo_restriction,
     views_state . graph_straddle . clone (),
     DiffViewBufferRerender::RefreshOnly );
-  let saved_diffView_buffer_kind : Option<DiffViewBufferKind> =
-    // A held view is what the connection registered; an unheld one, what the request names.
-    match viewforest_id_from_request_result . as_ref () . ok ()
-      . and_then ( |viewforest_id| views_state . open_views . views . get (viewforest_id) )
-    { Some (held) => held . diffView_buffer_kind,
-      None => named_diffView_buffer_kind, };
-  let mut saved_view_mut : ViewForest = saved_view;
-  let mut saved_viewnode_id_record : ViewnodeIdRecord =
-    // The parsed buffer carries viewnode IDs; the record says which
-    // it knows, before the refresh runs.
-    views_state . open_views . viewnode_id_record_for_saved_buffer (
-      viewforest_id_from_request_result . as_ref () . ok (),
-      &saved_view_mut );
-  saved_viewnode_id_record . drop_unknown_viewnode_ids_in_parsed_viewforest (&mut saved_view_mut);
-  replace_saved_view_fork_roots (&mut saved_view_mut, fork_specs) ?;
+  let mut saved : SavedView = SavedView {
+    diffView_buffer_kind :
+      // A held view is what the connection registered; an unheld one, what the request names.
+      match viewforest_id_from_request_result . as_ref () . ok ()
+        . and_then ( |viewforest_id| views_state . open_views . views . get (viewforest_id) )
+      { Some (held) => held . diffView_buffer_kind,
+        None => named_diffView_buffer_kind, },
+    viewnode_id_record :
+      // The parsed buffer carries viewnode IDs; the record says which
+      // it knows, before the refresh runs.
+      views_state . open_views . viewnode_id_record_for_saved_buffer (
+        viewforest_id_from_request_result . as_ref () . ok (),
+        &saved_view ),
+    viewforest : saved_view,
+    perspective, };
+  saved . viewnode_id_record . drop_unknown_viewnode_ids_in_parsed_viewforest (&mut saved . viewforest);
+  replace_saved_view_fork_roots (&mut saved . viewforest, fork_specs) ?;
   // The skgsave-commit has happened, so every `(editRequest ...)` in the
   // submitted view is now consumed input. Clear all request carriers at this
   // one boundary before the refresh can echo any of them into the response.
   // `viewRequests` remain: those are fulfilled by the refresh below.
-  saved_view_mut . consume_edit_requests_after_save ();
+  saved . viewforest . consume_edit_requests_after_save ();
   // Gate the occurrences already in the forests before rendering, so even a
   // rendering error cannot echo protected title/body text. A second decision
   // below covers nodes introduced by the refresh.
-  { let restriction : &SkgrepoRestriction = skgrepo_restriction;
-    let input_candidates : Vec<ID> = release_candidates (
-      std::iter::once (&saved_view_mut) . chain (
+  { let release : TextReleaseDecision = save_rerender_release (
+      std::iter::once (&saved . viewforest) . chain (
         collateral_viewforest_ids . iter () . filter_map ( |viewforest_id|
-          views_state . open_views . viewforest_id_to_view (viewforest_id) )));
-    let release : TextReleaseDecision = decide (
-      "save-rerender", restriction, &input_candidates,
-      &context . runtime . graph, &HashSet::new () );
+          views_state . open_views . viewforest_id_to_view (viewforest_id) )),
+      skgrepo_restriction, &context . runtime . graph );
     if matches! (release, TextReleaseDecision::Challenge { .. }) {
       return Ok ( withhold_save_rerender (
-        &release, saved_view_mut, saved_viewnode_id_record,
-        saved_diffView_buffer_kind, perspective . clone (), &collateral_viewforest_ids,
+        &release, saved, &collateral_viewforest_ids,
         viewforest_id_from_request_result, views_state,
         &context . runtime . graph, skgrepo_restriction )); }}
   let requesting_containers : Vec<NodeId> =
-    occurrences_requesting_containers (&saved_view_mut);
+    occurrences_requesting_containers (&saved . viewforest);
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "refresh_view (saved)" ). entered();
       refresh_view ( // saved view first; collateral ones later
-        &mut saved_view_mut,
-        &mut saved_viewnode_id_record,
+        &mut saved . viewforest,
+        &mut saved . viewnode_id_record,
         &mut context,
-        RerenderMode::of_buffer (saved_diffView_buffer_kind, false, perspective . clone ()) ) ?; }
+        RerenderMode::of_buffer (saved . diffView_buffer_kind, false, saved . perspective . clone ()) ) ?; }
   context . warnings . extend ( no_other_containers_warning (
-    &saved_view_mut, &requesting_containers ));
-  let saved_text : String = viewforest_to_string (&saved_view_mut) ?;
+    &saved . viewforest, &requesting_containers ));
+  let saved_text : String = viewforest_to_string (&saved . viewforest) ?;
   let processed_summary : Option<BufferProcessedSummary> =
-    saved_diffView_buffer_kind . and ( context . graph_straddle . as_ref () )
+    saved . diffView_buffer_kind . and ( context . graph_straddle . as_ref () )
     . map ( |straddle| buffer_processed_summary_for (
-      env, straddle, &saved_view_mut ) );
+      env, straddle, &saved . viewforest ) );
   let collateral_views : Vec<RerenderedView> =
     rerender_open_views (&collateral_viewforest_ids, views_state, &mut context);
   // Everything textual is now staged in memory. Decide before changing the
   // open-view registry or streaming the first view.
-  let release_candidates : Vec<ID> = release_candidates (
-    std::iter::once (&saved_view_mut) . chain (
-      collateral_views . iter () . map ( |view| &view . viewforest ) ));
-  { let restriction : &SkgrepoRestriction = skgrepo_restriction;
-    let release : TextReleaseDecision = decide (
-      "save-rerender", restriction, &release_candidates,
-      &context . runtime . graph, &HashSet::new () );
+  { let release : TextReleaseDecision = save_rerender_release (
+      std::iter::once (&saved . viewforest) . chain (
+        collateral_views . iter () . map ( |view| &view . viewforest ) ),
+      skgrepo_restriction, &context . runtime . graph );
     match release {
       decision @ TextReleaseDecision::Challenge { .. } => {
         return Ok ( withhold_save_rerender (
-          &decision, saved_view_mut, saved_viewnode_id_record,
-          saved_diffView_buffer_kind, perspective, &collateral_viewforest_ids,
+          &decision, saved, &collateral_viewforest_ids,
           viewforest_id_from_request_result, views_state,
           &context . runtime . graph, skgrepo_restriction )); }
       TextReleaseDecision::AllowWithWarning { warning } =>
@@ -227,14 +221,35 @@ pub fn update_views_after_save (
   if let Ok (viewforest_id) = viewforest_id_from_request_result {
     register_saved_view (
       views_state, &context . runtime . graph, viewforest_id,
-      saved_view_mut, saved_viewnode_id_record, saved_diffView_buffer_kind,
-      perspective, skgrepo_restriction );
+      saved, skgrepo_restriction );
     register_and_send_rerendered_views (
       stream, views_state, &context . runtime, skgrepo_restriction,
       collateral_views, TcpToClient::CollateralView ); }
   Ok ( SaveResponse::saved (
     saved_buffer_text, saved_text, context . errors, context . warnings,
     processed_summary )) }
+
+/// The saved view, as 'update_views_after_save' carries it to its
+/// registration ('register_saved_view'): the viewforest and its vnid
+/// record, which the refresh brings up to date; its buffer kind in
+/// the diff view, if it is one; and the perspective the request says
+/// it follows, which the connection keeps for the view.
+struct SavedView {
+  viewforest           : ViewForest,
+  viewnode_id_record   : ViewnodeIdRecord,
+  diffView_buffer_kind : Option<DiffViewBufferKind>,
+  perspective          : Perspective,
+}
+
+/// The text-release decision of a save's rerender over what
+/// 'viewforests' show ('release_candidates').
+fn save_rerender_release<'v> (
+  viewforests : impl Iterator<Item = &'v ViewForest>,
+  restriction : &SkgrepoRestriction,
+  graph       : &InRustGraph,
+) -> TextReleaseDecision {
+  decide ( "save-rerender", restriction, &release_candidates (viewforests),
+           graph, &HashSet::new () ) }
 
 /// What a save says of a containers request that drew no folder.
 pub const NO_OTHER_CONTAINERS : &str = "No other containers.";
@@ -283,10 +298,7 @@ fn no_other_containers_warning (
 /// then the collateral ones.
 fn withhold_save_rerender (
   decision                          : &TextReleaseDecision,
-  saved_view                        : ViewForest,
-  saved_viewnode_id_record          : ViewnodeIdRecord,
-  saved_diffView_buffer_kind        : Option<DiffViewBufferKind>,
-  perspective                       : Perspective, // the save's, under which the saved view is registered
+  saved                             : SavedView,
   collateral_viewforest_ids         : &[ViewforestId],
   viewforest_id_from_request_result : &Result<ViewforestId, String>,
   views_state                       : &mut ViewsState,
@@ -296,35 +308,29 @@ fn withhold_save_rerender (
   let mut withheld_viewforest_ids : Vec<ViewforestId> = Vec::new ();
   if let Ok (viewforest_id) = viewforest_id_from_request_result {
     register_saved_view (
-      views_state, graph, viewforest_id,
-      saved_view, saved_viewnode_id_record, saved_diffView_buffer_kind,
-      perspective, skgrepo_restriction );
+      views_state, graph, viewforest_id, saved, skgrepo_restriction );
     withheld_viewforest_ids . push (viewforest_id . clone ()); }
   withheld_viewforest_ids . extend (
     collateral_viewforest_ids . iter () . cloned () );
   SaveResponse::text_release_challenge (decision, &withheld_viewforest_ids) }
 
-/// Register the saved view 'viewforest_id' in place of what the
-/// connection held, as the buffer of the diff view
-/// 'saved_diffView_buffer_kind' if it is one, following
-/// 'perspective', rendered under the save's
+/// Register 'saved' as the view 'viewforest_id', in place of what the
+/// connection held, as the buffer of the diff view its kind names if
+/// it is one, following its perspective, rendered under the save's
 /// 'skgrepo_restriction'.
 fn register_saved_view (
-  views_state                : &mut ViewsState,
-  graph                      : &InRustGraph,
-  viewforest_id              : &ViewforestId,
-  saved_view                 : ViewForest,
-  saved_viewnode_id_record   : ViewnodeIdRecord,
-  saved_diffView_buffer_kind : Option<DiffViewBufferKind>,
-  perspective                : Perspective,
-  skgrepo_restriction        : &SkgrepoRestriction,
+  views_state         : &mut ViewsState,
+  graph               : &InRustGraph,
+  viewforest_id       : &ViewforestId,
+  saved               : SavedView,
+  skgrepo_restriction : &SkgrepoRestriction,
 ) {
   views_state . open_views . update_view (
-    graph, viewforest_id, saved_view, saved_viewnode_id_record,
+    graph, viewforest_id, saved . viewforest, saved . viewnode_id_record,
     skgrepo_restriction );
   views_state . open_views . set_perspective (
-    viewforest_id, perspective );
-  if let Some (buffer_kind) = saved_diffView_buffer_kind {
+    viewforest_id, saved . perspective );
+  if let Some (buffer_kind) = saved . diffView_buffer_kind {
     views_state . open_views . mark_as_diffView_buffer (viewforest_id, buffer_kind); }}
 
 /// A fresh view of a forked node shows the node itself (from the root
