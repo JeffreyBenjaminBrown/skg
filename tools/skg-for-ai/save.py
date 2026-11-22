@@ -724,7 +724,6 @@ def predicted_forks (edited, original, headline_of_handle, ownership,
   or forker as such), whose content is shown in part, takes no edit
   of its title or body."""
   forks = PredictedForks ()
-  owned = [ name for name, is_owned in ownership . items () if is_owned ]
   original_index_of_handle = { headline . handle : index
                                for index, headline in enumerate (original) }
   seen_handles = set ()
@@ -773,6 +772,16 @@ def predicted_forks (edited, original, headline_of_handle, ownership,
     forks . gnids . append (gnid)
   if not forks . lines:
     return forks
+  settle_clone_skgrepo (forks, ownership, fork_into)
+  return forks
+
+def settle_clone_skgrepo (forks, ownership, fork_into):
+  """Set 'forks . clone_skgrepo', the owned skgrepo the clones of FORKS
+  go to: FORK_INTO if it names an owned one, else the one skgrepo this
+  server owns. Where neither settles it, add an error line; where one
+  does, a line saying which, and how. OWNERSHIP and FORK_INTO are as
+  'predicted_forks' takes them."""
+  owned = [ name for name, is_owned in ownership . items () if is_owned ]
   if fork_into is not None:
     if fork_into in owned:
       forks . clone_skgrepo = fork_into
@@ -795,7 +804,6 @@ def predicted_forks (edited, original, headline_of_handle, ownership,
         else ", the one skgrepo this server owns" ) +
       ", unless the edit settles another. The server asks before forking; "
       "'--yes' approves." )
-  return forks
 
 def in_content_position (edited, index, headline_of_handle):
   """Whether the headline at INDEX of the edited outline stands where
