@@ -84,8 +84,10 @@ use crate::types::env::SkgEnv;
 use crate::types::errors::{BufferValidationError, SaveError, format_save_error_as_org};
 use crate::types::config::SkgConfig;
 use crate::types::misc::{ID, SkgrepoName};
+use crate::types::nodes::complete::Graphnode;
 use crate::types::save::{
-  NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan, SkgrepoMove };
+  ForkSpec, NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan,
+  SkgrepoMove, UneditedStaleGraphnode };
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::ViewnodeId;
 use crate::types::views_state::{DiffViewBufferKind, Perspective, ViewforestId, ViewnodeIdRecord};
@@ -94,7 +96,7 @@ use crate::view_text_delta::{changed_headlines, changed_headlines_entry};
 
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
@@ -770,15 +772,9 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
   if viewforest . is_empty ()
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
-  { // A buffer the connection does not hold keeps the viewnode IDs it
-    // carries, and fresh ones are counted from past them.
-    let held : bool = viewforest_id_from_request_result . as_ref () . ok ()
-      . is_some_and ( |viewforest_id| views_state . open_views . views . contains_key (viewforest_id) );
-    if ! held {
-      ViewnodeIdRecord::error_unless_carried_viewnode_ids_leave_room (&viewforest)
-        . map_err ( |e| Box::new ( SaveError::BufferValidationErrors {
-            errors : vec! [ BufferValidationError::Other (e) ],
-            warnings : parse_warnings . clone (), } ) as Box<dyn Error> ) ?; }}
+  error_unless_unheld_buffer_leaves_room_past_its_viewnode_ids (
+    &viewforest, viewforest_id_from_request_result, views_state,
+    &parse_warnings ) ?;
   let SavePlan {
     node_instructions      : mut nonmerge_nodeInstructions,
     nodeMerge_pairs,
@@ -788,15 +784,9 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
     unedited_stale_graphnodes,
     hide_report }
     = save_plan;
-  { // A node the buffer would write that changed after the buffer was
-    // rendered refuses the whole save, before any confirmation is asked.
-    let stale_errors : Vec<BufferValidationError> =
-      stale_write_errors (
-        &runtime . graph, &baseline . writes, &viewforest,
-        &nonmerge_nodeInstructions, &fork_specs );
-    if ! stale_errors . is_empty () {
-      return Err (Box::new (SaveError::BufferValidationErrors {
-        errors : stale_errors, warnings : parse_warnings, })); }}
+  error_if_buffer_writes_stale_graphnodes (
+    &runtime . graph, &baseline . writes, &viewforest,
+    &nonmerge_nodeInstructions, &fork_specs, &parse_warnings ) ?;
   error_unless_unrestricted_for_restore_and_processed_requests (
     &viewforest, skgrepo_restriction, &parse_warnings ) ?;
   if preview { // nothing below has run, so nothing is written or held
@@ -842,22 +832,14 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
     // and on approval re-issues the save with (approved-forks . "true").
     // (The already-forked and skgrepo checks ran in
     // buffer_to_validated_saveplan, so every fork here is admissible.)
-    return Ok ( SaveResponse::fork_confirmation (
-      parse_warnings,
-      build_fork_confirmation_buffer (&fork_specs),
-      format! ( "{} node(s) will be forked. Save again to approve, \
-                 or kill this buffer to decline.",
-                fork_specs . len () ))); }
+    return Ok ( fork_confirmation_response (parse_warnings, &fork_specs) ); }
   // Forks detected this save (approved, or none): editing a foreign node
   // N is a request to clone it. The clone C is skgsave-committed with the rest of the
   // save -- its 'forks = [N]' relationship rides in the same
   // NodeInstructions, so the fork rules' check of the touched notes (which reads the
   // simulated post-save graph) sees C before validating.
-  let nonmerge_nodeInstructions : Vec<NodeInstruction> = {
-    let mut nodes : Vec<NodeInstruction> = nonmerge_nodeInstructions;
-    for spec in &fork_specs {
-      nodes . push ( NodeInstruction::Save ( spec . clone . clone () )); }
-    nodes };
+  let nonmerge_nodeInstructions : Vec<NodeInstruction> =
+    with_fork_clones_saved (nonmerge_nodeInstructions, &fork_specs);
 
   let prepared_save : PreparedSave =
   { // Prepare every graph/filesystem phase while the writer gate is held.
@@ -944,21 +926,96 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
         &fork_specs,
         named_diffView_buffer_kind,
         perspective ) ?;
-    { // Nonfatal parse warnings (e.g. discarded folder headline text)
-      // precede the rerender's warnings.
-      let mut warnings : Vec<String> = parse_warnings;
-      warnings . extend ( response . warnings );
-      warnings . extend ( strandeds_warnings );
-      warnings . extend ( unedited_stale_graphnodes . iter ()
-                          . map (left_as_the_graph_has_it_warning) );
-      warnings . extend ( restore_warnings );
-      warnings . extend ( processed_warnings );
-      warnings . extend (
+    response . warnings =
+      save_warnings_in_the_order_shown (
+        parse_warnings, response . warnings, strandeds_warnings,
+        &unedited_stale_graphnodes, restore_warnings, processed_warnings,
         post_skgsave_commit_hiddenoutside_warnings (
-          &swapped_in . graph, &post_skgsave_commit_notice_candidates ) );
-      response . warnings = warnings; }
+          &swapped_in . graph, &post_skgsave_commit_notice_candidates ));
     response . hides = hide_report;
     Ok (response) } }
+
+/// A buffer the connection does not hold keeps the viewnode IDs it
+/// carries, and fresh ones are counted from past them: refused unless
+/// they leave room for that.
+fn error_unless_unheld_buffer_leaves_room_past_its_viewnode_ids (
+  viewforest                        : &ViewForest,
+  viewforest_id_from_request_result : &Result<ViewforestId, String>,
+  views_state                       : &ViewsState,
+  parse_warnings                    : &[String],
+) -> Result<(), Box<dyn Error>> {
+  let held : bool = viewforest_id_from_request_result . as_ref () . ok ()
+    . is_some_and ( |viewforest_id| views_state . open_views . views . contains_key (viewforest_id) );
+  if ! held {
+    ViewnodeIdRecord::error_unless_carried_viewnode_ids_leave_room (viewforest)
+      . map_err ( |e| Box::new ( SaveError::BufferValidationErrors {
+          errors : vec! [ BufferValidationError::Other (e) ],
+          warnings : parse_warnings . to_vec (), } ) as Box<dyn Error> ) ?; }
+  Ok (( )) }
+
+/// A node the buffer would write that changed after the buffer was
+/// rendered refuses the whole save, before any confirmation is asked.
+fn error_if_buffer_writes_stale_graphnodes (
+  graph                     : &InRustGraph,
+  baseline_writes           : &BTreeMap<ID, Graphnode>,
+  viewforest                : &ViewForest,
+  nonmerge_nodeInstructions : &[NodeInstruction],
+  fork_specs                : &[ForkSpec],
+  parse_warnings            : &[String],
+) -> Result<(), Box<dyn Error>> {
+  let stale_errors : Vec<BufferValidationError> =
+    stale_write_errors (
+      graph, baseline_writes, viewforest,
+      nonmerge_nodeInstructions, fork_specs );
+  if ! stale_errors . is_empty () {
+    return Err (Box::new (SaveError::BufferValidationErrors {
+      errors : stale_errors, warnings : parse_warnings . to_vec (), })); }
+  Ok (( )) }
+
+/// A save that found forks and was not approved: the write-protected
+/// fork-confirmation buffer, and the prompt that goes with it.
+fn fork_confirmation_response (
+  parse_warnings : Vec<String>,
+  fork_specs     : &[ForkSpec],
+) -> SaveResponse {
+  SaveResponse::fork_confirmation (
+    parse_warnings,
+    build_fork_confirmation_buffer (fork_specs),
+    format! ( "{} node(s) will be forked. Save again to approve, \
+               or kill this buffer to decline.",
+              fork_specs . len () )) }
+
+/// The save's nodeInstructions, then a Save of each fork's clone.
+fn with_fork_clones_saved (
+  nonmerge_nodeInstructions : Vec<NodeInstruction>,
+  fork_specs                : &[ForkSpec],
+) -> Vec<NodeInstruction> {
+  let mut nodes : Vec<NodeInstruction> = nonmerge_nodeInstructions;
+  for spec in fork_specs {
+    nodes . push ( NodeInstruction::Save ( spec . clone . clone () )); }
+  nodes }
+
+/// Every warning of a saved save, in the order the user reads them.
+/// Nonfatal parse warnings (e.g. discarded folder headline text)
+/// precede the rerender's warnings.
+fn save_warnings_in_the_order_shown (
+  parse_warnings            : Vec<String>,
+  rerender_warnings         : Vec<String>,
+  strandeds_warnings        : Vec<String>,
+  unedited_stale_graphnodes : &[UneditedStaleGraphnode],
+  restore_warnings          : Vec<String>,
+  processed_warnings        : Vec<String>,
+  hiddenoutside_warnings    : Vec<String>,
+) -> Vec<String> {
+  let mut warnings : Vec<String> = parse_warnings;
+  warnings . extend ( rerender_warnings );
+  warnings . extend ( strandeds_warnings );
+  warnings . extend ( unedited_stale_graphnodes . iter ()
+                      . map (left_as_the_graph_has_it_warning) );
+  warnings . extend ( restore_warnings );
+  warnings . extend ( processed_warnings );
+  warnings . extend ( hiddenoutside_warnings );
+  warnings }
 
 /// Restore and processed requests write or approve what a skgrepo
 /// restriction may hide: refused unless the connection is
