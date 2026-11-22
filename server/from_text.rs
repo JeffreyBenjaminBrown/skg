@@ -463,7 +463,7 @@ fn explicit_fork_specs_from_viewforest (
     if ! t . view_requests . contains (& ViewRequest::Fork) { continue; }
     let pid : &ID = & t . gnid;
     let graph_snapshot : Graphnode =
-      match graphnode_by_gnid (graph, config, pid) {
+      match graphnode_by_gnid (graph, pid) {
         Ok (nc) => nc,
         Err (e) => {
           errors . push ( BufferValidationError::Other ( format! (

@@ -65,10 +65,10 @@ fn nodeMerge_from_acquirer_and_acquiree (
 ) -> Result<NodeMerge, Box<dyn Error>> {
   let acquirer_before_nodeMerge : Graphnode =
     graphnode_by_gnid (
-      graph, config, acquirer_gnid )?;
+      graph, acquirer_gnid )?;
   let acquiree_before_nodeMerge : Graphnode =
     graphnode_by_gnid (
-      graph, config, &acquiree_gnid )?;
+      graph, &acquiree_gnid )?;
   let acquiree_text_preserver : Graphnode =
     create_acquiree_text_preserver (&acquiree_before_nodeMerge);
   let shown_pre_merge : HashSet<ID> = {

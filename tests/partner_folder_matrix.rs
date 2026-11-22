@@ -405,7 +405,7 @@ async fn forker_only_members (
     fails . want_before (s, &resp . saved_view,
                          "(skg hiddenOutsideOfForkPartnersFolder)", "(gnid roSub-a)");
     let owner : Graphnode = graphnode_by_gnid (
-      &graph . load_full (), config, &ID::from ("roSub-owner") ) ?;
+      &graph . load_full (), &ID::from ("roSub-owner") ) ?;
     if members_of (owner . hides . or_default ()) != vec! [ ID::from ("roSub-a") ] {
       fails . record (s, format! (
         "deleting a forker-only member must hide it: hides = {:?}",
@@ -834,7 +834,7 @@ fn a_save_admits_a_second_owned_fork
       let r2 : Graphnode =
         graphnode_by_gnid (
           &graph_handle_from_config (config) ? . load_full (),
-          config, &ID::from ("mono-r2") ) ?;
+          &ID::from ("mono-r2") ) ?;
       assert_eq! ( members_msv (&r2 . forks) . or_default (),
                    &[ ID::from ("mono-target") ],
                    "the save must write mono-r2's fork" );
@@ -877,7 +877,7 @@ fn buffer_save_refuses_a_self_fork
       let r2 : Graphnode =
         graphnode_by_gnid (
           &skg::test_utils::graph_handle_from_config (config)? . load_full (),
-          config, &ID::from ("mono-r2") ) ?;
+          &ID::from ("mono-r2") ) ?;
       let forks_empty : bool = match &r2 . forks {
         MSV::Unspecified       => true,
         MSV::Specified (gnids)   => gnids . is_empty (), };
@@ -926,7 +926,7 @@ fn a_save_leaving_an_owned_note_containing_its_foreign_forker_is_refused
       let e : Graphnode =
         graphnode_by_gnid (
           &graph_handle_from_config (config) ? . load_full (),
-          config, &ID::from ("E") ) ?;
+          &ID::from ("E") ) ?;
       assert! ( members_of (&e . contains) . is_empty (),
         "the save ending the pair writes E without R: {:?}", e . contains );
       Ok (( )) } )) }

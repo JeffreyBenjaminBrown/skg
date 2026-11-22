@@ -199,7 +199,7 @@ pub fn node (
   pid    : &str,
 ) -> Result<Graphnode, Box<dyn Error>> {
   graphnode_by_gnid (
-    &graph_handle_from_config (config) ? . load_full (), config, &ID::from (pid) ) }
+    &graph_handle_from_config (config) ? . load_full (), &ID::from (pid) ) }
 
 /// The node 'pid' as the files on disk have it.
 pub fn node_from_disk (
