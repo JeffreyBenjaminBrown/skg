@@ -100,7 +100,26 @@ import time
 import traceback
 import uuid
 
-REPO_ROOT = os . path . dirname ( os . path . dirname (
+# The sections of this file, in order, each under a banner of '='
+# (subsections '-') whose first line is the title given here; grep
+# for '^# TITLE' to reach one:
+#   Commands: 'main', the command line, a function per command.
+#   The chain of a headline; What a headline's heralds mean: 'chain'
+#     and 'describe'.
+#   Fetching views; Writing the files ('RenderedView').
+#   The full view, parsed; Facts from one headline's metadata;
+#   Relationship heralds; Links; Repo ownership; The compact view;
+#   Every herald (- The lens; - What a headline's heralds need from the
+#   headlines around it); Change facts; The summary.
+#   Saving an edited compact view (- Words read against the outline;
+#   - 'subtree'; - Rebuilding the full buffer; - The report of changes;
+#   - Placing an existing node; - Forking; - Retyped headlines; - The
+#   fork confirmation; - The save's other questions; - The server's
+#   answer).
+#   The daemon; The connection ('SkgConnection', 'DaemonConnection',
+#   the errors, the response helpers); S-expressions.
+
+REPO_ROOT =os . path . dirname ( os . path . dirname (
   os . path . dirname ( os . path . abspath (__file__) )))
 SHARED_FOLDER = os . path . join (REPO_ROOT, "shared")
 HOST = "127.0.0.1"
