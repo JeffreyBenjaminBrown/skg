@@ -14,6 +14,7 @@
 // n from a view of u: n's view, rerendered collaterally, shows u in
 // its place by pid, after t and the note riding after t.
 
+use crate::view_and_save_helpers::line_containing;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::save_and_rerender;
 use std::error::Error;
@@ -46,16 +47,6 @@ fn a_forks_folders_forkers_keep_the_graphs_order
       a_forks_folders_forkers_keep_the_graphs_order_impl (
         config, tantivy ) . await
     } )) }
-
-/// The whole line containing the given metadata fragment.
-fn line_containing<'a> (
-  buf      : &'a str,
-  fragment : &str,
-) -> &'a str {
-  buf . lines ()
-    . find ( |l| l . contains (fragment) )
-    . unwrap_or_else (
-      || panic! ( "no line contains {:?} in:\n{}", fragment, buf )) }
 
 fn assert_member_order (
   buf    : &str,

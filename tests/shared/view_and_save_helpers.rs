@@ -95,6 +95,16 @@ pub fn line_of<'a> (
     . find ( |line| line . contains (&format! ("(gnid {})", gnid)) )
     . unwrap_or_else ( || panic! ( "no line shows {} in:\n{}", gnid, buf )) }
 
+/// The first line of 'buf' that contains 'fragment'.
+pub fn line_containing<'a> (
+  buf      : &'a str,
+  fragment : &str,
+) -> &'a str {
+  buf . lines ()
+    . find ( |l| l . contains (fragment) )
+    . unwrap_or_else (
+      || panic! ( "no line contains {:?} in:\n{}", fragment, buf )) }
+
 pub fn depth (
   line : &str,
 ) -> usize {

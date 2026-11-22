@@ -12,6 +12,7 @@
 // folders, and so draws its hider folder. x is an unrelated node the
 // test places inside that folder.
 
+use crate::view_and_save_helpers::line_containing;
 use std::error::Error;
 
 use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, run_with_shared_test_stores, graph_handle_from_config};
@@ -55,15 +56,6 @@ async fn save_buffer (
     &Ok ( ViewforestId::ContentView ("view of n" . to_string ()) ),
     views_state ) . await }
 
-
-fn line_containing<'a> (
-  buf      : &'a str,
-  fragment : &str,
-) -> &'a str {
-  buf . lines ()
-    . find ( |l| l . contains (fragment) )
-    . unwrap_or_else (
-      || panic! ( "no line contains {:?} in:\n{}", fragment, buf )) }
 
 async fn write_protected_folder_repairs_warn_impl (
   config : &SkgConfig,

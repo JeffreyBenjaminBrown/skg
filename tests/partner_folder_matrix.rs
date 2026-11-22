@@ -22,6 +22,7 @@
 // established style of partner_folder_order / partner_folder_warnings, which
 // keeps the metadata always correct.
 
+use crate::view_and_save_helpers::line_containing;
 use skg::metadata_canon::without_viewnode_ids;
 use std::error::Error;
 
@@ -89,12 +90,6 @@ impl Fails {
 //////////////////////////////////////////////////////////////
 // Small helpers
 //////////////////////////////////////////////////////////////
-
-fn line_containing<'a> ( buf : &'a str, fragment : &str ) -> &'a str {
-  buf . lines ()
-    . find ( |l| l . contains (fragment) )
-    . unwrap_or_else (
-      || panic! ( "no line contains {:?} in:\n{}", fragment, buf )) }
 
 async fn render (
   root    : &str,
