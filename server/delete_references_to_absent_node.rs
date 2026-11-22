@@ -5,8 +5,8 @@
 //! that same graph snapshot rather than from client-supplied text.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::save::graphnode_from_graphnodeInRust;
 use crate::types::misc::{ID, RelPartner, MSV, SkgConfig, SkgrepoName};
+use crate::types::nodes::complete::Graphnode;
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::links::links_with_ranges_from_text;
 
@@ -192,7 +192,7 @@ pub fn rewrite (
   for pid in affected {
     let node = graph . get (&pid)
       .ok_or_else (|| format! ("Cleanup recorder disappeared: {}", pid))?;
-    let mut rewritten = graphnode_from_graphnodeInRust (node);
+    let mut rewritten = Graphnode::from (node);
     rewritten . contains . retain (|m| m . member != fresh . raw_gnid);
     rewritten . forks = remove_exact (
       &rewritten . forks, &fresh . raw_gnid);

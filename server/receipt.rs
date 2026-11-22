@@ -20,7 +20,6 @@ use crate::from_text::fork::{
   build_fork_clone, existing_owned_fork_of, validate_fork_specs_in_graph};
 use crate::from_text::hide_report::hide_report_lines;
 use crate::from_text::local_fieldintent_collection::resolve_visibility::member_it_stands_for;
-use crate::save::graphnode_from_graphnodeInRust;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName};
@@ -240,7 +239,7 @@ fn receipt_holder (
     } else { existing_owned_fork_of (config, graph, &item . pid)
              . map ( |fork| ( fork, "your fork of it" )) };
   if let Some ((pid, which)) = existing {
-    let mut holder : Graphnode = graphnode_from_graphnodeInRust (
+    let mut holder : Graphnode = Graphnode::from (
       graph . nodes . get (&pid) . expect ("an existing fork is a node") );
     if let Some (named) = &request . fork_into {
       if named != &holder . home_skgrepo {
@@ -264,7 +263,7 @@ fn receipt_holder (
     Some (named) => named . clone (),
     None => default_fork_skgrepo (graph, config, restriction, item, mailbox) ?, };
   let buffer_node : Graphnode = { // the item, with the receipt typed as its first child
-    let mut node : Graphnode = graphnode_from_graphnodeInRust (item);
+    let mut node : Graphnode = Graphnode::from (item);
     node . contains . insert ( 0, RelPartner::at_relRepo (
       skgrepo . clone (), receipt_pid . clone () ));
     node };
@@ -346,7 +345,7 @@ fn mailbox_fork_hiding (
   item        : &GraphnodeInRust,
   mailbox     : &Mailbox,
 ) -> Result<(Option<Graphnode>, Vec<String>), ReceiptRefusal> {
-  let mut fork : Graphnode = graphnode_from_graphnodeInRust (
+  let mut fork : Graphnode = Graphnode::from (
     graph . nodes . get (&mailbox . fork)
       . expect ("a mailbox's fork is a node") );
   let member_pid : ID = graph . pid_else_raw_id (&mailbox . member);

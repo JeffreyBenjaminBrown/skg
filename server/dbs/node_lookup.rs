@@ -38,17 +38,4 @@ pub fn graphnode_from_graph (
   gnid    : &ID,
 ) -> Option<Graphnode> {
   let pid : ID = graph . pid_of (gnid) ?;
-  let rust = graph . nodes . get (&pid) ?;
-  Some ( Graphnode {
-    pid                          : rust . pid . clone (),
-    home_skgrepo                 : rust . home_skgrepo . clone (),
-    extra_ids                    : rust . extra_ids . clone (),
-    title                        : rust . title . clone (),
-    overPrivateText_telescope               : rust . overPrivateText_telescope,
-    aliases                      : rust . aliases . clone (),
-    body                         : rust . body . clone (),
-    contains                     : rust . contains . clone (),
-    forks                        : rust . forks . clone (),
-    hides                        : rust . hides . clone (),
-    flags                        : rust . flags . clone (),
-    attribution                  : rust . attribution . clone (), } ) }
+  graph . nodes . get (&pid) . map (Graphnode::from) }

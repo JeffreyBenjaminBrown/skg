@@ -62,6 +62,27 @@ impl From<&Graphnode> for GraphnodeInRust {
   }
 }
 
+impl From<&GraphnodeInRust> for Graphnode {
+  /// Copy every field but the derived 'linksTo', verbatim: an
+  /// unspecified list stays unspecified.
+  fn from (rust: &GraphnodeInRust) -> Self {
+    Graphnode {
+      pid                          : rust . pid . clone (),
+      home_skgrepo                 : rust . home_skgrepo . clone (),
+      extra_ids                    : rust . extra_ids . clone (),
+      title                        : rust . title . clone (),
+      overPrivateText_telescope               : rust . overPrivateText_telescope,
+      aliases                      : rust . aliases . clone (),
+      body                         : rust . body . clone (),
+      contains                     : rust . contains . clone (),
+      forks                        : rust . forks . clone (),
+      hides                        : rust . hides . clone (),
+      flags                        : rust . flags . clone (),
+      attribution                  : rust . attribution . clone (),
+    }
+  }
+}
+
 /// 'list', or 'MSV::Unspecified' if it is empty.
 fn unspecified_if_empty<T : Clone> (
   list : &MSV<T>,

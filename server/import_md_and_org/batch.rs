@@ -5,8 +5,7 @@ use super::{discover_documents, build::{BuiltDocument, build_document},
   resolve::{contains_absolute_file_link, resolve_document_links}};
 use crate::dbs::filesystem::multiple_nodes::{
   read_all_skg_files_from_skgrepos_read_only, read_skg_sections_from_folder};
-use crate::dbs::in_rust_graph::{InRustGraph,
-  complete_validation::complete_from_rust};
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::export_org::claimed_export_targets;
 use crate::types::env::SkgEnv;
 use crate::types::links::org_literal_ranges::HEADLINES_INSIDE_BLOCKS_EXPLANATION;
@@ -249,7 +248,7 @@ fn ensure_runtime_matches_disk (
       normalized_for_runtime_comparison (node . clone ()))) . collect ();
   let runtime : HashMap<ID, Graphnode> = graph . nodes . iter ()
     .map (|(gnid, node)| (gnid . clone (),
-      normalized_for_runtime_comparison (complete_from_rust (node))))
+      normalized_for_runtime_comparison (Graphnode::from (node))))
     .collect ();
   if disk != runtime {
     return Err ("Configured repo files differ from the runtime graph; rebuild and preview again"

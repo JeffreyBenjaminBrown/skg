@@ -487,7 +487,7 @@ pub(crate) fn apply_delete_propagation_cleanup (
     for pid in referencer_pids {
       let Some (rust) = graph_snap . get (&pid) else { continue; };
       node_defs . push ( NodeInstruction::Save ( SaveNode (
-        graphnode_from_graphnodeInRust (rust) ))); }
+        Graphnode::from (rust) ))); }
     if cleanup_count > 0 {
       tracing::info!(
         "Adding {} cleanup save(s) to remove references to deleted nodes.",
@@ -578,27 +578,6 @@ fn records_of_graphnodeInRust (
     . collect () }
 
 
-
-/// Project a GraphnodeInRust back into a Graphnode verbatim. Stripping
-/// of deleted ids happens later, in 'apply_delete_propagation_cleanup''s
-/// ID-stripping pass, and applies uniformly to all Saves.
-pub(crate) fn graphnode_from_graphnodeInRust (
-  rust : &GraphnodeInRust,
-) -> Graphnode {
-  Graphnode {
-    pid                          : rust . pid . clone (),
-    home_skgrepo                 : rust . home_skgrepo . clone (),
-    extra_ids                    : rust . extra_ids . clone (),
-    title                        : rust . title . clone (),
-    overPrivateText_telescope               : rust . overPrivateText_telescope,
-    aliases                      : rust . aliases . clone (),
-    body                         : rust . body . clone (),
-    contains                     : rust . contains . clone (),
-    forks                        : rust . forks . clone (),
-    hides                        : rust . hides . clone (),
-    flags                        : rust . flags . clone (),
-    attribution                  : rust . attribution . clone (),
-  }}
 
 pub fn update_fs_from_nodeInstructions (
   node_defs     : &[NodeInstruction],

@@ -18,7 +18,6 @@ use crate::dbs::in_rust_graph::fork_rules::{
 use crate::telescope::invariants::{TelescopeViolation, validate_all_telescopes};
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
-use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -186,7 +185,7 @@ pub fn validate_complete_graph_candidate (
   nodeInstructions : &[NodeInstruction],
 ) -> CompleteGraphValidation {
   let mut by_pid : BTreeMap<ID, Graphnode> = current . nodes . iter ()
-    . map (|(pid, node)| (pid . clone (), complete_from_rust (node)))
+    . map (|(pid, node)| (pid . clone (), Graphnode::from (node)))
     . collect ();
   for nodeInstruction in nodeInstructions {
     match nodeInstruction {
@@ -197,21 +196,4 @@ pub fn validate_complete_graph_candidate (
     }}
   let nodes : Vec<Graphnode> = by_pid . into_values () . collect ();
   validate_complete_graph (config, &nodes)
-}
-
-pub(crate) fn complete_from_rust (node : &GraphnodeInRust) -> Graphnode {
-  Graphnode {
-    title : node . title . clone (),
-    overPrivateText_telescope : node . overPrivateText_telescope,
-    aliases : node . aliases . clone (),
-    home_skgrepo : node . home_skgrepo . clone (),
-    pid : node . pid . clone (),
-    extra_ids : node . extra_ids . clone (),
-    body : node . body . clone (),
-    contains : node . contains . clone (),
-    forks : node . forks . clone (),
-    hides : node . hides . clone (),
-    flags : node . flags . clone (),
-    attribution : node . attribution . clone (),
-  }
 }
