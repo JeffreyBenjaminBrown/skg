@@ -410,7 +410,12 @@ pub(crate) fn warrant_of_child (
 /// 'ByGraph', carrying no warrant fact. Under a tombstone, which has
 /// no goal, an occurrence of an orphan graphnode (one no list the
 /// skgrepo restriction shows contains) is unwarranted, as it is under
-/// a write-protected occurrence ('orphan_under_a_tombstone').
+/// a write-protected occurrence ('orphan_under_a_tombstone'). Under a
+/// parent that reads no claims ('parent_reads_claims'), each child
+/// first claims nothing, as 'mark_claims' leaves it: the printer
+/// writes no 'noClaim' there, so a child read back from the text
+/// claims, and a forker-only or indirect member of a forks folder
+/// under a write-protected occurrence would be unwarranted.
 fn set_warrants (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -419,7 +424,11 @@ fn set_warrants (
 ) {
   let is_root : bool = matches! ( tree . get (parent) . unwrap () . value () . kind,
                                   ViewnodeKind::BufferRoot );
+  let claims_are_read : bool = is_root || parent_reads_claims (tree, parent);
   for child in children_of (tree, parent) {
+    if ! claims_are_read
+       && tree . get (child) . unwrap () . value () . claims () == Some (true) {
+      tree . get_mut (child) . unwrap () . value () . set_claim (false); }
     let warrant : Warrant =
       if is_root { Warrant::ByGraph } // a root carries no warrant fact
       else if orphan_under_a_tombstone (tree, parent, child, walk) { Warrant::No }

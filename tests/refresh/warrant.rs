@@ -107,3 +107,26 @@ node p
     node c wp noClaim ⊥
     node d wp noClaim" );
   assert_eq! ( run . text . matches ("noWarrant") . count (), 1, "{}", run . text ); }
+
+/// A forks folder under a write-protected note, as under a search hit,
+/// reads no claims, so the printer writes no 'noClaim' there. Read
+/// back, its forker-only member f and its indirect member g claim;
+/// they stay warranted, and the refresh of the refresh's output gives
+/// it back. n forks e; f forks n; g forks e.
+#[test]
+fn a_forks_folder_under_a_write_protected_note_keeps_its_members_warranted () {
+  let graph : InRustGraph = graph (&[
+    Graphnode { forks : msv_ids (&["e"]), .. node ("n") },
+    node ("e"),
+    Graphnode { forks : msv_ids (&["n"]), .. node ("f") },
+    Graphnode { forks : msv_ids (&["e"]), .. node ("g") }, ]);
+  let input : String = formatdoc! ("
+    * {} n
+    ** (skg forksFolder)
+    ", occurrence_metadata ("n", "writeProtected") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
+node n wp
+  forksFolder
+    node e wp noClaim
+    node f wp noClaim
+    node g wp noClaim" ); }
