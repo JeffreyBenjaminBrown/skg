@@ -1,6 +1,20 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-modify-graph.el --- Swap a branch and a link; biggest branch  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: User-facing commands that modify graph structure.
+;;; Commentary:
+;;;
+;;; Turn a branch into a link, or a link into a branch, then save; and
+;;; jump to the biggest branch. 'skg-replace-content-with-link' (C-c m
+;;; l) replaces the branch at point with a headline linking to its
+;;; root. 'skg-replace-link-with-content' (C-c m c) replaces a leaf
+;;; holding one ID link with a write-protected headline of the linked
+;;; node, requesting its editable view. Both require an owned, editable
+;;; viewparent ('skg--check-content-link-replacement-container'), and
+;;; both save through 'skg-request-save-buffer'.
+;;; 'skg-goto-biggest-branch' (C-c g b) only moves point, to the
+;;; sibling or child with the most viewdescendants.
+;;; 'skg--immediate-viewchildren' also serves 'skg-processed.el'.
+;;;
+;;; Code:
 
 (require 'org)
 (require 'org-fold-core)

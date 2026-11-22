@@ -1,5 +1,27 @@
-;;; -*- lexical-binding: t; -*-
-;;; Display-only status and optional home-repo suffixes for Skg links.
+;;; skg-link-annotations.el --- Mark broken links; show home skgrepos  -*- lexical-binding: t; -*-
+;;;
+;;; Commentary:
+;;;
+;;; Display-only status and optional home-repo suffixes for skg links.
+;;; 'skg-link-annotations-mode' underlines, in the herald style ugly
+;;; ('heralds-ugly-face'), the label of each [[id:ID][LABEL]] link whose
+;;; target the server reports missing. 'skg-toggle-repo-overlay-on-links'
+;;; (C-c v L) also shows after each other link its target's home
+;;; skgrepo label, "[⌂:LABEL]", or why there is none ("restricted",
+;;; "lookup failed", "…" while pending). The buffer text is unchanged.
+;;; 'skg-buffer.el' turns the mode on in every view it opens; it
+;;; re-scans ('skg-link-annotations-refresh') soon after each edit,
+;;; painting from the session's cache of link statuses and asking the
+;;; server ("link statuses") for the targets it lacks. Link syntax in
+;;; text Org shows literally (blocks, fixed-width lines, =verbatim=,
+;;; ~code~) is an example, not a link
+;;; ('skg-link-annotations--literal-ranges').
+;;; 'skg-link-annotations-invalidate-all' empties the cache and
+;;; re-scans every view; 'skg-length-prefix.el' calls it after a save,
+;;; a rerender, a skgrepo restriction change and the like, and
+;;; 'skg-client.el' on each connect.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'subr-x)

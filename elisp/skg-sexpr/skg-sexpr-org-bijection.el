@@ -1,7 +1,14 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-sexpr-org-bijection.el --- Sexps to org text and back  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Roughly-bijective transformations between
-;;; atom-headed sexps and org text.
+;;; Commentary:
+;;;
+;;; Roughly-bijective transformations between atom-headed sexps and
+;;; org text: how the metadata editor ('skg-sexpr-edit.el',
+;;; 'skg-view-metadata') shows a headline's '(skg ...)' metadata as an
+;;; org tree ('sexp-to-org'), and reads the edited tree back
+;;; ('org-to-sexp'). Filling in and stripping the fields' defaults is
+;;; 'skg-metadata-fields.el's, which also uses
+;;; 'org-to-sexp--extract-headlines'.
 ;;;
 ;;; INPUT REQUIREMENTS
 ;;; - An input sexp must be:
@@ -20,12 +27,12 @@
 ;;; - Multi-word headlines become symbols with spaces.
 ;;; - Childless non-root headlines become bare atoms, not lists,
 ;;;   but for one whose text is '(ATOM)': a proper sub-sexp that wraps
-;;;   a single atom in parens, such as the processed request '(processed)',
-;;;   is that headline.
+;;;   a single atom in parens, such as the processed request
+;;;   '(processed)', is that headline.
 ;;;
-;;; ENTRY POINTS:
-;;;   sexp-to-org
-;;;   org-to-sexp
+;;; ENTRY POINTS: 'sexp-to-org', 'org-to-sexp'.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 

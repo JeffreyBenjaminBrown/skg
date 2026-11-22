@@ -1,16 +1,26 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-repo-files-reloaded.el --- Files changed on disk: report, redraw  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Handle the message the server sends unprompted when it
-;;; has reloaded '.skg' files that changed on disk (another writer,
-;;; a 'git pull'): "repo-files-reloaded", with (reloaded ((SKGREPO
-;;; N) ...)), (warnings (...)) and (view-ids (...)).
+;;; Commentary:
+;;;
+;;; When '.skg' files change on disk (another writer, a 'git pull'),
+;;; say so and redraw the open views that show them. The server, having
+;;; reloaded the files, sends unprompted "repo-files-reloaded", with
+;;; (reloaded ((SKGREPO N) ...)), (warnings (...)) and (view-ids
+;;; (...)). Loading this file makes 'skg--repo-files-reloaded-handler'
+;;; that message's handler in 'skg-unprompted-response-handler-map'.
+;;; 'skg--rerender-views-changed-on-disk' asks for the rerender
+;;; ('skg--request-rerender-views-excluding', in
+;;; 'skg-request-rerender-all-views.el'), again every
+;;; 'skg--repo-files-reloaded-retry-seconds' while another streaming
+;;; request is in flight.
 ;;;
 ;;; A message with no warnings is an echo-area message of its counts
-;;; ("skg: reloaded 2 files from repo first"). One that carries a warning
-;;; (a file that could not be read, a batch that failed validation, a
-;;; leak) goes, counts and warnings, to `skg-server-warnings-buffer-name'
-;;; under a headline "Repo changes", as the startup warnings do, and
-;;; shows that buffer. The views it names show a changed node; each one whose buffer holds no unsaved
+;;; ("skg: reloaded 2 files from repo first"). One that carries a
+;;; warning (a file that could not be read, a batch that failed
+;;; validation, a leak) goes, counts and warnings, to
+;;; 'skg-server-warnings-buffer-name' under a headline "Repo changes",
+;;; as the startup warnings do, and shows that buffer. The views it
+;;; names show a changed node; each one whose buffer holds no unsaved
 ;;; edits is rerendered, through a "rerender all views" request that
 ;;; excludes every other view; the server also extends each buffer of
 ;;; the diff view among them to the changes it does not show. A buffer
@@ -19,6 +29,8 @@
 ;;;
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org, "Repo files
 ;;; reloaded".
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'skg-request-rerender-all-views)

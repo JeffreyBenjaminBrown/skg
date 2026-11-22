@@ -1,18 +1,24 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-redraw-whole-view.el --- Redraw a view, keeping point and folds  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Redraw a whole view from the server's new text -- the
-;;; saved view after a save, or another view a save or a rerender
-;;; changed -- keeping each window's point and the folds where they
-;;; were. The entry points: 'skg--apply-streamed-view-update', which the
-;;; save's collateral-view and the rerender's rerender-view messages
-;;; share; 'skg--replace-buffer-keeping-viewnode-points-and-folds', for
-;;; a redraw the user did not ask for; and
+;;; Commentary:
+;;;
+;;; Redraw a whole view from the server's new text -- the saved view
+;;; after C-x C-s, or another view a save or a rerender changed --
+;;; keeping each window's point and the folds where they were. The
+;;; entry points: 'skg--apply-streamed-view-update', which the save's
+;;; collateral-view and the rerender's rerender-view messages share
+;;; ('skg-request-save.el', 'skg-request-rerender-all-views.el'), and
+;;; which calls 'skg--replace-buffer-keeping-viewnode-points-and-folds'
+;;; for a redraw the user did not ask for; and
 ;;; 'skg-replace-buffer-with-new-content', for the saved buffer, whose
 ;;; point 'skg--current-save-point-position' measured before the save
 ;;; and 'skg--restore-save-point-position' puts back. Rewriting only
 ;;; the headlines a save changed is 'skg-redraw-delta.el's; choosing
 ;;; between that and a whole redraw, for the saved buffer, is
-;;; 'skg-request-save.el's ('skg--redraw-saved-buffer').
+;;; 'skg-request-save.el's ('skg--redraw-saved-buffer'). Its Neovim
+;;; twin is 'nvim/lua/skg/redraw_whole_view.lua'.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'org)

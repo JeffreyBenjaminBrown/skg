@@ -1,12 +1,22 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-investigate-unknown-node.el --- Look up an unknown node  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Ask the server what an unknown node is: the node its ID
-;;; resolves to, if any, or else what the git history of every
-;;; skgrepo says it used to be. Shows the answer, Org text, in a
-;;; read-only buffer.
+;;; Commentary:
 ;;;
-;;; DATA USED/ASSUMED: See docs/api-and-formats.org,
+;;; 'skg-investigate-unknown-node' (C-c t r) asks the server what an
+;;; unknown node is ('docs/diff-view.org', "Investigating an unknown
+;;; graphnode"): the node its ID resolves to, if any, or else what the
+;;; git history of every skgrepo says it used to be. It takes the ID
+;;; from the unknown viewnode at point ('skg--unknown-node-id-at-point'),
+;;; or asks for one, and shows the answer, Org text, in the read-only
+;;; buffer *skg unknown node* with 'skg-report-mode'
+;;; ('skg--investigate-unknown-node-handler'). Removing references to
+;;; the unknown node is 'skg-request-delete-references-to-absent-node.el's.
+;;; Its Neovim twin is 'nvim/lua/skg/investigate_unknown_node.lua'.
+;;;
+;;; DATA USED/ASSUMED: See 'docs/api-and-formats.org',
 ;;; "Investigate unknown node".
+;;;
+;;; Code:
 
 (require 'skg-length-prefix)
 (require 'skg-metadata) ; for skg--unknown-node-id-at-point

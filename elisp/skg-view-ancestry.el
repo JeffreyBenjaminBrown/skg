@@ -1,9 +1,18 @@
-;;; skg-view-ancestry.el --- Show ancestry of org headline -*- lexical-binding: t; -*-
-
-;;; PURPOSE:
+;;; skg-view-ancestry.el --- Show the outline ancestry of a headline  -*- lexical-binding: t; -*-
+;;;
+;;; Commentary:
+;;;
+;;; 'skg-view-ancestry' (C-c v a) shows, in a new buffer, only the
+;;; outline ancestry of the headline at point: its parent, grandparent,
+;;; etc. up to the top level, plus the headline itself, with heralds if
+;;; the buffer it was called from shows them. The new buffer,
+;;; *Ancestry: TITLE* (or *Ancestry (vnid X): TITLE*), is a scratch org
+;;; buffer, not a view: nothing in it is saved. For the graph edges
+;;; that join those notes, see 'skg-push-ancestry.el'.
+;;;
 ;;; This is not skg-specific; it works in any org buffer.
-;;; What I mean by 'ancestry' is the node at point's parent, grandparent, etc. up to the top level.
-;;; For instance, if you called this function from 'e' in the following buffer:
+;;; For instance, if you called this function from "e" in the
+;;; following buffer:
 ;;;   * a
 ;;;   ** b
 ;;;   ** c
@@ -15,6 +24,8 @@
 ;;;   * a
 ;;;   ** c
 ;;;   *** e
+;;;
+;;; Code:
 
 (require 'org)
 (require 'skg-buffer)

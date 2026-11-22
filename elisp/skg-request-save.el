@@ -1,4 +1,34 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-save.el --- Save a view and draw the server's answer  -*- lexical-binding: t; -*-
+;;;
+;;; Commentary:
+;;;
+;;; C-x C-s on a view (or M-x 'skg-save'): send the view to the server,
+;;; lock the views while the save runs, and draw what the server
+;;; answers. 'skg-request-save-buffer' starts a save (the commands that
+;;; save first call it too); 'skg--send-save-buffer' sends the view,
+;;; its baseline and the other views' snapshots, and registers the
+;;; handlers of the answer stream (save-lock -> save-relax-lock ->
+;;; collateral-view* -> save-result, or a confirmation in place of
+;;; save-result); 'skg--save-result-handler' ends the stream, and
+;;; 'skg--redraw-saved-buffer' draws the saved view, showing errors
+;;; and warnings ('skg-show-save-errors-and-warnings'), the processed
+;;; summary and what the save hid ('skg--save-hides-message').
+;;;
+;;; What it leaves to other files: rewriting only the headlines the
+;;; save changed is 'skg-redraw-delta.el's; redrawing a whole view,
+;;; keeping point and folds, is 'skg-redraw-whole-view.el's; the
+;;; confirmations (fork, telescope hoist, delete-from, strandeds,
+;;; overPrivateText release) are 'skg-save-confirmations.el's; locking
+;;; the views is 'skg-lock-buffers.el's; the report buffers are
+;;; 'skg-messages.el's. The wire format is 'docs/api-and-formats.org',
+;;; "Save buffer". Its Neovim twin is 'nvim/lua/skg/save.lua'.
+;;;
+;;; PITFALL: Every handler but save-lock and save-result is registered
+;;; without ONE-SHOT ('skg--save-response-types-not-one-shot'), so it
+;;; does not count toward 'skg-lp--pending-count'; whichever message
+;;; ends the save removes the others, or the next save hangs.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'skg-log)

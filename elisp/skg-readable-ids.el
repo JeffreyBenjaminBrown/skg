@@ -1,11 +1,24 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-readable-ids.el --- Show titles beside IDs in magit and .skg files  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Minor mode that annotates skg UUIDs in magit and .skg
-;;; file buffers with their titles, using after-string overlays.
-;;; It affects both bare IDs and IDs that are part of .skg filenames.
+;;; Commentary:
+;;;
+;;; 'skg-readable-ids-mode' (C-c v r) annotates skg UUIDs in a buffer
+;;; with their titles: each UUID's tail is shown as an ellipsis (the
+;;; text is unchanged, so copy-paste still yields the full ID), and the
+;;; node's title, fetched from the server ("titles by ids") and cached
+;;; for the session, follows it in an after-string overlay. It affects
+;;; both bare IDs and IDs that are part of .skg filenames. It turns on
+;;; by itself in every buffer visiting a .skg file
+;;; ('skg-readable-ids--maybe-enable', on 'find-file-hook') and in the
+;;; magit buffers 'skg-request-file-path.el' opens, and re-annotates on
+;;; each magit refresh. 'skg-readable-ids-refresh' (C-c v R) forgets
+;;; the cached titles and re-annotates the current buffer.
 ;;;
 ;;; PITFALL: The after-string overlays break home/end navigation
-;;; when lines are truncated. See PITFALLs.org for details and mitigations.
+;;; when lines are truncated. See elisp/PITFALLs.org for details and
+;;; mitigations.
+;;;
+;;; Code:
 
 (require 'skg-buffer)
 (require 'skg-id-search)

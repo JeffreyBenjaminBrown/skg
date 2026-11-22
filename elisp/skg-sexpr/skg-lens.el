@@ -1,20 +1,28 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-lens.el --- Transform sexps by declarative rules  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE:
-;;; Transform s-expressions using
-;;; an abstract, declarative set of pattern-matching rules.
-;;; Currently, it is used to turn a text-only metadata sexp
-;;; into a shorter, colorful visual representation.
-;;; But it might turn out to be useful for other things.
+;;; Commentary:
+;;;
+;;; Transform s-expressions using an abstract, declarative set of
+;;; pattern-matching rules: how a headline's '(skg ...)' metadata
+;;; becomes the heralds drawn in its place ('heralds-minor-mode.el'),
+;;; and the herald hint beside each field in the metadata editor
+;;; ('skg-sexpr-edit.el'). Entry point: 'skg-transform-sexp-flat',
+;;; whose docstring gives the rule grammar. It returns tokens, strings
+;;; whose character ranges carry an 'skg-style' text property, and
+;;; whose first character may carry 'skg-abut'; mapping styles to faces
+;;; is 'heralds-minor-mode.el's. The rule table comes from the server
+;;; ('skg-request-herald-rules.el').
 ;;;
 ;;; The directive WHEN ('(WHEN KIND... RULE...)') applies its rules
 ;;; to an object only when one of the object's elements is labeled
 ;;; KIND. The herald rule table needs it because a headline's parts
 ;;; stand beside its kind atom, and a part such as '(diff ...)' reads
 ;;; differently by kind. Its full semantics are in the docstring of
-;;; `skg-transform-sexp-flat'; 'docs/heralds.org' says how the table
+;;; 'skg-transform-sexp-flat'; 'docs/heralds.org' says how the table
 ;;; uses it, and the Rust conformance tests check that each WHEN names
 ;;; only kind atoms and carries no style.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'skg-shared)

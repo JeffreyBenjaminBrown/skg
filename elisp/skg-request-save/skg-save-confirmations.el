@@ -1,12 +1,27 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-save-confirmations.el --- Handle a save's confirmation requests  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: What the client does when the server stops a save to ask.
-;;; Each handler here answers one of the alternatives to save-result
-;;; that `skg--send-save-buffer' registers: a fork-confirmation, a
-;;; delete-from-confirmation, a strandeds-confirmation, a
-;;; telescope-hoist-confirmation, or an
-;;; overPrivateText-telescope-confirmation (text release). All but the
-;;; last ask the user and re-issue the same save with the answer.
+;;; Commentary:
+;;;
+;;; What the client does when the server stops a save to ask. Each
+;;; handler here answers one of the alternatives to save-result that
+;;; 'skg--send-save-buffer' registers: a fork-confirmation
+;;; ('skg--fork-confirmation-handler'), a delete-from-confirmation
+;;; ('skg--delete-from-confirmation-handler'), a strandeds-confirmation
+;;; ('skg--strandeds-confirmation-handler'), a
+;;; telescope-hoist-confirmation
+;;; ('skg--telescope-hoist-confirmation-handler'), or an
+;;; overPrivateText-telescope-confirmation, a text release
+;;; ('skg--save-text-release-confirmation-handler'). All but the last
+;;; ask the user and re-issue the same save
+;;; ('skg-request-save-buffer') with the answer; the last asks the
+;;; server to rerender the withheld views, since the save was written.
+;;;
+;;; A fork shows the *SKG Fork Confirmation* buffer, where
+;;; 'skg-approve-fork' (C-c C-c) re-saves with the forks approved,
+;;; 'skg-decline-fork' (C-c C-k) declines, and C-c s s sets a clone's
+;;; skgrepo. Its Neovim twin is 'nvim/lua/skg/save/confirmations.lua'.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'skg-log)

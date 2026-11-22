@@ -1,8 +1,14 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-zippy-mode.el --- Type K to run what C-c K runs, in skg buffers  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: skg-zippy-mode, in which typing runs skg commands
-;;; instead of inserting text: in an skg buffer, the key sequence K
-;;; runs what C-c K runs there. C-c z turns it on, z turns it off.
+;;; Commentary:
+;;;
+;;; 'skg-zippy-mode', in which typing runs skg commands instead of
+;;; inserting text: in an skg buffer, the key sequence K runs what
+;;; C-c K runs there. C-c z ('skg-zippy-mode') turns it on, z
+;;; ('skg-zippy-exit') turns it off. Digits and - give a prefix
+;;; argument; any other printable key zippy does not bind runs
+;;; 'skg-zippy-unbound-key', which says so. The C-c keymaps it reads
+;;; are 'skg-keymaps-and-aliases.el's.
 ;;;
 ;;; The mode is global: one on/off state for every skg buffer, the
 ;;; existing ones and those made later, and no effect anywhere else.
@@ -33,10 +39,12 @@
 ;;; 'window-buffer-change-functions' re-decide it for the frame whose
 ;;; selected window or its buffer changed. Before changing a frame's
 ;;; colour, zippy keeps the colour it had in a frame parameter, and
-;;; restores exactly that when the frame no longer wants green. If
+;;; restores exactly that when the frame no longer wants zippy's. If
 ;;; something else (a theme) changes the colour meanwhile, the new
 ;;; colour becomes the one to restore. Frames that cannot show a cursor
 ;;; colour (terminals) are left alone.
+;;;
+;;; Code:
 
 (require 'skg-keymaps-and-aliases)
 

@@ -1,21 +1,35 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-stage-and-commit.el --- Git-commit the changed nodes  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Git-commit the changed nodes of the owned skgrepos, with
-;;; one message ('docs/diff-view.org', "Stage and commit"):
-;;; C-c r c commits every node whose changes are all processed, except
-;;; one that needs a node whose changes are not; C-c r C commits every
-;;; changed node.
-;;; The message is written in a buffer of its own, as in magit:
-;;; C-c C-c sends it and C-c C-k cancels. The buffer remembers which
-;;; of the two commits opened it last.
+;;; Commentary:
+;;;
+;;; Git-commit the changed nodes of the owned skgrepos, with one
+;;; message ('docs/diff-view.org', "Stage and commit"):
+;;; 'skg-stage-and-commit' (C-c r c) commits every node whose changes
+;;; are all processed, except one that needs a node whose changes are
+;;; not; 'skg-stage-and-commit-everything' (C-c r C) commits every
+;;; changed node. Each refuses while a view has unsaved edits, then
+;;; opens the commit-message buffer
+;;; ('skg--stage-and-commit-open-message-buffer'), as in magit:
+;;; 'skg-commit-message-send' (C-c C-c) sends it and
+;;; 'skg-commit-message-cancel' (C-c C-k) cancels. The buffer remembers
+;;; which of the two commands opened it last
+;;; ('skg--commit-processed-only'), and keeps the message until it is
+;;; moot ('skg--stage-and-commit-report-result').
+;;; 'skg--stage-and-commit-result-message' words the answer. Marking
+;;; changes processed is 'skg-processed.el's. Its Neovim twin is
+;;; 'nvim/lua/skg/stage_and_commit.lua'.
+;;;
 ;;; A commit of everything while some changed node is not processed
 ;;; makes the server ask for confirmation instead, changing nothing;
 ;;; only the typed word "yes" resends the request confirmed. A commit
 ;;; of the processed asks nothing. Every answer is followed by a
-;;; rerender stream, which after a commit rerenders the open buffers
-;;; of the diff view.
+;;; rerender stream ('skg--send-streaming-request'), which after a
+;;; commit rerenders the open buffers of the diff view.
 ;;;
-;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
+;;; DATA USED/ASSUMED: See 'docs/api-and-formats.org', "Stage and
+;;; commit".
+;;;
+;;; Code:
 
 (require 'skg-buffer)
 (require 'skg-processed) ; for skg--processed-summary-message

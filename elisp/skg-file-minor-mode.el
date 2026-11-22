@@ -1,12 +1,20 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-file-minor-mode.el --- skg ID keys in buffers visiting .skg files  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Minor mode enabled in buffers visiting .skg files.
-;;; Provides skg keybindings that operate on IDs (bare UUIDs,
-;;; UUID.skg filenames, pid: lines, etc.) in the file.
-;;; The keymap `skg-file-minor-mode-map' is defined in
-;;; skg-keymaps-and-aliases.el alongside the other skg keymaps,
-;;; so require that explicitly — the `:keymap' slot of
-;;; `define-minor-mode' below consults the variable at load time.
+;;; Commentary:
+;;;
+;;; 'skg-file-minor-mode', which 'find-file-hook' turns on in every
+;;; buffer visiting a .skg file ('skg-file-minor-mode--maybe-enable'),
+;;; lets the user act on the IDs in the raw file (bare UUIDs, UUID.skg
+;;; filenames): visit one ('skg-goto', C-c g RET), hop between them
+;;; ('skg-id-next', C-c i n), and paste or pop the linkstack (C-c o,
+;;; C-c O). What those commands do is 'skg-id-search.el's.
+;;;
+;;; The keymap 'skg-file-minor-mode-map' is defined in
+;;; 'skg-keymaps-and-aliases.el' alongside the other skg keymaps, so
+;;; this file requires that one explicitly: the ':keymap' slot of
+;;; 'define-minor-mode' below consults the variable at load time.
+;;;
+;;; Code:
 
 (require 'skg-keymaps-and-aliases)
 (require 'skg-id-search)

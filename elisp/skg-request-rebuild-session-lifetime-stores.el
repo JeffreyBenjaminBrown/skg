@@ -1,4 +1,16 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-rebuild-session-lifetime-stores.el --- Rebuild graph and index  -*- lexical-binding: t; -*-
+;;;
+;;; Commentary:
+;;;
+;;; M-x skg-rebuild-session-lifetime-stores
+;;; ('skg-rebuild-session-lifetime-stores') has the server reload its
+;;; config and rebuild the in-memory graph and Tantivy from the .skg
+;;; files, which it does not change. After a successful rebuild,
+;;; 'skg--refetch-herald-rules-and-rerender-all-views' fetches the
+;;; herald rules again ('skg-request-herald-rules') and rerenders every
+;;; view without unsaved edits ('skg-request-rerender-all-views').
+;;;
+;;; Code:
 
 (require 'skg-length-prefix)
 (require 'skg-request-herald-rules)

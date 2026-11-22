@@ -1,21 +1,26 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-restore-requests.el --- Ask a save to restore what was removed  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: In the diff view, ask the next save to bring back what a
-;;; change removed ('docs/diff-view.org', "Restoring what a change
-;;; removed"): 'skg-restore-deleted-node' (C-c s n) writes back the
-;;; deleted node at point (a ghost), and 'skg-restore-removed-membership'
-;;; (C-c s l) re-adds the removed relationship at point; neither saves.
+;;; Commentary:
+;;;
+;;; In the diff view, ask the next save to bring back what a change
+;;; removed ('docs/diff-view.org', "Restoring what a change removed"):
+;;; 'skg-restore-deleted-node' (C-c s n) writes back the deleted node
+;;; at point (a ghost), and 'skg-restore-removed-membership' (C-c s l)
+;;; re-adds the removed relationship at point; neither saves.
 ;;; 'skg--restoreRel-position-at-point-p' says where a restoreRel may
 ;;; stand, as the save checks it, and 'skg--removed-membership-p'
 ;;; whether a headline carries a removed membership, so that the
-;;; metadata editor's cycle ('skg-sexpr-cycling.el') offers restoreRel.
-;;; Writing the request into the metadata is 'skg-metadata.el's
-;;; ('skg--write-edit-request').
+;;; metadata editor's cycle ('skg-sexpr-edit/skg-sexpr-cycling.el')
+;;; offers restoreRel. Writing the request into the metadata is
+;;; 'skg-metadata.el's ('skg--write-edit-request'). Its Neovim twin is
+;;; 'nvim/lua/skg/restore_requests.lua'.
 ;;;
 ;;; The server refuses the requests on the wrong kind of headline with
 ;;; the same texts as the refusals below, except that its refusal of a
 ;;; restoreRel without a removed membership goes on to say where a
 ;;; restoreRel belongs.
+;;;
+;;; Code:
 
 (require 'org)
 (require 'skg-metadata)

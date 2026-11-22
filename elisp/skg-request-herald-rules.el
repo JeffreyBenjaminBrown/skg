@@ -1,18 +1,28 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-herald-rules.el --- Fetch the herald rule table  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Fetch the herald rule table from the server, and the
-;;; skgrepo label table it serves beside it.
-;;; The table lives only in Rust (server/heralds.rs); Emacs caches it
-;;; in `heralds--transform-rules' for the session, and the labels in
-;;; `heralds--skgrepo-labels'. `skg-client-init'
-;;; calls `skg-request-herald-rules' once per connect, so reconnecting
-;;; re-fetches it; `heralds-minor-mode' calls `skg-herald-rules-ensure'
-;;; to self-heal a missing table when the user turns heralds on.
+;;; Commentary:
+;;;
+;;; Fetch the herald rule table, which says how the heralds read, from
+;;; the server, and the skgrepo label table it serves beside it. The
+;;; table lives only in Rust (server/heralds.rs); Emacs caches it in
+;;; 'heralds--transform-rules' for the session, and the labels in
+;;; 'heralds--skgrepo-labels' (both in 'heralds-minor-mode.el').
+;;; 'skg-request-herald-rules' sends the request and installs the
+;;; reply when it lands; 'skg-herald-rules-ensure' sends it, a bounded
+;;; number of times, until a table is installed. 'skg-client-init'
+;;; clears the table and calls 'skg-herald-rules-ensure' on each
+;;; connect, so it waits for the current server's table;
+;;; 'heralds-minor-mode' calls it to self-heal a missing table when
+;;; heralds are turned on; a rebuild of the session-lifetime stores
+;;; re-fetches with 'skg-request-herald-rules'. Drawing the heralds is
+;;; 'heralds-minor-mode.el's.
 ;;;
 ;;; There is deliberately no user-facing command here. A missing table
-;;; is recovered automatically (see `skg-herald-rules-ensure'), and a
+;;; is recovered automatically (see 'skg-herald-rules-ensure'), and a
 ;;; hard failure surfaces an informative message at that point, so a
 ;;; manual re-fetch command is unnecessary.
+;;;
+;;; Code:
 
 (require 'heralds-minor-mode)
 (require 'skg-length-prefix)

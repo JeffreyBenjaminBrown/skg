@@ -1,8 +1,22 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-push-ancestry.el --- Push the ancestry at point to the linkstack  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Push the view-ancestry of the headline at point to
-;;; `skg-linkstack', as a tree of the notes above it, each joined to the
-;;; next by the graph edge that justifies its place in the view.
+;;; Commentary:
+;;;
+;;; 'skg-push-ancestry' (C-c U) pushes the view-ancestry of the
+;;; headline at point to 'skg-linkstack', as a tree of the notes above
+;;; it, each joined to the next by the graph edge that justifies its
+;;; place in the view ('skg--ancestry-edge', read from the headline's
+;;; (view (birth ...) (rels ...)) metadata). Folder headlines are
+;;; skipped; it refuses, naming the two notes, when a note has no edge
+;;; to the note above it. 'skg-paste-link' (C-c o l) then pastes the
+;;; tree as a chain of links joined by those edges. The linkstack's
+;;; trees, and pasting them, are 'skg-id-search.el's
+;;; ('skg--linkstack-tree'). The pushed tree records the graph when it
+;;; was pushed; it is not kept current.
+;;;
+;;; DATA USED/ASSUMED: See docs/api-and-formats.org, "Stats metadata".
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'org)

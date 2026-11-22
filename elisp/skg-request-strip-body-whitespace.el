@@ -1,4 +1,15 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-strip-body-whitespace.el --- Strip trailing body whitespace  -*- lexical-binding: t; -*-
+;;;
+;;; Commentary:
+;;;
+;;; M-x skg-strip-trailing-whitespace-from-bodies
+;;; ('skg-strip-trailing-whitespace-from-bodies') has the server strip
+;;; trailing whitespace from every line of every body in the owned
+;;; skgrepos, rewriting only the .skg files that change, and shows its
+;;; reply with a hint to check the result with
+;;; 'git diff --ignore-all-space'.
+;;;
+;;; Code:
 
 (require 'skg-length-prefix)
 

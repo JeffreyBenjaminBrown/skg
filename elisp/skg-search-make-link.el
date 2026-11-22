@@ -1,35 +1,35 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-search-make-link.el --- Search, then insert a link to a hit  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: A workflow to search for text and insert a link
-;;; to one of the search results.
+;;; Commentary:
 ;;;
-;;; The user invokes `skg-search-make-link' (C-c f l) from any
-;;; buffer — typically a skg content view buffer. The command
-;;; records the buffer object and point, and runs the same search
-;;; as C-c f RET. In the resulting search buffer,
-;;; `skg-search-make-link-mode' is active; pressing C-c C-c on a
-;;; result picks that result, kills the search buffer, returns to
-;;; the source buffer at the saved position, and inserts a
-;;; [[id:X][LABEL]] link there.
+;;; 'skg-search-make-link' (C-c f l) searches for text and inserts a
+;;; link to one of the results. Run from any buffer, typically a
+;;; content view, it records the buffer object and point and runs the
+;;; same search as C-c f RET ('skg-search'). In the search buffer
+;;; 'skg-search-make-link-mode' is on; its C-c C-c
+;;; ('skg-search-make-link-finish') picks the result at point, kills
+;;; the search buffer, returns to the source buffer at the saved
+;;; position and inserts [[id:X][LABEL]] there. Aside from C-c C-c
+;;; the search buffer is like any other. The search itself is
+;;; 'skg-request-text-search.el's, which runs this file's
+;;; 'skg--maybe-activate-link-from-search-mode' through
+;;; 'skg--search-buffer-setup-hook'.
 ;;;
-;;; The user may save the source buffer afterwards (C-x C-s).
-;;; PITFALL: an earlier version of this command saved the skgrepo
-;;; buffer eagerly (before the search), to make later "detours"
-;;; through the search results' links feel safer. That eager save
-;;; turned out to break the workflow: the server's rerender of the
-;;; saved buffer can collapse a freshly-typed blank line into
-;;; nothing, leaving the recorded integer point dangling on the
-;;; next headline — so the inserted link glued itself to the wrong
-;;; spot. We now skip the eager save entirely; nothing forbids
-;;; detours, they just operate against an unsaved skgrepo.
+;;; The label is the result's title with any inline [[id:Y][L]] links
+;;; reduced to their labels (so the new link's label is plain text,
+;;; never nested links), by 'skg-replace-links-with-labels'
+;;; ('skg-id-search.el'). The user may save the source buffer
+;;; afterwards (C-x C-s).
 ;;;
-;;; Aside from its C-c C-c behavior,
-;;; the search results buffer is just like any other.
+;;; PITFALL: do not save the source buffer eagerly, before the
+;;; search. The server's rerender of the saved buffer can collapse a
+;;; freshly-typed blank line into nothing, leaving the recorded
+;;; integer point dangling on the next headline, so the inserted link
+;;; glues itself to the wrong spot. Nothing forbids detours through
+;;; the search results' links; they just operate against an unsaved
+;;; source buffer.
 ;;;
-;;; The label is the result's title with any inline [[id:Y][L]]
-;;; links reduced to their labels (so the new link's label is
-;;; plain text, never nested links). Reduction is done by
-;;; `skg-replace-links-with-labels' (see skg-id-search.el).
+;;; Code:
 
 (require 'skg-id-search)
 ;; NOTE: deliberately not requiring skg-request-text-search here.

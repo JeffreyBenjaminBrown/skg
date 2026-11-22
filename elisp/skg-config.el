@@ -1,6 +1,23 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-config.el --- Read skgconfig.toml; the skgrepo pickers  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Read configuration from skgconfig.toml.
+;;; Commentary:
+;;;
+;;; What the client reads from skgconfig.toml, the file
+;;; 'skg-client-init' names ('skg-config-file'): the server's port
+;;; ('skg-port-from-toml'), the skgrepos, owned and foreign, and their
+;;; directories ('skg--owned-repos', 'skg--foreign-repo-names',
+;;; 'skg--repo-paths'), and the rungs of the skgrepo restriction
+;;; ('skg--repo-set-names', 'skg--skgrepo-restriction-label'). Also the
+;;; minibuffer pickers built on them, with S-left/S-right cycling
+;;; ('skg--completing-read-with-cycle'): 'skg--prompt-for-owned-repo',
+;;; 'skg--prompt-for-repo-change' (where C-? runs 'skg-view-repo-list')
+;;; and 'skg--prompt-for-repo-set' (used by 'skg-restrict-repo-set',
+;;; C-c v l, in 'skg-request-repo-sets.el').
+;;;
+;;; This is a hand-rolled line scan of the narrow TOML subset
+;;; skgconfig.toml uses, not a general TOML parser.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'org)

@@ -1,7 +1,20 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-file-path.el --- Show a node's .skg file in magit  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Request the on-disk file path for a node,
-;;; and open a magit view navigated to an appropriate location.
+;;; Commentary:
+;;;
+;;; Show the .skg file of the node at point in magit. 'skg-goto-in-magit'
+;;; (C-c g m) asks the server for the file's path ("get file path") and
+;;; opens magit-status on that skgrepo's git repository, at the file's
+;;; first section (unstaged, staged, untracked), warning when there are
+;;; several. 'skg-goto-in-magit-parent' (C-c g M) does the same for the
+;;; outline parent's file, then moves to the first hunk line that holds
+;;; this node's ID. With G for g ('skg-goto-in-magit-and-close-this',
+;;; 'skg-goto-in-magit-parent-and-close-this') each also kills the
+;;; buffer left behind. The magit buffer gets 'skg-readable-ids-mode'
+;;; ('skg-readable-ids.el'); reading the ID and repo from metadata is
+;;; 'skg-id-search.el's ('skg--extract-id-from-metadata-sexp').
+;;;
+;;; Code:
 
 (require 'skg-id-search)
 (require 'skg-readable-ids)

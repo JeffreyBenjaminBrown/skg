@@ -1,16 +1,28 @@
-;;; -*- lexical-binding: t; -*-
-;;
-;; PURPOSE: Read and restore org-fold state, and the 'folded' and
-;; 'bodyFolded' atoms that carry it to and from the server.
-;;
-;; BACKGROUND:
-;; If a node's branches are folded,
-;; they are marked folded, but the node they belong to is not.
-;; For other discoveries re. folding (so far none esp. relevant), see
-;;   not_using/experiments/org-folding/FINDINGS.org
-;;
-;; TODO ? Distinguish between foldedness and other invisibility.
-;; Currently foldedness is recognized via '(invisible-p (point))'.
+;;; skg-org-fold.el --- The body toggle, and folds across a save  -*- lexical-binding: t; -*-
+;;;
+;;; Commentary:
+;;;
+;;; Folding in a view: the body toggle, and how the folds survive a
+;;; save. 'skg-org-body-toggle' (C-c v b) hides or shows the body of
+;;; the headline at point. A save writes each headline's folds as the
+;;; 'folded' and 'bodyFolded' atoms ('skg-request-save.el's
+;;; 'skg--transient-save-atoms', which asks
+;;; 'skg-headline-body-hidden-p'); when the server's text comes back,
+;;; 'skg-fold-headlines-by-atoms' folds what they mark.
+;;; 'skg--fold-state-of-headline-at-point' reads one headline's folds
+;;; for 'skg-redraw-whole-view.el'. Its Neovim twin is
+;;; 'nvim/lua/skg/folds.lua'.
+;;;
+;;; BACKGROUND:
+;;; If a node's branches are folded,
+;;; they are marked folded, but the node they belong to is not.
+;;; For other discoveries re. folding (so far none esp. relevant), see
+;;;   _burying/not_using/experiments/org-folding/FINDINGS.org
+;;;
+;;; TODO ? Distinguish between foldedness and other invisibility.
+;;; Currently foldedness is recognized via '(invisible-p (point))'.
+;;;
+;;; Code:
 
 (require 'org)
 (require 'skg-metadata)

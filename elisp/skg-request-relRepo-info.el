@@ -1,11 +1,22 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-relRepo-info.el --- Choose a relationship's relRepo  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: `skg-set-relRepo' -- request the relRepo
-;;; of one relationship, informed by the server's
-;;; 'relRepo info' endpoint
-;;; ('docs/api-and-formats.org', "relRepo info") -- and, below it, the
-;;; buffer-local helpers it drives and the recursive command
-;;; `skg-set-relRepo-recursive'.
+;;; Commentary:
+;;;
+;;; Choose the skgrepo that records the relationship at point (its
+;;; relRepo). 'skg-set-relRepo' (C-c s r) asks the server's 'relRepo
+;;; info' endpoint ('docs/api-and-formats.org', "relRepo info") for the
+;;; relationship's default and current relRepo (an alias's it reads
+;;; from the buffer), then prompts over the skgrepos at least as
+;;; private as the default, writing '(editRequest (relRepo REPO))' on
+;;; the headline. 'skg-set-relRepo-recursive' (C-c s R, or C-u C-c s
+;;; r) asks for a relationship kind and a skgrepo and writes that
+;;; request on each relationship of the kind in the subtree. Neither
+;;; saves. Below them stand the helpers both drive;
+;;; 'skg--relRepo-requested-value' also serves
+;;; 'skg-request-flag-state.el'. Writing the request into the metadata
+;;; is 'skg-metadata.el's ('skg--write-edit-request').
+;;;
+;;; Code:
 
 (require 'org)
 (require 'seq)

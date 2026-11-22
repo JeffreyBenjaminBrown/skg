@@ -1,11 +1,20 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-shared.el --- Read the JSON tables in 'shared/'  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Read the data files in 'shared/', which the server's tests
-;;; and both clients read: 'herald-styles.json' (the herald styles and
-;;; how relationship heralds use them), 'relations.json' (the
-;;; node-node relations) and 'metadata-fields.json' (the fields a user
-;;; may set on each kind of headline). The Neovim analog is
+;;; Commentary:
+;;;
+;;; Read the data files in 'shared/', which the server (embedding them
+;;; at compile time) and both clients read: 'herald-styles.json' (the
+;;; herald styles and how relationship heralds use them, and the view
+;;; faces: 'skg-shared-herald-styles', 'skg-shared-styles'),
+;;; 'relations.json' (the node-node relations: 'skg-shared-relation',
+;;; 'skg-shared-relations-in-display-order') and 'metadata-fields.json'
+;;; (the fields a user may set on each kind of headline:
+;;; 'skg-shared-metadata-kind', 'skg-shared-metadata-parts'). Each is
+;;; read once, at load. Drawing the heralds is 'heralds-minor-mode.el's;
+;;; using the fields is 'skg-metadata-fields.el's. The Neovim analog is
 ;;; nvim/lua/skg/shared.lua.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'json)

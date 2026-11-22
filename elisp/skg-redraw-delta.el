@@ -1,13 +1,21 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-redraw-delta.el --- Rewrite only the headlines a save changed  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Redraw a view by its delta: rewrite only the headline
-;;; lines a response names in '(changed-headlines (V ...))', instead of
+;;; Commentary:
+;;;
+;;; After C-x C-s, redraw only the headlines the save changed, so the
+;;; folds and point stay as they are: rewrite the headline lines a
+;;; save-result names in '(changed-headlines (V ...))', instead of
 ;;; erasing and reinserting the whole buffer ('docs/api-and-formats.org',
-;;; "The redraw delta"). The new lines are the server's lines in their
-;;; stripped form, without the fold and focus atoms, which the buffer
-;;; keeps as org folds and point. After the rewrite the buffer must
-;;; equal the stripped form of the new text; when it does not, the
-;;; caller redraws the whole buffer.
+;;; "The redraw delta"). The entry point is
+;;; 'skg--patch-buffer-with-delta', which 'skg-request-save.el's
+;;; 'skg--redraw-saved-buffer' calls. The new lines are the server's
+;;; lines in their stripped form ('skg--stripped-text'), without the
+;;; fold and focus atoms, which the buffer keeps as org folds and
+;;; point. After the rewrite the buffer must equal the stripped form
+;;; of the new text; when it does not, the caller redraws the whole
+;;; buffer, which is 'skg-redraw-whole-view.el's. That file also uses
+;;; the stripping here ('skg--stripped-text-and-atom-headlines'). Its
+;;; Neovim twin is 'nvim/lua/skg/redraw_delta.lua'.
 ;;;
 ;;; The stripped form is one rule the server and both clients
 ;;; implement. All three test against
@@ -18,6 +26,8 @@
 ;;; headline whose body is folded takes the fold's property and hides
 ;;; itself, so a patch needs 'overlays', under which every fold around
 ;;; and below a rewritten line survives.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'org-fold-core)

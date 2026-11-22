@@ -1,5 +1,21 @@
-;;; -*- lexical-binding: t; -*-
-;; The explicit cleanup command for one Unknown's raw relationship ID.
+;;; skg-request-delete-references-to-absent-node.el --- Remove owned references  -*- lexical-binding: t; -*-
+;;;
+;;; Commentary:
+;;;
+;;; 'skg-delete-references-to-absent-node' (C-c d a) removes the owned
+;;; structured references to the unknown viewnode at point: the
+;;; explicit cleanup of one unknown's raw relationship ID. It refuses
+;;; while a view has unsaved edits. The server first answers with a
+;;; preview, shown in *skg absent-reference warning*
+;;; ('skg--delete-absent-confirmation-handler'); on "yes" the request
+;;; is resent with that preview approved ('skg--delete-absent-send'),
+;;; and the report goes to *skg absent-reference cleanup*. Each answer
+;;; is followed by a rerender stream ('skg--send-streaming-request', in
+;;; 'skg-request-rerender-all-views.el'). Learning what the unknown
+;;; node was is 'skg-request-investigate-unknown-node.el's. Its Neovim
+;;; twin is 'nvim/lua/skg/delete_references_to_absent_node.lua'.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'skg-buffer)

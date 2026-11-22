@@ -1,6 +1,48 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-metadata.el --- Read and edit a headline's (skg ...) metadata  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Utilities to parse and edit skg headline metadata.
+;;; Commentary:
+;;;
+;;; Read and edit the '(skg ...)' metadata a view's headline carries
+;;; after its stars, and the commands that are only such an edit, each
+;;; asking the next save to do something, none saving: 'skg-delete'
+;;; (C-c <backspace>; with a prefix argument 'skg-delete-recursive'),
+;;; 'skg-strip-attribution', 'skg-detach' (C-c s t) and 'skg-attach'
+;;; (C-c s a), 'skg-set-repo' (C-c s s) and 'skg-set-repo-recursive'
+;;; (C-c s S), and 'skg-set-merge-request' (C-c s m). Also
+;;; 'skg-view-without-metadata' (C-c v w: the region, metadata
+;;; stripped, in a new buffer), 'skg-beginning-of-line' (C-a: line
+;;; start or title start), and 'skg--around-org-todo', advice that
+;;; lets 'org-todo' cycle a headline that carries metadata.
+;;;
+;;; For code: 'skg-split-as-stars-metadata-title' and
+;;; 'skg--metadata-sexp-at-point-or-nil' read a headline's metadata;
+;;; 'skg-edit-metadata-at-point' merges an edit
+;;; ('skg-sexpr-dsl-for-edits.el') into it, each part it adds landing
+;;; where the server writes it; 'skg--write-edit-request' sets its edit
+;;; request, and 'skg--metadata-with-processed-request' its processed
+;;; request (for 'skg-processed.el'); 'skg--pending-detachment-p' tells
+;;; the heralds a 'noClaim' child leaves its parent's list at the next
+;;; save; 'skg-strip-fork-requests-in-buffer' serves the save's fork
+;;; confirmation.
+;;;
+;;; Elsewhere: reading the '(diff ...)' change facts is
+;;; 'skg-change-facts.el's; the diff view's restore requests
+;;; ('skg-restore-deleted-node', 'skg-restore-removed-membership') are
+;;; 'skg-restore-requests.el's; the relRepo gestures ('skg-set-relRepo',
+;;; 'skg-set-relRepo-recursive') are 'skg-request-relRepo-info.el's.
+;;; Marking a change processed is 'skg-processed.el's; editing the
+;;; metadata as an org tree ('skg-view-metadata') is
+;;; 'skg-sexpr-edit.el's; drawing it as heralds is
+;;; 'heralds-minor-mode.el's.
+;;;
+;;; PITFALL: rewrite a headline line only through
+;;; 'skg-replace-current-line', which runs inside
+;;; 'org-fold-core-ignore-fragility-checks'; a raw edit of a folded
+;;; headline line can corrupt the fold below it ('elisp/PITFALLs.org',
+;;; "Programmatic metadata edits must be performed ignoring fragility
+;;; checks").
+;;;
+;;; Code:
 
 (require 'org)
 (require 'org-fold-core)

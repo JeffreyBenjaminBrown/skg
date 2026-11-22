@@ -1,16 +1,23 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-receipt.el --- Write a read receipt for a mailed item  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Write a read receipt for the item at point, in a view of
-;;; someone's mailbox to you: the server writes a note, how you
-;;; handled the item, as the first child of your fork of it (forking
-;;; it first if you hold none), and hides the item from your fork of
-;;; the mailbox, in one write, then redraws the views that show them.
-;;; When the server needs a choice (the mailbox, where the item is in
-;;; several; the skgrepo of a new fork, where nothing safe suggests
-;;; one), it refuses, naming the choices; this asks, and sends again.
+;;; Commentary:
+;;;
+;;; 'skg-receipt' (C-c m a): write a read receipt for the item at
+;;; point, in a view of someone's mailbox to you: the server writes a
+;;; note, how you handled the item, as the first child of your fork of
+;;; it (forking it first if you hold none), and hides the item from
+;;; your fork of the mailbox, in one write, then redraws the views that
+;;; show them. When the server needs a choice (the mailbox, where the
+;;; item is in several; the skgrepo of a new fork, where nothing safe
+;;; suggests one), it refuses, naming the choices;
+;;; 'skg--receipt-handler' asks, and 'skg--receipt-send' sends again.
+;;; Sending the request and receiving the redraws are
+;;; 'skg-request-rerender-all-views.el's ('skg--send-streaming-request').
 ;;;
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org, "Receipt", and
 ;;; docs/forks.org, "Read receipts".
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'org)

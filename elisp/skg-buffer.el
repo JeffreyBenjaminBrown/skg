@@ -1,4 +1,34 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-buffer.el --- The view buffer: its mode, state, opening, closing  -*- lexical-binding: t; -*-
+;;;
+;;; Commentary:
+;;;
+;;; What makes a buffer an skg view, from the server's text to its
+;;; closing. 'skg-open-org-buffer-from-text' opens a view (for
+;;; 'skg-request-single-root-content-view.el', 'skg-request-diff-view.el'
+;;; and, through 'skg-open-empty-content-view', 'skg-view-new-empty.el'):
+;;; it names the buffer ('skg-content-view-buffer-name', qualified by
+;;; skgrepo on a clash), enters 'skg-content-view-mode' (an org-mode
+;;; whose faces 'skg--dictate-view-faces' takes from
+;;; 'shared/herald-styles.json'), turns on the heralds and link
+;;; annotations, and records the view's ID ('skg-view-id') and its
+;;; clean baseline ('skg--capture-clean-baseline'). Text search fills
+;;; its own buffer ('skg-search-buffer-name'). Killing a view tells the
+;;; server ('skg-send-close-view'); M-x skg-close-all-skg-buffers
+;;; kills every view ('skg-buffer-p'). A view's first edit while
+;;; another view holds unsaved edits asks first
+;;; ('skg--confirm-before-dirtying-another-view'). The buffer also keeps
+;;; its perspective ('skg--set-perspective', shown in the mode line).
+;;; Redrawing an open view is 'skg-redraw-whole-view.el's and
+;;; 'skg-redraw-delta.el's; the keys (C-x C-s saves) are
+;;; 'skg-keymaps-and-aliases.el's; cycling the perspective (C-c v o)
+;;; is 'skg-request-perspective.el's.
+;;;
+;;; 'skg-view-id' and the other view variables are permanent-local, to
+;;; survive major-mode changes. 'skg-reload' does not unload this file
+;;; but re-reads it with 'load-file': 'unload-feature' would kill the
+;;; mode and the view ID of every open view.
+;;;
+;;; Code:
 
 (require 'org-id)
 (require 'cl-lib)

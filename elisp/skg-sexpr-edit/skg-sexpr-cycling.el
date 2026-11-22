@@ -1,13 +1,19 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-sexpr-cycling.el --- S-left/S-right in the metadata editor  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: S-left / S-right cycling for sexp-edit buffers.
+;;; Commentary:
+;;;
+;;; S-left / S-right in the metadata editor ('skg-sexpr-edit.el'):
+;;; 'skg-sexp-edit-cycle-left' and 'skg-sexp-edit-cycle-right' replace
+;;; the field value at point with the previous or next value the field
+;;; may take, prompting for the arguments of one that takes them.
 ;;; Dispatch is based on the parent headline text; what a field's
 ;;; cycle runs through comes from 'shared/metadata-fields.json'
-;;; ('skg-metadata-fields.el').
+;;; ('skg-metadata-fields.el'), a nodeRepo's from the owned skgrepos.
+;;; Whether to offer restoreRel asks 'skg--removed-membership-p'
+;;; ('skg-restore-requests.el'). The keys are bound in
+;;; 'skg-sexp-edit-mode-map' ('skg-keymaps-and-aliases.el').
 ;;;
-;;; ENTRY POINTS:
-;;;   skg-sexp-edit-cycle-left
-;;;   skg-sexp-edit-cycle-right
+;;; Code:
 
 (require 'cl-lib)
 (require 'skg-config)

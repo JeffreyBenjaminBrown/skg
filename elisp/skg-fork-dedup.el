@@ -1,6 +1,7 @@
-;;; skg-fork-dedup.el --- Cover what a forks-folder member restates -*- lexical-binding: t; -*-
-
-;;; PURPOSE:
+;;; skg-fork-dedup.el --- Cover what a forks-folder member restates  -*- lexical-binding: t; -*-
+;;;
+;;; Commentary:
+;;;
 ;;; A member of a forks folder often says what the folder's note says:
 ;;; its title, its body, or both, are the note's. Where so, an overlay
 ;;; covers the member's title with "<b's title, unchanged>" and its
@@ -8,16 +9,21 @@
 ;;; counted from the member (its grandparent, past the folder). The
 ;;; buffer keeps the real text, which a save sends as it is; the
 ;;; overlays are drawing only. 'skg-fork-dedup-overlay', buffer-local,
-;;; turns them on (the default) or off; `skg-toggle-fork-dedup-overlay'
+;;; turns them on (the default) or off; 'skg-toggle-fork-dedup-overlay'
 ;;; (C-c v u) toggles it, so that the text can be read and edited.
 ;;; An edit that makes the two differ removes the overlay.
 ;;;
 ;;; The overlays are tagged (overlay-put ov 'skg-fork-dedup t) and found
 ;;; by that tag, as the herald overlays are ('heralds-minor-mode.el',
-;;; PITFALL: ORPHANED OVERLAYS). The herald machinery calls in here:
-;;; `heralds-apply-to-buffer' draws them all, `heralds-after-change'
-;;; redraws those of the forks folders an edit can change, and so does
-;;; the delta redraw ('skg-redraw-delta.el').
+;;; PITFALL: ORPHANED OVERLAYS). This file draws only when called, and
+;;; the herald machinery calls it: 'heralds-apply-to-buffer' draws them
+;;; all ('skg-fork-dedup-refresh-buffer'), 'heralds-after-change'
+;;; redraws those of the forks folders an edit can change
+;;; ('skg-fork-dedup-refresh-lines'), and so does the delta redraw
+;;; ('skg-redraw-delta.el'); turning 'heralds-minor-mode' off clears
+;;; them.
+;;;
+;;; Code:
 
 (require 'skg-metadata)
 

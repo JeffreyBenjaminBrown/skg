@@ -1,7 +1,16 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-sexpr-dsl-for-edits.el --- A small DSL for editing sexps  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Edit s-expressions with 'DELETE', 'REPLACE', 'ENSURE',
-;;; and (the default, so no keyword) merge operations.
+;;; Commentary:
+;;;
+;;; Edit s-expressions with 'DELETE', 'REPLACE', 'ENSURE', and (the
+;;; default, so no keyword) merge operations: how the commands that
+;;; change a headline's metadata say what to change, e.g.
+;;; '(skg (DELETE noClaim))'. Entry point: 'skg-edit-nested-sexp',
+;;; which 'skg-metadata.el's 'skg-edit-metadata-at-point' runs; placing
+;;; a part the edit adds where the server writes it is
+;;; 'skg-metadata.el's. Loaded through 'skg-sexpr-search.el'.
+;;;
+;;; Code:
 
 (defun skg-edit-nested-sexp (target instructions)
   "Edit TARGET s-expression according to INSTRUCTIONS.

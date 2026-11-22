@@ -1,19 +1,30 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-perspective.el --- Cycle the perspective of a view  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Cycle the perspective of the current view: the skgrepo
-;;; whose list of skgrepos ranks the mirrors it shows in a note's
-;;; place. A fresh view is drawn from each root's home skgrepo; the
-;;; cycle then holds each skgrepo home to a mirror in the view whose
-;;; perspective would show the view differently, so that you can
-;;; choose among them (a private and a public fork, say). The
-;;; server computes the cycle afresh at each request, switches the
-;;; view to the next perspective and redraws it; the answer names the
-;;; view and the perspective, and a rerender stream follows, carrying
-;;; the redrawn buffer, which keeps point and folds as any redraw the
-;;; user did not ask for does.
+;;; Commentary:
+;;;
+;;; 'skg-cycle-perspective' (C-c v o) cycles the perspective of the
+;;; current view: the skgrepo whose list of skgrepos ranks the mirrors
+;;; it shows in a note's place. A fresh view is drawn from each root's
+;;; home skgrepo; the cycle then holds each skgrepo home to a mirror in
+;;; the view whose perspective would show the view differently, so
+;;; that you can choose among them (a private and a public fork, say).
+;;; It refuses while the buffer has unsaved edits. The server computes
+;;; the cycle afresh at each request, switches the view to the next
+;;; perspective and redraws it; the answer names the view and the
+;;; perspective ('skg--cycle-perspective-handler'), and a rerender
+;;; stream follows, carrying the redrawn buffer, which keeps point and
+;;; folds as any redraw the user did not ask for does. Sending the
+;;; request and receiving the stream are
+;;; 'skg-request-rerender-all-views.el's ('skg--send-streaming-request').
 ;;;
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org, "Set
-;;; perspective".
+;;; perspective". The buffer keeps the perspective in 'skg-perspective'
+;;; (nil for the root homes, else its wire name) and
+;;; 'skg-perspective-name' (the server's name for it), which
+;;; 'skg--set-perspective' ('skg-buffer.el') sets; each save sends the
+;;; first ('skg-request-save.el').
+;;;
+;;; Code:
 
 (require 'skg-buffer)
 (require 'skg-request-rerender-all-views) ; for skg--send-streaming-request

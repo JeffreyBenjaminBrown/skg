@@ -1,12 +1,20 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-describe-heralds.el --- Explain a headline's heralds  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: `skg-describe-at-point' (C-c v ?) -- say in plain sentences
-;;; what the headline at point is, when it is a folder, and what each of
-;;; its heralds means, with this headline's own numbers and letters read
-;;; out. The sentences come from the server's "describe heralds"
-;;; endpoint ('docs/api-and-formats.org', "Describe heralds";
-;;; 'server/herald_descriptions.rs'), which Neovim and skg-for-ai ask
-;;; too, so that they are written once.
+;;; Commentary:
+;;;
+;;; 'skg-describe-at-point' (C-c v ?) -- say in plain sentences what
+;;; the headline at point is, when it is a folder, and what each of its
+;;; heralds means, with this headline's own numbers and letters read
+;;; out: in the echo area when they fit in two lines, else in the
+;;; buffer 'skg-describe-buffer-name' names ('skg--describe-show'). It
+;;; changes and saves nothing. The sentences come from the server's
+;;; "describe heralds" endpoint ('docs/api-and-formats.org', "Describe
+;;; heralds"; 'server/herald_descriptions.rs'), which Neovim and
+;;; skg-for-ai ask too, so that they are written once;
+;;; 'skg--describe-request-at-point' builds the request. Drawing the
+;;; heralds is 'heralds-minor-mode.el's.
+;;;
+;;; Code:
 
 (require 'org)
 (require 'skg-length-prefix)

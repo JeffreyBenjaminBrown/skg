@@ -1,7 +1,16 @@
-;;; -*- lexical-binding: t; -*-
-;; PURPOSE: Utilities I found useful during initial development.
-
-;; `M-x pp-28` pretty-prints a highlighted s-exp.
+;;; skg-util.el --- Abandoned: early development helpers  -*- lexical-binding: t; -*-
+;;;
+;;; Commentary:
+;;;
+;;; Loaded by nothing; kept as reference. Utilities I found useful
+;;; during initial development: 'skg-props' (the text properties at
+;;; point), 'skg-2id-insert' and 'skg-add-id-properties-to-all-headlines'
+;;; (toy 'id' properties on headlines), 'skg-doc-get-property' and
+;;; 'skg-alist-diff' (compare two nested alists).
+;;;
+;;; M-x pp-28 pretty-prints a highlighted s-exp.
+;;;
+;;; Code:
 
 (defun skg-props ()
   "Print the properties at point to the minibuffer."

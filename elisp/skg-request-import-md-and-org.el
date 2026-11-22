@@ -1,5 +1,25 @@
-;;; -*- lexical-binding: t; -*-
-;;; Interactive, additive Markdown/Org import.
+;;; skg-request-import-md-and-org.el --- Import Markdown and Org files  -*- lexical-binding: t; -*-
+;;;
+;;; Commentary:
+;;;
+;;; M-x 'skg-import-md-and-org' (no key) imports a directory of
+;;; Markdown and Org files into an owned skgrepo, adding nodes and
+;;; changing no input file. It asks for the input directory (a path on
+;;; the server's filesystem) and the destination skgrepo
+;;; ('skg--prompt-for-owned-repo'), which sets the privacy of every
+;;; imported node; shows the server's preview in *skg import preview*,
+;;; asking for a host root first when the server needs one; and on
+;;; approval sends the preview's approval token, then shows the result
+;;; in *skg import result* and, when the result names an import record
+;;; ('record-id'), rerenders the views without unsaved edits
+;;; ('skg--import-rerender-clean-views'). Declining sends a cancel
+;;; ('skg--import-md-and-org-cancel'). Its Neovim twin is
+;;; 'nvim/lua/skg/import_md_and_org.lua'.
+;;;
+;;; DATA USED/ASSUMED: See 'docs/api-and-formats.org', "Import Markdown
+;;; and Org".
+;;;
+;;; Code:
 
 (require 'skg-config)
 (require 'cl-lib)

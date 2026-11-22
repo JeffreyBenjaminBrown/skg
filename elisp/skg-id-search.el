@@ -1,9 +1,36 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-id-search.el --- Find and visit the ID near point; the linkstack  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Extract, search for, and visit (in a new view) IDs.
-
-;; todo ? speed : This could be more efficient.
-;; It re-reads the same text a few times.
+;;; Commentary:
+;;;
+;;; Find the ID at or near point and open a view of it. 'skg-goto'
+;;; (C-c g RET, or C-c C-o in a view) visits the nearest ID on the
+;;; line ('skg-nearest-id': a UUID, headline metadata, an
+;;; [[id:..]] link or a .skg filename); 'skg-goto-by-id' (C-c g i)
+;;; visits a typed ID; with G for g ('skg-goto-and-close-this',
+;;; 'skg-goto-by-id-and-close-this') each also kills the buffer left
+;;; behind. 'skg-id-next' and 'skg-id-prev' (C-c i n, C-c i p) hop
+;;; between IDs; 'skg-goto-viewnode-id' (C-c g v) moves to the
+;;; headline a message names by its viewnode ID. Requesting the view
+;;; is 'skg-request-single-root-content-view.el's
+;;; ('skg-request-single-root-content-view-from-id').
+;;;
+;;; The linkstack, 'skg-linkstack' (defined in 'skg-state.el'), is a
+;;; stack of trees of (ID LABEL) notes. 'skg-push-id' (C-c u) pushes
+;;; the link or headline at point as a tree of one; 'skg-push-ancestry'
+;;; ('skg-push-ancestry.el', C-c U) pushes a chain. C-c o then i, l
+;;; or n ('skg-paste-id', 'skg-paste-link', 'skg-paste-node') inserts
+;;; the top's ID, a link (a chain of links for a tree), or a
+;;; write-protected headline; C-c O ('skg-pop-id', 'skg-pop-link',
+;;; 'skg-pop-node') does the same and pops. 'skg-view-linkstack'
+;;; (C-c v s) opens the stack as the editable buffer *skg-linkstack*,
+;;; whose C-x C-s ('skg--save-linkstack-buffer') replaces the stack.
+;;; Also here: 'skg-replace-links-with-labels', used by
+;;; 'skg-search-make-link.el'.
+;;;
+;;; todo ? speed : This could be more efficient.
+;;; It re-reads the same text a few times.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'subr-x)

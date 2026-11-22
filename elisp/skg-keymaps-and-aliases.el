@@ -1,9 +1,28 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-keymaps-and-aliases.el --- Every skg key binding and M-x alias  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: All skg keybindings and user-facing command aliases.
-
-;; No requires here — the underlying functions are loaded by skg-client.el,
-;; which also requires this file. Adding requires here would create a cycle.
+;;; Commentary:
+;;;
+;;; Every skg key, and which command it runs; what each command does
+;;; is its own file's. The global keys (C-c f RET, C-c f i, C-c f l,
+;;; C-c g i, C-c v l), the keys in magit, the minibuffer and shell
+;;; buffers, and the maps of the skg modes: 'skg-content-view-mode-map'
+;;; (a view), 'skg-file-minor-mode-map' (a .skg file),
+;;; 'skg-report-mode-map' (a report buffer), 'skg-linkstack-mode-map'
+;;; and 'skg-sexp-edit-mode-map'. The modes themselves are defined
+;;; elsewhere ('skg-buffer.el', 'skg-file-minor-mode.el',
+;;; 'skg-messages.el', 'skg-id-search.el', 'skg-sexpr-edit.el').
+;;; 'skg-alias' gives an internal command a user-facing name ('skg-save'
+;;; for 'skg-request-save-buffer', say) and hides the internal one from
+;;; M-x.
+;;;
+;;; No requires here: the underlying functions are loaded by
+;;; 'skg-client.el', which also requires this file. Adding requires
+;;; here would create a cycle. 'skg-reload' does not unload this file
+;;; but re-reads it with 'load-file', since 'define-minor-mode'
+;;; consults these maps when the modes are defined: unloaded, they
+;;; would be void there.
+;;;
+;;; Code:
 
 (setq ;; By default M-x shows every interactive command, ignoring `completion-predicate'. This passage makes Emacs actually consult each command's `completion-predicate' property — thus letting `skg-alias' hides internal names. This setting is global (not skg-specific), and it enables Emacs's own mode-aware filtering for built-in commands.
  read-extended-command-predicate

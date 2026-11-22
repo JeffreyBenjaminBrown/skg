@@ -1,6 +1,24 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-client.el --- The TCP connection to the server; the require hub  -*- lexical-binding: t; -*-
 ;;;
-;;; For instructions see docs/usage.org.
+;;; Commentary:
+;;;
+;;; The one TCP connection to the skg server, which every request
+;;; travels on. The user starts it with 'skg-client-init' (given the
+;;; path to skgconfig.toml; see docs/setup.org), which reads the port,
+;;; connects, verifies ('skg-connection-verify') and fetches the herald
+;;; rules ('skg-herald-rules-ensure'); it refuses to switch to another
+;;; port while skg buffers from the old one are open. Every request
+;;; calls 'skg-tcp-connect-to-rust', which connects only when there is
+;;; no live connection, and then asks for the startup warnings
+;;; ('skg-request-server-warnings'). Each chunk read goes to
+;;; 'skg-handle-rust-response', thence to 'skg-length-prefix.el'
+;;; ('skg-lp-handle-generic-chunk'), which splits and dispatches the
+;;; messages. 'skg--tcp-sentinel' unlocks save-locked buffers and drops
+;;; the handlers when the connection is lost. M-x skg-connection-end
+;;; closes it. This file also requires every request module, so that
+;;; 'skg-init.el' loading it loads them.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 

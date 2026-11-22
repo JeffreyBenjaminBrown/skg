@@ -1,16 +1,21 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-server-warnings.el --- Show the server's startup warnings  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Show what the server warned about as it started (unknown
-;;; skgconfig.toml keys, say).
+;;; Commentary:
 ;;;
-;;; Startup warnings: `skg-tcp-connect-to-rust' sends the request once
-;;; per connection, as soon as the connection is up and so before any
-;;; view is requested. A non-empty answer is appended to
-;;; `skg-server-warnings-buffer-name', under a headline "Startup
-;;; warnings", keeping what it held (the warnings of an earlier
-;;; connection); an empty one opens nothing.
+;;; Show what the server warned about as it started (unknown
+;;; skgconfig.toml keys, say), in the buffer named by
+;;; 'skg-server-warnings-buffer-name'. 'skg-tcp-connect-to-rust' calls
+;;; 'skg-request-server-warnings' once per connection, as soon as the
+;;; connection is up and so before any view is requested.
+;;; 'skg--server-warnings-handler' appends a non-empty answer to that
+;;; buffer under a headline "Startup warnings", keeping what it held
+;;; (the warnings of an earlier connection); an empty one opens
+;;; nothing. 'skg-repo-files-reloaded.el' appends to the same buffer,
+;;; through 'skg--append-to-server-warnings'.
 ;;;
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org, "Server warnings".
+;;;
+;;; Code:
 
 (require 'skg-length-prefix)
 (require 'skg-messages) ; for skg--message-list-nonempty-p

@@ -1,11 +1,21 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-test-utils.el --- Test-only: load path and fixtures  -*- lexical-binding: t; -*-
 ;;;
-;;; Utilities for skg tests (unit and integration).
+;;; Commentary:
 ;;;
-;;; For unit tests in tests/elisp/, load this file first to set up load-path:
+;;; Test-only; the client never loads it. Most tests in tests/elisp/
+;;; load it first, which puts elisp/ and its subdirectories on the
+;;; load path. 'skg-test-install-herald-rules' installs the herald rule
+;;; table and skgrepo labels from fixtures in tests/shared/, as the
+;;; server would at connect time; 'find-skg-content-buffer' finds an
+;;; open content view.
+;;;
+;;; For unit tests in tests/elisp/, load this file first to set up
+;;; load-path:
 ;;;   (load-file "../../elisp/skg-test-utils.el")
 ;;;   (require 'ert)
 ;;;   (require 'your-module-here)
+;;;
+;;; Code:
 
 (require 'cl-lib)
 

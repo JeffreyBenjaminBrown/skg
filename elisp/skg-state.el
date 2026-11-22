@@ -1,8 +1,23 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-state.el --- Session-wide state: connection, handlers  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Global state variables for the skg client.
+;;; Commentary:
+;;;
+;;; The skg client's session-wide state: the TCP process
+;;; ('skg-rust-tcp-proc') and port ('skg-port'); the maps from
+;;; response-type to the handler awaiting it ('skg-response-handler-map',
+;;; 'skg-unprompted-response-handler-map'), with
+;;; 'skg-register-response-handler' and
+;;; 'skg--unregister-response-handlers'; the length-prefix receiver's
+;;; buffer and counts ('skg-lp-reset'); the config file's path and
+;;; directory ('skg-config-file-path', 'skg-config-dir'); and the
+;;; linkstack ('skg-linkstack'). Using them is other files'
+;;; ('skg-client.el', 'skg-length-prefix.el', 'skg-id-search.el').
+;;; 'skg-reload' keeps the port, the config path and directory, and
+;;; the linkstack; the rest it rebuilds.
 ;;;
 ;;; TODO: Can these globals be avoided?
+;;;
+;;; Code:
 
 (defvar skg-rust-tcp-proc nil
   "Persistent TCP connection to the Rust backend. See

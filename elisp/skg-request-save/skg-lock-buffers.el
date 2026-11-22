@@ -1,13 +1,26 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-lock-buffers.el --- Lock views while a save or rerender runs  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Lock skg buffers against edits during a save-in-progress.
+;;; Commentary:
+;;;
+;;; While a save or a rerender stream runs, the views refuse edits,
+;;; and a second such request is refused. 'skg--lock-all-skg-buffers'
+;;; locks every view; 'skg--unlock-non-collateral-buffers'
+;;; (save-relax-lock) and 'skg--unlock-buffers-not-in-view-id-list'
+;;; (rerender-lock) narrow the lock to the views the server will
+;;; redraw; 'skg--unlock-after-save' and 'skg--unlock-all-save-locked'
+;;; release it. 'skg--begin-stream' and 'skg--end-stream' keep
+;;; 'skg--stream-in-progress', the single-flight guard.
+;;; 'skg-request-save.el' and 'skg-request-rerender-all-views.el' drive
+;;; these. Its Neovim twin is 'nvim/lua/skg/lock.lua'.
 ;;;
 ;;; Uses overlays rather than buffer-read-only because:
 ;;; - Custom error message ("skg: buffer locked -- save in progress")
 ;;;   instead of the generic "Buffer is read-only".
-;;; - inhibit-read-only (used by skg-replace-buffer-with-new-content)
+;;; - inhibit-read-only (used by 'skg-replace-buffer-with-new-content')
 ;;;   does not suppress overlay hooks, so we must explicitly remove
 ;;;   overlays before updating buffer content -- which is what we want.
+;;;
+;;; Code:
 
 (defvar skg--stream-in-progress nil
   "Client-side bookkeeping: non-nil while a streaming request

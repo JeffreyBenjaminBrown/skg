@@ -1,6 +1,14 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-verify-connection.el --- Ping the server, echo its reply  -*- lexical-binding: t; -*-
+;;;
+;;; Commentary:
+;;;
+;;; 'skg-connection-verify' (M-x skg-connection-verify, and run by
+;;; 'skg-client-init') pings the server and shows its reply in the
+;;; echo area, or "connected".
 ;;;
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
+;;;
+;;; Code:
 
 (require 'skg-length-prefix)
 

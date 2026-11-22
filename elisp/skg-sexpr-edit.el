@@ -1,9 +1,26 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-sexpr-edit.el --- Edit a headline's metadata as an org tree  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Interactive s-expression editing utilities.
-;;; From a 'source buffer', the user can call skg-view-metadata
-;;; to open a new 'sexp edit' buffer,
-;;; where the sexp is rendered as an org-tree.
+;;; Commentary:
+;;;
+;;; The metadata editor. 'skg-view-metadata' (C-c v m) opens the
+;;; metadata of the headline at point as an org tree in a buffer of
+;;; its own ('skg-sexp-edit-mode'), each field the user may set shown,
+;;; at its default where unset. C-c C-c ('skg-sexp-edit--apply')
+;;; writes the edited tree back into the headline without saving the
+;;; view; killing the buffer cancels; S-left/S-right cycle a field's
+;;; values ('skg-sexpr-cycling.el'). Each headline shows, in
+;;; parentheses, the herald its path produces
+;;; ('skg-sexp-edit--decorate-with-heralds'); an occurrence's title is
+;;; shown read-only. On a headline without metadata it first asks for
+;;; a skgrepo. Advice on 'org-insert-heading-respect-content'
+;;; ('skg-sexp-edit--after-insert-headline') runs 'skg-set-repo' on a
+;;; new headline that cannot inherit a skgrepo
+;;; ('skg--headline-can-inherit-skgrepo-p'). Which fields a kind has,
+;;; and filling in and stripping their defaults, are
+;;; 'skg-metadata-fields.el's; turning a sexp into org text and back
+;;; is 'skg-sexpr-org-bijection.el's.
+;;;
+;;; Code:
 
 (require 'heralds-minor-mode) ;; rule table + token rendering, for the per-field herald hints
 (require 'skg-buffer)

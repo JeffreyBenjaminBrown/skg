@@ -1,15 +1,32 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-views.el --- View requests: folders, editability, forks  -*- lexical-binding: t; -*-
 ;;;
-;;; Commands that request viewbranches by adding a (viewRequests ...)
-;;; atom to the headline at point and saving, letting Rust fulfill the
-;;; request during the refresh. The folder commands,
-;;; `skg-show-folderOf-*', auto-save: (folder RELNAME) builds both
-;;; folders of the relation (one for containers and mentioners). A
-;;; containers folder carries, under each member, that member's
-;;; containerward chain: its containers, theirs under them, up to the
-;;; roots.
-;;; (`skg-request-editable-view' and the write-protect requests, a
-;;; different concept, are also here.)
+;;; Commentary:
+;;;
+;;; Commands that ask the server to show more of the headline at
+;;; point, or to show it differently, by adding a (viewRequests ...)
+;;; atom to its metadata, which the next save fulfills. The folder
+;;; commands auto-save ('skg--request-view-and-save'):
+;;; 'skg-show-folderOf-aliases' (C-c l a), 'skg-show-folderOf-hides'
+;;; (C-c l h), 'skg-show-folderOf-forks' (C-c l f),
+;;; 'skg-show-folderOf-flags' (C-c l p),
+;;; 'skg-show-folderOf-containers' (C-c l c) and
+;;; 'skg-show-folderOf-mentioners' (C-c l m). (folder RELNAME)
+;;; builds both folders of the relation (one for containers,
+;;; mentioners and forks; aliases and flags are no relation and build
+;;; one). A containers folder carries, under each member, that
+;;; member's containerward chain: its containers, theirs under them,
+;;; up to the roots. See docs/COMMANDS.org, "C-c l".
+;;;
+;;; The editable-view and write-protect requests do not auto-save:
+;;; 'skg-request-editable-view' (C-c s e, alias 'skg-set-editable'),
+;;; 'skg-request-write-protected' (C-c s w) and
+;;; 'skg-request-write-protected-recursive' (C-c s W). The explicit
+;;; fork, 'skg-fork-node' (C-c m f, alias 'skg-fork'), auto-saves.
+;;; Writing the atom is 'skg-metadata.el's
+;;; ('skg-edit-metadata-at-point'); sending the save is
+;;; 'skg-request-save.el's ('skg-request-save-buffer').
+;;;
+;;; Code:
 
 (require 'skg-metadata)
 (require 'skg-request-save)

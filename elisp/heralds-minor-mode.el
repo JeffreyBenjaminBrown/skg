@@ -1,17 +1,50 @@
-;;; -*- lexical-binding: t; -*-
+;;; heralds-minor-mode.el --- Draw headline metadata as heralds  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE
-;;; See the comment for 'heralds-minor-mode' below.
+;;; Commentary:
+;;;
+;;; Draw the heralds -- the short colored tokens a view shows in place
+;;; of each headline's '(skg ...)' metadata -- and keep them current
+;;; while the user edits. 'skg-open-org-buffer-from-text'
+;;; ('skg-buffer.el') turns 'heralds-minor-mode' on in every view;
+;;; 'skg-view-heralds-mode' (C-c v h), its alias, turns it off and on.
+;;; 'heralds-apply-to-line' draws one headline's heralds, an overlay
+;;; whose 'display' is the string 'heralds-from-metadata' builds;
+;;; 'heralds-after-change' redraws the lines an edit touches, and the
+;;; folders above them ('heralds--refresh-folders-above'). The faces of
+;;; the herald styles, from 'shared/herald-styles.json', are defined
+;;; here ('heralds--define-style-faces').
+;;;
+;;; The rule table, which 'skg-request-herald-rules.el' fetches from
+;;; the server (server/heralds.rs) and installs here
+;;; ('heralds-install-rules', cached in 'heralds--transform-rules', with
+;;; the skgrepo labels in 'heralds--skgrepo-labels'), places the tokens
+;;; other than the relationship heralds, through 'skg-lens.el'
+;;; ('skg-transform-sexp-flat'); this file renders the relationship
+;;; heralds and property counts itself, from the semantic facts of
+;;; '(view ...)' ('heralds--render-rel-facts'). Three heralds need what
+;;; the headline's own metadata cannot say, so this client supplies it:
+;;; a 'repoBoundary' gets its skgrepo's label
+;;; ('heralds--with-repoBoundary-label'), a pending detachment the atom
+;;; 'pendingDetachment', and a changed folder its label in place of the
+;;; lens's ('heralds--changed-folder-text'). Saying what each herald
+;;; means is 'skg-request-describe-heralds.el's. Covering what a
+;;; forks-folder member restates is 'skg-fork-dedup.el's, which this
+;;; file refreshes beside its own overlays. Rewriting only the changed
+;;; headlines is 'skg-redraw-delta.el's, which re-heralds the lines
+;;; itself. The metadata editor ('skg-sexpr-edit.el') borrows the rule
+;;; table and 'heralds--tokens->text' for its per-field hints.
 ;;;
 ;;; PITFALL: ORPHANED OVERLAYS
 ;;; Switching major modes (e.g. org -> text -> org) kills all
 ;;; buffer-local variables. But the overlay objects themselves are
-;;; attached to the buffer and survive it, still setting `display'
+;;; attached to the buffer and survive it, still setting 'display'
 ;;; properties on the text. So no list of them is kept: every overlay
 ;;; we create is tagged with (overlay-put ov 'heralds t), and the
 ;;; clearing functions find them by that property. Finding them so is
-;;; also fast: `overlays-in' reads only the overlays of its region,
+;;; also fast: 'overlays-in' reads only the overlays of its region,
 ;;; where a list would be scanned whole at every edit.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'skg-metadata) ;; for skg--pending-detachment-at-point-p

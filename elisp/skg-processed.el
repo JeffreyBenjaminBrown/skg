@@ -1,14 +1,30 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-processed.el --- Mark changes processed, and move between them  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: The processed gestures of the diff view
-;;; ('docs/diff-view.org', "Processed requests and gestures"). Each says
-;;; what it marks and which way: 'C-c m', then 'n' (the node), 'r' (its
-;;; relationship to its viewparent) or 'b' (both), then 'p' (processed)
-;;; or 'u' (unprocessed). It writes processed requests, '(processed
-;;; OBJECTS)' or '(unprocessed OBJECTS)', into the '(editRequest ...)'
-;;; of headline metadata, then saves. The save consumes them, setting
-;;; or clearing the marks, and answers with the buffer rerendered and
-;;; the processed summary.
+;;; Commentary:
+;;;
+;;; Marking the changes of the diff view processed, and moving between
+;;; them ('docs/diff-view.org', "Processed requests and gestures"). A
+;;; gesture says what it marks and which way: C-c m, then 'n' (the
+;;; node), 'r' (its relationship to its viewparent) or 'b' (both),
+;;; then 'p' (processed) or 'u' (unprocessed), as in
+;;; 'skg-mark-node-processed' (C-c m n p); C-c m h then 'p' or 'u'
+;;; ('skg-mark-homeSkgrepo-move-processed') marks a home-skgrepo move.
+;;; A prefix argument makes a gesture recursive. Each writes processed
+;;; requests, '(processed OBJECTS)' or '(unprocessed OBJECTS)', into
+;;; the '(editRequest ...)' of headline metadata
+;;; ('skg--write-processed-request'), then saves. The save consumes
+;;; them, setting or clearing the marks, and answers with the buffer
+;;; rerendered and the processed summary. The motions C-c r n and
+;;; C-c r p, then 'c' (any), 'u' or 'p', move to the next or previous
+;;; headline with change facts ('skg-diffView-goto-next-change' and
+;;; its siblings); a capital last letter visits every one.
+;;;
+;;; What a headline's change facts say, and whether a folder's change
+;;; is processed, are read in 'skg-change-facts.el'; how a request is
+;;; placed in '(editRequest ...)', in 'skg-metadata.el'
+;;; ('skg--metadata-with-processed-request'); the save is
+;;; 'skg-request-save.el's. Its Neovim twin is
+;;; 'nvim/lua/skg/processed.lua'.
 ;;;
 ;;; The server says which leaves (single changes) a headline names:
 ;;; it writes '(leaves N OBJECT...)' in the headline's '(diff ...)'
@@ -17,21 +33,24 @@
 ;;; a request naming every listed object touches. A headline that
 ;;; names exactly one leaf (a property member, an old text, a home
 ;;; skgrepo or relRepo move, an unknown or restricted viewnode) lists
-;;; no object, and a bare request marks it. A changeset marker lists only 'rel', though 'node' there names
-;;; its members' own leaves. A folder shown because of a change names
-;;; no leaf itself; a gesture on it acts on its children. The server
-;;; writes such a folder as its bare atom; whether it is changed, and
-;;; processed, follows from its members
-;;; (`skg--folder-change-processed-at-point').
+;;; no object, and a bare request marks it. A changeset marker lists
+;;; only 'rel', though 'node' there names its members' own leaves. A
+;;; folder shown because of a change names no leaf itself; a gesture
+;;; on it acts on its children. The server writes such a folder as its
+;;; bare atom; whether it is changed, and processed, follows from its
+;;; members ('skg--folder-change-processed-at-point').
 ;;;
 ;;; The letter's objects are what a gesture names on each headline,
 ;;; filtered by what the headline lists
-;;; (`skg--processed-objects-named-by-letters').
+;;; ('skg--processed-objects-named-by-letters').
 ;;;
-;;; It also formats the processed summary, which the save, stage-and-
-;;; commit and extend-diff-view show.
+;;; It also formats the processed summary
+;;; ('skg--processed-summary-message'), which the save, the diff view,
+;;; stage-and-commit and extend-diff-view show.
 ;;;
-;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
+;;; DATA USED/ASSUMED: See 'docs/api-and-formats.org'.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'org)

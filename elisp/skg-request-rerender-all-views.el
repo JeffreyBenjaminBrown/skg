@@ -1,16 +1,25 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-rerender-all-views.el --- The rerender stream  -*- lexical-binding: t; -*-
 ;;;
-;;; The "rerender all views" command, which skips every buffer with
-;;; unsaved edits ('skg-request-rerender-all-views'), the "rerender
-;;; views" request that releases a save's withheld rerender
-;;; ('skg--request-rerender-views'),
-;;; the handler for its request/response,
-;;; and the rerender stream that follows several other requests,
-;;; with the prologue those requests share
-;;; ('skg--send-streaming-request').
+;;; Commentary:
 ;;;
-;;; Protocol: rerender-lock → rerender-view* → rerender-done.
+;;; Redraw the open views from the server. 'skg-request-rerender-all-views'
+;;; (M-x; no key) rerenders every view that holds no unsaved edits,
+;;; naming those it skips. The same rerender stream follows every
+;;; request sent through 'skg--send-streaming-request', the prologue
+;;; those requests share: switching the skgrepo restriction, cycling a
+;;; perspective, a receipt, stage-and-commit, extending the diff view,
+;;; deleting references to an absent node.
+;;; 'skg--request-rerender-views' releases a save's withheld rerender
+;;; (called from 'skg-save-confirmations.el');
+;;; 'skg--request-rerender-views-excluding' serves
+;;; 'skg-repo-files-reloaded.el' and 'skg-request-import-md-and-org.el'.
+;;; Redrawing each view is 'skg-redraw-whole-view.el's
+;;; ('skg--apply-streamed-view-update').
+;;;
+;;; Protocol: rerender-lock -> rerender-view* -> rerender-done.
 ;;; Each view is unlocked and updated as its rerender-view arrives.
+;;;
+;;; Code:
 
 (require 'skg-length-prefix)
 (require 'skg-redraw-whole-view) ; for skg--apply-streamed-view-update

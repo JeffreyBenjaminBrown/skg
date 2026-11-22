@@ -1,4 +1,14 @@
-;;; -*- lexical-binding: t; -*-
+;;; read-only.el --- Scratch experiment with the read-only text property  -*- lexical-binding: t; -*-
+;;;
+;;; Commentary:
+;;;
+;;; Loaded by nothing; a scratch file of forms to evaluate one at a
+;;; time (C-x C-e), trying out the 'read-only' text property on a
+;;; region. The positions the forms below name are examples from one
+;;; session; evaluate '(point)' to find your own.
+;;;
+;;; Code:
+
 (point) ;; if point is just after the ), it is at 8
 (point) ;; if point is just after the ), it is at 60
 

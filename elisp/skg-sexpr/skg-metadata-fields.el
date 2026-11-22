@@ -1,24 +1,31 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-metadata-fields.el --- Fields a user may set on a headline  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Fill in and strip the fields a user may set on a headline,
-;;; for the metadata editor ('skg-sexpr-edit.el'), and say what each
-;;; field's cycle runs through. The fields of each kind of headline,
+;;; Commentary:
+;;;
+;;; When the metadata editor ('skg-sexpr-edit.el', 'skg-view-metadata')
+;;; opens, show every field the user may set on the headline, at its
+;;; default where unset; when it applies, drop the defaults again; and
+;;; say what each field's S-left/S-right cycle runs through
+;;; ('skg-sexpr-cycling.el'). The fields of each kind of headline,
 ;;; their defaults and their values come from
 ;;; 'shared/metadata-fields.json', whose comments describe them.
-;;; After sexp-to-org, filling in inserts each missing field at its
-;;; default, every part where the server writes it; before org-to-sexp,
-;;; stripping removes each field at its default and writes a value that
-;;; took arguments as a list. Both clients pass the cases of
-;;; 'tests/shared/metadata-editor-cases.txt'.
-;;; The Neovim analog is nvim/lua/skg/sexpr/metadata_fields.lua.
+;;; After 'sexp-to-org', filling in inserts each missing field at its
+;;; default, every part where the server writes it; before
+;;; 'org-to-sexp', stripping removes each field at its default and
+;;; writes a value that took arguments as a list. Both clients pass the
+;;; cases of 'tests/shared/metadata-editor-cases.txt'. The Neovim
+;;; analog is nvim/lua/skg/sexpr/metadata_fields.lua.
+;;; 'skg-metadata.el' reads the table too: which fields a kind has
+;;; ('skg-metadata-fields-field-names'), and where a part ranks
+;;; ('skg-metadata-fields--part-rank').
 ;;;
-;;; ENTRY POINTS:
-;;;   skg-metadata-fields-kind-of-sexp
-;;;   skg-metadata-fields-fillIn-defaults-in-org
-;;;   skg-metadata-fields-strip-defaults-from-org
-;;;   skg-metadata-fields-cycle-values
-;;;   skg-metadata-fields-value-arguments
-;;;   skg-headlines-to-org
+;;; ENTRY POINTS: 'skg-metadata-fields-kind-of-sexp',
+;;; 'skg-metadata-fields-fillIn-defaults-in-org',
+;;; 'skg-metadata-fields-strip-defaults-from-org',
+;;; 'skg-metadata-fields-cycle-values',
+;;; 'skg-metadata-fields-value-arguments', 'skg-headlines-to-org'.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'skg-sexpr-org-bijection)

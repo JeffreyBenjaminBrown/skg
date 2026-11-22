@@ -1,11 +1,20 @@
-;;; -*- lexical-binding: t; -*-
-;; ABANDONED. Too hard.
-;; Instead I just changed the spec --
-;; an ID *can* be `contained` in more than one place.
-;; If the user wants to avoid that (as in org-roam),
-;; they can. If they don't,
-;; following a link with multiple targets will
-;; bring up a menu of options to the user.
+;;; skg-id-copy-minor-mode.el --- Abandoned: kill/yank advice for IDs  -*- lexical-binding: t; -*-
+;;;
+;;; Commentary:
+;;;
+;;; Loaded by nothing; kept as reference. 'skg-id-copy-minor-mode'
+;;; advised the kill, copy and yank commands, to keep a pasted 'id'
+;;; text property from being pasted again elsewhere.
+;;;
+;;; ABANDONED. Too hard.
+;;; Instead I just changed the spec --
+;;; an ID *can* be "contained" in more than one place.
+;;; If the user wants to avoid that (as in org-roam),
+;;; they can. If they don't,
+;;; following a link with multiple targets will
+;;; bring up a menu of options to the user.
+;;;
+;;; Code:
 
 ;; Define advice functions for all kill|copy|paste operations
 (defun skg-advice-for-kill (&rest _)

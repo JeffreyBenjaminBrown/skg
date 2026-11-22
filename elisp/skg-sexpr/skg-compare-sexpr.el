@@ -1,6 +1,13 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-compare-sexpr.el --- Whether one sexp holds another's paths  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Compare s-expressions.
+;;; Commentary:
+;;;
+;;; Compare s-expressions: 'skg-sexp-subtree-p' asks whether one holds
+;;; every path of another, which is how the code asks what a headline's
+;;; metadata says (is it '(skg ghost)'?), in 'skg-metadata.el' and
+;;; 'skg-id-search.el'. Loaded through 'skg-sexpr-search.el'.
+;;;
+;;; Code:
 
 (require 'cl-lib)
 

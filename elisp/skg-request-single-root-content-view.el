@@ -1,6 +1,23 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-single-root-content-view.el --- Open a view of one node  -*- lexical-binding: t; -*-
 ;;;
-;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
+;;; Commentary:
+;;;
+;;; Open a view of one node: 'skg-request-single-root-content-view-from-id'
+;;; asks the server for a single-root content view of it, and
+;;; 'skg-handle-content-view-sexp' opens the reply as a view buffer, or,
+;;; when the node is already a root of an open view, switches to that
+;;; buffer (once repairing the server's bookkeeping when that buffer is
+;;; gone). Errors and warnings go to *SKG Content View Messages*; a
+;;; privacy challenge asks, then sends again with the approval. The
+;;; workhorse behind 'skg-goto' (C-c g RET) and 'skg-goto-by-id'
+;;; (C-c g i), whose commands, finding the ID, are 'skg-id-search.el's;
+;;; setting up the buffer is 'skg-buffer.el's
+;;; ('skg-open-org-buffer-from-text').
+;;;
+;;; DATA USED/ASSUMED: See docs/api-and-formats.org, "Single-root
+;;; content view from ID".
+;;;
+;;; Code:
 
 (require 'skg-log)
 (require 'skg-length-prefix)

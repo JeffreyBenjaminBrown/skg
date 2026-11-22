@@ -1,16 +1,23 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-change-facts.el --- Read a diff-view headline's change facts  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Say what the diff view shows changed at a headline, and
-;;; whether the user marked that change processed, by reading its
-;;; change facts, the '(diff ...)' part of its metadata: what changed
+;;; Commentary:
+;;;
+;;; Say what the diff view shows changed at a headline, and whether
+;;; the user marked that change processed, by reading its change
+;;; facts, the '(diff ...)' part of its metadata: what changed
 ;;; ('skg--processed-form', 'skg--processed-leaves') and whether it is
 ;;; processed ('skg--objects-processed-p'); and whether a folder is
 ;;; changed, by its members' relationships, and processed
-;;; ('skg--folder-change-processed', '...-at-point'). The heralds, the
-;;; herald descriptions and the processed gestures ('skg-processed.el')
-;;; read them. The gestures themselves are 'skg-processed.el's; writing
-;;; a processed request is 'skg-metadata.el's
-;;; ('skg--metadata-with-processed-request').
+;;; ('skg--folder-change-processed',
+;;; 'skg--folder-change-processed-at-point'). The heralds
+;;; ('heralds-minor-mode.el'), the herald descriptions
+;;; ('skg-request-describe-heralds.el') and the processed gestures
+;;; ('skg-processed.el') read them. The gestures themselves are
+;;; 'skg-processed.el's; writing a processed request is
+;;; 'skg-metadata.el's ('skg--metadata-with-processed-request'). Its
+;;; Neovim twin is 'nvim/lua/skg/change_facts.lua'.
+;;;
+;;; Code:
 
 (require 'seq)
 (require 'org)

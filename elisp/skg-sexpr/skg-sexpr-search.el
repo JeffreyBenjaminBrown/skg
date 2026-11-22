@@ -1,7 +1,20 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-sexpr-search.el --- Read sexps on a line, and values by path  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Generic utilities that
-;;; read, compare, edit and transform s-exps.
+;;; Commentary:
+;;;
+;;; Read the s-expression on a line, dropping its derived facts,
+;;; '(view ...)' and '(diff ...)' ('skg-strip-heralds-from-sexp'):
+;;; 'skg-first-sexpr-on-line' (for 'skg-request-file-path.el'), and
+;;; 'skg-sexp-at-or-after-point' (only the tests call it). Find where a
+;;; headline's metadata ends ('skg-find-sexp-end', for
+;;; 'skg-metadata.el'), by counting parentheses ('elisp/PITFALLs.org',
+;;; "Find the end of skg metadata by counting parentheses"). Take the
+;;; values at a path of labels ('skg-sexp-cdr-at-path', used across the
+;;; client). Requiring this file also loads the edit DSL
+;;; ('skg-sexpr-dsl-for-edits.el'), the comparison
+;;; ('skg-compare-sexpr.el') and the lens ('skg-lens.el').
+;;;
+;;; Code:
 
 (require 'seq)
 (require 'skg-sexpr-dsl-for-edits)

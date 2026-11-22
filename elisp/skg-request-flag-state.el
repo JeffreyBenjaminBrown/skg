@@ -1,6 +1,21 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-flag-state.el --- Stage a node's noSearchMatching flag  -*- lexical-binding: t; -*-
 ;;;
-;;; Show and change the user-mutable NoSearchMatching flag.
+;;; Commentary:
+;;;
+;;; Stage whether the node at point may match text searches, its
+;;; user-mutable noSearchMatching flag. 'skg-set-flag-search-matching'
+;;; (C-c s x) asks the server for the flag's value (a "flag state"
+;;; request), offers "search matching" or "no search matching", and
+;;; writes the choice as the headline's edit request, replacing a
+;;; pending relRepo request there ('skg--relRepo-requested-value', from
+;;; 'skg-request-relRepo-info.el'). With a prefix argument it does the
+;;; same to the occurrences below that claim membership of their
+;;; viewparents ('skg--flag-recursive-targets'), skipping one that is
+;;; foreign, write-protected, unsaved or holds an edit request. It does
+;;; not save; the flag changes at the next save. Writing the request
+;;; is 'skg-metadata.el's ('skg--write-edit-request').
+;;;
+;;; Code:
 
 (require 'cl-lib)
 (require 'org)

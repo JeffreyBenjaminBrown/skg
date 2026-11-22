@@ -1,6 +1,22 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-text-search.el --- Text search and its results buffer  -*- lexical-binding: t; -*-
 ;;;
-;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
+;;; Commentary:
+;;;
+;;; Text search. 'skg-search' (C-c f RET) searches titles with the
+;;; conservative defaults; 'skg-search-interactive' (C-c f i) first
+;;; asks for options: regex, body text, Tantivy syntax, or help (which
+;;; opens docs/COMMANDS.org). Both send the request through
+;;; 'skg--request-text-search', which asks again when the server asks
+;;; whether to include overPrivateText telescopes. One
+;;; 'search-results' message carries the search buffer, each hit with
+;;; what the enrichment draws under it; 'skg--display-search-results'
+;;; opens it as a view under the view ID "search:TERMS". Inserting a
+;;; link to a hit is 'skg-search-make-link.el's, through
+;;; 'skg--search-buffer-setup-hook'.
+;;;
+;;; DATA USED/ASSUMED: See docs/api-and-formats.org, "Text search".
+;;;
+;;; Code:
 
 (require 'skg-client)
 (require 'skg-buffer)

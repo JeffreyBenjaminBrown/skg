@@ -1,9 +1,21 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-export-org.el --- Export skg data to plain .org files  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: skg-export-some-to-org -- export Skg data to plain .org
-;;; files under org-exports/. All the logic is in Rust; this command
-;;; picks a skgrepo restriction (client-side, with the circular selector) and
-;;; sends the "export to org" request, then shows the server's report.
+;;; Commentary:
+;;;
+;;; M-x 'skg-export-some-to-org' (no key) exports skg data to plain
+;;; .org files, under 'org-exports/' by default. All the logic is in
+;;; Rust; this command picks a skgrepo restriction (client-side, with
+;;; the cycling selector 'skg--prompt-for-repo-set') and an output dir,
+;;; sends the "export to org" request, asks before including
+;;; overPrivateText telescopes when the server asks
+;;; ('skg--register-overPrivateText-confirmation-instead-of'), and
+;;; shows the server's report in *skg export to org*
+;;; ('skg--export-to-org-handler'). Its Neovim twin is
+;;; 'nvim/lua/skg/export_org.lua'.
+;;;
+;;; DATA USED/ASSUMED: See 'docs/api-and-formats.org', "Export to org".
+;;;
+;;; Code:
 
 (require 'skg-config)         ; skg--prompt-for-repo-set
 (require 'skg-length-prefix)

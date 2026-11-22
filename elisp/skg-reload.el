@@ -1,7 +1,25 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-reload.el --- Reload the client from disk, no restart  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Force-reload all skg modules.
-;;; Evaluate this file to pick up code changes without restarting Emacs.
+;;; Commentary:
+;;;
+;;; 'skg-reload' (M-x skg-reload) reloads every skg module from disk,
+;;; to pick up code changes without restarting Emacs. Nothing in the
+;;; client requires this file; load it with 'load-file' first (as
+;;; docs/setup.org does). It closes the connection first
+;;; ('skg-connection-end'), unloads 'skg--reload-unloaded-features',
+;;; then loads 'skg-init.el' again ('skg--reload-modules').
+;;;
+;;; It carries across the reload what would otherwise be lost: the
+;;; settings 'skg-client-init' made and the linkstack
+;;; ('skg--reload-preserved-vars'), and the herald rule table and
+;;; skgrepo labels fetched from the server, restored inside an
+;;; 'unwind-protect' so a load error cannot lose them. It never unloads
+;;; 'skg--reload-kept-features': 'skg-buffer.el' and
+;;; 'skg-keymaps-and-aliases.el' it re-reads with 'load-file' instead,
+;;; and 'skg-log.el' it leaves as first loaded. The docstring of
+;;; 'skg-reload' says why.
+;;;
+;;; Code:
 
 (defconst skg--reload-preserved-vars
   '( skg-port

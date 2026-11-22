@@ -1,4 +1,19 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-repo-sets.el --- Query and switch the skgrepo restriction  -*- lexical-binding: t; -*-
+;;;
+;;; Commentary:
+;;;
+;;; List, query, and switch the per-connection skgrepo restriction of
+;;; display and search. 'skg-restrict-repo-set' (C-c v l) switches it,
+;;; choosing the most private owned skgrepo to show or whether foreign
+;;; skgrepos are shown; it refuses while a view has unsaved edits, and
+;;; the switch rerenders every open view in place.
+;;; 'skg-list-repo-sets' (M-x) lists the restrictions the config
+;;; offers; 'skg-show-skgrepo-restriction' (M-x) echoes the current
+;;; one. The chooser and the labels are 'skg-config.el's
+;;; ('skg--prompt-for-repo-set'); the rerender stream is
+;;; 'skg-request-rerender-all-views.el's ('skg--send-streaming-request').
+;;;
+;;; Code:
 
 (require 'skg-buffer)
 (require 'skg-config)

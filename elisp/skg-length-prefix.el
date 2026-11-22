@@ -1,10 +1,28 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-length-prefix.el --- Split server replies, dispatch each by type  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Read length-prefixed messages from the server
-;;; and dispatch by response-type via skg-response-handler-map.
-;;; (This file does not handle adding length prefixes to outgoing
-;;; messages. That's easier, and done inline where messages are sent,
-;;; e.g., in skg-request-save.el.)
+;;; Commentary:
+;;;
+;;; Every answer from the server passes through here on its way to the
+;;; command that asked for it. 'skg-lp-handle-generic-chunk' (which
+;;; 'skg-handle-rust-response' in 'skg-client.el' calls with each chunk
+;;; read) splits the byte stream into messages, each a
+;;; "Content-Length: N" header and N bytes of sexp;
+;;; 'skg-lp--dispatch-by-type' hands each to the handler that
+;;; 'skg-response-handler-map' holds for its response-type, or else
+;;; 'skg-unprompted-response-handler-map' (both in 'skg-state.el').
+;;; Registering the handlers is each command's own.
+;;; 'skg-tell-answer-not-applied' tells the user a handler failed, and
+;;; 'skg--register-overPrivateText-confirmation-instead-of' asks before
+;;; a request shows overPrivateText telescope text.
+;;;
+;;; The handler maps are keyed by symbols because the server's sexp
+;;; crate prints simple strings, response-types among them, unquoted.
+;;;
+;;; This file does not add length prefixes to outgoing messages. That
+;;; is easier, and done inline where messages are sent (as in
+;;; 'skg-request-save.el').
+;;;
+;;; Code:
 
 (require 'skg-log)
 (require 'skg-state)

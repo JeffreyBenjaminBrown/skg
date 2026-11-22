@@ -1,6 +1,16 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-recovery.el --- Archive a dirty view's edits for manual recovery  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Detached, lossless recovery documents for dirty skg views.
+;;; Commentary:
+;;;
+;;; Detached, lossless recovery documents for dirty skg views.
+;;; 'skg-show-unsaved-changes' (M-x; no key) writes, to a file the user
+;;; names, an Org document holding the view's baseline
+;;; ('skg-clean-baseline') and current text exactly (as JSON strings)
+;;; and a unified diff of them ('skg--unsaved-changes-document'), then
+;;; opens it. It is not a view: nothing in it reaches the server. See
+;;; docs/COMMANDS.org, "M-x skg-show-unsaved-changes".
+;;;
+;;; Code:
 
 (require 'json)
 (require 'skg-buffer)

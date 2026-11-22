@@ -1,20 +1,31 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-log.el --- Debugging log, off by default  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Structured logging for the skg Emacs client.
+;;; Commentary:
 ;;;
-;;; Output: JSON lines to <skg-log-file>, one object per entry.
+;;; A debugging log of what the client did, off unless 'skg-log-file'
+;;; names a file. Every module writes to it through 'skg-log'; the
+;;; user sees none of it (a handler that fails also tells the user,
+;;; through 'skg-tell-answer-not-applied' in 'skg-length-prefix.el').
+;;;
+;;; Output: JSON lines to 'skg-log-file', one object per entry.
 ;;; Each entry has: timestamp, level, caller, category, message.
 ;;;
-;;; Toggle: set skg-log-file to nil to disable all logging.
-;;; Filter: set skg-log-categories to a list of symbols to restrict
+;;; Toggle: set 'skg-log-file' to nil to disable all logging.
+;;; Filter: set 'skg-log-categories' to a list of symbols to restrict
 ;;;         which categories are logged. Empty list = log everything.
-;;; Level:  set skg-log-min-level to 'debug, 'info, 'warn, or 'error.
+;;; Level:  set 'skg-log-min-level' to 'debug, 'info, 'warn, or 'error.
+;;;
+;;; PITFALL: 'skg-reload' never unloads this file, so that the user's
+;;; log settings survive it; a function added here is void until
+;;; Emacs restarts.
 ;;;
 ;;; USAGE:
 ;;;   (skg-log 'info 'save "sending %d bytes" content-length)
 ;;;   (skg-log 'debug 'tcp "received %s" payload)
 ;;;   (skg-log 'warn 'view-id "nil skg-view-id in %s" (buffer-name))
 ;;;   (skg-log 'error 'parse "failed: %S" err)
+;;;
+;;; Code:
 
 (defvar skg-log-file nil
   "Path to the skg client log file. Nil disables logging.")

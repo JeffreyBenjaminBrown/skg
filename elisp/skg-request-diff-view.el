@@ -1,13 +1,27 @@
-;;; -*- lexical-binding: t; -*-
+;;; skg-request-diff-view.el --- Open the diff view's buffers  -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: The diff view
-;;; ('docs/diff-view.org', "The four buffers").
-;;; One command sends one "diff view" request per buffer, in
-;;; order, and opens each buffer the server does not answer with
-;;; '(empty . t)', named "diff-view: " followed by the buffer's name.
-;;; Each is an ordinary registered content view.
+;;; Commentary:
 ;;;
-;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
+;;; 'skg-diffView-open' (C-c v d) opens the diff view: every change in
+;;; the owned skgrepos since their last git-commits, in up to four
+;;; buffers ('docs/diff-view.org', "The four buffers";
+;;; 'skg-diffView-buffers'), each named "diff-view: " followed by its
+;;; name. It sends one "diff view" request per buffer, in order
+;;; ('skg--request-diffView-buffers'), and opens each the server does
+;;; not answer with '(empty . t)', showing its processed summary
+;;; ('skg--handle-diffView-response'). Each is an ordinary registered
+;;; content view, which 'skg-diffView-buffer-kind' names.
+;;;
+;;; Marking changes processed and moving between them are
+;;; 'skg-processed.el's; extending a buffer to the changes it does not
+;;; make editable, 'skg-request-extend-diff-view.el's; saving a buffer
+;;; of the diff view, 'skg-request-save.el's; git-committing,
+;;; 'skg-request-stage-and-commit.el's. Its Neovim twin is
+;;; 'nvim/lua/skg/diff_view.lua'.
+;;;
+;;; DATA USED/ASSUMED: See 'docs/api-and-formats.org', "Diff view".
+;;;
+;;; Code:
 
 (require 'org-id)
 (require 'skg-log)
