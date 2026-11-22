@@ -5,9 +5,9 @@ use skg::dbs::in_rust_graph::complete_validation::{
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::fork_rules::ForkRuleViolation;
 use skg::telescope::invariants::TelescopeViolation;
+use skg::test_utils::graphnode_at;
 use skg::types::config::{SkgConfig, Skgrepo};
 use skg::types::misc::{ID, MSV, RelPartner, SkgrepoName};
-use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::save::{NodeInstruction, SaveNode};
 
 use std::collections::HashMap;
@@ -31,23 +31,15 @@ fn config () -> SkgConfig {
   config
 }
 
-fn node (pid : &str, skgrepo : &str) -> Graphnode {
-  let mut node = empty_graphnode ();
-  node . pid = ID::from (pid);
-  node . title = pid . to_string ();
-  node . home_skgrepo = SkgrepoName::from (skgrepo);
-  node
-}
-
 #[test]
 fn identity_errors_are_aggregated_and_deterministically_ordered () {
-  let mut first = node ("same-pid", "public");
+  let mut first = graphnode_at ("same-pid", "public");
   first . extra_ids = vec![ID::from ("shared-extra"), ID::from ("also-primary")];
-  let mut second = node ("same-pid", "private");
+  let mut second = graphnode_at ("same-pid", "private");
   second . extra_ids = vec![ID::from ("same-pid")];
-  let mut other = node ("other", "private");
+  let mut other = graphnode_at ("other", "private");
   other . extra_ids = vec![ID::from ("shared-extra")];
-  let also_primary = node ("also-primary", "public");
+  let also_primary = graphnode_at ("also-primary", "public");
   let report = validate_complete_graph (
     &config (), &[first, second, other, also_primary]);
   assert! (matches! (
@@ -64,7 +56,7 @@ fn identity_errors_are_aggregated_and_deterministically_ordered () {
 
 #[test]
 fn repeated_gnids_of_one_recorder_are_normalized_not_rejected () {
-  let mut carrier = node ("carrier", "public");
+  let mut carrier = graphnode_at ("carrier", "public");
   carrier . extra_ids = vec![
     ID::from ("B"),
     ID::from ("carrier"),
@@ -86,12 +78,12 @@ fn repeated_gnids_of_one_recorder_are_normalized_not_rejected () {
 
 #[test]
 fn unknown_home_is_hard_but_relationship_provenance_is_a_warning () {
-  let mut recorder = node ("recorder", "public");
+  let mut recorder = graphnode_at ("recorder", "public");
   recorder . contains = vec![
     RelPartner::at_relRepo (
       SkgrepoName::from ("unconfigured-relRepo"), ID::from ("dangling")),
   ];
-  let unknown_home = node ("unknown-home", "unconfigured-home");
+  let unknown_home = graphnode_at ("unknown-home", "unconfigured-home");
   let report = validate_complete_graph (&config (), &[recorder, unknown_home]);
   assert! (report . errors . iter () . any (|error| matches! (
     error, CompleteGraphError::UnconfiguredNodeHome { pid, .. }
@@ -106,7 +98,7 @@ fn unknown_home_is_hard_but_relationship_provenance_is_a_warning () {
 
 #[test]
 fn configured_dangling_members_are_tolerated_without_warning () {
-  let mut recorder = node ("recorder", "public");
+  let mut recorder = graphnode_at ("recorder", "public");
   recorder . forks = MSV::Specified (vec![RelPartner::at_relRepo (
     SkgrepoName::from ("public"), ID::from ("absent"))]);
   let report = validate_complete_graph (&config (), &[recorder]);
@@ -118,9 +110,9 @@ fn configured_dangling_members_are_tolerated_without_warning () {
 #[test]
 fn canonical_entry_includes_the_fork_rules_and_telescope_orientation () {
   // a and b both fork target (legal); a also contains it (not).
-  let target = node ("target", "private");
-  let mut a = node ("a", "public");
-  let mut b = node ("b", "public");
+  let target = graphnode_at ("target", "private");
+  let mut a = graphnode_at ("a", "public");
+  let mut b = graphnode_at ("b", "public");
   for forker in [&mut a, &mut b] {
     forker . forks = MSV::Specified (vec![
       RelPartner::at_relRepo (
@@ -143,10 +135,10 @@ fn canonical_entry_includes_the_fork_rules_and_telescope_orientation () {
 /// which is foreign, not an error.
 #[test]
 fn an_owned_note_containing_its_foreign_forker_is_a_warning () {
-  let mut e = node ("e", "public");
+  let mut e = graphnode_at ("e", "public");
   e . contains = vec![ RelPartner::at_relRepo (
     SkgrepoName::from ("public"), ID::from ("f")) ];
-  let mut f = node ("f", "foreign");
+  let mut f = graphnode_at ("f", "foreign");
   f . forks = MSV::Specified (vec![ RelPartner::at_relRepo (
     SkgrepoName::from ("foreign"), ID::from ("e")) ]);
   let report = validate_complete_graph (&config (), &[e, f]);
@@ -163,10 +155,10 @@ fn an_owned_note_containing_its_foreign_forker_is_a_warning () {
 /// warning naming e as foreign.
 #[test]
 fn an_owned_note_forking_its_foreign_container_is_a_warning () {
-  let mut r = node ("r", "public");
+  let mut r = graphnode_at ("r", "public");
   r . forks = MSV::Specified (vec![ RelPartner::at_relRepo (
     SkgrepoName::from ("public"), ID::from ("e")) ]);
-  let mut e = node ("e", "foreign");
+  let mut e = graphnode_at ("e", "foreign");
   e . contains = vec![ RelPartner::at_relRepo (
     SkgrepoName::from ("foreign"), ID::from ("r")) ];
   let report = validate_complete_graph (&config (), &[r, e]);
@@ -181,10 +173,10 @@ fn an_owned_note_forking_its_foreign_container_is_a_warning () {
 /// records alone make the violation, so it is an error.
 #[test]
 fn an_owned_note_containing_its_owned_forker_is_an_error () {
-  let mut e = node ("e", "public");
+  let mut e = graphnode_at ("e", "public");
   e . contains = vec![ RelPartner::at_relRepo (
     SkgrepoName::from ("public"), ID::from ("r")) ];
-  let mut r = node ("r", "public");
+  let mut r = graphnode_at ("r", "public");
   r . forks = MSV::Specified (vec![ RelPartner::at_relRepo (
     SkgrepoName::from ("public"), ID::from ("e")) ]);
   let report = validate_complete_graph (&config (), &[e, r]);
@@ -198,10 +190,10 @@ fn an_owned_note_containing_its_owned_forker_is_an_error () {
 #[test]
 fn save_candidate_is_rejected_before_publication () {
   let current = InRustGraph::from_graphnodes (&[
-    node ("existing", "public"),
-    node ("edited", "public"),
+    graphnode_at ("existing", "public"),
+    graphnode_at ("edited", "public"),
   ]);
-  let mut edited = node ("edited", "unconfigured-home");
+  let mut edited = graphnode_at ("edited", "unconfigured-home");
   edited . extra_ids = vec![ID::from ("existing")];
   let report = validate_complete_graph_candidate (
     &config (), &current, &[NodeInstruction::Save (SaveNode (edited))]);

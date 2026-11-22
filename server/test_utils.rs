@@ -46,7 +46,7 @@ use crate::types::config::{SkgConfig, Skgrepo};
 use crate::types::misc::{
   MSV, ID, TantivyIndex, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
 use crate::types::save::{DeleteNode, NodeInstruction, SaveNode};
-use crate::types::nodes::complete::Graphnode;
+use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 use crate::types::viewnode::{ Viewnode, ViewnodeKind };
 use crate::types::viewnode::{Vognode};
 
@@ -941,6 +941,39 @@ pub fn strip_org_comments(s: &str) -> String {
       } else { line . to_string() }} )
     . collect::<Vec<String>>()
     . join ("\n") }
+
+/// A node with nothing but its pid, a title equal to that pid, and
+/// its home skgrepo.
+pub fn graphnode_at (
+  pid          : &str,
+  home_skgrepo : &str,
+) -> Graphnode {
+  let mut node : Graphnode = empty_graphnode ();
+  node . pid = ID::from (pid);
+  node . title = pid . to_string ();
+  node . home_skgrepo = SkgrepoName::from (home_skgrepo);
+  node }
+
+/// A config of owned skgrepos named 'names', most public first, each
+/// at the (unread) path 'owned/NAME'.
+pub fn owned_skgrepos_config_in_order (
+  names : &[&str],
+) -> SkgConfig {
+  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
+    HashMap::new ();
+  for name in names {
+    skgrepos . insert (
+      SkgrepoName::from (*name),
+      Skgrepo {
+        name         : SkgrepoName::from (*name),
+        abbreviation : None,
+        path         : PathBuf::from ( format! ("owned/{}", name) ),
+        owned        : true, } ); }
+  let mut config : SkgConfig =
+    SkgConfig::dummyFromSkgrepos (skgrepos);
+  config . skgrepo_order =
+    names . iter () . map ( |n| SkgrepoName::from (*n) ) . collect ();
+  config }
 
 /// Example Graphnode for use in tests.
 pub fn graphnode_example () -> Graphnode {
