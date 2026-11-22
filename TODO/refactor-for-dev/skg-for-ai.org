@@ -1,14 +1,16 @@
 * Refactoring 'tools/skg-for-ai/' for the next agent
   The territory: 'skg_for_ai.py' (the entry, with 'main' and an index
   of the modules) and the modules beside it (about 7000 lines), its
-  suite 'test_skg_for_ai.py' and its fixtures, and 'README.org'. The
+  suite 'test_skg_for_ai.py' with its groups in 'tests/', its fixtures, and 'README.org'. The
   tool's command line, everything it prints, the files it writes and
   the README are read by other agents as their manual: they must stay
   byte-identical (the README may be corrected where it is false).
   The suite needs 'target/debug/skg' in the worktree. Run it on a port
   of your own ('SKG_FOR_AI_TEST_PORT=18793'; it also takes that port
   plus one), since other worktrees may run it on the default 1793.
-  It takes about 90 seconds.
+  It takes about 75 seconds; given group names ('python3
+  tools/skg-for-ai/test_skg_for_ai.py daemon_checks'), it runs only
+  those, in seconds.
 * Done
 ** A view the tool writes is a 'RenderedView'
    The fetchers, the save, 'extend', 'perspective' and the daemon used
@@ -59,21 +61,67 @@
    Running the tool now writes '__pycache__/' beside it (gitignored);
    no module may import 'skg_for_ai', which runs as '__main__' and
    would be loaded a second time.
+** The suite's checks are in 'tests/', a module per group
+   'test_skg_for_ai.py' (4206 lines) is now the entry: its docstring
+   with an index of the groups, 'main', and 'SCRATCH_SERVER_GROUPS'.
+   Each group is a module in 'tests/' ('no_server_checks',
+   'reading_checks', 'writing_checks', 'placing_and_forking_checks',
+   'more_words_checks', 'reviewing_checks', 'daemon_checks',
+   'two_owned_skgrepos_checks', 'perspective_checks',
+   'receipts_checks'), and 'tests/harness.py' holds what they share
+   (paths and port, scratch servers, 'run_tool', the 'require_*'
+   checks, the diff view's files, daemons). No group imports another.
+   The statements moved unchanged; a profiler over every 'check_*' and
+   'failures_*' call showed the same 138 calls in the same order. The
+   names end in '_checks' because 'daemon', 'receipts' and 'save' are
+   the tool's own module names. The commands are unchanged; group
+   names on the command line run only those groups.
+** 'save.py' lost its retyped headlines and its server dialogue
+   'retyped_headlines.py' (the exact retype, the reworded pairs, the
+   fuzzy title match) and 'save_dialogue.py'
+   ('send_save_and_write_its_rerender', the fork confirmation, the
+   other questions, 'rerendered_view_of_save', 'server_supports',
+   'print_save_preview'). 'save.py' is 853 lines.
+** 'compact_view.py' lost its heralds
+   'heralds.py' holds relationship heralds, the lens and the served
+   rule table, the herald contexts and change facts; it imports only
+   'sexp', 'server_connection' and 'full_view'. 'compact_view.py' is
+   374 lines: links, repo ownership, the compact tree, the summary.
+** 'edited_compact_view.py' lost the words read against the outline
+   'outline_words.py' holds 'outline_word_check', the 'subtree'
+   expansion, the request text of words, 'described_handle' and
+   'descendant_indices'; it imports from 'edited_compact_view', never
+   the reverse. 'WRITABLE_FOLDER_RELATIONSHIP_KINDS' moved up within
+   'edited_compact_view.py' (beside 'RELREPO_KINDS'), since
+   'request_token_problems' reads it.
+** How the splits were made
+   A script ('move_section.py', not kept; easy to rebuild) took line
+   ranges of a module, wrote them unchanged into a new one, generated
+   its imports from the names it uses (refusing a cycle), pruned the
+   source's imports, and pointed the other modules' 'from SOURCE
+   import' lines at the new module; qualified uses in the tests
+   ('compact_view . herald_text') it listed, to fix by hand.
 * Candidates left, best first
-** Split 'save.py' (1380 lines) at the server dialogue
-   'save.py' holds the rebuild and the report (what a preview shows)
-   and, from "The fork confirmation" on, the answers to the server's
-   questions and its rerender (what '--yes' does). Two modules would
-   halve what an agent reads to change either. Safe as the first split
-   was (move unchanged, check free names); the sections already form
-   the seam. An hour's work with the script the first split used
-   (rebuild it: an AST walk assigning each top-level name a module and
-   generating the imports).
-** Split 'compact_view.py' (990 lines): the heralds apart
-   Relationship heralds, the lens and the herald contexts (about 450
-   lines) are one concern, the compact tree, links and summary
-   another. Same safety and cost as above; check that the herald half
-   needs nothing from the other.
+** Placing and fork prediction out of 'save.py'
+   Its sections "Placing an existing node" and "Forking" (about 265
+   lines: 'resolve_placed_nodes', 'predicted_forks',
+   'changed_parts_of_node_occurrence') are a third concern beside the
+   report and the rebuild. Check that they need nothing of the rest
+   of 'save.py' ('save_report' calls them). Safe as the other splits;
+   under an hour.
+** The tests' 'context' dict could be a named type
+   Every case of 'tests/' takes a dict with string keys ('scratch',
+   'daemon_folder', 'main_repo', 'daemon', 'processes', ...), each
+   group adding its own; only reading the group's 'failures_of_*'
+   says which keys a case may use. A small class per group, or one
+   with optional fields, would name them. Test-only, so safe; the
+   keys are read in about 90 places, an hour or two.
+** The test entry's docstring repeats the groups
+   'test_skg_for_ai.py' lists the groups, then describes them again
+   at length, "In order, it:". Each description could move into its
+   module's docstring, leaving the index. Prose only; low value.
+** 'daemon.py' (715 lines) is not surveyed
+   Its sections are few and long; look before splitting.
 ** 'parse_command_line' is 311 lines of argparse
    Declarative and greppable ('add_parser ( "save"'); splitting it per
    command would help little.
