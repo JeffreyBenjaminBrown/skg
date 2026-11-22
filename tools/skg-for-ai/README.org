@@ -189,7 +189,12 @@ as the clients' 'C-c l' commands draw it ('docs/COMMANDS.org', "C-c
 l"), named 'forest-KIND_ID'. Under each member of a partner folder
 hangs its containerward chain: its containers, theirs, and so on up
 to the roots; under a member of the forks folder, in a containers
-folder of its own, folded (but the view-ancestors). The forks folder
+folder of its own, folded (but the view-ancestors). The chain passes
+through mirrors: a member, or a note of its chain, that forks or is
+forked holds its forks folder first, each mirror there with its own
+containers, and so on, a set of mirrors listed once per view; so
+'forest containers' says where a note sits in anyone's version of it
+('docs/mirrors.org', "Forests through mirrors"). The forks folder
 is flat: no member of it shows a forks folder of its own unless one
 is asked for there. The kinds:
 | KIND          | Emacs   | what it draws                                                                    |

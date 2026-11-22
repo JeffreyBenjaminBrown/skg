@@ -562,7 +562,14 @@ folder but the diff view's two acquisition folders, hangs its
 containerward chain: the member's containers, write-protected and
 claiming nothing, theirs under them, up to the roots or
 'max_roleTree_depth', a container met again on the way shown once
-more as a leaf. A request on a chain node draws that node's own
+more as a leaf. The chain passes through mirrors: the member, and
+each node of its chain, that has a fork partner holds its forksFolder,
+first, listing its mirrors write-protected, each with its own
+containers in a folded containerFolder, whose members carry their
+chains in turn; so the folder answers where the note sits in anyone's
+version of it. A note whose mirrors a forksFolder elsewhere in the
+view lists already holds none, so each set of mirrors is listed once.
+The diff view draws none. A request on a chain node draws that node's own
 containers folder. A fresh content view shows its root's containers
 folder this way. Under a member of a forksFolder the chain stands in a
 containerFolder instead, drawn folded (only its headline shows; open

@@ -25,7 +25,20 @@ body: |2-
   draws none under a repeat. A member drawn into
   a compound folder or a containers folder that already stood, all its
   members folded, is drawn folded too, so that the folder stays
-  collapsed ('stands_drawn_folded'). The chain is drawn
+  collapsed ('stands_drawn_folded'). Outside the diff view the
+  chain passes through mirrors: under the member and under each chain
+  node that is an occurrence, the refresh adds the forks folder, first,
+  as a folder request adds one ('add_folders'), where the note has a
+  fork partner the skgrepo restriction shows and the view lists none
+  of its mirrors yet ('list_mirrors_of_chain_occurrence' in
+  'server/refresh/chain.rs'). The view's listed mirrors
+  ('Walk::pids_whose_mirrors_are_listed') are those of every note
+  holding a forks folder when the walk begins, and of each note that
+  'add_folders' gives one, so that each set of mirrors is listed once,
+  however many notes of it the walk meets, and a cycle of containment
+  and forks ends. The refresh fills that folder as any: its members
+  write-protected, each with its containers folder, whose members
+  carry their chains in turn. The chain is drawn
   walking the member's
   containers breadth-first over the live graph or, in the diff view,
   over the union of the straddle. The extent of a chain is none, so a

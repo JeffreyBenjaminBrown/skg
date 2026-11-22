@@ -19,7 +19,14 @@ body: |2-
   those, its containers;
   and so on to the roots, or to the config's 'max_roleTree_depth'. A
   container met again on the way is drawn once more, as a leaf. The
-  nodes of a chain are *chain nodes*. A member of the forks folder is
+  nodes of a chain are *chain nodes*. The chain passes through
+  mirrors: outside the diff view, the member and each chain node that
+  has a fork partner hold its forks folder, first among their
+  children, listing its mirrors, write-protected, each with its
+  containers in a containers folder, as below; but not where a forks
+  folder elsewhere in the view lists that note's mirrors already, so
+  that each set of mirrors is listed once, and a cycle through forks
+  ends. A member of the forks folder is
   the exception, outside the diff view: its chain is itself foldered.
   Under it the refresh draws a containers folder, drawn folded (only
   its headline shows), which leaves out the member's view-ancestors,

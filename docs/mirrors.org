@@ -87,6 +87,47 @@ partners).
 A foreign hit never suppresses another top-level result, although
 visible foreign relatives can occur in the folders: a
 foreign mutual pair that both match shows both.
+** Forests through mirrors
+A forest is what a folder request draws (the =C-c l= commands;
+skg-for-ai's 'forest KIND ID'): the partners of a note in one
+relation, each with its containerward chain. Wherever a forest walks
+containerward it passes through mirrors: the member, and each note of
+its chain, that has a fork partner holds its forks folder, which lists
+its mirrors, each with its own containers, which pass through mirrors
+in turn ('docs/glossary.org', "foldering, the containerward chain,
+chain node"). So a containers forest says where a note sits in anyone's
+version of it:
+
+#+begin_example
+  * N
+  ** These also contain it.
+  *** C              (C contains N; C forks T)
+  **** (forks folder)
+  ***** T            (theirs)
+  ****** These also contain it.
+  ******* TT         (TT contains T)
+  **** CC            (CC contains C)
+#+end_example
+
+The chain stays raw: each note is itself, never a mirror shown in its
+place, and a set of mirrors is listed once per view, at the first of
+its notes the refresh reaches, so a cycle of containment and forks
+ends. The skgrepo restriction gates the forks folder as any: a mirror
+it keeps out is not listed, or, where only its home is kept out and
+the record shows, is a restricted headline.
+
+The other traversals:
+- A content view's contentward tree passes through mirrors by
+  substitution ("Mirror substitution"), and an editable note's forks
+  folder lists the rest.
+- The step of a partner folder itself names the note's own partners,
+  not its mirrors': a link names one ID, and a hide one note in one
+  forkee's content. Its members' chains pass through mirrors as above.
+- The forks folder lists every mirror already, flat.
+- The diff view draws no forks folder in a chain, as it substitutes
+  nothing: its chains place a change, and a mirror of an unchanged
+  container would not help.
+- Org export follows the stored =contains=.
 ** Mirror substitution
 Substitution is a recursive-content rendering rule, not a navigation
 rule ('server/dbs/in_rust_graph/mirrors.rs').
@@ -371,6 +412,7 @@ not perform interactive mirror substitution.
 - [[file:../server/dbs/in_rust_graph/mirrors.rs][mirrors, and which one stands]]
 - [[file:../server/dbs/in_rust_graph/fork_rules.rs][what an owned note may not fork, contain or hide]]
 - [[file:../server/refresh/visit.rs][substitution and raw positions ('substitute_mirrors')]]
+- [[file:../server/refresh/chain.rs][the containerward chain through mirrors ('list_mirrors_of_chain_occurrence')]]
 - [[file:../server/rerender_pass.rs][saved-view fork replacement and collateral rerendering]]
 - [[file:../server/types/views_state.rs][open-view root registration]]
 - [[file:../server/types/viewnode.rs][folder rules and =inPlaceOf= collection]]

@@ -474,7 +474,10 @@ text calls them the ladder):
 5. reinstate: each goal item no child stands for is drawn, as far as
    the extent allows (below); what it draws is what the ID rule makes
    of the item, and a member of a folder whose members carry the
-   containerward chain gets its chain; in a content view a member of
+   containerward chain gets its chain, in a content view through
+   mirrors: the member and each chain node with a fork partner whose
+   mirrors no forks folder of the view lists yet gets a forks folder
+   ('list_mirrors_of_chain_occurrence'); in a content view a member of
    the forks folder gets, unless it is a repeat, a containers folder
    instead, whose members are drawn folded and carry their chains
    ('after_drawing');

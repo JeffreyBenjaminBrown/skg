@@ -1,0 +1,43 @@
+title: Forests through mirrors
+pid: 5c52a974-1f40-4955-94f9-712304c41a39
+body: |2-
+  A forest is what a folder request draws (the =C-c l= commands;
+  skg-for-ai's 'forest KIND ID'): the partners of a note in one
+  relation, each with its containerward chain. Wherever a forest walks
+  containerward it passes through mirrors: the member, and each note of
+  its chain, that has a fork partner holds its forks folder, which lists
+  its mirrors, each with its own containers, which pass through mirrors
+  in turn ('docs/glossary.org', "foldering, the containerward chain,
+  chain node"). So a containers forest says where a note sits in anyone's
+  version of it:
+
+  #+begin_example
+    * N
+    ** These also contain it.
+    *** C              (C contains N; C forks T)
+    **** (forks folder)
+    ***** T            (theirs)
+    ****** These also contain it.
+    ******* TT         (TT contains T)
+    **** CC            (CC contains C)
+  #+end_example
+
+  The chain stays raw: each note is itself, never a mirror shown in its
+  place, and a set of mirrors is listed once per view, at the first of
+  its notes the refresh reaches, so a cycle of containment and forks
+  ends. The skgrepo restriction gates the forks folder as any: a mirror
+  it keeps out is not listed, or, where only its home is kept out and
+  the record shows, is a restricted headline.
+
+  The other traversals:
+  - A content view's contentward tree passes through mirrors by
+    substitution ("Mirror substitution"), and an editable note's forks
+    folder lists the rest.
+  - The step of a partner folder itself names the note's own partners,
+    not its mirrors': a link names one ID, and a hide one note in one
+    forkee's content. Its members' chains pass through mirrors as above.
+  - The forks folder lists every mirror already, flat.
+  - The diff view draws no forks folder in a chain, as it substitutes
+    nothing: its chains place a change, and a mirror of an unchanged
+    container would not help.
+  - Org export follows the stored =contains=.

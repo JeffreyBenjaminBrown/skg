@@ -1821,7 +1821,15 @@ no folder unasked but where something changed.
   member's containers as write-protected occurrences claiming nothing,
   under each of those its containers, breadth-first up to the roots or
   =max_roleTree_depth=; a container met again on the way is drawn once
-  more as a leaf. The member's partners in the folder's own role are
+  more as a leaf. Outside the diff view the chain passes through
+  mirrors: the member and each chain node that is an occurrence with
+  a fork partner the skgrepo restriction shows hold a =forksFolder=,
+  as their first child, listing their mirrors write-protected, each
+  with a folded =containerFolder= whose members carry their chains in
+  turn; but not a note whose mirrors a =forksFolder= elsewhere in the
+  view lists already (one in the buffer when the refresh began, or
+  one it drew before), so that each set of mirrors is listed once and
+  a cycle of containment and forks ends. The member's partners in the folder's own role are
   not drawn below it; a folder request on the member draws them.
   Nothing hangs under a ghost member. The refresh draws the chain
   under a member it draws and never reinstates a chain node, so a
