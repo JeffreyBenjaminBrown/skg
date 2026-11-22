@@ -69,12 +69,12 @@ use crate::serve::util::{
   value_from_request_sexp };
 use crate::from_text::fork::build_fork_confirmation_buffer;
 use crate::types::env::SkgEnv;
-use crate::types::errors::{BufferValidationError, SaveError};
+use crate::types::errors::{BufferValidationError, SaveError, format_save_error_as_org};
 use crate::types::git::SkgrepoDiff;
 use crate::types::config::SkgConfig;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::save::{
-  NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan, format_save_error_as_org };
+  NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan };
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::ViewnodeId;
 use crate::types::views_state::{DiffViewBufferKind, Perspective, ViewforestId, ViewnodeIdRecord};

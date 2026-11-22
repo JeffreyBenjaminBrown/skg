@@ -21,7 +21,7 @@ use skg::types::errors::SaveError;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
-use skg::types::save::format_save_error_as_org;
+use skg::types::errors::format_save_error_as_org;
 use skg::types::views_state::{OpenViews, ViewforestId};
 
 /// Save 'buf' as a view of 'root'.

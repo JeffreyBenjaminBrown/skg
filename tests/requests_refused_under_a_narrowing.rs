@@ -21,7 +21,7 @@ use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::skg_env_from_parts;
 use skg::types::env::SkgEnv;
 use skg::types::errors::SaveError;
-use skg::types::save::format_save_error_as_org;
+use skg::types::errors::format_save_error_as_org;
 
 use std::collections::BTreeMap;
 use std::error::Error;

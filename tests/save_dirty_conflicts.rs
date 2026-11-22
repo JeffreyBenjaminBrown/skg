@@ -18,7 +18,7 @@ use skg::test_utils::single_root_view;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
 use skg::types::errors::SaveError;
-use skg::types::save::format_save_error_as_org;
+use skg::types::errors::format_save_error_as_org;
 use skg::types::views_state::{OpenViews, ViewforestId};
 
 fn dirty_buffer_snapshot (

@@ -8,8 +8,8 @@
 //!   'ego_tree' helpers.
 //! - 'views_state': a connection's open views ('OpenViews', 'ViewState').
 //! - 'save': what a save plans and does ('SavePlan', 'NodeInstruction').
-//! - 'errors': save and buffer-validation errors, and how messages name
-//!   a headline.
+//! - 'errors': save and buffer-validation errors, their texts, and how
+//!   messages name a headline.
 //! - 'config': the config file's contents ('SkgConfig'), and the
 //!   privacy ladder and fold order of its skgrepos.
 //! - 'env': the runtime generation every request reads ('SkgEnv').

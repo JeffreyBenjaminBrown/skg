@@ -16,7 +16,7 @@ use crate::git_fixture::{
 use skg::save::DeleteFrom;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::errors::SaveError;
-use skg::types::save::format_save_error_as_org;
+use skg::types::errors::format_save_error_as_org;
 
 use std::collections::BTreeMap;
 use std::error::Error;

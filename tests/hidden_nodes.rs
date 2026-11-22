@@ -34,7 +34,7 @@ use skg::types::nodes::rust::GraphnodeInRust;
 use skg::metadata_canon::without_viewnode_ids;
 use skg::org_to_text::viewforest_to_string;
 use skg::types::errors::SaveError;
-use skg::types::save::format_save_error_as_org;
+use skg::types::errors::format_save_error_as_org;
 use skg::types::viewnode::{Folder, Viewnode, ViewnodeId, ViewnodeKind, Vognode};
 use skg::types::views_state::{DiffViewBufferKind, ViewforestId};
 

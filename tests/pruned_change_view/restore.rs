@@ -25,7 +25,7 @@ use crate::parse_helpers::viewnode_tree_as_written;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::errors::SaveError;
 use skg::types::misc::ID;
-use skg::types::save::format_save_error_as_org;
+use skg::types::errors::format_save_error_as_org;
 use skg::types::viewnode::{Ghost, ViewnodeKind, Vognode};
 use skg::serve::parse_metadata_sexp::{
   RESTORE_NODE_ON_A_NODE_NOT_DELETED, RESTORE_REL_ON_A_DELETED_NODE,

@@ -19,7 +19,7 @@ use skg::test_utils::run_with_test_stores;
 use skg::types::errors::{BufferValidationError, HeadlineName, SaveError};
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
-use skg::types::save::format_save_error_as_org;
+use skg::types::errors::format_save_error_as_org;
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::ViewnodeId;
 use std::error::Error;
