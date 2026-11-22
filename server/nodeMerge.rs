@@ -1,3 +1,14 @@
+//! Merging two nodes: the acquirer takes the acquiree's IDs and
+//! relationships, and a new node keeps the acquiree's text. A save
+//! carries out the nodeMerges its buffer asks for after its other
+//! instructions ('apply_prepared_nodeMerges', called by 'server/save.rs'),
+//! writing the files, then the in-Rust graph, then Tantivy (rebuilt from
+//! disk if its update fails). 'merge_nodes', which the tests call, does
+//! the same outside a save.
+//! - 'nodeMergeInstructionTriple': the three instructions a merge is
+//!   (the updated acquirer, the text preserver, the acquiree's delete).
+//! - 'validate_nodeMerge': which merge requests a buffer may make.
+
 pub mod nodeMergeInstructionTriple;
 pub mod validate_nodeMerge;
 

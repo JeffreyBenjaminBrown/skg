@@ -1,3 +1,9 @@
+//! What one nodeMerge writes ('NodeMerge'): the acquirer with the
+//! acquiree's IDs and relationships combined into its own (relRepos
+//! kept, so a merge publishes nothing), a new node holding the
+//! acquiree's title and body, and the acquiree's delete. Built from
+//! the graph per pair ('nodeMerge_instructions_from_pairs').
+
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::{graphnode_by_gnid, graphnode_from_graph};
 use crate::from_text::local_fieldintent_collection::lower::nodeMerge_pairs;

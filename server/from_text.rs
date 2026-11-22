@@ -1,9 +1,25 @@
-//! The 'buffer' referred to here
-//! is a Skg buffer from the Emacs client,
-//! read by the Rust server when the user saves it.
-//! The sole purpose of all the sub-libraries in 'from_text::'
-//! is the function 'buffer_to_validated_saveplan'
-//! defined here.
+//! A save's first half: from the text of a buffer the user saves to a
+//! validated plan ('SavePlan'), with nothing written.
+//! 'buffer_to_validated_saveplan_in_graph' (and its '_with_fork_skgrepos'
+//! form) parses the buffer into a viewforest, validates it, extracts one
+//! instruction per node, supplements it from disk, applies the foreign
+//! write policy (which turns an edit of a foreign node into a fork),
+//! and checks the plan as a whole; its doc lists the stages. Carrying
+//! the plan out is 'server/save.rs'; the request is
+//! 'serve/handlers/save_buffer.rs'.
+//! - 'buffer_to_viewnodes': parsing the text into a viewforest, with
+//!   what headlines leave out supplied, and the tree's validation.
+//! - 'local_fieldintent_collection': extracting each node's
+//!   instructions from the viewforest.
+//! - 'supplement_from_disk': filling the fields a buffer leaves
+//!   unspecified from disk.
+//! - 'validate': the foreign write policy and the cross-plan checks.
+//! - 'fork': turning an edit of a foreign node into a fork.
+//! - 'write_protected_edits': edits on write-protected occurrences.
+//! - 'strandeds': what moving a node between skgrepos strands.
+//! - 'weave': keeping list members a restricted view could not show.
+//! - 'hide_report': what a save hides, in words.
+//! - 'file_what_is_written_in': a reply typed in the unread list.
 
 pub mod buffer_to_viewnodes;
 pub mod file_what_is_written_in;

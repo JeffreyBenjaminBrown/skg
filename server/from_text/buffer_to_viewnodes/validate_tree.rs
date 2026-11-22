@@ -1,3 +1,11 @@
+//! Refusing a buffer whose structure makes saving impossible
+//! ('find_buffer_errors_for_saving_in_graph'): an ID removed from an
+//! ID folder, a tampered '(inPlaceOf ...)', bad fork or view requests,
+//! a relRepo request no save would read, and the contradictions
+//! 'contradictory_instructions' finds. Checks of a lone viewnode are
+//! 'local.rs'; checks that need the extracted plan are
+//! 'from_text/validate.rs'.
+
 pub mod contradictory_instructions;
 
 use crate::dbs::in_rust_graph::InRustGraph;

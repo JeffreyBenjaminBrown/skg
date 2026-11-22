@@ -1,3 +1,9 @@
+//! Parsing a saved buffer's Org text into a viewforest
+//! ('org_to_viewforest'): each level-1 headline a root, each
+//! headline's '(skg ...)' metadata read ('headline_to_triple',
+//! 'serve/parse_metadata_sexp.rs'), and what a headline leaves out
+//! supplied as the tree is built ('add_missing_info.rs').
+//!
 //! DANGER: This was vibe-coded without much oversight.
 //! I *believe* the tests constrain its behavior sufficiently.
 

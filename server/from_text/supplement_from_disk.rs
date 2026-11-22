@@ -1,9 +1,9 @@
 //! PURPOSE:
 //! When a Graphnode is created from user input,
 //! it might not mention every Graphnode field.
-//! If it contains Some([]) for that field,
+//! If it holds 'Specified(vec![])' ('MSV') for that field,
 //! then the user is asking to empty the field.
-//! But if it has None for that field,
+//! But if it holds 'Unspecified' for that field,
 //! then the field should not be changed --
 //! which means it must be read from disk
 //! and inserted into the Graphnode.

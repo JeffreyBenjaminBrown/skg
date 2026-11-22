@@ -1,3 +1,8 @@
+//! Two headlines of a saved buffer that contradict each other: one ID
+//! both deleted and not ('find_inconsistent_instructions'), and change
+//! leaves one headline marks processed and another unprocessed
+//! ('find_contradictory_processed_requests').
+
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::diff_view::named_leaf_set::NamedLeafSet;
 use crate::diff_view::processed_requests::{

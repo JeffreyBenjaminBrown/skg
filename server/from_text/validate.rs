@@ -1,3 +1,12 @@
+//! The plan's validators that need more than the tree: the foreign
+//! write policy ('validate_and_filter_foreign_instructions', which drops
+//! unchanged foreign nodes and turns an edited one into a fork), no node
+//! both moved and merged or both deleted and merged, and, under a
+//! skgrepo restriction, no write to a restricted node
+//! ('suppress_writes_to_restricted_nodes') or into a restricted section
+//! ('refuse_records_landing_restricted'). The tree's own validation is
+//! 'buffer_to_viewnodes/validate_tree.rs'.
+
 use crate::from_text::fork::{CloneSkgrepoInputs, fork_spec_from_buffer_node};
 use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::skgrepo_sets::SkgrepoRestriction;
