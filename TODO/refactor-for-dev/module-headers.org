@@ -76,3 +76,23 @@
    The library's unit tests, each included by '#[path]' from its
    module. A few have headers ('export_org.rs'); the rest could get
    one line each. Safe; small.
+* The Neovim client ('nvim/')
+** Where the index is
+   A newcomer reads 'nvim/README.org' first, so its "Where things
+   live" lists every module of 'nvim/lua/skg/' with a phrase, grouped
+   by what a user does, as 'server/lib.rs' groups the server's.
+   'nvim/lua/skg/init.lua', the module 'require('skg')' loads, points
+   there; it requires the others only where it uses them.
+** What a header says
+   The server's order, in Lua comments under the label '-- PURPOSE:'
+   that the client's headers already used: what the module is for in
+   a user's words (the command, key, buffer or redraw), its entry
+   points in single quotes with the ':Skg*' command or '<localleader>'
+   key that reaches them, what it leaves to which module ('skg.x'),
+   and "The Lua port of elisp/FILE.el" where it ports one. Design
+   notes a header already held (a fold model, a concurrency model)
+   stay below the opening paragraph, after a line holding only '--'.
+** Checking that headers cite real things
+   The server's check, adapted: extract each quoted 'name' from the
+   comment lines before a file's first 'local' or 'M' line, and look
+   for it in the code of 'nvim/' and 'elisp/', or in the file tree.

@@ -9,9 +9,13 @@ itself with 'cd tests/integration/DIR && SKG_TEST_CLIENT=nvim
 ** Commands name their module and function as strings
 'M.commands' in 'nvim/lua/skg/keymaps.lua' resolves each ':Skg*'
 command's module and function lazily, by name. Moving a command's
-function means editing its entry there (never its Ex name). No spec
-checks that every entry resolves; after such a move, require each
-entry's module headless and check that its 'fn' is a function.
+function means editing its entry there (never its Ex name).
+'tests/nvim/keymaps_spec.lua' fails if an entry's module does not
+load or lacks its function, or if a key names no command.
+** A module that moves a function can shadow its own module name
+A function moved out of 'skg.metadata' into a module that requires
+'skg.metadata' as 'metadata' must not keep a local named 'metadata'
+(several did, for a headline's metadata sexp); rename the local.
 ** Never use 'git stash' in a worktree
 The stash is shared by every worktree of the repository and holds
 Jeff's old entries; a 'stash' with nothing to save followed by 'stash
@@ -54,42 +58,67 @@ The relRepo section of 'metadata.lua' (about 500 lines: menu choices,
 the relationship at a line, 'set_relRepo_recursive') moved beside
 'set_relRepo', which drives it. 'metadata.first_value_at_path' became
 public for it. 'metadata.lua' fell from 2012 to about 1500 lines.
+** A whole redraw keeping points and folds has its own module
+'nvim/lua/skg/redraw_whole_view.lua' ('skg.redraw_whole_view') holds
+'apply_streamed_view_update' (the save's collateral-view and the
+rerender's rerender-view), 'replace_buffer_keeping_viewnode_points_and_folds',
+'replace_buffer_with_new_content' and the point measure and restore.
+'save.lua' fell from 893 to about 520 lines; the rerender stream no
+longer requires 'skg.save'.
+** Change facts and the restore requests left 'metadata.lua'
+'skg.change_facts' reads a headline's '(diff ...)' part and whether a
+folder's change is processed; 'skg.restore_requests' holds the diff
+view's two restore commands and where a restoreRel may stand.
+'metadata.lua' fell from about 1500 to about 1250 lines, and its
+list readers 'head_name', 'child_with_head' and 'arguments' are public.
+** A spec checks the command table
+See "Commands name their module and function as strings" above.
+** Every module has a header saying what it is for and where else to look
+'nvim/README.org', "Where things live", lists every module with a
+phrase; each module's '-- PURPOSE:' header says what it is for in a
+user's words, its entry points, and what it leaves to which module.
+'TODO/refactor-for-dev/module-headers.org' has the conventions.
 * Candidates left, best first
-** 'metadata.lua' (about 1500 lines) is still a grab bag
-Its diff-view part -- the restore requests, the processed-change
-predicates ('processed_form' to 'folder_change_processed_at_line',
-roughly lines 919 to 1135) and the pending-detachment predicates
-(1136 to 1320) -- reads like a module of its own, or of
-'processed.lua'. Worth it: an agent changing the diff view would read
-200 lines, not 1500. Risk: 'processed.lua', 'heralds.lua' and many
-specs call these as 'metadata.X'; list every caller with 'rg' first,
-and watch for require cycles (does 'processed' require something that
-requires it?).
-** The save's five retry answers travel as positional arguments
+** Detach, attach and the pending detachment could leave 'metadata.lua'
+'metadata.lua' (about 1250 lines) still holds 'detach', 'attach',
+'set_claim' and the pending-detachment predicates
+('pending_detachment_p' to 'ancestor_headline_indices_in_lines'),
+about 250 lines that the heralds also read. A module of their own
+would follow the pattern of 'skg.change_facts'. Safe by the same
+moves: the 'Detach' and 'Attach' entries of 'keymaps.commands'
+follow (the spec checks them); 'skg.heralds' must require the new
+module late; 'detach_attach_spec.lua' calls 'metadata.X'. The
+skgrepo moves ('set_repo' to 'change_repo_at_line', about 140
+lines) are a second seam. About an hour each.
+** ? The save's five retry answers travel as positional arguments
 'save.request_save_buffer', 'send_save_buffer', 'save_request_sexp'
 and each handler in 'skg.save.confirmations' pass APPROVED_FORKS
 FORK_SKGREPOS APPROVED_HOIST_PIDS STRANDEDS_REVIEW DELETE_FROM in that
 order, each handler re-passing four; the fork buffer stores two in
 'vim.b' to pass them on. One table of "the answers this save carries"
-would remove most of that. Risky: 'request_save_buffer' is the ':Skg
-Save' command's function and the specs assert the positional re-save
-arguments; the Emacs client has the same shape, and the two should
-change together. Needs Jeff's agreement.
-** The save's view-replacement helpers serve the rerender too
-'save.apply_streamed_view_update',
-'replace_buffer_keeping_viewnode_points_and_folds' and their fold and
-point helpers ('save.lua', roughly lines 400 to 680) are called by the
-rerender stream ('rerender_all_views.lua') as much as by the save, and
-could be their own module. Moderate: tests stub
-'save.replace_buffer_with_new_content' ('redraw_delta_spec.lua') and
-'save.broad_save_lock_handler' (an integration test), so those stubs
-would follow the move.
+would remove most of that. Needs Jeff's yes: 'request_save_buffer' is
+the ':SkgSave' command's function, the specs assert the positional
+re-save arguments, and the Emacs client has the same shape. If he
+says nothing, it stays.
+** 'goto_then_close' is written twice
+'id_search.lua' and 'goto_git.lua' each define the same local
+'goto_then_close'. One public copy (in 'skg.id_search', which
+'goto_git' could require) removes the duplicate. Safe and small;
+check for a require cycle first. ('TODO/problems.org' notes that it
+discards unsaved edits; that is a separate, behavioural question.)
 ** Remaining hand-written removals of the overPrivateText handler
 'text_search.lua' (three), and the answer handlers of the export and
 the single-root view, still write
 'state.response_handler_map[...] = nil'; 'text_search' could use
 'register_overPrivateText_confirmation_instead_of' if its own prompt
-('&Include' / '&Exclude' and a choice string) were a parameter. Small.
-** Not surveyed
-'heralds.lua' (834 lines), 'processed.lua' (688) and 'keymaps.lua'
-(532) were not read for seams.
+('&Include' / '&Exclude' and a choice string) were a parameter. Small,
+but the prompt is user-visible: keep it byte for byte.
+** ? 'require('skg').config_path' is written and never read
+'init.lua' sets it; nothing in 'nvim/' or the tests reads it (its
+comment says so). A user's config could read it, so deleting it needs
+Jeff's yes; if he says nothing, it stays.
+** 'heralds.lua' (about 840 lines) was not surveyed for seams
+Its relationship-herald rendering ('render_rel_facts',
+'tokens_to_chunks_with_rels', the 'rel_chunks' helpers) may be one.
+'processed.lua' (about 690) holds both the processed gestures and the
+twelve diff-view motions, a likely seam.

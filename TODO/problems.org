@@ -6,6 +6,38 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* Problems noticed while writing the Neovim client's module headers (2026-11-22)
+  Found reading 'nvim/' for its headers; none reproduced, none fixed.
+** The "and close this" gotos discard the left buffer's unsaved edits
+  'goto_then_close' ('nvim/lua/skg/id_search.lua', and a copy in
+  'goto_git.lua') clears 'modified' and force-deletes the buffer it
+  leaves, also when the goto found nothing to open without raising.
+  Emacs's 'kill-buffer' would ask about unsaved edits.
+** The plain-diff fallback of goto-in-git shows nothing for an untracked file
+  'open_plain_diff_at' ('nvim/lua/skg/goto_git.lua') falls back to
+  'git diff --cached', so an untracked file reports "no unstaged or
+  staged changes" instead of being shown.
+** The link-to-branch refusals name the other command
+  'container_data' and 'check_container' ('nvim/lua/skg/modify_graph.lua')
+  serve 'replace_link_with_content' too, but always refuse with
+  "Cannot replace this branch with a link".
+** The log names an unnamed caller "file:nil"
+  'calling_function_name' ('nvim/lua/skg/log.lua') asks
+  'debug.getinfo' for 'nS' and then reads 'currentline', which only
+  'l' fills.
+** User-visible texts that tell history or carry a bad rename
+  'keymaps.invoke' says a command "is not available yet (MODULE has
+  not landed)", though every command's module loads (a spec checks
+  it). The recovery document ('nvim/lua/skg/recovery.lua', and
+  'elisp/skg-recovery.el') says "Each repo block is one JSON string",
+  probably "src block" before a rename of "repo". The 'ViewNewEmpty'
+  command's description says "in a chosen repo", but
+  'view_new_empty' asks for none.
+** A lazy reconnect keeps the old herald rules
+  Only 'init' fetches the herald rule table; the reconnect that
+  'skg.client.send_string' makes for a later request does not, so a
+  restarted server with new rules leaves the Neovim client on the old
+  table until ':SkgInit' or ':SkgReload'.
 * The search-results response is printed by the 'sexp' crate (2026-11-22)
   'mk_search_results_sexp' ('server/serve/handlers/text_search.rs')
   prints its Sexp with the crate's 'to_string', which prints an empty
@@ -308,9 +340,7 @@
   The overPrivateText release warning says "selected below its node's
   home repo" ('server/serve/handlers/text_release.rs', two messages),
   where the glossary asks for "home skgrepo"; 'docs/api-and-formats.org'
-  now quotes the code. A comment in 'nvim/lua/skg/keymaps.lua' calls
-  the module "the single skgrepo of truth", an over-eager rename of
-  "source of truth" ('docs/COMMANDS-nvim.org' had it too; fixed there).
+  now quotes the code.
 * Problems noticed while executing plan 19, slice 10 (2026-10-24)
 ** nvim-orgmode's insert-heading-respect-content breaks in a view
   nvim-orgmode's 'insert_heading_respect_content' (default
