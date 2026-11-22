@@ -19,8 +19,9 @@ from full_view import (
   HEADLINE_PATTERN, headline_viewnode_id, metadata_span_of_headline,
   parse_full_view )
 from compact_view import (
-  compact_tree_lines, fetch_herald_tables, fetch_link_statuses,
-  fetch_repo_ownership, summary_lines )
+  compact_tree_lines, fetch_link_statuses, fetch_repo_ownership,
+  summary_lines )
+from heralds import fetch_herald_tables
 
 # The folders a client can request from a node ('C-c l' in Emacs; the
 # 'skg-show-folderOf-*' commands in 'elisp/skg-request-views.el'), each

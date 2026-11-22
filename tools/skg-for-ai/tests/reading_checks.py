@@ -8,7 +8,7 @@ import os
 import shutil
 
 import sexp
-import compact_view
+import heralds
 
 from harness import (
   FIXTURE_FOLDER, HANDLE_PATTERN, SHARED_HERALD_RULES, TOOL_FOLDER,
@@ -194,7 +194,7 @@ def failures_of_raw_and_import (scratch):
   # The compact views render the served rule table; the herald cases
   # above render the pinned one.
   rules = run_tool ([ "raw", '((request . "herald rules"))' ])
-  served = compact_view . herald_tables_of_response (
+  served = heralds . herald_tables_of_response (
     sexp . parse_sexp ( rules . stdout . split ("\n", 1) [1] ))
   if served . rules != sexp . parse_sexp ( read_file (SHARED_HERALD_RULES) ):
     failures . append ( f"the served herald rules differ from {SHARED_HERALD_RULES}" )

@@ -11,7 +11,8 @@ from server_connection import (
   SkgConnection, SkgToolError, request_line, require_response_type,
   response_field )
 from full_view import headline_gnid, headline_viewnode_id, relation_side
-from compact_view import fetch_link_statuses_of_ids, herald_contexts
+from compact_view import fetch_link_statuses_of_ids
+from heralds import herald_contexts
 from views import (
   load_saved_view, read_text_file, require_port_of_sidecar,
   write_text_file )

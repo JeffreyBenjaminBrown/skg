@@ -12,10 +12,10 @@ from server_connection import SkgToolError
 from full_view import (
   HEADLINE_PATTERN, folder_atom, headline_gnid, headline_kind,
   headline_node_repo, headline_viewnode_id, metadata_has_atom )
-from compact_view import (
-  NOT_HELD_ANNOTATION, RESTATED_WORDS, is_editable_node,
-  is_symbol_named, leaves_fact, membership_change_processed,
-  parent_indices_by_level, reads_claims )
+from compact_view import NOT_HELD_ANNOTATION, RESTATED_WORDS
+from heralds import (
+  is_editable_node, is_symbol_named, leaves_fact,
+  membership_change_processed, parent_indices_by_level, reads_claims )
 
 # ============================================================
 # Saving an edited compact view

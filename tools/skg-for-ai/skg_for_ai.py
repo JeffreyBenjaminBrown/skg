@@ -118,8 +118,9 @@ from daemon import command_daemon
 #     'daemon': 'daemon'; 'daemon_client': how a command reaches one.
 #   Below the commands: 'edited_compact_view' (an edited compact view,
 #   read for a save); 'views' (fetching a view, writing its three files,
-#   reading them back); 'compact_view' (the compact view, its heralds
-#   and summary); 'full_view' (the full view parsed, and the facts of a
+#   reading them back); 'compact_view' (the compact view and its
+#   summary); 'heralds' (a headline's heralds as text, and change
+#   facts); 'full_view' (the full view parsed, and the facts of a
 #   headline's metadata); 'server_connection' (the connection, the
 #   errors, the request and response helpers); 'sexp'.
 # Each module's sections stand under banners of '=' (subsections '-')

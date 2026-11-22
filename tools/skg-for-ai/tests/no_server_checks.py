@@ -16,6 +16,7 @@ import sexp
 import server_connection
 import full_view
 import compact_view
+import heralds
 import views
 import edited_compact_view
 import save_dialogue
@@ -90,7 +91,7 @@ def failures_of_forks_folder_claims ():
     return headline_of_handle [handle] . metadata
   failures = []
   for handle, pending in [ ( "0c", False ), ( "0d", True ), ( "0e", True ) ]:
-    if compact_view . is_pending_detachment (
+    if heralds . is_pending_detachment (
         metadata (handle), metadata ("0b"), metadata ("0a") ) != pending:
       failures . append ( f"the forks folder's member {handle} should "
                           f"{'' if pending else 'not '}be a pending detachment" )
@@ -486,7 +487,7 @@ def failures_of_reworded_pairing ():
 # ============================================================
 
 def failures_of_shared_herald_cases ():
-  herald_tables = compact_view . HeraldTables (
+  herald_tables = heralds . HeraldTables (
     sexp . parse_sexp ( read_file (SHARED_HERALD_RULES) ),
     { sexp . sexp_to_text ( entry [0] ) :
         sexp . sexp_to_text ( entry [1] )
@@ -495,9 +496,9 @@ def failures_of_shared_herald_cases ():
   failures = []
   cases = shared_herald_cases ()
   for name, metadata_text, text, context in cases:
-    rendered = compact_view . herald_text (
+    rendered = heralds . herald_text (
       sexp . parse_sexp (metadata_text), herald_tables,
-      compact_view . HeraldContext (
+      heralds . HeraldContext (
         { "folderChange processed" : True,
           "folderChange unprocessed" : False } . get (context),
         context == "pendingDetachment" ))
