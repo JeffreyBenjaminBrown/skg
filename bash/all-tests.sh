@@ -44,7 +44,9 @@ Environment:
   SKG_TEST_NICE              nice level for test commands. Default: 15.
   SKG_TEST_IONICE=0          Disable idle I/O priority.
   SKG_FOR_AI_TEST_PORT       Port of the AI reader's scratch servers.
-                             Default: 1793.
+                             Default: 1793, or in a linked git
+                             worktree a port derived from its path
+                             ('skg_port_for_this_checkout').
 EOF
 }
 
@@ -84,8 +86,11 @@ BUILD_JOBS="$(skg_positive_int_or_default "${SKG_CARGO_BUILD_JOBS:-}" 2)"
 NEXTEST_BUILD_JOBS="$(skg_positive_int_or_default \
   "${SKG_NEXTEST_BUILD_JOBS:-}" "$(skg_default_jobs 8)")"
 NEXTEST_JOBS="$(skg_positive_int_or_default "${SKG_NEXTEST_JOBS:-}" 1)"
+export SKG_FOR_AI_TEST_PORT="${SKG_FOR_AI_TEST_PORT:-$(
+  skg_port_for_this_checkout 1793 "$PROJECT_ROOT")}"
 echo -e "${BOLD}=== All Tests ===${NC}"
 echo -e "${DIM}Build jobs: $BUILD_JOBS (nextest phase: $NEXTEST_BUILD_JOBS); nextest jobs: $NEXTEST_JOBS; integration: sequential${NC}"
+echo -e "${DIM}AI reader test port: $SKG_FOR_AI_TEST_PORT${NC}"
 echo ""
 
 # ── Phase 1: Build ──────────────────────────────────────────────
@@ -145,10 +150,11 @@ suite_team_tools () {
 
 suite_ai_reader () {
   # tools/skg-for-ai/: it runs target/debug/skg (built in phase 1)
-  # on scratch servers at SKG_FOR_AI_TEST_PORT (default 1793). It runs
+  # on scratch servers at SKG_FOR_AI_TEST_PORT (set above). It runs
   # alone, like every suite here, so nothing rebuilds the binary or
   # takes that port under it; the integration tests' ports lie far
-  # from it ('find_available_port').
+  # from it ('find_available_port'). A suite run at once from another
+  # worktree uses another port ('skg_port_for_this_checkout').
   skg_low_priority python3 tools/skg-for-ai/test_skg_for_ai.py; }
 
 suite_generated_docs () {
