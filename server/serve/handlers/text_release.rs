@@ -7,7 +7,8 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::protocol::TcpToClient;
-use crate::serve::util::sexp_to_client_string;
+use crate::serve::util::{
+  sexp_to_client_string, string_atom_sexp, string_entry_sexp};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::ID;
 use crate::types::sexp::extract_string_list_from_sexp;
@@ -16,7 +17,7 @@ use crate::types::viewnode::{
   Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeMut, Tree};
-use sexp::{Atom, Sexp};
+use sexp::Sexp;
 use std::collections::HashSet;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -75,12 +76,12 @@ pub fn search_choice_from_request (
 /// to reveal. The retry must choose inclusion or exclusion before querying.
 pub fn search_challenge_response () -> String {
   sexp_to_client_string ( &Sexp::List ( vec! [
-    pair (
+    string_entry_sexp (
       "response-type",
       TcpToClient::OverPrivateTextTelescopeConfirmation . repr_in_client () ),
-    pair ("operation", "text-search"),
-    Sexp::List ( vec! [ atom ("pids"), Sexp::List (Vec::new ()) ] ),
-    pair (
+    string_entry_sexp ("operation", "text-search"),
+    Sexp::List ( vec! [ string_atom_sexp ("pids"), Sexp::List (Vec::new ()) ] ),
+    string_entry_sexp (
       "prompt",
       "Some indexed nodes have title or body text selected below home. Include or exclude those telescopes from this search?" ),
   ] ))
@@ -146,10 +147,10 @@ pub fn save_rerender_challenge_response (
 ) -> Option<String> {
   challenge_entries (decision) . map ( |mut entries| {
     entries . push ( Sexp::List ( vec! [
-      atom ("view-ids"),
+      string_atom_sexp ("view-ids"),
       Sexp::List (
         withheld_viewforest_ids . iter ()
-        . map ( |viewforest_id| atom (&viewforest_id . repr_in_client ()) )
+        . map ( |viewforest_id| string_atom_sexp (&viewforest_id . repr_in_client ()) )
         . collect () ) ] ));
     sexp_to_client_string ( &Sexp::List (entries) ) } )
 }
@@ -161,17 +162,17 @@ fn challenge_entries (
     operation, pids, prompt,
   } = decision else { return None; };
   Some ( vec! [
-    pair (
+    string_entry_sexp (
       "response-type",
       TcpToClient::OverPrivateTextTelescopeConfirmation . repr_in_client () ),
-    pair ("operation", operation),
+    string_entry_sexp ("operation", operation),
     Sexp::List ( vec! [
-      atom ("pids"),
+      string_atom_sexp ("pids"),
       Sexp::List (
         pids . iter ()
-        . map ( |pid| atom (pid . as_str ()) )
+        . map ( |pid| string_atom_sexp (pid . as_str ()) )
         . collect () ) ] ),
-    pair ("prompt", prompt),
+    string_entry_sexp ("prompt", prompt),
   ] )
 }
 
@@ -248,19 +249,6 @@ fn pid_phrase (
     format! ("PID {}", rendered)
   } else {
     format! ("PIDs {}", rendered) }
-}
-
-fn atom (
-  value : &str,
-) -> Sexp {
-  Sexp::Atom ( Atom::S ( value . to_string () ) )
-}
-
-fn pair (
-  key   : &str,
-  value : &str,
-) -> Sexp {
-  Sexp::List ( vec! [ atom (key), atom (value) ] )
 }
 
 #[cfg(test)]

@@ -50,6 +50,8 @@ use crate::serve::util::{
   read_length_prefixed_content,
   send_response_with_length_prefix,
   sexp_to_client_string,
+  string_atom_sexp,
+  string_entry_sexp,
   tag_sexp_response,
   value_from_request_sexp };
 use crate::from_text::fork::build_fork_confirmation_buffer;
@@ -782,16 +784,13 @@ fn strandeds_review_from_request (
 fn strandeds_confirmation_response (
   strandeds : &[StrandedRelationship],
 ) -> String {
-  let atom = |text : &str| -> Sexp { Sexp::Atom ( Atom::S ( text . to_string () )) };
-  let pair = |key : &str, value : &str| -> Sexp {
-    Sexp::List ( vec! [ atom (key), atom (value) ] ) };
   let entries : Vec<Sexp> = strandeds . iter ()
     . map ( |stranded| Sexp::List ( vec! [
-      pair ("relation", stranded . relationship . relation . relation_name ()),
-      pair ("recorder", stranded . relationship . recorder . as_str ()),
-      pair ("member",   stranded . relationship . member . as_str ()),
-      pair ("relRepo",  stranded . relRepo . as_str ()),
-      pair ("default",  stranded . new_default . as_str ()), ] ))
+      string_entry_sexp ("relation", stranded . relationship . relation . relation_name ()),
+      string_entry_sexp ("recorder", stranded . relationship . recorder . as_str ()),
+      string_entry_sexp ("member",   stranded . relationship . member . as_str ()),
+      string_entry_sexp ("relRepo",  stranded . relRepo . as_str ()),
+      string_entry_sexp ("default",  stranded . new_default . as_str ()), ] ))
     . collect ();
   let count : usize = strandeds . len ();
   let prompt : String = format! (
@@ -800,8 +799,8 @@ fn strandeds_confirmation_response (
     if count == 1 { "its" } else { "their" },
     if count == 1 { "" } else { "s" } );
   Sexp::List ( vec! [
-    Sexp::List ( vec! [ atom ("strandeds"), Sexp::List (entries) ] ),
-    pair ("prompt", &prompt), ] ) . to_string () }
+    Sexp::List ( vec! [ string_atom_sexp ("strandeds"), Sexp::List (entries) ] ),
+    string_entry_sexp ("prompt", &prompt), ] ) . to_string () }
 
 /// The request's choice of where its deletes may strip the deleted
 /// IDs: '(delete-from . "visible")' or '(delete-from . "all")', present
@@ -823,13 +822,12 @@ fn delete_from_from_request (
 fn delete_from_confirmation_response (
   count : usize,
 ) -> String {
-  let atom = |text : &str| -> Sexp { Sexp::Atom ( Atom::S ( text . to_string () )) };
   let prompt : String = format! (
     "{} record{} in skgrepos the skgrepo restriction keeps out name{} a graphnode this save deletes. Nothing was saved.",
     count, if count == 1 { "" } else { "s" }, if count == 1 { "s" } else { "" } );
   Sexp::List ( vec! [
-    Sexp::List ( vec! [ atom ("count"), Sexp::Atom ( Atom::I (count as i64) ) ] ),
-    Sexp::List ( vec! [ atom ("prompt"), atom (&prompt) ] ), ] ) . to_string () }
+    Sexp::List ( vec! [ string_atom_sexp ("count"), Sexp::Atom ( Atom::I (count as i64) ) ] ),
+    Sexp::List ( vec! [ string_atom_sexp ("prompt"), string_atom_sexp (&prompt) ] ), ] ) . to_string () }
 
 /// Answer a preview whose save would be refused: 'save-preview' with
 /// no hides and the refusal's errors and warnings.

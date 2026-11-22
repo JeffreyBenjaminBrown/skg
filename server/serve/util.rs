@@ -36,11 +36,8 @@ pub fn tag_sexp_response (
   sexp_payload  : &str,
 ) -> String {
   let tag : String =
-    sexp_to_client_string ( &Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "response-type" . to_string () )),
-      Sexp::Atom ( Atom::S ( response_type . repr_in_client ()
-                             . to_string () )),
-    ] ));
+    sexp_to_client_string ( &string_entry_sexp (
+      "response-type", response_type . repr_in_client () ));
   format! ( "({} {}", tag, &sexp_payload [ 1.. ] ) }
 
 /// Wrap plain text in a tagged s-exp for LP delivery.
@@ -50,14 +47,8 @@ pub fn tag_text_response (
   text          : &str,
 ) -> String {
   sexp_to_client_string ( &Sexp::List ( vec! [
-    Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "response-type" . to_string () )),
-      Sexp::Atom ( Atom::S ( response_type . repr_in_client ()
-                             . to_string () )), ] ),
-    Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "content"       . to_string () )),
-      Sexp::Atom ( Atom::S ( text            . to_string () )), ] ),
-  ] )) }
+    string_entry_sexp ("response-type", response_type . repr_in_client ()),
+    string_entry_sexp ("content", text), ] )) }
 
 
 pub fn send_response_with_length_prefix (
@@ -133,9 +124,7 @@ pub(crate) fn buffer_response_entries (
   warnings       : &[String],
 ) -> Vec<Sexp> {
   vec! [
-    Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "content" . to_string () )),
-      Sexp::Atom ( Atom::S ( buffer_content . to_string () )) ] ),
+    string_entry_sexp ("content", buffer_content),
     format_string_list_sexp ("errors", errors),
     format_string_list_sexp ("warnings", warnings) ] }
 
@@ -150,12 +139,8 @@ pub(crate) fn format_fork_confirmation_response_sexp (
   to_minibuffer  : &str,
 ) -> String {
   sexp_to_client_string ( &Sexp::List ( vec! [
-    Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "content" . to_string () )),
-      Sexp::Atom ( Atom::S ( buffer_content . to_string () )) ] ),
-    Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "to-minibuffer" . to_string () )),
-      Sexp::Atom ( Atom::S ( to_minibuffer . to_string () )) ] ),
+    string_entry_sexp ("content", buffer_content),
+    string_entry_sexp ("to-minibuffer", to_minibuffer),
     format_string_list_sexp ("errors", &[]),
     format_string_list_sexp ("warnings", &[]) ] )) }
 
@@ -169,12 +154,8 @@ pub(crate) fn format_single_view_sexp (
   content       : &str,
 ) -> String {
   sexp_to_client_string ( &Sexp::List ( vec! [
-    Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "view-id" . to_string () )),
-      Sexp::Atom ( Atom::S ( viewforest_id . repr_in_client () )) ] ),
-    Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "content" . to_string () )),
-      Sexp::Atom ( Atom::S ( content . to_string () )) ] ) ] )) }
+    string_entry_sexp ("view-id", &viewforest_id . repr_in_client ()),
+    string_entry_sexp ("content", content) ] )) }
 
 /// Format: ((lock-views ("VIEW_ID1" "VIEW_ID2" ...)))
 pub(crate) fn format_lock_views_sexp (
@@ -198,6 +179,20 @@ pub(crate) fn format_rerender_done_sexp (
   sexp_to_client_string ( &Sexp::List ( vec! [
     format_string_list_sexp ("errors", errors),
     format_string_list_sexp ("warnings", warnings) ] )) }
+
+/// A string atom, printed bare or quoted as 'sexp_to_client_string'
+/// decides.
+pub(crate) fn string_atom_sexp (
+  text : &str,
+) -> Sexp {
+  Sexp::Atom ( Atom::S ( text . to_string () )) }
+
+/// Format: (KEY "VALUE")
+pub(crate) fn string_entry_sexp (
+  key   : &str,
+  value : &str,
+) -> Sexp {
+  Sexp::List ( vec! [ string_atom_sexp (key), string_atom_sexp (value) ] ) }
 
 /// Format: (KEY . t)
 pub(crate) fn true_entry_sexp (

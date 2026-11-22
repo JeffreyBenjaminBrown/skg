@@ -20,7 +20,8 @@ use crate::serve::rerender_stream::{
   stream_empty_rerender, stream_prepared_rerenders};
 use crate::serve::util::{
   format_string_list_sexp, send_response_with_length_prefix,
-  sexp_to_client_string, tag_sexp_response, value_from_request_sexp};
+  sexp_to_client_string, string_entry_sexp, tag_sexp_response,
+  value_from_request_sexp};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SkgrepoName};
@@ -29,7 +30,7 @@ use crate::types::views_state::ViewforestId;
 use crate::util::path_from_pid_and_skgrepo;
 
 use futures::executor::block_on;
-use sexp::{Atom, Sexp};
+use sexp::Sexp;
 use std::collections::HashSet;
 use std::net::TcpStream;
 
@@ -115,11 +116,11 @@ fn plan_response (
   preview : bool,
 ) -> String {
   sexp_to_client_string ( &Sexp::List ( vec! [
-    pair ( "preview", if preview { "true" } else { "false" } ),
+    string_entry_sexp ( "preview", if preview { "true" } else { "false" } ),
     format_string_list_sexp ( "lines", &plan . lines ),
-    pair ( "receipt-id", plan . receipt . pid . as_str () ),
-    pair ( "holder-id", plan . holder . pid . as_str () ),
-    pair ( "holder-is-new-fork",
+    string_entry_sexp ( "receipt-id", plan . receipt . pid . as_str () ),
+    string_entry_sexp ( "holder-id", plan . holder . pid . as_str () ),
+    string_entry_sexp ( "holder-is-new-fork",
            if plan . new_fork . is_some () { "true" } else { "false" } ), ] )) }
 
 /// A refusal, and the empty rerender stream every answer is followed
@@ -130,7 +131,7 @@ fn refuse (
   stream  : &mut TcpStream,
   refusal : &ReceiptRefusal,
 ) {
-  let mut entries : Vec<Sexp> = vec! [ pair ("refusal", refusal . message ()) ];
+  let mut entries : Vec<Sexp> = vec! [ string_entry_sexp ("refusal", refusal . message ()) ];
   match refusal {
     ReceiptRefusal::Plain (_) => {},
     ReceiptRefusal::ChooseSkgrepo { choices, .. } =>
@@ -207,10 +208,3 @@ fn stream_rerender_views_showing_the_receipt (
     &mut prepared, skgrepo_restriction, "receipt-rerender" );
   stream_prepared_rerenders (stream, views_state, prepared); }
 
-fn pair (
-  key   : &str,
-  value : &str,
-) -> Sexp {
-  Sexp::List ( vec! [
-    Sexp::Atom ( Atom::S ( key . to_string () )),
-    Sexp::Atom ( Atom::S ( value . to_string () )) ] ) }

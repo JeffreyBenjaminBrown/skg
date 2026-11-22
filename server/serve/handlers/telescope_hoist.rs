@@ -7,14 +7,15 @@
 //! confirmation response.
 
 use crate::dbs::filesystem::one_node::telescope_from_disk;
-use crate::serve::util::sexp_to_client_string;
+use crate::serve::util::{
+  sexp_to_client_string, string_atom_sexp, string_entry_sexp};
 use crate::telescope::compose::compose_telescope_collecting_warnings;
 use crate::types::config::SkgConfig;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::sexp::extract_string_list_from_sexp;
 
-use sexp::{Atom, Sexp};
+use sexp::Sexp;
 use std::collections::HashSet;
 use std::io;
 
@@ -127,8 +128,8 @@ pub fn confirmation_response (
 ) -> String {
   let telescope_entries : Vec<Sexp> = candidates . iter ()
     .map ( |candidate| Sexp::List ( vec! [
-      pair ("pid", candidate . pid . as_str ()),
-      pair ("home", candidate . home . as_str ()),
+      string_entry_sexp ("pid", candidate . pid . as_str ()),
+      string_entry_sexp ("home", candidate . home . as_str ()),
     ] ) )
     .collect ();
   let count : usize = candidates . len ();
@@ -137,17 +138,9 @@ pub fn confirmation_response (
     count, if count == 1 { "" } else { "s" } );
   sexp_to_client_string ( &Sexp::List ( vec! [
     Sexp::List ( vec! [
-      atom ("telescopes"), Sexp::List (telescope_entries) ] ),
-    pair ("prompt", &prompt),
+      string_atom_sexp ("telescopes"), Sexp::List (telescope_entries) ] ),
+    string_entry_sexp ("prompt", &prompt),
   ] ))
-}
-
-fn atom (value : &str) -> Sexp {
-  Sexp::Atom ( Atom::S ( value . to_string () ) )
-}
-
-fn pair (key : &str, value : &str) -> Sexp {
-  Sexp::List ( vec! [atom (key), atom (value)] )
 }
 
 #[cfg(test)]
