@@ -18,7 +18,8 @@ import full_view
 import compact_view
 import views
 import edited_compact_view
-import save
+import save_dialogue
+import retyped_headlines
 import view_commands
 import diff_and_commit
 import headline_commands
@@ -233,9 +234,9 @@ def failures_of_preview_support ():
   new = Answering ( '((response-type verify-connection) (content "x") '
                     '(supports ("save preview")))' )
   failures = []
-  if save . server_supports (old, "save preview"):
+  if save_dialogue . server_supports (old, "save preview"):
     failures . append ( "an older server was taken to support the preview" )
-  if not save . server_supports (new, "save preview"):
+  if not save_dialogue . server_supports (new, "save preview"):
     failures . append ( "a server naming the preview was taken not to support it" )
   return failures
 
@@ -431,21 +432,21 @@ TITLE_MATCH_CASES = [
 def failures_of_title_matching ():
   failures = []
   for title, words in NORMALIZED_TITLES:
-    if save . normalized_title_words (title) != words:
+    if retyped_headlines . normalized_title_words (title) != words:
       failures . append (
         f"{title!r} normalizes to "
-        f"{save . normalized_title_words (title)}, not {words}" )
+        f"{retyped_headlines . normalized_title_words (title)}, not {words}" )
   for new_title, removed_title, asks in TITLE_MATCH_CASES:
-    if save . titles_probably_reworded (new_title, removed_title) != asks:
+    if retyped_headlines . titles_probably_reworded (new_title, removed_title) != asks:
       failures . append (
         f"{new_title!r} / {removed_title!r}: the fuzzy match "
         + ( "does not ask" if asks else "asks" ) + ", with (Dice, ratio) "
-        f"{save . title_similarity (new_title, removed_title)}" )
-  dice, ratio = save . title_similarity (
+        f"{retyped_headlines . title_similarity (new_title, removed_title)}" )
+  dice, ratio = retyped_headlines . title_similarity (
     "one two three six seven", "one two three four five" )
-  if dice != 0.6 or ratio >= save . REWORDED_RATIO_THRESHOLD:
+  if dice != 0.6 or ratio >= retyped_headlines . REWORDED_RATIO_THRESHOLD:
     failures . append ( f"the Dice threshold case gives {( dice, ratio )}" )
-  dice, ratio = save . title_similarity (
+  dice, ratio = retyped_headlines . title_similarity (
     "abcdefxy kmn pqr", "abcdefgh kmo pqs" )
   if dice != 0 or ratio != 0.75:
     failures . append ( f"the ratio threshold case gives {( dice, ratio )}" )
@@ -468,7 +469,7 @@ def failures_of_reworded_pairing ():
   failures = []
   pairs = [ ( pair . new_index, pair . removed_handle,
               pair . other_removed_handles )
-            for pair in save . reworded_headline_pairs (edited, original) ]
+            for pair in retyped_headlines . reworded_headline_pairs (edited, original) ]
   if pairs != [ ( 1, "0b", [ "0a" ] ), ( 2, "0a", [ "0b" ] ) ]:
     failures . append ( f"the reworded pairs are {pairs}" )
   errors = edited_compact_view . handle_error_lines (

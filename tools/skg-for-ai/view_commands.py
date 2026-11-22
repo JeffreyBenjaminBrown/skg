@@ -24,7 +24,8 @@ from views import (
   require_view_has_headlines, write_view_files )
 from save import (
   compact_view_has_edits, connection_for_saved_view,
-  register_view_by_saving_it_unchanged, rerendered_view_of_save )
+  register_view_by_saving_it_unchanged )
+from save_dialogue import rerendered_view_of_save
 
 # Commands that name one forest kind.
 FOREST_COMMAND_ALIASES = { "contains" : "containers",

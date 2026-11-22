@@ -106,7 +106,10 @@ from daemon import command_daemon
 #   The commands, by module:
 #     'view_commands': 'view', 'search', 'forest', 'contains',
 #       'links-here', 'new', 'perspective', 'close'.
-#     'save': 'save'.
+#     'save': 'save', with 'retyped_headlines' (a new headline whose
+#       title is, or resembles, a removed one's) and 'save_dialogue'
+#       (the save sent, the server's questions answered, its rerender
+#       written).
 #     'diff_and_commit': 'diff', 'extend', 'commit'.
 #     'receipts': 'receipt'.
 #     'request_commands': 'raw', 'import', 'delete-references',
