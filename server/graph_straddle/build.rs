@@ -1,3 +1,8 @@
+//! Building a graph straddle: the before-graph read from HEAD and paired
+//! with the live graph ('GraphStraddle::from_head_and_live'), and a
+//! connection's straddle brought up to date, rebuilt only when HEAD
+//! moved ('current_graph_straddle_in_slot').
+
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::complete_validation::validated_graph;
 use crate::git_ops::git_snapshot::{
