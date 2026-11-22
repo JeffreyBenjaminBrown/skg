@@ -123,44 +123,20 @@ pub fn reload_changed_skg_files (
     for file in changed_files {
       by_pid . entry (file . pid . clone ()) . or_default () . push (file); }
     by_pid };
-  let mut nodeInstructions : Vec<NodeInstruction> = Vec::new ();
-  let mut illegal_edits : HashMap<ID, Vec<IllegalEdit>> = HashMap::new ();
-  let mut reloaded_pids : BTreeSet<ID> = BTreeSet::new ();
-  for (pid, files) in &files_by_pid {
-    match read_change_of_pid (config, &base, pid) {
-      Err (message) =>
-        notice . problems . push ( RepoChangeProblem {
-          skgrepos : skgrepos_of (files),
-          message  : format! (
-            "Node {} changed on disk but could not be read, so the server keeps serving its previous version: {}",
-            pid, message ), } ),
-      Ok ((change, illegal)) => {
-        let illegal_edits_changed : bool =
-          base . illegal_edits . get (pid) . cloned () . unwrap_or_default ()
-          != illegal;
-        let wrote : bool = match change {
-          ReadChange::Write (node) => {
-            nodeInstructions . push ( NodeInstruction::Save (SaveNode (node)) );
-            true },
-          ReadChange::Delete (delete) => {
-            nodeInstructions . push ( NodeInstruction::Delete (delete) );
-            true },
-          ReadChange::Nothing => false, };
-        if wrote || illegal_edits_changed {
-          illegal_edits . insert ( pid . clone (), illegal );
-          reloaded_pids . insert ( pid . clone () ); }}, }}
+  let ReadChanges { nodeInstructions, illegal_edits, reloaded_pids } =
+    read_changes_of_pids (config, &base, &files_by_pid, &mut notice . problems);
   if reloaded_pids . is_empty () {
     return (notice, BTreeSet::new ()); }
   let prepared : PreparedGraphUpdate =
     match prepare_graph_update (config, base . clone (), nodeInstructions) {
       Ok (prepared) => prepared,
       Err (error) => {
-        let retry : BTreeSet<PathBuf> = reloaded_pids . iter ()
-          . flat_map ( |pid| files_by_pid [pid] . iter () . map ( |file| file . path . clone () ))
+        let retry : BTreeSet<PathBuf> =
+          files_of_pids (&reloaded_pids, &files_by_pid)
+          . map ( |file| file . path . clone () )
           . collect ();
         notice . problems . push ( RepoChangeProblem {
-          skgrepos : skgrepos_of ( reloaded_pids . iter ()
-                                   . flat_map ( |pid| files_by_pid [pid] . iter () )),
+          skgrepos : skgrepos_of ( files_of_pids (&reloaded_pids, &files_by_pid) ),
           message  : format! (
             "Files that changed on disk could not be reloaded, so the server keeps serving its previous graph; they are tried again with the next change on disk:\n{}",
             error ), } );
@@ -182,9 +158,8 @@ pub fn reload_changed_skg_files (
     &swapped_in . graph, &runtime . tantivy_index,
     prepared . nodeInstructions () . to_vec () );
   emit_telescope_warnings (&telescope_warnings);
-  let reloaded_files : Vec<&ChangedSkgFile> = reloaded_pids . iter ()
-    . flat_map ( |pid| files_by_pid [pid] . iter () )
-    . collect ();
+  let reloaded_files : Vec<&ChangedSkgFile> =
+    files_of_pids (&reloaded_pids, &files_by_pid) . collect ();
   notice . foreign_files_reloaded = reloaded_files . iter ()
     . any ( |file| ! config . skgrepo_is_owned (&file . skgrepo) );
   if notice . foreign_files_reloaded {
@@ -203,6 +178,59 @@ pub fn reload_changed_skg_files (
     nodes = notice . changed_pids . len (),
     "reloaded .skg files that changed on disk" );
   (notice, BTreeSet::new ()) }
+
+/// What a batch's changed nodes, read again, say to do.
+struct ReadChanges {
+  /// What to write to or delete from the graph.
+  nodeInstructions : Vec<NodeInstruction>,
+  /// The illegal edits of each node in 'reloaded_pids', as now read.
+  illegal_edits    : HashMap<ID, Vec<IllegalEdit>>,
+  /// The nodes that differ from the graph, or whose illegal edits do.
+  reloaded_pids    : BTreeSet<ID>,
+}
+
+/// Read each node of 'files_by_pid' again. A node that cannot be read
+/// is left as 'base' has it, and adds to 'problems'.
+fn read_changes_of_pids (
+  config       : &SkgConfig,
+  base         : &InRustGraph,
+  files_by_pid : &BTreeMap<ID, Vec<ChangedSkgFile>>,
+  problems     : &mut Vec<RepoChangeProblem>,
+) -> ReadChanges {
+  let mut nodeInstructions : Vec<NodeInstruction> = Vec::new ();
+  let mut illegal_edits : HashMap<ID, Vec<IllegalEdit>> = HashMap::new ();
+  let mut reloaded_pids : BTreeSet<ID> = BTreeSet::new ();
+  for (pid, files) in files_by_pid {
+    match read_change_of_pid (config, base, pid) {
+      Err (message) =>
+        problems . push ( RepoChangeProblem {
+          skgrepos : skgrepos_of (files),
+          message  : format! (
+            "Node {} changed on disk but could not be read, so the server keeps serving its previous version: {}",
+            pid, message ), } ),
+      Ok ((change, illegal)) => {
+        let illegal_edits_changed : bool =
+          base . illegal_edits . get (pid) . cloned () . unwrap_or_default ()
+          != illegal;
+        let wrote : bool = match change {
+          ReadChange::Write (node) => {
+            nodeInstructions . push ( NodeInstruction::Save (SaveNode (node)) );
+            true },
+          ReadChange::Delete (delete) => {
+            nodeInstructions . push ( NodeInstruction::Delete (delete) );
+            true },
+          ReadChange::Nothing => false, };
+        if wrote || illegal_edits_changed {
+          illegal_edits . insert ( pid . clone (), illegal );
+          reloaded_pids . insert ( pid . clone () ); }}, }}
+  ReadChanges { nodeInstructions, illegal_edits, reloaded_pids } }
+
+/// The changed files of the nodes 'pids', each a key of 'files_by_pid'.
+fn files_of_pids<'a> (
+  pids         : &'a BTreeSet<ID>,
+  files_by_pid : &'a BTreeMap<ID, Vec<ChangedSkgFile>>,
+) -> impl Iterator<Item = &'a ChangedSkgFile> {
+  pids . iter () . flat_map ( |pid| files_by_pid [pid] . iter () ) }
 
 /// The '.skg' files among 'paths' that sit directly in a configured
 /// skgrepo's directory, each with its skgrepo and the pid its name
