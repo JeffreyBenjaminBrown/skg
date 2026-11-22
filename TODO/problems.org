@@ -7,23 +7,6 @@
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
 * Problems noticed while refactoring tools/ (2026-11-22)
-** The pacer records its session's start time from the wrong process
-  In 'session' ('tools/team/pacer.sh'), the subshell that runs a
-  session writes 'running-session' with
-  'echo "$BASHPID $(proc_field "$BASHPID" 20) $stamp"'. The second
-  '$BASHPID' is inside '$( )', so it is the command substitution's
-  own pid: the start time recorded is that short-lived child's, not
-  the subshell's. Both usually start in the same clock tick (1/100 s),
-  so 'other_pacer' matches them; under load they do not, and then a
-  session whose pacer was killed no longer keeps a new pacer from
-  starting (ONE PACER in the script's header), so two sessions can
-  run at once. Seen in 'tools/team/test_pacer.py' with three busy
-  loops sharing its core: the new pacer started a second session
-  instead of refusing, and the test timed out; it is likely why that
-  test timed out twice while three suites ran at once. The fix is to
-  name the subshell's pid once, outside the substitution
-  ('me=$BASHPID; echo "$me $(proc_field "$me" 20) $stamp"'). Not
-  made: the pacer was in use, and its behaviour was not to change.
 ** 'skg_filenames_match_pids' reads a key no '.skg' file has
   'tools/introspect/skg_filenames_match_pids.rs' takes a file's IDs
   from 'ids', but a '.skg' file names them 'pid' and 'extra_ids', so

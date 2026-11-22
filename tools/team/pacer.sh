@@ -170,9 +170,10 @@ session() { # REASON: one session, in the foreground
   list_jeffs_files "$stamp.start.gz"
   # PACER_SESSION reaches the session's shells, so 'hold' can say who holds.
   # The subshell names itself in RUNNING_SESSION, so a pacer started while
-  # it lives, this one killed, refuses (ONE PACER, above).
+  # it lives, this one killed, refuses (ONE PACER, above). Its pid is read
+  # once, outside '$( )', whose own process has a pid and start time of its own.
   local status
-  ( echo "$BASHPID $(proc_field "$BASHPID" 20) $stamp" > "$RUNNING_SESSION"
+  ( me=$BASHPID; echo "$me $(proc_field "$me" 20) $stamp" > "$RUNNING_SESSION"
     cd "$ROOT" && PACER_SESSION="$stamp" timeout "$SESSION_TIMEOUT" claude -p "$WAKE_PROMPT" \
       --model "$MODEL" --dangerously-skip-permissions \
       > "$DIR/session.$stamp.out" 2>&1 )

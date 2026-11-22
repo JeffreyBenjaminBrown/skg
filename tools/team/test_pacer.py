@@ -29,9 +29,6 @@ TEAM_FOLDER = os . path . dirname ( os . path . abspath (__file__) )
 # ps, ...) can wait seconds for a core. With three busy loops sharing
 # one core, the first test took 18 seconds, though nothing was wrong.
 # So the limit is generous; it is reached only if the pacer is stuck.
-# Under such load the second test can also fail for a real reason: see
-# "the pacer records its session's start time from the wrong process"
-# in TODO/problems.org.
 PATIENCE_SECONDS = 120
 
 USAGE_STAND_IN = """#!/usr/bin/env bash

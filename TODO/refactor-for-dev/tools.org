@@ -15,10 +15,8 @@
 ** 'test_pacer.py' waits up to two minutes, and fails at once when a pacer starts instead of refusing
    Its 15-second waits were too short at nice 15 under load (one test
    took 18 seconds with three busy loops on its core). The other cause
-   of its timeouts is a race in 'pacer.sh', in 'TODO/problems.org'
-   ("the pacer records its session's start time from the wrong
-   process"); unfixed, so the second test can still fail under heavy
-   load, now quickly and with the log. To reproduce: start three
+   of its timeouts was a race in 'pacer.sh', fixed below. To load the
+   tests' core as the suites did: start three
    'taskset -c 7 bash -c "while :; do :; done" &' and run
    'taskset -c 7 nice -n 15 python3 tools/team/test_pacer.py'.
 ** 'check_jeffs_files.py' has a test, and its 'check' only reports
@@ -30,13 +28,16 @@
 ** 'specialist.sh' reads the ports file through 'recorded_port' and 'recorded_home'
    They replace five copies of one awk program. Checked by running
    every path that reads the file in a scratch root, before and after.
+** The pacer records the start time of its session's own process
+   'session' in 'pacer.sh' wrote 'running-session' with the start time
+   of the '$( )' child, not of the subshell, so under load a pacer
+   started after one was killed did not see the orphaned session and
+   started a second. Now the subshell's pid is read once ('me'). No
+   cheap test fails without it (the two processes usually start in the
+   same tick); the second test of 'test_pacer.py' does under the load
+   above, and passes with it.
 ** call-graph's README and rust-field-tags' header say what they are for and what runs them
 * Left, best first
-** Fix the pacer's start-time race (needs Jeff's yes: the pacer is live)
-   'session' in 'pacer.sh': one line, 'me=$BASHPID' before the 'echo'.
-   Then the second test of 'test_pacer.py' passes under any load. Safe
-   in itself, but a running 'pacer.sh run' keeps the old text until it
-   is restarted, which only Jeff should do.
 ** A test that the pacer's wake prompt starts as the spending account expects
    'PACER_PROMPT_START' in 'spending_account.py' must be the start of
    'WAKE_PROMPT' in 'pacer.sh'; 'test_spending_account.py' checks the
