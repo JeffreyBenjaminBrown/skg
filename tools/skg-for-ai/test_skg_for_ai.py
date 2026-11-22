@@ -114,6 +114,7 @@ import server_connection
 import full_view
 import compact_view
 import views
+import edited_compact_view
 import skg_for_ai
 
 FIXTURE_FOLDER = os . path . join (TOOL_FOLDER, "test-fixture")
@@ -237,7 +238,7 @@ def failures_of_forks_folder_claims ():
               "*** e ⟨0d⟩\n*** m ⟨0e⟩\n*** k ⟨0g relRepo:main⟩\n" )
   headline_of_handle = views . headlines_by_viewnode_id (
     full_view . parse_full_view (full) )
-  edited = skg_for_ai . parse_edited_compact_view (compact)
+  edited = edited_compact_view . parse_edited_compact_view (compact)
   def metadata (handle):
     return headline_of_handle [handle] . metadata
   failures = []
@@ -246,11 +247,11 @@ def failures_of_forks_folder_claims ():
         metadata (handle), metadata ("0b"), metadata ("0a") ) != pending:
       failures . append ( f"the forks folder's member {handle} should "
                           f"{'' if pending else 'not '}be a pending detachment" )
-  refusal = skg_for_ai . relRepo_problems (
+  refusal = edited_compact_view . relRepo_problems (
     edited, 2, headline_of_handle, { "main" : True } )
   if not ( len (refusal) == 1 and "claims nothing" in refusal [0] ):
     failures . append ( f"'relRepo:main' on a forker claiming nothing gave {refusal!r}" )
-  allowed = skg_for_ai . relRepo_problems (
+  allowed = edited_compact_view . relRepo_problems (
     edited, 5, headline_of_handle, { "main" : True } )
   if allowed:
     failures . append ( f"'relRepo:main' on a claiming forkee gave {allowed!r}" )
@@ -260,7 +261,7 @@ def failures_of_forks_folder_claims ():
       ( "** ⟨0b Its mirrors are these.⟩", ( [], [], [], False ) ),
       ( "** ⟨0b Its mirrors are these. relRepo:main subtree⟩",
         ( [], [], [ "relRepo:main" ], True ) ) ]:
-    folder = skg_for_ai . parse_edited_compact_view (text) [0]
+    folder = edited_compact_view . parse_edited_compact_view (text) [0]
     found = ( folder . repo_words (), folder . view_request_words (),
               folder . edit_request_words (), folder . asks_subtree () )
     if found != asked:
@@ -484,7 +485,7 @@ def failures_of_link_annotation_round_trip ():
   for text in [ "See [[id:odd-id][the note]] and [[id:gone-id][gone]].",
                 "[[id:odd-id]] then [[id:odd-id][again ⟦→ typed⟧]]⟦→ typed⟧" ]:
     annotated = compact_view . annotate_links (text, statuses)
-    stripped = skg_for_ai . strip_link_annotations (annotated)
+    stripped = edited_compact_view . strip_link_annotations (annotated)
     if stripped != text:
       failures . append (
         f"annotating then stripping {text!r} gives {stripped!r}" )
@@ -511,11 +512,11 @@ def failures_of_link_annotations ():
   for annotation in ( [ annotation for _, annotation in LINK_ANNOTATION_CASES ]
                       + [ "⟦✗ missing⟧" ] ):
     text = "see " + link + annotation + ", then more"
-    stripped = skg_for_ai . strip_link_annotations (text)
+    stripped = edited_compact_view . strip_link_annotations (text)
     if stripped != "see " + link + ", then more":
       failures . append ( f"{annotation!r} after a link strips to "
                           f"{stripped!r}" )
-  if skg_for_ai . strip_link_annotations ("⟦not held here⟧ alone") \
+  if edited_compact_view . strip_link_annotations ("⟦not held here⟧ alone") \
      != "⟦not held here⟧ alone":
     failures . append ( "'⟦not held here⟧' after no link is stripped" )
   return failures
@@ -606,11 +607,11 @@ def failures_of_reworded_pairing ():
   """Pairs are one to one, best first: each new headline gets its best
   removed one still unpaired, and names the others it resembles. A
   headline marked '⟨new⟩' is never paired, and carries no other word."""
-  original = [ skg_for_ai . OutlineHeadline ( handle, 1, title, [], None )
+  original = [ edited_compact_view . OutlineHeadline ( handle, 1, title, [], None )
                for handle, title in [ ( "0a", "Fred likes apples and pears" ),
                                       ( "0b", "Fred likes apples" ),
                                       ( "0c", "Unrelated" ) ] ]
-  edited = skg_for_ai . parse_edited_compact_view (
+  edited = edited_compact_view . parse_edited_compact_view (
     "* Unrelated ⟨0c⟩\n"
     "* Fred likes apples and plums\n"
     "* Fred likes apples, pears\n"
@@ -622,7 +623,7 @@ def failures_of_reworded_pairing ():
             for pair in skg_for_ai . reworded_headline_pairs (edited, original) ]
   if pairs != [ ( 1, "0b", [ "0a" ] ), ( 2, "0a", [ "0b" ] ) ]:
     failures . append ( f"the reworded pairs are {pairs}" )
-  errors = skg_for_ai . handle_error_lines (
+  errors = edited_compact_view . handle_error_lines (
     edited [ 1 : ], { "0c" : original [2] } )
   if errors != [ "Error: ⟨new⟩ on line 5 of the compact view carries "
                  "'delete'; it takes no other word but one 'repo:NAME'." ]:
