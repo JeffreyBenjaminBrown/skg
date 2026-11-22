@@ -389,14 +389,13 @@ gap too. Details, options and questions:
    identity walks. Share immutable identity-transition facts while retaining
    distinct index, validation, write, and view dependency scopes and an
    independent full reconstruction oracle.
-** Node-to-complete projections and lookup adapters multiply change sites
-   'nodecomplete_from_graph' in 'server/dbs/node_lookup.rs',
-   'nodecomplete_from_noderust' in 'server/save.rs', and
-   'complete_from_rust' in 'server/dbs/in_rust_graph/complete_validation.rs'
-   repeat the same field projection. Share it next to the node types.
-   The rustFirst/graphFirst lookup wrappers also ignore skgrepo/config
-   arguments and perform only graph lookup; their names and fallible
-   wrappers obscure the captured-generation contract.
+** 'graphnode_by_gnid' takes a config it ignores
+   'graphnode_by_gnid' ('server/dbs/node_lookup.rs') ignores its
+   '_config' argument; its callers include tests
+   ('tests/partner_folder_matrix.rs', 'tests/shared/view_and_save_helpers.rs'),
+   so dropping it changes them. 'tests/mutation_gate.rs' keeps its own
+   copy of the projection that 'From<&GraphnodeInRust> for Graphnode'
+   ('server/types/nodes/rust.rs') now is.
 ** Ordinary saves and node merges have different index application policies
    'server/save.rs::apply_defineNodes' queues Tantivy updates with computed
    context types. 'server/nodeMerge.rs::apply_prepared_nodeMerges' writes
@@ -601,21 +600,6 @@ gap too. Details, options and questions:
    per-ID and skgrepo is a function of ID), so this is a doc wording
    nit only.
 * Problems noted during the forks arc (TODO/forks/)
-** Quasi-duplication: "Repo '...' not found in config" across ~9 sites
-   The plan asked to consolidate the duplicated "repo not found"
-   error into one 'RepoValidationError'. The recon found the
-   duplication is wider than the three sites named (server/util.rs,
-   dbs/filesystem/multiple_nodes.rs x2, plus copies in not_nodes.rs,
-   git_ops/read_repo.rs, diff_analysis/snapshot.rs) -- ~9 literals of
-   the same format string -- across three carrier types (io::Error,
-   Result<_, String>, BufferValidationError). A clean consolidation
-   needs an enum with both an ID-less 'NotInConfig(RepoName)' shape
-   (the fs layer has no node id) and ID-bearing shapes, plus
-   From-impls bridging to io::Error / Box<dyn Error>. I added typed
-   fork-specific errors (ForkRepoUnresolved / ForkAlreadyExists /
-   ForkRepoInactive on BufferValidationError) but DEFERRED the broad
-   string consolidation -- it is a nice-to-have touching fs/git/diff
-   layers, out of proportion to the fork work. Worth doing on its own.
 * Problems found during herald overhaul research
 ** (mostly fixed) Save validation and extraction use different edit-request surfaces
    The save extraction path uses 'collect_savenode_candidates' to define

@@ -9,9 +9,7 @@ pub fn path_from_pid_and_skgrepo (
   pid     : ID,
 ) -> Result < String, String > {
   let skgrepo_config : &Skgrepo =
-    config . skgrepos . get (skgrepo)
-    . ok_or_else ( || format! ("Repo '{}' not found in config",
-                               skgrepo) ) ?;
+    config . skgrepo_or_err (skgrepo) ?;
   let f : PathBuf = skgrepo_config . path . clone() ;
   let s: String = pid . 0;
   Ok ( f . join (s)

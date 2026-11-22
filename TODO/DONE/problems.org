@@ -1,3 +1,23 @@
+* Quasi-duplication: "Repo '...' not found in config" across ~9 sites (fixed 2026-11-22)
+  The plan asked to consolidate the duplicated "repo not found"
+  error into one 'RepoValidationError'. The recon found the
+  duplication is wider than the three sites named (server/util.rs,
+  dbs/filesystem/multiple_nodes.rs x2, plus copies in not_nodes.rs,
+  git_ops/read_repo.rs, diff_analysis/snapshot.rs) -- ~9 literals of
+  the same format string -- across three carrier types (io::Error,
+  Result<_, String>, BufferValidationError). A clean consolidation
+  needs an enum with both an ID-less 'NotInConfig(RepoName)' shape
+  (the fs layer has no node id) and ID-bearing shapes, plus
+  From-impls bridging to io::Error / Box<dyn Error>. I added typed
+  fork-specific errors (ForkRepoUnresolved / ForkAlreadyExists /
+  ForkRepoInactive on BufferValidationError) but DEFERRED the broad
+  string consolidation -- it is a nice-to-have touching fs/git/diff
+  layers, out of proportion to the fork work. Worth doing on its own.
+  Fixed: 'SkgConfig::skgrepo_or_err' ('server/types/misc.rs') holds
+  the message; the eight call sites in 'util.rs', 'git_ops/' and
+  'dbs/filesystem/multiple_nodes.rs' call it. The typed error enum
+  was not built. 'server/test_utils.rs' keeps its own copy, for a
+  'get_mut'.
 * A whole redraw rewrote every folded headline line of the live buffer (noted 2026-11-19; fixed 2026-11-19)
   Found measuring slow forks. When a save's answer, or any redraw,
   replaces the whole buffer ('skg-replace-buffer-with-new-content',

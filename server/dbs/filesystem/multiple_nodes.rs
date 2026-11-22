@@ -255,10 +255,8 @@ pub fn read_skg_sections_from_folder (
   config       : &SkgConfig,
 ) -> io::Result < Vec<(SkgrepoName, GraphnodeOnDisk)> > {
   let skgrepo : &Skgrepo =
-    config . skgrepos . get (skgrepo_name)
-    . ok_or_else(|| io::Error::new(
-      io::ErrorKind::NotFound,
-      format!("Repo '{}' not found in config", skgrepo_name)))?;
+    config . skgrepo_or_err (skgrepo_name)
+    . map_err ( |message| io::Error::new (io::ErrorKind::NotFound, message) ) ?;
   let mut sections : Vec<(SkgrepoName, GraphnodeOnDisk)> = Vec::new ();
   let mut retired : RetiredKeysInFiles =
     RetiredKeysInFiles { files : Vec::new () };

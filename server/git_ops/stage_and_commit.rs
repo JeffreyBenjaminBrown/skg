@@ -47,8 +47,7 @@ pub fn changed_skg_paths_by_stem (
 ) -> Result<BTreeMap<ID, Vec<ChangedSkgPath>>, String> {
   let mut by_stem : BTreeMap<ID, Vec<ChangedSkgPath>> = BTreeMap::new ();
   for skgrepo_name in config . privacy_ladder () {
-    let skgrepo : &Skgrepo = config . skgrepos . get (&skgrepo_name)
-      . ok_or_else ( || format! ( "Repo '{}' not found in config", skgrepo_name )) ?;
+    let skgrepo : &Skgrepo = config . skgrepo_or_err (&skgrepo_name) ?;
     let in_skgrepo = |e : String| -> String {
       format! ( "skgrepo {}: {}", skgrepo_name, e ) };
     let gitrepo : Repository = open_gitrepo ( Path::new (&skgrepo . path) )
@@ -110,8 +109,7 @@ pub fn blobs_at_head_and_in_worktree (
   config : &SkgConfig,
   path   : &ChangedSkgPath,
 ) -> Result<(Option<Oid>, Option<Oid>), String> {
-  let skgrepo : &Skgrepo = config . skgrepos . get (&path . skgrepo)
-    . ok_or_else ( || format! ( "Repo '{}' not found in config", path . skgrepo )) ?;
+  let skgrepo : &Skgrepo = config . skgrepo_or_err (&path . skgrepo) ?;
   let gitrepo : Repository = open_gitrepo ( Path::new (&skgrepo . path) )
     . ok_or_else ( || format! ( "skgrepo {} is not in a git repository", path . skgrepo )) ?;
   let at_head : Option<Oid> = gitrepo . head ()
@@ -133,8 +131,7 @@ pub fn blob_text (
   skgrepo : &SkgrepoName,
   blob    : Oid,
 ) -> Result<String, String> {
-  let skgrepo_config : &Skgrepo = config . skgrepos . get (skgrepo)
-    . ok_or_else ( || format! ( "Repo '{}' not found in config", skgrepo )) ?;
+  let skgrepo_config : &Skgrepo = config . skgrepo_or_err (skgrepo) ?;
   let gitrepo : Repository = open_gitrepo ( Path::new (&skgrepo_config . path) )
     . ok_or_else ( || format! ( "skgrepo {} is not in a git repository", skgrepo )) ?;
   let found = gitrepo . find_blob (blob)
@@ -222,8 +219,7 @@ pub fn prepare_commits (
   for skgrepo_name in &owned {
     let in_skgrepo = |e : String| -> String {
       format! ( "skgrepo {}: {}", skgrepo_name, e ) };
-    let skgrepo : &Skgrepo = config . skgrepos . get (skgrepo_name)
-      . ok_or_else ( || format! ( "Repo '{}' not found in config", skgrepo_name )) ?;
+    let skgrepo : &Skgrepo = config . skgrepo_or_err (skgrepo_name) ?;
     let gitrepo : Repository = open_gitrepo ( Path::new (&skgrepo . path) )
       . ok_or_else ( || in_skgrepo ( "it is not in a git repository" . to_string () )) ?;
     let root : PathBuf = gitrepo_root (&gitrepo);

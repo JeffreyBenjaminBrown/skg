@@ -658,6 +658,16 @@ impl SkgConfig {
       . unwrap_or (false)
   }
 
+  /// The configured skgrepo of that name, else an error saying it is
+  /// not in the config.
+  pub fn skgrepo_or_err (
+    &self,
+    skgrepo_name : &SkgrepoName
+  ) -> Result<&Skgrepo, String> {
+    self . skgrepos . get (skgrepo_name)
+      . ok_or_else ( || format! (
+        "Repo '{}' not found in config", skgrepo_name )) }
+
   /// Every skgrepo name in declaration order, or alphabetical when
   /// declaration order is unavailable (a dummy/test config, whose
   /// 'skgrepo_order' is empty), so the result is always

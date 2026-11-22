@@ -89,8 +89,7 @@ pub fn owned_head_identity (
     Vec::new ();
   for skgrepo_name in config . privacy_ladder () {
     let skgrepo : &Skgrepo =
-      config . skgrepos . get (&skgrepo_name) . ok_or_else ( || format! (
-        "Repo '{}' not found in config", skgrepo_name )) ?;
+      config . skgrepo_or_err (&skgrepo_name) ?;
     let gitrepo : Repository =
       open_gitrepo (Path::new (&skgrepo . path)) . ok_or_else ( || format! (
         "Cannot read HEAD of skgrepo '{}': it is not in a git repository.",
@@ -372,8 +371,7 @@ fn read_skgrepo_from_tree (
   tree         : Option<Oid>,
 ) -> Result<Vec<(SkgrepoName, GraphnodeOnDisk)>, TreeReadError> {
   let skgrepo : &Skgrepo =
-    config . skgrepos . get (skgrepo_name) . ok_or_else ( || format! (
-      "Repo '{}' not found in config", skgrepo_name )) ?;
+    config . skgrepo_or_err (skgrepo_name) ?;
   let skgrepo_path : &Path =
     Path::new ( &skgrepo . path );
   let gitrepo : Repository =
