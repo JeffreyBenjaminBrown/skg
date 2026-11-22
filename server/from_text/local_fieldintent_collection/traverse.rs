@@ -169,94 +169,14 @@ fn visit_occurrence (
     // Emission happens only inside this block, because an
     // write-protected vognode emits nothing.
     match member_as_such_of {
-      Some (( note, note_is_editable )) => {
-        if owned (& t . home_skgrepo) {
-          collected . instructionMerge_fieldIntent (
-            &headline,
-            t . gnid . clone(),
-            FieldIntent::SetTitleAndBody {
-              skgrepo : t . home_skgrepo . clone(),
-              title   : t . title . clone(),
-              body    : t . body() . cloned() } ) ?;
-        } else {
-          // A foreign one's title and body must be as on disk: an
-          // edit would otherwise be dropped silently.
-          collected . instructionMerge_fieldIntent (
-            &headline,
-            t . gnid . clone(),
-            FieldIntent::MemberAsSuchTextClaim (
-              MemberAsSuchTextClaim {
-                title    : t . title . clone(),
-                body     : t . body() . cloned(),
-                headline : headline . clone () } )) ?; }
-        if note_is_editable {
-          // The at-most-one-writer-per-ID guard: only the
-          // forksFolder under the editable instance of a
-          // note may write its hide edits. The same note
-          // can recur write-protected elsewhere with its own
-          // forksFolder; without this guard those could emit
-          // contradictory hide edits for one ID.
-          let visible : Vec<ID> = visible_content_members (node_ref);
-          let in_integratedElsewhere_or_hiddenIn_folder : Vec<ID> =
-            members_of_integratedElsewhere_and_hiddenIn_folders (node_ref);
-          collected . instructionMerge_fieldIntent (
-            &headline,
-            note . clone(),
-            FieldIntent::MemberAsSuchVisibility (
-              MemberAsSuchVisibility {
-                member : t . gnid . clone(),
-                role   : if t . claimsMembership { MemberAsSuch::Forkee }
-                         else { MemberAsSuch::Forker },
-                visible, in_integratedElsewhere_or_hiddenIn_folder } )) ?; }
-        // Delete, NodeMerge and flag edit requests here are ignored
-        // (the module doc's "save-eligible"). Deleting it from the
-        // folder is read from the folder ('ForksFolderMembers').
-      },
-      None => {
-        if has_delete_request {
-          collected . instructionMerge_fieldIntent (
-            &headline,
-            t . gnid . clone(),
-            FieldIntent::Delete {
-              skgrepo : t . home_skgrepo . clone() } ) ?;
-        } else {
-          collected . instructionMerge_fieldIntent (
-            &headline,
-            t . gnid . clone(),
-            FieldIntent::SetTitleAndBody {
-              skgrepo : t . home_skgrepo . clone(),
-              title   : t . title . clone(),
-              body    : t . body() . cloned() } ) ?;
-          if children_are_its_whole_content (t) {
-            collected . instructionMerge_fieldIntent (
-              &headline,
-              t . gnid . clone(),
-              // This is always emitted, even if empty: an editable
-              // node's content is always Specified where the view
-              // drew it whole.
-              FieldIntent::SetContains (
-                content_members (
-                  node_ref, ! owned (& t . home_skgrepo) ) )) ?; }
-          if let Some (NodeEditRequest::NodeMerge (acquiree)) =
-            t . edit_request()
-          { collected . instructionMerge_fieldIntent (
-              &headline,
-              t . gnid . clone(),
-              FieldIntent::NodeMerge {
-                acquiree : acquiree . clone() } ) ?; }
-          if let Some (NodeEditRequest::SetFlag { flag, value }) =
-            t . edit_request()
-          { collected . instructionMerge_fieldIntent (
-              &headline,
-              t . gnid . clone(),
-              FieldIntent::SetFlag {
-                flag : *flag, value : *value } ) ?; }
-          if let Some (NodeEditRequest::StripAttribution) =
-            t . edit_request()
-          { collected . instructionMerge_fieldIntent (
-              &headline,
-              t . gnid . clone(),
-              FieldIntent::StripAttribution ) ?; }}},}}
+      Some (( note, note_is_editable )) =>
+        emit_member_as_such_fieldIntents (
+          node_ref, t, &headline, note, note_is_editable,
+          collected, owned ) ?,
+      None =>
+        emit_editable_occurrence_fieldIntents (
+          node_ref, t, &headline, has_delete_request,
+          collected, owned ) ?, }}
   recurse_under_vognode (
     node_ref,
     Some ( DefiningFolderRecorder {
@@ -266,6 +186,119 @@ fn visit_occurrence (
       is_saveEligible } ),
     if is_saveEligible { Some (t . gnid . clone()) } else { None },
     collected, owned) }
+
+/// What an editable member as such of a forks folder emits: its own
+/// title and body (as a save if owned, else as a text claim), and, if
+/// the folder's note is editable, the member's visibility for the
+/// note's hides.
+fn emit_member_as_such_fieldIntents (
+  node_ref         : NodeRef<Viewnode>,
+  t                : &Occurrence,
+  headline         : &HeadlineName,
+  note             : &ID,
+  note_is_editable : bool,
+  collected        : &mut CollectedFieldIntents,
+  owned            : IsOwned,
+) -> Result<(), String> {
+  if owned (& t . home_skgrepo) {
+    collected . instructionMerge_fieldIntent (
+      headline,
+      t . gnid . clone(),
+      FieldIntent::SetTitleAndBody {
+        skgrepo : t . home_skgrepo . clone(),
+        title   : t . title . clone(),
+        body    : t . body() . cloned() } ) ?;
+  } else {
+    // A foreign one's title and body must be as on disk: an
+    // edit would otherwise be dropped silently.
+    collected . instructionMerge_fieldIntent (
+      headline,
+      t . gnid . clone(),
+      FieldIntent::MemberAsSuchTextClaim (
+        MemberAsSuchTextClaim {
+          title    : t . title . clone(),
+          body     : t . body() . cloned(),
+          headline : headline . clone () } )) ?; }
+  if note_is_editable {
+    // The at-most-one-writer-per-ID guard: only the
+    // forksFolder under the editable instance of a
+    // note may write its hide edits. The same note
+    // can recur write-protected elsewhere with its own
+    // forksFolder; without this guard those could emit
+    // contradictory hide edits for one ID.
+    let visible : Vec<ID> = visible_content_members (node_ref);
+    let in_integratedElsewhere_or_hiddenIn_folder : Vec<ID> =
+      members_of_integratedElsewhere_and_hiddenIn_folders (node_ref);
+    collected . instructionMerge_fieldIntent (
+      headline,
+      note . clone(),
+      FieldIntent::MemberAsSuchVisibility (
+        MemberAsSuchVisibility {
+          member : t . gnid . clone(),
+          role   : if t . claimsMembership { MemberAsSuch::Forkee }
+                   else { MemberAsSuch::Forker },
+          visible, in_integratedElsewhere_or_hiddenIn_folder } )) ?; }
+  // Delete, NodeMerge and flag edit requests here are ignored
+  // (the module doc's "save-eligible"). Deleting it from the
+  // folder is read from the folder ('ForksFolderMembers').
+  Ok (( )) }
+
+/// What any other editable occurrence emits: a delete, or else its
+/// title and body, its content where the view drew it whole, and its
+/// nodeMerge, flag and strip-attribution requests.
+fn emit_editable_occurrence_fieldIntents (
+  node_ref           : NodeRef<Viewnode>,
+  t                  : &Occurrence,
+  headline           : &HeadlineName,
+  has_delete_request : bool,
+  collected          : &mut CollectedFieldIntents,
+  owned              : IsOwned,
+) -> Result<(), String> {
+  if has_delete_request {
+    collected . instructionMerge_fieldIntent (
+      headline,
+      t . gnid . clone(),
+      FieldIntent::Delete {
+        skgrepo : t . home_skgrepo . clone() } ) ?;
+  } else {
+    collected . instructionMerge_fieldIntent (
+      headline,
+      t . gnid . clone(),
+      FieldIntent::SetTitleAndBody {
+        skgrepo : t . home_skgrepo . clone(),
+        title   : t . title . clone(),
+        body    : t . body() . cloned() } ) ?;
+    if children_are_its_whole_content (t) {
+      collected . instructionMerge_fieldIntent (
+        headline,
+        t . gnid . clone(),
+        // This is always emitted, even if empty: an editable
+        // node's content is always Specified where the view
+        // drew it whole.
+        FieldIntent::SetContains (
+          content_members (
+            node_ref, ! owned (& t . home_skgrepo) ) )) ?; }
+    if let Some (NodeEditRequest::NodeMerge (acquiree)) =
+      t . edit_request()
+    { collected . instructionMerge_fieldIntent (
+        headline,
+        t . gnid . clone(),
+        FieldIntent::NodeMerge {
+          acquiree : acquiree . clone() } ) ?; }
+    if let Some (NodeEditRequest::SetFlag { flag, value }) =
+      t . edit_request()
+    { collected . instructionMerge_fieldIntent (
+        headline,
+        t . gnid . clone(),
+        FieldIntent::SetFlag {
+          flag : *flag, value : *value } ) ?; }
+    if let Some (NodeEditRequest::StripAttribution) =
+      t . edit_request()
+    { collected . instructionMerge_fieldIntent (
+        headline,
+        t . gnid . clone(),
+        FieldIntent::StripAttribution ) ?; }}
+  Ok (( )) }
 
 /// This recurses into a vognode's children. Vognode
 /// children get 'UnderVognode'; defining-folder children get
