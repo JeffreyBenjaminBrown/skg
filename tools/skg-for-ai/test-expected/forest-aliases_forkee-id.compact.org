@@ -2,5 +2,5 @@
 A body the forker and the forkee share.
 ** ⟨0d aliases⟩
 *** Another name for it ⟨0e alias⟩
-** ⟨0b It forks these, or these fork it, or these fork or are forked by others here.⟩
+** ⟨0b Its mirrors are these.⟩
 *** A forker, outside the view ⟨0c Kb F1 body=b⟩

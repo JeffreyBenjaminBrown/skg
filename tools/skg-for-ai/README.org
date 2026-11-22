@@ -57,8 +57,8 @@ three notes link to it, all substantive (3/L); its home skgrepo is
   joined to it by forks; its parent contains that note, not this one.
 A headline whose handle holds a sentence is a folder. 'These also
 contain it.' and 'These link to it.' list notes, each with its own
-containers under it, so there nesting reads upward. In 'It forks
-these, or these fork it, ...', 'bK' marks a note the folder's note
+containers under it, so there nesting reads upward. In 'Its mirrors
+are these.', 'bK' marks a note the folder's note
 forks, 'Kb' one that forks it. A member there whose title is the
 folder's note's carries 'title=b'; one whose body is, 'body=b', and
 its body is left out of the compact file: read b's (see "Restated

@@ -190,7 +190,7 @@ write-protected position: a node, a ghost, a folder, or a flag row.
 On a node, =B= rides the ☮ when the node's body exists but is
 omitted from the buffer. =⟳= marks a cycle.
 
-The forks folder reads =It forks these, or these fork it, or these fork or are forked by others here.=, with no ☮:
+The forks folder reads =Its mirrors are these.=, with no ☮:
 it is editable. The labels of the three folders of what a note hides
 name the notes they relate by their ancestor letters (see [[*Ancestor flags and floors][Ancestor flags and floors]]),
 shown high (the style keys 'hiddenInForkPartnerFolder_hider',

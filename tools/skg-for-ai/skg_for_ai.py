@@ -3167,11 +3167,9 @@ def parse_edited_compact_view (compact_text):
   return headlines
 
 # The heralds whose words include a handle word, which a handle's words
-# leave out: the labels of the forks, hider and hidden folders hold
-# 'fork' or 'forks', the words for the fork operation, which no
-# folder takes.
+# leave out: the labels of the hider and hidden folders hold 'forks',
+# a word for the fork operation, which no folder takes.
 HERALD_PHRASES_HOLDING_HANDLE_WORDS = (
-  "It forks these, or these fork it, or these fork or are forked by others here.",
   "It hides these from its forks.",
   "These hide it from their forks.",
   "hides these, but no fork partner shown contains them." )

@@ -153,9 +153,8 @@ If you already fork the node, =skg-fork-node= is rejected by the same
 guard (below); deepen the chain by forking your /fork/, not the
 already-forked node.
 ** Unintegrated content: the forks folder
-Because =C= forks =N=, a generated *forksFolder* ("It forks these, or
-these fork it, or these fork or are forked by others here.") appears
-under =C= listing =N=, claiming, as a
+Because =C= forks =N=, a generated *forksFolder* ("Its mirrors are
+these.") appears under =C= listing =N=, claiming, as a
 /forkee as such/. The same folder lists, after
 the forkees, the notes that fork =C=, and then =C='s other mirrors,
 each claiming nothing (deleting one hides it, attaching it makes =C=

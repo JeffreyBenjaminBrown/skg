@@ -1,10 +1,9 @@
 title: the forks folder, fork partner, forker-only member, mutual, indirect member
 pid: 0df79986-1638-4fae-b2da-eea3743652fe
 body: |2-
-  The *forks folder* ('Folder::Forks', atom =forksFolder=, label "It
-  forks these, or these fork it, or these fork or are forked by others
-  here.") is the one partner folder of the
-  relation 'forks'. Under an occurrence of a note N it holds every
+  The *forks folder* ('Folder::Forks', atom =forksFolder=, label "Its
+  mirrors are these.") is the one partner folder of the relation
+  'forks'. Under an occurrence of a note N it holds every
   mirror of N (see "mirror") but N, each once, by records the skgrepo
   restriction shows: it is *flat*. Its members are N's *fork
   partners* -- each note N forks, and each that forks N -- and its

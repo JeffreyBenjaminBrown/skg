@@ -20,7 +20,7 @@ and to [[id:missing-id][a node nobody wrote]]⟦not held here⟧.
 A body line that stays unnumbered.
 *** Contained twice ⟨0e 2aC⟩
 ** Second child, a forker ⟨0f a/L K1 H2⟩
-*** ⟨0g It forks these, or these fork it, or these fork or are forked by others here.⟩
+*** ⟨0g Its mirrors are these.⟩
 **** Fred's note ⟨0h C1 1/L bK ⌂:fred⟩
 ***** ⟨0i ☮ It contains these, but c hides them.⟩
 ****** A detail of Fred's ⟨0j ☮ bC dH folded⟩

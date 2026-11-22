@@ -226,8 +226,8 @@
 ---- styles: crucial*1 -*1 message*31
 ==== folders: a writable folder
 (skg forksFolder)
----- text: It forks these, or these fork it, or these fork or are forked by others here.
----- styles: message*77
+---- text: Its mirrors are these.
+---- styles: message*22
 ==== folders: what a forkee or forker as such contains that the user keeps elsewhere
 (skg integratedElsewhereFolder)
 ---- text: ☮ It contains these, and you keep them elsewhere.

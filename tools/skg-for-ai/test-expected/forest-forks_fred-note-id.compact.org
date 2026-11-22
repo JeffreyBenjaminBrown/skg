@@ -1,5 +1,5 @@
 * Fred's note ⟨0a C1 1/L 1K ⌂:fred⟩
-** ⟨0b It forks these, or these fork it, or these fork or are forked by others here.⟩
+** ⟨0b Its mirrors are these.⟩
 *** Second child, a forker ⟨0c 1C 1/L Kb H2 ⌂:main⟩
 **** ⟨0d ☮ a hides these, which c contains.⟩
 ***** A detail of Fred's ⟨0e ☮ dC bH ⌂:fred folded⟩
