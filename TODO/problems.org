@@ -394,20 +394,14 @@ gap too. Details, options and questions:
    boundary could reduce duplication, but unifying the index policy changes
    timing, recovery, and potentially ranking. State and test that contract
    before treating this as a mechanical refactor.
-* Some docs links retain paths relative to the repository root (2026-09-25)
-  [[file:../docs/README-old.org][docs/README-old.org]] links to 'docs/FAQ.md', which resolves from its
-  current directory to the absent 'docs/docs/FAQ.md'. Likewise,
-  [[file:../docs/some-underlying-beliefs.org][docs/some-underlying-beliefs.org]] links to
-  './docs/wise-people-say-write.md' instead of './wise-people-say-write.md'.
-  These are stale input links, not missing importer syntax. A future importer
-  should report them without guessing a different base directory. The docs
-  links themselves have not been repaired in this discussion-only task.
 * Org-roam import clears its destination before validating input (2026-09-24)
   'import_org_roam_directory' in [[file:../server/import_org_roam.rs][server/import_org_roam.rs]] removes
   existing immediate '.skg' files before scanning the input. Traversal errors
   are filtered out, and 'parse_org_file' returns no nodes for unreadable
   files or files without a file-level ID. An unusable input can therefore
   erase an earlier import without a corresponding parse error in the report.
+  Of all the input's problems, only a headline inside a block is refused
+  before the wipe ('refuse_headlines_inside_blocks').
   This is also a barrier to reusing the entry point for import into a
   populated configured skgrepo. Preflight input and stage replacement before
   modifying existing files; make replacement an explicit operation.
@@ -829,17 +823,6 @@ gap too. Details, options and questions:
    HEAD and the git index are read at git's own path, and work.) Only
    'titles-by-ids' reads these nodes, for nodes the search index lacks.
 * Problems found during the org-export feature (2026-06-13)
-** heading-anchor links rely on heading-text uniqueness
-   Deep links use org's =[[./file.org::*Heading][label]]= search,
-   which matches the FIRST headline with that text. When two
-   DISTINCT nodes in one exported file have the same title, links to
-   the second resolve to the first. The exporter emits one warning
-   per such collision, but org has no per-node anchor available
-   without property drawers (which we omit, since exported files
-   must not require org-roam). Headings are rendered as the title's
-   plain-label form (links collapsed to labels), so a heading's text
-   always equals the anchor used to link to it -- the earlier
-   heading-vs-anchor divergence is gone.
 ** a literal bracket in a title can break a deep link
    Anchors and labels are interpolated verbatim into
    =[[*anchor][label]]=. A title containing a literal =]= (e.g.

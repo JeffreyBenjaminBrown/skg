@@ -1,3 +1,28 @@
+* Some docs links retained paths relative to the repository root (2026-09-25; obsolete 2026-11-22)
+  [[file:../docs/README-old.org][docs/README-old.org]] links to 'docs/FAQ.md', which resolves from its
+  current directory to the absent 'docs/docs/FAQ.md'. Likewise,
+  [[file:../docs/some-underlying-beliefs.org][docs/some-underlying-beliefs.org]] links to
+  './docs/wise-people-say-write.md' instead of './wise-people-say-write.md'.
+  These are stale input links, not missing importer syntax. A future importer
+  should report them without guessing a different base directory. The docs
+  links themselves have not been repaired in this discussion-only task.
+  Obsolete: 'docs/README-old.org' now links './FAQ.org', and
+  'docs/some-underlying-beliefs.org' links './wise-people-say-write.org'.
+* Org-export heading-anchor links relied on heading-text uniqueness (2026-06-13; obsolete 2026-11-22)
+   Deep links use org's =[[./file.org::*Heading][label]]= search,
+   which matches the FIRST headline with that text. When two
+   DISTINCT nodes in one exported file have the same title, links to
+   the second resolve to the first. The exporter emits one warning
+   per such collision, but org has no per-node anchor available
+   without property drawers (which we omit, since exported files
+   must not require org-roam). Headings are rendered as the title's
+   plain-label form (links collapsed to labels), so a heading's text
+   always equals the anchor used to link to it -- the earlier
+   heading-vs-anchor divergence is gone.
+  Obsolete: 'build_homes' ('server/export_org.rs') addresses a node
+  whose plain title repeats an earlier headline of its file by its
+  CUSTOM_ID, and gives that headline the drawer; the unit test
+  'links_to_a_repeated_title_use_custom_id' pins it.
 * (dormant) 'mk_removed_child_viewnode' hardcodes unstaged=Minus axes (noted 2026-06-12; obsolete 2026-11-22)
   Dormant as of 2026-06-12: 'mk_removed_child_viewnode' now lives in
   server/to_org/expand/unused_but_nice.rs ("Held for someday, not
