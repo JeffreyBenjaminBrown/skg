@@ -826,31 +826,20 @@ fn nodes_differing_between_the_two_graphs (
 /// differently only when it is an extra ID of some node in one graph
 /// and not of the same node in the other, so such IDs are found among
 /// the extra-ID differences of the nodes in 'differing' (those that
-/// differ between the graphs), and their recorders through each
-/// graph's recorderward relmaps.
+/// differ between the graphs; 'reresolved_extra_ids_of'), and their
+/// recorders through each graph's recorderward relmaps.
 fn recorders_of_reresolved_members (
   straddle  : &GraphStraddle,
   differing : &BTreeSet<ID>,
 ) -> BTreeSet<ID> {
-  let extra_ids_in = |graph : &InRustGraph, pid : &ID| -> BTreeSet<ID> {
-    graph . get (pid)
-      . map ( |node| node . extra_ids . iter () . cloned () . collect () )
-      . unwrap_or_default () };
-  let member_key_in = |graph : &InRustGraph, gnid : &ID| -> ID {
-    graph . relationship_member_key (gnid) . into_id () };
   let reresolved : BTreeSet<ID> =
     differing . iter ()
-    . flat_map ( |pid|
-      extra_ids_in (&straddle . before, pid)
-      . symmetric_difference ( &extra_ids_in (&straddle . after, pid) )
-      . cloned () . collect::<Vec<ID>> () )
-    . filter ( |gnid| member_key_in (&straddle . before, gnid)
-                       != member_key_in (&straddle . after, gnid) )
+    . flat_map ( |pid| reresolved_extra_ids_of (straddle, pid) )
     . collect ();
   let mut recorders : BTreeSet<ID> = BTreeSet::new ();
   for gnid in &reresolved {
     for graph in [ &straddle . before, &straddle . after ] {
-      let member : ID = member_key_in (graph, gnid);
+      let member : ID = graph . relationship_member_key (gnid) . into_id ();
       for role in ROLES_OF_LISTED_MEMBERS {
         recorders . extend (
           graph . inbound_pids_for_relation (&member, role . relation) ); }} }
