@@ -9,6 +9,7 @@ local compare = require('skg.sexpr.compare')
 local metadata = require('skg.metadata')
 local picker = require('skg.picker')
 local relRepo_info = require('skg.relRepo_info')
+local restore_requests = require('skg.restore_requests')
 local sexpr = require('skg.sexpr.parse')
 local sexpr_cycling = require('skg.sexpr_edit.sexpr_cycling')
 
@@ -380,7 +381,7 @@ describe('skg.metadata commands', function ()
   it('restore_deleted_node marks a ghost', function ()
     buffer_with('* (skg (vnid 0d) ghost (gnid g) (skgRepos (nodeRepo main))'
                 .. ' (diff (node removed) (rel removed))) g')
-    metadata.restore_deleted_node()
+    restore_requests.restore_deleted_node()
     assert.are.equal(
       '* (skg (vnid 0d) ghost (gnid g) (skgRepos (nodeRepo main))'
         .. ' (editRequest restoreNode) (diff (node removed) (rel removed)))'
@@ -405,7 +406,7 @@ describe('skg.metadata commands', function ()
         .. ' noClaim writeProtected (diff (rel removed) (properties changed)'
         .. ' (leaves 1 rel all))) d' }) do
       buffer_at_last_line(headline)
-      metadata.restore_removed_membership()
+      restore_requests.restore_removed_membership()
       assert.is_true(subtree_p(last_metadata_sexp(),
         '(skg node (editRequest restoreRel))'))
     end
@@ -436,14 +437,14 @@ describe('skg.metadata commands', function ()
         '* (skg ghost (gnid g) (skgRepos (nodeRepo main))'
         .. ' (editRequest (unprocessed node)) (diff (node removed) (rel removed)'
         .. ' (leaves 1 node) (processed node))) g',
-        metadata.restore_deleted_node))
+        restore_requests.restore_deleted_node))
     assert.are.equal('(editRequest restoreRel (processed rel))',
       edit_request_after(
         '* (skg node (gnid r) (skgRepos (nodeRepo main))) r\n'
         .. '** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim'
         .. ' (editRequest (processed rel)) (view noWarrant)'
         .. ' (diff (rel removed) (leaves 1 rel))) x',
-        metadata.restore_removed_membership))
+        restore_requests.restore_removed_membership))
   end)
 
   it('the restore commands refuse the wrong kind of headline', function ()
@@ -451,7 +452,7 @@ describe('skg.metadata commands', function ()
       'This node is deleted; restore it first (:SkgRestoreDeletedNode)',
       refusal_of('* (skg ghost (gnid g) (skgRepos (nodeRepo main))'
                  .. ' (diff (node removed) (rel removed))) g',
-                 metadata.restore_removed_membership))
+                 restore_requests.restore_removed_membership))
     for _, headline in ipairs({
       '* (skg node (gnid x) (skgRepos (nodeRepo main)) (diff (rel added))) x',
       '* (skg node (gnid x) (skgRepos (nodeRepo main))) x',
@@ -475,7 +476,7 @@ describe('skg.metadata commands', function ()
         .. '**** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected'
         .. ' (diff (rel removed))) d' }) do
       assert.are.equal('Only a removed membership can be restored',
-        refusal_of(headline, metadata.restore_removed_membership))
+        refusal_of(headline, restore_requests.restore_removed_membership))
     end
     for _, headline in ipairs({
       '* (skg node (gnid x) (skgRepos (nodeRepo main)) (diff (rel removed))) x',
@@ -485,7 +486,7 @@ describe('skg.metadata commands', function ()
       assert.are.equal('Only a node deleted since HEAD can be restored;'
                        .. ' restoreNode belongs on a ghost'
                        .. ' (:SkgRestoreDeletedNode)',
-        refusal_of(headline, metadata.restore_deleted_node))
+        refusal_of(headline, restore_requests.restore_deleted_node))
     end
   end)
 

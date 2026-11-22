@@ -370,6 +370,7 @@ describe('skg.heralds', function ()
 
   it('shows each pending edit request', function ()
     local metadata = require('skg.metadata')
+    local restore_requests = require('skg.restore_requests')
     local sexpr = require('skg.sexpr.parse')
     local home = { editable_root, child_at_home }
     shows_after(home, metadata.delete, 'delete')
@@ -391,11 +392,11 @@ describe('skg.heralds', function ()
     shows_after({ editable_root,
                   '** (skg ghost (gnid g) (skgRepos (nodeRepo main))'
                   .. ' (diff (node removed) (rel removed) (leaves 2 node rel))) g' },
-                metadata.restore_deleted_node, 'restore node')
+                restore_requests.restore_deleted_node, 'restore node')
     shows_after({ editable_root,
                   '** (skg node (gnid c) (skgRepos (nodeRepo main)) noClaim'
                   .. ' (diff (rel removed) (leaves 1 rel))) c' },
-                metadata.restore_removed_membership, 'restore membership')
+                restore_requests.restore_removed_membership, 'restore membership')
     shows_after({ editable_root,
                   '** (skg node (gnid c) (skgRepos (nodeRepo main))'
                   .. ' (diff (node added) (leaves 1 node))) c' },

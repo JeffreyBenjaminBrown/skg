@@ -10,6 +10,7 @@ local config = require('skg.config')
 local fields = require('skg.sexpr.metadata_fields')
 local metadata = require('skg.metadata')
 local picker = require('skg.picker')
+local restore_requests = require('skg.restore_requests')
 local sexpr = require('skg.sexpr.parse')
 local shared = require('skg.shared')
 
@@ -33,7 +34,7 @@ function M.cycle_values_for_field (field_name)
     return nil end
   return fields.cycle_values(M.edit_buffer_kind(), field_name,
                              M.editable_p(),
-                             metadata.removed_membership_p(M.source_sexp()))
+                             restore_requests.removed_membership_p(M.source_sexp()))
 end
 
 ---The kind of the headline the current edit buffer edits, from
