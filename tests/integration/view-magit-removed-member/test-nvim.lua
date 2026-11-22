@@ -40,15 +40,11 @@ local goto_git = require('skg.goto_git')
 ---@return integer|nil bufnr of the "all changes" buffer, once it shows a
 local function find_all_changes_buffer (timeout_secs)
   return T.wait_for(function ()
-    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-      if vim.api.nvim_buf_is_valid(buf)
-         and vim.api.nvim_buf_get_name(buf):find(
+    return T.first_buffer_where(function (buf)
+      return vim.api.nvim_buf_get_name(buf):find(
                'diff-view: all changes', 1, true)
-         and T.buffer_text(buf):find('(gnid a)', 1, true) then
-        return buf
-      end
-    end
-    return nil
+             and T.buffer_text(buf):find('(gnid a)', 1, true)
+    end)
   end, timeout_secs)
 end
 

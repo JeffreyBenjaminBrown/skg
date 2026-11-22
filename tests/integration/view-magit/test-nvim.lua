@@ -42,13 +42,10 @@ end
 ---@return integer|nil bufnr
 local function find_content_view_buffer_matching (needle, timeout_secs)
   return T.wait_for(function ()
-    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-      if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_content_view
-         and T.buffer_text(buf):find(needle, 1, true) then
-        return buf
-      end
-    end
-    return nil
+    return T.first_buffer_where(function (buf)
+      return vim.b[buf].skg_content_view
+             and T.buffer_text(buf):find(needle, 1, true)
+    end)
   end, timeout_secs)
 end
 

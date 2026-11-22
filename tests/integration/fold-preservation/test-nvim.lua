@@ -14,13 +14,10 @@ local save = require('skg.save')
 
 ---@return integer|nil the "all changes" buffer, once it shows dvroot
 local function diffView_all_changes_buffer ()
-  for _, b in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(b)
-       and vim.api.nvim_buf_get_name(b):find('diff-view: all changes', 1, true)
-       and T.buffer_text(b):find('(gnid dvroot)', 1, true) then
-      return b end
-  end
-  return nil
+  return T.first_buffer_where(function (b)
+    return vim.api.nvim_buf_get_name(b):find('diff-view: all changes', 1, true)
+           and T.buffer_text(b):find('(gnid dvroot)', 1, true)
+  end)
 end
 
 ---@param buf integer

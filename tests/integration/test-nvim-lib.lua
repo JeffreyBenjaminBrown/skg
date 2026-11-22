@@ -57,18 +57,26 @@ function M.wait_for (predicate, timeout_secs)
   return result
 end
 
+---The first valid buffer for which PREDICATE is truthy, or nil.
+---No polling: wrap it in 'wait_for' to wait for one.
+---@param predicate fun(buf: integer): any
+---@return integer|nil
+function M.first_buffer_where (predicate)
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_valid(buf) and predicate(buf) then
+      return buf end
+  end
+  return nil
+end
+
 ---Wait for a buffer named BUFFER_NAME; returns its bufnr or nil.
 ---@param buffer_name string
 ---@param timeout_secs number|nil
 ---@return integer|nil
 function M.wait_for_buffer (buffer_name, timeout_secs)
   return M.wait_for(function ()
-    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-      if vim.api.nvim_buf_is_valid(buf)
-         and vim.api.nvim_buf_get_name(buf) == buffer_name then
-        return buf end
-    end
-    return nil
+    return M.first_buffer_where(function (buf)
+      return vim.api.nvim_buf_get_name(buf) == buffer_name end)
   end, timeout_secs)
 end
 
@@ -89,6 +97,18 @@ end
 function M.buffer_text (buf)
   return table.concat(
     vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
+end
+
+---A skg view buffer (one with a view ID) whose text mentions
+---(gnid GNID), or nil. No polling.
+---@param gnid string
+---@return integer|nil
+function M.view_buffer_showing (gnid)
+  local needle = '(gnid ' .. gnid .. ')'
+  return M.first_buffer_where(function (buf)
+    return vim.b[buf].skg_view_id ~= nil
+           and M.buffer_text(buf):find(needle, 1, true)
+  end)
 end
 
 ---Write TEXT to PATH (the tests log intermediate buffer states).

@@ -20,15 +20,11 @@ local id_search = require('skg.id_search')
 local function find_skg_content_buffer (excluded)
   local excluded_set = {}
   for _, buf in ipairs(excluded or {}) do excluded_set[buf] = true end
-  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(buf)
-       and vim.b[buf].skg_content_view == true
-       and not excluded_set[buf]
-       and not vim.api.nvim_buf_get_name(buf):match('^skg://%?') then
-      return buf
-    end
-  end
-  return nil
+  return T.first_buffer_where(function (buf)
+    return vim.b[buf].skg_content_view == true
+           and not excluded_set[buf]
+           and not vim.api.nvim_buf_get_name(buf):match('^skg://%?')
+  end)
 end
 
 ---Search for 'has' and wait for results.

@@ -49,13 +49,10 @@ print('=== SKG Repo Cycling Integration Test ===')
 print('=== PHASE 1: Open content view ===')
 require('skg.single_root_content_view').request_single_root_content_view_from_id('x')
 local content_view = T.wait_for(function ()
-  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_content_view
-       and T.buffer_text(buf):find('(gnid x)', 1, true) then
-      return buf
-    end
-  end
-  return nil
+  return T.first_buffer_where(function (buf)
+    return vim.b[buf].skg_content_view
+           and T.buffer_text(buf):find('(gnid x)', 1, true)
+  end)
 end)
 if not content_view then fail('Content view not created') end
 vim.api.nvim_set_current_buf(content_view)

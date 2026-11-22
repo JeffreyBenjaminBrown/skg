@@ -14,18 +14,6 @@ local metadata = require('skg.metadata')
 local save = require('skg.save')
 local save_confirmations = require('skg.save.confirmations')
 
----Return a live skg view buffer whose text mentions (gnid ID).
-local function buffer_showing (gnid)
-  local needle = '(gnid ' .. gnid .. ')'
-  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_view_id ~= nil
-       and T.buffer_text(buf):find(needle, 1, true) then
-      return buf
-    end
-  end
-  return nil
-end
-
 ---Move the cursor in the current buffer onto the first line containing
 ---SNIPPET anywhere. Fails the test if no line does.
 local function goto_line_containing (snippet, description)
@@ -68,7 +56,7 @@ print('Starting fork repo-rotation integration test...')
 
 -- 1. Open owned P; its content is the foreign node N.
 content_view.request_single_root_content_view_from_id('P')
-local p_buf = T.wait_for(function () return buffer_showing('P') end, 10)
+local p_buf = T.wait_for(function () return T.view_buffer_showing('P') end, 10)
 T.check(p_buf, "P's view never appeared")
 vim.api.nvim_set_current_buf(p_buf)
 

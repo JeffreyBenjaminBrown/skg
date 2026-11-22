@@ -47,13 +47,10 @@ print('=== SKG Perspective Integration Test ===')
 require('skg.single_root_content_view')
   .request_single_root_content_view_from_id('R')
 buf = T.wait_for(function ()
-  for _, candidate in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(candidate)
-       and vim.b[candidate].skg_view_id
-       and line_in_ms_place(candidate, 'A') then
-      return candidate end
-  end
-  return nil
+  return T.first_buffer_where(function (candidate)
+    return vim.b[candidate].skg_view_id
+           and line_in_ms_place(candidate, 'A')
+  end)
 end, 10)
 T.check(buf, 'the view of R opened, showing A in M\'s place')
 vim.api.nvim_set_current_buf(buf)
@@ -141,13 +138,10 @@ T.check(buffer.perspective_mode_line(buf) == '',
 require('skg.single_root_content_view')
   .request_single_root_content_view_from_id('M')
 buf = T.wait_for(function ()
-  for _, candidate in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(candidate)
-       and vim.b[candidate].skg_view_id
-       and line_of_gnid(candidate, 'M') == 1 then
-      return candidate end
-  end
-  return nil
+  return T.first_buffer_where(function (candidate)
+    return vim.b[candidate].skg_view_id
+           and line_of_gnid(candidate, 'M') == 1
+  end)
 end, 10)
 T.check(buf, 'the view of M opened')
 vim.api.nvim_set_current_buf(buf)

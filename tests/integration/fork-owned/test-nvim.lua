@@ -17,28 +17,11 @@ local metadata = require('skg.metadata')
 local save_confirmations = require('skg.save.confirmations')
 local view_requests = require('skg.views')
 
----Return a live skg view buffer whose text mentions (gnid ID).
-local function buffer_showing (gnid)
-  local needle = '(gnid ' .. gnid .. ')'
-  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_view_id ~= nil
-       and T.buffer_text(buf):find(needle, 1, true) then
-      return buf
-    end
-  end
-  return nil
-end
-
 ---The live buffer named NAME, or nil. No polling -- for asserting the
 ---absence of a buffer that should never appear.
 local function find_buffer_named (name)
-  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(buf)
-       and vim.api.nvim_buf_get_name(buf) == name then
-      return buf
-    end
-  end
-  return nil
+  return T.first_buffer_where(function (buf)
+    return vim.api.nvim_buf_get_name(buf) == name end)
 end
 
 ---Move the cursor in the current buffer onto the first line containing
@@ -80,7 +63,7 @@ print('Starting explicit-fork integration test...')
 
 -- 1. Open the owned container Q; its content is the owned node M.
 content_view.request_single_root_content_view_from_id('Q')
-local q_buf = T.wait_for(function () return buffer_showing('Q') end, 10)
+local q_buf = T.wait_for(function () return T.view_buffer_showing('Q') end, 10)
 T.check(q_buf, "Q's view never appeared")
 vim.api.nvim_set_current_buf(q_buf)
 T.check(T.buffer_text(q_buf):find('(gnid M)', 1, true),
@@ -120,13 +103,13 @@ save_confirmations.approve_fork()
 -- 5. Reopen Q fresh: the clone, in M's skgrepo, where M stands as
 --    itself, is shown in M's forks folder, forking it.
 do
-  local live_q_buf = buffer_showing('Q')
+  local live_q_buf = T.view_buffer_showing('Q')
   if live_q_buf then
     vim.api.nvim_buf_delete(live_q_buf, { force = true }) end
 end
 content_view.request_single_root_content_view_from_id('Q')
 local shown = T.wait_for(function ()
-  local buf = buffer_showing('Q')
+  local buf = T.view_buffer_showing('Q')
   return buf and T.buffer_text(buf):find('(birth (forks out 2))', 1, true)
          and not T.buffer_text(buf):find('(inPlaceOf M)', 1, true)
 end, 10)
@@ -136,7 +119,7 @@ print("approve: M stands as itself, the clone in its forks folder")
 -- 6. DECLINE on a second node M2 (in Q2): the lingering fork atom is
 --    stripped and nothing is committed.
 content_view.request_single_root_content_view_from_id('Q2')
-local q2_buf = T.wait_for(function () return buffer_showing('Q2') end, 10)
+local q2_buf = T.wait_for(function () return T.view_buffer_showing('Q2') end, 10)
 T.check(q2_buf, "Q2's view never appeared")
 vim.api.nvim_set_current_buf(q2_buf)
 goto_owned_headline('M2')
@@ -157,7 +140,7 @@ print('decline stripped the lingering fork atom')
 -- Reopen Q2 fresh: no clone forks M2 (decline committed nothing).
 vim.api.nvim_buf_delete(q2_buf, { force = true })
 content_view.request_single_root_content_view_from_id('Q2')
-q2_buf = T.wait_for(function () return buffer_showing('Q2') end, 10)
+q2_buf = T.wait_for(function () return T.view_buffer_showing('Q2') end, 10)
 T.check(q2_buf, "Q2's view never reappeared")
 -- Give the view a beat, then assert no fork of M2 is drawn.
 T.wait_for(function () return false end, 1)
@@ -168,7 +151,7 @@ print('decline committed nothing (no clone forks M2)')
 -- 7. Killing the confirmation buffer directly (not via approve/decline)
 --    must also strip the lingering fork atom from the source buffer.
 content_view.request_single_root_content_view_from_id('Q3')
-local q3_buf = T.wait_for(function () return buffer_showing('Q3') end, 10)
+local q3_buf = T.wait_for(function () return T.view_buffer_showing('Q3') end, 10)
 T.check(q3_buf, "Q3's view never appeared")
 vim.api.nvim_set_current_buf(q3_buf)
 goto_owned_headline('M3')

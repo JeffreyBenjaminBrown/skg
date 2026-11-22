@@ -25,12 +25,9 @@ local processed = require('skg.processed')
 
 ---@return integer|nil the "all changes" buffer
 local function all_changes_buffer ()
-  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(buf)
-       and vim.api.nvim_buf_get_name(buf):find('diff-view: all changes', 1, true) then
-      return buf end
-  end
-  return nil
+  return T.first_buffer_where(function (buf)
+    return vim.api.nvim_buf_get_name(buf):find('diff-view: all changes', 1, true)
+  end)
 end
 
 ---The lines of the current buffer a motion visits: every one with

@@ -339,13 +339,11 @@ end
 -- opens beside them.
 require('skg.single_root_content_view').request_single_root_content_view_from_id('r')
 local view = T.wait_for(function ()
-  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_content_view
-       and not vim.api.nvim_buf_get_name(buf):find('diff-view: ', 1, true)
-       and T.buffer_text(buf):find('unknown (gnid d)', 1, true) then
-      return buf end
-  end
-  return nil
+  return T.first_buffer_where(function (buf)
+    return vim.b[buf].skg_content_view
+           and not vim.api.nvim_buf_get_name(buf):find('diff-view: ', 1, true)
+           and T.buffer_text(buf):find('unknown (gnid d)', 1, true)
+  end)
 end)
 if not view then T.fail('Timeout waiting for a view of r showing d as unknown') end
 T.check(#diffView_buffers() > 0,

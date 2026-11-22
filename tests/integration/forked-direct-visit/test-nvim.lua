@@ -11,15 +11,10 @@ local buffer = require('skg.buffer')
 ---Return a live skg view buffer whose text mentions (gnid ID).
 local function raw_view_buffer_showing (gnid)
   local needle = '(gnid ' .. gnid .. ')'
-  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(buf) then
-      local view_id = vim.b[buf].skg_view_id
-      if view_id and T.buffer_text(buf):find(needle, 1, true) then
-        return buf
-      end
-    end
-  end
-  return nil
+  return T.first_buffer_where(function (buf)
+    return vim.b[buf].skg_view_id
+           and T.buffer_text(buf):find(needle, 1, true)
+  end)
 end
 
 print('Starting forked direct-visit integration test...')

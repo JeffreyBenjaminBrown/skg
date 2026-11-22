@@ -19,18 +19,6 @@ local save = require('skg.save')
 local save_confirmations = require('skg.save.confirmations')
 local view_requests = require('skg.views')
 
----Return a live skg view buffer whose text mentions (gnid ID).
-local function buffer_showing (gnid)
-  local needle = '(gnid ' .. gnid .. ')'
-  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_view_id ~= nil
-       and T.buffer_text(buf):find(needle, 1, true) then
-      return buf
-    end
-  end
-  return nil
-end
-
 ---Move the cursor in the current buffer onto the first line containing
 ---SNIPPET anywhere. Fails the test if no line does.
 local function goto_line_containing (snippet, description)
@@ -61,10 +49,10 @@ end
 ---Kill any open P buffer and request a fresh single-root view of P;
 ---wait for and return the new P buffer.
 local function reopen_P ()
-  local existing = buffer_showing('P')
+  local existing = T.view_buffer_showing('P')
   if existing then vim.api.nvim_buf_delete(existing, { force = true }) end
   content_view.request_single_root_content_view_from_id('P')
-  local p_buf = T.wait_for(function () return buffer_showing('P') end, 10)
+  local p_buf = T.wait_for(function () return T.view_buffer_showing('P') end, 10)
   T.check(p_buf, "P's view never appeared")
   return p_buf
 end
