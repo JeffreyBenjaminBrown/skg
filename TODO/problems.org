@@ -597,38 +597,6 @@ gap too. Details, options and questions:
    deliberately ignored rather than rejected: a Delete or nodeMerge
    request on a subscribee-as-such is silently dropped, which validation
    could instead flag.
-* Problems found during the staged/unstaged diff axis refactor
-** (dormant) 'mk_removed_child_viewnode' hardcodes unstaged=Minus axes
-   Dormant as of 2026-06-12: 'mk_removed_child_viewnode' now lives in
-   server/to_org/expand/unused_but_nice.rs ("Held for someday, not
-   currently wired in"), so the bug is unreachable in the current
-   renderer. NOT closed: the per-stage-sign fix must land before that
-   module is ever revived.
-   server/to_org/expand/definitive.rs lines 394, 398.
-   When a parent .skg file is deleted, its children are loaded from
-   git HEAD and rendered as phantoms. Both existence and membership
-   axes are hardcoded as 'staged: None, unstaged: Some(Minus)',
-   which misattributes already-staged parent-deletions to the
-   unstaged side. Sibling bug to the one just fixed in phantom_axes
-   (types/phantom.rs). Fix is analogous: derive per-stage signs from
-   the parent's file-level diff status (staged vs unstaged maps in
-   SourceDiff), rather than assuming the change is on the unstaged
-   side. Additionally, for a deleted-parent scenario the child's
-   membership axis should probably mirror the parent's existence
-   axis (if parent removed staged, children are 'removed from
-   contains' staged too), which is a bit more nuanced than the pure
-   contains_diff lookup used in phantom_axes.
-** Three Graphnode parses per changed file in 'compute_diff_for_repo'
-   server/git_ops/diff.rs.
-   For each changed file we now load HEAD, index, and worktree YAML
-   blobs and parse them into Graphnodes. A small skgrepo with N changed
-   files does 3N parses. At current sizes this is fine but worth
-   measuring on a larger garden.
-** 'NotInGit' is per-repo but stamped per-vognode
-   server/to_org/render/diff.rs / process_truenode_diff.
-   Every active vognode in a non-gitrepo gets 'not_in_git = true'. The
-   wire-level emission is a per-vognode 'notInGit' atom too. A
-   per-repo banner / repo-herald prefix would scale better.
 * Other problems
 ** Windows packaging request names scripts as top-level =bash/= scripts, but they live in =data/bash/=
    The requested files =pull-all.sh=, =push-all.sh=, =remote-all.sh=,
@@ -828,10 +796,10 @@ gap too. Details, options and questions:
 * Problems found while adding skg-stage-moves (2026-06-13)
 ** (latent, by-design-dependent) Diff helpers use a repo-wide pathspec
    'get_staged_changed_skg_files' and 'get_unstaged_changed_skg_files'
-   (server/git_ops/read_repo.rs) diff the WHOLE skgrepo with
+   (server/git_ops/read_gitrepo.rs) diff the WHOLE gitrepo with
    'pathspec("*.skg")', not the skgrepo's own subdirectory. So if two
    configured skgrepos ever live inside one gitrepo (e.g. as sibling
-   subdirectories of a single skgrepo root), 'compute_diff_for_repo'
+   subdirectories of a single gitrepo root), 'compute_diff_for_skgrepo'
    would attribute that skgrepo's entire set of changed .skg files to
    each such skgrepo, double-counting them across skgrepos. This is
    harmless under the apparent deployment model (one gitrepo per
@@ -841,6 +809,15 @@ gap too. Details, options and questions:
    'path_relative_to_gitrepo'); the older diff path does not. If
    multi-Skg-repo gitrepos are to be supported, the diff helpers should
    take a Skg-repo-relative pathspec too.
+   A related slip, noted 2026-11-22: 'add_nodes_added_and_deleted_by_stage'
+   ('server/git_ops/diff.rs') joins each path, which git gives relative
+   to the gitrepo's root, onto the skgrepo's path, and reads HEAD, the
+   git index and the worktree at the result. For a skgrepo below its
+   gitrepo's root that path repeats the subfolder and names nothing,
+   so its added and deleted nodes are not found. (When the configured
+   path does not start with the gitrepo's worktree as git spells it,
+   HEAD and the git index are read at git's own path, and work.) Only
+   'titles-by-ids' reads these nodes, for nodes the search index lacks.
 * Problems found during the org-export feature (2026-06-13)
 ** heading-anchor links rely on heading-text uniqueness
    Deep links use org's =[[./file.org::*Heading][label]]= search,

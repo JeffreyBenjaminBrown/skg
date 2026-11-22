@@ -1,3 +1,43 @@
+* (dormant) 'mk_removed_child_viewnode' hardcodes unstaged=Minus axes (noted 2026-06-12; obsolete 2026-11-22)
+  Dormant as of 2026-06-12: 'mk_removed_child_viewnode' now lives in
+  server/to_org/expand/unused_but_nice.rs ("Held for someday, not
+  currently wired in"), so the bug is unreachable in the current
+  renderer. NOT closed: the per-stage-sign fix must land before that
+  module is ever revived.
+  server/to_org/expand/definitive.rs lines 394, 398.
+  When a parent .skg file is deleted, its children are loaded from
+  git HEAD and rendered as phantoms. Both existence and membership
+  axes are hardcoded as 'staged: None, unstaged: Some(Minus)',
+  which misattributes already-staged parent-deletions to the
+  unstaged side. Sibling bug to the one just fixed in phantom_axes
+  (types/phantom.rs). Fix is analogous: derive per-stage signs from
+  the parent's file-level diff status (staged vs unstaged maps in
+  SourceDiff), rather than assuming the change is on the unstaged
+  side. Additionally, for a deleted-parent scenario the child's
+  membership axis should probably mirror the parent's existence
+  axis (if parent removed staged, children are 'removed from
+  contains' staged too), which is a bit more nuanced than the pure
+  contains_diff lookup used in phantom_axes.
+  Obsolete: 'server/to_org/', and with it 'unused_but_nice.rs' and
+  'mk_removed_child_viewnode', is gone; the diff view is now drawn
+  over the graph straddle ('docs/diff-view.org'), with no per-stage
+  axes.
+* Three Graphnode parses per changed file in 'compute_diff_for_repo' (fixed 2026-11-22)
+  server/git_ops/diff.rs.
+  For each changed file we now load HEAD, index, and worktree YAML
+  blobs and parse them into Graphnodes. A small skgrepo with N changed
+  files does 3N parses. At current sizes this is fine but worth
+  measuring on a larger garden.
+  Fixed: 'compute_diff_for_skgrepo' ('server/git_ops/diff.rs') now
+  reads one side of each added or deleted file only, and no modified
+  file; nothing read the per-stage diffs it used to build.
+* 'NotInGit' is per-repo but stamped per-vognode (obsolete 2026-11-22)
+  server/to_org/render/diff.rs / process_truenode_diff.
+  Every active vognode in a non-gitrepo gets 'not_in_git = true'. The
+  wire-level emission is a per-vognode 'notInGit' atom too. A
+  per-repo banner / repo-herald prefix would scale better.
+  Obsolete: no 'not_in_git' flag or 'notInGit' atom remains in the
+  server or the clients.
 * The git_diff_view test matcher ignored bare metadata atoms (noted 2026-07-08; obsolete 2026-11-22)
    'assert_buffer_contains' (tests/git_diff_view/common.rs) matches
    each expected line by star depth, title, and PARENTHESIZED
