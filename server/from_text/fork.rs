@@ -228,7 +228,7 @@ pub fn explicit_new_child_skgrepos_for_foreign_vognodes (
 /// it with C-c s s), and refuses to approve while any remains (the
 /// server would reject it as an unknown skgrepo anyway). Must match
 /// 'skg-fork-repo-placeholder' in
-/// [[../../elisp/skg-request-save.el]].
+/// [[../../elisp/skg-request-save/skg-save-confirmations.el]].
 pub const FORK_SKGREPO_PLACEHOLDER : &str = "PICK-A-REPO";
 
 /// Build the fork-confirmation buffer. Its head is an org headline

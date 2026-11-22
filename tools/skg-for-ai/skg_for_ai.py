@@ -5120,7 +5120,7 @@ class ForkConfirmationClone:
 def fork_confirmation_clones (content):
   """The clones-to-be of the fork confirmation's buffer CONTENT, read
   as the clients read it ('skg--fork-repos-from-confirmation-buffer'
-  in 'elisp/skg-request-save.el'): each top-level headline with
+  in 'elisp/skg-request-save/skg-save-confirmations.el'): each top-level headline with
   metadata is a clone-to-be, and each headline with an ID under one
   that names its skgrepo is an original it forks. The instructions
   headline has no metadata."""

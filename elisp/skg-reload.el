@@ -125,6 +125,7 @@ the old one open beside the one it makes on its next request."
      skg-request-rebuild-session-lifetime-stores
      skg-request-rerender-all-views
      skg-request-save
+     skg-save-confirmations
      skg-request-server-warnings
      skg-repo-files-reloaded
      skg-request-single-root-content-view
