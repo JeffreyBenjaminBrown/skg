@@ -108,129 +108,95 @@ echo ""
 
 # ── Phase 2: Run suites sequentially ────────────────────────────
 
-echo -e "${YELLOW}Running suites sequentially...${NC}"
-echo ""
+# Each suite is a function, run from PROJECT_ROOT in a subshell by
+# 'run_suite', which logs it to RESULTS_DIR. To add a suite, define
+# its function and add one 'run_suite' line below; the summary and
+# ALL.org list it from the SUITE_* arrays.
 
-T_EMACS=$SECONDS
-echo -n "  Emacs tests ... "
-if (
-  cd "$PROJECT_ROOT"
-  skg_low_priority "$SCRIPT_DIR/emacs-tests.sh"
-) >"$RESULTS_DIR/emacs.log" 2>&1; then
-  EXIT_EMACS=0
-  echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - T_EMACS))s)${NC}"
-else
-  EXIT_EMACS=$?
-  echo -e "${RED}FAIL${NC} ${DIM}($((SECONDS - T_EMACS))s)${NC}"
-fi
-ELAPSED_EMACS=$((SECONDS - T_EMACS))
+suite_emacs () {
+  skg_low_priority "$SCRIPT_DIR/emacs-tests.sh"; }
 
-T_NVIM=$SECONDS
-echo -n "  Neovim tests ... "
-if (
-  cd "$PROJECT_ROOT"
-  skg_low_priority "$SCRIPT_DIR/nvim-tests.sh"
-) >"$RESULTS_DIR/nvim.log" 2>&1; then
-  EXIT_NVIM=0
-  echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - T_NVIM))s)${NC}"
-else
-  EXIT_NVIM=$?
-  echo -e "${RED}FAIL${NC} ${DIM}($((SECONDS - T_NVIM))s)${NC}"
-fi
-ELAPSED_NVIM=$((SECONDS - T_NVIM))
+suite_nvim () {
+  skg_low_priority "$SCRIPT_DIR/nvim-tests.sh"; }
 
-T_NEXTEST=$SECONDS
-echo -n "  Nextest ... "
-if (
-  cd "$PROJECT_ROOT"
+suite_nextest () {
   # --build-jobs: without it, cargo compiles/links with every core.
   # The test binaries are large (debug, ~quarter-GB each), so unbounded
   # parallel linking is the heaviest load a test run puts on the
   # machine; nice/ionice govern priority, not RAM.
   skg_low_priority cargo nextest run \
     --build-jobs "$NEXTEST_BUILD_JOBS" \
-    --jobs "$NEXTEST_JOBS" --no-fail-fast
-) >"$RESULTS_DIR/nextest.log" 2>&1; then
-  EXIT_NEXTEST=0
-  echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - T_NEXTEST))s)${NC}"
-else
-  EXIT_NEXTEST=$?
-  echo -e "${RED}FAIL${NC} ${DIM}($((SECONDS - T_NEXTEST))s)${NC}"
-fi
-ELAPSED_NEXTEST=$((SECONDS - T_NEXTEST))
+    --jobs "$NEXTEST_JOBS" --no-fail-fast; }
 
-T_DOCTEST=$SECONDS
-echo -n "  Doctests ... "
-if (
-  cd "$PROJECT_ROOT"
+suite_doctest () {
   # nextest structurally cannot run doctests, so they get their own
   # phase. --jobs caps build parallelism for politeness, matching the
   # build phase.
-  skg_low_priority cargo test --doc --jobs "$BUILD_JOBS"
-) >"$RESULTS_DIR/doctest.log" 2>&1; then
-  EXIT_DOCTEST=0
-  echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - T_DOCTEST))s)${NC}"
-else
-  EXIT_DOCTEST=$?
-  echo -e "${RED}FAIL${NC} ${DIM}($((SECONDS - T_DOCTEST))s)${NC}"
-fi
-ELAPSED_DOCTEST=$((SECONDS - T_DOCTEST))
+  skg_low_priority cargo test --doc --jobs "$BUILD_JOBS"; }
 
-T_TEAM_TOOLS=$SECONDS
-echo -n "  Team tool tests ... "
-if (
-  cd "$PROJECT_ROOT"
+suite_team_tools () {
   # The scripts in tools/team/ that the AI team runs, and those of
   # bash/ that have tests; each test makes its own data, and needs no
   # server.
   for test_script in tools/team/test_*.py bash/test_*.py; do
     echo "== $test_script"
     skg_low_priority python3 "$test_script" || exit 1
-  done
-) >"$RESULTS_DIR/team-tools.log" 2>&1; then
-  EXIT_TEAM_TOOLS=0
-  echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - T_TEAM_TOOLS))s)${NC}"
-else
-  EXIT_TEAM_TOOLS=$?
-  echo -e "${RED}FAIL${NC} ${DIM}($((SECONDS - T_TEAM_TOOLS))s)${NC}"
-fi
-ELAPSED_TEAM_TOOLS=$((SECONDS - T_TEAM_TOOLS))
+  done; }
 
-T_AI_READER=$SECONDS
-echo -n "  AI reader tests ... "
-if (
-  cd "$PROJECT_ROOT"
+suite_ai_reader () {
   # tools/skg-for-ai/: it runs target/debug/skg (built in phase 1)
   # on scratch servers at SKG_FOR_AI_TEST_PORT (default 1793). It runs
   # alone, like every suite here, so nothing rebuilds the binary or
   # takes that port under it; the integration tests' ports lie far
   # from it ('find_available_port').
-  skg_low_priority python3 tools/skg-for-ai/test_skg_for_ai.py
-) >"$RESULTS_DIR/ai-reader.log" 2>&1; then
-  EXIT_AI_READER=0
-  echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - T_AI_READER))s)${NC}"
-else
-  EXIT_AI_READER=$?
-  echo -e "${RED}FAIL${NC} ${DIM}($((SECONDS - T_AI_READER))s)${NC}"
-fi
-ELAPSED_AI_READER=$((SECONDS - T_AI_READER))
+  skg_low_priority python3 tools/skg-for-ai/test_skg_for_ai.py; }
 
-T_DOCS=$SECONDS
-echo -n "  Generated docs ... "
-if (
-  cd "$PROJECT_ROOT"
+suite_generated_docs () {
   # docs/ and coding-advice/ must be what skg-system/ exports
   # (coding-advice/generated-docs.org), with the binary of phase 1.
   SKG_BIN="$PROJECT_ROOT/target/debug/skg" \
-    skg_low_priority bash/check-docs-exported.sh
-) >"$RESULTS_DIR/generated-docs.log" 2>&1; then
-  EXIT_DOCS=0
-  echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - T_DOCS))s)${NC}"
-else
-  EXIT_DOCS=$?
-  echo -e "${RED}FAIL${NC} ${DIM}($((SECONDS - T_DOCS))s)${NC}"
-fi
-ELAPSED_DOCS=$((SECONDS - T_DOCS))
+    skg_low_priority bash/check-docs-exported.sh; }
+
+# Parallel arrays, one entry per suite run, in run order:
+#   SUITE_LABELS[k], SUITE_LOGS[k], SUITE_EXITS[k], SUITE_ELAPSED[k]
+SUITE_LABELS=()
+SUITE_LOGS=()
+SUITE_EXITS=()
+SUITE_ELAPSED=()
+
+# Usage: run_suite LABEL LOG-FILE-NAME FUNCTION
+run_suite () {
+  local label="$1"
+  local log_name="$2"
+  local suite_function="$3"
+  local t_suite=$SECONDS
+  local rc
+  echo -n "  $label ... "
+  if (
+    cd "$PROJECT_ROOT"
+    "$suite_function"
+  ) >"$RESULTS_DIR/$log_name" 2>&1; then
+    rc=0
+    echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - t_suite))s)${NC}"
+  else
+    rc=$?
+    echo -e "${RED}FAIL${NC} ${DIM}($((SECONDS - t_suite))s)${NC}"
+  fi
+  SUITE_LABELS+=("$label")
+  SUITE_LOGS+=("$log_name")
+  SUITE_EXITS+=($rc)
+  SUITE_ELAPSED+=($((SECONDS - t_suite))); }
+
+echo -e "${YELLOW}Running suites sequentially...${NC}"
+echo ""
+
+run_suite "Emacs tests"     emacs.log          suite_emacs
+run_suite "Neovim tests"    nvim.log           suite_nvim
+run_suite "Nextest"         nextest.log        suite_nextest
+run_suite "Doctests"        doctest.log        suite_doctest
+run_suite "Team tool tests" team-tools.log     suite_team_tools
+run_suite "AI reader tests" ai-reader.log      suite_ai_reader
+run_suite "Generated docs"  generated-docs.log suite_generated_docs
 
 INTEGRATION_DIR="$PROJECT_ROOT/tests/integration"
 INTEGRATION_NAMES=()   # each entry is "CLIENT/DIR-NAME"
@@ -238,6 +204,13 @@ INTEGRATION_STARTED=()
 INTEGRATION_EXITS=()
 INTEGRATION_ELAPSED=()
 INTEGRATION_FAILED=()  # entries are "CLIENT/DIR-NAME"
+
+# The log of one integration run. PREFIX is 'integration' for the
+# primary run and 'retry' for the retry; NAME is "CLIENT/DIR-NAME".
+integration_log_name () {
+  local prefix="$1"
+  local name="$2"
+  echo "${prefix}-${name%%/*}-${name#*/}.log"; }
 
 # Every integration directory runs once per client. The nvim pass is
 # the second half of the wall-clock cost; skip it in a hurry with
@@ -262,7 +235,7 @@ for client in "${INTEGRATION_CLIENTS[@]}"; do
     if (
       cd "$dir"
       SKG_TEST_CLIENT="$client" skg_low_priority ./run-test.sh
-    ) >"$RESULTS_DIR/integration-${client}-$(basename "$dir").log" 2>&1; then
+    ) >"$RESULTS_DIR/$(integration_log_name integration "$name")" 2>&1; then
       rc=0
       echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - t_integration))s)${NC}"
     else
@@ -300,7 +273,7 @@ if [ ${#INTEGRATION_FAILED[@]} -gt 0 ]; then
     (
       cd "$INTEGRATION_DIR/$retry_dir"
       SKG_TEST_CLIENT="$retry_client" skg_low_priority ./run-test.sh
-    ) >"$RESULTS_DIR/retry-${retry_client}-${retry_dir}.log" 2>&1
+    ) >"$RESULTS_DIR/$(integration_log_name retry "$name")" 2>&1
     rc=$?
     elapsed=$((SECONDS - T_RETRY))
 
@@ -324,54 +297,14 @@ echo -e "${BOLD}=== Summary ===${NC}"
 
 overall=0
 
-if [ $EXIT_EMACS -eq 0 ]; then
-  echo -e "  ${GREEN}PASS${NC}  Emacs tests"
-else
-  echo -e "  ${RED}FAIL${NC}  Emacs tests   (see emacs.log)"
-  overall=1
-fi
-
-if [ $EXIT_NVIM -eq 0 ]; then
-  echo -e "  ${GREEN}PASS${NC}  Neovim tests"
-else
-  echo -e "  ${RED}FAIL${NC}  Neovim tests  (see nvim.log)"
-  overall=1
-fi
-
-if [ $EXIT_NEXTEST -eq 0 ]; then
-  echo -e "  ${GREEN}PASS${NC}  Nextest"
-else
-  echo -e "  ${RED}FAIL${NC}  Nextest        (see nextest.log)"
-  overall=1
-fi
-
-if [ $EXIT_DOCTEST -eq 0 ]; then
-  echo -e "  ${GREEN}PASS${NC}  Doctests"
-else
-  echo -e "  ${RED}FAIL${NC}  Doctests       (see doctest.log)"
-  overall=1
-fi
-
-if [ $EXIT_TEAM_TOOLS -eq 0 ]; then
-  echo -e "  ${GREEN}PASS${NC}  Team tool tests"
-else
-  echo -e "  ${RED}FAIL${NC}  Team tool tests (see team-tools.log)"
-  overall=1
-fi
-
-if [ $EXIT_AI_READER -eq 0 ]; then
-  echo -e "  ${GREEN}PASS${NC}  AI reader tests"
-else
-  echo -e "  ${RED}FAIL${NC}  AI reader tests (see ai-reader.log)"
-  overall=1
-fi
-
-if [ $EXIT_DOCS -eq 0 ]; then
-  echo -e "  ${GREEN}PASS${NC}  Generated docs"
-else
-  echo -e "  ${RED}FAIL${NC}  Generated docs (see generated-docs.log)"
-  overall=1
-fi
+for k in "${!SUITE_LABELS[@]}"; do
+  if [ ${SUITE_EXITS[$k]} -eq 0 ]; then
+    echo -e "  ${GREEN}PASS${NC}  ${SUITE_LABELS[$k]}"
+  else
+    echo -e "  ${RED}FAIL${NC}  $(printf '%-14s' "${SUITE_LABELS[$k]}") (see ${SUITE_LOGS[$k]})"
+    overall=1
+  fi
+done
 
 n_total=${#INTEGRATION_NAMES[@]}
 n_failed=${#INTEGRATION_FAILED[@]}
@@ -384,7 +317,7 @@ elif [ $n_real -eq 0 ]; then
 else
   echo -e "  ${RED}FAIL${NC}  Integration    ($n_real real failure(s))"
   for name in "${RETRY_STILL_FAILING[@]}"; do
-    echo -e "         ${RED}-${NC} $name  (see retry-${name%%/*}-${name#*/}.log)"
+    echo -e "         ${RED}-${NC} $name  (see $(integration_log_name retry "$name"))"
   done
   overall=1
 fi
@@ -417,54 +350,15 @@ ORG="$RESULTS_DIR/ALL.org"
     echo "** PASS : Build (${ELAPSED_BUILD}s) [[file:build.log]]"
   fi
 
-  # Emacs
-  if [ $EXIT_EMACS -eq 0 ]; then
-    echo "** PASS : Emacs tests (${ELAPSED_EMACS}s) [[file:emacs.log]]"
-  else
-    echo "** FAIL : Emacs tests (${ELAPSED_EMACS}s) [[file:emacs.log]]"
-  fi
-
-  # Neovim
-  if [ $EXIT_NVIM -eq 0 ]; then
-    echo "** PASS : Neovim tests (${ELAPSED_NVIM}s) [[file:nvim.log]]"
-  else
-    echo "** FAIL : Neovim tests (${ELAPSED_NVIM}s) [[file:nvim.log]]"
-  fi
-
-  # Nextest
-  if [ $EXIT_NEXTEST -eq 0 ]; then
-    echo "** PASS : Nextest (${ELAPSED_NEXTEST}s) [[file:nextest.log]]"
-  else
-    echo "** FAIL : Nextest (${ELAPSED_NEXTEST}s) [[file:nextest.log]]"
-  fi
-
-  # Doctests
-  if [ $EXIT_DOCTEST -eq 0 ]; then
-    echo "** PASS : Doctests (${ELAPSED_DOCTEST}s) [[file:doctest.log]]"
-  else
-    echo "** FAIL : Doctests (${ELAPSED_DOCTEST}s) [[file:doctest.log]]"
-  fi
-
-  # Team tools
-  if [ $EXIT_TEAM_TOOLS -eq 0 ]; then
-    echo "** PASS : Team tool tests (${ELAPSED_TEAM_TOOLS}s) [[file:team-tools.log]]"
-  else
-    echo "** FAIL : Team tool tests (${ELAPSED_TEAM_TOOLS}s) [[file:team-tools.log]]"
-  fi
-
-  # AI reader
-  if [ $EXIT_AI_READER -eq 0 ]; then
-    echo "** PASS : AI reader tests (${ELAPSED_AI_READER}s) [[file:ai-reader.log]]"
-  else
-    echo "** FAIL : AI reader tests (${ELAPSED_AI_READER}s) [[file:ai-reader.log]]"
-  fi
-
-  # Generated docs
-  if [ $EXIT_DOCS -eq 0 ]; then
-    echo "** PASS : Generated docs (${ELAPSED_DOCS}s) [[file:generated-docs.log]]"
-  else
-    echo "** FAIL : Generated docs (${ELAPSED_DOCS}s) [[file:generated-docs.log]]"
-  fi
+  # The suites, in run order
+  for k in "${!SUITE_LABELS[@]}"; do
+    if [ ${SUITE_EXITS[$k]} -eq 0 ]; then
+      verdict=PASS
+    else
+      verdict=FAIL
+    fi
+    echo "** $verdict : ${SUITE_LABELS[$k]} (${SUITE_ELAPSED[$k]}s) [[file:${SUITE_LOGS[$k]}]]"
+  done
 
   # Integration
   n_pass=$((n_total - n_real))
@@ -481,14 +375,12 @@ ORG="$RESULTS_DIR/ALL.org"
   for i in "${!INTEGRATION_NAMES[@]}"; do
     [ ${INTEGRATION_EXITS[$i]} -ne 0 ] || continue
     name="${INTEGRATION_NAMES[$i]}"
-    logname="integration-${name%%/*}-${name#*/}.log"
-    echo "**** FAIL  $name (${INTEGRATION_ELAPSED[$i]}s) [[file:$logname]]"
+    echo "**** FAIL  $name (${INTEGRATION_ELAPSED[$i]}s) [[file:$(integration_log_name integration "$name")]]"
   done
   for i in "${!INTEGRATION_NAMES[@]}"; do
     [ ${INTEGRATION_EXITS[$i]} -eq 0 ] || continue
     name="${INTEGRATION_NAMES[$i]}"
-    logname="integration-${name%%/*}-${name#*/}.log"
-    echo "**** PASS  $name (${INTEGRATION_ELAPSED[$i]}s) [[file:$logname]]"
+    echo "**** PASS  $name (${INTEGRATION_ELAPSED[$i]}s) [[file:$(integration_log_name integration "$name")]]"
   done
 
   # *** retry — only if there were primary-run failures
@@ -500,14 +392,12 @@ ORG="$RESULTS_DIR/ALL.org"
     for j in "${!RETRY_NAMES[@]}"; do
       [ ${RETRY_EXITS[$j]} -ne 0 ] || continue
       name="${RETRY_NAMES[$j]}"
-      logname="retry-${name%%/*}-${name#*/}.log"
-      echo "**** FAIL  $name (${RETRY_ELAPSED[$j]}s) [[file:$logname]]"
+      echo "**** FAIL  $name (${RETRY_ELAPSED[$j]}s) [[file:$(integration_log_name retry "$name")]]"
     done
     for j in "${!RETRY_NAMES[@]}"; do
       [ ${RETRY_EXITS[$j]} -eq 0 ] || continue
       name="${RETRY_NAMES[$j]}"
-      logname="retry-${name%%/*}-${name#*/}.log"
-      echo "**** PASS  $name (${RETRY_ELAPSED[$j]}s) [[file:$logname]]"
+      echo "**** PASS  $name (${RETRY_ELAPSED[$j]}s) [[file:$(integration_log_name retry "$name")]]"
     done
   fi
 
