@@ -318,3 +318,56 @@ Read closely, old body against new pieces, with nothing to report:
   also run in batch Emacs, and its 'TODO/problems.org' entry.
 Not read: the plan 1db64bc7d. Nothing was built; only the Emacs probe
 was run.
+* fifth review
+A fifth independent review, of the 7 commits merged after the fourth
+review's 086e5c78c, from b22b3b5c3 to 383b3dd7e. Six split a long
+function in 'server/'; the seventh is a plan. It found no behaviour
+change. Nothing was fixed.
+** found
+*** No split changes behaviour
+Each kind of slip a split can make was looked for, and here is why
+each is absent:
+- Moved text. In each commit every line removed reappears among the
+  lines added, compared by machine with indentation stripped, but for
+  the lines that open or close a block, a comment that became the
+  helper's doc comment, and three lines that changed only by type:
+  'detect_skgrepo_move' takes the helper's 'pid : &ID' where it took
+  '&pid', and two loops take a borrowed collection where they took
+  '&' of an owned one. Every error, warning and refusal text is word
+  for word. No moved block holds a 'tracing' call, and each helper
+  stays in its module.
+- Early returns. Every '?' that moved into a helper returns the same
+  error type as the caller's ('Box<dyn Error>', 'io::Result',
+  'String'), and the caller returns it at once with '?' or as its
+  match arm's value. In 'level_jump_error' the old '?' on
+  'linecol_to_viewnode' became a 'match' that returns the same
+  'String' as the error, which the caller returns as before. In the
+  import handler nothing followed the 'match', so each 'return
+  refuse (...)' that now returns from 'apply_approved_import' or
+  'preview_import' still ends the request after the same one
+  response.
+- Effects in order. The import's apply still takes the pending
+  import, then checks the restriction, then takes and drops the
+  mutation gate's lock around the write, then answers; its preview
+  still clears 'pending' first, in the dispatch. The two kinds of
+  foreign-section warning are computed and appended in the old order,
+  so 'node_named''s reads of '.skg' files come in the old order too.
+  The telescope's refusal of foreign sections still comes before any
+  path or YAML is made.
+- Values. Nothing a helper mutates is a copy: the headlines' metadata
+  is edited through '&mut [ViewnodeLineCol]', the caller's own vector;
+  'pending' is the caller's '&mut Option<PendingImport>'; the
+  nodeMerge pairs, the node save intent and the disk node are moved
+  into the helper and their results returned by value. 'IdResolution'
+  is 'Copy', so passing it to the first helper leaves the caller's
+  for the second loop. The set of seen viewnode IDs, now local to its
+  helper, was read nowhere else. The rebuilt 'home_owner_of' closure
+  is the same one line in both helpers. No new name shadows another.
+** covered
+Read closely, old body against new pieces, with nothing to report:
+b22b3b5c3 ('suppress_nodeMerges_of_restricted_nodes'), e3179bca5
+('prepare_graphnode_telescope'), 8f6eb1e96 ('org_to_viewforest'),
+6707d4f4b ('supplement_nodeSaveIntent_from_disk'), 9122fd02a
+('handle_import_md_and_org_request') and fa323a303
+('foreign_section_warnings'). Not read: the plan 383b3dd7e. Nothing
+was built or run.
