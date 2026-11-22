@@ -152,21 +152,21 @@ pub(crate) fn apply_prepared_nodeMerges (
       Err (e) => {
         tracing::error!(
           "Tantivy merge failed: {}. Rebuilding from disk...", e);
-        let nodes : Vec<Graphnode> =
-          read_all_skg_files_from_skgrepos (&config)
-          . map_err (|e2| -> Box<dyn Error> {
-            format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
-            . into () }) ?;
-        error_unless_each_gnid_names_one_node (
-          &nodes, &config . data_root)
-          . map_err (|e2| -> Box<dyn Error> {
-            format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
-            . into () }) ?;
         let new_index : TantivyIndex =
-          rebuild_tantivy_from_nodes (&config, &nodes)
+          rebuild_tantivy_from_disk (&config)
           . map_err (|e2| -> Box<dyn Error> {
             format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
             . into () }) ?;
         tracing::warn!(
           "NodeMerge succeeded, but Tantivy had to be rebuilt from disk.");
         Ok (Some (new_index)) }}} }
+
+/// A new search index of every node on disk, each gnid naming one node.
+fn rebuild_tantivy_from_disk (
+  config : &SkgConfig,
+) -> Result<TantivyIndex, Box<dyn Error>> {
+  let nodes : Vec<Graphnode> =
+    read_all_skg_files_from_skgrepos (config) ?;
+  error_unless_each_gnid_names_one_node (
+    &nodes, &config . data_root) ?;
+  rebuild_tantivy_from_nodes (config, &nodes) }
