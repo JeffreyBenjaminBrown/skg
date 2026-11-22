@@ -22,6 +22,14 @@
 (require 'skg-length-prefix)
 (require 'eieio) ; 'oref' is its macro and must be known at compile time
 
+;; Magit's, called only after the goto below has required magit.
+(declare-function magit-toplevel "magit-git")
+(declare-function magit-status-setup-buffer "magit-status")
+(declare-function magit-section-show-level-2-all "magit-section")
+(declare-function magit-get-section "magit-section")
+(declare-function magit-section-goto "magit-section")
+(declare-function magit-section-show "magit-section")
+
 (defun skg-goto-in-magit ()
   "Open magit-status and go to the first section for the .skg file
 of the node at point. If the file appears in multiple sections

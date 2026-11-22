@@ -16,6 +16,7 @@
 ;;;
 ;;; Code:
 
+(require 'cl-lib)
 (require 'seq)
 (require 'skg-sexpr-dsl-for-edits)
 (require 'skg-compare-sexpr)

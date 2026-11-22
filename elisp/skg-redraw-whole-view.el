@@ -186,7 +186,7 @@ as the server drew it. Other lines, and the focus atom, are kept."
 headline without one."
   (let ((case-fold-search nil)
         (headlines nil))
-    (dotimes (index (length lines) (nreverse headlines))
+    (dotimes (index (length lines))
       (let ((line (aref lines index)))
         (when (string-match "\\`\\(\\*+\\) " line)
           (push (list index
@@ -194,7 +194,8 @@ headline without one."
                       (and (string-match
                             skg--viewnode-id-at-headline-start-regexp line)
                            (match-string 1 line)))
-                headlines))))))
+                headlines))))
+    (nreverse headlines)))
 
 (defun skg--folded-atom-decision (has-parent parent-fold-state)
   "Whether a headline is 'folded', as (\"folded\" . BOOLEAN), given

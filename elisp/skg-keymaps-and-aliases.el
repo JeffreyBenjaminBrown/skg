@@ -55,6 +55,9 @@ and hide INTERNAL from M-x completion."
   (global-set-key (kbd "C-c g i")   #'skg-goto-by-id) ;; Global because it works from any buffer: it only reads a typed/pasted ID.
   (global-set-key (kbd "C-c v l")   #'skg-restrict-repo-set))
 
+(defvar magit-mode-map) ;; defined by magit, which loads after this file
+(defvar shell-mode-map) ;; defined by shell, likewise
+
 (with-eval-after-load 'magit ;; Magit
   ;; Popping to the linkstack would make no sense here,
   ;; because magit buffers cannot be written to.
