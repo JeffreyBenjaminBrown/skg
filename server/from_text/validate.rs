@@ -66,7 +66,7 @@ pub fn validate_and_filter_foreign_instructions(
     nodeMerge_pairs . iter ()
     . flat_map ( |(acquirer, acquiree)| [acquirer, acquiree] )
     . filter_map ( |gnid| graph . pid_and_skgrepo (gnid) )
-    . filter ( |(_pid, skgrepo)| skgrepo_is_foreign (config, skgrepo) )
+    . filter ( |(_pid, skgrepo)| config . skgrepo_is_foreign (skgrepo) )
     . map ( |(pid, skgrepo)| ForeignPolicyOutcome::Reject (
       BufferValidationError::ModifiedForeignNode (pid, skgrepo) )) );
   collect_foreign_policy_outcomes (&outcomes)?;
@@ -112,7 +112,7 @@ fn apply_foreign_policy(
             Vec<BufferValidationError>> {
   match instr {
     NodeInstruction::Delete(DeleteNode { gnid, home_skgrepo: skgrepo }) => {
-      if skgrepo_is_foreign (config, skgrepo) {
+      if config . skgrepo_is_foreign (skgrepo) {
         // can't delete foreign nodes
         Ok (ForeignPolicyOutcome::Reject(
           BufferValidationError::ModifiedForeignNode(
@@ -120,7 +120,7 @@ fn apply_foreign_policy(
             skgrepo . clone() )))
       } else { Ok (ForeignPolicyOutcome::Keep) }}
     NodeInstruction::Save(SaveNode (node)) => {
-      if !skgrepo_is_foreign (config, &node . home_skgrepo) {
+      if !config . skgrepo_is_foreign (&node . home_skgrepo) {
         // not foreign, so keep
         return Ok (ForeignPolicyOutcome::Keep); }
       match graphnode_from_graph (graph, &node . pid) {
@@ -252,14 +252,6 @@ fn rehome_inherited_new_node (
   retag_msv (
     &mut node . hides, &old_skgrepo, new_skgrepo);
 }
-
-fn skgrepo_is_foreign(
-  config: &SkgConfig,
-  skgrepo: &SkgrepoName,
-) -> bool {
-  config . skgrepos . get (skgrepo)
-    . map(|s| !s . owned)
-    . unwrap_or (false)}
 
 /// Returns true if the buffer node differs from the disk node
 /// in any editable field (title, body, contains), any flag, or

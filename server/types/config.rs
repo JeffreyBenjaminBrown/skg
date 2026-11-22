@@ -627,7 +627,7 @@ impl SkgConfig {
       . position ( |s| s == skgrepo ) }
 
   /// Whether 'skgrepo' is configured and foreign.
-  fn skgrepo_is_foreign (
+  pub fn skgrepo_is_foreign (
     &self,
     skgrepo : &SkgrepoName,
   ) -> bool {
