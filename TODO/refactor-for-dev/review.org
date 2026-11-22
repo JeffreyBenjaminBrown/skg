@@ -241,6 +241,20 @@ Read closely, old body against new pieces, with nothing to report:
   7262ba7f1 (titles by IDs);
 - the clients: 0cae1bce7 (save handlers) and 251a6789c (rerender
   lock and done handlers), each in both Emacs and Neovim.
-Not read: the plans commits f2ae1efb9 and c04d79ce1, and the
-handoff-file edits inside 6fffd8ca1 and 350d53bbb, since they are
+Merged while this review ran, and read too, with nothing to report:
+- d17f7cc79: the AI reader's tests, run without
+  'SKG_FOR_AI_TEST_PORT', ask 'skg_port_for_this_checkout' for their
+  port, as 'bash/all-tests.sh' does; in the main checkout that is
+  1793 as before, and in a linked worktree a port from 18000 to
+  19998. The message says so; it is meant;
+- 71400b93f: 'tests/file_io.rs' writes in a 'tempfile' folder that
+  lives until the test ends, and reads back the same files from it,
+  which settles the second review's shared '/tmp/file_io_test';
+- f237f5141: 'bash/all-tests.sh' lists the failures under ALL.org's
+  title, and a failed build now writes an ALL.org. The helper
+  moved above the build unchanged; the removed 'n_pass' was read
+  nowhere; the new nextest pattern feeds only ALL.org. Meant, and
+  said so.
+Not read: the plans commits f2ae1efb9 and c04d79ce1, 82888079e, and
+the handoff-file edits inside 6fffd8ca1 and 350d53bbb, since they are
 documents. Nothing was built or run.
