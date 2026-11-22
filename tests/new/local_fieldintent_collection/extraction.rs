@@ -20,7 +20,7 @@ use skg::from_text::local_fieldintent_collection::types::{
   MemberAsSuch, MemberAsSuchVisibility };
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
 use skg::test_utils::extract_graphnode_if_save_else_error;
-use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config, graph_from_config};
+use skg::test_utils::{instruction_gnids, saved_node_by_gnid, run_with_shared_test_stores, graph_handle_from_config, graph_from_config};
 use skg::types::errors::BufferValidationError;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, MSV, SkgrepoName, members_of, members_msv};
@@ -34,24 +34,6 @@ use std::error::Error;
 
 const FORKEE_EDIT_CONFIG: &str =
   "tests/hidden_from_forks/fixtures-forkee-edit/skgconfig.toml";
-
-fn save_gnids (
-  instructions : &[NodeInstruction],
-) -> Vec<ID> {
-  instructions . iter() . map (|instruction| match instruction {
-    NodeInstruction::Save (SaveNode (node)) => node . pid . clone(),
-    NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid . clone(),
-  }) . collect() }
-
-fn saved_node_by_gnid<'a> (
-  instructions : &'a [NodeInstruction],
-  gnid           : &str,
-) -> &'a Graphnode {
-  for instruction in instructions {
-    if let NodeInstruction::Save (SaveNode (node)) = instruction {
-      if node . pid == ID::from (gnid) {
-        return node; }}}
-  panic! ("SaveNode not found: {}", gnid) }
 
 /// This runs collection plus lowering, with no disk involved: the
 /// pure half of extraction.
@@ -109,7 +91,7 @@ fn unknown_members_write_their_editable_relationship_recorders_only () {
   "};
   let instructions = nodeInstructions_from_tree (viewnode_tree_as_written (input))
     . expect ("Unknown relationship members are valid in a save");
-  assert_eq! (save_gnids (&instructions), vec! [ID::from ("recorder")],
+  assert_eq! (instruction_gnids (&instructions), vec! [ID::from ("recorder")],
               "an Unknown must not create a node save, delete, merge, or fork instruction");
   let recorder = saved_node_by_gnid (&instructions, "recorder");
   assert_eq! (members_of (&recorder . contains), vec! [ID::from ("content-unknown")]);
@@ -272,7 +254,7 @@ fn tombstones_emit_neither_savenode_nor_contains () {
     nodeInstructions_from_tree (viewforest) . unwrap ();
 
   assert_eq!(
-    save_gnids (&instructions),
+    instruction_gnids (&instructions),
     vec![ID::from ("root"), ID::from ("active-a"), ID::from ("active-b")],
     "tombstones should not produce SaveNodes");
   assert_eq!(
@@ -352,7 +334,7 @@ fn extraction_preserves_content_and_independent_children (
     nodeInstructions_from_tree (viewforest) . unwrap();
 
   assert_eq!(
-    save_gnids (&instructions),
+    instruction_gnids (&instructions),
     vec![ID::from ("root"), ID::from ("ordinary"), ID::from ("independent")]);
   assert_eq!(
     members_of (&saved_node_by_gnid (&instructions, "root") . contains),
@@ -377,7 +359,7 @@ fn extraction_skips_alias_and_id_display_nodes (
     nodeInstructions_from_tree (viewforest) . unwrap();
 
   assert_eq!(
-    save_gnids (&instructions),
+    instruction_gnids (&instructions),
     vec![ID::from ("root"), ID::from ("child")]);
   assert_eq!(
     members_msv (&saved_node_by_gnid (&instructions, "root") . aliases),
@@ -407,7 +389,7 @@ fn extraction_collects_forkees_without_hidden_branches (
     nodeInstructions_from_tree (viewforest) . unwrap();
 
   assert_eq!(
-    save_gnids (&instructions),
+    instruction_gnids (&instructions),
     // hidden-in and hidden-outside are editable members of
     // write-protected folders, so they are self-writers on the new recursion
     // surface. The owned forkee as such saves its title and body.
@@ -447,7 +429,7 @@ fn write_protected_folder_members_save_themselves_but_not_their_recorder (
     nodeInstructions_from_tree (viewforest) . unwrap();
 
   assert_eq!(
-    save_gnids (&instructions),
+    instruction_gnids (&instructions),
     // The members are self-writers, on the new recursion surface;
     // the recorder is unaffected by any of these write-protected folders.
     vec![ID::from ("recorder"),
@@ -648,7 +630,7 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
     nodeInstructions_from_tree (viewforest) . unwrap();
 
   assert_eq!(
-    save_gnids (&instructions),
+    instruction_gnids (&instructions),
     vec![ // the owned forkee as such saves its title and body
       ID::from ("root"),
       ID::from ("child"),
@@ -691,7 +673,7 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
     nodeInstructions_from_tree (viewforest) . unwrap();
 
   assert_eq!(
-    save_gnids (&instructions),
+    instruction_gnids (&instructions),
     vec![ // the owned forkee as such saves its title and body
       ID::from ("root"),
       ID::from ("independent"),
@@ -802,7 +784,7 @@ async fn forkee_as_such_child_list_removal_does_not_save_forkee (
         nodeInstructions_from_org_with_disk (
           input, config) . await?;
       assert!(
-        ! save_gnids (&instructions) . contains (&ID::from ("e")),
+        ! instruction_gnids (&instructions) . contains (&ID::from ("e")),
         "forkee-as-such should not produce a SaveNode: {:?}",
         instructions);
       Ok (()) }
@@ -843,7 +825,7 @@ async fn forkee_as_such_child_removal_is_not_foreign_contains_edit (
           config, &SkgrepoRestriction::unrestricted (config))
         . expect ("the forkee-as-such edit must not error");
       assert!(
-        ! save_gnids (&node_instructions) . contains (&ID::from ("e")),
+        ! instruction_gnids (&node_instructions) . contains (&ID::from ("e")),
         "e must not be written as a foreign node: {:?}", node_instructions);
       assert!(
         ! fork_specs . iter() . any (|spec| spec . original_gnid == ID::from ("e")),
@@ -868,7 +850,7 @@ async fn forkee_as_such_child_list_removal_infers_forker_hide (
           . hides),
         MSV::Specified (vec![ID::from ("e1")]));
       assert!(
-        ! save_gnids (&instructions) . contains (&ID::from ("e")),
+        ! instruction_gnids (&instructions) . contains (&ID::from ("e")),
         "forkee-as-such should not produce a SaveNode: {:?}",
         instructions);
       Ok (()) }
@@ -916,7 +898,7 @@ async fn forkee_as_such_visible_child_removes_forker_hide (
           . hides,
         MSV::Specified (vec![]));
       assert!(
-        ! save_gnids (&instructions) . contains (&ID::from ("E1")),
+        ! instruction_gnids (&instructions) . contains (&ID::from ("E1")),
         "forkee-as-such should not produce a SaveNode: {:?}",
         instructions);
       Ok (()) }
@@ -1033,7 +1015,7 @@ fn idfolder_resident_occurrence_saves_itself_but_is_not_content (
     nodeInstructions_from_tree (viewforest) . unwrap();
 
   assert_eq!(
-    save_gnids (&instructions),
+    instruction_gnids (&instructions),
     // display-child is a self-writer inside the IDFolder, on the new
     // recursion surface; the IDFolder's membership is never read.
     vec![ID::from ("root"),
@@ -1057,7 +1039,7 @@ async fn recursive_descendant_under_as_forkee_keeps_own_contains_edit (
         nodeInstructions_from_org_with_disk (
           input, config) . await?;
       assert!(
-        ! save_gnids (&instructions) . contains (&ID::from ("e")),
+        ! instruction_gnids (&instructions) . contains (&ID::from ("e")),
         "forkee-as-such should not produce a SaveNode: {:?}",
         instructions);
       assert_eq!(

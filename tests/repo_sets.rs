@@ -15,6 +15,8 @@ use skg::sexp_string::quote_sexp_string;
 use skg::serve::handlers::text_search::TitleOrAlias;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
+  saved_node_by_gnid,
+  save_gnids,
   mk_test_tcp_stream_pair,
   empty_views_state,
   run_with_skgrepo_set_test_db, search_gnids_for_skgrepo_set_for_test,
@@ -209,24 +211,6 @@ fn mirror_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
           . contains (&ID::from ("ovr-sub-mirror")),
         "the restricted mirror produces no SaveNode" );
       Ok (( )) } )) }
-
-fn save_gnids (
-  instructions : &[NodeInstruction],
-) -> Vec<ID> {
-  instructions . iter() . filter_map (|instruction| match instruction {
-    NodeInstruction::Save (SaveNode (node)) => Some (node . pid . clone()),
-    NodeInstruction::Delete (_) => None,
-  }) . collect() }
-
-fn saved_node_by_gnid<'a> (
-  instructions : &'a [NodeInstruction],
-  gnid           : &str,
-) -> &'a Graphnode {
-  for instruction in instructions {
-    if let NodeInstruction::Save (SaveNode (node)) = instruction {
-      if node . pid == ID::from (gnid) {
-        return node; }}}
-  panic! ("SaveNode not found: {}", gnid) }
 
 fn saved_or_graph_node_by_gnid (
   instructions : &[NodeInstruction],

@@ -14,12 +14,12 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use skg::from_text::local_fieldintent_collection::{
   extract_nonmergeSavePlan_locally, NonmergeSavePlan };
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
-use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config, graph_from_config};
+use skg::test_utils::{instruction_gnids, saved_node_by_gnid, run_with_shared_test_stores, graph_handle_from_config, graph_from_config};
 use skg::types::errors::BufferValidationError;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, MSV, TantivyIndex, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
-use skg::types::save::{NodeInstruction, NodeMerge, SaveNode, DeleteNode};
+use skg::types::save::{NodeInstruction, NodeMerge, DeleteNode};
 use skg::types::tree::forest::ViewForest;
 use std::error::Error;
 
@@ -38,24 +38,6 @@ async fn placed_forest_from_org_with_disk (
     : (ViewForest, Vec<BufferValidationError>, Vec<String>, WhatTheParseSupplied) =
     org_to_viewforest (input, IdResolution::ThroughGraph (&graph_from_config (config) ?)) ?;
   Ok ( viewforest ) }
-
-fn save_gnids (
-  instructions : &[NodeInstruction],
-) -> Vec<ID> {
-  instructions . iter() . map (|instruction| match instruction {
-    NodeInstruction::Save (SaveNode (node)) => node . pid . clone(),
-    NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid . clone(),
-  }) . collect() }
-
-fn saved_node_by_gnid<'a> (
-  instructions : &'a [NodeInstruction],
-  gnid           : &str,
-) -> &'a Graphnode {
-  for instruction in instructions {
-    if let NodeInstruction::Save (SaveNode (node)) = instruction {
-      if node . pid == ID::from (gnid) {
-        return node; }}}
-  panic! ("SaveNode not found: {}", gnid) }
 
 #[test]
 fn all_tests
@@ -119,7 +101,7 @@ async fn pipeline_basic_mixed_tree (
         extract_nonmergeSavePlan_locally (
           &viewforest_as_written (input), config, &SkgrepoRestriction::unrestricted (config))?;
       assert_eq!(
-        save_gnids (&plan . node_instructions),
+        instruction_gnids (&plan . node_instructions),
         vec![ ID::from ("root"), ID::from ("child"),
               ID::from ("grandchild"), ID::from ("independent"),
               ID::from ("explicit"), ID::from ("doomed") ]);
@@ -170,7 +152,7 @@ async fn pipeline_forkee_hiderels (
           . hides),
         MSV::Specified (vec![ID::from ("e1")]));
       assert!(
-        ! save_gnids (&plan . node_instructions)
+        ! instruction_gnids (&plan . node_instructions)
           . contains (&ID::from ("e")),
         "forkee-as-such should not produce a SaveNode" );
       Ok (( )) }
@@ -197,7 +179,7 @@ async fn pipeline_write_protected_folder_member_edits (
         extract_nonmergeSavePlan_locally (
           &viewforest_as_written (input), config, &SkgrepoRestriction::unrestricted (config))?;
       assert_eq!(
-        save_gnids (&plan . node_instructions),
+        instruction_gnids (&plan . node_instructions),
         vec![ ID::from ("recorder"), ID::from ("intruder"),
               ID::from ("intruder-child"), ID::from ("lurker") ]);
       assert_eq!(
@@ -222,7 +204,7 @@ async fn pipeline_restricted_subtree (
         extract_nonmergeSavePlan_locally (
           &viewforest_as_written (input), config, &SkgrepoRestriction::unrestricted (config))?;
       assert_eq!(
-        save_gnids (&plan . node_instructions),
+        instruction_gnids (&plan . node_instructions),
         // stowaway is on the new recursion surface.
         vec![ ID::from ("root"), ID::from ("stowaway") ]);
       assert_eq!(
@@ -248,7 +230,7 @@ async fn pipeline_ghost_subtree (
         extract_nonmergeSavePlan_locally (
           &forest, config, &SkgrepoRestriction::unrestricted (config))?;
       assert_eq!(
-        save_gnids (&plan . node_instructions),
+        instruction_gnids (&plan . node_instructions),
         // underneath is on the new recursion surface; the ghost
         // itself emits nothing and is not content of its parent.
         vec![ ID::from ("root"), ID::from ("underneath") ]);

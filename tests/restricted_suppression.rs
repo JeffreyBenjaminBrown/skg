@@ -18,31 +18,13 @@ use indoc::indoc;
 
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::skgrepo_sets::SkgrepoRestriction;
+use skg::test_utils::saved_node_by_gnid;
+use skg::test_utils::save_gnids;
 use skg::test_utils::run_with_skgrepo_set_test_db;
 use skg::types::misc::SkgrepoName;
 use skg::types::misc::{ID, members_of};
-use skg::types::nodes::complete::Graphnode;
-use skg::types::save::{NodeInstruction, SaveNode};
 
 use std::error::Error;
-
-fn save_gnids (instructions : &[NodeInstruction]) -> Vec<ID> {
-  instructions . iter ()
-    . filter_map ( |i| match i {
-        NodeInstruction::Save (SaveNode (node)) => Some (node . pid . clone ()),
-        _ => None } )
-    . collect () }
-
-fn saved_node_by_gnid<'a> (
-  instructions : &'a [NodeInstruction],
-  gnid           : &str,
-) -> &'a Graphnode {
-  instructions . iter ()
-    . find_map ( |i| match i {
-        NodeInstruction::Save (SaveNode (node))
-          if node . pid == ID::from (gnid) => Some (node),
-        _ => None } )
-    . unwrap_or_else ( || panic! ("no SaveNode for {}", gnid) ) }
 
 #[test]
 fn writes_to_restricted_nodes_are_suppressed_with_warning (

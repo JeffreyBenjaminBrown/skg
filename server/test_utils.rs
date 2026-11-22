@@ -45,7 +45,7 @@ use crate::types::views_state::{OpenViews, Perspective, ViewforestId, ViewnodeId
 use crate::types::config::{SkgConfig, Skgrepo};
 use crate::types::misc::{
   MSV, ID, TantivyIndex, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
-use crate::types::save::{NodeInstruction, SaveNode};
+use crate::types::save::{DeleteNode, NodeInstruction, SaveNode};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind };
 use crate::types::viewnode::{Vognode};
@@ -670,6 +670,47 @@ pub fn set_skgrepo_retagging_relRepos (
   if let MSV::Specified (v) = &mut node . aliases {
     for m in v . iter_mut () {
       m . relRepo = skgrepo . clone (); }} }
+
+/// The node that a save instruction among 'instructions' saves under
+/// 'gnid'. Panics if none does.
+pub fn saved_node_by_gnid<'a> (
+  instructions : &'a [NodeInstruction],
+  gnid         : &str,
+) -> &'a Graphnode {
+  opt_saved_node_by_gnid (instructions, gnid)
+    . unwrap_or_else ( || panic! ("SaveNode not found: {}", gnid) ) }
+
+/// The node that a save instruction among 'instructions' saves under
+/// 'gnid', if any does.
+pub fn opt_saved_node_by_gnid<'a> (
+  instructions : &'a [NodeInstruction],
+  gnid         : &str,
+) -> Option<&'a Graphnode> {
+  for instruction in instructions {
+    if let NodeInstruction::Save (SaveNode (node)) = instruction {
+      if node . pid == ID::from (gnid) {
+        return Some (node); }}}
+  None }
+
+/// The pid of each node that 'instructions' saves, in order; deletes
+/// are skipped ('instruction_gnids' includes them).
+pub fn save_gnids (
+  instructions : &[NodeInstruction],
+) -> Vec<ID> {
+  instructions . iter () . filter_map ( |instruction| match instruction {
+    NodeInstruction::Save (SaveNode (node)) => Some (node . pid . clone ()),
+    NodeInstruction::Delete (_) => None,
+  }) . collect () }
+
+/// The gnid of each node that 'instructions' saves or deletes, in
+/// order.
+pub fn instruction_gnids (
+  instructions : &[NodeInstruction],
+) -> Vec<ID> {
+  instructions . iter () . map ( |instruction| match instruction {
+    NodeInstruction::Save (SaveNode (node)) => node . pid . clone (),
+    NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid . clone (),
+  }) . collect () }
 
 /// Verify the current graph's recorderward relmaps after a mutation.
 pub fn audit_inrustgraph_or_panic (

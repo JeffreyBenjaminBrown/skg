@@ -30,6 +30,7 @@ use skg::test_utils::{run_with_skgrepo_set_test_db, save_added_forks};
 use skg::types::misc::SkgrepoName;
 use skg::test_utils::graph_handle_from_config;
 use skg::test_utils::{
+  opt_saved_node_by_gnid,
   save_ignoring_streamed_messages,
   empty_views_state,
   multi_root_view, multi_root_view_with_skgrepo_set};
@@ -39,7 +40,7 @@ use skg::types::views_state::ViewforestId;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, MSV, TantivyIndex, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
-use skg::types::save::{NodeInstruction, SaveNode};
+use skg::types::save::NodeInstruction;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::node_lookup::graphnode_by_gnid;
 use skg::from_text::buffer_to_validated_saveplan;
@@ -88,14 +89,6 @@ impl Fails {
 //////////////////////////////////////////////////////////////
 // Small helpers
 //////////////////////////////////////////////////////////////
-
-fn saved_node_by_gnid<'a> (
-  instructions : &'a [NodeInstruction], gnid : &str,
-) -> Option<&'a Graphnode> {
-  for instruction in instructions {
-    if let NodeInstruction::Save (SaveNode (node)) = instruction {
-      if node . pid == ID::from (gnid) { return Some (node); }}}
-  None }
 
 fn line_containing<'a> ( buf : &'a str, fragment : &str ) -> &'a str {
   buf . lines ()
@@ -682,7 +675,7 @@ async fn editable_forksFolder (
       swap_lines (&buf, "(gnid wSub-a)", "(gnid wSub-c)");
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&reordered, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
-    match saved_node_by_gnid (&nodes, "wSub-owner") {
+    match opt_saved_node_by_gnid (&nodes, "wSub-owner") {
       Some (n) => if members_msv (&n . forks) != MSV::Specified (vec![
           ID::from ("wSub-c"), ID::from ("wSub-b"), ID::from ("wSub-a")]) {
         fails . record (s, format! (
@@ -693,7 +686,7 @@ async fn editable_forksFolder (
     let edited : String = without_subtree_of (&buf, "(gnid wSub-b)");
     let nodes  : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
-    match saved_node_by_gnid (&nodes, "wSub-owner") {
+    match opt_saved_node_by_gnid (&nodes, "wSub-owner") {
       Some (n) => if members_msv (&n . forks) != MSV::Specified (vec![
           ID::from ("wSub-a"), ID::from ("wSub-c")]) {
         fails . record (s, format! (
@@ -707,7 +700,7 @@ async fn editable_forksFolder (
       &c_line, &format! ("{}\n{}", c_line, member_line (stars, "wSub-d")) );
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
-    match saved_node_by_gnid (&nodes, "wSub-owner") {
+    match opt_saved_node_by_gnid (&nodes, "wSub-owner") {
       Some (n) => if members_msv (&n . forks) != MSV::Specified (vec![
           ID::from ("wSub-a"), ID::from ("wSub-b"),
           ID::from ("wSub-c"), ID::from ("wSub-d")]) {
@@ -737,7 +730,7 @@ async fn hiddenFolder_delete_does_not_unhide (
     saveplan_nodes (&edited, config, &SkgrepoRestriction::unrestricted (config)) . await ?;
   // Either the recorder is a no-op (absent from the plan), or its SaveNode
   // still hides roHidden-a; in no case is roHidden-a unhidden.
-  if let Some (n) = saved_node_by_gnid (&nodes, "roHidden-owner") {
+  if let Some (n) = opt_saved_node_by_gnid (&nodes, "roHidden-owner") {
     let hides : Vec<ID> = match &n . hides {
       MSV::Specified (gnids) => members_of (gnids),
       MSV::Unspecified => Vec::new (), };
@@ -788,7 +781,7 @@ async fn omission_scenarios (
     let edited : String = without_subtree_of (&buf, "(gnid omWsub-active)");
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, &restriction) . await ?;
-    match saved_node_by_gnid (&nodes, "omWsub-owner") {
+    match opt_saved_node_by_gnid (&nodes, "omWsub-owner") {
       Some (n) => { let subs : Vec<ID> = match &n . forks {
           MSV::Specified (gnids) => members_of (gnids),
           MSV::Unspecified => Vec::new (), };

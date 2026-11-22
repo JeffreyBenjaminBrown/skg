@@ -48,6 +48,8 @@ use skg::assert_metadata_eq;
 use skg::serve::ViewsState;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
+  opt_saved_node_by_gnid,
+  saved_node_by_gnid,
   mk_test_tcp_stream_pair,
   empty_views_state,
   run_with_shared_test_stores,
@@ -58,7 +60,7 @@ use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
-use skg::types::save::{NodeInstruction, SaveNode};
+use skg::types::save::NodeInstruction;
 use skg::types::views_state::{Perspective, ViewforestId};
 use skg::serve::handlers::perspective::handle_set_perspective_request;
 use skg::serve::handlers::rerender_views::handle_rerender_views_request;
@@ -202,23 +204,6 @@ fn marked_lines<'a> (
   buf . lines ()
     . filter ( |l| l . contains (&fact) )
     . collect () }
-
-fn saved_node_by_gnid<'a> (
-  instructions : &'a [NodeInstruction],
-  gnid           : &str,
-) -> &'a Graphnode {
-  opt_saved_node_by_gnid (instructions, gnid)
-    . unwrap_or_else ( || panic! ("SaveNode not found: {}", gnid) ) }
-
-fn opt_saved_node_by_gnid<'a> (
-  instructions : &'a [NodeInstruction],
-  gnid           : &str,
-) -> Option<&'a Graphnode> {
-  for instruction in instructions {
-    if let NodeInstruction::Save (SaveNode (node)) = instruction {
-      if node . pid == ID::from (gnid) {
-        return Some (node); }}}
-  None }
 
 async fn node_instructions_from (
   buffer : &str,
