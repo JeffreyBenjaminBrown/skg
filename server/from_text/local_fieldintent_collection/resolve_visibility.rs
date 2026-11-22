@@ -109,74 +109,10 @@ pub fn resolve_visibility (
     // there after the save, whichever signal comes first.
     &mut lowered, member_as_such_visibility, graph, config,
     skgrepo_restriction ) ?;
-  for (forker, signal) in signals_of_role (
-    member_as_such_visibility, MemberAsSuch::Forkee ) {
-    let Some (forkee_from_disk) =
-      graphnode_from_graph (graph, &signal . member)
-    else { lowered . set_contains_of_new_member_as_such (
-             &signal . member, &signal . visible );
-           continue; };
-    let Some (forker_from_disk) =
-      graphnode_from_graph (graph, forker)
-    else { continue; };
-    let key : &dyn Fn (&ID) -> ID =
-      &|gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
-    let forker_contains : HashSet<ID> =
-      lowered . note_contains_after_save (
-        &forker_from_disk ) . iter () . map (key) . collect ();
-    let visible_content : HashSet<ID> =
-      signal . visible . iter () . map (key) . collect ();
-    let forkee_contains : Vec<ID> = // what the buffer could show of the forkee's content
-      members_with_visible_records (
-        &forkee_from_disk . contains, skgrepo_restriction );
-    let forker_hides : Vec<ID> = // a restricted hide the buffer could not show, so no save removes it
-      members_with_visible_records (
-        forker_from_disk . hides . or_default (),
-        skgrepo_restriction );
-    let shown_before : bool = // false for a member typed into the folder in this save
-      forks_folder_members_drawn (
-        graph, skgrepo_restriction, &forker_from_disk, is_diff_view )
-      . contains (&key (&signal . member));
-    let drawn_before : Vec<ID> = // what the view drew under the forkee
-      if ! shown_before { Vec::new () } else {
-        let hidden_contained_or_set_aside : HashSet<ID> =
-          forker_hides . iter ()
-          . chain ( members_with_visible_records (
-                      &forker_from_disk . contains, skgrepo_restriction ) . iter () )
-          . chain ( signal . in_integratedElsewhere_or_hiddenIn_folder . iter () )
-          . map (key) . collect ();
-        forkee_contains . iter ()
-          . filter ( |gnid| ! hidden_contained_or_set_aside . contains (&key (gnid))
-                            && ! kept_elsewhere_before_save (
-                                   graph, config, skgrepo_restriction, gnid,
-                                   &forkee_from_disk . pid ) )
-          . cloned () . collect () };
-    let inferred_hides : Vec<ID> =
-      drawn_before . iter()
-      . filter ( |gnid| ! visible_content . contains (&key (gnid)) )
-      . filter ( |gnid| ! forker_contains . contains (&key (gnid)) )
-      . filter ( |gnid| owned_notes_containing_after_save (
-                          &lowered, gnid, &forkee_from_disk . pid,
-                          graph, config, skgrepo_restriction ) . is_empty () )
-      . cloned()
-      . collect();
-    let inferred_unhides : Vec<ID> = { // as the forker's hides name them
-      let forkee_contains_keys : HashSet<ID> =
-        forkee_contains . iter () . map (key) . collect ();
-      forker_hides . iter ()
-        . filter ( |gnid| visible_content . contains (&key (gnid))
-                          && forkee_contains_keys . contains (&key (gnid)) )
-        . cloned () . collect () };
-    if inferred_hides . is_empty() && inferred_unhides . is_empty()
-      { continue; }
-    if ! config . skgrepo_is_owned (&forker_from_disk . home_skgrepo) {
-      return Err ( Box::new ( BufferValidationError::Other (
-        refusal_to_change_what_a_foreign_note_hides (
-          &forker_from_disk, &forkee_from_disk, MemberAsSuch::Forkee ) ))); }
-    lowered . apply_hiderel_delta_to_hider (
-      forker_from_disk,
-      &inferred_hides,
-      &inferred_unhides ); }
+  resolve_forkee_visibility (
+    &mut lowered,
+    signals_of_role ( member_as_such_visibility, MemberAsSuch::Forkee ),
+    graph, config, skgrepo_restriction, is_diff_view ) ?;
   resolve_forker_visibility (
     &mut lowered,
     signals_of_role ( member_as_such_visibility, MemberAsSuch::Forker ),
@@ -313,6 +249,90 @@ fn add_children_placed_under_member_as_such (
       contains . iter () . position ( |member| key (member) == key (gnid) )
     { follows = Some (position); }}
   lowered . set_contains_of_member_as_such (member_from_disk . clone (), contains);
+  Ok (( )) }
+
+/// The forkee-visibility step (the module's header gives its policy),
+/// for each forkee E shown as such in the forks folder of a forker R:
+/// what the view drew under E that the buffer no longer shows there
+/// is hidden in R, unless R or an owned note but E contains it after
+/// the save, and what R hides that the buffer shows claiming under E
+/// is unhidden. A foreign R records neither, so such a save is
+/// refused ('refusal_to_change_what_a_foreign_note_hides').
+fn resolve_forkee_visibility<'a> (
+  lowered             : &mut LoweredNodeIntents,
+  signals             : impl Iterator<Item = &'a (ID, MemberAsSuchVisibility)>,
+  graph               : &InRustGraph,
+  config              : &SkgConfig,
+  skgrepo_restriction : &SkgrepoRestriction,
+  is_diff_view        : bool,
+) -> Result<(), Box<dyn Error>> {
+  for (forker, signal) in signals {
+    let Some (forkee_from_disk) =
+      graphnode_from_graph (graph, &signal . member)
+    else { lowered . set_contains_of_new_member_as_such (
+             &signal . member, &signal . visible );
+           continue; };
+    let Some (forker_from_disk) =
+      graphnode_from_graph (graph, forker)
+    else { continue; };
+    let key : &dyn Fn (&ID) -> ID =
+      &|gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
+    let forker_contains : HashSet<ID> =
+      lowered . note_contains_after_save (
+        &forker_from_disk ) . iter () . map (key) . collect ();
+    let visible_content : HashSet<ID> =
+      signal . visible . iter () . map (key) . collect ();
+    let forkee_contains : Vec<ID> = // what the buffer could show of the forkee's content
+      members_with_visible_records (
+        &forkee_from_disk . contains, skgrepo_restriction );
+    let forker_hides : Vec<ID> = // a restricted hide the buffer could not show, so no save removes it
+      members_with_visible_records (
+        forker_from_disk . hides . or_default (),
+        skgrepo_restriction );
+    let shown_before : bool = // false for a member typed into the folder in this save
+      forks_folder_members_drawn (
+        graph, skgrepo_restriction, &forker_from_disk, is_diff_view )
+      . contains (&key (&signal . member));
+    let drawn_before : Vec<ID> = // what the view drew under the forkee
+      if ! shown_before { Vec::new () } else {
+        let hidden_contained_or_set_aside : HashSet<ID> =
+          forker_hides . iter ()
+          . chain ( members_with_visible_records (
+                      &forker_from_disk . contains, skgrepo_restriction ) . iter () )
+          . chain ( signal . in_integratedElsewhere_or_hiddenIn_folder . iter () )
+          . map (key) . collect ();
+        forkee_contains . iter ()
+          . filter ( |gnid| ! hidden_contained_or_set_aside . contains (&key (gnid))
+                            && ! kept_elsewhere_before_save (
+                                   graph, config, skgrepo_restriction, gnid,
+                                   &forkee_from_disk . pid ) )
+          . cloned () . collect () };
+    let inferred_hides : Vec<ID> =
+      drawn_before . iter()
+      . filter ( |gnid| ! visible_content . contains (&key (gnid)) )
+      . filter ( |gnid| ! forker_contains . contains (&key (gnid)) )
+      . filter ( |gnid| owned_notes_containing_after_save (
+                          lowered, gnid, &forkee_from_disk . pid,
+                          graph, config, skgrepo_restriction ) . is_empty () )
+      . cloned()
+      . collect();
+    let inferred_unhides : Vec<ID> = { // as the forker's hides name them
+      let forkee_contains_keys : HashSet<ID> =
+        forkee_contains . iter () . map (key) . collect ();
+      forker_hides . iter ()
+        . filter ( |gnid| visible_content . contains (&key (gnid))
+                          && forkee_contains_keys . contains (&key (gnid)) )
+        . cloned () . collect () };
+    if inferred_hides . is_empty() && inferred_unhides . is_empty()
+      { continue; }
+    if ! config . skgrepo_is_owned (&forker_from_disk . home_skgrepo) {
+      return Err ( Box::new ( BufferValidationError::Other (
+        refusal_to_change_what_a_foreign_note_hides (
+          &forker_from_disk, &forkee_from_disk, MemberAsSuch::Forkee ) ))); }
+    lowered . apply_hiderel_delta_to_hider (
+      forker_from_disk,
+      &inferred_hides,
+      &inferred_unhides ); }
   Ok (( )) }
 
 /// The forker-visibility step ('docs/forks.org', "Cutting from a
