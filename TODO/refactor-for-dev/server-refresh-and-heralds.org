@@ -1,0 +1,80 @@
+* Refactoring for dev: 'server/refresh/', the heralds, the rerender pass
+  The territory: everything under 'server/refresh/', plus the
+  top-level files of 'server/' that draw views and compute heralds:
+  'server/heralds.rs', 'server/herald_descriptions.rs',
+  'server/herald_tokens.rs' and 'server/rerender_pass.rs'. The focused
+  tests for it are 'bash/nextest.sh --lib --test grouped_views --test
+  grouped_forks --test grouped_unit' (about forty seconds warm); add
+  '--test grouped_saves --test grouped_repos' when touching
+  'server/rerender_pass.rs'.
+
+  The territory was already well factored: the refresh's rungs are
+  short functions, each with a comment that 'docs/' cites by file. So
+  most of the remaining candidates below are moves that would leave
+  those citations stale.
+* Done
+** The viewnode stats pass carries its inputs in one 'ViewnodestatsPass'
+   'set_viewnodestats_recursive' took eleven arguments and
+   'set_herald_strings_in_viewnode' twelve ('server/refresh/viewnodestats.rs');
+   the eight pass-wide ones are now one struct.
+** 'relationship_member_stands_for' names the relationship 'set_relRepo' compares
+   The (recorder, relation, target) that a member position represents
+   was worked out inline in the 69-line 'set_relRepo'.
+** A save's rerender carries the saved view as one 'SavedView'
+   'update_views_after_save' ('server/rerender_pass.rs') handed four
+   values separately to 'withhold_save_rerender' (ten arguments) and
+   'register_saved_view' (eight); its two text-release gates now both
+   ask 'save_rerender_release'.
+** 'record_of_relationship_is_visible' is the one relRepo gate of the viewnode stats
+   'flag_ancestor_relations' and 'relationship_is_visible' each spelled
+   it out.
+** An obsolete problem entry went to 'TODO/DONE/problems.org'
+   "New relationship folders are populated before their completion
+   visit" named 'server/to_org/', which the refresh rewrite deleted;
+   'add_folders' now adds folders empty.
+* Candidates left, best first
+** Split 'server/refresh/visit.rs' (1521 lines) along its rung sections
+   The file is already divided by comment headers into the eight rungs
+   ("1. re-kind" through "8. requests"). Substitution (about 350
+   lines, from 'substitute_mirrors' on) and claims (about 230 lines)
+   would each make a file an agent could read alone. The moves are
+   mechanical, but 'docs/' (generated; edit through 'skg-system/')
+   cites many of these functions as "in 'server/refresh/visit.rs'":
+   'docs/glossary.org' six times, 'docs/mirrors.org' and
+   'docs/api-and-formats.org' for 'substitute_mirrors' and
+   'substitute_roots', 'docs/forks.org' and 'docs/data-model_technical.org'.
+   Those notes must change in the same commit, or the docs lie.
+** Split the conformance code off 'server/heralds.rs' (1135 lines)
+   Lines from "Consistency of shared/herald-styles.json" to the end
+   (about 390 lines) only check the table against the styles file and
+   the server's vocabulary; the table and its serialization are the
+   first 735. A file 'server/herald_conformance.rs' would hold them.
+   Callers: 'server/main.rs' ('herald_styles_inconsistencies'),
+   'server/herald_descriptions.rs' ('emittable_kind_atoms',
+   'text_emitting_rule_paths'), and 'tests/unit/heralds.rs', which is
+   mounted as the module's tests and would need its imports changed.
+   'docs/heralds.org' cites 'client_computed_atoms' in
+   'server/heralds.rs', so its note must change too.
+** One setter for an occurrence's view stats in 'viewnodestats.rs'
+   Six setters end with the same three lines, 'if let Occurrence (t)
+   = &mut tree . get_mut (treeid) ... { t . viewStats . X = Y; }'.
+   A helper taking a closure would make each one line. ego_tree 0.11
+   has no 'NodeMut::into_value', so a helper cannot return the
+   '&mut ViewnodeStats'. Safe; small gain.
+** PARTNER_ROLE_VOCAB's glyph column and 'RelationRole::glyph()'
+   'TODO/problems.org' calls these vestigial: only a self-consistency
+   test reads 'glyph()'. They are in 'server/dbs/in_rust_graph/relation_accessors.rs',
+   outside this territory, and deleting the test would need the
+   coordinator's word.
+** 'update_views_after_save' still takes twelve arguments
+   Its caller ('server/serve/handlers/save_buffer.rs', outside the
+   territory) could build the 'SavedView' itself, and the restriction,
+   environment and runtime could travel as one value. That changes a
+   handler's code; worth it only alongside other work there.
+** 'sentences_for_path' in 'server/herald_descriptions.rs' (128 lines)
+   One match from metadata path to sentence, mostly literal text. It is
+   long but flat; splitting it would scatter what a reader wants in one
+   place. Leave it.
+** The herald rule-table retirement
+   'TODO/problems.org', "Herald rule-table retirement remains separate":
+   a feature change to the protocol, not a refactor.
