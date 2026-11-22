@@ -6,50 +6,13 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
-* Problems noticed while refactoring tools/ (2026-11-22)
-** 'skg_filenames_match_pids' reads a key no '.skg' file has
-  'tools/introspect/skg_filenames_match_pids.rs' takes a file's IDs
-  from 'ids', but a '.skg' file names them 'pid' and 'extra_ids', so
-  it can find nothing. Its default folder, 'data/skg', is gone, and
-  its header names it by two bin names. It still builds, as a [[bin]]
-  of the root 'Cargo.toml'.
-** 'bench-prominence-inmemory' defaults to a config that is gone
-  'tools/bench-prominence-inmemory.rs' reads 'data/real/skgconfig.toml'
-  when given no config; its siblings 'top-contents' and
-  'top-contentward-descendants' moved to 'data/jeff/skgconfig.toml'.
-* Problems noticed while writing the Neovim client's module headers (2026-11-22)
-  Found reading 'nvim/' for its headers; none reproduced, none fixed.
-** The "and close this" gotos discard the left buffer's unsaved edits
-  'goto_then_close' ('nvim/lua/skg/id_search.lua', and a copy in
-  'goto_git.lua') clears 'modified' and force-deletes the buffer it
-  leaves, also when the goto found nothing to open without raising.
-  Emacs's 'kill-buffer' would ask about unsaved edits.
-** The plain-diff fallback of goto-in-git shows nothing for an untracked file
-  'open_plain_diff_at' ('nvim/lua/skg/goto_git.lua') falls back to
-  'git diff --cached', so an untracked file reports "no unstaged or
-  staged changes" instead of being shown.
-** The link-to-branch refusals name the other command
-  'container_data' and 'check_container' ('nvim/lua/skg/modify_graph.lua')
-  serve 'replace_link_with_content' too, but always refuse with
-  "Cannot replace this branch with a link".
-** The log names an unnamed caller "file:nil"
-  'calling_function_name' ('nvim/lua/skg/log.lua') asks
-  'debug.getinfo' for 'nS' and then reads 'currentline', which only
-  'l' fills.
-** User-visible texts that tell history or carry a bad rename
-  'keymaps.invoke' says a command "is not available yet (MODULE has
-  not landed)", though every command's module loads (a spec checks
-  it). The recovery document ('nvim/lua/skg/recovery.lua', and
-  'elisp/skg-recovery.el') says "Each repo block is one JSON string",
-  probably "src block" before a rename of "repo". The 'ViewNewEmpty'
-  command's description says "in a chosen repo", but
-  'view_new_empty' asks for none.
-** A lazy reconnect keeps the old herald rules
-  Only 'init' fetches the herald rule table; the reconnect that
-  'skg.client.send_string' makes for a later request does not, so a
-  restarted server with new rules leaves the Neovim client on the old
-  table until ':SkgInit' or ':SkgReload'.
-* The search-results response is printed by the 'sexp' crate (2026-11-22)
+  Entries stand under the part of the code they concern (the parts
+  of 'TODO/refactor-for-dev/'), newest first, so read only your
+  part. File a new entry at the top of its part, its date in its
+  headline. Where a check against the code could not confirm an
+  entry, a line beginning "Checked DATE" says why.
+* Server: serve and handlers ('server/serve.rs', 'server/serve/')
+** The search-results response is printed by the 'sexp' crate (2026-11-22)
   'mk_search_results_sexp' ('server/serve/handlers/text_search.rs')
   prints its Sexp with the crate's 'to_string', which prints an empty
   string atom as nothing; 'server/serve/util.rs' says every response
@@ -58,85 +21,118 @@
   would send '(content )' or a missing warning. Neither happens today
   (a search with no hits answers with a message), so nothing breaks;
   printing through 'sexp_to_client_string' would remove the exception.
-* all-tests.sh never plays its completion sound (2026-11-22)
-  'bash/all-tests.sh' sets 'BEEP' to a path and an argument in one
-  string ("$PROJECT_ROOT/../sound/play-beep.sh beep-soothing") and then
-  tests '[ -x "$BEEP" ]', which no file passes; so the sound never
-  plays, and '--no-sound' changes nothing. (The script is also absent
-  in the container.) Splitting the path from the argument would fix it.
-* 'detach' can show where no save would detach anything (2026-11-20)
-  The clients draw =detach= ('pendingDetachment', 'docs/heralds.org')
-  from a headline's own metadata and its parent's, so it can be wrong
-  where that metadata is stale or the parent reads claims only for
-  the clients. Found reading the code, none reproduced:
-  - 'shared/herald-styles.json' does not list 'idFolder' as
-    write-protected, so the clients let =C-c s t= write 'noClaim' on an
-    ID and show =detach=, but the server reads no claims there
-    ('server/types/viewnode.rs' ~871), and the save ignores it.
-  - A headline carrying 'noClaim' where it was drawn (a forker-only
-    member of a forks folder, say) and then moved under an editable
-    node keeps its old warrant, so it shows =detach= though the new
-    parent's list never named it.
-  - A rerender of a stored view can leave a member of a forks or alias
-    folder 'noClaim' after its occurrence turns editable again:
-    'ensure_editableOccurrences_exist'
-    ('server/diff_view/buffer_rerender.rs' ~255) resets only direct
-    children, 'merge_editability' ('server/refresh/editability.rs'
-    ~450) and a ghost turned occurrence ('server/refresh/id_rule.rs'
-    ~228) reset nothing; the next save would then delete that alias or
-    end that fork.
-  Checked 2026-11-22: could not confirm the first case still holds,
-  because "~871" in 'server/types/viewnode.rs' no longer points at
-  where claims are read, and the ID property member
-  ('PropertyMember::ID', ~545) now carries a 'claimsMembership' field.
-* Skg does not count a link whose label wraps across lines (2026-11-20)
-  Org reads =[[id:X][a label\nthat wraps]]= as a link (a blank line
-  ends it), and filling a paragraph makes such links. The server's
-  link pattern ('LINK_PATTERN' in 'server/types/links.rs') does not
-  cross a line break, so for the server ('linksTo' and what derives
-  from it, save-time dangling-link warnings, absent-reference cleanup,
-  the vanished-node check, search text) such a link is plain text. The Markdown/Org importer creates
-  them from wrapped links in its input. Only the Org exporter reads
-  them ('links_with_wrapped_labels_and_ranges_from_text'). Making
-  'LINK_PATTERN' match them would change what counts as a link
-  everywhere, and the Neovim client's patterns would need the same
-  change.
-* The diff view cannot mark a change only the files show (2026-11-20)
-  A commit of the processed leaves out a node one of whose files, at
-  HEAD or in the worktree, is not byte for byte what skg writes for it
-  ('files_hold_more_than_their_node' in 'server/diff_view/other_changes.rs';
-  'docs/diff-view.org', "Changes no mark covers"): a hand-formatted
-  file, say, or one an older skg wrote with another field order. The
-  diff view does not show that change, since finding it reads each
-  changed file from Git, which the straddle does not; only a commit of
-  everything, or Git, takes such a node. A file that differs from HEAD
-  only in bytes the parser does not read is no changed node of the
-  straddle at all. Both could be one more kind of the node's other
-  changes ('OtherChange'), its fingerprint the two blobs, once the
-  straddle reads the changed files of the nodes that differ (and Git's
-  list of changed files, for the second), at each re-pairing.
-* A request's 'skg-lp-reset' can drop another request's reply (2026-11-19)
-  Seen measuring saves: a link-status request sent while views were
-  being opened never got its reply handled, and stayed in
-  'skg-link-annotations--requests' (its buffer unpainted, and
-  'skg-lp--pending-count' one too high). Each view, search and save
-  request calls 'skg-lp-reset' before sending, which empties
-  'skg-lp--buf'; a reply already partly read into it is lost, and the
-  rest of it is then read as a header. Link-status requests go out
-  after every save and every redraw, so they are the replies most
-  often in flight.
-* A save's remaining client cost, after the redraw fixes (2026-11-19)
-  Measured in 'emacs -nw' (a real frame, -Q, compiled), saving a
-  265 KB view of Jeff's data whose save redraws four other mostly
-  folded views: about 0.6 s, half of it garbage collection at the
-  default 'gc-cons-threshold'. The largest parts: heralds computed for
-  every line of each view redrawn whole, folded or not (about 110 ms
-  for a 2,500-line view, before its share of collection); the collateral
-  views' whole redraws themselves, which 'TODO/general-fast-diffView/1_3_plan.org'
-  slice 5 would turn into patches; and the outbound buffer snapshot
-  (60-75 ms, twice per fork), whose atoms are merged by a metadata
-  edit per headline in a temporary buffer.
-* IDs compared letter for letter outside every-mirror's diff (2026-11-17)
+** A stale-buffer warning names the note when only its forker changed (2026-11-16)
+  Found by the probe pass of every-mirror plan 2 ('TODO/every-mirror/review-2-probes.org',
+  observation of 35). Client A holds N's view, where R, a forker as
+  such, shows what it adds to N. Client B adds a child to R. A's save
+  of its unchanged view writes nothing, as it should, but warns "Left
+  as the graph has it: N (N), which changed after this buffer was
+  rendered ...", though N did not change: the baseline, parsed
+  against the new graph, reads R's new child as cut from R (absent
+  under R in the baseline), so the baseline's N would fork R and hide
+  the child, which differs from the graph, and N is judged stale. An
+  edit of N in that buffer would be refused for the same reason. The
+  cause is that the stale check ('server/serve/handlers/save_staleness.rs')
+  extracts the baseline's writes against today's graph, and a member
+  as such's partial content is read against the member's list as it
+  is now. Nothing is lost or made up; the warning and the refusal are
+  wrong. A fix would read a member as such's cuts in the baseline
+  against what that baseline drew, not against the graph. (Every-mirror
+  plan 3, slice 4, did so for a child the buffer shows in the member's
+  folder of what the user keeps elsewhere, or of what the note hides
+  in it; a child added to the member since the buffer was drawn is
+  still read as cut.)
+** The hidden-outside save's notice checks forkees only (2026-11-16)
+  Found by every-mirror plan 3, slice 4's sweep.
+  'post_skgsave_commit_hiddenoutside_warnings'
+  ('server/serve/handlers/save_buffer.rs') says that a hide typed
+  into the folder of what a note hides outside its fork partners
+  "moved to HiddenInForkPartnerFolder" only when one of the note's
+  forkees contains the hidden node. Since every-mirror plan 2 a
+  forker-only member's content explains a hide too, and since plan 3
+  an indirect member's: a hide typed there of something only such a
+  member contains is drawn in that member's hidden-in folder, and the
+  save says nothing of the move. The check should read the folder's
+  members ('forks_folder_members_shown').
+** Every small server response waits about 40 ms for Nagle (2026-11-06)
+  'send_response_with_length_prefix' ('server/serve/util.rs:61')
+  writes the length header and the payload in two 'write_all'
+  calls on a stream without 'set_nodelay', so the payload waits
+  for the client's delayed ACK. Measured: 41 ms round trips for
+  5-8 ms of server work. One write per message, or
+  'set_nodelay(true)' on accepted streams, removes it. Also
+  noted: 'ProcessedStore::save' ('server/diff_view/processed_store.rs',
+  formerly 'ReadinessStore') uses 'fs::write', which is not atomic.
+** The save handler's checks depend on their position in it (2026-11-05)
+  In 'update_from_and_rerender_buffer_with_approvals'
+  ('server/serve/handlers/save_buffer.rs') one vector,
+  'nonmerge_nodeInstructions', starts as the buffer's writes and
+  accumulates derived writes (restore requests, delete
+  propagation, strandeds resets, Hoist repairs, fork clones) as
+  the handler proceeds. A NodeInstruction does not record whether
+  the buffer asked for it or the save derived it, so a check that
+  must see only the buffer's writes ('stale_write_errors') is
+  correct only because of where in the handler it runs. A
+  provenance tag on NodeInstruction, or separate vectors until
+  the final concatenation, would make such checks
+  position-independent. Deferred by Jeff (2026-11-05); see
+  'TODO/merge-save-refused/2_1_principles.org', "The checks are
+  defined by their position in the handler".
+** Problems noticed while executing plan 19, slice 12 (2026-10-24)
+*** Two texts with a bare "repo"
+  The overPrivateText release warning says "selected below its node's
+  home repo" ('server/serve/handlers/text_release.rs', two messages),
+  where the glossary asks for "home skgrepo"; 'docs/api-and-formats.org'
+  now quotes the code.
+** Cosmetic: api-and-formats.org says search filters "before grouping" (2026-07-06)
+  (Filed under "Problems noted while writing forking-and-privacy.org".)
+   The text-search section says the skgrepo restriction is applied
+   "before grouping, ranking, alias/title selection, and display
+   truncation". In code ('server/serve/handlers/text_search.rs'),
+   'group_matches_by_gnid' runs first and
+   'filter_match_groups_to_unrestricted_skgrepos' then filters the groups,
+   before ranking and truncation. Behaviorally identical (groups are
+   per-ID and skgrepo is a function of ID), so this is a doc wording
+   nit only.
+** Initialization warning files can be easy to miss (2026-05-06)
+  (Filed under "Other problems".)
+   On 2026-05-06, startup completed and logged "Server ready", but
+   data/ also contained:
+
+   - initialization-error_duplicate-ids.org: duplicate id
+     0a6dcf44-6c2c-432a-90a7-babfbb3e0b7d in pers-deprecated and public.
+   - initialization-error_unreadable-skg-files.org: unreadable
+     /home/ubuntu/data/private for skgrepo private.
+
+   These did not block connection verification, but they are important
+   enough that the client should probably surface them after init.
+   NOTE (2026-07-28): the duplicate-id example above predates the
+   privacy telescope. One id in two skgrepos is now the normal shape of
+   any node with a privatized relationship, not a defect. The entry's point --
+   init warning files are easy to miss -- still stands; only the
+   illustration is stale. See [[../dup-ids-maybe-bad.org]].
+   Checked 2026-11-22: still holds. The duplicate-id report is now
+   'initialization-error_ids-claimed-by-two-nodes.org'
+   ('server/dbs/filesystem/multiple_nodes.rs'). Since 869bef743
+   (2026-10-20) the clients show the server's startup warnings in a
+   buffer ('skg-request-server-warnings.el'), but those warnings
+   do not include these report files.
+** Long-running SKG server can hide code/protocol fixes (2026-05-04)
+  (Filed under "Other problems".)
+   On 2026-05-04, the server process listening on port 1730 was still
+   an older / already-running binary. It accepted 'titles by ids'
+   requests and logged them, but did not send responses, while the
+   current source-level handler test sent a parseable response. This
+   makes client bugs look nondeterministic after code changes. A small
+   version/build-id endpoint, or logging the executable build hash at
+   startup, would make stale-server cases obvious.
+   PARTLY RESOLVED 2026-07-03 (fable-cleans-up): the logging remedy is
+   done -- startup now logs the executable's path and age ("Server
+   binary exe=... binary_age=...", server/main.rs, right after
+   init_tracing). Open only in case a client-visible version endpoint
+   is still wanted.
+* Server: from_text and save ('server/from_text/', 'server/save.rs', 'server/nodeMerge.rs')
+** IDs compared letter for letter outside every-mirror's diff (2026-11-17)
   Seen during "IDs compared as equivalence classes"
   (TODO/every-mirror/progress.org, plan 4), on lines the branch did
   not change; none fixed or reproduced. Each compares
@@ -165,7 +161,7 @@
     'server/git_ops/vanished.rs'), so an
     unknown ID that was an extra ID of a vanished note is reported as
     never present.
-* A headline whose 'writeProtected' mark is gone is read as the node's whole content (2026-11-17)
+** A headline whose 'writeProtected' mark is gone is read as the node's whole content (2026-11-17)
   Found while fixing "A moved headline whose content was not drawn"
   (TODO/every-mirror/progress.org, plan 4). Older than every-mirror.
   The save reads an occurrence's editability from its line alone, and
@@ -189,7 +185,7 @@
   could be closed in the clients: cycling 'writeProtected' off could
   write an editable-view request instead, which draws the content
   before anything of it is read.
-* A fork's creation-time hides ignore what the user keeps elsewhere (2026-11-16)
+** A fork's creation-time hides ignore what the user keeps elsewhere (2026-11-16)
   Found by every-mirror plan 3, slice 3 (its record, "Unfinished").
   'build_fork_clone' ('server/from_text/fork.rs') hides in the clone
   every child the forking edit deleted, without asking whether the
@@ -198,19 +194,169 @@
   user keeps elsewhere anyway) and harmless (it stands in the
   hidden-in folder instead, and moving it out unhides it), but it is
   the one hide the save still writes for a child the user keeps.
-* The hidden-outside save's notice checks forkees only (2026-11-16)
-  Found by every-mirror plan 3, slice 4's sweep.
-  'post_skgsave_commit_hiddenoutside_warnings'
-  ('server/serve/handlers/save_buffer.rs') says that a hide typed
-  into the folder of what a note hides outside its fork partners
-  "moved to HiddenInForkPartnerFolder" only when one of the note's
-  forkees contains the hidden node. Since every-mirror plan 2 a
-  forker-only member's content explains a hide too, and since plan 3
-  an indirect member's: a hide typed there of something only such a
-  member contains is drawn in that member's hidden-in folder, and the
-  save says nothing of the move. The check should read the folder's
-  members ('forks_folder_members_shown').
-* A forks-folder member's containers folder is drawn only when the member is (2026-11-16)
+** The server reads a title that starts "(skg" as metadata (2026-10-31)
+  (Filed under "Problems noticed while executing plan 10, slice 5".)
+  'headline_to_triple' ('server/from_text/buffer_to_viewnodes/
+  uninterpreted.rs') takes a headline whose text after the stars
+  starts with "(skg" for metadata, so '* (skgrepos are cool) title'
+  is parsed as metadata and refused. Slice 5 made both clients read
+  metadata only where "(skg" is followed by a space or ")"
+  ('skg--metadata-opening-regexp', 'metadata_opening_pattern'); the
+  server's parser was not in the slice's list. Traced, not run.
+** The acquired folder refuses what the API doc says it accepts (2026-10-31)
+  (Filed under "Problems noticed while executing plan 10, slice 5".)
+  'validate_acquired_folder' ('server/from_text/buffer_to_viewnodes/
+  local.rs') admits only ghosts and occurrences, while
+  'docs/api-and-formats.org' says "An acquiredFolder also accepts a
+  child the user puts there, which claims nothing", so an unknown or
+  restricted viewnode put there is refused. Found while writing
+  slice 5's test of the admission rule, which leaves the acquired
+  folder out. Traced, not run.
+** Problems noticed while executing plan 10, slice 2 (2026-10-31)
+  Found by repeating the search of
+  'TODO/simplify-refresh/09_1_review-reports/restriction-edits.org'
+  (no longer in the tree) after the slice's fixes (read, not run,
+  unless said).
+*** A strandeds reset can move a hide across the skgrepo restriction
+  'stranded_relationships' ('server/from_text/strandeds.rs') runs
+  after the save's check of records landing restricted, takes no
+  skgrepo restriction, and computes a hide's new default with
+  'hide_skgrepo', which counts restricted subscriptions. With three
+  owned skgrepos and the restriction {public, semi}: r subscribes to
+  e1 (public) and e2 (private), both containing y, and hides y at
+  public; one save drops the subscription to e1 and moves y to semi.
+  The hide is raised automatically to private, and the warning names
+  'private'. Conversely a restricted hide whose new default is
+  visible is listed in the strandeds confirmation (a leak), and
+  resetting it moves the record into view. Traced, not run.
+*** A pasted headline for a member with a restricted record reorders it
+  Without a relRepo request, a headline pasted under r for m, which
+  r contains by a restricted record, is woven as already placed: the
+  record stays in its restricted section, but the weave may reorder
+  that section, and the pasted line vanishes from the view with no
+  warning. With an explicit relRepo request the save is now refused
+  ('RecordMovedOutOfRestrictedSkgrepo'). Read, not run.
+*** An explicit fork of a private node names it in the clone's home
+  'build_fork_clone' records the clone's 'subscribesTo' and
+  'overrides' of N at the clone's home with no floor, and copies N's
+  title and body there: forking a private owned N into a public
+  clone publishes N's ID, title and body. The user chooses the
+  clone's skgrepo in the confirmation buffer, so this may be
+  intended; it breaks the default floor rule for those two records.
+  Under any skgrepo-set. Read, not run.
+*** The moved-hide warning names restricted subscribees
+  The warning the save answers when a hide moves into a
+  subscribee's folder names the subscribees it moved among,
+  restricted ones included: a read leak, not a write. Found by
+  the slice's repeat of the search; filed by the orchestrator.
+  Read, not run.
+** Ordinary saves and node merges have different index application policies (2026-09-25)
+  (Filed under "Findings from the simplification reconnaissance".)
+  Research and proposed slices: [[file:astra-cleans-up.org][Making Skg easier to change]].
+  These are source-inspection findings; no application changes or runtime
+  reproduction were performed during the review.
+   'server/save.rs::apply_nodeInstructions' queues Tantivy updates with computed
+   context types. 'server/nodeMerge.rs::apply_prepared_nodeMerges' writes
+   synchronously with an empty context map and rebuild-on-failure behavior;
+   its comment defers context refresh to rebuild. A common application
+   boundary could reduce duplication, but unifying the index policy changes
+   timing, recovery, and potentially ranking. State and test that contract
+   before treating this as a mechanical refactor.
+** Dead-link warnings miss targets deleted by the same save (2026-09-13)
+  =dead_link_warnings= regards every ID present in the pre-save graph as
+  live. Therefore, when one buffer both saves a text link and deletes that
+  link's target, the final graph contains a dangling link but no warning is
+  emitted. Computing final ID existence must account for Save, Delete,
+  fork, and nodeMerge outcomes together; merely subtracting Delete intents
+  would mishandle IDs retained by a merge.
+** Fork deliberate-pick rule is enforced only client-side (2026-07-06)
+  (Filed under "Problems noted while writing forking-and-privacy.org".)
+   docs/forks.org promises "approving before you have set every
+   clone's skgrepo is refused", to keep a fork from silently landing
+   in a default skgrepo. The refusal lives in 'skg-approve-fork'
+   (checks for the PICK-A-REPO placeholder); the server's only
+   backstop is that the placeholder is not a configured skgrepo. A
+   client that re-sends the save with (fork-approved . "true") and NO
+   (fork-repos ...) field commits the clones into the
+   inferred-or-default skgrepo ('fork_spec_from_buffer_node' falls
+   through user-set -> inferred -> default) -- exactly the silent
+   default the docs rule out. Immaterial while Emacs is the only
+   client; if other clients appear (nvim/), consider having the
+   server refuse an approved save whose fork_repos map does not
+   cover every fork spec.
+   Checked 2026-11-22: still holds. The Neovim client exists now and
+   refuses the placeholder too ('nvim/lua/skg/save/confirmations.lua');
+   the server's fallback is in 'server/from_text/fork.rs'.
+** Performance: the save-buffer pathway (see profiling-save.org) (2026-06-05)
+  Profiling the save of an insert-a-child edit (node 846207ef, 'doing')
+  found four inefficiencies, in impact order. Full evidence, numbers,
+  and recommendations are in the top-level 'profiling-save.org'.
+  (Two of the four -- the override full-scan and the Tantivy double
+  commit -- are fixed; their entries are in TODO/DONE/problems.org.)
+*** Save cost degrades 3-4x within a session of repeated saves
+   404 ms -> 1220 ms over 11 consecutive saves; a 'rebuild dbs' resets
+   it. Cause: each tiny Tantivy commit spawns a segment and merges fall
+   behind. Mostly fixed by the single-commit change (see the Tantivy
+   entry in TODO/DONE/problems.org); also consider debouncing commits
+   (Tantivy is a rebuildable cache) and dropping the forced per-commit
+   'reader.reload()' in production.
+   Checked 2026-11-22: could not confirm it still holds. Since
+   dd117a31b (2026-06-05) the Tantivy commit runs in the background,
+   off the save's response; each commit still forces
+   'reader.reload()' ('server/dbs/tantivy/write.rs':175). The
+   top-level 'profiling-save.org' was deleted (f30dc06f8).
+** Problems found during herald overhaul research (2026-05-20)
+*** (mostly fixed) Save validation and extraction use different edit-request surfaces
+   The save extraction path uses 'collect_savenode_candidates' to define
+   which view positions can produce save/merge instructions. Some
+   validation still walks the whole viewforest directly, especially
+   merge validation and contradictory instruction collection.
+
+   That can make validation and execution disagree for edit metadata
+   placed under display/non-vognode positions: validation may see it even
+   when extraction ignores it, or vice versa if the candidate policy
+   changes. The cleaner fix is probably to validate write-intent
+   metadata through the same candidate/role policy used by extraction,
+   and explicitly reject edit requests outside that surface.
+
+   Mostly fixed 2026-06-10 by local instruction collection: extraction
+   now recurses into every position, so an editable node's self-edits
+   (including edit requests) are honored wherever validation can see
+   them. The residual gap is positions where edit requests are
+   deliberately ignored rather than rejected: a Delete or nodeMerge
+   request on a subscribee-as-such is silently dropped, which validation
+   could instead flag.
+   Checked 2026-11-22: could not confirm the residual still holds,
+   because 'collect_savenode_candidates' is gone and no server code
+   says "subscribee" any more (a member as such of a forks folder is
+   the nearest successor); I did not test a Delete request there.
+* Server: refresh and heralds ('server/refresh/', 'server/heralds.rs' and kin)
+** 'detach' can show where no save would detach anything (2026-11-20)
+  The clients draw =detach= ('pendingDetachment', 'docs/heralds.org')
+  from a headline's own metadata and its parent's, so it can be wrong
+  where that metadata is stale or the parent reads claims only for
+  the clients. Found reading the code, none reproduced:
+  - 'shared/herald-styles.json' does not list 'idFolder' as
+    write-protected, so the clients let =C-c s t= write 'noClaim' on an
+    ID and show =detach=, but the server reads no claims there
+    ('server/types/viewnode.rs' ~871), and the save ignores it.
+  - A headline carrying 'noClaim' where it was drawn (a forker-only
+    member of a forks folder, say) and then moved under an editable
+    node keeps its old warrant, so it shows =detach= though the new
+    parent's list never named it.
+  - A rerender of a stored view can leave a member of a forks or alias
+    folder 'noClaim' after its occurrence turns editable again:
+    'ensure_editableOccurrences_exist'
+    ('server/diff_view/buffer_rerender.rs' ~255) resets only direct
+    children, 'merge_editability' ('server/refresh/editability.rs'
+    ~450) and a ghost turned occurrence ('server/refresh/id_rule.rs'
+    ~228) reset nothing; the next save would then delete that alias or
+    end that fork.
+  Checked 2026-11-22: could not confirm the first case still holds,
+  because "~871" in 'server/types/viewnode.rs' no longer points at
+  where claims are read, and the ID property member
+  ('PropertyMember::ID', ~545) now carries a 'claimsMembership' field.
+** A forks-folder member's containers folder is drawn only when the member is (2026-11-16)
   Found while fixing the probe review of every-mirror plan 3 (its
   record, "Review fixes"). A member of a content view's forks folder
   gets its containers folder when it is drawn, or when an
@@ -223,211 +369,101 @@
   a fresh view would not draw. The review fixed both for members of
   the integrated-elsewhere folder; forks-folder members could follow
   the same rule.
-* A stale-buffer warning names the note when only its forker changed (2026-11-16)
-  Found by the probe pass of every-mirror plan 2 ('TODO/every-mirror/review-2-probes.org',
-  observation of 35). Client A holds N's view, where R, a forker as
-  such, shows what it adds to N. Client B adds a child to R. A's save
-  of its unchanged view writes nothing, as it should, but warns "Left
-  as the graph has it: N (N), which changed after this buffer was
-  rendered ...", though N did not change: the baseline, parsed
-  against the new graph, reads R's new child as cut from R (absent
-  under R in the baseline), so the baseline's N would fork R and hide
-  the child, which differs from the graph, and N is judged stale. An
-  edit of N in that buffer would be refused for the same reason. The
-  cause is that the stale check ('server/serve/handlers/save_staleness.rs')
-  extracts the baseline's writes against today's graph, and a member
-  as such's partial content is read against the member's list as it
-  is now. Nothing is lost or made up; the warning and the refusal are
-  wrong. A fix would read a member as such's cuts in the baseline
-  against what that baseline drew, not against the graph. (Every-mirror
-  plan 3, slice 4, did so for a child the buffer shows in the member's
-  folder of what the user keeps elsewhere, or of what the note hides
-  in it; a child added to the member since the buffer was drawn is
-  still read as cut.)
-* An opened view keeps the server's fold atoms as text (2026-11-12)
-  'skg-open-org-buffer-from-text' ('elisp/skg-buffer.el'), which
-  both the content view and the diff view open through, inserts the
-  server's text verbatim. A 'folded' or 'bodyFolded' atom in it is
-  neither applied as an org fold nor removed; the heralds hide it, so
-  the user sees an unfolded headline, and the atom sits in the
-  buffer and its baseline until the first whole redraw. Since the
-  buffer then differs from the stripped form of what it sent, the
-  first save after opening a diff view cannot be patched by its redraw
-  delta and redraws the whole buffer (plan 1_3, slice 2; measured on
-  Jeff's "all changes" buffer, where folder headlines open with
-  'folded'). Neovim's opener, 'open_org_buffer_from_text'
-  ('nvim/lua/skg/buffer.lua'), had the same defect; plan 1_3 slice 3
-  made it act on the atoms through 'act_on_fold_and_focus_atoms',
-  which its whole redraw shares.
-* A readiness mark leaves the other diff buffers' marks stale (2026-11-06)
-  'skg-cycle-commit-ready' saves only the buffer it is in, and the
-  server redraws only that buffer. The other diff buffers keep
-  their old '(ready ...)' facts until something else redraws
-  them, so their check heralds and derived folder readiness lie.
-  Found while measuring the mark gesture; see
-  'TODO/general-fast-diffView/1_discussion.org'.
-  Names since: a readiness mark is now called processed. The gesture
-  is one of 'skg-mark-node-processed' and its siblings
-  ('elisp/skg-processed.el'), and the facts are '(processed ...)'.
-  Checked 2026-11-22: could not confirm it still holds, because I did
-  not trace whether a save that consumes processed requests now
-  redraws the other diff buffers.
-* Every small server response waits about 40 ms for Nagle (2026-11-06)
-  'send_response_with_length_prefix' ('server/serve/util.rs:61')
-  writes the length header and the payload in two 'write_all'
-  calls on a stream without 'set_nodelay', so the payload waits
-  for the client's delayed ACK. Measured: 41 ms round trips for
-  5-8 ms of server work. One write per message, or
-  'set_nodelay(true)' on accepted streams, removes it. Also
-  noted: 'ProcessedStore::save' ('server/diff_view/processed_store.rs',
-  formerly 'ReadinessStore') uses 'fs::write', which is not atomic.
-* The save handler's checks depend on their position in it (2026-11-05)
-  In 'update_from_and_rerender_buffer_with_approvals'
-  ('server/serve/handlers/save_buffer.rs') one vector,
-  'nonmerge_nodeInstructions', starts as the buffer's writes and
-  accumulates derived writes (restore requests, delete
-  propagation, strandeds resets, Hoist repairs, fork clones) as
-  the handler proceeds. A NodeInstruction does not record whether
-  the buffer asked for it or the save derived it, so a check that
-  must see only the buffer's writes ('stale_write_errors') is
-  correct only because of where in the handler it runs. A
-  provenance tag on NodeInstruction, or separate vectors until
-  the final concatenation, would make such checks
-  position-independent. Deferred by Jeff (2026-11-05); see
-  'TODO/merge-save-refused/2_1_principles.org', "The checks are
-  defined by their position in the handler".
-* Problems noticed while executing plan 10, slice 5 (2026-10-31)
-** The server reads a title that starts "(skg" as metadata
-  'headline_to_triple' ('server/from_text/buffer_to_viewnodes/
-  uninterpreted.rs') takes a headline whose text after the stars
-  starts with "(skg" for metadata, so '* (skgrepos are cool) title'
-  is parsed as metadata and refused. Slice 5 made both clients read
-  metadata only where "(skg" is followed by a space or ")"
-  ('skg--metadata-opening-regexp', 'metadata_opening_pattern'); the
-  server's parser was not in the slice's list. Traced, not run.
-** The diff view's content marker tells of a restricted record
+** Herald rule-table retirement remains separate (reviewed 2026-09-23)
+  The September herald audit rewrote 'api-and-formats.org' to document
+  semantic '(rels ...)' facts and linked the user legend in
+  'docs/heralds.org'. The former assembled-string and birth-color claims
+  are resolved. The served rule table still positions and colors
+  non-relationship tokens. Its eventual retirement is tracked by
+  'TODO/DONE/semantic-heralds-wire/retire-rule-table.org' and is outside the
+  September plan; that future work must update this protocol section.
+* Server: diff view and git ('server/diff_view/', 'server/graph_straddle/', 'server/git_ops/')
+** Two Graphnode parses per modified file in 'compute_diff_for_skgrepo' (2026-11-22)
+  'server/git_ops/diff.rs', which only 'titles-by-ids' calls, for
+  nodes the search index lacks. Only added and deleted files name
+  nodes it wants, and each of those is read on one side. But a
+  modified file is read and parsed on both sides of each stage (HEAD
+  and the git index for staged, the git index and the worktree for
+  unstaged) and the nodes dropped, only so that a side that fails to
+  parse is warned about in the server log. Dropping those reads would
+  drop that warning. At current sizes this is fine but worth measuring
+  on a larger garden.
+** The diff view cannot mark a change only the files show (2026-11-20)
+  A commit of the processed leaves out a node one of whose files, at
+  HEAD or in the worktree, is not byte for byte what skg writes for it
+  ('files_hold_more_than_their_node' in 'server/diff_view/other_changes.rs';
+  'docs/diff-view.org', "Changes no mark covers"): a hand-formatted
+  file, say, or one an older skg wrote with another field order. The
+  diff view does not show that change, since finding it reads each
+  changed file from Git, which the straddle does not; only a commit of
+  everything, or Git, takes such a node. A file that differs from HEAD
+  only in bytes the parser does not read is no changed node of the
+  straddle at all. Both could be one more kind of the node's other
+  changes ('OtherChange'), its fingerprint the two blobs, once the
+  straddle reads the changed files of the nodes that differ (and Git's
+  list of changed files, for the second), at each re-pairing.
+** The diff view's content marker tells of a restricted record (2026-10-31)
+  (Filed under "Problems noticed while executing plan 10, slice 5".)
   Run by 'a_switch_leaves_out_a_member_whose_record_is_private'
   ('tests/refresh/diff_view.rs'). p's file adds c to p's content in
   p's private section since HEAD. Under the skgrepo restriction
   "main" the all-changes buffer leaves c out, as it should, but
   keeps p's '(skg changesetMarker content)', which says that p's
   content changed: a change the skgrepo restriction keeps out.
-** The acquired folder refuses what the API doc says it accepts
-  'validate_acquired_folder' ('server/from_text/buffer_to_viewnodes/
-  local.rs') admits only ghosts and occurrences, while
-  'docs/api-and-formats.org' says "An acquiredFolder also accepts a
-  child the user puts there, which claims nothing", so an unknown or
-  restricted viewnode put there is refused. Found while writing
-  slice 5's test of the admission rule, which leaves the acquired
-  folder out. Traced, not run.
-* Problems noticed while executing plan 10, slice 2 (2026-10-31)
-  Found by repeating the search of
-  'TODO/simplify-refresh/09_1_review-reports/restriction-edits.org'
-  (no longer in the tree) after the slice's fixes (read, not run,
-  unless said).
-** A strandeds reset can move a hide across the skgrepo restriction
-  'stranded_relationships' ('server/from_text/strandeds.rs') runs
-  after the save's check of records landing restricted, takes no
-  skgrepo restriction, and computes a hide's new default with
-  'hide_skgrepo', which counts restricted subscriptions. With three
-  owned skgrepos and the restriction {public, semi}: r subscribes to
-  e1 (public) and e2 (private), both containing y, and hides y at
-  public; one save drops the subscription to e1 and moves y to semi.
-  The hide is raised automatically to private, and the warning names
-  'private'. Conversely a restricted hide whose new default is
-  visible is listed in the strandeds confirmation (a leak), and
-  resetting it moves the record into view. Traced, not run.
-** A pasted headline for a member with a restricted record reorders it
-  Without a relRepo request, a headline pasted under r for m, which
-  r contains by a restricted record, is woven as already placed: the
-  record stays in its restricted section, but the weave may reorder
-  that section, and the pasted line vanishes from the view with no
-  warning. With an explicit relRepo request the save is now refused
-  ('RecordMovedOutOfRestrictedSkgrepo'). Read, not run.
-** An explicit fork of a private node names it in the clone's home
-  'build_fork_clone' records the clone's 'subscribesTo' and
-  'overrides' of N at the clone's home with no floor, and copies N's
-  title and body there: forking a private owned N into a public
-  clone publishes N's ID, title and body. The user chooses the
-  clone's skgrepo in the confirmation buffer, so this may be
-  intended; it breaks the default floor rule for those two records.
-  Under any skgrepo-set. Read, not run.
-** The moved-hide warning names restricted subscribees
-  The warning the save answers when a hide moves into a
-  subscribee's folder names the subscribees it moved among,
-  restricted ones included: a read leak, not a write. Found by
-  the slice's repeat of the search; filed by the orchestrator.
-  Read, not run.
-* Problems noticed while executing plan 19, slice 12 (2026-10-24)
-** Two texts with a bare "repo"
-  The overPrivateText release warning says "selected below its node's
-  home repo" ('server/serve/handlers/text_release.rs', two messages),
-  where the glossary asks for "home skgrepo"; 'docs/api-and-formats.org'
-  now quotes the code.
-* Problems noticed while executing plan 19, slice 10 (2026-10-24)
-** nvim-orgmode's insert-heading-respect-content breaks in a view
-  nvim-orgmode's 'insert_heading_respect_content' (default
-  '<prefix>ih') finds the headline at point by loading the buffer's
-  file by name; a content view is named 'skg://...', so it finds
-  none, takes the line for plain text and puts stars before it:
-  '* (skg (node ...)) x' becomes '* * (skg (node ...)) x'.
-  'meta_return' finds headlines by treesitter and works. The
-  skgrepo prompt that wraps both
-  ('wrap_org_insert_heading_actions', 'nvim/lua/skg/sexpr_edit.lua')
-  acts only on a new empty headline, so it leaves such a line alone;
-  its test names its buffer like an org file. Found by a probe in
-  'tests/results/plan19-slice10/probe_orgmode.lua'.
-* Problems found while reviewing the view-ids run (2026-10-23)
+** Problems found while reviewing the view-ids run (2026-10-23)
   Each was run by a throwaway test; the reports are under
   'tests/results/review18/'. The decisions are in
   'TODO/total-diff-view/18_review.org'.
-** The readiness summary's foreign-change count goes stale
+*** The readiness summary's foreign-change count goes stale
   'GraphStraddle::with_after' ('server/graph_straddle/build.rs')
   carries the foreign-change count forward without recounting, so
   the readiness summary's count of changed files in foreign
   skgrepos refreshes only when HEAD moves or the slot is emptied.
   Read; 'tests/results/review18/throwaway-straddle/report.md'.
-
-* Problems noticed while fixing repo moves over repeated nodes (2026-10-07)
-** Repo moves do graph logic in the client
-The Emacs client computes which relationships a repo move strands, from
-the buffer alone, re-implementing server rules with verified
-divergences: a foreign relRepo the save refuses, deliberate
-privatizations undone, stale repeat repos, out-of-view and non-content
-relationships missed. Also, relationships INTO a node moved more private
-keep their more public repo, leaving its ID there; that one is a server
-gap too. Details, options and questions:
-[[file:repo-move-graph-logic/1_discussion.org][Repo moves do graph logic in the client]].
-Checked 2026-11-22: could not confirm it still holds. The client part
-looks gone: 0fcd22704 (2026-10-17) dropped Emacs's own analysis, and
-the clients now answer the server's strand confirmation. I did not
-check the server gap (relationships into a node moved more private).
-* Findings from the simplification reconnaissance (2026-09-25)
+** Problems found while adding skg-stage-moves (2026-06-13)
+*** (latent, by-design-dependent) Diff helpers use a repo-wide pathspec
+   'get_staged_changed_skg_files' and 'get_unstaged_changed_skg_files'
+   (server/git_ops/read_gitrepo.rs) diff the WHOLE gitrepo with
+   'pathspec("*.skg")', not the skgrepo's own subdirectory. So if two
+   configured skgrepos ever live inside one gitrepo (e.g. as sibling
+   subdirectories of a single gitrepo root), 'compute_diff_for_skgrepo'
+   would attribute that skgrepo's entire set of changed .skg files to
+   each such skgrepo, double-counting them across skgrepos. This is
+   harmless under the apparent deployment model (one gitrepo per
+   skgrepo) and only bites if a gitrepo spans multiple skgrepos.
+   'find_and_stage_moves.rs' (removed with stage moves, c70192bb0,
+   2026-10-19) avoided the issue by scoping its HEAD
+   scan to each skgrepo's own subtree ('head_skg_ids' /
+   'path_relative_to_gitrepo'); the older diff path does not. If
+   multi-Skg-repo gitrepos are to be supported, the diff helpers should
+   take a Skg-repo-relative pathspec too.
+   A related slip, noted 2026-11-22: 'add_nodes_added_and_deleted_by_stage'
+   ('server/git_ops/diff.rs') joins each path, which git gives relative
+   to the gitrepo's root, onto the skgrepo's path, and reads HEAD, the
+   git index and the worktree at the result. For a skgrepo below its
+   gitrepo's root that path repeats the subfolder and names nothing,
+   so its added and deleted nodes are not found. (When the configured
+   path does not start with the gitrepo's worktree as git spells it,
+   HEAD and the git index are read at git's own path, and work.) Only
+   'titles-by-ids' reads these nodes, for nodes the search index lacks.
+* Server: types and dbs ('server/types/', 'server/dbs/')
+** Skg does not count a link whose label wraps across lines (2026-11-20)
+  Org reads =[[id:X][a label\nthat wraps]]= as a link (a blank line
+  ends it), and filling a paragraph makes such links. The server's
+  link pattern ('LINK_PATTERN' in 'server/types/links.rs') does not
+  cross a line break, so for the server ('linksTo' and what derives
+  from it, save-time dangling-link warnings, absent-reference cleanup,
+  the vanished-node check, search text) such a link is plain text. The Markdown/Org importer creates
+  them from wrapped links in its input. Only the Org exporter reads
+  them ('links_with_wrapped_labels_and_ranges_from_text'). Making
+  'LINK_PATTERN' match them would change what counts as a link
+  everywhere, and the Neovim client's patterns would need the same
+  change.
+** Graph updates rediscover identity-change facts across several consumers (2026-09-25)
+  (Filed under "Findings from the simplification reconnaissance".)
   Research and proposed slices: [[file:astra-cleans-up.org][Making Skg easier to change]].
   These are source-inspection findings; no application changes or runtime
   reproduction were performed during the review.
-** Neovim skgrepo moves omit Emacs's write-protection and stuck-edge handling
-   'elisp/skg-metadata.el::skg--set-repo-and-handle-stuck-edges' skips
-   write-protected occurrences and offers to publicize content relationships left
-   at their old, more-private skgrepos by a home move.
-   'nvim/lua/skg/metadata.lua::set_repo' instead calls direct skgrepo
-   rewriting helpers, including on write-protected occurrences, without
-   that analysis. Its success message can therefore describe an edit the
-   save will not honor as expected. This is client-policy drift, not a
-   demonstrated bypass of server validation. Add shared behavioral cases
-   and align the commands; consider server-owned preview logic if such
-   graph-dependent policies continue to multiply. The Emacs-only policy
-   tables ('skg--writable-folder-relations',
-   'skg--relRepo-unsupported-folder-atoms' in 'elisp/skg-request-relRepo-info.el')
-   should then be served or shared, not copied into Neovim (noted from
-   [[file:DONE/herald-colors/2_plan.org][the herald-colors plan]], 2026-10-04).
-   Checked 2026-11-22: could not confirm it still holds.
-   'skg--set-repo-and-handle-stuck-edges' is gone: Emacs's 'skg-set-repo'
-   ('elisp/skg-metadata.el') and Neovim's 'set_repo' both skip
-   write-protected occurrences, and the server decides what a move
-   strands (0fcd22704). The two policy tables are now copied into
-   'nvim/lua/skg/relRepo_info.lua' ("Mirrors ...").
-** Graph updates rediscover identity-change facts across several consumers
    'GraphChangeSet' in 'server/dbs/in_rust_graph/prepared_update.rs' and
    'apply_nodeInstructions_to_inRustGraph' ('server/dbs/in_rust_graph.rs')
    independently compute affected IDs
@@ -435,41 +471,30 @@ check the server gap (relationships into a node moved more private).
    identity walks. Share immutable identity-transition facts while retaining
    distinct index, validation, write, and view dependency scopes and an
    independent full reconstruction oracle.
-** 'tests/mutation_gate.rs' copies a projection the server has
-   'tests/mutation_gate.rs' keeps its own
-   copy of the projection that 'From<&GraphnodeInRust> for Graphnode'
-   ('server/types/nodes/rust.rs') now is.
-   (Split on 2026-11-22 from "'graphnode_by_gnid' takes a config it
-   ignores", now in TODO/DONE/problems.org; the copy is
-   'complete_from_rust'.)
-** Ordinary saves and node merges have different index application policies
-   'server/save.rs::apply_nodeInstructions' queues Tantivy updates with computed
-   context types. 'server/nodeMerge.rs::apply_prepared_nodeMerges' writes
-   synchronously with an empty context map and rebuild-on-failure behavior;
-   its comment defers context refresh to rebuild. A common application
-   boundary could reduce duplication, but unifying the index policy changes
-   timing, recovery, and potentially ranking. State and test that contract
-   before treating this as a mechanical refactor.
-* Org-roam import clears its destination before validating input (2026-09-24)
-  'import_org_roam_directory' in [[file:../server/import_org_roam.rs][server/import_org_roam.rs]] removes
-  existing immediate '.skg' files before scanning the input. Traversal errors
-  are filtered out, and 'parse_org_file' returns no nodes for unreadable
-  files or files without a file-level ID. An unusable input can therefore
-  erase an earlier import without a corresponding parse error in the report.
-  Of all the input's problems, only a headline inside a block is refused
-  before the wipe ('refuse_headlines_inside_blocks').
-  This is also a barrier to reusing the entry point for import into a
-  populated configured skgrepo. Preflight input and stage replacement before
-  modifying existing files; make replacement an explicit operation.
-  See [[file:import-md-and-org/1_discussion.org][the mixed-format import discussion]]. No implementation changed here.
-* Dead-link warnings miss targets deleted by the same save (2026-09-13)
-  =dead_link_warnings= regards every ID present in the pre-save graph as
-  live. Therefore, when one buffer both saves a text link and deletes that
-  link's target, the final graph contains a dangling link but no warning is
-  emitted. Computing final ID existence must account for Save, Delete,
-  fork, and nodeMerge outcomes together; merely subtracting Delete intents
-  would mishandle IDs retained by a merge.
-* Problems noted while recovering a wedged server (2026-07-25)
+** Problems found while researching cross-owner deletion (2026-09-10)
+  Found while writing TODO/DONE/delete-shared-node/.  The first is the
+  reported bug; the others are pre-existing gaps exposed by making
+  foreign dangling relationships an intentional state.
+*** Outbound PartnerFolders discard unresolved raw members
+   The outbound accessors in
+   server/dbs/in_rust_graph/relation_accessors.rs enumerate relationship
+   members through 'filter_map(pid_of)'. A raw subscribe, override, or
+   hide member therefore disappears before PartnerFolder rendering whenever
+   its target is unresolved. The initial renderer's nominal fallback
+   produces empty Active child data rather than 'Phantom::Unknown', and
+   the rerender path can instead fail because no member relSource exists.
+
+   Consequently the UI has no coherent representation from which an
+   recorder could remove most non-content dangling relationships. These
+   paths need raw-ID-aware enumeration and a true Unknown case if the
+   deletion policy covers all four structured outbound fields.
+   Checked 2026-11-22: could not confirm it still holds. Raw-ID
+   accessors now exist ('outbound_gnids_for_relation_gated'), beside
+   'outbound_pids_for_relation' and its gated form, which still
+   'filter_map' through 'pid_of' ('relation_accessors.rs' ~514, ~565);
+   the structured relations are now contains, forks and hides, and I
+   did not trace which accessor each folder draws from.
+** Problems noted while recovering a wedged server (2026-07-25)
   Context: Jeff reported "I can't start the server -- usually TypeDB is
   borked." TypeDB was innocent and healthy the whole time. The actual
   cause was ONE zero-byte .skg file
@@ -479,7 +504,7 @@ check the server gap (relationships into a node moved more private).
   sat idle -- so the symptom was "port 1730 dead", which looks exactly
   like a TypeDB problem. Diagnosis cost was almost entirely in the two
   entries below.
-** The unreadable-files report names the REPO FOLDER, not the file
+*** The unreadable-files report names the REPO FOLDER, not the file
    This is the big one: it is the difference between a 30-second fix
    and a manual scan of 54,566 files.
    'read_skg_sections_from_folder'
@@ -507,7 +532,7 @@ check the server gap (relationships into a node moved more private).
    'path . display ()' before propagating; and either collect per-file
    errors instead of aborting the folder, or rename the count to say
    "repo" so it stops lying.
-** A titleless single-section node makes the whole server unbootable
+*** A titleless single-section node makes the whole server unbootable
    After the empty file got a valid 'pid', init failed again, further
    in, with "Telescope '...' has no home: no section carries a title."
    (multiple_nodes.rs:133; checked 2026-11-22, still so: the message
@@ -530,281 +555,11 @@ check the server gap (relationships into a node moved more private).
    disproportionate, and it is precisely when you can least afford to
    lose the tool (you cannot inspect or delete the offending node
    through the UI, because the UI will not start).
-* Problems noted while building recursive set-relRepo (2026-07-22)
-  Context: the investigation written up in
-  TODO/DONE/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org.
-** skg--rel-at-point misclassifies some positions
-   It classifies "activeNode child of an activeNode parent" as the
-   parent-contains-child relationship, without checking:
-   - 'birth': a role graft (e.g. a containerward one)
-     represents the INVERTED relation -- the child contains the
-     parent -- so the command queries and offers to set a
-     nonexistent parent->child contains relationship;
-   - 'parentIs': a parked (independent) child is not a member of the
-     parent's collection, so the written '(relRepo ...)' atom is
-     save-inert (extraction only reads the atom off collected members);
-   - the parent's editability: under a write-protected parent the
-     contains list is not collected, so the atom is save-inert there too.
-   Inert atoms are harmless to the data but lie to the user: the
-   command reports "Save to apply" and the save applies nothing.
-   (The recursive walker added 2026-07-22,
-   'skg--set-relRepo-recursive-walk', checks parentIs and
-   parent editability; the single-relationship command still does not.)
-   Checked 2026-11-22: could not confirm it still holds in full.
-   'skg--rel-at-point' ('elisp/skg-request-relRepo-info.el') now
-   refuses under a write-protected parent and in write-protected
-   folders, and the birth is gone from the server (663a4bba6); a
-   content child that claims nothing ('noClaim') is still not refused.
-** start-servers.sh misreports a LINK failure as a COMPILE failure
-  Context: Jeff's machine overheated and cut power mid-'cargo build',
-  truncating 3 of 501 rlibs in target/. Servers then refused to start,
-  permanently and identically, on unchanged code and unchanged data.
-  Fixed by 'cargo clean -p skg -p tantivy -p typedb-driver'. Written up
-  in docs/troubleshooting/build-artifacts-corrupted-by-power-loss.org.
-   'preflight_check_config' (bash/start-servers.sh) wraps
-   'cargo build -q --bin skg' and, on failure, prints "ERROR: skg
-   failed to compile (see errors above)". In the 2026-07-14 incident the
-   crate compiled fine; it failed to *link*, against a truncated rlib
-   ("file too short"). The wording sends you looking for a source bug
-   that does not exist -- and since the user's premise is "the code
-   hasn't changed", the message reads as nonsense and pushes them toward
-   TypeDB, which was innocent. Suggested fix: on build failure, add a
-   line pointing at
-   docs/troubleshooting/build-artifacts-corrupted-by-power-loss.org and
-   at 'python3 docs/troubleshooting/check-rlibs.py', noting that a
-   linker error on unchanged code usually means truncated artifacts in
-   target/. Cheap, and it would have collapsed this whole investigation
-   into one command.
-* Problems noted while writing forking-and-privacy.org
-** Fork deliberate-pick rule is enforced only client-side
-   docs/forks.org promises "approving before you have set every
-   clone's skgrepo is refused", to keep a fork from silently landing
-   in a default skgrepo. The refusal lives in 'skg-approve-fork'
-   (checks for the PICK-A-REPO placeholder); the server's only
-   backstop is that the placeholder is not a configured skgrepo. A
-   client that re-sends the save with (fork-approved . "true") and NO
-   (fork-repos ...) field commits the clones into the
-   inferred-or-default skgrepo ('fork_spec_from_buffer_node' falls
-   through user-set -> inferred -> default) -- exactly the silent
-   default the docs rule out. Immaterial while Emacs is the only
-   client; if other clients appear (nvim/), consider having the
-   server refuse an approved save whose fork_repos map does not
-   cover every fork spec.
-   Checked 2026-11-22: still holds. The Neovim client exists now and
-   refuses the placeholder too ('nvim/lua/skg/save/confirmations.lua');
-   the server's fallback is in 'server/from_text/fork.rs'.
-** Cosmetic: api-and-formats.org says search filters "before grouping"
-   The text-search section says the skgrepo restriction is applied
-   "before grouping, ranking, alias/title selection, and display
-   truncation". In code ('server/serve/handlers/text_search.rs'),
-   'group_matches_by_gnid' runs first and
-   'filter_match_groups_to_unrestricted_skgrepos' then filters the groups,
-   before ranking and truncation. Behaviorally identical (groups are
-   per-ID and skgrepo is a function of ID), so this is a doc wording
-   nit only.
-* Problems found during herald overhaul research
-** (mostly fixed) Save validation and extraction use different edit-request surfaces
-   The save extraction path uses 'collect_savenode_candidates' to define
-   which view positions can produce save/merge instructions. Some
-   validation still walks the whole viewforest directly, especially
-   merge validation and contradictory instruction collection.
-
-   That can make validation and execution disagree for edit metadata
-   placed under display/non-vognode positions: validation may see it even
-   when extraction ignores it, or vice versa if the candidate policy
-   changes. The cleaner fix is probably to validate write-intent
-   metadata through the same candidate/role policy used by extraction,
-   and explicitly reject edit requests outside that surface.
-
-   Mostly fixed 2026-06-10 by local instruction collection: extraction
-   now recurses into every position, so an editable node's self-edits
-   (including edit requests) are honored wherever validation can see
-   them. The residual gap is positions where edit requests are
-   deliberately ignored rather than rejected: a Delete or nodeMerge
-   request on a subscribee-as-such is silently dropped, which validation
-   could instead flag.
-   Checked 2026-11-22: could not confirm the residual still holds,
-   because 'collect_savenode_candidates' is gone and no server code
-   says "subscribee" any more (a member as such of a forks folder is
-   the nearest successor); I did not test a Delete request there.
-* Two Graphnode parses per modified file in 'compute_diff_for_skgrepo'
-  'server/git_ops/diff.rs', which only 'titles-by-ids' calls, for
-  nodes the search index lacks. Only added and deleted files name
-  nodes it wants, and each of those is read on one side. But a
-  modified file is read and parsed on both sides of each stage (HEAD
-  and the git index for staged, the git index and the worktree for
-  unstaged) and the nodes dropped, only so that a side that fails to
-  parse is warned about in the server log. Dropping those reads would
-  drop that warning. At current sizes this is fine but worth measuring
-  on a larger garden.
-* Other problems
-** Long-running SKG server can hide code/protocol fixes
-   On 2026-05-04, the server process listening on port 1730 was still
-   an older / already-running binary. It accepted 'titles by ids'
-   requests and logged them, but did not send responses, while the
-   current source-level handler test sent a parseable response. This
-   makes client bugs look nondeterministic after code changes. A small
-   version/build-id endpoint, or logging the executable build hash at
-   startup, would make stale-server cases obvious.
-   PARTLY RESOLVED 2026-07-03 (fable-cleans-up): the logging remedy is
-   done -- startup now logs the executable's path and age ("Server
-   binary exe=... binary_age=...", server/main.rs, right after
-   init_tracing). Open only in case a client-visible version endpoint
-   is still wanted.
-** Emacs client can hold stale TCP state after server/data replacement
-   Observed 2026-05-06 after stopping the server, replacing data/,
-   and restarting. The Rust server was listening on 1730 and a fresh
-   batch Emacs process could run 'skg-connection-verify', but the live
-   user session could not.
-
-   Likely recovery is 'M-x skg-connection-end' followed by
-   'M-x skg-connection-verify' or re-running 'skg-client-init'.
-   The client could be more robust if request send failures forced
-   'skg-rust-tcp-proc' to nil and retried once.
-
-   Related: 'skg-client-init' uses '(defvar skg-port ...)' rather than
-   '(setq skg-port ...)', so reinitializing with a replaced config will
-   not update an already-bound port variable. That is harmless when the
-   port stays 1730, but surprising when switching configs.
-   Checked 2026-11-22: the related note no longer holds:
-   'skg-client-init' now 'setq's 'skg-port' ('elisp/skg-client.el':66).
-   The rest still holds: 'skg-tcp-connect-to-rust' does not retry a
-   failed send.
-** Initialization warning files can be easy to miss
-   On 2026-05-06, startup completed and logged "Server ready", but
-   data/ also contained:
-
-   - initialization-error_duplicate-ids.org: duplicate id
-     0a6dcf44-6c2c-432a-90a7-babfbb3e0b7d in pers-deprecated and public.
-   - initialization-error_unreadable-skg-files.org: unreadable
-     /home/ubuntu/data/private for skgrepo private.
-
-   These did not block connection verification, but they are important
-   enough that the client should probably surface them after init.
-   NOTE (2026-07-28): the duplicate-id example above predates the
-   privacy telescope. One id in two skgrepos is now the normal shape of
-   any node with a privatized relationship, not a defect. The entry's point --
-   init warning files are easy to miss -- still stands; only the
-   illustration is stale. See [[../dup-ids-maybe-bad.org]].
-   Checked 2026-11-22: still holds. The duplicate-id report is now
-   'initialization-error_ids-claimed-by-two-nodes.org'
-   ('server/dbs/filesystem/multiple_nodes.rs'). Since 869bef743
-   (2026-10-20) the clients show the server's startup warnings in a
-   buffer ('skg-request-server-warnings.el'), but those warnings
-   do not include these report files.
-** Replacing data/skgconfig.toml can leave server and client on different ports
-   Observed 2026-05-06: data/skgconfig.toml said 'port = 1731',
-   but the already-running server process was still listening on 1730.
-   'cargo-watch watch -w server/ ... data/skgconfig.toml' watches
-   server/ only, so replacing data/ or editing skgconfig.toml does
-   not restart the server with the new config.
-
-   The result is confusing because '(skg-client-init "../data/skgconfig.toml")'
-   correctly points Emacs at the new config port, while the live Rust
-   process remains bound to the old one.
-
-   Possible fixes: watch the config file too, log the active port and
-   config path in a user-visible way, or add a client diagnostic that
-   explicitly says "config wants port X but no server is listening".
-   Checked 2026-11-22: still holds. The config is now the path given
-   to 'bash/start-servers.sh' (default 'data/jeff/skgconfig.toml'),
-   and cargo-watch runs only with '--hot-reload', watching server/;
-   the rerun loop rereads the config only when the server restarts.
-* Performance: the save-buffer pathway (see profiling-save.org)
-  Profiling the save of an insert-a-child edit (node 846207ef, 'doing')
-  found four inefficiencies, in impact order. Full evidence, numbers,
-  and recommendations are in the top-level 'profiling-save.org'.
-  (Two of the four -- the override full-scan and the Tantivy double
-  commit -- are fixed; their entries are in TODO/DONE/problems.org.)
-** Save cost degrades 3-4x within a session of repeated saves
-   404 ms -> 1220 ms over 11 consecutive saves; a 'rebuild dbs' resets
-   it. Cause: each tiny Tantivy commit spawns a segment and merges fall
-   behind. Mostly fixed by the single-commit change (see the Tantivy
-   entry in TODO/DONE/problems.org); also consider debouncing commits
-   (Tantivy is a rebuildable cache) and dropping the forced per-commit
-   'reader.reload()' in production.
-   Checked 2026-11-22: could not confirm it still holds. Since
-   dd117a31b (2026-06-05) the Tantivy commit runs in the background,
-   off the save's response; each commit still forces
-   'reader.reload()' ('server/dbs/tantivy/write.rs':175). The
-   top-level 'profiling-save.org' was deleted (f30dc06f8).
-* Problems found while investigating test-suite speed (2026-06-12)
-  See TODO/DONE/faster-tests.org for the full investigation.
-** (mostly fixed) Six near-duplicate test-db setup paths
-   The same connect / create-db / define-schema / populate / teardown
-   sequence is implemented in: 'run_with_test_db' and
-   'run_with_test_db_from_config' (server/test_utils.rs),
-   'setup_test_dbs' (tests/git_diff_view/common.rs), 'setup_test' and
-   'setup_temp_test' (tests/hidden_from_subscriptions.rs), 'setup'
-   (tests/move_source.rs), 'setup_test_dbs'
-   (tests/collateral_source_move.rs), and
-   'run_with_source_set_test_db' (used by tests/source_sets.rs).
-   They differ only in whether config comes from a TOML file and
-   whether fixtures are copied to /tmp. Quasi-duplication worth
-   collapsing -- and the natural moment is the shared-db-session
-   refactor proposed in TODO/DONE/faster-tests.org.
-   Mostly fixed 2026-06-12: hidden_from_subscriptions' and
-   move_source's private helpers are deleted (their tests use
-   SharedDbSession). Still alive on 2026-11-22 (the TypeDB-era names
-   above are gone; these are their successors):
-   'run_with_skgrepo_set_test_db' (server/test_utils.rs; leak_battery,
-   partner_folder_matrix, repo_sets, restricted_suppression), which,
-   unlike 'run_with_test_stores', neither takes
-   'TEST_STORE_GROUPS_MUTEX' nor cleans up after a panic;
-   'setup_test_stores' in tests/collateral_repo_move.rs; and the
-   one-line 'setup_multi_skgrepo_test' and 'cleanup_test' wrappers in
-   tests/forks_folder_by_default.rs.
-* Problems found while adding skg-stage-moves (2026-06-13)
-** (latent, by-design-dependent) Diff helpers use a repo-wide pathspec
-   'get_staged_changed_skg_files' and 'get_unstaged_changed_skg_files'
-   (server/git_ops/read_gitrepo.rs) diff the WHOLE gitrepo with
-   'pathspec("*.skg")', not the skgrepo's own subdirectory. So if two
-   configured skgrepos ever live inside one gitrepo (e.g. as sibling
-   subdirectories of a single gitrepo root), 'compute_diff_for_skgrepo'
-   would attribute that skgrepo's entire set of changed .skg files to
-   each such skgrepo, double-counting them across skgrepos. This is
-   harmless under the apparent deployment model (one gitrepo per
-   skgrepo) and only bites if a gitrepo spans multiple skgrepos.
-   'find_and_stage_moves.rs' (removed with stage moves, c70192bb0,
-   2026-10-19) avoided the issue by scoping its HEAD
-   scan to each skgrepo's own subtree ('head_skg_ids' /
-   'path_relative_to_gitrepo'); the older diff path does not. If
-   multi-Skg-repo gitrepos are to be supported, the diff helpers should
-   take a Skg-repo-relative pathspec too.
-   A related slip, noted 2026-11-22: 'add_nodes_added_and_deleted_by_stage'
-   ('server/git_ops/diff.rs') joins each path, which git gives relative
-   to the gitrepo's root, onto the skgrepo's path, and reads HEAD, the
-   git index and the worktree at the result. For a skgrepo below its
-   gitrepo's root that path repeats the subfolder and names nothing,
-   so its added and deleted nodes are not found. (When the configured
-   path does not start with the gitrepo's worktree as git spells it,
-   HEAD and the git index are read at git's own path, and work.) Only
-   'titles-by-ids' reads these nodes, for nodes the search index lacks.
-* Problems found during the org-export feature (2026-06-13)
-** a literal bracket in a title can break a deep link
-   Anchors and labels are interpolated verbatim into
-   =[[*anchor][label]]=. A title containing a literal =]= (e.g.
-   "Notes [draft]") yields a malformed org link. The textlink regex
-   keeps labels free of =][=, but a title is arbitrary user text.
-   Rare; not escaped. Robust fix would require org link-syntax
-   escaping of anchors/labels.
-* Problems found while adding data/bash/id-histories.sh + lib.sh (2026-06-20)
-** windows/starter-data/bash/ copies still use the old list-file pattern
-   The Windows starter bundle ships its own copies of these scripts
-   (=windows/starter-data/bash/{push,pull,status,remote}-all.sh=) that
-   still =for i in $(cat list-of-repositories.txt)=. They are now
-   divergent from =data/bash/= (which derives all/owned from
-   skgconfig.toml via lib.sh) and still depend on a list file. Docs that
-   describe the bundle (=to-windows.org=, =windows/run.ps1=,
-   =windows/docs/windows-user.org=) reference the list file too. If the
-   lib.sh approach is the intended one, the Windows bundle and its docs
-   should be regenerated/updated to match. Left untouched this round (out
-   of scope: the request was about data/bash/).
-* Problems found while diagnosing a diff-mode render crash (2026-06-17)
+** Problems found while diagnosing a diff-mode render crash (2026-06-17)
   Trigger: in git diff mode, visiting a deciduous node aborted document
   generation with "Error generating document: find_source: no source for
   8c24623a-736f-4f07-ba5a-624c3328f5ee". Investigation in this session.
-** (open) No audit catches a container whose contains points at a missing .skg file
+*** (open) No audit catches a container whose contains points at a missing .skg file
    The ordinary save path does NOT create such dangling references:
    'apply_delete_propagation_cleanup' (server/save.rs:370-428) runs
    before the FS write and, via the in-Rust inverse indexes
@@ -853,39 +608,66 @@ check the server gap (relationships into a node moved more private).
    and 'apply_delete_propagation_cleanup' is now at 'server/save.rs':465,
    so the save.rs line numbers above are stale. An offline scan lives
    in 'tools/find-danglers/'.
-* Problems found while researching cross-owner deletion (2026-09-10)
-  Found while writing TODO/DONE/delete-shared-node/.  The first is the
-  reported bug; the others are pre-existing gaps exposed by making
-  foreign dangling relationships an intentional state.
-** Outbound PartnerFolders discard unresolved raw members
-   The outbound accessors in
-   server/dbs/in_rust_graph/relation_accessors.rs enumerate relationship
-   members through 'filter_map(pid_of)'. A raw subscribe, override, or
-   hide member therefore disappears before PartnerFolder rendering whenever
-   its target is unresolved. The initial renderer's nominal fallback
-   produces empty Active child data rather than 'Phantom::Unknown', and
-   the rerender path can instead fail because no member relSource exists.
-
-   Consequently the UI has no coherent representation from which an
-   recorder could remove most non-content dangling relationships. These
-   paths need raw-ID-aware enumeration and a true Unknown case if the
-   deletion policy covers all four structured outbound fields.
-   Checked 2026-11-22: could not confirm it still holds. Raw-ID
-   accessors now exist ('outbound_gnids_for_relation_gated'), beside
-   'outbound_pids_for_relation' and its gated form, which still
-   'filter_map' through 'pid_of' ('relation_accessors.rs' ~514, ~565);
-   the structured relations are now contains, forks and hides, and I
-   did not trace which accessor each folder draws from.
-* Herald rule-table retirement remains separate (reviewed 2026-09-23)
-  The September herald audit rewrote 'api-and-formats.org' to document
-  semantic '(rels ...)' facts and linked the user legend in
-  'docs/heralds.org'. The former assembled-string and birth-color claims
-  are resolved. The served rule table still positions and colors
-  non-relationship tokens. Its eventual retirement is tracked by
-  'TODO/DONE/semantic-heralds-wire/retire-rule-table.org' and is outside the
-  September plan; that future work must update this protocol section.
-* Requests holding a raw newline break the line-based protocol (2026-11-12)
-** Only the streaming sender guards against it
+* Server: import and export
+** Org-roam import clears its destination before validating input (2026-09-24)
+  'import_org_roam_directory' in [[file:../server/import_org_roam.rs][server/import_org_roam.rs]] removes
+  existing immediate '.skg' files before scanning the input. Traversal errors
+  are filtered out, and 'parse_org_file' returns no nodes for unreadable
+  files or files without a file-level ID. An unusable input can therefore
+  erase an earlier import without a corresponding parse error in the report.
+  Of all the input's problems, only a headline inside a block is refused
+  before the wipe ('refuse_headlines_inside_blocks').
+  This is also a barrier to reusing the entry point for import into a
+  populated configured skgrepo. Preflight input and stage replacement before
+  modifying existing files; make replacement an explicit operation.
+  See [[file:import-md-and-org/1_discussion.org][the mixed-format import discussion]]. No implementation changed here.
+** Problems found during the org-export feature (2026-06-13)
+*** a literal bracket in a title can break a deep link
+   Anchors and labels are interpolated verbatim into
+   =[[*anchor][label]]=. A title containing a literal =]= (e.g.
+   "Notes [draft]") yields a malformed org link. The textlink regex
+   keeps labels free of =][=, but a title is arbitrary user text.
+   Rare; not escaped. Robust fix would require org link-syntax
+   escaping of anchors/labels.
+* Emacs client ('elisp/')
+** A request's 'skg-lp-reset' can drop another request's reply (2026-11-19)
+  Seen measuring saves: a link-status request sent while views were
+  being opened never got its reply handled, and stayed in
+  'skg-link-annotations--requests' (its buffer unpainted, and
+  'skg-lp--pending-count' one too high). Each view, search and save
+  request calls 'skg-lp-reset' before sending, which empties
+  'skg-lp--buf'; a reply already partly read into it is lost, and the
+  rest of it is then read as a header. Link-status requests go out
+  after every save and every redraw, so they are the replies most
+  often in flight.
+** A save's remaining client cost, after the redraw fixes (2026-11-19)
+  Measured in 'emacs -nw' (a real frame, -Q, compiled), saving a
+  265 KB view of Jeff's data whose save redraws four other mostly
+  folded views: about 0.6 s, half of it garbage collection at the
+  default 'gc-cons-threshold'. The largest parts: heralds computed for
+  every line of each view redrawn whole, folded or not (about 110 ms
+  for a 2,500-line view, before its share of collection); the collateral
+  views' whole redraws themselves, which 'TODO/general-fast-diffView/1_3_plan.org'
+  slice 5 would turn into patches; and the outbound buffer snapshot
+  (60-75 ms, twice per fork), whose atoms are merged by a metadata
+  edit per headline in a temporary buffer.
+** An opened view keeps the server's fold atoms as text (2026-11-12)
+  'skg-open-org-buffer-from-text' ('elisp/skg-buffer.el'), which
+  both the content view and the diff view open through, inserts the
+  server's text verbatim. A 'folded' or 'bodyFolded' atom in it is
+  neither applied as an org fold nor removed; the heralds hide it, so
+  the user sees an unfolded headline, and the atom sits in the
+  buffer and its baseline until the first whole redraw. Since the
+  buffer then differs from the stripped form of what it sent, the
+  first save after opening a diff view cannot be patched by its redraw
+  delta and redraws the whole buffer (plan 1_3, slice 2; measured on
+  Jeff's "all changes" buffer, where folder headlines open with
+  'folded'). Neovim's opener, 'open_org_buffer_from_text'
+  ('nvim/lua/skg/buffer.lua'), had the same defect; plan 1_3 slice 3
+  made it act on the atoms through 'act_on_fold_and_focus_atoms',
+  which its whole redraw shares.
+** Requests holding a raw newline break the line-based protocol (2026-11-12)
+*** Only the streaming sender guards against it
    The server reads one request per line ('server/serve.rs'), and the
    'sexp' crate reads '\n' in a string as a backslash and an 'n', not a
    newline.  A request whose printed form holds a newline reaches the
@@ -897,3 +679,254 @@ check the server gap (relationships into a node moved more private).
    sending it.  Senders that call 'process-send-string' directly, such
    as text search, have no guard; a pasted multi-line search query would
    hit the same failure.
+** A readiness mark leaves the other diff buffers' marks stale (2026-11-06)
+  'skg-cycle-commit-ready' saves only the buffer it is in, and the
+  server redraws only that buffer. The other diff buffers keep
+  their old '(ready ...)' facts until something else redraws
+  them, so their check heralds and derived folder readiness lie.
+  Found while measuring the mark gesture; see
+  'TODO/general-fast-diffView/1_discussion.org'.
+  Names since: a readiness mark is now called processed. The gesture
+  is one of 'skg-mark-node-processed' and its siblings
+  ('elisp/skg-processed.el'), and the facts are '(processed ...)'.
+  Checked 2026-11-22: could not confirm it still holds, because I did
+  not trace whether a save that consumes processed requests now
+  redraws the other diff buffers.
+** Problems noticed while fixing repo moves over repeated nodes (2026-10-07)
+*** Repo moves do graph logic in the client
+The Emacs client computes which relationships a repo move strands, from
+the buffer alone, re-implementing server rules with verified
+divergences: a foreign relRepo the save refuses, deliberate
+privatizations undone, stale repeat repos, out-of-view and non-content
+relationships missed. Also, relationships INTO a node moved more private
+keep their more public repo, leaving its ID there; that one is a server
+gap too. Details, options and questions:
+[[file:repo-move-graph-logic/1_discussion.org][Repo moves do graph logic in the client]].
+Checked 2026-11-22: could not confirm it still holds. The client part
+looks gone: 0fcd22704 (2026-10-17) dropped Emacs's own analysis, and
+the clients now answer the server's strand confirmation. I did not
+check the server gap (relationships into a node moved more private).
+** skg--rel-at-point misclassifies some positions (2026-07-22)
+  (Filed under "Problems noted while building recursive set-relRepo".)
+  Context: the investigation written up in
+  TODO/DONE/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org.
+   It classifies "activeNode child of an activeNode parent" as the
+   parent-contains-child relationship, without checking:
+   - 'birth': a role graft (e.g. a containerward one)
+     represents the INVERTED relation -- the child contains the
+     parent -- so the command queries and offers to set a
+     nonexistent parent->child contains relationship;
+   - 'parentIs': a parked (independent) child is not a member of the
+     parent's collection, so the written '(relRepo ...)' atom is
+     save-inert (extraction only reads the atom off collected members);
+   - the parent's editability: under a write-protected parent the
+     contains list is not collected, so the atom is save-inert there too.
+   Inert atoms are harmless to the data but lie to the user: the
+   command reports "Save to apply" and the save applies nothing.
+   (The recursive walker added 2026-07-22,
+   'skg--set-relRepo-recursive-walk', checks parentIs and
+   parent editability; the single-relationship command still does not.)
+   Checked 2026-11-22: could not confirm it still holds in full.
+   'skg--rel-at-point' ('elisp/skg-request-relRepo-info.el') now
+   refuses under a write-protected parent and in write-protected
+   folders, and the birth is gone from the server (663a4bba6); a
+   content child that claims nothing ('noClaim') is still not refused.
+** Emacs client can hold stale TCP state after server/data replacement (2026-05-06)
+  (Filed under "Other problems".)
+   Observed 2026-05-06 after stopping the server, replacing data/,
+   and restarting. The Rust server was listening on 1730 and a fresh
+   batch Emacs process could run 'skg-connection-verify', but the live
+   user session could not.
+
+   Likely recovery is 'M-x skg-connection-end' followed by
+   'M-x skg-connection-verify' or re-running 'skg-client-init'.
+   The client could be more robust if request send failures forced
+   'skg-rust-tcp-proc' to nil and retried once.
+
+   Related: 'skg-client-init' uses '(defvar skg-port ...)' rather than
+   '(setq skg-port ...)', so reinitializing with a replaced config will
+   not update an already-bound port variable. That is harmless when the
+   port stays 1730, but surprising when switching configs.
+   Checked 2026-11-22: the related note no longer holds:
+   'skg-client-init' now 'setq's 'skg-port' ('elisp/skg-client.el':66).
+   The rest still holds: 'skg-tcp-connect-to-rust' does not retry a
+   failed send.
+* Neovim client ('nvim/')
+** Problems noticed while writing the Neovim client's module headers (2026-11-22)
+  Found reading 'nvim/' for its headers; none reproduced, none fixed.
+*** The "and close this" gotos discard the left buffer's unsaved edits
+  'goto_then_close' ('nvim/lua/skg/id_search.lua', and a copy in
+  'goto_git.lua') clears 'modified' and force-deletes the buffer it
+  leaves, also when the goto found nothing to open without raising.
+  Emacs's 'kill-buffer' would ask about unsaved edits.
+*** The plain-diff fallback of goto-in-git shows nothing for an untracked file
+  'open_plain_diff_at' ('nvim/lua/skg/goto_git.lua') falls back to
+  'git diff --cached', so an untracked file reports "no unstaged or
+  staged changes" instead of being shown.
+*** The link-to-branch refusals name the other command
+  'container_data' and 'check_container' ('nvim/lua/skg/modify_graph.lua')
+  serve 'replace_link_with_content' too, but always refuse with
+  "Cannot replace this branch with a link".
+*** The log names an unnamed caller "file:nil"
+  'calling_function_name' ('nvim/lua/skg/log.lua') asks
+  'debug.getinfo' for 'nS' and then reads 'currentline', which only
+  'l' fills.
+*** User-visible texts that tell history or carry a bad rename
+  'keymaps.invoke' says a command "is not available yet (MODULE has
+  not landed)", though every command's module loads (a spec checks
+  it). The recovery document ('nvim/lua/skg/recovery.lua', and
+  'elisp/skg-recovery.el') says "Each repo block is one JSON string",
+  probably "src block" before a rename of "repo". The 'ViewNewEmpty'
+  command's description says "in a chosen repo", but
+  'view_new_empty' asks for none.
+*** A lazy reconnect keeps the old herald rules
+  Only 'init' fetches the herald rule table; the reconnect that
+  'skg.client.send_string' makes for a later request does not, so a
+  restarted server with new rules leaves the Neovim client on the old
+  table until ':SkgInit' or ':SkgReload'.
+** Problems noticed while executing plan 19, slice 10 (2026-10-24)
+*** nvim-orgmode's insert-heading-respect-content breaks in a view
+  nvim-orgmode's 'insert_heading_respect_content' (default
+  '<prefix>ih') finds the headline at point by loading the buffer's
+  file by name; a content view is named 'skg://...', so it finds
+  none, takes the line for plain text and puts stars before it:
+  '* (skg (node ...)) x' becomes '* * (skg (node ...)) x'.
+  'meta_return' finds headlines by treesitter and works. The
+  skgrepo prompt that wraps both
+  ('wrap_org_insert_heading_actions', 'nvim/lua/skg/sexpr_edit.lua')
+  acts only on a new empty headline, so it leaves such a line alone;
+  its test names its buffer like an org file. Found by a probe in
+  'tests/results/plan19-slice10/probe_orgmode.lua'.
+** Neovim skgrepo moves omit Emacs's write-protection and stuck-edge handling (2026-09-25)
+  (Filed under "Findings from the simplification reconnaissance".)
+  Research and proposed slices: [[file:astra-cleans-up.org][Making Skg easier to change]].
+  These are source-inspection findings; no application changes or runtime
+  reproduction were performed during the review.
+   'elisp/skg-metadata.el::skg--set-repo-and-handle-stuck-edges' skips
+   write-protected occurrences and offers to publicize content relationships left
+   at their old, more-private skgrepos by a home move.
+   'nvim/lua/skg/metadata.lua::set_repo' instead calls direct skgrepo
+   rewriting helpers, including on write-protected occurrences, without
+   that analysis. Its success message can therefore describe an edit the
+   save will not honor as expected. This is client-policy drift, not a
+   demonstrated bypass of server validation. Add shared behavioral cases
+   and align the commands; consider server-owned preview logic if such
+   graph-dependent policies continue to multiply. The Emacs-only policy
+   tables ('skg--writable-folder-relations',
+   'skg--relRepo-unsupported-folder-atoms' in 'elisp/skg-request-relRepo-info.el')
+   should then be served or shared, not copied into Neovim (noted from
+   [[file:DONE/herald-colors/2_plan.org][the herald-colors plan]], 2026-10-04).
+   Checked 2026-11-22: could not confirm it still holds.
+   'skg--set-repo-and-handle-stuck-edges' is gone: Emacs's 'skg-set-repo'
+   ('elisp/skg-metadata.el') and Neovim's 'set_repo' both skip
+   write-protected occurrences, and the server decides what a move
+   strands (0fcd22704). The two policy tables are now copied into
+   'nvim/lua/skg/relRepo_info.lua' ("Mirrors ...").
+* Tests, harness and bash ('tests/', 'bash/', 'windows/')
+** all-tests.sh never plays its completion sound (2026-11-22)
+  'bash/all-tests.sh' sets 'BEEP' to a path and an argument in one
+  string ("$PROJECT_ROOT/../sound/play-beep.sh beep-soothing") and then
+  tests '[ -x "$BEEP" ]', which no file passes; so the sound never
+  plays, and '--no-sound' changes nothing. (The script is also absent
+  in the container.) Splitting the path from the argument would fix it.
+** 'tests/mutation_gate.rs' copies a projection the server has (2026-09-25)
+  (Filed under "Findings from the simplification reconnaissance".)
+  Research and proposed slices: [[file:astra-cleans-up.org][Making Skg easier to change]].
+  These are source-inspection findings; no application changes or runtime
+  reproduction were performed during the review.
+   'tests/mutation_gate.rs' keeps its own
+   copy of the projection that 'From<&GraphnodeInRust> for Graphnode'
+   ('server/types/nodes/rust.rs') now is.
+   (Split on 2026-11-22 from "'graphnode_by_gnid' takes a config it
+   ignores", now in TODO/DONE/problems.org; the copy is
+   'complete_from_rust'.)
+** start-servers.sh misreports a LINK failure as a COMPILE failure (2026-07-22)
+  (Filed under "Problems noted while building recursive set-relRepo".)
+  Context: Jeff's machine overheated and cut power mid-'cargo build',
+  truncating 3 of 501 rlibs in target/. Servers then refused to start,
+  permanently and identically, on unchanged code and unchanged data.
+  Fixed by 'cargo clean -p skg -p tantivy -p typedb-driver'. Written up
+  in docs/troubleshooting/build-artifacts-corrupted-by-power-loss.org.
+   'preflight_check_config' (bash/start-servers.sh) wraps
+   'cargo build -q --bin skg' and, on failure, prints "ERROR: skg
+   failed to compile (see errors above)". In the 2026-07-14 incident the
+   crate compiled fine; it failed to *link*, against a truncated rlib
+   ("file too short"). The wording sends you looking for a source bug
+   that does not exist -- and since the user's premise is "the code
+   hasn't changed", the message reads as nonsense and pushes them toward
+   TypeDB, which was innocent. Suggested fix: on build failure, add a
+   line pointing at
+   docs/troubleshooting/build-artifacts-corrupted-by-power-loss.org and
+   at 'python3 docs/troubleshooting/check-rlibs.py', noting that a
+   linker error on unchanged code usually means truncated artifacts in
+   target/. Cheap, and it would have collapsed this whole investigation
+   into one command.
+** Problems found while adding data/bash/id-histories.sh + lib.sh (2026-06-20)
+*** windows/starter-data/bash/ copies still use the old list-file pattern
+   The Windows starter bundle ships its own copies of these scripts
+   (=windows/starter-data/bash/{push,pull,status,remote}-all.sh=) that
+   still =for i in $(cat list-of-repositories.txt)=. They are now
+   divergent from =data/bash/= (which derives all/owned from
+   skgconfig.toml via lib.sh) and still depend on a list file. Docs that
+   describe the bundle (=to-windows.org=, =windows/run.ps1=,
+   =windows/docs/windows-user.org=) reference the list file too. If the
+   lib.sh approach is the intended one, the Windows bundle and its docs
+   should be regenerated/updated to match. Left untouched this round (out
+   of scope: the request was about data/bash/).
+** Problems found while investigating test-suite speed (2026-06-12)
+  See TODO/DONE/faster-tests.org for the full investigation.
+*** (mostly fixed) Six near-duplicate test-db setup paths
+   The same connect / create-db / define-schema / populate / teardown
+   sequence is implemented in: 'run_with_test_db' and
+   'run_with_test_db_from_config' (server/test_utils.rs),
+   'setup_test_dbs' (tests/git_diff_view/common.rs), 'setup_test' and
+   'setup_temp_test' (tests/hidden_from_subscriptions.rs), 'setup'
+   (tests/move_source.rs), 'setup_test_dbs'
+   (tests/collateral_source_move.rs), and
+   'run_with_source_set_test_db' (used by tests/source_sets.rs).
+   They differ only in whether config comes from a TOML file and
+   whether fixtures are copied to /tmp. Quasi-duplication worth
+   collapsing -- and the natural moment is the shared-db-session
+   refactor proposed in TODO/DONE/faster-tests.org.
+   Mostly fixed 2026-06-12: hidden_from_subscriptions' and
+   move_source's private helpers are deleted (their tests use
+   SharedDbSession). Still alive on 2026-11-22 (the TypeDB-era names
+   above are gone; these are their successors):
+   'run_with_skgrepo_set_test_db' (server/test_utils.rs; leak_battery,
+   partner_folder_matrix, repo_sets, restricted_suppression), which,
+   unlike 'run_with_test_stores', neither takes
+   'TEST_STORE_GROUPS_MUTEX' nor cleans up after a panic;
+   'setup_test_stores' in tests/collateral_repo_move.rs; and the
+   one-line 'setup_multi_skgrepo_test' and 'cleanup_test' wrappers in
+   tests/forks_folder_by_default.rs.
+** Replacing data/skgconfig.toml can leave server and client on different ports (2026-05-06)
+  (Filed under "Other problems".)
+   Observed 2026-05-06: data/skgconfig.toml said 'port = 1731',
+   but the already-running server process was still listening on 1730.
+   'cargo-watch watch -w server/ ... data/skgconfig.toml' watches
+   server/ only, so replacing data/ or editing skgconfig.toml does
+   not restart the server with the new config.
+
+   The result is confusing because '(skg-client-init "../data/skgconfig.toml")'
+   correctly points Emacs at the new config port, while the live Rust
+   process remains bound to the old one.
+
+   Possible fixes: watch the config file too, log the active port and
+   config path in a user-visible way, or add a client diagnostic that
+   explicitly says "config wants port X but no server is listening".
+   Checked 2026-11-22: still holds. The config is now the path given
+   to 'bash/start-servers.sh' (default 'data/jeff/skgconfig.toml'),
+   and cargo-watch runs only with '--hot-reload', watching server/;
+   the rerun loop rereads the config only when the server restarts.
+* Tools ('tools/')
+** Problems noticed while refactoring tools/ (2026-11-22)
+*** 'skg_filenames_match_pids' reads a key no '.skg' file has
+  'tools/introspect/skg_filenames_match_pids.rs' takes a file's IDs
+  from 'ids', but a '.skg' file names them 'pid' and 'extra_ids', so
+  it can find nothing. Its default folder, 'data/skg', is gone, and
+  its header names it by two bin names. It still builds, as a [[bin]]
+  of the root 'Cargo.toml'.
+*** 'bench-prominence-inmemory' defaults to a config that is gone
+  'tools/bench-prominence-inmemory.rs' reads 'data/real/skgconfig.toml'
+  when given no config; its siblings 'top-contents' and
+  'top-contentward-descendants' moved to 'data/jeff/skgconfig.toml'.
