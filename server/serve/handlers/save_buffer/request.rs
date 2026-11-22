@@ -233,9 +233,7 @@ pub(super) fn strandeds_review_from_request (
   request : &str,
 ) -> StrandedsReview {
   let reviewed : bool =
-    value_from_request_sexp ("strandeds-reviewed", request)
-    . map ( |v| v == "true" )
-    . unwrap_or (false);
+    request_field_is_true ("strandeds-reviewed", request);
   if ! reviewed { return StrandedsReview::NotReviewed; }
   let mut chosen : HashSet<RelationshipKey> = HashSet::new ();
   let Ok (Sexp::List (items)) = sexp::parse (request)
@@ -275,9 +273,7 @@ pub(super) fn delete_from_from_request (
 pub(super) fn preview_from_request (
   request : &str,
 ) -> bool {
-  value_from_request_sexp ("preview", request)
-    . map ( |v| v == "true" )
-    . unwrap_or (false) }
+  request_field_is_true ("preview", request) }
 
 /// Whether this save request carries '(approved-forks . "true")', set by
 /// the client when the user approves a fork-confirmation. Absent or any
@@ -285,7 +281,15 @@ pub(super) fn preview_from_request (
 pub(super) fn fork_approved_from_request (
   request : &str,
 ) -> bool {
-  value_from_request_sexp ("approved-forks", request)
+  request_field_is_true ("approved-forks", request) }
+
+/// Whether the request carries '(KEY . "true")'. Absent or any other
+/// value, false.
+fn request_field_is_true (
+  key     : &str,
+  request : &str,
+) -> bool {
+  value_from_request_sexp (key, request)
     . map ( |v| v == "true" )
     . unwrap_or (false) }
 
