@@ -15,10 +15,11 @@
 -- a capital 'M' for outward ('Mnp').
 -- It also formats the processed summary, which the save,
 -- stage-and-commit and extend-diff-view show. What a
--- headline's change facts say, whether a folder's change is processed, and
--- how a request is placed in '(editRequest ...)' are read in
--- skg.metadata, as in Emacs.
+-- headline's change facts say, and whether a folder's change is
+-- processed, are read in skg.change_facts; how a request is placed in
+-- '(editRequest ...)', in skg.metadata.
 
+local change_facts = require('skg.change_facts')
 local metadata = require('skg.metadata')
 local modify_graph = require('skg.modify_graph')
 local payload = require('skg.payload')
@@ -182,7 +183,7 @@ end
 ---@param at_gesture boolean|nil
 ---@return string[]|nil
 function M.objects_named_by_letters (metadata_sexp, letter_objects, at_gesture)
-  local leaves = metadata.processed_leaves(metadata_sexp)
+  local leaves = change_facts.processed_leaves(metadata_sexp)
   if not leaves then return nil end
   if #leaves.objects == 0 then
     local kind = M.single_leaf_kind(metadata_sexp)
@@ -203,9 +204,9 @@ end
 ---@param metadata_sexp any
 ---@return boolean
 function M.processed_p (metadata_sexp)
-  local leaves = metadata.processed_leaves(metadata_sexp)
+  local leaves = change_facts.processed_leaves(metadata_sexp)
   return leaves ~= nil
-         and metadata.objects_processed_p(metadata_sexp, leaves.objects)
+         and change_facts.objects_processed_p(metadata_sexp, leaves.objects)
 end
 
 ---Whether the headline at LINE_NUMBER is processed: a changed folder when
@@ -214,7 +215,7 @@ end
 ---@param line_number integer
 ---@return boolean
 function M.processed_at_line (line_number)
-  local folder_change = metadata.folder_change_processed_at_line(line_number)
+  local folder_change = change_facts.folder_change_processed_at_line(line_number)
   if folder_change then return folder_change.processed end
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
   return metadata_sexp ~= nil and M.processed_p(metadata_sexp)
@@ -285,8 +286,8 @@ function M.requests_at_line (line_number, letter_objects, processed)
   local named = M.objects_named_by_letters(metadata_sexp, letter_objects, true)
   if named then
     return { M.request_at_line(line_number, processed, named) } end
-  if metadata.processed_leaves(metadata_sexp)
-     or not metadata.folder_change_processed_at_line(line_number) then
+  if change_facts.processed_leaves(metadata_sexp)
+     or not change_facts.folder_change_processed_at_line(line_number) then
     return {} end
   local requests = {}
   for _, line in ipairs(modify_graph.immediate_viewchildren(line_number)) do
@@ -327,7 +328,7 @@ function M.requests_for_subtree_at_line (line_number, letter_objects,
       local at_root = line == line_number
       local handed_over = false
       if headline then
-        if at_root then handed_over = metadata.processed_node_added_p(headline)
+        if at_root then handed_over = change_facts.processed_node_added_p(headline)
         else handed_over = M.hands_to_the_server_p(line, headline) end end
       local named = nil
       if handed_over then
@@ -349,7 +350,7 @@ end
 ---@param metadata_sexp any
 ---@return boolean
 function M.hands_to_the_server_p (line_number, metadata_sexp)
-  if not metadata.processed_node_added_p(metadata_sexp) then return false end
+  if not change_facts.processed_node_added_p(metadata_sexp) then return false end
   local parent = metadata.parent_line(line_number)
   return parent ~= nil and metadata.folder_atom(
     metadata.metadata_sexp_at_line_or_nil(parent)) == nil
@@ -362,7 +363,7 @@ end
 ---@param objects string[]
 ---@return table
 function M.request_at_line (line_number, processed, objects)
-  local leaves = metadata.processed_leaves(
+  local leaves = change_facts.processed_leaves(
     metadata.metadata_sexp_at_line_or_nil(line_number))
   return { line = line_number, processed = processed, objects = objects,
            count = M.leaves_touched(leaves, objects) }
@@ -587,7 +588,7 @@ function M.diffView_change_start_on_line (line_number, processed, anywhere)
   local stars = metadata.line_text(line_number):match('^(%*+ )%(skg')
   if not stars then return nil end
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
-  if not (metadata_sexp and metadata.processed_leaves(metadata_sexp)) then
+  if not (metadata_sexp and change_facts.processed_leaves(metadata_sexp)) then
     return nil end
   if processed == 'processed' and not M.processed_p(metadata_sexp)
      or processed == 'unprocessed' and M.processed_p(metadata_sexp) then

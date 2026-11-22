@@ -2,6 +2,7 @@
 -- processed summary a save of a diff-view buffer shows.
 -- Mirrors tests/elisp/test-skg-processed.el.
 
+local change_facts = require('skg.change_facts')
 local metadata = require('skg.metadata')
 local picker = require('skg.picker')
 local processed = require('skg.processed')
@@ -404,7 +405,7 @@ describe('skg.processed', function ()
       local lines = { '* (skg containerFolder) its containers' }
       for _, member in ipairs(members) do table.insert(lines, member) end
       table.insert(lines, '* (skg node (gnid after) (diff (rel added))) after')
-      local change = metadata.folder_change_processed_in_lines(lines, 1)
+      local change = change_facts.folder_change_processed_in_lines(lines, 1)
       return change and { processed = change.processed } or nil
     end
     assert.are.same({ processed = true }, folder_change({ processed_member }))
@@ -429,7 +430,7 @@ describe('skg.processed', function ()
     -- Only a folder's members count, and only for a folder.
     assert.is_nil(folder_change({ '** (skg node (gnid m)) m',
                                   '*** ' .. unprocessed_alias:sub(4) }))
-    assert.is_nil(metadata.folder_change_processed_in_lines(
+    assert.is_nil(change_facts.folder_change_processed_in_lines(
       { '* (skg node (gnid p)) p', unprocessed_member }, 1))
   end)
 
@@ -742,7 +743,7 @@ describe('skg.processed moving between headlines with change facts', function ()
         local sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
         assert.is_true(processed.diffView_change_of_other_files_p(line_number, sexp))
         local gnid = lines[line_number]:match('%(gnid ([^)]+)%)')
-        local objects = metadata.processed_leaves(sexp).objects
+        local objects = change_facts.processed_leaves(sexp).objects
         local folder_line = metadata.parent_line(line_number)
         local partner = lines[metadata.parent_line(folder_line)]:match('%(gnid ([^)]+)%)')
         local found = false

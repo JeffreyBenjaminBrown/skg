@@ -42,6 +42,12 @@ local function metadata ()
   return require('skg.metadata')
 end
 
+---skg.change_facts, required late, since it requires skg.metadata.
+---@return table
+local function change_facts ()
+  return require('skg.change_facts')
+end
+
 M.namespace = vim.api.nvim_create_namespace('skg-heralds')
 
 -- The placeholder token the server's `rels` and `props` rules emit
@@ -588,7 +594,7 @@ end
 ---The herald chunks of FOLDER, a folder's atom, shown because a
 ---member's relationship changed: its ☮ when it is write-protected, its
 ---changed label styled as its ordinary one, then ✓ when FOLDER_CHANGE
----(as skg.metadata.folder_change_processed_in_lines gives it) says it is processed.
+---(as skg.change_facts.folder_change_processed_in_lines gives it) says it is processed.
 ---@param folder string
 ---@param folder_change table
 ---@return table[]
@@ -696,7 +702,7 @@ end
 ---Lens the first (skg ...) occurrence on 0-based line ROW of BUF into
 ---one conceal+virtual-text extmark (at most). A folder's herald
 ---depends on its members' metadata
----(skg.metadata.folder_change_processed_in_lines),
+---(skg.change_facts.folder_change_processed_in_lines),
 ---and a 'noClaim' headline's on its parents'
 ---(skg.metadata.pending_detachment_in_lines), read from LINES, BUF's
 ---lines, when given.
@@ -716,7 +722,7 @@ function M.apply_to_line (buf, row, lines)
   end
   local folder_change = nil
   if line:find('Folder', 1, true) then
-    folder_change = metadata().folder_change_processed_in_lines(
+    folder_change = change_facts().folder_change_processed_in_lines(
       buffer_lines(), row + 1) end
   local pending_detachment = false
   if line:find('noClaim', 1, true) then

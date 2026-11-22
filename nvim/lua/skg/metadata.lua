@@ -30,7 +30,7 @@ local NODE = sexpr.symbol('node')
 ---The head symbol's name of a list, or nil.
 ---@param value any
 ---@return string|nil
-local function head_name (value)
+function M.head_name (value)
   if sexpr.is_list(value) and value[1] ~= nil
      and not sexpr.is_list(value[1]) then
     return sexpr.atom_text(value[1]) end
@@ -41,9 +41,9 @@ end
 ---@param list any
 ---@param key string
 ---@return any|nil
-local function child_with_head (list, key)
+function M.child_with_head (list, key)
   for i = 2, #list do
-    if head_name(list[i]) == key then return list[i] end
+    if M.head_name(list[i]) == key then return list[i] end
   end
   return nil
 end
@@ -51,7 +51,7 @@ end
 ---The atoms after the head of FORM, as strings.
 ---@param form any|nil
 ---@return string[]
-local function arguments (form)
+function M.arguments (form)
   local result = {}
   if form then
     for i = 2, #form do
@@ -485,7 +485,7 @@ end
 ---@return boolean is it a processed request, '(processed OBJECT...)' or
 ---'(unprocessed OBJECT...)'?
 function M.processed_request_p (request)
-  local head = head_name(request)
+  local head = M.head_name(request)
   return head == 'processed' or head == 'unprocessed'
 end
 
@@ -498,7 +498,7 @@ end
 ---@param requests_from fun(requests: any[]): any[]
 ---@return any
 local function metadata_with_editRequest_parts (metadata_sexp, requests_from)
-  local old_form = child_with_head(metadata_sexp, 'editRequest')
+  local old_form = M.child_with_head(metadata_sexp, 'editRequest')
   local new_form = { sexpr.symbol('editRequest') }
   for _, request in ipairs(requests_from(
                              old_form and { unpack(old_form, 2) } or {})) do
@@ -991,147 +991,6 @@ function M.partner_folder_atom (metadata_sexp)
   return nil
 end
 
--- ── a headline's change facts ──────────────────────────────────────
-
----The '(diff ...)' form of METADATA_SEXP, which every kind keeps at
----the top level, or nil.
----@param metadata_sexp any
----@return any|nil
-function M.processed_diff_form (metadata_sexp)
-  return child_with_head(metadata_sexp, 'diff')
-end
-
----The (KEY ...) part of METADATA_SEXP's '(diff ...)' form, or nil.
----@param metadata_sexp any
----@param key string
----@return any|nil
-function M.processed_form (metadata_sexp, key)
-  local diff = M.processed_diff_form(metadata_sexp)
-  if not diff then return nil end
-  return child_with_head(diff, key)
-end
-
----The '(leaves N OBJECT...)' fact of the headline with METADATA_SEXP,
----as { count = N, objects = OBJECTS }, or nil when it names no leaf.
----@param metadata_sexp any
----@return table|nil
-function M.processed_leaves (metadata_sexp)
-  local form = M.processed_form(metadata_sexp, 'leaves')
-  if not form then return nil end
-  local atoms = arguments(form)
-  return { count = tonumber(atoms[1]) or 0,
-           objects = vim.list_slice(atoms, 2) }
-end
-
----@param metadata_sexp any
----@return boolean is the headline with METADATA_SEXP a new node? Its
----'(diff ...)' says '(node added)'.
-function M.processed_node_added_p (metadata_sexp)
-  return arguments(M.processed_form(metadata_sexp, 'node'))[1] == 'added'
-end
-
----@param metadata_sexp any
----@param objects string[]
----@return boolean is every one of OBJECTS processed? It is when the
----headline carries a '(processed ...)' that names each of them. A
----headline that lists no object (one naming a single leaf) is processed
----when it carries any '(processed ...)'.
-function M.objects_processed_p (metadata_sexp, objects)
-  local processed = M.processed_form(metadata_sexp, 'processed')
-  if not processed then return false end
-  local processed_objects = {}
-  for _, object in ipairs(arguments(processed)) do
-    processed_objects[object] = true
-  end
-  for _, object in ipairs(objects) do
-    if not processed_objects[object] then return false end
-  end
-  return true
-end
-
----Whether a folder member carries a change of its relationship to
----the folder's viewparent, and if so whether that change is processed.
----MEMBER_SEXP is the member's metadata; CHILD_SEXPS that of its own
----child headlines. The member carries such a change when its
----'(diff ...)' has a '(rel ...)', or when one of its children is a
----'(relRepoMove ...)'. The change is processed when both of these hold:
----if the member has a '(rel ...)', its '(diff ...)' has a '(processed
----...)' that, when its '(leaves ...)' lists 'rel', names 'rel'; if
----it has a '(relRepoMove ...)' child, that child's '(diff ...)' has
----a '(processed ...)'.
----@param member_sexp any
----@param child_sexps any[]
----@return boolean|nil nil when the member carries no such change,
----else whether it is processed
-function M.membership_change_processed (member_sexp, child_sexps)
-  local changed, processed = false, true
-  if M.processed_form(member_sexp, 'rel') then
-    changed = true
-    local leaves = M.processed_leaves(member_sexp)
-    local objects = {}
-    if leaves and vim.tbl_contains(leaves.objects, 'rel') then
-      objects = { 'rel' } end
-    processed = M.objects_processed_p(member_sexp, objects)
-  end
-  for _, child in ipairs(child_sexps) do
-    if child_with_head(child, 'relRepoMove') then
-      changed = true
-      processed = processed and M.processed_form(child, 'processed') ~= nil end
-  end
-  if not changed then return nil end
-  return processed
-end
-
----Whether the folder whose headline is LINES[INDEX] is changed, and
----if so whether it is processed. LINES are a buffer's lines, 1-based. The
----folder is changed when one of its members (its direct child
----headlines) carries a change of its relationship to the folder's
----viewparent (M.membership_change_processed), and processed when every such
----change is processed. Nil when the headline is no folder or no member
----carries such a change; else { processed = BOOLEAN }.
----@param lines string[]
----@param index integer
----@return table|nil
-function M.folder_change_processed_in_lines (lines, index)
-  local level = M.headline_level_on_line(lines[index])
-  if not (level and M.folder_atom(M.metadata_on_line(lines[index]))) then
-    return nil end
-  local members = {} -- each { sexp, child_sexps }
-  for i = index + 1, #lines do
-    local line_level = M.headline_level_on_line(lines[i])
-    if line_level then
-      if line_level <= level then break end
-      if line_level == level + 1 then
-        table.insert(members, { sexp = M.metadata_on_line(lines[i]),
-                                child_sexps = {} })
-      elseif line_level == level + 2 and #members > 0 then
-        local child = M.metadata_on_line(lines[i])
-        if child then
-          table.insert(members[#members].child_sexps, child) end
-      end
-    end
-  end
-  local changed, processed = false, true
-  for _, member in ipairs(members) do
-    local member_processed = member.sexp
-      and M.membership_change_processed(member.sexp, member.child_sexps)
-    if member_processed ~= nil then
-      changed = true
-      processed = processed and member_processed end
-  end
-  if not changed then return nil end
-  return { processed = processed }
-end
-
----M.folder_change_processed_in_lines for the headline at LINE_NUMBER of the
----current buffer.
----@param line_number integer
----@return table|nil
-function M.folder_change_processed_at_line (line_number)
-  return M.folder_change_processed_in_lines(
-    vim.api.nvim_buf_get_lines(0, 0, -1, false), line_number)
-end
-
 -- ── a pending detachment ───────────────────────────────────────────
 -- A child the user marked 'noClaim' under an editable parent stays in
 -- the buffer but leaves the parent's list at the next save. Until then
@@ -1167,7 +1026,7 @@ local function form_at (metadata_sexp, path)
   local form = metadata_sexp
   for _, key in ipairs(path) do
     if not sexpr.is_list(form) then return nil end
-    form = child_with_head(form, key)
+    form = M.child_with_head(form, key)
   end
   return form
 end
@@ -1179,7 +1038,7 @@ end
 ---skg--forked-by-its-folders-viewparent-p.
 function M.forked_by_its_folders_viewparent_p (metadata_sexp)
   return vim.tbl_contains(
-    arguments(form_at(metadata_sexp,
+    M.arguments(form_at(metadata_sexp,
                       { 'view', 'rels', 'forks', 'in', 'ancestors' })),
     '2')
 end
@@ -1195,8 +1054,8 @@ function M.born_only_forking_its_folders_viewparent_p (metadata_sexp)
     if not birth then return false end
     for i = 2, #birth do
       local fact = birth[i]
-      if head_name(fact) == 'forks'
-         and vim.deep_equal(arguments(fact), { side, '2' }) then
+      if M.head_name(fact) == 'forks'
+         and vim.deep_equal(M.arguments(fact), { side, '2' }) then
         return true end
     end
     return false
@@ -1209,7 +1068,7 @@ end
 ---carry neither 'noWarrant' nor 'ghostWarrant', and its '(diff ...)'
 ---no '(rel removed)'? What HEAD alone warrants is no detachment.
 function M.warranted_by_the_graph_p (metadata_sexp)
-  local view_atoms = arguments(child_with_head(metadata_sexp, 'view'))
+  local view_atoms = M.arguments(M.child_with_head(metadata_sexp, 'view'))
   return not (vim.tbl_contains(view_atoms, 'noWarrant')
               or vim.tbl_contains(view_atoms, 'ghostWarrant')
               or M.relationship_removed_p(metadata_sexp))

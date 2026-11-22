@@ -19,6 +19,7 @@ T.arm_timeout(90)
 local notified = {} -- every notification, oldest first
 vim.notify = function (msg) table.insert(notified, tostring(msg)) end
 
+local change_facts = require('skg.change_facts')
 local metadata = require('skg.metadata')
 local processed = require('skg.processed')
 
@@ -69,7 +70,7 @@ local function check_skipped_changes_are_drawn_editable (visited, all)
       T.check(processed.diffView_change_of_other_files_p(line_number, sexp),
               'skipped line ' .. line_number .. ' is a ☮ member of an (other files) folder')
       local gnid = lines[line_number]:match('%(gnid ([^)]+)%)')
-      local objects = metadata.processed_leaves(sexp).objects
+      local objects = change_facts.processed_leaves(sexp).objects
       local partner = lines[metadata.parent_line(metadata.parent_line(line_number))]
                         :match('%(gnid ([^)]+)%)')
       local found = false

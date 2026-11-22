@@ -6,6 +6,7 @@
 -- 'server/herald_descriptions.rs'). The Lua port of
 -- elisp/skg-request-describe-heralds.el.
 
+local change_facts = require('skg.change_facts')
 local client = require('skg.client')
 local metadata = require('skg.metadata')
 local sexpr = require('skg.sexpr.parse')
@@ -35,7 +36,7 @@ function M.request_at_line (line_number)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'describe heralds'),
     sexpr.pair(sexpr.symbol('metadata'), text) }
-  local folder_change = metadata.folder_change_processed_in_lines(
+  local folder_change = change_facts.folder_change_processed_in_lines(
     lines, headline)
   if folder_change then
     table.insert(request, sexpr.pair(sexpr.symbol('folder-change'),

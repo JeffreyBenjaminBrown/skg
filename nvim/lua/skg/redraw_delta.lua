@@ -194,7 +194,7 @@ end
 ---1-based INDICES of BUF and of each headline whose herald reads one of
 ---them: the folders among its two nearest ancestors, which read their
 ---members and their members' children
----(metadata.folder_change_processed_in_lines; M.watch_buffer does this
+---(change_facts.folder_change_processed_in_lines; M.watch_buffer does this
 ---for an edit), and the headlines one or two levels below it, since a
 ---pending detachment reads its parent and grandparent
 ---(metadata.pending_detachment_in_lines).
