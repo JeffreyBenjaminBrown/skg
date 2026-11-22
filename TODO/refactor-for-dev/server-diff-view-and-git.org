@@ -1,0 +1,75 @@
+* Refactoring for dev: 'server/diff_view/', 'server/git_ops/', 'server/graph_straddle/'
+  The territory: the diff view's server side, the git layer under it,
+  and the graph straddle both stand on. No top-level file of 'server/'
+  belongs to it. The diff view's handlers in 'server/serve/handlers/'
+  ('diff_view.rs', 'extend_diff_view.rs', 'titles_by_gnids.rs') belong
+  to 'server/serve/'. The focused tests are 'bash/nextest.sh --lib
+  --test grouped_unit --test grouped_repos' (about a minute warm);
+  add '--test grouped_saves' when touching what validation reads
+  ('named_leaf_set.rs').
+
+  The territory was already well factored: short functions, each with
+  a comment, and 'docs/diff-view.org' cites many of them by file, so
+  moving a cited function means changing its note in 'skg-system/' in
+  the same commit.
+* Done
+** A skgrepo's diff is the nodes its changed files add or delete
+   'SkgrepoDiff' ('server/types/git.rs') carried per-stage per-file
+   diffs and an 'is_gitrepo' flag that nothing read, and
+   'compute_diff_for_skgrepo' ('server/git_ops/diff.rs') parsed both
+   sides of every modified file only to drop them. It now reads one
+   side of each added or deleted file. Only the server log differs: a
+   modified file that fails to parse is no longer warned about there.
+** The IDs a merge re-resolves are found by 'reresolved_extra_ids_of' alone
+   'recorders_of_reresolved_members' ('server/diff_view/change_leaves.rs')
+   repeated the search and its two closures.
+** One 'profile_step' times every step of a git snapshot's read
+   'profile_step_result' ('server/git_ops/git_snapshot.rs') was a copy.
+** What a processed request names ('NamedLeafSet') has its own file
+   'server/diff_view/named_leaf_set.rs' takes the set algebra that
+   validation reads too, out of 'processed_requests.rs' (736 lines,
+   now 483).
+** Three problem entries went to 'TODO/DONE/problems.org'
+   Two named 'server/to_org/', which is gone; the third, three parses
+   per changed file, is the first item above. The entry on the
+   repo-wide pathspec names today's files, and records a latent slip
+   of the same kind in 'diff.rs' (a gitrepo-relative path joined to
+   the skgrepo's path).
+* Candidates left, best first
+** Split the commit choice off 'server/diff_view/change_leaves.rs' (1000 lines)
+   From 'WaitReason' to 'title_in_straddle' (about 300 lines) is the
+   rule of what a commit takes ('CommitChoice', 'hold_back_waiting_nodes',
+   'merge_needs'); the rest is the change-forest. A file
+   'commit_choice.rs' would let an agent read either alone. The move
+   is mechanical ('reresolved_extra_ids_of' is shared; make it
+   'pub(crate)'), but 'docs/diff-view.org' cites 'hold_back_waiting_nodes'
+   in 'change_leaves.rs' and 'docs/api-and-formats.org' says "the
+   choice of nodes in change_leaves.rs"; their notes in 'skg-system/'
+   must change in the same commit. Callers: 'change_viewnodes.rs'
+   ('title_in_straddle'), 'server/serve/handlers/stage_and_commit.rs',
+   'tests/unit/change_leaves.rs' and
+   'tests/pruned_change_view/commit_processed.rs'.
+** Move 'compute_diff_for_every_skgrepo' to 'server/git_ops/diff.rs'
+   It is defined in 'server/serve/handlers/save_buffer.rs' but only
+   'titles_by_gnids.rs' calls it; it is a git function. Safe and
+   small, but it edits two files of 'server/serve/', so coordinate
+   with that territory.
+** One helper for "the HEAD tree, else 'it has no HEAD commit'"
+   'server/git_ops/stage_and_commit.rs' spells it in
+   'skg_paths_differing_from_head', 'prepare_commits' and
+   'head_holds_tree'; and three functions open a skgrepo's gitrepo
+   with "not in a git repository" (two wordings). Small saving; the
+   messages must stay word for word.
+** Inline 'relationships_to_viewparent' ('processed_requests.rs')
+   It only unwraps 'relationship_keys_to_viewparent', whose Option
+   exists for '?'. Trivial.
+** ? Two parsers of a '.skg' blob
+   'parse_blob_section' ('git_snapshot.rs') checks the pid against the
+   file stem and fails; 'graphnode_on_disk_as_graphnode_with_default_skgrepo'
+   ('diff.rs') does not check, logs and returns None, and refuses
+   retired keys. Unifying them changes what 'titles-by-ids' finds for a
+   misnamed file, so it needs Jeff's yes; if he says nothing, they stay.
+** ? "Walking HEAD tree" is said of a candidate tree too
+   'read_skgrepo_from_tree' ('git_snapshot.rs') words a walk error so
+   even when it reads a tree to commit. A user-visible message, so it
+   needs Jeff's yes; if he says nothing, it stays.
