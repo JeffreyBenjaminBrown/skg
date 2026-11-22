@@ -109,6 +109,7 @@ TOOL_FOLDER = os . path . dirname ( os . path . abspath (__file__) )
 REPO_ROOT = os . path . dirname ( os . path . dirname (TOOL_FOLDER) )
 sys . dont_write_bytecode = True
 sys . path . insert (0, TOOL_FOLDER)
+import sexp
 import skg_for_ai
 
 FIXTURE_FOLDER = os . path . join (TOOL_FOLDER, "test-fixture")
@@ -369,7 +370,7 @@ def failures_of_save_envelope ():
 def failures_of_commit_result_text ():
   """A commit's line names each node left because it changed in a way
   no mark covers, with how, and says what can commit it."""
-  response = skg_for_ai . parse_sexp (
+  response = sexp . parse_sexp (
     '((commits (("main" "9c1e40d2"))) (committed-nodes 1) (left-nodes 2)'
     ' (waiting ()) (unmarkable (("h" "H" ("its file changed in a way the diff view does not show (formatting, say)"))'
     ' ("t" "T" ("its file changed in a way the diff view does not show (formatting, say)"))))'
@@ -390,7 +391,7 @@ def failures_of_preview_support ():
     def __init__ (self, answer):
       self . answer = answer
     def request (self, line):
-      return skg_for_ai . parse_sexp (self . answer)
+      return sexp . parse_sexp (self . answer)
   old = Answering ( '((response-type verify-connection) (content "This is '
                     'the skg server verifying the connection."))' )
   new = Answering ( '((response-type verify-connection) (content "x") '
@@ -632,16 +633,16 @@ def failures_of_reworded_pairing ():
 
 def failures_of_shared_herald_cases ():
   herald_tables = skg_for_ai . HeraldTables (
-    skg_for_ai . parse_sexp ( read_file (SHARED_HERALD_RULES) ),
-    { skg_for_ai . sexp_to_text ( entry [0] ) :
-        skg_for_ai . sexp_to_text ( entry [1] )
-      for entry in skg_for_ai . parse_sexp (
+    sexp . parse_sexp ( read_file (SHARED_HERALD_RULES) ),
+    { sexp . sexp_to_text ( entry [0] ) :
+        sexp . sexp_to_text ( entry [1] )
+      for entry in sexp . parse_sexp (
         read_file (SHARED_SKGREPO_LABELS) ) [ 1 : ] } )
   failures = []
   cases = shared_herald_cases ()
   for name, metadata_text, text, context in cases:
     rendered = skg_for_ai . herald_text (
-      skg_for_ai . parse_sexp (metadata_text), herald_tables,
+      sexp . parse_sexp (metadata_text), herald_tables,
       skg_for_ai . HeraldContext (
         { "folderChange processed" : True,
           "folderChange unprocessed" : False } . get (context),
@@ -902,8 +903,8 @@ def failures_of_raw_and_import (scratch):
   # above render the pinned one.
   rules = run_tool ([ "raw", '((request . "herald rules"))' ])
   served = skg_for_ai . herald_tables_of_response (
-    skg_for_ai . parse_sexp ( rules . stdout . split ("\n", 1) [1] ))
-  if served . rules != skg_for_ai . parse_sexp ( read_file (SHARED_HERALD_RULES) ):
+    sexp . parse_sexp ( rules . stdout . split ("\n", 1) [1] ))
+  if served . rules != sexp . parse_sexp ( read_file (SHARED_HERALD_RULES) ):
     failures . append ( f"the served herald rules differ from {SHARED_HERALD_RULES}" )
   import_folder = os . path . join (scratch, "import")
   os . makedirs (import_folder)
