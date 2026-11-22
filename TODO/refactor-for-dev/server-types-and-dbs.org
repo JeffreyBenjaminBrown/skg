@@ -23,23 +23,17 @@
 ** A config names its missing skgrepo through one method
    'SkgConfig::skgrepo_or_err' ('server/types/misc.rs') holds the
    message "Repo '...' not found in config", once written at eight sites.
+** 'graphnode_by_gnid' takes no config
+   It ignored the one it was given. (Done by the 'server/serve/' agent.)
+** A config lives in 'server/types/config.rs'
+   'SkgConfig', 'Skgrepo', the foreign-order types, 'SkgrepoOwner',
+   the run-folder functions and the config's serde defaults moved
+   unchanged out of 'misc.rs'. (Done by the 'server/serve/' agent.)
 * Candidates left, best first
-** 'graphnode_by_gnid' takes a config it ignores
-   'server/dbs/node_lookup.rs'. Dropping '_config' is mechanical and
-   safe (compile-checked), but four of its eleven callers are tests
-   ('tests/partner_folder_matrix.rs', 'tests/shared/view_and_save_helpers.rs'),
-   which then change by more than a rename; it needs the coordinator's
-   word. 'tests/mutation_gate.rs' also keeps a private copy of the
-   'From<&GraphnodeInRust>' projection ('complete_from_rust') that it
-   could drop, under the same condition.
-** Split 'server/types/misc.rs' (993 lines) along its seams
-   It holds 'ID', 'MSV', 'RelPartner', 'SkgrepoName', 'Skgrepo',
-   'SkgConfig' (two impl blocks, at ~354 and ~605) and 'TantivyIndex'.
-   An agent looking for the config type would not guess "misc". A
-   'config.rs' holding 'SkgConfig', 'Skgrepo' and the foreign-order
-   types is the clear seam. Safe (moves only), but about seventy files
-   import 'SkgConfig' from 'types::misc', so the diff is wide; a
-   re-export would be the legacy shim the rules forbid.
+** 'tests/mutation_gate.rs' keeps a private copy of a 'From' projection
+   'complete_from_rust' there duplicates 'From<&GraphnodeInRust> for
+   Graphnode' ('server/types/nodes/rust.rs'). Dropping it is a test edit
+   that checks no less; small.
 ** 'server/types/viewnode.rs' (1702 lines)
    The biggest file in the territory: the viewnode types, then their
    impls from line ~773 ('Folder' alone ~190 lines of impl). The diff
