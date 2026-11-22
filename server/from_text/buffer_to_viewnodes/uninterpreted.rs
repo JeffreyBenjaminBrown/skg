@@ -88,7 +88,6 @@ pub fn org_to_viewforest (
     ViewForest::new();
   let mut parsing_errors: Vec<BufferValidationError> = Vec::new();
   let mut parsing_warnings: Vec<String> = Vec::new();
-  let mut viewnode_ids_seen: HashSet<ViewnodeId> = HashSet::new();
   // treeid_stack[0] is the internal forest root,
   // treeid_stack[1] is the current view root, etc.
   let mut treeid_stack: Vec<NodeId> = vec![ {
@@ -97,19 +96,8 @@ pub fn org_to_viewforest (
     viewforest_root_treeid } ];
   let mut viewnode_line_cols: Vec<ViewnodeLineCol> =
     divide_into_viewNodeLineCols (input)?;
-  for viewnode_line_col in &mut viewnode_line_cols {
-    let metadata : &mut ViewnodeMetadata =
-      viewnode_line_col . headline . 1 . get_or_insert_with (default_metadata);
-    if let Some (viewnode_id) = &metadata . viewnode_id {
-      // Of two headlines with one viewnode ID, the first in buffer order
-      // keeps it; the second is a copy, and will get a fresh one.
-      // (Dropped before the headline becomes a viewnode, so that no
-      // message names the copy by the original's viewnode ID.)
-      // One the view's record does not know is dropped after the
-      // parse ('drop_unknown_viewnode_ids_in_parsed_viewforest').
-      if ! viewnode_ids_seen . insert (viewnode_id . clone ()) {
-        metadata . viewnode_id = None; }}
-    replace_gnid_with_pid (metadata, id_resolution); }
+  drop_repeated_viewnode_ids_and_resolve_gnids (
+    &mut viewnode_line_cols, id_resolution );
   let mut supplied : WhatTheParseSupplied =
     WhatTheParseSupplied::new (
       skgrepos_after_save_of_writeProtected_occurrences (
@@ -127,19 +115,7 @@ pub fn org_to_viewforest (
     // treeid_stack.len() should equal level
     // because the internal forest root is at level 0.
     if treeid_stack . len() < level {
-      let viewnode : Viewnode = // only to name it
-        linecol_to_viewnode (viewnode_line_col)? . 1;
-      let headline : HeadlineName = { // by what it writes, not a minted gnid
-        let (_level, metadata, title) : &HeadlineInfo =
-          &viewnode_line_col . headline;
-        metadata . as_ref () . map_or_else (
-          || HeadlineName::of ( None, None, title ),
-          |metadata| metadata . headline_name (title) ) };
-      return Err ( with_org_subheadlines (
-        &format! (
-          "Node \"{}\" at level {} jumps too far between levels (no valid parent at level {}).",
-          viewnode . error_label(), level, level - 1),
-        &[ headline ] )); }
+      return Err ( level_jump_error (viewnode_line_col, level) ); }
     let parent_treeid: NodeId = *treeid_stack . last() . unwrap();
     let (viewnode, error_opt, warning_opt)
       : (Viewnode, Option<BufferValidationError>, Option<String>)
@@ -158,6 +134,52 @@ pub fn org_to_viewforest (
         parent_mut . append (viewnode) . id() };
       new_treeid } ); }
   Ok ( ( viewforest, parsing_errors, parsing_warnings, supplied ) ) }
+
+/// Give every headline metadata (the default where it has none), take
+/// a repeated viewnode ID from each headline but the first that writes
+/// it, and resolve each occurrence's gnid ('replace_gnid_with_pid').
+fn drop_repeated_viewnode_ids_and_resolve_gnids (
+  viewnode_line_cols : &mut [ViewnodeLineCol],
+  id_resolution      : IdResolution,
+) {
+  let mut viewnode_ids_seen: HashSet<ViewnodeId> = HashSet::new();
+  for viewnode_line_col in viewnode_line_cols {
+    let metadata : &mut ViewnodeMetadata =
+      viewnode_line_col . headline . 1 . get_or_insert_with (default_metadata);
+    if let Some (viewnode_id) = &metadata . viewnode_id {
+      // Of two headlines with one viewnode ID, the first in buffer order
+      // keeps it; the second is a copy, and will get a fresh one.
+      // (Dropped before the headline becomes a viewnode, so that no
+      // message names the copy by the original's viewnode ID.)
+      // One the view's record does not know is dropped after the
+      // parse ('drop_unknown_viewnode_ids_in_parsed_viewforest').
+      if ! viewnode_ids_seen . insert (viewnode_id . clone ()) {
+        metadata . viewnode_id = None; }}
+    replace_gnid_with_pid (metadata, id_resolution); }}
+
+/// The error for a headline at 'level' with no parent at the level
+/// above it (e.g., ** without preceding *), naming the headline by
+/// what it writes, not a minted gnid; or the error of reading the
+/// headline, if that fails first.
+fn level_jump_error (
+  viewnode_line_col : &ViewnodeLineCol,
+  level             : usize,
+) -> String {
+  let viewnode : Viewnode = // only to name it
+    match linecol_to_viewnode (viewnode_line_col) {
+      Ok (parsed) => parsed . 1,
+      Err (error) => return error, };
+  let headline : HeadlineName = { // by what it writes, not a minted gnid
+    let (_level, metadata, title) : &HeadlineInfo =
+      &viewnode_line_col . headline;
+    metadata . as_ref () . map_or_else (
+      || HeadlineName::of ( None, None, title ),
+      |metadata| metadata . headline_name (title) ) };
+  with_org_subheadlines (
+    &format! (
+      "Node \"{}\" at level {} jumps too far between levels (no valid parent at level {}).",
+      viewnode . error_label(), level, level - 1),
+    &[ headline ] ) }
 
 /// The viewnode a headline under VIEWPARENT stands for, with what the
 /// headline leaves out supplied ('add_missing_info.rs'), recording in
