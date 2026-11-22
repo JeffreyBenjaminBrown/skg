@@ -189,27 +189,33 @@ pub fn compose_sections (
         sections, |s| s . hides . as_deref (),
         resolve, &mut warnings ) ) }
     else { None };
-  composed . aliases = {
-    if ! sections . iter () . any ( |(_, s)| s . aliases . is_some () ) {
-      None }
-    else { // aliases: union like the unordered relations,
-      // but members are strings, deduped verbatim.
-      let mut seen : std::collections::HashSet<String> =
-        std::collections::HashSet::new ();
-      let mut out : Vec<RelPartner<String>> = Vec::new ();
-      for (skgrepo, s) in sections {
-        if let Some (aliases) = &s . aliases {
-          for a in aliases {
-            if seen . insert ( a . clone () ) {
-              out . push ( RelPartner::at_relRepo (
-                skgrepo . clone (), a . clone () )); }
-            else {
-              // No per-alias id to report; reuse DuplicateMember with
-              // a synthetic ID carrying the alias text.
-              warnings . push ( CompositionWarning::DuplicateMember {
-                member : ID ( a . clone () ) } ); }}}}
-      Some (out) }};
+  composed . aliases = compose_aliases (sections, &mut warnings);
   (composed, warnings) }
+
+/// The aliases' compose, None if no section mentions them: a union
+/// like the unordered relations', but members are strings, deduped
+/// verbatim.
+fn compose_aliases (
+  sections : &[(SkgrepoName, SectionSlices)],
+  warnings : &mut Vec<CompositionWarning>,
+) -> Option<Vec<RelPartner<String>>> {
+  if ! sections . iter () . any ( |(_, s)| s . aliases . is_some () ) {
+    return None; }
+  let mut seen : std::collections::HashSet<String> =
+    std::collections::HashSet::new ();
+  let mut out : Vec<RelPartner<String>> = Vec::new ();
+  for (skgrepo, s) in sections {
+    if let Some (aliases) = &s . aliases {
+      for a in aliases {
+        if seen . insert ( a . clone () ) {
+          out . push ( RelPartner::at_relRepo (
+            skgrepo . clone (), a . clone () )); }
+        else {
+          // No per-alias id to report; reuse DuplicateMember with
+          // a synthetic ID carrying the alias text.
+          warnings . push ( CompositionWarning::DuplicateMember {
+            member : ID ( a . clone () ) } ); }}}}
+  Some (out) }
 
 /// One ordered relation's compose. 'slice_of' projects a section's
 /// stored item sequence for this relation (None = no opinion).
@@ -225,45 +231,9 @@ fn compose_ordered (
     let Some (items) = slice_of (s) else { continue; };
     let is_base : bool = ! any_section_yet;
     any_section_yet = true;
-    // Parse items into prepend + per-anchor queues. Runs sharing an
-    // anchor concatenate in file order; a dangling anchor's run
-    // attaches after the preceding run (or joins the prepend).
-    let mut prepend : Vec<ID> = Vec::new ();
-    let mut queue_keys : Vec<ID> = Vec::new (); // resolved, insertion-ordered
-    let mut queues : HashMap<ID, Vec<ID>> = HashMap::new ();
-    { let known : std::collections::HashSet<ID> =
-        effective . iter ()
-        . map ( |m| resolve ( &m . member ) )
-        . collect ();
-      enum Dest { Prepend, Queue (ID) }
-      let mut dest : Dest = Dest::Prepend;
-      for item in items {
-        match item {
-          ListItem::Anchor { anchor : a } => {
-            let key : ID = resolve (a);
-            if is_base {
-              warnings . push ( CompositionWarning::AnchorInBase {
-                anchor : a . clone () } );
-              // fall through to the dangling handling below
-            }
-            if known . contains (&key) {
-              if ! queues . contains_key (&key) {
-                queue_keys . push ( key . clone () );
-                queues . insert ( key . clone (), Vec::new () ); }
-              dest = Dest::Queue (key);
-            } else {
-              if ! is_base { // base already warned above
-                warnings . push ( CompositionWarning::DanglingAnchor {
-                  anchor : a . clone () } ); }
-              // Fallback: keep writing into whatever preceded this
-              // run -- the previous run's queue, or the prepend.
-            }}
-          ListItem::Member (gnid) => {
-            match &dest {
-              Dest::Prepend    => prepend . push ( gnid . clone () ),
-              Dest::Queue (k)  =>
-                queues . get_mut (k) . expect ("queue exists")
-                . push ( gnid . clone () ), }} }} }
+    let (prepend, mut queues) : (Vec<ID>, HashMap<ID, Vec<ID>>) =
+      prepend_and_anchored_runs (
+        items, &effective, resolve, is_base, warnings );
     // Dedup against the composition so far and within this section.
     let mut seen : std::collections::HashSet<ID> =
       effective . iter ()
@@ -293,6 +263,56 @@ fn compose_ordered (
               skgrepo . clone (), gnid )); }} }}
     effective = next; }
   effective }
+
+/// One section's items for an ordered relation, parsed into its
+/// prepend and, for each anchor (resolved) that names a member of
+/// 'effective' (the compose of the more public sections), the run to
+/// insert after that member. Runs sharing an anchor concatenate in
+/// file order; a dangling anchor's run attaches after the preceding
+/// run (or joins the prepend). 'is_base': no more public section
+/// mentions the relation, so every anchor is out of place.
+fn prepend_and_anchored_runs (
+  items     : &[ListItem],
+  effective : &[RelPartner<ID>],
+  resolve   : &dyn Fn (&ID) -> ID,
+  is_base   : bool,
+  warnings  : &mut Vec<CompositionWarning>,
+) -> (Vec<ID>, HashMap<ID, Vec<ID>>) {
+  let mut prepend : Vec<ID> = Vec::new ();
+  let mut queues : HashMap<ID, Vec<ID>> = HashMap::new ();
+  let known : std::collections::HashSet<ID> =
+    effective . iter ()
+    . map ( |m| resolve ( &m . member ) )
+    . collect ();
+  enum Dest { Prepend, Queue (ID) }
+  let mut dest : Dest = Dest::Prepend;
+  for item in items {
+    match item {
+      ListItem::Anchor { anchor : a } => {
+        let key : ID = resolve (a);
+        if is_base {
+          warnings . push ( CompositionWarning::AnchorInBase {
+            anchor : a . clone () } );
+          // fall through to the dangling handling below
+        }
+        if known . contains (&key) {
+          if ! queues . contains_key (&key) {
+            queues . insert ( key . clone (), Vec::new () ); }
+          dest = Dest::Queue (key);
+        } else {
+          if ! is_base { // base already warned above
+            warnings . push ( CompositionWarning::DanglingAnchor {
+              anchor : a . clone () } ); }
+          // Fallback: keep writing into whatever preceded this
+          // run -- the previous run's queue, or the prepend.
+        }}
+      ListItem::Member (gnid) => {
+        match &dest {
+          Dest::Prepend    => prepend . push ( gnid . clone () ),
+          Dest::Queue (k)  =>
+            queues . get_mut (k) . expect ("queue exists")
+            . push ( gnid . clone () ), }} }}
+  (prepend, queues) }
 
 /// One unordered relation's compose: union in skgrepo order, most public
 /// occurrence winning.
