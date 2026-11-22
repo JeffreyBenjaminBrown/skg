@@ -110,152 +110,140 @@ pub fn handle_text_search_request (
   views_state      : &mut ViewsState,
   restriction      : &SkgrepoRestriction,
 ) {
-  let parsed_sexp : Result < Sexp, String > =
-    sexp::parse (request)
-    . map_err ( |e| format! (
-      "Failed to parse S-expression: {}", e ) );
-  let sexp : Sexp = match parsed_sexp {
+  let response : String =
+    text_search_response (request, env, views_state, restriction);
+  send_response_with_length_prefix (stream, &response); }
+
+/// The one response 'handle_text_search_request' sends. A search
+/// that draws its buffer registers it as a view first, replacing a
+/// prior search with the same terms.
+fn text_search_response (
+  request          : &str,
+  env              : &SkgEnv,
+  views_state      : &mut ViewsState,
+  restriction      : &SkgrepoRestriction,
+) -> String {
+  let sexp : Sexp = match sexp::parse (request) {
     Ok (s) => s,
-    Err (err) => {
+    Err (e) => {
+      let err : String = format! (
+        "Failed to parse S-expression: {}", e );
       tracing::error! ( "{}", err );
-      send_search_results_text (stream, &err);
-      return; } };
-  let search_terms : Result < String, String > =
-    extract_v_from_kv_pair_in_sexp ( &sexp, "terms" );
+      return search_results_text (&err); } };
   let search_choice : Option<SearchOverPrivateTextChoice> =
     match search_choice_from_request (&sexp) {
       Ok (choice) => choice,
-      Err (error) => {
-        send_search_results_text (stream, &error);
-        return; }};
-  match search_terms {
-    Ok (search_terms) => {
-      // Wait for any in-flight background search-index writes to tantivy-commit, so
-      // the search reflects every save issued so far (read-your-writes).
-      wait_for_tantivy_writes_idle ();
-      let runtime = env . runtime_snapshot ();
-      let index_has_overPrivateText : bool =
-        match has_overPrivateText_telescope (&runtime . tantivy_index) {
-          Ok (has_overPrivateText) => has_overPrivateText,
-          Err (error) => {
-            send_search_results_text (
-              stream,
-              &format! ("Error checking search privacy: {}", error) );
-            return; }};
-      if ! restriction . is_unrestricted ()
-         && index_has_overPrivateText
-         && search_choice . is_none () {
-        send_response_with_length_prefix (
-          stream, &search_challenge_response () );
-        return; }
-      let include_overPrivateText_telescopes : bool =
-        restriction . is_unrestricted ()
-        || search_choice == Some (SearchOverPrivateTextChoice::Include);
-      let search_opts : SearchOptions = SearchOptions {
-        regex     : bool_key ( &sexp, "regex" ),
-        body      : bool_key ( &sexp, "body" ),
-        operators : bool_key ( &sexp, "operators" ),
-        exclude_overPrivateText_telescope : ! include_overPrivateText_telescopes,
-      };
-      match search_index ( &runtime . tantivy_index,
-                           &search_terms,
-                           &search_opts ) {
-        Ok (( best_matches, searcher )) => {
-          if best_matches . is_empty () {
-            send_search_results_text (stream, "No matches found.");
-            return; }
-          let matches_by_gnid : MatchGroups =
-            filter_match_groups_to_unrestricted_skgrepos (
-              group_matches_by_gnid (
-              best_matches,
-              searcher,
-              &runtime . tantivy_index,
-              &search_terms,
-              &search_opts,
-              restriction ),
-              restriction );
-          if matches_by_gnid . is_empty () {
-            send_search_results_text (stream, "No matches found.");
-            return; }
-          let suppressed : HashSet<ID> =
-            suppressed_result_gnids (
-              &matches_by_gnid,
-              &runtime . graph,
-              &runtime . config,
-              restriction );
-          let (mut viewforest, search_results) : (ViewForest, Vec<ID>) =
-            build_search_viewforest (
-              &search_terms,
-              &matches_by_gnid,
-              &suppressed );
-          if matches! (
-            release_decision (
-              &search_results, restriction, &runtime . graph,
-              include_overPrivateText_telescopes ),
-            TextReleaseDecision::Challenge { .. } ) {
-            send_response_with_length_prefix (
-              stream, &search_challenge_response () );
-            return; }
-          let drawn : Result<String, Box<dyn Error>> =
-            draw_search_buffer (
-              &mut viewforest, &mut ViewnodeIdRecord::default (),
-              &runtime . graph, &runtime . config,
-              &search_results, restriction,
-              include_overPrivateText_telescopes );
-          let rendered : String = match drawn {
-            Ok (rendered) => rendered,
-            Err (error) => {
-              send_search_results_text (
-                stream,
-                & format! ("Error drawing the search buffer: {}", error) );
-              return; }};
-          let drawn_pids : Vec<ID> =
-            pids_from_viewforest (&viewforest) . into_iter () . collect ();
-          let warnings : Vec<String> =
-            match release_decision (
-              &drawn_pids, restriction, &runtime . graph,
-              include_overPrivateText_telescopes )
-            { TextReleaseDecision::AllowWithWarning { warning } =>
-                vec! [warning],
-              TextReleaseDecision::Challenge { .. } => {
-                // The challenge before the query, and the exclusion in
-                // 'draw_search_buffer', make this unreachable. Fail
-                // closed rather than serialize if a change violates either.
-                send_search_results_text (
-                  stream,
-                  "The search buffer reached the release boundary without approval." );
-                return; },
-              TextReleaseDecision::Allow => Vec::new (), };
-          let viewforest_id : ViewforestId =
-            ViewforestId::SearchView ( search_terms . clone () );
-          if views_state . open_views . views . contains_key (&viewforest_id) {
-            // Replace prior search with the same terms.
-            views_state . open_views . unregister_view (&viewforest_id); }
-          views_state . open_views . register_view (
-            &runtime . graph, viewforest_id, viewforest, &drawn_pids, restriction );
-          send_response_with_length_prefix (
-            stream,
-            & mk_search_results_sexp (
-              &rendered, &warnings ) ); },
-        Err (e) => {
-          send_search_results_text (
-            stream,
-            & format! ("Error querying the search index: {}", e) ); }} },
-    Err (err) => {
-      let error_msg : String =
-        format! (
-          "Error extracting search terms: {}", err );
-      tracing::error! ( "{}", error_msg ) ;
-      send_search_results_text (stream, &error_msg); }} }
+      Err (error) => return search_results_text (&error), };
+  let search_terms : String =
+    match extract_v_from_kv_pair_in_sexp ( &sexp, "terms" ) {
+      Ok (search_terms) => search_terms,
+      Err (err) => {
+        let error_msg : String =
+          format! (
+            "Error extracting search terms: {}", err );
+        tracing::error! ( "{}", error_msg ) ;
+        return search_results_text (&error_msg); }};
+  // Wait for any in-flight background search-index writes to tantivy-commit, so
+  // the search reflects every save issued so far (read-your-writes).
+  wait_for_tantivy_writes_idle ();
+  let runtime = env . runtime_snapshot ();
+  let index_has_overPrivateText : bool =
+    match has_overPrivateText_telescope (&runtime . tantivy_index) {
+      Ok (has_overPrivateText) => has_overPrivateText,
+      Err (error) =>
+        return search_results_text (
+          &format! ("Error checking search privacy: {}", error) ), };
+  if ! restriction . is_unrestricted ()
+     && index_has_overPrivateText
+     && search_choice . is_none () {
+    return search_challenge_response (); }
+  let include_overPrivateText_telescopes : bool =
+    restriction . is_unrestricted ()
+    || search_choice == Some (SearchOverPrivateTextChoice::Include);
+  let search_opts : SearchOptions = SearchOptions {
+    regex     : bool_key ( &sexp, "regex" ),
+    body      : bool_key ( &sexp, "body" ),
+    operators : bool_key ( &sexp, "operators" ),
+    exclude_overPrivateText_telescope : ! include_overPrivateText_telescopes,
+  };
+  let (best_matches, searcher) : (Vec<(f32, tantivy::DocAddress)>, Searcher) =
+    match search_index ( &runtime . tantivy_index,
+                         &search_terms,
+                         &search_opts ) {
+      Ok (found) => found,
+      Err (e) =>
+        return search_results_text (
+          & format! ("Error querying the search index: {}", e) ), };
+  if best_matches . is_empty () {
+    return search_results_text ("No matches found."); }
+  let matches_by_gnid : MatchGroups =
+    filter_match_groups_to_unrestricted_skgrepos (
+      group_matches_by_gnid (
+      best_matches,
+      searcher,
+      &runtime . tantivy_index,
+      &search_terms,
+      &search_opts,
+      restriction ),
+      restriction );
+  if matches_by_gnid . is_empty () {
+    return search_results_text ("No matches found."); }
+  let suppressed : HashSet<ID> =
+    suppressed_result_gnids (
+      &matches_by_gnid,
+      &runtime . graph,
+      &runtime . config,
+      restriction );
+  let (mut viewforest, search_results) : (ViewForest, Vec<ID>) =
+    build_search_viewforest (
+      &search_terms,
+      &matches_by_gnid,
+      &suppressed );
+  if matches! (
+    release_decision (
+      &search_results, restriction, &runtime . graph,
+      include_overPrivateText_telescopes ),
+    TextReleaseDecision::Challenge { .. } ) {
+    return search_challenge_response (); }
+  let rendered : String =
+    match draw_search_buffer (
+      &mut viewforest, &mut ViewnodeIdRecord::default (),
+      &runtime . graph, &runtime . config,
+      &search_results, restriction,
+      include_overPrivateText_telescopes ) {
+      Ok (rendered) => rendered,
+      Err (error) =>
+        return search_results_text (
+          & format! ("Error drawing the search buffer: {}", error) ), };
+  let drawn_pids : Vec<ID> =
+    pids_from_viewforest (&viewforest) . into_iter () . collect ();
+  let warnings : Vec<String> =
+    match release_decision (
+      &drawn_pids, restriction, &runtime . graph,
+      include_overPrivateText_telescopes )
+    { TextReleaseDecision::AllowWithWarning { warning } =>
+        vec! [warning],
+      TextReleaseDecision::Challenge { .. } =>
+        // The challenge before the query, and the exclusion in
+        // 'draw_search_buffer', make this unreachable. Fail
+        // closed rather than serialize if a change violates either.
+        return search_results_text (
+          "The search buffer reached the release boundary without approval." ),
+      TextReleaseDecision::Allow => Vec::new (), };
+  let viewforest_id : ViewforestId =
+    ViewforestId::SearchView ( search_terms . clone () );
+  if views_state . open_views . views . contains_key (&viewforest_id) {
+    // Replace prior search with the same terms.
+    views_state . open_views . unregister_view (&viewforest_id); }
+  views_state . open_views . register_view (
+    &runtime . graph, viewforest_id, viewforest, &drawn_pids, restriction );
+  mk_search_results_sexp ( &rendered, &warnings ) }
 
-/// Sends TEXT, a message to the user, as the 'search-results'.
-fn send_search_results_text (
-  stream : &mut TcpStream,
+/// TEXT, a message to the user, as the 'search-results'.
+fn search_results_text (
   text   : &str,
-) {
-  send_response_with_length_prefix (
-    stream,
-    & tag_text_response (TcpToClient::SearchResults, text) ); }
+) -> String {
+  tag_text_response (TcpToClient::SearchResults, text) }
 
 /// Whether the search may release the text of 'pids': each of them
 /// approved when the search includes overPrivateText telescopes,
