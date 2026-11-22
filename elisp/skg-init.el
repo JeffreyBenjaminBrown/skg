@@ -36,7 +36,9 @@
 ;;; - 'skg-request-rerender-all-views.el': the rerender stream.
 ;;; - 'skg-view-ancestry.el': show the outline ancestry of a headline.
 ;;; - 'skg-push-ancestry.el': push the ancestry at point to the linkstack.
-;;; - 'skg-id-search.el': find and visit the ID near point; the linkstack.
+;;; - 'skg-id-search.el': find and visit the ID near point.
+;;; - 'skg-linkstack.el': push, paste and pop IDs and links; view
+;;;   the stack.
 ;;; - 'skg-request-text-search.el': text search and its results buffer.
 ;;; - 'skg-search-make-link.el': search, then insert a link to a hit.
 ;;; - 'skg-request-file-path.el': show a node's .skg file in magit.
@@ -146,6 +148,7 @@
   (require 'skg-buffer)
   (require 'skg-client)
   (require 'skg-id-search)
+  (require 'skg-linkstack)
   (require 'skg-push-ancestry)
   (require 'skg-request-text-search)
   (require 'skg-request-views)

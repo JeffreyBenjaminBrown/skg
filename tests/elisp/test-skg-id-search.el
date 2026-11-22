@@ -4,6 +4,7 @@
                              (file-name-directory load-file-name)))
 (require 'ert)
 (require 'skg-id-search)
+(require 'skg-linkstack)
 
 (defconst test-skg-id-navigation-buffer
   (concat "* no id\n"

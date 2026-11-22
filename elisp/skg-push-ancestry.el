@@ -10,7 +10,7 @@
 ;;; skipped; it refuses, naming the two notes, when a note has no edge
 ;;; to the note above it. 'skg-paste-link' (C-c o l) then pastes the
 ;;; tree as a chain of links joined by those edges. The linkstack's
-;;; trees, and pasting them, are 'skg-id-search.el's
+;;; trees, and pasting them, are 'skg-linkstack.el's
 ;;; ('skg--linkstack-tree'). The pushed tree records the graph when it
 ;;; was pushed; it is not kept current.
 ;;;
@@ -21,6 +21,7 @@
 (require 'cl-lib)
 (require 'org)
 (require 'skg-id-search)
+(require 'skg-linkstack)
 (require 'skg-metadata)
 (require 'skg-sexpr-search)
 (require 'skg-state)

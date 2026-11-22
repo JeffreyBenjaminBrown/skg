@@ -8,8 +8,7 @@
 -- 'id_prev') hop between IDs; <localleader>gv ('goto_viewnode_id')
 -- moves to the headline a message names by its viewnode ID. Requesting
 -- the view is skg.single_root_content_view's; the linkstack is
--- skg.linkstack's. The Lua port of the navigation half of
--- elisp/skg-id-search.el.
+-- skg.linkstack's. The Lua port of elisp/skg-id-search.el.
 --
 -- Positions are (1-based line, 0-based byte column) cursor pairs;
 -- matches are byte ranges from Lua patterns.

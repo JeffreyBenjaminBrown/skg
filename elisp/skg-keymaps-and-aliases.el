@@ -10,7 +10,7 @@
 ;;; 'skg-report-mode-map' (a report buffer), 'skg-linkstack-mode-map'
 ;;; and 'skg-sexp-edit-mode-map'. The modes themselves are defined
 ;;; elsewhere ('skg-buffer.el', 'skg-file-minor-mode.el',
-;;; 'skg-messages.el', 'skg-id-search.el', 'skg-sexpr-edit.el').
+;;; 'skg-messages.el', 'skg-linkstack.el', 'skg-sexpr-edit.el').
 ;;; 'skg-alias' gives an internal command a user-facing name ('skg-save'
 ;;; for 'skg-request-save-buffer', say) and hides the internal one from
 ;;; M-x.

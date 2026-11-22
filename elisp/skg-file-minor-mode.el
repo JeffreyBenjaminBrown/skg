@@ -7,7 +7,8 @@
 ;;; lets the user act on the IDs in the raw file (bare UUIDs, UUID.skg
 ;;; filenames): visit one ('skg-goto', C-c g RET), hop between them
 ;;; ('skg-id-next', C-c i n), and paste or pop the linkstack (C-c o,
-;;; C-c O). What those commands do is 'skg-id-search.el's.
+;;; C-c O). What those commands do is 'skg-id-search.el's and
+;;; 'skg-linkstack.el's.
 ;;;
 ;;; The keymap 'skg-file-minor-mode-map' is defined in
 ;;; 'skg-keymaps-and-aliases.el' alongside the other skg keymaps, so
@@ -18,6 +19,7 @@
 
 (require 'skg-keymaps-and-aliases)
 (require 'skg-id-search)
+(require 'skg-linkstack)
 
 ;;;###autoload
 (define-minor-mode skg-file-minor-mode

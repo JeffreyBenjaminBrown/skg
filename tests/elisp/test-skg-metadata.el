@@ -12,6 +12,7 @@
 (require 'skg-restore-requests)
 (require 'skg-request-views)
 (require 'skg-id-search)
+(require 'skg-linkstack)
 (require 'skg-modify-graph)
 (require 'skg-compare-sexpr)
 (require 'skg-sexpr-cycling)

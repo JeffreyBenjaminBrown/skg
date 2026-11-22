@@ -11,7 +11,7 @@
 ;;; buffer and counts ('skg-lp-reset'); the config file's path and
 ;;; directory ('skg-config-file-path', 'skg-config-dir'); and the
 ;;; linkstack ('skg-linkstack'). Using them is other files'
-;;; ('skg-client.el', 'skg-length-prefix.el', 'skg-id-search.el').
+;;; ('skg-client.el', 'skg-length-prefix.el', 'skg-linkstack.el').
 ;;; 'skg-reload' keeps the port, the config path and directory, and
 ;;; the linkstack; the rest it rebuilds.
 ;;;

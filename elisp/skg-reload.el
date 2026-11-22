@@ -119,6 +119,7 @@ the old one open beside the one it makes on its next request."
      skg-compare-sexpr
      skg-config
      skg-id-search
+     skg-linkstack
      skg-push-ancestry
      skg-length-prefix
      skg-lens

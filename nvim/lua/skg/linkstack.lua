@@ -7,9 +7,9 @@
 -- <localleader>vs ('view_linkstack') opens the stack as an editable
 -- buffer, 'skg://linkstack', whose ':w' replaces the stack
 -- ('save_linkstack_buffer'). Finding the ID at the cursor is
--- skg.id_search's. The Lua port of the stack half of
--- elisp/skg-id-search.el, without its trees: there an entry can be a
--- view-ancestry (skg-push-ancestry); here each is one note.
+-- skg.id_search's. The Lua port of elisp/skg-linkstack.el, without
+-- its trees: there an entry can be a view-ancestry
+-- (skg-push-ancestry); here each is one note.
 --
 -- Paste/pop work in ordinary buffers (inserting at the cursor) and in
 -- command-line prompts (inserting into the command line; <C-x>i, l,
