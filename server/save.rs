@@ -347,33 +347,21 @@ pub fn prepare_save_under_mutation_gate (
     prepared_nodeMerge . as_ref () . map (|prepared| prepare_fs_update (
       prepared . nodeInstructions (), &[], config, approved_hoist_pids))
     . transpose () ?;
-  let final_candidate : Arc<InRustGraph> = prepared_nodeMerge . as_ref ()
-    .map (|prepared| prepared . candidate () . clone ())
-    .or_else (|| prepared_save . as_ref ()
-      .map (|prepared| prepared . candidate () . clone ()))
-    .unwrap_or_else (|| graph_before_save . clone ());
-  let saved_pids_for_telescope : HashSet<ID> = prepared_save . iter ()
-    .chain (prepared_nodeMerge . iter ())
-    .flat_map (|prepared| prepared . saved_pids () . iter () . cloned ())
-    .collect ();
-  let affected_ids_for_telescope : HashSet<ID> = prepared_save . iter ()
-    .chain (prepared_nodeMerge . iter ())
-    .flat_map (|prepared| prepared . affected_gnids () . iter () . cloned ())
-    .collect ();
+  let final_candidate : Arc<InRustGraph> =
+    graph_both_phases_leave (
+      &prepared_save, &prepared_nodeMerge, &graph_before_save );
+  let (saved_pids_for_telescope, affected_ids_for_telescope)
+    : (HashSet<ID>, HashSet<ID>) =
+    pids_saved_and_gnids_affected_by_both_phases (
+      &prepared_save, &prepared_nodeMerge );
   let telescope_warnings : Vec<(ID, TelescopeViolation)> =
     affected_telescope_warnings (
       config, &graph_before_save, &final_candidate,
       &saved_pids_for_telescope, &affected_ids_for_telescope);
-  let final_write_identities : HashSet<ID> = all_filesystem_outputs . iter ()
-    .chain (prepared_save . iter ()
-      .flat_map (|prepared| prepared . nodeInstructions () . iter ()))
-    .chain (prepared_nodeMerge . iter ()
-      .flat_map (|prepared| prepared . nodeInstructions () . iter ()))
-    .flat_map (identities_in_nodeInstruction)
-    .chain (skgrepo_moves . iter () . map (|skgrepo_move|
-      skgrepo_move . pid . clone ()))
-    .chain (affected_ids_for_telescope)
-    .collect ();
+  let final_write_identities : HashSet<ID> =
+    identities_the_save_writes (
+      &all_filesystem_outputs, &prepared_save, &prepared_nodeMerge,
+      skgrepo_moves, affected_ids_for_telescope );
   Ok (PreparedSave {
     graph_before_save,
     nodeMerges,
@@ -386,6 +374,58 @@ pub fn prepare_save_under_mutation_gate (
     telescope_warnings,
   })
 }
+
+/// The candidate graph of the last phase prepared: the nodeMerge
+/// phase's, else the nodeInstructions phase's, else (neither had
+/// anything to do) the graph before the save.
+fn graph_both_phases_leave (
+  prepared_save      : &Option<PreparedGraphUpdate>,
+  prepared_nodeMerge : &Option<PreparedGraphUpdate>,
+  graph_before_save  : &Arc<InRustGraph>,
+) -> Arc<InRustGraph> {
+  prepared_nodeMerge . as_ref ()
+    .map (|prepared| prepared . candidate () . clone ())
+    .or_else (|| prepared_save . as_ref ()
+      .map (|prepared| prepared . candidate () . clone ()))
+    .unwrap_or_else (|| graph_before_save . clone ()) }
+
+/// The pids either phase saves, and the gnids either affects, which
+/// the telescope check reads.
+fn pids_saved_and_gnids_affected_by_both_phases (
+  prepared_save      : &Option<PreparedGraphUpdate>,
+  prepared_nodeMerge : &Option<PreparedGraphUpdate>,
+) -> (HashSet<ID>, HashSet<ID>) {
+  let saved_pids_for_telescope : HashSet<ID> = prepared_save . iter ()
+    .chain (prepared_nodeMerge . iter ())
+    .flat_map (|prepared| prepared . saved_pids () . iter () . cloned ())
+    .collect ();
+  let affected_ids_for_telescope : HashSet<ID> = prepared_save . iter ()
+    .chain (prepared_nodeMerge . iter ())
+    .flat_map (|prepared| prepared . affected_gnids () . iter () . cloned ())
+    .collect ();
+  (saved_pids_for_telescope, affected_ids_for_telescope) }
+
+/// Every identity the save touches ('PreparedSave::final_write_identities'):
+/// those of each nodeInstruction it writes, as requested and as each
+/// phase prepared it, the pid of each skgrepo move, and every gnid
+/// either phase affects.
+fn identities_the_save_writes (
+  all_filesystem_outputs     : &[NodeInstruction],
+  prepared_save              : &Option<PreparedGraphUpdate>,
+  prepared_nodeMerge         : &Option<PreparedGraphUpdate>,
+  skgrepo_moves              : &[SkgrepoMove],
+  affected_ids_for_telescope : HashSet<ID>,
+) -> HashSet<ID> {
+  all_filesystem_outputs . iter ()
+    .chain (prepared_save . iter ()
+      .flat_map (|prepared| prepared . nodeInstructions () . iter ()))
+    .chain (prepared_nodeMerge . iter ()
+      .flat_map (|prepared| prepared . nodeInstructions () . iter ()))
+    .flat_map (identities_in_nodeInstruction)
+    .chain (skgrepo_moves . iter () . map (|skgrepo_move|
+      skgrepo_move . pid . clone ()))
+    .chain (affected_ids_for_telescope)
+    .collect () }
 
 fn identities_in_nodeInstruction (
   nodeInstruction : &NodeInstruction,
