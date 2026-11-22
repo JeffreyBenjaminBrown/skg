@@ -733,26 +733,10 @@ fn infer_hides_from_contains_removals (
     let inferred_hides : Vec<ID> =
       if removed . is_empty () { Vec::new () }
       else {
-        let partner_contents : Vec<(ID, Vec<ID>)> = { // each partner's content, as written
-          let forkees : Vec<ID> = match &forks_msv {
-            // The post-save forks: unforking a node in
-            // the same save also stops hides being inferred from it.
-            MSV::Specified (forkees) => forkees . clone (),
-            MSV::Unspecified =>
-              members_with_visible_records (
-                hider_from_disk . forks . or_default (),
-                skgrepo_restriction ), };
-          let mut contents : Vec<(ID, Vec<ID>)> = Vec::new ();
-          for partner in forks_folder_members_shown (
-            graph, skgrepo_restriction, &hider_pid, &forkees )
-          { if let Some (partner_from_disk) =
-              graphnode_from_graph (graph, &partner)
-            { contents . push ((
-                partner_from_disk . pid . clone (),
-                members_with_visible_records (
-                  & partner_from_disk . contains,
-                  skgrepo_restriction ))); }}
-          contents };
+        let partner_contents : Vec<(ID, Vec<ID>)> = // each partner's content, as written
+          forks_folder_members_with_their_content (
+            graph, skgrepo_restriction, &hider_from_disk, &hider_pid,
+            &forks_msv );
         let partner_content : HashSet<ID> =
           partner_contents . iter ()
           . flat_map ( |(_, content)| content . iter () . cloned () )
@@ -778,6 +762,38 @@ fn infer_hides_from_contains_removals (
     lowered . apply_hiderel_delta_to_hider (
       hider_from_disk, &inferred_hides, &inferred_unhides ); }
   Ok (( )) }
+
+/// Each member of the hider's forks folder ('forks_folder_members_shown')
+/// that the graph has, by its pid, with its content; both by the
+/// records the skgrepo restriction shows. The hider's forks are those
+/// the save leaves: 'forks_msv' when the save specifies them, else the
+/// hider's forks on disk.
+fn forks_folder_members_with_their_content (
+  graph               : &InRustGraph,
+  skgrepo_restriction : &SkgrepoRestriction,
+  hider_from_disk     : &Graphnode,
+  hider_pid           : &ID,
+  forks_msv           : &MSV<ID>,
+) -> Vec<(ID, Vec<ID>)> {
+  let forkees : Vec<ID> = match forks_msv {
+    // The post-save forks: unforking a node in
+    // the same save also stops hides being inferred from it.
+    MSV::Specified (forkees) => forkees . clone (),
+    MSV::Unspecified =>
+      members_with_visible_records (
+        hider_from_disk . forks . or_default (),
+        skgrepo_restriction ), };
+  let mut contents : Vec<(ID, Vec<ID>)> = Vec::new ();
+  for partner in forks_folder_members_shown (
+    graph, skgrepo_restriction, hider_pid, &forkees )
+  { if let Some (partner_from_disk) =
+      graphnode_from_graph (graph, &partner)
+    { contents . push ((
+        partner_from_disk . pid . clone (),
+        members_with_visible_records (
+          & partner_from_disk . contains,
+          skgrepo_restriction ))); }}
+  contents }
 
 /// The member of 'members' that 'gnid', a child removed from a
 /// forker, stands for: 'gnid' itself when it is one; otherwise
