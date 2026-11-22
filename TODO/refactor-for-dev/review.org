@@ -258,3 +258,63 @@ Merged while this review ran, and read too, with nothing to report:
 Not read: the plans commits f2ae1efb9 and c04d79ce1, 82888079e, and
 the handoff-file edits inside 6fffd8ca1 and 350d53bbb, since they are
 documents. Nothing was built or run.
+* fourth review
+A fourth independent review, of the 7 commits merged after the
+third, from 61eaf7d41 to 1db64bc7d. Six split a long function: four
+in 'server/', one in the Emacs client's linkstack check and one in
+the AI reader's fork prediction; the seventh is a plan. It found no
+behaviour change. Nothing was fixed.
+** found
+*** No split changes behaviour
+Each kind of slip a split can make was looked for, and here is why
+each is absent:
+- Early returns. In 'resolve_link' the one return that moved into a
+  helper, an undecodable Markdown path, comes back as the helper's
+  'Err' and is returned at once; every later return is the helper's
+  tail value, which is 'resolve_link''s. In the rebuild every '?' that
+  moved returns the same 'String' through the caller's '?' inside the
+  same closure, so the open views are kept as before. The Python
+  helper 'settle_clone_skgrepo' returns nothing and is called last,
+  just before the 'return forks' it replaced.
+- Effects in order. The rebuild still reads the files, validates, and
+  writes the telescope report before the search index is rebuilt and
+  before its first 'info' line; the prominence sources are still
+  stored between that line and the next. 'prepare_save_under_mutation_gate'
+  computes its four values in the old order, and only the telescope
+  check, which stayed in place, has an effect.
+- Values. Nothing a helper mutates is a copy: the rebuild's graph and
+  warnings are mutated inside the helper and returned by value; the
+  Python helper mutates the caller's 'forks' object. Messages that
+  printed a 'String' path now print a '&str' of it, which 'Debug'
+  writes the same.
+- The Python split. 'owned' is now computed only when there are forks;
+  'ownership' is the dict the caller passes and was only read, so the
+  list is the same. No name is new to the module but the helper's, it
+  imports nothing, and nothing differs under 'python3 -I'.
+- The Emacs split. The file is lexically bound; neither helper reads a
+  free variable, binds a special one, or moves to another buffer. Point
+  and match data change in the old order: the title and level are read
+  from the headline's match, then the body is read (which moves point
+  and matches '^\\*'), then the edge is read from the title string.
+  The three error texts are word for word, tested in the old order.
+  Six buffers, run under 'emacs -Q --batch' through the old and new
+  definitions, gave the same results and the same point.
+*** The linkstack's error on a last headline without a final newline is old
+The third batch's entry in 'TODO/problems.org' ("The linkstack buffer
+signals on a last headline with no body and no final newline") is
+right, and the split did not cause it. The body's start,
+'(1+ (line-end-position))', has been read the same way since commit
+7e650ac76 (2025-12-03); the batch run of the version of
+'skg-id-search.el' from before 2026-11-22 (8b7834c56) signals the same
+'args-out-of-range' on "* a\nid-a\n* b", as do the versions before and
+after the split.
+** covered
+Read closely, old body against new pieces, with nothing to report:
+- 'server/': 61eaf7d41 ('resolve_link'), 4521f274a (the rebuild),
+  e85ee6aea ('prepare_save_under_mutation_gate') and 243d0a7c8
+  ('infer_hides_from_contains_removals');
+- 'tools/skg-for-ai/save.py': c86f31ed6 ('predicted_forks');
+- 'elisp/skg-linkstack.el': 0c06f6343 ('skg-validate-linkstack-buffer'),
+  also run in batch Emacs, and its 'TODO/problems.org' entry.
+Not read: the plan 1db64bc7d. Nothing was built; only the Emacs probe
+was run.
