@@ -242,7 +242,7 @@ describe('skg.buffer confirmation before dirtying another view', function ()
     local a = open('a')
     local b = open('b')
     edit(a) settle()
-    require('skg.save').replace_buffer_with_new_content(
+    require('skg.redraw_whole_view').replace_buffer_with_new_content(
       b, '* (skg node (gnid y)) y')
     settle()
     assert.are.equal(0, asked)

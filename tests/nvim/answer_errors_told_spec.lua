@@ -13,6 +13,7 @@ local payload = require('skg.payload')
 local rerender_all_views = require('skg.rerender_all_views')
 local save = require('skg.save')
 local save_confirmations = require('skg.save.confirmations')
+local redraw_whole_view = require('skg.redraw_whole_view')
 local state = require('skg.state')
 
 local CONFIRMATION_FAILED =
@@ -88,12 +89,12 @@ describe('a handler that fails on the server answer says so', function ()
 
   it('collateral-view and rerender-view', function ()
     assert_told(told_by(function ()
-                  save.apply_streamed_view_update(
+                  redraw_whole_view.apply_streamed_view_update(
                     '', {}, 'save', 'collateral-view', true) end),
                 'collateral-view',
                 'the server may have saved, but a view was not redrawn')
     assert_told(told_by(function ()
-                  save.apply_streamed_view_update(
+                  redraw_whole_view.apply_streamed_view_update(
                     '', {}, 'rerender', 'rerender-view') end),
                 'rerender-view', 'a view was not redrawn')
   end)

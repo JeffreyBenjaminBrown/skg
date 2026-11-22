@@ -12,7 +12,7 @@ local lock = require('skg.lock')
 local log = require('skg.log')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
-local save = require('skg.save')
+local redraw_whole_view = require('skg.redraw_whole_view')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -211,8 +211,8 @@ function M.register_rerender_stream_handlers ()
     end, true)
   state.register_response_handler('rerender-view',
     function (payload_text, response)
-      save.apply_streamed_view_update(payload_text, response,
-                                      'rerender', 'rerender-view')
+      redraw_whole_view.apply_streamed_view_update(
+        payload_text, response, 'rerender', 'rerender-view')
     end, false) -- non-one-shot: fires for each streamed view
   state.register_response_handler('rerender-done',
     function (_payload_text, response)

@@ -12,6 +12,7 @@ local buffer = require('skg.buffer')
 local folds = require('skg.folds')
 local heralds = require('skg.heralds')
 local redraw_delta = require('skg.redraw_delta')
+local redraw_whole_view = require('skg.redraw_whole_view')
 local save = require('skg.save')
 local sexpr = require('skg.sexpr.parse')
 
@@ -127,19 +128,20 @@ end
 
 describe('skg.redraw_delta patch', function ()
   local whole_redraws
-  local replace_buffer_with_new_content = save.replace_buffer_with_new_content
+  local replace_buffer_with_new_content =
+    redraw_whole_view.replace_buffer_with_new_content
 
   before_each(function ()
     helpers.install_fixture_herald_rules()
     helpers.wipe_skg_buffers()
     whole_redraws = 0
-    save.replace_buffer_with_new_content = function (...)
+    redraw_whole_view.replace_buffer_with_new_content = function (...)
       whole_redraws = whole_redraws + 1
       return replace_buffer_with_new_content(...)
     end
   end)
   after_each(function ()
-    save.replace_buffer_with_new_content = replace_buffer_with_new_content
+    redraw_whole_view.replace_buffer_with_new_content = replace_buffer_with_new_content
     helpers.wipe_skg_buffers()
   end)
 

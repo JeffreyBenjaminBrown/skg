@@ -7,7 +7,7 @@ local annotations = require('skg.link_annotations')
 local buffer = require('skg.buffer')
 local herald_rules = require('skg.herald_rules')
 local misc = require('skg.misc_requests')
-local save = require('skg.save')
+local redraw_whole_view = require('skg.redraw_whole_view')
 
 T.client.connect()
 herald_rules.request_herald_rules()
@@ -67,7 +67,7 @@ annotations.toggle_repo_overlay(buf)
 T.check(suffix('⌂:PUB') and suffix('⌂:restricted') and not suffix('PRIV')
         and not suffix('missing') and broken_count() > 0,
         'suffixes distinguish visible and unavailable targets; broken links get none')
-save.replace_buffer_with_new_content(buf, view_text)
+redraw_whole_view.replace_buffer_with_new_content(buf, view_text)
 T.check(vim.b[buf].skg_link_repo_suffix == true
         and not vim.bo[buf].modified,
         'repo toggle and clean state survive replacement')

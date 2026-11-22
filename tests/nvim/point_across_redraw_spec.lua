@@ -6,7 +6,7 @@ local helpers = dofile(
   debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 
 local buffer = require('skg.buffer')
-local save = require('skg.save')
+local redraw_whole_view = require('skg.redraw_whole_view')
 local sexpr = require('skg.sexpr.parse')
 
 ---COUNT headlines, each with a two-line body, numbered from 0, the
@@ -32,8 +32,8 @@ end
 
 local function rerender (content)
   local payload = '((view-id "view-point") (content "' .. content .. '"))'
-  save.apply_streamed_view_update(payload, sexpr.read(payload),
-                                  'rerender', 'rerender-view')
+  redraw_whole_view.apply_streamed_view_update(
+    payload, sexpr.read(payload), 'rerender', 'rerender-view')
 end
 
 local function open_view (text)

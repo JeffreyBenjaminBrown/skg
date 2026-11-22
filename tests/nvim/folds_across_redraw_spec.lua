@@ -7,7 +7,7 @@ local helpers = dofile(
 
 local buffer = require('skg.buffer')
 local folds = require('skg.folds')
-local save = require('skg.save')
+local redraw_whole_view = require('skg.redraw_whole_view')
 local sexpr = require('skg.sexpr.parse')
 
 ---A view as its last save left it: B folded, so B1 hidden.
@@ -20,8 +20,8 @@ local last_save =
 
 local function rerender (content)
   local payload = '((view-id "view-folds") (content "' .. content .. '"))'
-  save.apply_streamed_view_update(payload, sexpr.read(payload),
-                                  'rerender', 'rerender-view')
+  redraw_whole_view.apply_streamed_view_update(
+    payload, sexpr.read(payload), 'rerender', 'rerender-view')
 end
 
 ---The line of the headline whose title is TITLE.
@@ -52,7 +52,7 @@ describe('a redraw the user did not ask for', function ()
     local buf = buffer.open_org_buffer_from_text(last_save, 'skg://folds',
                                                  'view-folds')
     folds.set_up_window()
-    save.replace_buffer_with_new_content(buf, last_save, nil) -- the last save's redraw
+    redraw_whole_view.replace_buffer_with_new_content(buf, last_save, nil) -- the last save's redraw
     assert.is_true(invisible_p('B1'))
     -- The user unfolds B, folds A and hides C's body.
     vim.cmd(string.format('%dfoldopen', headline_line('B')))
@@ -87,7 +87,7 @@ describe('a redraw the user did not ask for, after a collapsed'
     local buf = buffer.open_org_buffer_from_text(last_save, 'skg://folds',
                                                  'view-folds')
     folds.set_up_window()
-    save.replace_buffer_with_new_content(buf, last_save, nil) -- the last save's redraw
+    redraw_whole_view.replace_buffer_with_new_content(buf, last_save, nil) -- the last save's redraw
     assert.is_true(invisible_p('B1'))
     rerender('* (skg (vnid a0) node (gnid ga0)) A\nbody of A\n'
              .. '** (skg (vnid a1) node (gnid ga1)) A1\nbody of A1\n'
@@ -114,7 +114,7 @@ describe('content_with_fold_atoms', function ()
       .. '* (skg (vnid k5) bodyFolded node (gnid g5)) five\nbody\n'
       .. '* (skg (vnid k6) node (gnid g6)) six\n'
       .. '** (skg (vnid n7) folded node (gnid g7)) seven\n',
-      save.content_with_fold_atoms(
+      redraw_whole_view.content_with_fold_atoms(
         '* (skg (vnid k1) focused folded node (gnid g1)) folded title\n'
         .. 'body\n'
         .. '** (skg (vnid k2) folded bodyFolded node (gnid g2)) two\n'
