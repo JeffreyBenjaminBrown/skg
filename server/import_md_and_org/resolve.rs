@@ -297,6 +297,41 @@ fn resolve_link (
   if destination . contains ("://") ||
     destination . starts_with ("data:") {
     return LinkTarget::External; }
+  let (path, search) : (String, Option<&str>) =
+    match link_path_and_search (link) {
+      Ok (path_and_search) => path_and_search,
+      Err (unresolved) => return unresolved, };
+  if ! path . is_empty () && ! names_a_document (&path) {
+    return link_to_a_non_document (
+      document, &path, search, link, input_directory, host_root); }
+  if path . starts_with ('~') { return LinkTarget::Unresolved (
+    "Home-relative paths are unsupported; use a relative path or the configured host root"
+      . to_string ()); }
+  let target_document : usize = if path . is_empty () {
+    document_index
+  } else {
+    let Some (relative) = normalized_input_path (
+      &document . path, &path, input_directory, host_root) else {
+      return LinkTarget::Unresolved (format! (
+        "Path {:?} is outside the imported input tree or host mapping", path)); };
+    let Some (target) = index . files . get (&relative) else {
+      return LinkTarget::Unresolved (format! (
+        "Path {:?} does not name an imported document", path)); };
+    *target };
+  link_target_within_document (
+    link, index, target_document, &path, search )
+}
+
+/// The path a link names, decoded as its syntax writes it, and the
+/// search it carries within that document: Markdown's '#fragment',
+/// Org's '::search', or the whole of an Org link that is only a search
+/// ('#custom-id' or '*heading') of its own document, whose path is
+/// empty. A 'file:' prefix is dropped. A Markdown path that does not
+/// percent-decode is the link's 'Unresolved' target, as the 'Err'.
+fn link_path_and_search (
+  link : &ParsedLink,
+) -> Result<(String, Option<&str>), LinkTarget> {
+  let destination : &str = &link . destination;
   let target : &str = destination . strip_prefix ("file:")
     . unwrap_or (destination);
   let (path, search) : (&str, Option<&str>) = match link . syntax {
@@ -316,25 +351,23 @@ fn resolve_link (
   let path : String = match link . syntax {
     LinkSyntax::Markdown => match percent_decode (path) {
       Ok (decoded) => decoded,
-      Err (error) => return LinkTarget::Unresolved (error), },
+      Err (error) => return Err (LinkTarget::Unresolved (error)), },
     LinkSyntax::Org => org_unescape (path), };
-  if ! path . is_empty () && ! names_a_document (&path) {
-    return link_to_a_non_document (
-      document, &path, search, link, input_directory, host_root); }
-  if path . starts_with ('~') { return LinkTarget::Unresolved (
-    "Home-relative paths are unsupported; use a relative path or the configured host root"
-      . to_string ()); }
-  let target_document : usize = if path . is_empty () {
-    document_index
-  } else {
-    let Some (relative) = normalized_input_path (
-      &document . path, &path, input_directory, host_root) else {
-      return LinkTarget::Unresolved (format! (
-        "Path {:?} is outside the imported input tree or host mapping", path)); };
-    let Some (target) = index . files . get (&relative) else {
-      return LinkTarget::Unresolved (format! (
-        "Path {:?} does not name an imported document", path)); };
-    *target };
+  Ok ((path, search))
+}
+
+/// The node a link names within the imported document
+/// 'target_document': its root when the link carries no search, else
+/// the one node its decoded search addresses (a Markdown fragment, an
+/// Org heading, custom ID or named target). 'path' is the link's
+/// path, for the message when no node, or several, answer.
+fn link_target_within_document (
+  link            : &ParsedLink,
+  index           : &AddressIndex,
+  target_document : usize,
+  path            : &str,
+  search          : Option<&str>,
+) -> LinkTarget {
   let root : ID = index . roots . get (&target_document) . unwrap () . clone ();
   if search . is_none () || search == Some ("") {
     return LinkTarget::Node (root, None); }
