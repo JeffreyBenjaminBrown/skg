@@ -343,20 +343,8 @@ pub fn handle_save_buffer_request (
   let perspective_result : Result<Perspective, String> =
     perspective_from_save_request (
       request, & env . runtime_snapshot () . config );
-  { // Send the early broad lock before reading the buffer, so the client's
-    // one-shot save-lock handler always fires exactly once and balances its
-    // pending-count -- even when the read below fails (otherwise only
-    // save-result would arrive, leaving the count unbalanced and wedging the
-    // next save's wait). save-result unlocks regardless. Conservative/broad
-    // here: the SavePlan is not yet computed.
-    let viewforest_ids_to_lock : Vec<ViewforestId> =
-      viewforest_ids_of_views_to_lock (
-        &viewforest_id_from_request_result, views_state );
-    let lock_sexp : String =
-      format_lock_views_sexp ( &viewforest_ids_to_lock );
-    send_response_with_length_prefix (
-      stream,
-      & tag_sexp_response ( TcpToClient::SaveLock, &lock_sexp )); }
+  send_early_broad_save_lock (
+    stream, &viewforest_id_from_request_result, views_state );
   match ( read_length_prefixed_content (reader)
             .and_then (|content| parse_save_request_envelope (
               &content, viewforest_id_from_request_result . as_ref () . ok ())),
@@ -398,38 +386,11 @@ pub fn handle_save_buffer_request (
             save_response . save_point_position =
               save_point_position . clone ();
             send_save_response (stream, &save_response); }
-          Err (err) if preview => {
-            // A preview the save would refuse: its errors, as a save's.
-            let (errors, warnings) : (Vec<String>, Vec<String>) =
-              match err . downcast_ref::<SaveError>() {
-                Some (save_error) => (
-                  vec! [ format_save_error_as_org (save_error) ],
-                  match save_error {
-                    SaveError::BufferValidationErrors { warnings, .. } =>
-                      warnings . clone (),
-                    _ => Vec::new (), } ),
-                None => ( vec! [ format! (
-                  "Error processing buffer content: {}", err ) ],
-                          Vec::new () ), };
-            send_preview_refusal (stream, errors, warnings); }
-          Err (err) => { // Check if this is a SaveError that should be formatted for the client
-            if let Some (save_error) = err . downcast_ref::<SaveError>() {
-              // Warnings always accompany errors (decided 2026-06-12):
-              // a failed validation carries the parse-time warnings it
-              // collected before aborting.
-              let warnings : &[String] = match save_error {
-                SaveError::BufferValidationErrors { warnings, .. } =>
-                  warnings,
-                _ => &[], };
-              send_save_refusal (
-                stream, & format_save_error_as_org (save_error),
-                warnings, & save_point_position );
-            } else {
-              let error_msg : String =
-                format!("Error processing buffer content: {}", err);
-              tracing::error!("{}", error_msg);
-              send_save_refusal (
-                stream, &error_msg, &[], &save_point_position ); }} }}; }
+          Err (err) if preview =>
+            send_preview_refusal_of_pipeline_error (stream, &err),
+          Err (err) =>
+            send_save_refusal_of_pipeline_error (
+              stream, &err, &save_point_position ), }}; }
     (Err (err), _) if preview =>
       send_preview_refusal (
         stream,
@@ -441,6 +402,69 @@ pub fn handle_save_buffer_request (
       tracing::error! ( "{}", error_msg );
       send_save_refusal (
         stream, &error_msg, &[], &save_point_position ); }} }
+
+/// Send the early broad lock before reading the buffer, so the client's
+/// one-shot save-lock handler always fires exactly once and balances its
+/// pending-count -- even when the read fails (otherwise only
+/// save-result would arrive, leaving the count unbalanced and wedging the
+/// next save's wait). save-result unlocks regardless. Conservative/broad
+/// here: the SavePlan is not yet computed.
+fn send_early_broad_save_lock (
+  stream                            : &mut TcpStream,
+  viewforest_id_from_request_result : &Result<ViewforestId, String>,
+  views_state                       : &ViewsState,
+) {
+  let viewforest_ids_to_lock : Vec<ViewforestId> =
+    viewforest_ids_of_views_to_lock (
+      viewforest_id_from_request_result, views_state );
+  let lock_sexp : String =
+    format_lock_views_sexp ( &viewforest_ids_to_lock );
+  send_response_with_length_prefix (
+    stream,
+    & tag_sexp_response ( TcpToClient::SaveLock, &lock_sexp )); }
+
+/// A preview the save would refuse: its errors, as a save's.
+fn send_preview_refusal_of_pipeline_error (
+  stream : &mut TcpStream,
+  err    : &Box<dyn Error>,
+) {
+  let (errors, warnings) : (Vec<String>, Vec<String>) =
+    match err . downcast_ref::<SaveError>() {
+      Some (save_error) => (
+        vec! [ format_save_error_as_org (save_error) ],
+        match save_error {
+          SaveError::BufferValidationErrors { warnings, .. } =>
+            warnings . clone (),
+          _ => Vec::new (), } ),
+      None => ( vec! [ format! (
+        "Error processing buffer content: {}", err ) ],
+                Vec::new () ), };
+  send_preview_refusal (stream, errors, warnings); }
+
+/// Refuse a save the pipeline failed: a 'SaveError' formatted for the
+/// client, with its warnings; any other error logged and sent as it reads.
+fn send_save_refusal_of_pipeline_error (
+  stream              : &mut TcpStream,
+  err                 : &Box<dyn Error>,
+  save_point_position : &Option<SavePointPosition>,
+) {
+  if let Some (save_error) = err . downcast_ref::<SaveError>() {
+    // Warnings always accompany errors (decided 2026-06-12):
+    // a failed validation carries the parse-time warnings it
+    // collected before aborting.
+    let warnings : &[String] = match save_error {
+      SaveError::BufferValidationErrors { warnings, .. } =>
+        warnings,
+      _ => &[], };
+    send_save_refusal (
+      stream, & format_save_error_as_org (save_error),
+      warnings, save_point_position );
+  } else {
+    let error_msg : String =
+      format!("Error processing buffer content: {}", err);
+    tracing::error!("{}", error_msg);
+    send_save_refusal (
+      stream, &error_msg, &[], save_point_position ); }}
 
 /// Send the answer to a save the pipeline finished: a preview's,
 /// a confirmation the save asks for (each checked in this order),
