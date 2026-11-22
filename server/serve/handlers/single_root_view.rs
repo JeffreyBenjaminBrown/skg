@@ -2,7 +2,7 @@
 //! one node ('render_initial_view' in 'server/update_buffer.rs'), or
 //! name the open view already rooted there.
 
-use crate::types::env::SkgEnv;
+use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::serve::ViewsState;
 use crate::update_buffer::multi_root_view_via_runtime;
 use crate::serve::protocol::TcpToClient;
@@ -20,12 +20,14 @@ use crate::serve::util::{
   tag_text_response};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::misc::ID;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::views_state::ViewforestId;
 
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
+use std::collections::HashSet;
 use std::net::TcpStream; // handles two-way communication
 
 /// Gets a node id from the request,
@@ -48,13 +50,7 @@ pub fn handle_single_root_view_request (
     viewforest_id_from_request (request);
   match node_gnid_from_single_root_view_request (request) {
     Ok (gnid) => {
-      let kept_out : bool =
-        match runtime . graph . gnid_presence_gated (&gnid, skgrepo_restriction) {
-          GnidPresence::Present    => false,
-          GnidPresence::Restricted => true,
-          GnidPresence::Absent     => // refused under any skgrepo restriction
-            ! skgrepo_restriction . is_unrestricted (), };
-      if kept_out {
+      if gnid_is_kept_out (&runtime . graph, &gnid, skgrepo_restriction) {
         let response_sexp : String =
           format_buffer_response_sexp (
             &String::new (),
@@ -73,17 +69,11 @@ pub fn handle_single_root_view_request (
           . content_viewforest_id_for_root_gnid ( &gnid )
         { // Following a link to a root that is already open lands in
           // that content view proper's buffer.
-          let switch_sexp : String =
-            sexp_to_client_string ( &Sexp::List ( vec! [
-              Sexp::List ( vec! [
-                Sexp::Atom ( Atom::S (
-                  "switch-to-view" . to_string () )),
-                Sexp::Atom ( Atom::S (
-                  existing_viewforest_id . repr_in_client () )) ] ) ] ));
           send_response_with_length_prefix (
             stream,
             & tag_sexp_response (
-              TcpToClient::ContentView, &switch_sexp ));
+              TcpToClient::ContentView,
+              & switch_to_view_sexp (&existing_viewforest_id) ));
           return; }
       let approved_overPrivateText_pids =
         approved_pids_from_request (request);
@@ -91,50 +81,9 @@ pub fn handle_single_root_view_request (
       { let _span : tracing::span::EnteredSpan =
           tracing::info_span!( "single_root_view" ). entered();
         block_on ( async {
-            match multi_root_view_via_runtime (
-              &runtime,
-              &[gnid . clone ()],
-              skgrepo_restriction )
-            { Ok ( (buffer_content, pids, viewforest) ) => {
-                let release = decide_text_release (
-                  "single-root-view",
-                  skgrepo_restriction,
-                  &pids,
-                  &runtime . graph,
-                  &approved_overPrivateText_pids );
-                if matches! (
-                  release, TextReleaseDecision::Challenge { .. } ) {
-                  return challenge_response (&release) . unwrap (); }
-                if let Ok (viewforest_id) = &viewforest_id_result {
-                  views_state . open_views . register_view (
-                    &runtime . graph,
-                    viewforest_id . clone (),
-                    viewforest,
-                    &pids,
-                    skgrepo_restriction ); }
-                let warnings : Vec<String> =
-                  { let mut warnings : Vec<String> = Vec::new ();
-                    if let TextReleaseDecision::AllowWithWarning {
-                      warning,
-                    } = release {
-                      warnings . push (warning); }
-                    warnings };
-                tag_sexp_response (
-                  TcpToClient::ContentView,
-                  & format_buffer_response_sexp (
-                    & buffer_content,
-                    &[],
-                    & warnings ) ) },
-              Err (e) => {
-                let mut errors : Vec<String> = Vec::new ();
-                errors . push ( format! (
-                  "Error generating document: {}", e ));
-                tag_sexp_response (
-                  TcpToClient::ContentView,
-                  & format_buffer_response_sexp (
-                    & String::new (),
-                    & errors,
-                    &[] ) ) }} } ) };
+          draw_and_register_single_root_view (
+            &runtime, &gnid, &viewforest_id_result, views_state,
+            skgrepo_restriction, &approved_overPrivateText_pids ) } ) };
       send_response_with_length_prefix (
         stream, &response ); },
     Err (err) => {
@@ -145,6 +94,90 @@ pub fn handle_single_root_view_request (
         stream,
         & tag_text_response (
           TcpToClient::ContentView, &error_msg )); } } }
+
+/// Whether the skgrepo restriction keeps 'gnid' out of a view: it
+/// keeps out a restricted node, and, unless the connection is
+/// unrestricted, an absent one.
+fn gnid_is_kept_out (
+  graph               : &InRustGraph,
+  gnid                : &ID,
+  skgrepo_restriction : &SkgrepoRestriction,
+) -> bool {
+  match graph . gnid_presence_gated (gnid, skgrepo_restriction) {
+    GnidPresence::Present    => false,
+    GnidPresence::Restricted => true,
+    GnidPresence::Absent     => // refused under any skgrepo restriction
+      ! skgrepo_restriction . is_unrestricted (), }}
+
+/// '((switch-to-view "VIEW_ID"))': the client should show the open
+/// view 'viewforest_id' instead of a new one.
+fn switch_to_view_sexp (
+  viewforest_id : &ViewforestId,
+) -> String {
+  sexp_to_client_string ( &Sexp::List ( vec! [
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S (
+        "switch-to-view" . to_string () )),
+      Sexp::Atom ( Atom::S (
+        viewforest_id . repr_in_client () )) ] ) ] )) }
+
+/// Draw the view rooted at 'gnid' and answer it as a content view,
+/// registering it under 'viewforest_id_result' if the request named
+/// one. Text the release check would challenge is answered with the
+/// challenge instead, and nothing is registered. A drawing error is
+/// answered as the view's one error.
+fn draw_and_register_single_root_view (
+  runtime                       : &RuntimeGeneration,
+  gnid                          : &ID,
+  viewforest_id_result          : &Result<ViewforestId, String>,
+  views_state                   : &mut ViewsState,
+  skgrepo_restriction           : &SkgrepoRestriction,
+  approved_overPrivateText_pids : &HashSet<ID>,
+) -> String {
+  match multi_root_view_via_runtime (
+    runtime,
+    &[gnid . clone ()],
+    skgrepo_restriction )
+  { Ok ( (buffer_content, pids, viewforest) ) => {
+      let release = decide_text_release (
+        "single-root-view",
+        skgrepo_restriction,
+        &pids,
+        &runtime . graph,
+        approved_overPrivateText_pids );
+      if matches! (
+        release, TextReleaseDecision::Challenge { .. } ) {
+        return challenge_response (&release) . unwrap (); }
+      if let Ok (viewforest_id) = viewforest_id_result {
+        views_state . open_views . register_view (
+          &runtime . graph,
+          viewforest_id . clone (),
+          viewforest,
+          &pids,
+          skgrepo_restriction ); }
+      let warnings : Vec<String> =
+        { let mut warnings : Vec<String> = Vec::new ();
+          if let TextReleaseDecision::AllowWithWarning {
+            warning,
+          } = release {
+            warnings . push (warning); }
+          warnings };
+      tag_sexp_response (
+        TcpToClient::ContentView,
+        & format_buffer_response_sexp (
+          & buffer_content,
+          &[],
+          & warnings ) ) },
+    Err (e) => {
+      let mut errors : Vec<String> = Vec::new ();
+      errors . push ( format! (
+        "Error generating document: {}", e ));
+      tag_sexp_response (
+        TcpToClient::ContentView,
+        & format_buffer_response_sexp (
+          & String::new (),
+          & errors,
+          &[] ) ) }} }
 
 pub fn node_gnid_from_single_root_view_request (
   request : &str
