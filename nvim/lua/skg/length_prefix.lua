@@ -12,6 +12,7 @@
 -- quoted spelling.
 
 local log = require('skg.log')
+local payload = require('skg.payload')
 local state = require('skg.state')
 local sexpr = require('skg.sexpr.parse')
 
@@ -36,6 +37,42 @@ function M.tell_answer_not_applied (answer, err, consequence)
                consequence or M.answer_not_applied_default_consequence,
                answer, tostring(err)),
              vim.log.levels.ERROR)
+end
+
+---Ask the prompt of RESPONSE, an overPrivateText-telescope-confirmation
+---(DEFAULT_PROMPT if it carries none), and if the user approves, call
+---ON_APPROVAL with the pids it lists, as strings: the telescopes whose
+---text the retried request may show.
+---@param response any
+---@param default_prompt string
+---@param on_approval fun(pids: string[])
+function M.when_overPrivateText_approved (response, default_prompt,
+                                          on_approval)
+  local prompt = payload.field_text(response, 'prompt') or default_prompt
+  local pids = payload.string_list(payload.field(response, 'pids'))
+  if vim.fn.confirm(prompt, '&Include\n&Decline', 2) == 1 then
+    on_approval(pids) end
+end
+
+---Register the handler of an overPrivateText-telescope-confirmation,
+---which the server sends instead of ANSWER_TYPE, a one-shot answer,
+---when that answer would show text from overPrivateText telescopes. It
+---is not one-shot, so only ANSWER_TYPE counts toward the pending
+---responses. When it fires, both handlers are removed (balancing
+---ANSWER_TYPE's count), and if the user approves
+---('when_overPrivateText_approved'), RETRY is called with the pids
+---approved.
+---@param answer_type string
+---@param default_prompt string
+---@param retry fun(pids: string[])
+function M.register_overPrivateText_confirmation_instead_of (
+    answer_type, default_prompt, retry)
+  state.register_response_handler('overPrivateText-telescope-confirmation',
+    function (_payload_text, response)
+      state.unregister_response_handlers(
+        { 'overPrivateText-telescope-confirmation', answer_type })
+      M.when_overPrivateText_approved(response, default_prompt, retry)
+    end, false)
 end
 
 ---Consume the message stream in chunks: accumulate CHUNK's bytes,

@@ -176,19 +176,13 @@ function M.register_rerender_overPrivateText_confirmation (
   M.overPrivateText_challenged = false
   state.register_response_handler('overPrivateText-telescope-confirmation',
     function (_payload_text, response)
-      state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
-      if unfired_response_type
-         and state.response_handler_map[unfired_response_type] then
-        state.response_handler_map[unfired_response_type] = nil
-        state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-      end
+      state.unregister_response_handlers(
+        { 'overPrivateText-telescope-confirmation', unfired_response_type })
       M.overPrivateText_challenged = true
-      local prompt = payload.field_text(response, 'prompt') or
-        'This rerender includes text selected below home. Include it?'
-      local pids = payload.string_list(payload.field(response, 'pids'))
-      if vim.fn.confirm(prompt, '&Include\n&Decline', 2) == 1 then
-        M.overPrivateText_retry = function () retry(pids) end
-      end
+      length_prefix.when_overPrivateText_approved(response,
+        'This rerender includes text selected below home. Include it?',
+        function (pids)
+          M.overPrivateText_retry = function () retry(pids) end end)
     end, false)
 end
 

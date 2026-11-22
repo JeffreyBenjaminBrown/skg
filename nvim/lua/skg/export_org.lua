@@ -5,6 +5,7 @@
 
 local client = require('skg.client')
 local config = require('skg.config')
+local length_prefix = require('skg.length_prefix')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
 local picker = require('skg.picker')
@@ -40,19 +41,10 @@ function M.export_some_to_org (repo_set, output_dir, approved_pids)
       state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
       M.export_to_org_handler(response)
     end, true)
-  state.register_response_handler('overPrivateText-telescope-confirmation',
-    function (_payload_text, response)
-      state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
-      if state.response_handler_map['export-to-org'] then
-        state.response_handler_map['export-to-org'] = nil
-        state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-      end
-      local prompt = payload.field_text(response, 'prompt') or
-        'This export includes text selected below home. Include it?'
-      local pids = payload.string_list(payload.field(response, 'pids'))
-      if vim.fn.confirm(prompt, '&Include\n&Decline', 2) == 1 then
-        M.export_some_to_org(repo_set, output_dir, pids) end
-    end, false)
+  length_prefix.register_overPrivateText_confirmation_instead_of(
+    'export-to-org',
+    'This export includes text selected below home. Include it?',
+    function (pids) M.export_some_to_org(repo_set, output_dir, pids) end)
   state.lp_reset()
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'export to org'),

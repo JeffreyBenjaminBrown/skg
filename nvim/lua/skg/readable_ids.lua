@@ -8,6 +8,7 @@
 
 local client = require('skg.client')
 local id_search = require('skg.id_search')
+local length_prefix = require('skg.length_prefix')
 local payload = require('skg.payload')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
@@ -201,11 +202,10 @@ function M.ensure_title_response_handler ()
         vim.notify('skg-readable-ids: privacy challenge without pending request')
         return end
       state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-      local prompt = payload.field_text(response, 'prompt') or
-        'This title lookup includes text selected below home. Include it?'
-      local pids = payload.string_list(payload.field(response, 'pids'))
-      if vim.fn.confirm(prompt, '&Include\n&Decline', 2) == 1 then
-        M.request_titles(entry[3], entry[1], entry[2], pids) end
+      length_prefix.when_overPrivateText_approved(response,
+        'This title lookup includes text selected below home. Include it?',
+        function (pids)
+          M.request_titles(entry[3], entry[1], entry[2], pids) end)
     end, false)
 end
 

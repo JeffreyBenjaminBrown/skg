@@ -5,6 +5,7 @@
 
 local buffer = require('skg.buffer')
 local client = require('skg.client')
+local length_prefix = require('skg.length_prefix')
 local log = require('skg.log')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
@@ -45,21 +46,12 @@ function M.request_single_root_content_view_from_id (node_gnid,
     end, true)
   -- Alternative to content-view. It is non-one-shot so the pending
   -- response count represents only the one terminal reply.
-  state.register_response_handler('overPrivateText-telescope-confirmation',
-    function (_payload_text, response)
-      state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
-      if state.response_handler_map['content-view'] then
-        state.response_handler_map['content-view'] = nil
-        state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-      end
-      local prompt = payload.field_text(response, 'prompt') or
-        'This view includes text selected below a node home repo. Include it?'
-      local pids =
-        payload.string_list(payload.field(response, 'pids'))
-      if vim.fn.confirm(prompt, '&Include\n&Decline', 2) == 1 then
-        M.request_single_root_content_view_from_id(
-          node_gnid, pids, view_id) end
-    end, false)
+  length_prefix.register_overPrivateText_confirmation_instead_of(
+    'content-view',
+    'This view includes text selected below a node home repo. Include it?',
+    function (pids)
+      M.request_single_root_content_view_from_id(node_gnid, pids, view_id)
+    end)
   state.lp_reset()
   client.send_string(
     M.single_root_view_request_string(
