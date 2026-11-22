@@ -23,15 +23,18 @@
    'string_atom_sexp' and 'string_entry_sexp' ('server/serve/util.rs')
    replaced three private 'atom'/'pair' pairs (text_release, telescope_hoist,
    receipt), two closures in save_buffer and util's own hand-built entries.
+** A save request's fields are read in 'save_buffer/request.rs'
+   The envelope parser and the request-line readers moved unchanged
+   out of 'handlers/save_buffer.rs' (now 1145 lines). The request
+   types ('SaveRequestEnvelope' and kin) stayed in 'save_buffer.rs',
+   where 'docs/glossary.org' cites them. 'tests/save_request_envelope.rs'
+   imports the parser from 'save_buffer::request'.
+** A save request's '(KEY . "true")' flags are read by one function
+   'request_field_is_true' ('save_buffer/request.rs').
+** A diff of every skgrepo is computed in 'server/git_ops/diff.rs'
+   'compute_diff_for_every_skgrepo' left the save handler; only
+   'titles_by_gnids.rs' calls it.
 * Candidates left, best first
-** Move the save request's field readers out of 'save_buffer.rs'
-   'handlers/save_buffer.rs' (~1450 lines) holds, from
-   'parse_save_request_envelope' to 'fork_skgrepos_from_request', about
-   400 lines that only read the request line and the envelope. A
-   'save_buffer/request.rs' (precedent: 'text_search.rs' with
-   'text_search/coverage.rs') would leave the handler file to the
-   pipeline. A pure move, but the moved functions need 'pub(super)';
-   'tests' reach 'parse_save_request_envelope' by path, so check them.
 ** Split 'update_from_and_rerender_buffer_with_approvals_or_preview' (~340 lines)
    'handlers/save_buffer.rs'. The longest function in the territory. Its
    confirmations (strandeds, delete-from, hoist, fork, text release) are
@@ -40,15 +43,20 @@
    handler's checks depend on their position in it", which Jeff deferred:
    tagging a NodeInstruction's provenance needs his yes; extracting the
    steps in place does not). Read the whole function first; medium work.
-** Request-field readers repeat one shape
-   Three '(KEY . "true")' readers in save_buffer ('preview_from_request',
-   'fork_approved_from_request', the strandeds flag) and about fifteen
-   'sexp::parse (request)' walks across the handlers. A
-   'bool_from_request (key, request)' in 'util.rs' is small and safe.
 ** 'parse_metadata_sexp.rs' (1106 lines)
-   Metadata types (to ~250), the viewnode builders, the element
-   classifier, and the edit-request parsers (from ~895). The
-   edit-request parsing is a clear seam. Not surveyed closely.
+   Three seams: the metadata types (to line ~245), the builder
+   'viewnode_from_metadata' (~245-465), and the parser (the rest).
+   'docs/api-and-formats.org' and 'coding-advice/architecture.org' say
+   the grammar and the parser live in this file, so the parser should
+   stay; moving the types or the builder out touches the imports of
+   about eight test files ('rg parse_metadata_sexp:: tests'). Safe,
+   mechanical, moderate gain.
+** About fifteen 'sexp::parse (request)' walks across the handlers
+   Each reads one field its own way ('fork_skgrepos_from_request',
+   'strandeds_review_from_request' in 'save_buffer/request.rs' walk the
+   list for a key's whole form). A 'form_from_request (key, request)'
+   in 'util.rs' could serve them; the refusal texts must stay word for
+   word. Small gain.
 ** 'send_import_response' ('handlers/import_md_and_org.rs', ~160 lines)
    and 'handle_text_search_request' (~145 lines) are the next longest;
    not read.

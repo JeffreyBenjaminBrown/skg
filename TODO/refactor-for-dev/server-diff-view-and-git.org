@@ -29,6 +29,8 @@
    'server/diff_view/named_leaf_set.rs' takes the set algebra that
    validation reads too, out of 'processed_requests.rs' (736 lines,
    now 483).
+** A diff of every skgrepo is computed in 'server/git_ops/diff.rs'
+   'compute_diff_for_every_skgrepo' moved there from the save handler.
 ** Two problem entries went to 'TODO/DONE/problems.org'
    Both named 'server/to_org/', which is gone. The entry on parses
    per changed file now says what is left: a modified file's two
@@ -46,15 +48,11 @@
    'pub(crate)'), but 'docs/diff-view.org' cites 'hold_back_waiting_nodes'
    in 'change_leaves.rs' and 'docs/api-and-formats.org' says "the
    choice of nodes in change_leaves.rs"; their notes in 'skg-system/'
-   must change in the same commit. Callers: 'change_viewnodes.rs'
+   must change in the same commit (edit the '.skg' text, then
+   'bash/export-docs.sh'; see 'server-refresh-and-heralds.org'). Callers: 'change_viewnodes.rs'
    ('title_in_straddle'), 'server/serve/handlers/stage_and_commit.rs',
    'tests/unit/change_leaves.rs' and
    'tests/pruned_change_view/commit_processed.rs'.
-** Move 'compute_diff_for_every_skgrepo' to 'server/git_ops/diff.rs'
-   It is defined in 'server/serve/handlers/save_buffer.rs' but only
-   'titles_by_gnids.rs' calls it; it is a git function. Safe and
-   small, but it edits two files of 'server/serve/', so coordinate
-   with that territory.
 ** One helper for "the HEAD tree, else 'it has no HEAD commit'"
    'server/git_ops/stage_and_commit.rs' spells it in
    'skg_paths_differing_from_head', 'prepare_commits' and

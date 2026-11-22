@@ -32,29 +32,38 @@
    "New relationship folders are populated before their completion
    visit" named 'server/to_org/', which the refresh rewrite deleted;
    'add_folders' now adds folders empty.
+** Mirror substitution, a refresh rung, has its own file
+   'server/refresh/substitution.rs' holds the seventh rung
+   ('substitute_mirrors', 'substitute_roots' and their helpers), moved
+   unchanged out of 'visit.rs'; the visit's helpers it calls became
+   'pub(super)'.
+** The claims, a refresh rung, have their own file
+   'server/refresh/claims.rs' holds the fourth rung ('mark_claims',
+   'claim_forks_folder_members_as_the_graph_does', what leaves a
+   write-protected folder, and 'vanish'). 'visit.rs' is now 953 lines,
+   and its comment banners say where the two rungs went.
+** The herald table's conformance checks live in 'server/herald_conformance.rs'
+   The vocabulary the server emits ('emittable_metadata_atoms') and the
+   checks of the table and 'shared/herald-styles.json' left 'heralds.rs'
+   (now 865 lines: the table, its serialization, the table queries).
+   'property_and_change_kind_atoms' stayed: the table itself needs it.
+** How to change a doc that cites a moved function
+   The notes behind 'docs/' are plain '.skg' files in 'skg-system/'.
+   For a one-line citation, editing the note's text directly, then
+   'bash/export-docs.sh' and 'bash/check-docs-exported.sh', needs no
+   server ('rg' the old path in 'skg-system/' to find the notes).
 * Candidates left, best first
-** Split 'server/refresh/visit.rs' (1521 lines) along its rung sections
-   The file is already divided by comment headers into the eight rungs
-   ("1. re-kind" through "8. requests"). Substitution (about 350
-   lines, from 'substitute_mirrors' on) and claims (about 230 lines)
-   would each make a file an agent could read alone. The moves are
-   mechanical, but 'docs/' (generated; edit through 'skg-system/')
-   cites many of these functions as "in 'server/refresh/visit.rs'":
-   'docs/glossary.org' six times, 'docs/mirrors.org' and
-   'docs/api-and-formats.org' for 'substitute_mirrors' and
-   'substitute_roots', 'docs/forks.org' and 'docs/data-model_technical.org'.
-   Those notes must change in the same commit, or the docs lie.
-** Split the conformance code off 'server/heralds.rs' (1135 lines)
-   Lines from "Consistency of shared/herald-styles.json" to the end
-   (about 390 lines) only check the table against the styles file and
-   the server's vocabulary; the table and its serialization are the
-   first 735. A file 'server/herald_conformance.rs' would hold them.
-   Callers: 'server/main.rs' ('herald_styles_inconsistencies'),
-   'server/herald_descriptions.rs' ('emittable_kind_atoms',
-   'text_emitting_rule_paths'), and 'tests/unit/heralds.rs', which is
-   mounted as the module's tests and would need its imports changed.
-   'docs/heralds.org' cites 'client_computed_atoms' in
-   'server/heralds.rs', so its note must change too.
+** Split more rungs off 'server/refresh/visit.rs' (953 lines)
+   Requests ("8. requests", about 160 lines, 'fulfill_view_requests'
+   on) and reinstate ("5. reinstate", about 230 lines with
+   'after_drawing' and the containers-folder functions) are the next
+   seams. Each is a mechanical move, but 'docs/mirrors.org' links
+   'fulfill_view_requests' to 'visit.rs', and 'docs/glossary.org'
+   cites 'after_drawing', 'add_containers_folder_under_member' and
+   'folder_goes_when_empty' there; change those notes in the same
+   commit. The rungs call back into 'visit.rs' helpers
+   ('children_of', 'draw_item', 'folders_of_relation'), so expect a few
+   more 'pub(super)'.
 ** One setter for an occurrence's view stats in 'viewnodestats.rs'
    Six setters end with the same three lines, 'if let Occurrence (t)
    = &mut tree . get_mut (treeid) ... { t . viewStats . X = Y; }'.
