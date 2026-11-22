@@ -127,71 +127,93 @@ fn supplement_nodeSaveIntent_from_disk (
   let from_disk : Option<Graphnode> =
     graphnode_from_graph (graph, &pid);
   match from_disk {
-    None => {
-      // A brand-new node has no sticky skgrepos (no disk relationships to be
-      // sticky about), but an explicit '(editRequest (relRepo ...))'
-      // request must
-      // still be validated against the default floor -- an empty
-      // disk stand-in reuses 'apply_sticky_relRepos_in_graph_with_prospective_homes' unchanged (its
-      // sticky lookups simply find nothing, falling through to
-      // default every time).
-      let requested_relRepos : RequestedRelRepos =
-        from_buffer . requested_relRepos ();
-      let flag_request = from_buffer . flag_request;
-      let strip_attribution : bool = from_buffer . strip_attribution;
-      let mut supplemented : Graphnode =
-        from_buffer . into_graphnode ();
-      if strip_attribution { supplemented . attribution = None; }
-      if let Some ((flag, value)) = flag_request {
-        set_flag (&mut supplemented . flags, flag, value); }
-      let empty_disk : Graphnode = Graphnode {
-        pid          : supplemented . pid    . clone (),
-        home_skgrepo : supplemented . home_skgrepo . clone (),
-        .. empty_graphnode () };
-      let supplemented : Graphnode =
-        apply_sticky_relRepos_in_graph_with_prospective_homes (
-          supplemented, &empty_disk, &requested_relRepos,
-          graph, config, prospective_homes )
-        . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-      Ok (NodeInstruction_with_Opt_Repomove {
-        instruction : NodeInstruction::Save (SaveNode (supplemented)),
-        skgrepo_move   : None, } ) },
-    Some (disk_node) => {
-      let disk_node : Graphnode = disk_node;
-      let mut from_buffer : NodeSaveIntent = from_buffer;
-      from_buffer . fill_unspecified_contains (
-        &members_of (&disk_node . contains));
-      let requested_relRepos : RequestedRelRepos =
-        from_buffer . requested_relRepos ();
-      let flag_request = from_buffer . flag_request;
-      let strip_attribution : bool = from_buffer . strip_attribution;
-      let from_buffer : Graphnode =
-        from_buffer . into_graphnode();
-      let canonicalized : Graphnode =
-        canonicalize_gnids_from_disk (from_buffer, &disk_node) ?;
-      let maybe_move : Option<SkgrepoMove> =
-        detect_skgrepo_move ( config,  &pid,
-                             &canonicalized . home_skgrepo,
-                             &disk_node . home_skgrepo) ?;
-      let supplemented : Graphnode = {
-        let mut supplemented : Graphnode =
-          supplement_unspecified_fields_from_disk (
-            canonicalized, &disk_node);
-        if let Some ((flag, value)) = flag_request {
-          set_flag (&mut supplemented . flags, flag, value); }
-        if strip_attribution { supplemented . attribution = None; }
-        let supplemented : Graphnode =
-          if skgrepo_restriction . is_unrestricted () { supplemented }
-          else { preserve_invisible_members (
-                   supplemented, &disk_node, graph, skgrepo_restriction ) };
-        apply_sticky_relRepos_in_graph_with_prospective_homes (
-          supplemented, &disk_node, &requested_relRepos,
-          graph, config, prospective_homes )
-          . map_err ( |e| -> Box<dyn Error> { e . into () } ) ? };
-      Ok (NodeInstruction_with_Opt_Repomove {
-        instruction : NodeInstruction::Save (SaveNode (supplemented)),
-        skgrepo_move   : maybe_move,
-      }) }}}
+    None => supplement_nodeSaveIntent_of_new_node (
+      from_buffer, graph, config, prospective_homes ),
+    Some (disk_node) => supplement_nodeSaveIntent_from_disk_node (
+      from_buffer, &pid, disk_node,
+      graph, config, skgrepo_restriction, prospective_homes ), }}
+
+/// The save of a node the graph lacks, which no move can concern.
+fn supplement_nodeSaveIntent_of_new_node (
+  from_buffer            : NodeSaveIntent,
+  graph                  : &InRustGraph,
+  config                 : &SkgConfig,
+  prospective_homes      : &HashMap<ID, SkgrepoName>,
+) -> Result<NodeInstruction_with_Opt_Repomove, Box<dyn Error>> {
+  // A brand-new node has no sticky skgrepos (no disk relationships to be
+  // sticky about), but an explicit '(editRequest (relRepo ...))'
+  // request must
+  // still be validated against the default floor -- an empty
+  // disk stand-in reuses 'apply_sticky_relRepos_in_graph_with_prospective_homes' unchanged (its
+  // sticky lookups simply find nothing, falling through to
+  // default every time).
+  let requested_relRepos : RequestedRelRepos =
+    from_buffer . requested_relRepos ();
+  let flag_request = from_buffer . flag_request;
+  let strip_attribution : bool = from_buffer . strip_attribution;
+  let mut supplemented : Graphnode =
+    from_buffer . into_graphnode ();
+  if strip_attribution { supplemented . attribution = None; }
+  if let Some ((flag, value)) = flag_request {
+    set_flag (&mut supplemented . flags, flag, value); }
+  let empty_disk : Graphnode = Graphnode {
+    pid          : supplemented . pid    . clone (),
+    home_skgrepo : supplemented . home_skgrepo . clone (),
+    .. empty_graphnode () };
+  let supplemented : Graphnode =
+    apply_sticky_relRepos_in_graph_with_prospective_homes (
+      supplemented, &empty_disk, &requested_relRepos,
+      graph, config, prospective_homes )
+    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+  Ok (NodeInstruction_with_Opt_Repomove {
+    instruction : NodeInstruction::Save (SaveNode (supplemented)),
+    skgrepo_move   : None, } ) }
+
+/// The save of the node 'pid', whose graph form is 'disk_node': what
+/// the buffer leaves unspecified comes from 'disk_node', and a change
+/// of home is a move.
+fn supplement_nodeSaveIntent_from_disk_node (
+  mut from_buffer        : NodeSaveIntent,
+  pid                    : &ID,
+  disk_node              : Graphnode,
+  graph                  : &InRustGraph,
+  config                 : &SkgConfig,
+  skgrepo_restriction    : &SkgrepoRestriction,
+  prospective_homes      : &HashMap<ID, SkgrepoName>,
+) -> Result<NodeInstruction_with_Opt_Repomove, Box<dyn Error>> {
+  from_buffer . fill_unspecified_contains (
+    &members_of (&disk_node . contains));
+  let requested_relRepos : RequestedRelRepos =
+    from_buffer . requested_relRepos ();
+  let flag_request = from_buffer . flag_request;
+  let strip_attribution : bool = from_buffer . strip_attribution;
+  let from_buffer : Graphnode =
+    from_buffer . into_graphnode();
+  let canonicalized : Graphnode =
+    canonicalize_gnids_from_disk (from_buffer, &disk_node) ?;
+  let maybe_move : Option<SkgrepoMove> =
+    detect_skgrepo_move ( config,  pid,
+                         &canonicalized . home_skgrepo,
+                         &disk_node . home_skgrepo) ?;
+  let supplemented : Graphnode = {
+    let mut supplemented : Graphnode =
+      supplement_unspecified_fields_from_disk (
+        canonicalized, &disk_node);
+    if let Some ((flag, value)) = flag_request {
+      set_flag (&mut supplemented . flags, flag, value); }
+    if strip_attribution { supplemented . attribution = None; }
+    let supplemented : Graphnode =
+      if skgrepo_restriction . is_unrestricted () { supplemented }
+      else { preserve_invisible_members (
+               supplemented, &disk_node, graph, skgrepo_restriction ) };
+    apply_sticky_relRepos_in_graph_with_prospective_homes (
+      supplemented, &disk_node, &requested_relRepos,
+      graph, config, prospective_homes )
+      . map_err ( |e| -> Box<dyn Error> { e . into () } ) ? };
+  Ok (NodeInstruction_with_Opt_Repomove {
+    instruction : NodeInstruction::Save (SaveNode (supplemented)),
+    skgrepo_move   : maybe_move,
+  }) }
 
 /// Under a skgrepo restriction, the buffer shows only some of a
 /// node's relationship-list members, so its lists describe only the
