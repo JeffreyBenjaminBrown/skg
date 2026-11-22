@@ -1,0 +1,75 @@
+* Refactoring for dev: the import and export code of 'server/'
+  The territory: 'server/export_org.rs', 'server/obsidian/',
+  'server/import_md_and_org/', 'server/import_org_roam.rs' and
+  'server/import_org_roam/'. Their callers ('server/main.rs',
+  'server/serve/handlers/') belong to others. An export's files must
+  stay byte-identical. The focused tests are
+  'cargo nextest run -E "test(/export|import|obsidian|vault|org_roam/)"'
+  (118 tests, about two seconds warm); the whole suite ran before merge.
+* Done
+** The org exporter builds its PID map and extra-ID map in one place each
+   'nodes_by_pid' and 'pid_of_each_extra_id' ('server/export_org.rs')
+   replace three copies; 'rewrite_links' calls 'resolve_pid' instead of
+   repeating it.
+** An Org property drawer's ID, CUSTOM_ID and aliases are one type
+   'OrgDrawerMetadata' ('server/import_md_and_org/parse.rs') replaces
+   two positional tuples whose field orders differed.
+** Link resolution reuses 'ranges_overlap' and 'section_at_offset'
+   'server/import_md_and_org/resolve.rs' wrote the overlap test out
+   four times and the section lookup once more.
+** Link resolution is three named steps per document
+   'resolve_document_links' calls 'convert_links', 'convert_footnotes'
+   and 'render_sections_into_nodes'; the bodies moved unchanged.
+** The import preview and its approval share one check
+   'check_configured_skgrepos_admit_import'
+   ('server/import_md_and_org/batch.rs'): disk matches the runtime
+   graph, and no existing export root claims a new target's path.
+** Two problems.org entries were obsolete
+   Repeated titles in an org export are addressed by CUSTOM_ID now,
+   and the docs links were fixed; both moved to 'TODO/DONE/problems.org'.
+* Candidates left, best first
+** Bundle the org exporter's lookup tables into one struct
+   'server/export_org.rs': 'by_pid', 'alias_to_pid', 'roots_by_pid',
+   'marker_pids' and the restriction travel together through
+   'collect_events', 'custom_id_link_targets', 'render_root' and
+   'rewrite_links' (six to eight arguments each). A struct
+   ('ExportGraph') with 'resolve_pid' as a method would shorten every
+   signature. Safe (compile-checked, no output change); medium diff.
+** Name the import batch's tuples
+   'server/import_md_and_org/batch.rs': 'export_targets' is
+   'Vec<(PathBuf, String)>' (document path, target without '.org') and
+   'record_documents' 'Vec<(PathBuf, ID)>' (path, file root). Named
+   structs would say which string is which. Safe, small; the fields
+   are used only in that file.
+** Split 'server/export_org.rs' (850 lines) along its seams
+   Header ('export_header', 'export_header_length', which the importer
+   uses), marker discovery ('discover_roots', 'parse_target_filepath',
+   'parse_root_headline'), homes, and rendering. Moves only, but the
+   unit tests ('tests/unit/export_org.rs', included by '#[path]') reach
+   private functions through 'super::*', so visibilities must widen.
+** 'configured_identity_map' takes its own runtime snapshot
+   'server/import_md_and_org/batch.rs': 'prepare_import_batch_with'
+   holds a snapshot, then 'configured_identity_map' takes another, so
+   the two could be different generations. Passing the held one is
+   simpler and closes the gap, but changes which generation is read
+   (benign; the approval re-checks). Its two insert loops (graph
+   nodes, then files) could share a helper.
+** 'file_part_of_link' quasi-duplicates the path split in 'resolve_link'
+   'server/import_md_and_org/resolve.rs'. They differ on purpose or by
+   accident: 'file_part_of_link' does not treat 'data:' as external,
+   and does not treat a bare Org '#'/'*' search as a search. Check
+   which differences matter before merging them; not safe as is.
+** 'write_graphnode_to_dir' builds a one-skgrepo config per node
+   'server/import_org_roam.rs'. Building it once per import is a small,
+   safe speed-up and shortens the function.
+** 'ParsedSection' could hold an 'OrgDrawerMetadata'
+   'server/import_md_and_org/parse.rs': its 'explicit_id',
+   'custom_id' and 'aliases' mirror the drawer's fields, but Markdown
+   front matter also fills 'aliases', and 'build.rs' and 'resolve.rs'
+   read them. Small value.
+** Leave alone: 'server/obsidian/vault_check.rs' duplicates fence and front-matter reading
+   On purpose: it reads a vault "its own way, not through the
+   exporter's code", as an independent check.
+* Bugs in the territory (in 'TODO/problems.org', not fixed)
+** A literal bracket in a title can break an org-export deep link
+** Org-roam import clears its destination before validating input
