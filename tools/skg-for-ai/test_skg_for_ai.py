@@ -116,6 +116,7 @@ import compact_view
 import views
 import edited_compact_view
 import save
+import view_commands
 import skg_for_ai
 
 FIXTURE_FOLDER = os . path . join (TOOL_FOLDER, "test-fixture")
@@ -207,9 +208,9 @@ def failures_of_perspective_names ():
                        ( [ "root", "homes" ], "root homes" ),
                        ( [ "skgrepo main" ], "skgrepo main" ),
                        ( [ "skgrepo", "main" ], "skgrepo main" ) ]:
-    if skg_for_ai . perspective_of_argument (words) != name:
+    if view_commands . perspective_of_argument (words) != name:
       failures . append ( f"the words {words!r} name "
-                          f"{skg_for_ai . perspective_of_argument (words)!r}, not {name!r}" )
+                          f"{view_commands . perspective_of_argument (words)!r}, not {name!r}" )
   return failures
 
 # ============================================================
