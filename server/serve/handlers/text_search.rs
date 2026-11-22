@@ -86,12 +86,11 @@ impl TitleOrAlias {
 pub fn search_buffer_for_skgrepo_set_for_test (
   graph            : &InRustGraph,
   config           : &SkgConfig,
-  terms            : &str,
   matches_by_gnid : &MatchGroups,
   restriction      : &SkgrepoRestriction,
 ) -> Result<String, Box<dyn Error>> {
   let (mut viewforest, search_results) : (ViewForest, Vec<ID>) =
-    build_search_viewforest (terms, matches_by_gnid, &HashSet::new ());
+    build_search_viewforest (matches_by_gnid, &HashSet::new ());
   draw_search_buffer (
     &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
     &search_results, restriction, false ) }
@@ -197,7 +196,6 @@ fn text_search_response (
       restriction );
   let (mut viewforest, search_results) : (ViewForest, Vec<ID>) =
     build_search_viewforest (
-      &search_terms,
       &matches_by_gnid,
       &suppressed );
   if matches! (
@@ -562,7 +560,6 @@ fn hit_standing_among (
 /// the node's aliases. Returns the viewforest and the ordered list of
 /// result IDs.
 pub fn build_search_viewforest (
-  _search_terms    : &str,
   matches_by_gnid : &MatchGroups,
   suppressed       : &HashSet<ID>,
 ) -> (ViewForest, Vec<ID>) {

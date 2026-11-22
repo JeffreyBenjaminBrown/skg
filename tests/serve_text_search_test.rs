@@ -85,7 +85,6 @@ fn test_text_search_org_format (
           search_terms, &SearchOptions::default (), &unrestricted () );
       let (viewforest, _search_results) =
         build_search_viewforest (
-          search_terms,
           &matches_by_gnid,
           &std::collections::HashSet::new () );
       let result : String =
@@ -191,7 +190,7 @@ fn test_search_results_preserve_links_in_title (
         best_matches, searcher, &tantivy_index,
         "science", &SearchOptions::default (), &unrestricted () );
       let (viewforest, _ids) = build_search_viewforest (
-        "science", &matches_by_gnid, &std::collections::HashSet::new () );
+        &matches_by_gnid, &std::collections::HashSet::new () );
       let result : String =
         viewforest_to_string ( &viewforest )
         . expect ("search viewforest rendering never fails");

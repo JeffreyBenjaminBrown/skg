@@ -88,7 +88,7 @@ fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
     suppressed_result_gnids ( &matches, &graph, config, restriction );
   let (mut viewforest, search_results)
     : (ViewForest, Vec<ID>) =
-    build_search_viewforest ( "cooking", &matches, &suppressed );
+    build_search_viewforest ( &matches, &suppressed );
   assert_eq! (
     search_results, vec![ ID::from ("U") ],
     "F and G are suppressed, so only U is a top-level result" );
@@ -211,7 +211,7 @@ fn a_hit_shows_the_nodes_it_forks_in_a_folder (
     [ hit ("U", "main", "cooking the owned way") ]
     . into_iter () . collect ();
   let (mut viewforest, results) =
-    build_search_viewforest ( "cooking", &matches, &HashSet::new () );
+    build_search_viewforest ( &matches, &HashSet::new () );
   draw_search_buffer (
     &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
     &results, restriction, false ) ?;
@@ -250,7 +250,7 @@ fn a_hit_shows_the_nodes_that_fork_it_in_a_folder (
     [ hit ("E", "foreign", "exciting original") ]
     . into_iter () . collect ();
   let (mut viewforest, results) =
-    build_search_viewforest ( "exciting", &matches, &HashSet::new () );
+    build_search_viewforest ( &matches, &HashSet::new () );
   draw_search_buffer (
     &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
     &results, restriction, false ) ?;
@@ -283,7 +283,7 @@ fn a_hit_forking_an_absent_node_shows_it_in_a_folder (
     [ hit ("D", "foreign", "dangling fork") ]
     . into_iter () . collect ();
   let (mut viewforest, results) =
-    build_search_viewforest ( "dangling", &matches, &HashSet::new () );
+    build_search_viewforest ( &matches, &HashSet::new () );
   draw_search_buffer (
     &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
     &results, restriction, false ) ?;

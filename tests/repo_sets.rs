@@ -741,7 +741,6 @@ fn search_enrichment_omits_the_restricted_containers (
       ::search_buffer_for_skgrepo_set_for_test (
         &graph,
         &config,
-        "search term",
         &matches_by_gnid,
         &restriction)?;
   assert! (

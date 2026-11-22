@@ -220,7 +220,7 @@ fn an_excluded_overPrivateText_container_leaves_no_trace (
   let drawn = |include_overPrivateText_telescopes : bool|
     -> Result<String, Box<dyn Error>> {
       let (mut viewforest, search_results) : (ViewForest, Vec<ID>) =
-        build_search_viewforest ("hit", &matches, &HashSet::new ());
+        build_search_viewforest (&matches, &HashSet::new ());
       draw_search_buffer (
         &mut viewforest, &mut ViewnodeIdRecord::default (), &graph, &config,
         &search_results, &restriction,
