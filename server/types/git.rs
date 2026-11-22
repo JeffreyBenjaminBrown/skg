@@ -10,15 +10,11 @@ use std::path::PathBuf;
 // Types
 //
 
-/// Represents the per-stage diff for an entire skgrepo directory.
-/// 'staged'   maps each changed '.skg' file to its HEAD-vs-index diff.
-/// 'unstaged' maps each changed '.skg' file to its index-vs-worktree diff.
-/// A file may appear in either, both, or neither.
-#[derive(Debug, Clone)]
+/// The nodes of a skgrepo's '.skg' files that git sees added or
+/// deleted, staged or not ('compute_diff_for_skgrepo'). They title
+/// nodes the search index lacks.
+#[derive(Debug, Clone, Default)]
 pub struct SkgrepoDiff {
-  pub is_gitrepo: bool,
-  pub staged   : HashMap<PathBuf, GraphnodeDiff>,
-  pub unstaged : HashMap<PathBuf, GraphnodeDiff>,
   /// Nodes that exist in the index or worktree but not in the
   /// stage baseline. Used to title new/untracked files before the
   /// search index has seen them.
@@ -26,21 +22,6 @@ pub struct SkgrepoDiff {
   /// Nodes that existed in HEAD but not in worktree (deleted files).
   /// Loaded from git HEAD or from the git index. Used to title them.
   pub deleted_nodes: HashMap<ID, Graphnode>,
-}
-
-/// All the diff info for a single .skg file.
-#[derive(Debug, Clone)]
-pub struct GraphnodeDiff {
-  pub status: GitDiffStatus,
-  /// The "before" state of this stage: HEAD for staged, index for
-  /// unstaged. Populated only for Deleted status; read by
-  /// 'collect_deleted_nodes_for_both' to resolve ghosts' titles.
-  /// Name reflects the stage's baseline rather than always-HEAD.
-  pub before_node: Option<Graphnode>,
-  /// The "after" state of this stage: index for staged, worktree for
-  /// unstaged. Populated only for Added status; used for unindexed
-  /// titles of new files.
-  pub after_node: Option<Graphnode>,
 }
 
 /// A single entry representing a changed file.
@@ -63,10 +44,6 @@ pub enum GitDiffStatus {
 //
 
 impl SkgrepoDiff {
+  /// The diff of a skgrepo that is not in a gitrepo: empty.
   pub fn new_not_gitrepo () -> Self {
-    SkgrepoDiff {
-      is_gitrepo  : false,
-      staged       : HashMap::new(),
-      unstaged     : HashMap::new(),
-      added_nodes  : HashMap::new(),
-      deleted_nodes: HashMap::new() } } }
+    SkgrepoDiff::default () } }
