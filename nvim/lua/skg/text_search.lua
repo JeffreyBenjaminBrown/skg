@@ -1,7 +1,15 @@
--- PURPOSE: Text search: the request, and the search buffer, which
--- one 'search-results' message carries, each hit with what the
--- enrichment draws under it (docs/api-and-formats.org, "Text
--- search"). The Lua port of elisp/skg-request-text-search.el.
+-- PURPOSE: Text search. <localleader>ff (':SkgSearch', 'search')
+-- searches titles with the conservative defaults; <localleader>fi
+-- (':SkgSearchInteractive', 'search_interactive') first asks for
+-- options: regex, body text, Tantivy syntax, or help. Both send the
+-- request through 'request_text_search', which asks again when the
+-- server asks whether to include overPrivateText telescopes. One
+-- 'search-results' message carries the search buffer, each hit with
+-- what the enrichment draws under it (docs/api-and-formats.org, "Text
+-- search"); 'display_search_results' opens it as a view under the
+-- view ID 'search:TERMS'. Inserting a link to a hit is
+-- skg.search_make_link's, through 'search_buffer_setup_hooks'. The
+-- Lua port of elisp/skg-request-text-search.el.
 
 local buffer = require('skg.buffer')
 local client = require('skg.client')

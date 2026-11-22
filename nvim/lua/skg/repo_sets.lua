@@ -1,6 +1,13 @@
--- PURPOSE: List, query, and switch the per-connection
--- skgrepo restriction; switching re-renders every open view in
--- place. The Lua port of elisp/skg-request-repo-sets.el.
+-- PURPOSE: List, query, and switch the per-connection skgrepo
+-- restriction of display and search. <localleader>vl
+-- (':SkgRestrictRepoSet', 'restrict_repo_set') switches it, choosing
+-- the most private owned skgrepo to show or whether foreign skgrepos
+-- are shown; it refuses while a view has unsaved edits, and the
+-- switch rerenders every open view in place.
+-- ':SkgListRepoSets' ('list_repo_sets') lists the restrictions the
+-- config offers; ':SkgShowSkgrepoRestriction'
+-- ('show_skgrepo_restriction') echoes the current one. The chooser
+-- is skg.picker's. The Lua port of elisp/skg-request-repo-sets.el.
 
 local buffer = require('skg.buffer')
 local client = require('skg.client')

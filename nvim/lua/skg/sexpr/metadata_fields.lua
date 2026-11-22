@@ -1,21 +1,23 @@
--- PURPOSE: Fill in and strip the fields a user may set on a headline,
--- for the metadata editor (skg.sexpr_edit), and say what each
--- field's cycle runs through. The fields of each kind of headline,
--- their defaults and their values come from
+-- PURPOSE: When the metadata editor (skg.sexpr_edit,
+-- ':SkgViewMetadata') opens, show every field the user may set on
+-- the headline, at its default where unset; when it applies, drop the
+-- defaults again; and say what each field's S-left/S-right cycle
+-- runs through (skg.sexpr_edit.sexpr_cycling). The fields of each
+-- kind of headline, their defaults and their values come from
 -- 'shared/metadata-fields.json', whose comments describe them. After
--- sexp_to_org, filling in inserts each missing field at its default,
--- every part where the server writes it; before org_to_sexp, stripping
--- removes each field at its default and writes a value that took
--- arguments as a list. Both clients pass the cases of
--- 'tests/shared/metadata-editor-cases.txt'. The Lua port of
+-- 'sexp_to_org', filling in inserts each missing field at its
+-- default, every part where the server writes it; before
+-- 'org_to_sexp', stripping removes each field at its default and
+-- writes a value that took arguments as a list. Both clients pass the
+-- cases of 'tests/shared/metadata-editor-cases.txt'. The Lua port of
 -- elisp/skg-sexpr/skg-metadata-fields.el.
 --
--- ENTRY POINTS: kind_of_sexp, fillIn_defaults_in_org,
--- strip_defaults_from_org, cycle_values, value_arguments,
--- headlines_to_org.
+-- ENTRY POINTS: 'kind_of_sexp', 'fillIn_defaults_in_org',
+-- 'strip_defaults_from_org', 'cycle_values', 'value_arguments',
+-- 'headlines_to_org'.
 --
 -- Headlines here are the {level, text} tables produced by
--- skg.sexpr.org_bijection's extract_headlines.
+-- skg.sexpr.org_bijection's 'extract_headlines'.
 
 local parse = require('skg.sexpr.parse')
 local bijection = require('skg.sexpr.org_bijection')

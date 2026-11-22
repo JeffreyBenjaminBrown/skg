@@ -1,8 +1,12 @@
--- PURPOSE: Read the data files in 'shared/', which the server's tests
--- and both clients read: 'herald-styles.json' (the herald styles and
--- how relationship heralds use them), 'relations.json' (the
--- node-node relations) and 'metadata-fields.json' (the fields a user
--- may set on each kind of headline). The Emacs analog is
+-- PURPOSE: Read the data files in 'shared/', which the server
+-- (embedding them at compile time) and both clients read:
+-- 'herald-styles.json' (the herald styles and how relationship
+-- heralds use them: 'herald_styles', 'style_highlight_group'),
+-- 'relations.json' (the node-node relations: 'relation',
+-- 'relations_in_display_order') and 'metadata-fields.json' (the
+-- fields a user may set on each kind of headline: 'metadata_kind',
+-- 'metadata_parts'). Drawing the heralds is skg.heralds'; using the
+-- fields is skg.sexpr.metadata_fields'. The Emacs analog is
 -- elisp/skg-shared.el.
 
 local M = {}

@@ -1,9 +1,17 @@
--- PURPOSE: The save's confirmations: the handlers of the terminal
--- messages the server sends instead of save-result (fork-, telescope-
--- hoist-, delete-from-, strandeds- and the save's overPrivateText
--- release confirmation), and the fork-confirmation buffer with its
--- approve and decline commands. Each but the release confirmation
--- retries the save through 'save.request_save_buffer'. The Lua port of
+-- PURPOSE: The questions a save stops to ask: whether to fork the
+-- foreign nodes it edited, to hoist telescope text, where its deletes
+-- may strip IDs, which stranded relationships to reset, and, when a
+-- save is written but its rerender withheld, whether to show that
+-- text. Each is the handler of a terminal message the server sends
+-- in place of save-result ('fork_confirmation_handler',
+-- 'telescope_hoist_confirmation_handler',
+-- 'delete_from_confirmation_handler', 'strandeds_confirmation_handler',
+-- 'save_text_release_confirmation_handler'). The fork question shows
+-- the fork-confirmation buffer ('show_fork_confirmation'), where
+-- '<localleader>cc' runs 'approve_fork' and '<localleader>ck'
+-- 'decline_fork'. Each but the release retries the save through
+-- 'save.request_save_buffer'; the release asks skg.rerender_all_views
+-- ('request_rerender_views'). The Lua port of
 -- elisp/skg-request-save/skg-save-confirmations.el. 'skg.save'
 -- requires this module only inside the handlers it registers, so the
 -- two load in either order.
@@ -86,7 +94,7 @@ end
 ---@param save_buf integer
 ---@param response any
 ---@param approved_forks boolean|nil
----@param fork_repos table[]|nil
+---@param fork_skgrepos table[]|nil
 function M.telescope_hoist_confirmation_handler (
     save_buf, response, approved_forks, fork_skgrepos,
     strandeds_review, delete_from)

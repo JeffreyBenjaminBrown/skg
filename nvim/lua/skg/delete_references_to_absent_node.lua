@@ -1,5 +1,13 @@
--- The explicit cleanup command for one unknown's raw relationship ID.
--- The Lua port of elisp/skg-request-delete-references-to-absent-node.el.
+-- PURPOSE: <localleader>da (':SkgDeleteReferencesToAbsentNode',
+-- 'delete_references_to_absent_node') removes the owned references to
+-- the unknown viewnode at point: the explicit cleanup of one
+-- unknown's raw relationship ID. It refuses while a view has unsaved
+-- edits. The server first answers with a preview, shown in
+-- 'skg://absent-reference-warning'; on "Yes" the request is resent
+-- with that preview approved, and a rerender stream follows
+-- (skg.rerender_all_views). Learning what the unknown node was is
+-- skg.investigate_unknown_node's. The Lua port of
+-- elisp/skg-request-delete-references-to-absent-node.el.
 
 local buffer = require('skg.buffer')
 local messages = require('skg.messages')

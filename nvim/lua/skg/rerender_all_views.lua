@@ -1,10 +1,16 @@
--- PURPOSE: The rerender stream (rerender-lock -> rerender-view* ->
--- rerender-done), shared by the switch of the skgrepo restriction, the explicit
--- rerender-all command (which skips every buffer with unsaved edits),
--- the "rerender views" request that releases a save's withheld rerender,
--- and the requests a rerender stream follows,
--- with the prologue those requests share (send_streaming_request).
--- The Lua port of elisp/skg-request-rerender-all-views.el.
+-- PURPOSE: Redraw the open views from the server.
+-- ':SkgRerenderAllViews' ('request_rerender_all_views') rerenders
+-- every view that holds no unsaved edits, naming those it skips.
+-- The same rerender stream (rerender-lock -> rerender-view* ->
+-- rerender-done) follows every request sent through
+-- 'send_streaming_request': switching the skgrepo restriction,
+-- cycling a perspective, a receipt, stage-and-commit, extending the
+-- diff view, deleting references to an absent node.
+-- 'request_rerender_views' releases a save's withheld rerender;
+-- 'request_rerender_views_excluding' serves skg.repo_files_reloaded.
+-- Redrawing each view is skg.redraw_whole_view's
+-- ('apply_streamed_view_update'). The Lua port of
+-- elisp/skg-request-rerender-all-views.el.
 
 local client = require('skg.client')
 local length_prefix = require('skg.length_prefix')

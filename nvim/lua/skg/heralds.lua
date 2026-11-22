@@ -1,17 +1,29 @@
--- PURPOSE: Display skg metadata as a short list of "heralds".
--- Each org headline the server sends starts with '(skg ...)' metadata.
--- This module lenses that tree via skg.sexpr.lens, producing colored
--- tokens that summarize view and code information. The served rule
--- table (server/heralds.rs) places non-relationship tokens. This client
--- renders semantic relationship facts and their per-character styles.
--- Three heralds need what the headline's own metadata cannot say, so
--- this client supplies it: a 'repoBoundary' gets its skgrepo's label
--- (M.with_repoBoundary_label), a pending detachment the atom
--- 'pendingDetachment' (M.sexp_for_lens), and a changed folder its
--- label in place of the lens's (M.changed_folder_chunks).
+-- PURPOSE: Draw the heralds -- the short colored tokens a view shows
+-- in place of each headline's '(skg ...)' metadata -- and keep them
+-- current while the user edits. skg.buffer turns them on in every
+-- view ('enable'); ':SkgHeraldsToggle' ('<localleader>vh', 'toggle')
+-- turns them off and on. 'apply_to_line' draws one headline's heralds
+-- from 'chunks_from_metadata'; 'watch_buffer' redraws the lines an
+-- edit touches, and the folders above them. The view faces (the
+-- colors of the view's own text) are defined here too.
+-- The rule table, which skg.herald_rules fetches from the server
+-- (server/heralds.rs), places the tokens other than the relationship
+-- heralds, through skg.sexpr.lens; this module renders the
+-- relationship heralds and property counts itself, from the semantic
+-- facts of '(view ...)' ('render_rel_facts'). Three heralds need what
+-- the headline's own metadata cannot say, so this client supplies it:
+-- a 'repoBoundary' gets its skgrepo's label
+-- ('with_repoBoundary_label'), a pending detachment the atom
+-- 'pendingDetachment' ('sexp_for_lens'), and a changed folder its
+-- label in place of the lens's ('changed_folder_chunks').
+-- Saying what each herald means is skg.describe_heralds's. Covering
+-- what a forks-folder member restates is skg.fork_dedup's, which this
+-- module refreshes beside its own. Rewriting only the changed
+-- headlines is skg.redraw_delta's, which edits inside
+-- 'call_without_watching' and re-heralds the lines itself.
 -- The Lua port of elisp/heralds-minor-mode.el.
 --
--- DISPLAY MECHANISM. Where Emacs used an overlay with a 'display'
+-- DISPLAY MECHANISM. Where Emacs uses an overlay with a 'display'
 -- property (the metadata text stays in the buffer but is shown as the
 -- herald string), here one extmark per headline conceals the metadata
 -- extent and renders the heralds as inline virtual text whose chunk

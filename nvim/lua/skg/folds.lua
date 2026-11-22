@@ -1,6 +1,18 @@
--- PURPOSE: Read, act on, and edit 'folded' / 'bodyFolded' metadata,
--- plus the fold model skg buffers use. The Lua port of
--- elisp/skg-org-fold.el.
+-- PURPOSE: Folding in a view: what a view's folds are, the body
+-- toggle, and how the folds survive a save. 'org_body_toggle'
+-- (':SkgOrgBodyToggle', '<localleader>vb') hides or shows the body of
+-- the headline at point. 'set_up_window', which skg.buffer calls on
+-- each window showing a view, gives the window the fold model below
+-- ('foldexpr'). To take the buffer's text, skg.save writes the folds
+-- into 'folded' / 'bodyFolded' atoms ('add_folded_metadata') and
+-- strips them again ('remove_folded_metadata'); when the server's
+-- text comes back, 'fold_marked_headlines' folds what they mark and
+-- 'remove_folded_metadata' strips them (skg.buffer's
+-- 'act_on_fold_and_focus_atoms').
+-- 'fold_state_of_headline_at_line' reads one headline's folds for
+-- skg.redraw_whole_view. The '<Tab>' and '<S-Tab>' fold keys are
+-- skg.keymaps's; the 'focused' atom, its sibling, is skg.focus's.
+-- The Lua port of elisp/skg-org-fold.el.
 --
 -- THE FOLD MODEL. org-fold does not exist here; skg buffers use vim
 -- folds with a buffer-local foldexpr: a headline of level n starts a
@@ -10,7 +22,7 @@
 -- closing just the body's fold hides only the body (org's entry
 -- fold, what 'bodyFolded' records). Three consequences worth naming:
 -- - a closed vim fold always displays a one-line placeholder, where
---   org hid the text entirely -- cosmetic, recorded as a deviation;
+--   org hides the text entirely -- cosmetic, recorded as a deviation;
 -- - vim cannot close a single-line fold, so a one-line body cannot be
 --   body-folded here (a 'bodyFolded' atom on one degrades
 --   gracefully: the body stays visible and the atom is not
@@ -18,7 +30,7 @@
 -- - fold state is per-window in vim, so the atom readers/writers
 --   here operate on the current window, which is where saves happen.
 --
--- The atom protocol is unchanged from the Emacs client: 'folded' on
+-- The atoms mean what they mean to the Emacs client: 'folded' on
 -- each headline hidden inside a folded ancestor, 'bodyFolded' on each
 -- visible headline whose body is hidden; both round-trip through the
 -- server, are acted on after each rerender, and are stripped from the

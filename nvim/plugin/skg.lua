@@ -1,8 +1,13 @@
--- PURPOSE: Ex-command surface and autocmd wiring for the skg client.
--- The analog of the interactive entry points in
--- elisp/skg-keymaps-and-aliases.el's global bindings. Buffer-local
--- keymaps live in lua/skg/keymaps.lua and attach per skg buffer.
--- Commands are added here as their modules are ported.
+-- PURPOSE: What Neovim sets up for skg at startup, before any view
+-- is open: the ':SkgInit', ':SkgReload', ':SkgConnectionVerify' and
+-- ':SkgConnectionEnd' commands; every other ':Skg*' command, through
+-- 'keymaps.define_ex_commands'; the '<C-x>' linkstack keys of the
+-- command line (the analog of Emacs's minibuffer bindings); the key
+-- subset and readable IDs of '.skg' files (the analog of
+-- skg-file-minor-mode); and readable IDs refreshed with neogit's
+-- status. The analog of the global bindings of
+-- elisp/skg-keymaps-and-aliases.el. A view's buffer-local keys are
+-- skg.keymaps', which skg.buffer attaches to each view.
 
 if vim.g.loaded_skg then return end
 vim.g.loaded_skg = true

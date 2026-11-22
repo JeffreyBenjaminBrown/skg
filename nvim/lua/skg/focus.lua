@@ -1,7 +1,15 @@
--- PURPOSE: Read, edit and act on (by moving the cursor to the focused
--- headline) 'focused' metadata. This is how point survives the
--- save/rerender round-trip. The Emacs client does this in
--- elisp/skg-request-save.el.
+-- PURPOSE: Keep the cursor's headline across a save: the 'focused'
+-- atom marks it in the text sent, and the cursor goes back to it in
+-- the text that comes back. skg.save adds the atom
+-- ('add_focused_metadata') and strips it again
+-- ('remove_focused_metadata'); skg.buffer's
+-- 'act_on_fold_and_focus_atoms' moves the cursor to the focused
+-- headline ('goto_focused_headline') and strips the atom. Many
+-- commands that act on the headline at point (skg.views,
+-- skg.modify_graph, ...) find it with 'owning_headline_line'.
+-- Restoring the cursor's line and column below that headline is
+-- skg.redraw_whole_view's; the fold atoms are skg.folds's. The Emacs
+-- client does this in elisp/skg-request-save.el.
 
 local compare = require('skg.sexpr.compare')
 local metadata = require('skg.metadata')

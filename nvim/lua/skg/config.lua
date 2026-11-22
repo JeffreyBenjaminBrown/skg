@@ -1,10 +1,14 @@
--- PURPOSE: Read configuration from skgconfig.toml.
--- The Lua port of elisp/skg-config.el's parsing half. The interactive
--- skgrepo pickers that elisp kept in the same file (built on
--- completing-read with S-arrow cycling) live in skg.picker instead,
--- since they are UI, not parsing. Like the elisp, this is a
--- hand-rolled line scan of the narrow TOML subset skgconfig.toml
--- uses, not a general TOML parser.
+-- PURPOSE: What the client reads from skgconfig.toml, the file
+-- ':SkgInit' names ('config_file_path'): the server's port
+-- ('port_from_toml'), the skgrepos, owned and foreign, and their
+-- directories ('owned_repos', 'foreign_repos', 'repo_paths',
+-- 'repo_dir'), and the rungs of the skgrepo restriction
+-- ('repo_set_names', 'skgrepo_restriction_label'). The Lua port of
+-- elisp/skg-config.el's parsing half. The interactive skgrepo pickers
+-- that elisp keeps in the same file (built on completing-read with
+-- S-arrow cycling) are skg.picker's, since they are UI, not parsing.
+-- Like the elisp, this is a hand-rolled line scan of the narrow TOML
+-- subset skgconfig.toml uses, not a general TOML parser.
 
 local M = {}
 

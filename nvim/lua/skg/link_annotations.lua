@@ -1,4 +1,21 @@
--- Display-only skgrepo suffixes and confirmed broken-link styling in views.
+-- PURPOSE: Show which links in a view are broken: the label of each
+-- '[[id:ID][LABEL]]' link whose target the server reports missing is
+-- underlined in the herald style 'ugly' ('SkgBrokenLink').
+-- ':SkgToggleRepoOverlayOnLinks' ('<localleader>vL',
+-- 'toggle_repo_overlay') also shows after each other link its
+-- target's home skgrepo label, "[⌂:LABEL]", or why there is none
+-- ("restricted", "lookup failed", "…" while pending). Display only:
+-- the buffer text is unchanged. skg.buffer calls 'enable' on every
+-- view, which re-scans ('refresh') soon after each edit; 'refresh'
+-- paints from the session's cache of link statuses and asks the
+-- server ("link statuses", 'request') for the targets it lacks. Link
+-- syntax in text Org shows literally (blocks, fixed-width lines,
+-- =verbatim=, ~code~) is an example, not a link ('literal_lines').
+-- 'invalidate_all' empties the cache and re-scans every view;
+-- skg.length_prefix calls it after a save, a rerender, a skgrepo
+-- restriction change and the like, and skg.client on each connect
+-- ('connection_changed'). The Lua port of
+-- elisp/skg-link-annotations.el.
 
 local client = require('skg.client')
 require('skg.heralds') -- defines the SkgHerald* highlight groups used here

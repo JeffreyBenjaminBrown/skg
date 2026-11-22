@@ -1,7 +1,35 @@
--- PURPOSE: Utilities to parse and edit skg headline metadata, plus
--- the user commands that reduce to metadata edits (delete,
--- set-repo, merge requests, ...).
--- The Lua port of elisp/skg-metadata.el.
+-- PURPOSE: Read and edit the '(skg ...)' metadata a view's headline
+-- carries after its stars, and the commands that are only such an
+-- edit, each asking the next save to do something, none saving:
+-- 'delete' (':SkgDelete', <localleader>dd), 'delete_recursive'
+-- (':SkgDeleteRecursive', dR), 'strip_attribution'
+-- (':SkgStripAttribution'), 'detach' (':SkgDetach', st) and 'attach'
+-- (':SkgAttach', sa), 'set_repo' (':SkgSetRepo', ss) and
+-- 'set_repo_recursive' (':SkgSetRepoRecursive', sS), and
+-- 'set_merge_request' (':SkgSetMergeRequest', sm). Also
+-- 'view_without_metadata' (':SkgViewWithoutMetadata', vw: the
+-- selection, metadata stripped, in a new buffer), 'beginning_of_line'
+-- ('^': line start or title start) and 'todo_cycle' ('cit', 'ciT').
+--
+-- For code: 'split_as_stars_metadata_title' and
+-- 'metadata_sexp_at_line_or_nil' read a headline's metadata;
+-- 'edit_metadata_at_line' merges an edit (skg.sexpr.edit_dsl) into it,
+-- each part it adds landing where the server writes it;
+-- 'write_edit_request_at_line' sets its edit request, and
+-- 'metadata_with_processed_request' its processed request (for
+-- skg.processed); 'pending_detachment_in_lines' tells the heralds a
+-- 'noClaim' child leaves its parent's list at the next save.
+--
+-- Elsewhere: reading the '(diff ...)' change facts is
+-- skg.change_facts'; the diff view's restore requests
+-- (':SkgRestoreDeletedNode', ':SkgRestoreRemovedMembership') are
+-- skg.restore_requests'; the relRepo gestures (':SkgSetRelRepo',
+-- ':SkgSetRelRepoRecursive') are skg.relRepo_info's. Marking a change
+-- processed is skg.processed's; editing the metadata as an org tree
+-- (':SkgViewMetadata') is skg.sexpr_edit's; drawing it as heralds is
+-- skg.heralds'; the s-expression reader is skg.sexpr.parse.
+-- The Lua port of elisp/skg-metadata.el, but for its change-facts,
+-- restore and relRepo sections, ported in those three modules.
 --
 -- The elisp file's biggest hazard -- org-fold's fragility check
 -- crashing on programmatic edits to folded headline lines, worked

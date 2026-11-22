@@ -1,10 +1,16 @@
 -- PURPOSE: Annotate skg UUIDs in a buffer with their titles: each
 -- UUID's tail is concealed to an ellipsis (the text is unchanged, so
--- copy-paste still yields the full id) and the node's title, fetched
--- from the server, is rendered after it as virtual text. Works on
--- .skg file buffers and git-status/diff buffers alike. The Lua port
--- of elisp/skg-readable-ids.el, with extmarks in place of the
--- display/after-string overlays.
+-- copy-paste still yields the full ID) and the node's title, fetched
+-- from the server ("titles by ids") and cached for the session, is
+-- rendered after it as virtual text. plugin/skg.lua turns this on
+-- ('enable') in every .skg file buffer and re-annotates
+-- ('annotate_buffer') each such buffer when neogit refreshes;
+-- skg.goto_git turns it on in the neogit and git-diff buffers it
+-- opens. ':SkgReadableIdsToggle' ('<localleader>vr', 'toggle') and
+-- ':SkgReadableIdsRefresh' ('<localleader>vR', 'refresh', which
+-- forgets the cached titles first) act on the current buffer. The
+-- Lua port of elisp/skg-readable-ids.el, with extmarks in place of
+-- the display/after-string overlays.
 
 local client = require('skg.client')
 local id_search = require('skg.id_search')

@@ -1,5 +1,11 @@
--- PURPOSE: The interactive pickers of a skgrepo and of the skgrepo
--- restriction.
+-- PURPOSE: The command-line prompts that ask the user for a skgrepo
+-- or a rung of the skgrepo restriction, with TAB completion and
+-- S-left/S-right cycling: 'prompt_for_owned_repo' (a new node's home,
+-- an import's target), 'prompt_for_repo_change' ('<localleader>ss'),
+-- 'prompt_for_repo_set' ('<localleader>vl', export), and the
+-- 'completing_read_with_cycle' they share; and ':SkgViewRepoList'
+-- ('view_repo_list'). Reading the config is skg.config's; switching
+-- the skgrepo restriction is skg.repo_sets'.
 -- The Lua port of the prompt half of elisp/skg-config.el
 -- ('skg--completing-read-with-cycle' and friends). The elisp built
 -- them on completing-read with S-left/S-right cycling in the

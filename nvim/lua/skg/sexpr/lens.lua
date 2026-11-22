@@ -1,7 +1,10 @@
 -- PURPOSE: Transform s-expressions using an abstract, declarative set
--- of pattern-matching rules. Currently, it is used to turn a text-only
--- metadata sexp into a shorter, colorful visual representation, but it
--- might turn out to be useful for other things.
+-- of pattern-matching rules: how a headline's '(skg ...)' metadata
+-- becomes the heralds drawn in its place (skg.heralds), and the
+-- herald hint beside each field in the metadata editor
+-- (skg.sexpr_edit). Entry point: 'transform_sexp_flat'. The rule
+-- table comes from the server (skg.herald_rules); mapping a token's
+-- styles to highlight groups is skg.heralds'.
 -- The Lua port of elisp/skg-sexpr/skg-lens.el.
 --
 -- TOKENS. The elisp engine emits propertized strings: an 'skg-style'

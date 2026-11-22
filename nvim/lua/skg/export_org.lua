@@ -1,7 +1,10 @@
--- PURPOSE: Export Skg data to plain .org files. All the logic is in
--- Rust; this command picks a skgrepo restriction (client-side, with the
--- cycling selector) and an output dir, sends the request, and shows
--- the server's report. The Lua port of elisp/skg-request-export-org.el.
+-- PURPOSE: ':SkgExportToOrg' ('export_some_to_org') exports skg data
+-- to plain .org files. All the logic is in Rust; this command picks a
+-- skgrepo restriction (client-side, with the cycling selector of
+-- skg.picker) and an output dir, sends the request, asks before
+-- including overPrivateText telescopes when the server asks, and
+-- shows the server's report ('export_to_org_handler'). The Lua port
+-- of elisp/skg-request-export-org.el.
 
 local client = require('skg.client')
 local config = require('skg.config')

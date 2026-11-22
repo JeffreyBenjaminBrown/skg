@@ -1,5 +1,9 @@
--- PURPOSE: Open a blank skg content view for creating new nodes. The
--- Lua port of elisp/skg-view-new-empty.el.
+-- PURPOSE: 'view_new_empty' (':SkgViewNewEmpty', '<localleader>ve'):
+-- open a blank skg content view, "skg://empty" (or "skg://empty<N>"
+-- when that name is taken), for creating new nodes; saving it creates
+-- them. Setting up the buffer is skg.buffer's
+-- ('open_org_buffer_from_text'). The Lua port of
+-- elisp/skg-view-new-empty.el.
 
 local buffer = require('skg.buffer')
 

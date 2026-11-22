@@ -1,4 +1,9 @@
 -- PURPOSE: Detached, lossless recovery documents for dirty skg views.
+-- ':SkgShowUnsavedChanges' ('show_unsaved_changes') writes, to a file
+-- the user names, an Org document holding the view's baseline and
+-- current text exactly (as JSON strings) and a unified diff of them
+-- ('document'), then opens it. It is not a view: nothing in it
+-- reaches the server. The Lua port of elisp/skg-recovery.el.
 
 local buffer = require('skg.buffer')
 

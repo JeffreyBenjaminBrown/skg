@@ -1,9 +1,17 @@
--- PURPOSE: 'set_relRepo' -- request the relRepo of one relationship,
--- informed by the server's 'relRepo info' endpoint
--- ('docs/api-and-formats.org', "relRepo info") -- and, below it, the
--- helpers it drives and the recursive gesture 'set_relRepo_recursive'.
--- The Lua port of elisp/skg-request-relRepo-info.el and of the relRepo
--- section of elisp/skg-metadata.el.
+-- PURPOSE: Choose the skgrepo that records the relationship at point
+-- (its relRepo). 'set_relRepo' (':SkgSetRelRepo', <localleader>sr)
+-- asks the server's 'relRepo info' endpoint
+-- ('docs/api-and-formats.org', "relRepo info") for the relationship's
+-- default and current relRepo, then prompts over the skgrepos at
+-- least as private as the default, writing
+-- '(editRequest (relRepo REPO))' on the headline.
+-- 'set_relRepo_recursive' (':SkgSetRelRepoRecursive', sR) asks for a
+-- relationship kind and a skgrepo and writes that request on each
+-- relationship of the kind in the subtree. Neither saves. Below them
+-- stand the helpers both drive. Writing the request into the
+-- metadata is skg.metadata's ('write_edit_request_at_line').
+-- The Lua port of elisp/skg-request-relRepo-info.el and of the
+-- relRepo section of elisp/skg-metadata.el.
 
 local client = require('skg.client')
 local config = require('skg.config')

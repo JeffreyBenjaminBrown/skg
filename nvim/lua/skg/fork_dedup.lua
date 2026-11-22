@@ -1,14 +1,17 @@
--- PURPOSE: cover what a forks-folder member restates of its note. The
--- Lua mirror of elisp/skg-fork-dedup.el: where a member's title, or
--- body, equals that of the note whose forks folder holds it, extmarks
--- conceal it and show "<b's title, unchanged>" or "<b's body,
--- unchanged>" in its place, b the note's ancestor letter as counted
--- from the member. The buffer keeps the real text, which a save sends
--- as it is. 'vim.b.skg_fork_dedup_overlay' (true unless set false)
--- turns them on or off per buffer; M.toggle (:SkgToggleForkDedupOverlay,
--- <localleader>vu) flips it. The herald machinery calls in here
--- (skg.heralds.apply_to_buffer, its watcher, skg.redraw_delta), so an
--- edit that makes the two differ removes the cover.
+-- PURPOSE: Cover what a forks-folder member restates of its note:
+-- where a member's title, or body, equals that of the note whose
+-- forks folder holds it, extmarks conceal it and show "<b's title,
+-- unchanged>" or "<b's body, unchanged>" in its place, b the note's
+-- ancestor letter as counted from the member. The buffer keeps the
+-- real text, which a save sends as it is.
+-- 'vim.b.skg_fork_dedup_overlay' (true unless set false) turns the
+-- covers on or off per buffer; 'toggle' (':SkgToggleForkDedupOverlay',
+-- '<localleader>vu') flips it. This module draws only when called:
+-- skg.heralds calls 'refresh_buffer' when it draws a buffer and
+-- 'refresh_rows' from its edit watcher, and skg.redraw_delta calls
+-- 'refresh_rows', so an edit that makes the two differ removes the
+-- cover; turning heralds off ('skg.heralds.disable') clears the
+-- covers too. The Lua port of elisp/skg-fork-dedup.el.
 
 local M = {}
 

@@ -1,8 +1,10 @@
--- PURPOSE: Show, in a new buffer, only the outline ancestry of the
--- headline at point (parent, grandparent, ... to the root, plus the
--- headline itself), with heralds if the buffer it was called from
--- shows them. Not skg-specific; works in any org buffer. The
--- Lua port of elisp/skg-view-ancestry.el.
+-- PURPOSE: 'view_ancestry' (':SkgViewAncestry', '<localleader>va'):
+-- show, in a new buffer, only the outline ancestry of the headline at
+-- point (parent, grandparent, ... to the root, plus the headline
+-- itself), with heralds if the buffer it was called from shows them.
+-- The new buffer is a scratch buffer, not a view: nothing in it is
+-- saved. Not skg-specific; works in any org buffer. The Lua port of
+-- elisp/skg-view-ancestry.el.
 
 local focus = require('skg.focus')
 local heralds = require('skg.heralds')

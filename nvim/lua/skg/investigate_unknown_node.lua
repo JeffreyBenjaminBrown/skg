@@ -1,8 +1,13 @@
--- PURPOSE: Ask the server what an unknown node is: the node its ID
--- resolves to, if any, or else what the git history of every
--- skgrepo says it used to be. Shows the answer, Org text, in a
--- read-only buffer. The Lua port of
--- elisp/skg-request-investigate-unknown-node.el.
+-- PURPOSE: <localleader>tr (':SkgInvestigateUnknownNode',
+-- 'investigate_unknown_node') asks the server what an unknown node is
+-- ('docs/diff-view.org', "Investigating an unknown graphnode"): the
+-- node its ID resolves to, if any, or else what the git history of
+-- every skgrepo says it used to be. It takes the ID from the unknown
+-- viewnode at point, or asks for one, and shows the answer, Org text,
+-- in the read-only buffer 'skg://unknown-node' with the report keys
+-- ('investigate_unknown_node_handler'). Removing references to the
+-- unknown node is skg.delete_references_to_absent_node's. The Lua
+-- port of elisp/skg-request-investigate-unknown-node.el.
 
 local client = require('skg.client')
 local messages = require('skg.messages')

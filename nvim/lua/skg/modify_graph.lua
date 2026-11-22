@@ -1,6 +1,14 @@
--- PURPOSE: User-facing commands that modify graph structure:
--- goto-biggest-branch, replace-content-with-link, and
--- replace-link-with-content. The Lua port of elisp/skg-modify-graph.el.
+-- PURPOSE: Turn a branch into a link, or a link into a branch, then
+-- save; and jump to the biggest branch. <localleader>ml (':SkgReplaceContentWithLink',
+-- 'replace_content_with_link') replaces the branch at point with a
+-- link to its root; <localleader>mc (':SkgReplaceLinkWithContent',
+-- 'replace_link_with_content') replaces a leaf holding one ID link
+-- with a headline of the linked node, requesting its editable view.
+-- Both require an owned, editable viewparent ('check_container').
+-- <localleader>gb (':SkgGotoBiggestBranch', 'goto_biggest_branch')
+-- only moves the cursor, to the sibling or child with the most
+-- viewdescendants. 'immediate_viewchildren' also serves
+-- skg.processed. The Lua port of elisp/skg-modify-graph.el.
 
 local config = require('skg.config')
 local focus = require('skg.focus')

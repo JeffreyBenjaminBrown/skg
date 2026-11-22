@@ -1,11 +1,17 @@
--- PURPOSE: Edit a headline's metadata sexp as an org tree in a
--- temporary buffer: ':w' (or <localleader>cc) applies the edited tree
--- back into the source headline; killing the buffer cancels;
--- S-left/S-right cycle field values (skg.sexpr_edit.sexpr_cycling).
--- Each headline shows, in parentheses, the herald its path produces.
--- Also asks for a skgrepo after org's insert-heading actions when the
--- new headline cannot inherit one. The Lua port of
--- elisp/skg-sexpr-edit.el.
+-- PURPOSE: The metadata editor. 'view_metadata' (':SkgViewMetadata',
+-- <localleader>vm) opens the metadata of the headline at point as an
+-- org tree in a buffer of its own, each field the user may set shown,
+-- at its default where unset; ':w' (or <localleader>cc, 'apply')
+-- writes the edited tree back into the headline without saving the
+-- view; ':bd!' cancels; S-left/S-right cycle a field's values
+-- (skg.sexpr_edit.sexpr_cycling). Each headline shows, in
+-- parentheses, the herald its path produces. On a headline without
+-- metadata it first asks for a skgrepo. Also asks for a skgrepo after
+-- org's insert-heading actions when the new headline cannot inherit
+-- one ('wrap_org_insert_heading_actions', run by skg.buffer). Which
+-- fields a kind has, and filling in and stripping their defaults, are
+-- skg.sexpr.metadata_fields'; turning a sexp into org text and back is
+-- skg.sexpr.org_bijection's. The Lua port of elisp/skg-sexpr-edit.el.
 --
 -- DEVIATION: the elisp made the display-only title group read-only
 -- with text properties; nvim has no per-range read-only text, so

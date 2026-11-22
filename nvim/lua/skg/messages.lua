@@ -1,6 +1,12 @@
--- PURPOSE: Display helpers for server-reported errors and warnings.
--- The Lua port of the message-formatting half of
--- elisp/skg-request-save.el (skg-big-nonfatal-message and friends),
+-- PURPOSE: The 'skg://messages/...' buffers in which the client shows
+-- what the server reported -- a save's or a rerender's errors and
+-- warnings, say -- split open beside the view without taking the
+-- cursor ('big_nonfatal_message', 'big_nonfatal_message_appended',
+-- 'errors_and_warnings_to_org_string'); and 'with_neovim_bindings',
+-- which rewrites the Emacs chords and command names a server message
+-- names as this client's '<localleader>' keys and ':Skg*' commands.
+-- The Lua port of the message-formatting part of
+-- elisp/skg-request-save.el ('skg-big-nonfatal-message' and friends),
 -- which content views, saves, and the stream consumers all share.
 
 local keymaps = require('skg.keymaps')

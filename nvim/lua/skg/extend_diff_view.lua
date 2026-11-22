@@ -1,10 +1,12 @@
--- PURPOSE: Extend a buffer of the diff view to the changes it does
+-- PURPOSE: <localleader>ru (':SkgDiffViewExtend', 'diffView_extend')
+-- extends the current buffer of the diff view to the changes it does
 -- not make editable ('docs/diff-view.org', "Extending the diff
--- view"). A save never makes an occurrence
--- editable or appends a root on its own; this command asks the server
--- to, for the current buffer. The answer carries the processed
--- summary, as a save's does, and a rerender stream follows it,
--- carrying the rerendered buffer. The Lua port of
+-- view"). A save never makes an occurrence editable or appends a root
+-- on its own; this command asks the server to, refusing while the
+-- buffer has unsaved edits. The answer carries the processed summary,
+-- as a save's does ('handler'), and a rerender stream follows it,
+-- carrying the rerendered buffer (skg.rerender_all_views). Opening
+-- the diff view is skg.diff_view's. The Lua port of
 -- elisp/skg-request-extend-diff-view.el.
 
 local processed = require('skg.processed')

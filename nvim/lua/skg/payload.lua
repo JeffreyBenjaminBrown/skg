@@ -1,4 +1,7 @@
--- PURPOSE: Small helpers for walking parsed server payloads.
+-- PURPOSE: Small helpers for walking parsed server payloads: every
+-- handler of a server answer reads its fields through 'field',
+-- 'field_text' or 'string_list'. Parsing the answer is
+-- skg.sexpr.parse's.
 -- The Lua stand-ins for the '(cadr (assoc 'key response))' idiom the
 -- elisp client uses everywhere. Handles both entry shapes the server
 -- produces: list entries '(key value)' and dotted pairs

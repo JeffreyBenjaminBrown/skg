@@ -1,7 +1,12 @@
 -- PURPOSE: Edit s-expressions with 'DELETE', 'REPLACE', 'ENSURE', and
--- (the default, so no keyword) merge operations.
+-- (the default, so no keyword) merge operations: how the commands
+-- that change a headline's metadata say what to change, e.g.
+-- '(skg (DELETE noClaim))'. Entry point: 'edit_nested_sexp', which
+-- skg.metadata's 'edit_metadata_at_line' runs; placing a part the
+-- edit adds where the server writes it is skg.metadata's.
 -- The Lua port of elisp/skg-sexpr/skg-sexpr-dsl-for-edits.el. Purely
--- functional: inputs are never mutated; every result is fresh.
+-- functional: inputs are never mutated; a result may share their
+-- unchanged parts.
 
 local parse = require('skg.sexpr.parse')
 local compare = require('skg.sexpr.compare')

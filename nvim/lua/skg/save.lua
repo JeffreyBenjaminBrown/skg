@@ -1,8 +1,18 @@
--- PURPOSE: The save pipeline: ship the buffer to the server, drive
--- the four-handler response stream (save-lock -> save-relax-lock ->
--- collateral-view* -> save-result | fork-confirmation), restore
--- point/scroll/folds after the rerender, and run the fork-confirmation
--- flow. The Lua port of elisp/skg-request-save.el.
+-- PURPOSE: ':w' on a view (or ':SkgSave'): send the view to the
+-- server, lock the views while the save runs, and draw what the
+-- server answers. 'request_save_buffer' starts a save (skg.buffer's
+-- BufWriteCmd calls it, as do the commands that save first);
+-- 'send_save_buffer' sends the view, its baseline and the other
+-- views' snapshots, and registers the handlers of the answer stream
+-- (save-lock -> save-relax-lock -> collateral-view* -> save-result,
+-- or a confirmation in place of save-result); 'save_result_handler'
+-- ends the stream, and 'redraw_saved_buffer' draws the saved view.
+-- Rewriting only the headlines the save changed is
+-- skg.redraw_delta's; redrawing a whole view, keeping the cursor and
+-- folds, is skg.redraw_whole_view's; the confirmations (fork,
+-- telescope hoist, delete-from, strandeds, overPrivateText release)
+-- are skg.save.confirmations'; locking is skg.lock's. The Lua port of
+-- elisp/skg-request-save.el.
 
 local buffer = require('skg.buffer')
 local client = require('skg.client')
@@ -26,10 +36,10 @@ local M = {}
 ---and 'focused' atoms are added (for the wire) and then removed
 ---from what the user sees. If the save edited any foreign node the
 ---server replies fork-confirmation instead of save-result, skgsave-committing
----nothing, unless FORK_APPROVED rides along; FORK_REPOS then pairs
+---nothing, unless APPROVED_FORKS rides along; FORK_SKGREPOS then pairs
 ---each forked node's id with the owned skgrepo chosen for its clone.
 ---@param approved_forks boolean|nil
----@param fork_repos table[]|nil {{id, repo}, ...}
+---@param fork_skgrepos table[]|nil {{id, repo}, ...}
 ---@param approved_hoist_pids string[]|nil
 ---@param strandeds_review table|nil the relationships, each
 ---  {relation, recorder, member}, the user chose to reset to default after a
@@ -267,7 +277,7 @@ end
 ---@param view_id string
 ---@param position table
 ---@param approved_forks boolean|nil
----@param fork_repos table[]|nil
+---@param fork_skgrepos table[]|nil
 ---@param approved_hoist_pids string[]|nil
 ---@param strandeds_review table|nil
 ---@param delete_from string|nil 'visible' or 'all'
@@ -395,7 +405,7 @@ function M.collateral_view_handler (payload_text, response)
 end
 
 ---Handle the terminal save-result: remove the streaming handlers and
----the unfired fork-confirmation alternative, end the stream, unlock
+---the unfired alternatives to save-result, end the stream, unlock
 ---everything, and apply the saved buffer's final content.
 ---@param save_buf integer
 ---@param response any

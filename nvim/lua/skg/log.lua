@@ -1,4 +1,7 @@
--- PURPOSE: Structured logging for the skg Neovim client.
+-- PURPOSE: A debugging log of what the client did, off unless
+-- 'M.log_file' names a file. Every module writes to it through
+-- 'log'; the user sees none of it (a handler that fails also tells
+-- the user, through skg.length_prefix's 'tell_answer_not_applied').
 -- The Lua port of elisp/skg-log.el.
 --
 -- Output: JSON lines to M.log_file, one object per entry.

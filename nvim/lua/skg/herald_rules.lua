@@ -1,13 +1,15 @@
--- PURPOSE: Fetch the herald rule table from the server, and the
--- skgrepo label table it serves beside it. The table lives only in
--- Rust (server/heralds.rs); the client caches it here for the
--- session, and the labels with it. require('skg').init fetches it once per connect,
--- so reconnecting re-fetches it; the heralds display calls
--- ensure_rules to self-heal a missing table when the user turns
--- heralds on. The Lua port of elisp/skg-request-herald-rules.el (the
--- cache itself lived in heralds-minor-mode.el there; here the fetch
--- module owns both caches, which is also what skg.reload preserves
--- across a reload).
+-- PURPOSE: Fetch the herald rule table, which says how the heralds
+-- read, from the server, and the skgrepo label table it serves beside
+-- it. The table lives only in Rust (server/heralds.rs); the client
+-- caches it here for the session ('get_rules'), and the labels with
+-- it ('get_skgrepo_labels'). 'init' (':SkgInit') sends
+-- 'request_herald_rules' each time it runs; a reconnect skg.client
+-- makes for a later request fetches nothing and keeps the caches.
+-- skg.heralds calls 'ensure_rules' to self-heal a missing table when
+-- heralds are turned on. Drawing the heralds is skg.heralds's. The
+-- Lua port of elisp/skg-request-herald-rules.el (whose caches live
+-- in elisp/heralds-minor-mode.el; here this module owns both, and
+-- skg.reload keeps them across a reload).
 --
 -- There is deliberately no user-facing command here. A missing table
 -- is recovered automatically (see ensure_rules), and a hard failure

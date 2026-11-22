@@ -1,4 +1,14 @@
--- Interactive, additive Markdown/Org import. All paths are server-side.
+-- PURPOSE: ':SkgImportMdAndOrg' ('import_md_and_org') imports a
+-- directory of Markdown and Org files into an owned skgrepo, adding
+-- nodes and changing no input file. It asks for the input directory
+-- (a path on the server's filesystem) and the destination skgrepo,
+-- which sets the privacy of every imported node; shows the server's
+-- preview, asking for a host root first when the server needs one;
+-- and on approval sends the preview's approval token, then shows the
+-- result in a report buffer and, when the result names an import
+-- record ('record-id'), rerenders the views without unsaved edits.
+-- Declining sends a cancel ('cancel'). The Lua port of
+-- elisp/skg-request-import-md-and-org.el.
 local client = require('skg.client')
 local messages = require('skg.messages')
 local payload = require('skg.payload')

@@ -1,10 +1,12 @@
--- PURPOSE: S-left / S-right cycling for the metadata edit buffer
--- (skg.sexpr_edit). Dispatch is based on the parent headline text;
--- what a field's cycle runs through comes from
--- 'shared/metadata-fields.json' (skg.sexpr.metadata_fields). The Lua
--- port of elisp/skg-sexpr-edit/skg-sexpr-cycling.el.
+-- PURPOSE: S-left / S-right in the metadata editor (skg.sexpr_edit):
+-- replace the field value at point with the previous or next value
+-- the field may take, prompting for the arguments of one that takes
+-- them. Dispatch is based on the parent headline text; what a field's
+-- cycle runs through comes from 'shared/metadata-fields.json'
+-- (skg.sexpr.metadata_fields), a nodeRepo's from the owned skgrepos.
+-- The Lua port of elisp/skg-sexpr-edit/skg-sexpr-cycling.el.
 --
--- ENTRY POINTS: M.cycle_left, M.cycle_right.
+-- ENTRY POINTS: 'cycle_left', 'cycle_right'.
 
 local config = require('skg.config')
 local fields = require('skg.sexpr.metadata_fields')

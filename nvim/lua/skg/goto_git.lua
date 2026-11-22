@@ -1,13 +1,18 @@
 -- PURPOSE: From a node in a view, jump to git's picture of its .skg
--- file: ask the server for the file's path, open a git UI on that
--- skgrepo's gitrepo, and land on the file (or, for the parent variant, on
--- the first changed line containing this node's id). The Lua port of
--- elisp/skg-request-file-path.el, re-targeted:
--- neogit (baked into the docker image) plays magit for the status
--- jump; the parent variant's land-on-the-id-line has no neogit API,
--- so it opens a plain git-diff buffer for the parent's file and
--- searches there -- same information, different chrome (a documented
--- deviation).
+-- file. <localleader>gm (':SkgGotoInGit', 'goto_in_git') asks the
+-- server for the file's path ('request_file_path'), opens neogit's
+-- status on that skgrepo's gitrepo, and lands on the file
+-- ('open_git_status_at_file'). <localleader>gM (':SkgGotoInGitParent',
+-- 'goto_in_git_parent') opens the diff of the parent's file instead
+-- and lands on the first line containing this node's ID
+-- ('open_plain_diff_at'). <localleader>Gm and <localleader>GM also
+-- close the buffer they were called from. The Lua port of
+-- elisp/skg-request-file-path.el, re-targeted: neogit (baked into the
+-- docker image) plays magit for the status jump; the parent variant's
+-- land-on-the-ID-line has no neogit API, so it opens a plain git-diff
+-- buffer for the parent's file and searches there -- same
+-- information, different chrome ('docs/nvim-client-deviations.org',
+-- "The git jumps").
 
 local client = require('skg.client')
 local config = require('skg.config')
@@ -146,8 +151,10 @@ function M.search_all (needle)
   return matches
 end
 
----Show the combined staged+unstaged diff (plus untracked content) of
----RESOLVED_PATH in a scratch diff buffer with readable ids; when
+---Show the combined staged+unstaged diff of RESOLVED_PATH against
+---HEAD (or, when that fails or is empty, its staged diff; an
+---untracked file shows nothing) in a scratch diff buffer with
+---readable ids; when
 ---SEARCH_ID is given, land on its first changed line, warning about
 ---further occurrences.
 ---@param resolved_path string
@@ -158,9 +165,8 @@ function M.open_plain_diff_at (resolved_path, search_id)
   local diff = vim.fn.system({ 'git', '-C', dir, 'diff', 'HEAD',
                                '--', file })
   if vim.v.shell_error ~= 0 or vim.trim(diff) == '' then
-    -- HEAD may not know the file (untracked) or there is no change;
-    -- fall back to the untracked file's own content as an
-    -- all-additions diff would show it.
+    -- 'git diff HEAD' fails in a gitrepo with no git-commit yet; fall
+    -- back to the staged diff. An untracked file is in neither.
     local staged = vim.fn.system({ 'git', '-C', dir, 'diff',
                                    '--cached', '--', file })
     if vim.trim(staged) ~= '' then

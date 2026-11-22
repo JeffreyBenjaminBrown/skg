@@ -1,13 +1,32 @@
--- PURPOSE: skg view buffers: creation from server text, naming, the
--- view-id registry, close-view notification, and the
--- clean-baseline bookkeeping. The Lua port of elisp/skg-buffer.el.
+-- PURPOSE: The view buffer itself: what makes a buffer a view, and
+-- its life from the server's text to its closing. Every view opens
+-- through 'open_org_buffer_from_text' (from
+-- skg.single_root_content_view, skg.text_search, skg.diff_view,
+-- skg.view_new_empty), which fills the buffer of the name its caller
+-- gives (a content view's, "skg://TITLE", from
+-- 'content_view_buffer_name'), sets it up ('configure_view_buffer':
+-- heralds, link annotations, the keys, the fold model, and ':w'
+-- calling skg.save's 'request_save_buffer'), acts on the fold and
+-- focus atoms the server sent ('act_on_fold_and_focus_atoms') and
+-- records the clean baseline ('capture_clean_baseline'). Editing a
+-- view while another holds unsaved edits asks first
+-- ('confirm_before_dirtying_another_view'). Closing a view tells the
+-- server ('send_close_view'); ':SkgCloseAllSkgBuffers'
+-- ('close_all_skg_buffers') closes every view. The buffer also keeps
+-- its view ID ('find_buffer_by_view_id') and its perspective
+-- ('set_perspective', 'perspective_mode_line').
+-- Redrawing an open view is skg.redraw_whole_view's and
+-- skg.redraw_delta's; the keys are skg.keymaps's; the fold model is
+-- skg.folds's; cycling the perspective is skg.perspective's. The Lua
+-- port of elisp/skg-buffer.el.
 --
--- Where Emacs used a derived major mode plus a permanent-local
--- 'skg-view-id', an skg view buffer here is: filetype org (so the
--- baked-in orgmode plugin provides highlighting/folding/cycling),
--- buftype acwrite (so ':w' fires our BufWriteCmd instead of writing a
--- file -- there is no file), 'vim.b.skg_view_id' as the registry
--- key, and 'vim.b.skg_content_view' marking the buffer as ours. The
+-- Where Emacs uses a derived major mode plus a permanent-local
+-- 'skg-view-id', an skg view buffer here is: filetype org (so
+-- nvim-orgmode, where installed, highlights it; its folds are
+-- skg.folds's own), buftype acwrite (so ':w' fires our BufWriteCmd
+-- instead of writing a file -- there is no file),
+-- 'vim.b.skg_view_id' as the registry key, and
+-- 'vim.b.skg_content_view' marking the buffer as ours. The
 -- permanent-local hazard (mode switches wiping the view_id) does not
 -- exist: vim.b survives filetype changes.
 

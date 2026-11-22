@@ -1,6 +1,14 @@
--- PURPOSE: Connection lifecycle for the persistent TCP link to the
--- Rust server. The Lua port of elisp/skg-client.el (minus the require
--- hub, which lua/skg/init.lua plays).
+-- PURPOSE: The one TCP connection to the skg server, which every
+-- command's request travels on. 'send_string' sends, connecting
+-- first ('connect') when there is no live connection; 'connect' reads
+-- the port from skgconfig.toml, asks for the startup warnings
+-- (skg.server_warnings) and registers the repo-files-reloaded handler
+-- (skg.repo_files_reloaded). Each chunk read goes to
+-- 'handle_rust_response', thence to skg.length_prefix, which splits
+-- and dispatches the messages. 'sentinel' cleans up a lost
+-- connection; ':SkgConnectionEnd' runs 'connection_end'. The Lua port
+-- of elisp/skg-client.el (minus the require hub, which lua/skg/init.lua
+-- plays).
 --
 -- Concurrency model: vim.uv callbacks may not touch most editor
 -- state, so the read callback forwards each chunk through

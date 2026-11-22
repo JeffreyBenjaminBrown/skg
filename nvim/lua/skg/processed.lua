@@ -1,23 +1,37 @@
--- PURPOSE: The processed gestures of the diff view
--- ('docs/diff-view.org', "Processed requests and gestures"). Each says
--- what it marks and which way: <localleader>m, then 'n' (the node), 'r'
+-- PURPOSE: Marking the changes of the diff view processed, and moving
+-- between them ('docs/diff-view.org', "Processed requests and
+-- gestures"). A gesture is <localleader>m, then 'n' (the node), 'r'
 -- (its relationship to its viewparent) or 'b' (both), then 'p'
--- (processed) or 'u' (unprocessed). It writes processed requests,
+-- (processed) or 'u' (unprocessed); <localleader>mh then 'p' or 'u'
+-- marks a home-skgrepo move. Each writes processed requests,
 -- '(processed OBJECTS)' or '(unprocessed OBJECTS)', into the
--- '(editRequest ...)' of headline metadata, then saves. The save
--- consumes them, setting or clearing the marks, and answers with the
--- buffer rerendered and the processed summary.
--- The Lua port of elisp/skg-processed.el, which describes how the
--- '(leaves N OBJECT...)' part of the server's '(diff ...)' form says
--- which leaves a headline names, and what a letter names on each kind
--- of headline. Neovim has no prefix argument, so each recursive form
--- is its own command: a capital last letter for contentward ('mnP'),
--- a capital 'M' for outward ('Mnp').
--- It also formats the processed summary, which the save,
--- stage-and-commit and extend-diff-view show. What a
--- headline's change facts say, and whether a folder's change is
--- processed, are read in skg.change_facts; how a request is placed in
--- '(editRequest ...)', in skg.metadata.
+-- '(editRequest ...)' of headline metadata, then saves; the save
+-- consumes them, setting or clearing the processed marks, and answers
+-- with the buffer rerendered and the processed summary. The motions
+-- <localleader>rn and <localleader>rp, then 'c' (any), 'u' or 'p',
+-- move to the next or previous headline with change facts.
+-- Entry points: 'mark', behind 'mark_node_processed' and the other
+-- seventeen ':SkgMark{Node,Rel,Both}*' commands;
+-- 'mark_homeSkgrepo_move', behind the four
+-- ':SkgMarkHomeSkgrepoMove*'; 'diffView_goto_change', behind the
+-- twelve ':SkgDiffViewGoto*'; and 'processed_summary_message', the
+-- processed summary that the save, the diff view, stage-and-commit and
+-- extend-diff-view show. What a headline's change facts say, and
+-- whether a folder's change is processed, are read in
+-- skg.change_facts; how a request is placed in '(editRequest ...)',
+-- in skg.metadata ('metadata_with_processed_request'); the save is
+-- skg.save's. The Lua port of elisp/skg-processed.el.
+--
+-- elisp/skg-processed.el describes how the '(leaves N OBJECT...)'
+-- part of the server's '(diff ...)' form says which leaves a headline
+-- names, and what a letter names on each kind of headline. Neovim has
+-- no prefix argument, so each recursive form is its own command: a
+-- capital last letter for contentward ('mnP'), a capital 'M' for
+-- outward ('Mnp'); on a home-skgrepo move, a capital last letter
+-- ('mhP') marks every move like it in the subtree. On a motion, a
+-- capital last letter ('rnC')
+-- also visits the ☮ members of "(other files)" folders, which the
+-- plain motions skip.
 
 local change_facts = require('skg.change_facts')
 local metadata = require('skg.metadata')

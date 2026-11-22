@@ -1,8 +1,15 @@
--- PURPOSE: Read length-prefixed messages from the server and dispatch
--- by response-type via the handler map in skg.state.
--- The Lua port of elisp/skg-length-prefix.el. (Like the elisp, this
--- file does not add length prefixes to outgoing messages; that is
--- easier and done inline where messages are sent.)
+-- PURPOSE: Every answer from the server passes through here on its
+-- way to the command that asked for it. 'handle_generic_chunk'
+-- (which skg.client calls with each chunk read) splits the byte
+-- stream into length-prefixed messages; 'dispatch_by_type' hands each
+-- to the handler skg.state's maps hold for its response-type.
+-- 'tell_answer_not_applied' tells the user a handler failed, and
+-- 'register_overPrivateText_confirmation_instead_of' asks before a
+-- request shows overPrivateText telescope text. Registering the
+-- handlers is each command's own. The Lua port of
+-- elisp/skg-length-prefix.el. (Like the elisp, this file does not add
+-- length prefixes to outgoing messages; that is easier and done
+-- inline where messages are sent.)
 --
 -- One wire fact the dispatcher relies on: the server's sexp printer
 -- (the Rust 'sexp' crate) prints string atoms bare unless they

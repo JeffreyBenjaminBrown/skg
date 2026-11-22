@@ -1,13 +1,16 @@
--- PURPOSE: The diff view's restore requests ('docs/diff-view.org',
--- "Restoring what a change removed"): 'restore_deleted_node' asks the
--- next save to write back the deleted node at point (a ghost), and
--- 'restore_removed_membership' to re-add the removed relationship at
--- point; neither saves. 'restoreRel_position_at_line_p' says where a
--- restoreRel may stand, as the save checks it, and
--- 'removed_membership_p' whether a headline carries one the editor of
--- metadata may offer (skg.sexpr_edit.sexpr_cycling). Writing the
--- request into the metadata is skg.metadata's ('write_edit_request').
--- The Lua port of the restore section of elisp/skg-metadata.el.
+-- PURPOSE: In the diff view, ask the next save to bring back what a
+-- change removed ('docs/diff-view.org', "Restoring what a change
+-- removed"): 'restore_deleted_node' (':SkgRestoreDeletedNode',
+-- <localleader>sn) writes back the deleted node at point (a ghost),
+-- and 'restore_removed_membership' (':SkgRestoreRemovedMembership',
+-- <localleader>sl) re-adds the removed relationship at point; neither
+-- saves. 'restoreRel_position_at_line_p' says where a restoreRel may
+-- stand, as the save checks it, and 'removed_membership_p' whether a
+-- headline carries a removed membership, so that the metadata
+-- editor's cycle (skg.sexpr_edit.sexpr_cycling) offers restoreRel.
+-- Writing the request into the metadata is skg.metadata's
+-- ('write_edit_request'). The Lua port of the restore section of
+-- elisp/skg-metadata.el.
 --
 -- The server refuses the requests on the wrong kind of headline with
 -- the same texts as the refusals below, except that its refusal of a

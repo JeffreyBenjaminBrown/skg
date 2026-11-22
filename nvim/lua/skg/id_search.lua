@@ -1,6 +1,15 @@
--- PURPOSE: Extract, search for, and visit (in a new view) IDs.
--- The Lua port of the navigation half of elisp/skg-id-search.el (the
--- linkstack half lives in skg.linkstack).
+-- PURPOSE: Find the ID at or near the cursor, hop between IDs, and
+-- open a view of one. <localleader>gg (':SkgGoto',
+-- 'goto_id_near_point') opens a view of the nearest ID on the line
+-- ('nearest_id': a UUID, headline metadata, an [[id:..]] link or a
+-- .skg filename); <localleader>gi ('goto_by_id') of a typed ID; with
+-- 'G' for 'g' each also closes the buffer left behind.
+-- <localleader>in / ]i and <localleader>ip / [i ('id_next',
+-- 'id_prev') hop between IDs; <localleader>gv ('goto_viewnode_id')
+-- moves to the headline a message names by its viewnode ID. Requesting
+-- the view is skg.single_root_content_view's; the linkstack is
+-- skg.linkstack's. The Lua port of the navigation half of
+-- elisp/skg-id-search.el.
 --
 -- Positions are (1-based line, 0-based byte column) cursor pairs;
 -- matches are byte ranges from Lua patterns.

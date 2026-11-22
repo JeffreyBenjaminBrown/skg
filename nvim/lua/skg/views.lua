@@ -1,10 +1,16 @@
--- PURPOSE: Commands that request viewbranches by adding a
--- (viewRequests ...) atom to the headline at point and saving,
--- letting the server fulfill the request during the refresh. The
--- folder commands auto-save: (folder RELNAME) builds both folders of
--- the relation, and a containers folder carries, under each member,
--- its containerward chain. Also the editable-view and write-protect
--- requests (no auto-save) and the explicit fork. The Lua port of
+-- PURPOSE: Commands that ask the server to show more of the headline
+-- at point, or to show it differently, by adding a (viewRequests ...)
+-- atom to its metadata, which the next save fulfills. The folder
+-- commands auto-save ('request_view_and_save'): the 'show_folderOf_*'
+-- functions, ':SkgShowFolderOf*' ('<localleader>la', 'lh', 'lf',
+-- 'lp', 'lc', 'lm'), each draw the folders of a relation, or the
+-- aliases or flags folder ('docs/COMMANDS.org', "C-c l"). The
+-- editable-view and write-protect requests do not auto-save:
+-- 'request_editable_view' (':SkgSetEditable', '<localleader>se'),
+-- 'request_write_protected' ('<localleader>sw') and
+-- 'request_write_protected_recursive' ('<localleader>sW'). The
+-- explicit fork, 'fork_node' (':SkgFork', '<localleader>mf'),
+-- auto-saves. Sending the save is skg.save's. The Lua port of
 -- elisp/skg-request-views.el.
 
 local focus = require('skg.focus')
@@ -79,7 +85,7 @@ end
 
 ---Fork the (owned) node at point: create a private clone that
 ---forks it. Refuses on a modified buffer, so the clone's saved
----saved state matches what is on screen; otherwise stamps (viewRequests
+---state matches what is on screen; otherwise stamps (viewRequests
 ---fork) and auto-saves. The server answers with the usual
 ---fork-confirmation buffer.
 function M.fork_node ()

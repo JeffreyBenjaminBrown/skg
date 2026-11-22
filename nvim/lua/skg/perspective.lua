@@ -1,13 +1,16 @@
--- PURPOSE: Cycle the perspective of the current view: the skgrepo
--- whose list of skgrepos ranks the mirrors it shows in a note's place.
--- A fresh view is drawn from each root's home skgrepo; the cycle then
--- holds each skgrepo home to a mirror in the view whose perspective
--- would show the view differently, so that you can choose among them
--- (a private and a public fork, say). The server computes the cycle afresh at each request,
--- switches the view to the next perspective and redraws it; the
--- answer names the view and the perspective, and a rerender stream
--- follows, carrying the redrawn buffer, which keeps the cursor and
--- folds as any redraw the user did not ask for does. The Lua port of
+-- PURPOSE: 'cycle_perspective' (':SkgCyclePerspective',
+-- '<localleader>vo'): cycle the perspective of the current view: the
+-- skgrepo whose list of skgrepos ranks the mirrors it shows in a
+-- note's place. A fresh view is drawn from each root's home skgrepo;
+-- the cycle then holds each skgrepo home to a mirror in the view
+-- whose perspective would show the view differently, so that you can
+-- choose among them (a private and a public fork, say). The server
+-- computes the cycle afresh at each request, switches the view to the
+-- next perspective and redraws it; the answer names the view and the
+-- perspective ('handler'), and a rerender stream follows, carrying
+-- the redrawn buffer, which keeps the cursor and folds as any redraw
+-- the user did not ask for does. Sending the request and receiving
+-- the stream are skg.rerender_all_views's. The Lua port of
 -- elisp/skg-request-perspective.el.
 --
 -- DATA USED/ASSUMED: See docs/api-and-formats.org, "Set

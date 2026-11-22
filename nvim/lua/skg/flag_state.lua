@@ -1,5 +1,15 @@
--- Read and stage the user-mutable noSearchMatching flag. The Lua port
--- of elisp/skg-request-flag-state.el.
+-- PURPOSE: Stage whether the node at point may match text searches,
+-- its user-mutable noSearchMatching flag. <localleader>sx
+-- (':SkgSetFlagSearchMatching', 'set_flag_search_matching') asks the
+-- server for the flag's value (a "flag state" request), offers
+-- "search matching" or "no search matching", and writes the choice
+-- as the headline's edit request, replacing a pending relRepo request
+-- there. <localleader>sX ('set_flag_search_matching_recursive') does
+-- the same to the occurrences below it reached through ones that
+-- claim membership of their viewparents, skipping one that is
+-- foreign, write-protected, unsaved or holds an edit request. The
+-- flag changes at the next save (skg.save). The Lua port of
+-- elisp/skg-request-flag-state.el.
 
 local client = require('skg.client')
 local config = require('skg.config')

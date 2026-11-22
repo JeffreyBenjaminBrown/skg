@@ -1,7 +1,13 @@
--- PURPOSE: Ask the server for a single-root content view of a node
--- and open the reply as a view buffer. The workhorse behind every
--- goto command. The Lua port of
--- elisp/skg-request-single-root-content-view.el.
+-- PURPOSE: Open a view of one node: ask the server for a single-root
+-- content view of it ('request_single_root_content_view_from_id') and
+-- open the reply as a view buffer ('handle_content_view_sexp'), or,
+-- when the node is already a root of an open view, switch to that
+-- buffer. Errors and warnings go to a messages buffer; a privacy
+-- challenge asks, then sends again with the approval. The workhorse
+-- behind ':SkgGoto' ('<localleader>gg') and ':SkgGotoById'
+-- ('<localleader>gi'), whose commands, finding the ID, are
+-- skg.id_search's; setting up the buffer is skg.buffer's. The Lua
+-- port of elisp/skg-request-single-root-content-view.el.
 
 local buffer = require('skg.buffer')
 local client = require('skg.client')
@@ -32,9 +38,9 @@ function M.single_root_view_request_string (node_gnid, view_id, approved_pids)
   return sexpr.to_string(request) .. '\n'
 end
 
----Ask the server for a single-root content view of NODE_ID.
+---Ask the server for a single-root content view of NODE_GNID.
 ---The server opens the requested node itself.
----@param node_id string
+---@param node_gnid string
 function M.request_single_root_content_view_from_id (node_gnid,
                                                      approved_pids,
                                                      existing_view_id)

@@ -1,5 +1,8 @@
 -- PURPOSE: Roughly-bijective transformations between atom-headed
--- sexps and org text.
+-- sexps and org text: how the metadata editor (skg.sexpr_edit,
+-- ':SkgViewMetadata') shows a headline's '(skg ...)' metadata as an
+-- org tree, and reads the edited tree back. Filling in and stripping
+-- the fields' defaults is skg.sexpr.metadata_fields'.
 -- The Lua port of elisp/skg-sexpr/skg-sexpr-org-bijection.el.
 --
 -- INPUT REQUIREMENTS
@@ -21,10 +24,10 @@
 --   sexp reader, but the edit-buffer pipeline never needs them to).
 -- - Childless non-root headlines become bare atoms, not lists, but
 --   for one whose text is '(ATOM)': a proper sub-sexp that wraps a
---   single atom in parens, such as the processed request '(processed)', is
---   that headline.
+--   single atom in parens, such as the processed request
+--   '(processed)', is that headline.
 --
--- ENTRY POINTS: sexp_to_org, org_to_sexp.
+-- ENTRY POINTS: 'sexp_to_org', 'org_to_sexp'.
 
 local parse = require('skg.sexpr.parse')
 

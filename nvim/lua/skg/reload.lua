@@ -1,6 +1,6 @@
--- PURPOSE: Force-reload all skg Lua modules.
--- The Lua port of elisp/skg-reload.el: pick up code changes without
--- restarting the editor.
+-- PURPOSE: ':SkgReload' ('reload'): reload every skg Lua module from
+-- disk, to pick up code changes without restarting the editor.
+-- The Lua port of elisp/skg-reload.el.
 --
 -- The elisp version must spare two files from unloading (skg-buffer,
 -- because 'unload-feature' would destroy the permanent-local view ID
@@ -13,7 +13,7 @@
 --
 -- Like the elisp version, the herald rule table and the skgrepo label
 -- table served beside it (fetched from the server at connect time,
--- session-only, no on-disk skgrepo) are captured before the reload
+-- session-only, no on-disk copy) are captured before the reload
 -- and re-installed after -- protected so that a load error in some
 -- other module cannot lose them for the rest of the session. The
 -- reload error itself still propagates.

@@ -1,11 +1,16 @@
--- PURPOSE: Redraw a view by its delta: rewrite only the headline
--- lines a response names in '(changed-headlines (V ...))', instead of
--- replacing the whole buffer ('docs/api-and-formats.org', "The redraw
--- delta"). The new lines are the server's lines in their stripped
--- form, without the fold and focus atoms, which the buffer keeps as
--- vim folds and the cursor. After the rewrite the buffer must equal
--- the stripped form of the new text; when it does not, the caller
--- redraws the whole buffer. The Lua port of elisp/skg-redraw-delta.el.
+-- PURPOSE: After ':w', redraw only the headlines the save changed, so
+-- the folds and the cursor stay as they are: rewrite the headline
+-- lines a save-result names in '(changed-headlines (V ...))', instead
+-- of replacing the whole buffer ('docs/api-and-formats.org', "The
+-- redraw delta"). The entry point is 'patch_buffer_with_delta', which
+-- skg.save's 'redraw_saved_buffer' calls. The new lines are the
+-- server's lines in their stripped form, without the fold and focus
+-- atoms, which the buffer keeps as vim folds and the cursor. After
+-- the rewrite the buffer must equal the stripped form of the new
+-- text; when it does not, the caller redraws the whole buffer, which
+-- is skg.redraw_whole_view's. That module also uses the line helpers
+-- here ('viewnode_id_headlines', 'without_fold_and_focus_atoms').
+-- The Lua port of elisp/skg-redraw-delta.el.
 --
 -- The stripped form is one rule the server and both clients
 -- implement. All three test against

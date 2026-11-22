@@ -1,6 +1,14 @@
--- PURPOSE: The small one-shot request/response commands:
--- verify-connection, rebuild-session-lifetime-stores and strip-body-whitespace. The Lua
--- port of elisp/skg-request-verify-connection.el,
+-- PURPOSE: The small one-shot request/response commands.
+-- ':SkgConnectionVerify' ('connection_verify', defined in
+-- 'nvim/plugin/skg.lua' and also sent by skg.init) pings the server
+-- and echoes its reply. ':SkgRebuildSessionLifetimeStores'
+-- ('rebuild_session_lifetime_stores') reloads the server's config and
+-- rebuilds the in-memory graph and Tantivy from the .skg files, then
+-- refetches the herald rules and rerenders every view without
+-- unsaved edits ('refetch_herald_rules_and_rerender_all_views').
+-- ':SkgStripBodyWhitespace' ('strip_trailing_whitespace_from_bodies')
+-- strips trailing whitespace from every body in the owned skgrepos.
+-- The Lua port of elisp/skg-request-verify-connection.el,
 -- elisp/skg-request-rebuild-session-lifetime-stores.el and
 -- elisp/skg-request-strip-body-whitespace.el.
 

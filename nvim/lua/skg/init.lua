@@ -1,6 +1,12 @@
--- PURPOSE: The entry point of the skg Neovim client; require('skg').
--- The analog of elisp/skg-init.el + the 'skg-client-init' entry in
--- elisp/skg-client.el. Modules land here as they are ported.
+-- PURPOSE: Start the skg Neovim client against a skgconfig.toml:
+-- 'init' (':SkgInit FILE', or require('skg').init(FILE) in a user's
+-- config) checks the Neovim version, connects to the server the file
+-- names, verifies the connection and fetches the herald rule table.
+-- The other modules are required where they are used, not from here;
+-- 'nvim/README.org', "Where things live", lists them with what each
+-- is for. The Ex commands and autocmds are wired in plugin/skg.lua.
+-- The analog of elisp/skg-init.el and the 'skg-client-init' entry in
+-- elisp/skg-client.el.
 
 local M = {}
 
@@ -19,8 +25,9 @@ function M.check_nvim_version ()
     v.major, v.minor, v.patch))
 end
 
----Absolute path of the directory holding skgconfig.toml, set by init.
----(The analog of 'skg-config-dir'.)
+---Absolute path of the skgconfig.toml given to init. Nothing in the
+---client reads it; skg.config keeps the path it reads from
+---('config_file_path').
 ---@type string|nil
 M.config_path = nil
 

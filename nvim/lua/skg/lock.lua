@@ -1,6 +1,11 @@
--- PURPOSE: Lock skg buffers against edits during a save-in-progress,
--- and the single-flight guard on streaming requests
--- ('stream_in_progress'). The Lua port of
+-- PURPOSE: While a save or a rerender stream runs, the views refuse
+-- edits, and a second such request is refused. 'lock_all_skg_buffers'
+-- locks every view; 'unlock_non_collateral_buffers' (save-relax-lock)
+-- and 'unlock_buffers_not_in_view_id_list' (rerender-lock) narrow the
+-- lock to the views the server will redraw; 'unlock_after_save' and
+-- 'unlock_all_save_locked' release it. 'begin_stream' and 'end_stream'
+-- keep 'stream_in_progress', the single-flight guard. skg.save and
+-- skg.rerender_all_views drive these. The Lua port of
 -- elisp/skg-request-save/skg-lock-buffers.el.
 --
 -- The elisp locked with whole-buffer overlays carrying
@@ -15,9 +20,9 @@ local state = require('skg.state')
 
 local M = {}
 
----Non-nil while a streaming request (save, rerender, diff-toggle) is
----in flight: a label string describing the operation. The server
----handles requests sequentially, so responses never interleave -- but
+---Non-nil while a streaming request (a save, or a request a rerender
+---stream follows) is in flight: a label string describing the
+---operation. The server handles requests sequentially, so responses never interleave -- but
 ---the client could send a second request before the first finishes,
 ---and overlapping operations would corrupt each other's lock/unlock
 ---state. Cleared by terminal handlers, the sentinel, and the

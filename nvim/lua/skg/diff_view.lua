@@ -1,8 +1,15 @@
--- PURPOSE: The diff view
--- ('docs/diff-view.org', "The four buffers").
--- One command sends one "diff view" request per buffer, in
--- order, and opens each buffer the server does not answer with
--- '(empty . t)', named "skg://diff-view: " followed by the buffer's name.
+-- PURPOSE: <localleader>vd (':SkgDiffViewOpen', 'diffView_open') opens
+-- the diff view: every change in the owned skgrepos since their last
+-- git-commits, in up to four buffers ('docs/diff-view.org', "The four
+-- buffers"; 'M.buffers'), each named "skg://diff-view: " followed by
+-- its name. It sends one "diff view" request per buffer, in order
+-- ('request_diffView_buffers'), and opens each the server does not
+-- answer with '(empty . t)', showing its processed summary
+-- ('handle_diffView_response').
+-- Marking changes processed and moving between them are
+-- skg.processed's; extending a buffer to the changes it does not make
+-- editable, skg.extend_diff_view's; saving a buffer of the diff view,
+-- skg.save's; git-committing, skg.stage_and_commit's.
 -- The Lua port of elisp/skg-request-diff-view.el.
 
 local buffer = require('skg.buffer')

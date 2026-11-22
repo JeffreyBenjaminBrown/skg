@@ -1,8 +1,11 @@
--- PURPOSE: A workflow to search for text and insert a link to one of
--- the results: run from any buffer, it records the buffer and cursor,
--- searches, and in the results buffer a pick (<CR> or
--- <localleader>cc) kills the search, returns to the source position,
--- and inserts [[id:X][LABEL]] there. The Lua port of
+-- PURPOSE: <localleader>fl (':SkgSearchMakeLink', 'search_make_link')
+-- searches for text and inserts a link to one of the results: run from
+-- any buffer, it records the buffer and cursor, searches, and in the
+-- search buffer a pick (<CR> or <localleader>cc, bound by
+-- 'maybe_activate_link_from_search_mode') kills the search buffer,
+-- returns to the source position, and inserts [[id:X][LABEL]] there
+-- ('finish'). The search itself is skg.text_search's, which runs this
+-- module's hook on each search buffer it opens. The Lua port of
 -- elisp/skg-search-make-link.el.
 --
 -- PITFALL (inherited): do not save the source buffer eagerly before

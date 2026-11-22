@@ -1,7 +1,13 @@
--- PURPOSE: Global state for the skg client.
--- The Lua port of elisp/skg-state.el. (One difference of homes: the
--- config path lives in skg.config here, not in state; see that file's
--- header.)
+-- PURPOSE: The skg client's session-wide state: the TCP handle, the
+-- maps from response-type to the handler awaiting it
+-- ('register_response_handler', 'unregister_response_handlers'), the
+-- length-prefix receiver's buffer and counts ('lp_reset'), the
+-- connection-reset hooks skg.client runs when a connection is lost,
+-- and the linkstack. Using them is other modules' (skg.client,
+-- skg.length_prefix, skg.lock, skg.linkstack). The Lua port of
+-- elisp/skg-state.el. (One difference of homes: the config path
+-- lives in skg.config here ('config.config_file_path'), not in
+-- state.)
 
 local M = {}
 
@@ -86,7 +92,7 @@ function M.run_connection_reset_hooks ()
     pcall(hook) end
 end
 
----Close the TCP handle if open. Used by connection_end and reload.
+---Close the TCP handle if open. Used by skg.client and skg.reload.
 function M.close_connection ()
   if M.tcp and not M.tcp:is_closing() then
     M.tcp:read_stop()

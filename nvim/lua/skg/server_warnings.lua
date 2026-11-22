@@ -1,10 +1,12 @@
 -- PURPOSE: Show, in M.buffer_name, what the server warned about as it
--- started (unknown skgconfig.toml keys, say). client.connect sends
--- the startup request once per connection, as soon as the connection
--- is up and so before any view is requested. A non-empty answer is
--- appended to M.buffer_name under a headline 'Startup warnings', erasing
--- nothing (the warnings of an earlier connection stay); an empty one
--- opens nothing. The Lua port of elisp/skg-request-server-warnings.el.
+-- started (unknown skgconfig.toml keys, say). 'client.connect' calls
+-- 'request_server_warnings' once per connection, as soon as the
+-- connection is up and so before any view is requested.
+-- 'server_warnings_handler' appends a non-empty answer to
+-- M.buffer_name under a headline 'Startup warnings', erasing nothing
+-- (the warnings of an earlier connection stay); an empty one opens
+-- nothing. skg.repo_files_reloaded appends to the same buffer. The
+-- Lua port of elisp/skg-request-server-warnings.el.
 --
 -- DATA USED/ASSUMED: See docs/api-and-formats.org, "Server warnings".
 

@@ -1,4 +1,16 @@
--- PURPOSE: All skg keybindings and the Ex-command surface.
+-- PURPOSE: Every skg key and ':Skg*' command, and which module and
+-- function each one runs. 'M.commands' maps each command name to its
+-- module and function; 'M.content_view_bindings' maps each
+-- '<localleader>' key of a view to a command name, and
+-- 'M.file_bindings' and 'M.report_bindings' do so for '.skg' files
+-- and report buffers. 'define_ex_commands' (called from
+-- plugin/skg.lua) makes the ':Skg*' commands; 'attach_content_view'
+-- (called from skg.buffer) binds a view's keys; 'invoke' runs a
+-- command, through 'call_showing_refusal', which shows a refusal as
+-- one line. What each command does is its module's. The few commands
+-- not in 'M.commands' (':SkgInit', ':SkgReload', ':SkgConnection*')
+-- are plugin/skg.lua's.
+--
 -- The Lua port of elisp/skg-keymaps-and-aliases.el, translated per
 -- the keybinding scheme of 'docs/nvim-client-deviations.org',
 -- "Input model":
@@ -10,9 +22,9 @@
 --   ride the ]i / [i motions; '^' toggles line start <-> title start
 --   (the C-a toggle); and every command is an :Skg* Ex command.
 --
--- Commands resolve their modules lazily (at keypress), so this
--- surface can be complete while modules land incrementally; invoking
--- a not-yet-ported command reports so instead of erroring. The elisp
+-- Commands resolve their modules lazily (at keypress), so loading
+-- this module loads none of them; 'tests/nvim/keymaps_spec.lua'
+-- checks that every entry of 'M.commands' resolves. The elisp
 -- alias/completion-predicate machinery has no analog here: the Ex
 -- command names are the public names.
 
@@ -334,9 +346,9 @@ function M.define_ex_commands ()
 end
 
 ---The content-view keybindings: {lhs, command-name} pairs under
----<localleader>, plus motions. The single skgrepo of truth for the
----C-c chord translations; docs/COMMANDS-nvim.org is generated to
----match.
+---<localleader>. The single source of truth for the C-c chord
+---translations; docs/COMMANDS-nvim.org mirrors it, and where they
+---disagree this table wins.
 M.content_view_bindings = {
   { 'dd', 'Delete' },                    -- C-c <backspace>
   { 'dR', 'DeleteRecursive' },           -- C-u C-c <backspace>

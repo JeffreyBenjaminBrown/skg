@@ -35,14 +35,95 @@ Emacs client's 'C-c' chords runs everything else; every command is
 also an ':Skg*' Ex command.
 
 * Where things live
-- lua/skg/ -- the modules; a module is usually named for the elisp
-  file it ports, without the 'skg-' or 'skg-request-' prefix.
-- plugin/skg.lua -- the Ex-command surface and autocmds.
+- lua/skg/ -- the modules (listed below); a module is usually named
+  for the elisp file it ports, without the 'skg-' or 'skg-request-'
+  prefix. Each opens with a '-- PURPOSE:' header: what it is for,
+  its entry points, and what it leaves to which other module.
+- plugin/skg.lua -- startup: ':SkgInit', ':SkgReload', the connection
+  commands, every other ':Skg*' command (from skg.keymaps), the
+  command-line keys, and the '.skg' file buffers' setup.
 - ../tests/nvim/ -- unit tests (plenary.busted; run
   ../bash/nvim-tests.sh).
 - ../tests/integration/*/test-nvim.lua -- integration tests, one per
   directory beside each test-emacs.el, dispatched by
   SKG_TEST_CLIENT=nvim ./run-test.sh.
+** The modules of lua/skg/, by what a user does
+To find the code behind a key, look up its command name in
+'keymaps.lua' ('M.content_view_bindings', then 'M.commands', which
+names the module and function).
+*** Starting, connecting, commands
+- init.lua -- ':SkgInit': connect to the server a skgconfig.toml names
+- config.lua -- what the client reads from skgconfig.toml
+- keymaps.lua -- every key and ':Skg*' command, and what it runs
+- client.lua -- the one TCP connection to the skg server
+- length_prefix.lua -- split server answers, hand each to its handler
+- state.lua -- session state: TCP handle, handler maps, linkstack
+- server_warnings.lua -- show the server's startup warnings
+- misc_requests.lua -- ping the server, rebuild stores, strip body whitespace
+- reload.lua -- ':SkgReload': reload the client code from disk
+- log.lua -- debugging log of client actions, off by default
+*** Opening and finding views
+- single_root_content_view.lua -- open a view of one node (behind ':SkgGoto')
+- id_search.lua -- find, hop between, and open views of IDs
+- text_search.lua -- '<localleader>ff'/'fi': text search and its results buffer
+- search_make_link.lua -- '<localleader>fl': search, pick a result, insert a link
+- linkstack.lua -- push, paste and pop links; edit the linkstack
+- view_new_empty.lua -- '<localleader>ve': open a blank view for new nodes
+- view_ancestry.lua -- '<localleader>va': a buffer of point's outline ancestry
+- goto_git.lua -- jump from a node to its file in neogit
+- investigate_unknown_node.lua -- '<localleader>tr': what was this unknown node?
+*** The view buffer and what it draws
+- buffer.lua -- the view buffer: opening, setup, baseline, closing
+- heralds.lua -- the colored tokens drawn in place of metadata; '<localleader>vh'
+- herald_rules.lua -- fetch and cache the server's herald rules and skgrepo labels
+- describe_heralds.lua -- '<localleader>v?': what this headline's heralds mean
+- link_annotations.lua -- broken links; '<localleader>vL' skgrepo suffixes
+- fork_dedup.lua -- '<localleader>vu': cover what forks-folder members repeat
+- readable_ids.lua -- titles after UUIDs in .skg files and git buffers
+- folds.lua -- view folds, '<localleader>vb', folds kept across saves
+- focus.lua -- keep the cursor's headline across a save
+- perspective.lua -- '<localleader>vo': redraw the view from the next perspective
+- messages.lua -- 'skg://messages/' buffers of server errors and warnings
+*** Editing a view's metadata and structure
+- metadata.lua -- read and edit a headline's metadata; delete, detach, set-repo, merge
+- relRepo_info.lua -- '<localleader>sr'/'sR': the skgrepo that records a relationship
+- views.lua -- '<localleader>l*' folders, 'se'/'sw'/'sW' view requests, 'mf' fork
+- modify_graph.lua -- branch to link, link to branch, biggest branch
+- receipt.lua -- '<localleader>ma': write a read receipt for a mailed item
+- flag_state.lua -- '<localleader>sx': stage whether a node matches searches
+- delete_references_to_absent_node.lua -- '<localleader>da': drop references to an unknown node
+- sexpr_edit.lua -- '<localleader>vm': edit a headline's metadata as an org tree
+- sexpr_edit/sexpr_cycling.lua -- S-left/S-right cycle a field in the metadata editor
+*** Saving and redrawing
+- save.lua -- ':w' on a view: send it, redraw the answer
+- save/confirmations.lua -- questions a save stops to ask (fork, hoist, ...)
+- lock.lua -- views refuse edits while a save or rerender runs
+- redraw_delta.lua -- after ':w', redraw only the changed headlines
+- redraw_whole_view.lua -- redraw a whole view, keeping cursor and folds
+- rerender_all_views.lua -- ':SkgRerenderAllViews' and every rerender stream
+- repo_sets.lua -- list, show and switch the skgrepo restriction
+- repo_files_reloaded.lua -- '.skg' files changed on disk: notify, rerender views
+- recovery.lua -- ':SkgShowUnsavedChanges': archive a dirty view to a file
+*** The diff view
+- diff_view.lua -- '<localleader>vd': open the diff view's buffers
+- extend_diff_view.lua -- '<localleader>ru': extend a diff-view buffer to every change
+- change_facts.lua -- what a headline's '(diff ...)' says changed, and whether processed
+- processed.lua -- mark changes processed; jump between changes
+- restore_requests.lua -- ask the next save to restore what a change removed
+- stage_and_commit.lua -- '<localleader>rc'/'rC': git-commit changed nodes
+*** Import and export
+- import_md_and_org.lua -- import Markdown/Org files into an owned skgrepo
+- export_org.lua -- export skg data to plain .org files
+*** Shared helpers
+- payload.lua -- pick fields out of a parsed server answer
+- shared.lua -- read the 'shared/*.json' tables (styles, relations, fields)
+- picker.lua -- prompts for a skgrepo or a skgrepo restriction
+- sexpr/parse.lua -- read and print s-expressions (the wire and metadata)
+- sexpr/compare.lua -- compare s-expressions (subtree test, equality)
+- sexpr/edit_dsl.lua -- edit a sexp by DELETE/REPLACE/ENSURE/merge
+- sexpr/lens.lua -- the rules that turn metadata into heralds
+- sexpr/metadata_fields.lua -- the metadata editor's fields and defaults
+- sexpr/org_bijection.lua -- sexp to org tree and back, for the metadata editor
 
 * Deviations from the Emacs client
 Every intentional behavioral difference is cataloged in

@@ -1,9 +1,12 @@
--- PURPOSE: 'describe_at_point' (<localleader>v?) -- say in plain
--- sentences what the headline at point is, when it is a folder, and
--- what each of its heralds means, with this headline's own numbers and
--- letters read out. The sentences come from the server's "describe
--- heralds" endpoint ('docs/api-and-formats.org', "Describe heralds";
--- 'server/herald_descriptions.rs'). The Lua port of
+-- PURPOSE: 'describe_at_point' (':SkgDescribeAtPoint',
+-- '<localleader>v?') -- say in plain sentences what the headline at
+-- point is, when it is a folder, and what each of its heralds means,
+-- with this headline's own numbers and letters read out: in the
+-- message area when they fit in two lines, else in a scratch buffer
+-- ('show'). The sentences come from the server's "describe heralds"
+-- endpoint ('docs/api-and-formats.org', "Describe heralds";
+-- 'server/herald_descriptions.rs'); 'request_at_line' builds the
+-- request. Drawing the heralds is skg.heralds's. The Lua port of
 -- elisp/skg-request-describe-heralds.el.
 
 local change_facts = require('skg.change_facts')

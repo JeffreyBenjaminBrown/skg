@@ -1,18 +1,25 @@
--- PURPOSE: Handle the message the server sends unprompted when it has
--- reloaded '.skg' files that changed on disk (another writer, a
--- 'git pull'): 'repo-files-reloaded', with (reloaded ((SKGREPO
--- N) ...)), (warnings (...)) and (view-ids (...)).
+-- PURPOSE: When '.skg' files change on disk (another writer, a 'git
+-- pull'), say so and redraw the open views that show them. The
+-- server, having reloaded the files, sends unprompted
+-- 'repo-files-reloaded', with (reloaded ((SKGREPO N) ...)),
+-- (warnings (...)) and (view-ids (...)). 'client.connect' calls
+-- 'register', which makes 'handler' the unprompted handler of that
+-- message ('state.unprompted_response_handler_map');
+-- 'rerender_views_changed_on_disk' asks for the rerender, through
+-- skg.rerender_all_views, again every 'retry_milliseconds' while
+-- another streaming request is in flight.
 --
 -- A message with no warnings is a notification of its counts ('skg:
 -- reloaded 2 files from repo first'). One that carries a warning (a
 -- file that could not be read, a batch that failed validation, a
 -- leak) is appended, counts and warnings, to the server-warnings
 -- buffer under a headline 'Repo changes', as the startup warnings
--- are, and that buffer is shown. The views it
+-- are (skg.server_warnings), and that buffer is shown. The views it
 -- names show a changed node; each one whose buffer holds no unsaved
 -- edits is rerendered, through a 'rerender all views' request that
--- excludes every other view; the server also extends each buffer of
--- the diff view among them to the changes it does not show. A buffer
+-- excludes every other view; absent a skgrepo restriction, the server
+-- also extends each buffer of the diff view among them to the changes
+-- it does not show. A buffer
 -- with unsaved edits keeps them; the server refuses its save if it
 -- would write a node changed on disk since it was rendered. The Lua
 -- port of elisp/skg-repo-files-reloaded.el.

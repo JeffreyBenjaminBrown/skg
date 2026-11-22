@@ -1,17 +1,25 @@
 -- PURPOSE: Git-commit the changed nodes of the owned skgrepos, with
 -- one message ('docs/diff-view.org', "Stage and commit"):
--- <localleader>rc commits every node whose changes are all processed,
--- except one that needs a node whose changes are not;
--- <localleader>rC commits every changed node.
--- A commit of everything while some changed node is not processed
+-- <localleader>rc (':SkgStageAndCommit', 'stage_and_commit')
+-- git-commits every node whose changes are all processed, except one
+-- that needs a node whose changes are not; <localleader>rC
+-- (':SkgStageAndCommitEverything', 'stage_and_commit_everything')
+-- git-commits every changed node. Each refuses while a view has
+-- unsaved edits, then opens the commit-message buffer
+-- ('open_commit_message_buffer'); sending it ('send_from_buffer')
+-- sends the request ('send'), and 'result_message' words the answer.
+-- Marking changes processed is skg.processed's. The Lua port of
+-- elisp/skg-request-stage-and-commit.el.
+--
+-- A git-commit of everything while some changed node is not processed
 -- makes the server ask for confirmation instead, changing nothing;
--- only the typed word "yes" resends the request confirmed. A commit of
--- the processed asks nothing. Every answer is followed by a rerender
--- stream, which after a commit rerenders the open buffers of the
--- diff view. The Lua port of elisp/skg-request-stage-and-commit.el.
+-- only the typed word "yes" resends the request confirmed
+-- ('confirm_and_resend'). A git-commit of the processed asks nothing.
+-- Every answer is followed by a rerender stream, which after a
+-- git-commit rerenders the open buffers of the diff view.
 -- The message is written in a buffer of its own: ':w' or
 -- <localleader>cc sends it, <localleader>ck cancels; the buffer
--- remembers which of the two commits opened it last
+-- remembers which of the two commands opened it last
 -- ('vim.b.skg_commit_processed_only'). It keeps the message until it
 -- is moot (M.report_result).
 

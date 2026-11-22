@@ -1,7 +1,12 @@
--- PURPOSE: An s-expression reader and printer for the skg wire
--- protocol and headline metadata. The Lua stand-in for the elisp
--- built-ins 'read' and 'prin1-to-string', which the Emacs client leans
--- on for every server payload and every '(skg ...)' metadata block.
+-- PURPOSE: An s-expression reader and printer: every request to and
+-- answer from the server, and the '(skg ...)' metadata on a view's
+-- headlines, pass through here. 'read' parses text, 'to_string'
+-- prints a value, 'symbol' makes an atom; 'find_sexp_end' finds where
+-- a headline's metadata ends (skg.metadata, skg.heralds). The Lua
+-- stand-in for the elisp built-ins 'read' and 'prin1-to-string', which
+-- the Emacs client leans on for every server payload and every
+-- '(skg ...)' metadata block. Picking a field out of a parsed answer
+-- is skg.payload's.
 --
 -- The grammar matched here is pinned by the two peers, not by full
 -- elisp:
@@ -289,8 +294,9 @@ function M.to_string (value)
         .. vim.inspect(value))
 end
 
----Quote and escape a string exactly as the server's 'quote_herald'
----does: backslash and double-quote only.
+---Quote and escape a string exactly as the server's
+---'quote_sexp_string' (server/sexp_string.rs) does: backslash and
+---double-quote only.
 ---@param text string
 ---@return string
 function M.quote_string (text)

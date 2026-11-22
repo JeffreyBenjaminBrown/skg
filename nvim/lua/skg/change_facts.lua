@@ -1,11 +1,14 @@
--- PURPOSE: Read a headline's change facts, the '(diff ...)' parts
--- of its metadata the diff view draws: what changed ('processed_form',
--- 'processed_leaves', 'processed_node_added_p') and whether the user
--- marked it processed ('objects_processed_p'); and whether a folder
--- is changed, by its members' relationships, and processed
--- ('folder_change_processed_in_lines'). The heralds, the herald
--- descriptions and the processed gestures (skg.processed) read them;
--- writing a processed request is skg.metadata's. The Lua port of the
+-- PURPOSE: Say what the diff view shows changed at a headline, and
+-- whether the user marked that change processed, by reading its
+-- change facts, the '(diff ...)' part of its metadata: what changed
+-- ('processed_form', 'processed_leaves', 'processed_node_added_p') and
+-- whether it is processed ('objects_processed_p'); and whether a
+-- folder is changed, by its members' relationships, and processed
+-- ('folder_change_processed_in_lines', '..._at_line'). The heralds,
+-- the herald descriptions and the processed gestures (skg.processed)
+-- read them. The gestures themselves are skg.processed's; writing a
+-- processed request is skg.metadata's
+-- ('metadata_with_processed_request'). The Lua port of the
 -- change-facts part of elisp/skg-metadata.el.
 
 local metadata = require('skg.metadata')

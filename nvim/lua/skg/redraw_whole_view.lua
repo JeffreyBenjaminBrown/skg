@@ -1,7 +1,9 @@
--- PURPOSE: Redraw a whole view buffer from the server's new text,
--- keeping each window's cursor and the folds where they were. The
--- entry points: 'apply_streamed_view_update', which the save's
--- collateral-view and the rerender's rerender-view messages share;
+-- PURPOSE: Redraw a whole view from the server's new text -- the
+-- saved view after ':w', or another view a save or a rerender
+-- changed -- keeping each window's cursor and the folds where they
+-- were. The entry points: 'apply_streamed_view_update', which the
+-- save's collateral-view and the rerender's rerender-view messages
+-- share;
 -- 'replace_buffer_keeping_viewnode_points_and_folds', for a redraw
 -- the user did not ask for; and 'replace_buffer_with_new_content',
 -- for the saved buffer, whose cursor 'current_save_point_position'

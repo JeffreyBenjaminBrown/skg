@@ -1,11 +1,21 @@
--- PURPOSE: The linkstack -- a stack of {id, title} pairs -- and its
--- push / paste / pop commands plus the editable stack buffer.
--- The Lua port of the stack half of elisp/skg-id-search.el.
+-- PURPOSE: The linkstack, a stack of {id, title} pairs kept in
+-- 'state.linkstack'. <localleader>u ('push_id') pushes the link or
+-- headline at the cursor; <localleader>o then 'i', 'l' or 'n'
+-- ('paste_id', 'paste_link', 'paste_node') inserts the top's ID, a
+-- link to it, or a write-protected headline of it; <localleader>O
+-- ('pop_id', 'pop_link', 'pop_node') does the same and pops it.
+-- <localleader>vs ('view_linkstack') opens the stack as an editable
+-- buffer, 'skg://linkstack', whose ':w' replaces the stack
+-- ('save_linkstack_buffer'). Finding the ID at the cursor is
+-- skg.id_search's. The Lua port of the stack half of
+-- elisp/skg-id-search.el, without its trees: there an entry can be a
+-- view-ancestry (skg-push-ancestry); here each is one note.
 --
 -- Paste/pop work in ordinary buffers (inserting at the cursor) and in
--- command-line prompts (inserting into the command line), the analog
--- of the elisp minibuffer bindings. In a prompt, the link label is
--- taken from the stack without asking, as elisp did under minibufferp.
+-- command-line prompts (inserting into the command line; <C-x>i, l,
+-- I, L, mapped in 'nvim/plugin/skg.lua'), the analog of the elisp
+-- minibuffer bindings. In a prompt, the link label is taken from the
+-- stack without asking, as elisp does under minibufferp.
 
 local id_search = require('skg.id_search')
 local metadata = require('skg.metadata')

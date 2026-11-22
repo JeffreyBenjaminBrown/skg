@@ -1,6 +1,8 @@
--- PURPOSE: Compare s-expressions.
--- The Lua port of elisp/skg-sexpr/skg-compare-sexpr.el, plus the
--- deep-equality helper that elisp got for free as 'equal'.
+-- PURPOSE: Compare s-expressions: 'subtree_p' asks whether one holds
+-- every path of another, which is how the code asks what a headline's
+-- metadata says (is it '(skg ghost)'?); 'values_equal' is deep
+-- equality. The Lua port of elisp/skg-sexpr/skg-compare-sexpr.el,
+-- plus the deep-equality helper that elisp got for free as 'equal'.
 
 local parse = require('skg.sexpr.parse')
 
