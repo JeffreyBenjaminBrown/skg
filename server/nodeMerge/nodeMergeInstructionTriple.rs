@@ -1,5 +1,5 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::node_lookup::{graphnode_by_gnid, opt_graphnode_by_gnid};
+use crate::dbs::node_lookup::{graphnode_by_gnid, graphnode_from_graph};
 use crate::from_text::local_fieldintent_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
 use crate::from_text::local_fieldintent_collection::types::CollectedFieldIntents;
@@ -253,8 +253,7 @@ fn gnids_shown_through_forks_folder_members (
   for partner_gnid in forks_folder_members_shown (
     graph, &unrestricted, &node . pid,
     &members_of ( node . forks . or_default () ))
-  { let Some (partner) = opt_graphnode_by_gnid (
-      graph, config, &partner_gnid ) ?
+  { let Some (partner) = graphnode_from_graph (graph, &partner_gnid)
     else { continue; };
     for gnid in members_of ( & partner . contains ) . iter () . map (key) {
       if ! hides . contains (&gnid)

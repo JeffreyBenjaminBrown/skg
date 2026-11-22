@@ -3,7 +3,7 @@ pub mod contradictory_instructions;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::mirrors::{
   is_mirror_of, mirror_shown, perspective_skgrepo_of_tree_containing};
-use crate::dbs::node_lookup::opt_graphnode_by_gnid;
+use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text::fork::existing_owned_fork_of;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Folder, PropertyMember, ViewRequest};
@@ -83,7 +83,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
   validate_fork_view_requests(
     viewforest, graph, config, &mut errors);
   idFolder_membership_errors (
-    viewforest, graph, config, &mut errors ) ?;
+    viewforest, graph, &mut errors );
   inPlaceOf_part_errors (
     viewforest, graph, config, perspective, &mut errors );
   validate_view_roots (
@@ -133,9 +133,8 @@ pub fn find_buffer_errors_for_saving (
 fn idFolder_membership_errors (
   viewforest : &ViewForest,
   graph      : &InRustGraph,
-  config     : &SkgConfig,
   errors     : &mut Vec<BufferValidationError>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) {
   for edge in viewforest . root () . traverse () {
     let node_ref = match edge {
       Edge::Open (node_ref)
@@ -157,8 +156,7 @@ fn idFolder_membership_errors (
           _ => None } )
       . collect ();
     let real_gnids : Option<Vec<ID>> =
-      opt_graphnode_by_gnid (graph, config, &recorder)
- ?
+      graphnode_from_graph (graph, &recorder)
       . map ( |nc| nc . all_gnids () . cloned () . collect () );
     match real_gnids {
       None =>
@@ -168,8 +166,7 @@ fn idFolder_membership_errors (
         buffer_gnids . sort ();
         if real . iter () . any ( |id| ! buffer_gnids . contains (id) ) {
           errors . push ( BufferValidationError::IDFolder_Edited (
-            recorder, buffer_gnids, real, recorder_headline )); }}, }}
-  Ok (( )) }
+            recorder, buffer_gnids, real, recorder_headline )); }}, }} }
 
 /// Tamper validation for the '(inPlaceOf N)' part
 /// ('docs/mirrors.org', "The inPlaceOf part").

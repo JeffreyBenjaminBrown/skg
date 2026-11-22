@@ -1,7 +1,7 @@
 use crate::from_text::fork::{CloneSkgrepoInputs, fork_spec_from_buffer_node};
 use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::dbs::node_lookup::{graphnode_from_graph, opt_graphnode_by_gnid};
+use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::errors::{BufferValidationError, NodeMergeRole};
 use crate::types::misc::{
@@ -114,10 +114,8 @@ fn apply_foreign_policy(
       if !skgrepo_is_foreign (config, &node . home_skgrepo) {
         // not foreign, so keep
         return Ok (ForeignPolicyOutcome::Keep); }
-      match opt_graphnode_by_gnid(
-        graph, config, &node . pid
-      ) {
-        Ok(Some (disk_node)) => {
+      match graphnode_from_graph (graph, &node . pid) {
+        Some (disk_node) => {
           if buffernode_differs_from_disknode(node, &disk_node) {
             // A direct edit of a foreign node forks it (no longer a
             // ModifiedForeignNode error -- that rejection was the
@@ -137,7 +135,7 @@ fn apply_foreign_policy(
             // drop a non-edit to a foreign node
             Ok (ForeignPolicyOutcome::DropUnchangedForeignSave)
           }}
-        Ok (None) => {
+        None => {
           // Foreign skgrepo & PID not found => trying to create a
           // foreign node. Not allowed -- except for a bare new
           // headline whose foreign skgrepo was merely inherited from a
@@ -149,11 +147,7 @@ fn apply_foreign_policy(
             Ok (ForeignPolicyOutcome::Reject(
               BufferValidationError::CreatedForeignNode(
                 node . pid . clone(),
-                node . home_skgrepo . clone() ))) }},
-        Err (e) =>
-          Err (vec![BufferValidationError::Other(
-            format!("Error reading foreign node {}: {}",
-                    node . pid . as_str(), e)) ] ) }}}
+                node . home_skgrepo . clone() ))) }} }}}
 }
 
 fn collect_foreign_policy_outcomes(

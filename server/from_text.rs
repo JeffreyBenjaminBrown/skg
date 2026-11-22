@@ -42,7 +42,7 @@ use validate::{
   validate_no_simultaneous_delete_and_nodeMerge,
   validate_no_simultaneous_move_and_nodeMerge};
 
-use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
+use crate::dbs::node_lookup::graphnode_by_gnid;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{ViewnodeKind, Vognode, ViewRequest};
 use std::collections::{HashMap, HashSet};
@@ -463,8 +463,7 @@ fn explicit_fork_specs_from_viewforest (
     if ! t . view_requests . contains (& ViewRequest::Fork) { continue; }
     let pid : &ID = & t . gnid;
     let graph_snapshot : Graphnode =
-      match graphnode_graphFirst_by_pid_and_skgrepo (
-        graph, config, pid, & t . home_skgrepo ) {
+      match graphnode_by_gnid (graph, config, pid) {
         Ok (nc) => nc,
         Err (e) => {
           errors . push ( BufferValidationError::Other ( format! (

@@ -15,7 +15,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::dbs::node_lookup::opt_graphnode_by_gnid;
+use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoChange, SkgrepoName, members_of, rel_partners_at_relRepo};
 use crate::types::disk_home::home_from_disk;
 use crate::types::nodes::complete::{
@@ -123,8 +123,7 @@ fn supplement_nodeSaveIntent_from_disk (
       "Cannot strip the attribution of '{}': its skgrepo '{}' is not yours.",
       from_buffer . title, from_buffer . home_skgrepo ) . into () ); }
   let from_disk : Option<Graphnode> =
-    opt_graphnode_by_gnid (
-      graph, config, &pid) ?;
+    graphnode_from_graph (graph, &pid);
   match from_disk {
     None => {
       // A brand-new node has no sticky skgrepos (no disk relationships to be

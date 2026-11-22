@@ -5,7 +5,7 @@ use crate::dbs::in_rust_graph::stats::{
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::dbs::in_rust_graph::relation_accessors::RelRepoLookup;
 use crate::types::misc::{ID, SkgConfig};
-use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
+use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{GraphnodeStats, Viewnode, ViewnodeKind};
@@ -63,9 +63,7 @@ pub fn set_metadata_relationships_in_node_recursive (
     { match & tree . get (treeid) . unwrap () . value () . kind {
         ViewnodeKind::Vognode (Vognode::Occurrence (t))
           => { let graphnode_opt : Option<Graphnode>
-                 = graphnode_graphFirst_by_pid_and_skgrepo (
-                     graph, config, &t . gnid, &t . home_skgrepo
-                   ). ok ();
+                 = graphnode_from_graph (graph, &t . gnid);
                Some ( graphnodestats_for_pid (
                  &t . gnid, stats, graphnode_opt . as_ref (), restriction )) },
         _ => None }};

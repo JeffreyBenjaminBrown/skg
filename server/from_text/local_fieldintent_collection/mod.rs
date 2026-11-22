@@ -73,7 +73,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
     collect_instructions_locally (
       viewforest, & |skgrepo| config . skgrepo_is_owned (skgrepo) )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  validate_text_claims (&collected, graph, config) ?;
+  validate_text_claims (&collected, graph) ?;
   let flag_targets : HashSet<ID> = collected . by_pid . iter ()
     . filter_map ( |(pid, entry)|
       entry . flag . map ( |_| pid . clone () ) )

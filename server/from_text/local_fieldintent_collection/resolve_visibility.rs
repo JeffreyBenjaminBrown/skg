@@ -63,7 +63,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::mirrors::{Mirrors, mirrors_of};
-use crate::dbs::node_lookup::opt_graphnode_by_gnid;
+use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::refresh::goal::{
   forks_folder_members_shown, forker_only_members, owned_notes_containing};
 use crate::from_text::local_fieldintent_collection::lower::LoweredNodeIntents;
@@ -111,14 +111,12 @@ pub fn resolve_visibility (
   for (forker, signal) in signals_of_role (
     member_as_such_visibility, MemberAsSuch::Forkee ) {
     let Some (forkee_from_disk) =
-      opt_graphnode_by_gnid (
-        graph, config, &signal . member ) ?
+      graphnode_from_graph (graph, &signal . member)
     else { lowered . set_contains_of_new_member_as_such (
              &signal . member, &signal . visible );
            continue; };
     let Some (forker_from_disk) =
-      opt_graphnode_by_gnid (
-        graph, config, forker ) ?
+      graphnode_from_graph (graph, forker)
     else { continue; };
     let key : &dyn Fn (&ID) -> ID =
       &|gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
@@ -229,9 +227,9 @@ fn add_children_placed_under_members_as_such (
     . collect ();
   for (note, member, member_as_such, visible) in signals {
     let Some (member_from_disk) : Option<Graphnode> =
-      opt_graphnode_by_gnid (graph, config, member) ?
+      graphnode_from_graph (graph, member)
       else { continue; };
-    if opt_graphnode_by_gnid (graph, config, note) ? . is_none () { continue; }
+    if graphnode_from_graph (graph, note) . is_none () { continue; }
     add_children_placed_under_member_as_such (
       lowered, &member_from_disk, member_as_such, visible,
       graph, config, skgrepo_restriction ) ?; }
@@ -354,12 +352,12 @@ fn resolve_forker_visibility<'a> (
 ) -> Result<(), Box<dyn Error>> {
   for (note, signal) in signals {
     let Some (forker_from_disk) : Option<Graphnode> =
-      opt_graphnode_by_gnid (graph, config, &signal . member) ?
+      graphnode_from_graph (graph, &signal . member)
       else { lowered . set_contains_of_new_member_as_such (
                &signal . member, &signal . visible );
              continue; };
     let Some (note_from_disk) : Option<Graphnode> =
-      opt_graphnode_by_gnid (graph, config, note) ?
+      graphnode_from_graph (graph, note)
       else { continue; };
     let key : &dyn Fn (&ID) -> ID =
       &|gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
@@ -459,7 +457,7 @@ fn resolve_forks_folder_removals (
 ) -> Result<(), Box<dyn Error>> {
   for (note, signal) in signals {
     let Some (note_from_disk) : Option<Graphnode> =
-      opt_graphnode_by_gnid (graph, config, note) ?
+      graphnode_from_graph (graph, note)
       else { continue; };
     if ! config . skgrepo_is_owned (&note_from_disk . home_skgrepo) {
       continue; }
@@ -563,7 +561,7 @@ fn apply_hiddenoutside_edits (
       return Err (Box::new (BufferValidationError::Other (
         format! ("More than one HiddenOutsideOfForkPartners edit was submitted for hider {}", hider) ))); }
     let Some (hider_from_disk) =
-      opt_graphnode_by_gnid (graph, config, hider) ?
+      graphnode_from_graph (graph, hider)
     else { continue; };
     if ! config . skgrepo_is_owned (&hider_from_disk . home_skgrepo) {
       continue; }
@@ -580,7 +578,7 @@ fn apply_hiddenoutside_edits (
     let mut inside : HashSet<ID> = HashSet::new ();
     for partner_gnid in partner_gnids {
       let Some (partner) =
-        opt_graphnode_by_gnid (graph, config, &partner_gnid) ?
+        graphnode_from_graph (graph, &partner_gnid)
       else { continue; };
       for member in partner . contains . iter ()
         . filter (|member| is_visible (member)) {
@@ -675,8 +673,7 @@ fn infer_hides_from_contains_removals (
     in lowered . nodeSaveIntents_with_specified_contains () {
     if ! config . skgrepo_is_owned (&skgrepo) { continue; }
     let Some (hider_from_disk) =
-      opt_graphnode_by_gnid (
-        graph, config, &hider_pid ) ?
+      graphnode_from_graph (graph, &hider_pid)
     else { continue; };
     let key : &dyn Fn (&ID) -> ID =
       &|gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
@@ -728,8 +725,7 @@ fn infer_hides_from_contains_removals (
           for partner in forks_folder_members_shown (
             graph, skgrepo_restriction, &hider_pid, &forkees )
           { if let Some (partner_from_disk) =
-              opt_graphnode_by_gnid (
-                graph, config, &partner ) ?
+              graphnode_from_graph (graph, &partner)
             { contents . push ((
                 partner_from_disk . pid . clone (),
                 members_with_visible_records (
@@ -822,7 +818,7 @@ fn validate_no_overlapping_forkee_hiderel_conflicts (
   for (note, signal) in signals_of_role (
     member_as_such_visibility, MemberAsSuch::Forker ) {
     let Some (forker_from_disk) : Option<Graphnode> =
-      opt_graphnode_by_gnid (graph, config, &signal . member) ?
+      graphnode_from_graph (graph, &signal . member)
       else { continue; };
     let visible_content : HashSet<ID> =
       signal . visible . iter () . map (pid_key) . collect ();
@@ -833,8 +829,7 @@ fn validate_no_overlapping_forkee_hiderel_conflicts (
   for (forker, signal) in signals_of_role (
     member_as_such_visibility, MemberAsSuch::Forkee ) {
     let forkee_from_disk : Graphnode =
-      match opt_graphnode_by_gnid (
-        graph, config, &signal . member ) ?
+      match graphnode_from_graph (graph, &signal . member)
       { Some (forkee_from_disk) => forkee_from_disk,
         None                        => continue, };
     let visible_content : HashSet<ID> =
@@ -843,7 +838,7 @@ fn validate_no_overlapping_forkee_hiderel_conflicts (
       signal . in_integratedElsewhere_or_hiddenIn_folder . iter ()
       . map (pid_key) . collect ();
     let shown_before : bool =
-      match opt_graphnode_by_gnid (graph, config, forker) ? {
+      match graphnode_from_graph (graph, forker) {
         Some (forker_from_disk) =>
           forks_folder_members_drawn (
             graph, skgrepo_restriction, &forker_from_disk, is_diff_view )
