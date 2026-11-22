@@ -61,3 +61,34 @@ describe('skg.keymaps refusals', function ()
     vim.api.nvim_buf_delete(buf, { force = true })
   end)
 end)
+
+-- 'keymaps.commands' names each command's module and function as
+-- strings, resolved only when the command runs; a function moved to
+-- another module without its entry would fail only then.
+describe('skg.keymaps command table', function ()
+  it("names, for every command, a module that loads and its function",
+     function ()
+    local unresolved = {}
+    for name, spec in pairs(keymaps.commands) do
+      local ok, module = pcall(require, spec.module)
+      if not (ok and type(module[spec.fn]) == 'function') then
+        table.insert(unresolved, name .. ' -> ' .. spec.module
+                                 .. '.' .. spec.fn) end
+    end
+    table.sort(unresolved)
+    assert.are.same({}, unresolved)
+  end)
+
+  it('binds keys only to commands it defines', function ()
+    local undefined = {}
+    for _, bindings in ipairs({ keymaps.content_view_bindings,
+                                keymaps.file_bindings,
+                                keymaps.report_bindings }) do
+      for _, binding in ipairs(bindings) do
+        if not keymaps.commands[binding[2]] then
+          table.insert(undefined, binding[1] .. ' -> ' .. binding[2]) end
+      end
+    end
+    assert.are.same({}, undefined)
+  end)
+end)
