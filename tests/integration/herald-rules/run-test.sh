@@ -33,10 +33,4 @@ abbreviation = "m"
 path = "$TEST_DIR/data/owned/skg"
 EOF
 
-start_skg_server
-
-run_client_test
-
-echo ""
-echo "=== Test Complete ==="
-exit $TEST_RESULT
+run_server_and_client_test_then_exit

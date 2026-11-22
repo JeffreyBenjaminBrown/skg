@@ -219,3 +219,13 @@ run_client_test() {
     run_emacs_test "test-emacs.el"
   fi
 }
+
+# The end of a test that checks nothing after its client test: start
+# the server, run the client test, and exit with its result.
+run_server_and_client_test_then_exit() {
+  start_skg_server
+  run_client_test
+  echo ""
+  echo "=== Test Complete ==="
+  exit $TEST_RESULT
+}
