@@ -1,0 +1,134 @@
+* Refactoring for dev: the server's longest functions, measured
+  The territory: all of 'server/', chosen by length rather than by
+  part. A script outside the repository counted, for every 'fn' in
+  'server/' outside 'test_utils' and '#[cfg(test)]' items, the lines
+  from its 'fn' line to its closing brace (a nested 'fn' counts inside
+  its outer one too, and again by itself). The twenty longest, as
+  measured before this round, were read and sorted into two kinds.
+  A "seam" function has stages that run in sequence, a loop body that
+  is a unit, or a block repeated for two cases. A "flat" one is long
+  only because it is a table or one match, or is already split into
+  named nested functions.
+  Six of the seam kind were split. Each extracted function says what
+  it does in the domain's words and takes only what it uses; effects
+  keep their order, errors, warnings and log lines keep their text and
+  target, and an early return is still the caller's.
+  Each split was checked by the whole Rust suite
+  ('cargo test --no-fail-fast'), and the round by 'bash/all-tests.sh'.
+* The measured list
+  Lines before; after, for the ones split.
+** 333 'update_from_and_rerender_buffer_with_approvals_or_preview': seam, done in part (now 247)
+   'server/serve/handlers/save_buffer.rs'. Six steps are functions now,
+   called where their code stood:
+   'error_unless_unrestricted_for_restore_and_processed_requests',
+   'add_restore_instructions_if_requested',
+   'propagate_deletes_unless_asking_where' and
+   'reset_strandeds_unless_asking' (each returns a 'ControlFlow' whose
+   'Break' the caller turns into its early confirmation response),
+   'error_if_dirty_views_conflict', and
+   'send_relaxed_lock_and_log_collateral_views'. See "left" for the rest.
+** 213 'herald_rule_table': flat
+   'server/heralds.rs'. One rule-tree literal.
+** 157 'hide_report_lines': seam, left
+   'server/from_text/hide_report.rs'. The loop over saved forkers is a
+   unit, and the "Hides nothing" reasoning in it another, but they read
+   a dozen locals and closures ('label', 'forker_label',
+   'visible_members', 'containers_of'); see "left".
+** 157 'dispatch_request': flat
+   'server/serve.rs'. One match from request type to handler.
+** 142 'apply_sticky_relRepos_in_graph_with_prospective_homes': seam, left
+   'server/from_text/supplement_from_disk.rs'. The contains, forks and
+   hides blocks are three units, but they share five closures; see
+   "left".
+** 141 'buffer_to_validated_saveplan_with_fork_skgrepos_in_graph': seam, not worth it
+   'server/from_text.rs'. Already a sequence of named calls, each with
+   its comment; what remains inline is a few lines per stage and the
+   'refusal' closure they share. Splitting would scatter the stage
+   list the module header promises.
+** 133 'handle_save_buffer_request': seam, left
+   'server/serve/handlers/save_buffer.rs'. Reads eleven request fields,
+   sends the early lock, and answers the pipeline's error three ways;
+   see "left".
+** 132 'validate_identity_and_derive_changes': seam, done (now 47)
+   'server/dbs/in_rust_graph/prepared_update.rs'. Six steps, each a
+   function: 'gnids_the_batch_affects', 'carriers_claiming_each_gnid',
+   'identity_errors', 'extra_id_revocations', 'carrier_changes',
+   'recorders_to_reindex_after_carrier_changes'.
+** 124 'visit_occurrence': seam, done (now 44)
+   'server/from_text/local_fieldintent_collection/traverse.rs'. Its two
+   cases are 'emit_member_as_such_fieldIntents' and
+   'emit_editable_occurrence_fieldIntents'.
+** 122 'sentences_for_path': flat
+   'server/herald_descriptions.rs'. One match from metadata path to
+   sentence, mostly literal text.
+** 120 'text_search_response': seam, left
+   'server/serve/handlers/text_search.rs'. Reading the request
+   (S-expression, search choice, terms) is a unit; see "left".
+** 117 'buffer_validation_error_text': flat
+   'server/types/errors.rs'. One match on the error's variant.
+** 109 'handle_single_root_view_request': seam, done (now 56)
+   'server/serve/handlers/single_root_view.rs'. Its three answers:
+   a refusal when 'gnid_is_kept_out', 'switch_to_view_sexp' when the
+   root is already open, else 'draw_and_register_single_root_view'.
+** 101 'instructionMerge_fieldIntent': flat
+   'server/from_text/local_fieldintent_collection/types.rs'. One match
+   on the fieldIntent, tangled with the borrow of one entry.
+** 101 'classify_metadata_element': flat
+   'server/serve/parse_metadata_sexp.rs'. One match on the element.
+** 100 'viewnode_from_metadata': flat
+   'server/serve/parse_metadata_sexp.rs'. One match on the kind.
+** 99 'run_server': seam, done (now 85)
+   'server/main.rs'. 'spawn_busysignal_thread' and
+   'start_repo_watcher_else_warning' are named; the start stays one
+   visible sequence, because its order is load-bearing.
+** 97 'update_views_after_save': seam, not worth it
+   'server/rerender_pass.rs'. Its stages are already named calls; the
+   two text-release checks differ in what they gate.
+** 97 'update_prominence_sources': seam, done (now 39)
+   'server/dbs/tantivy/prominence_update.rs'. The loop body's document
+   is rebuilt by 'document_with_prominence_source', which reads the
+   stored fields with the existing 'string_field'.
+** 96 'occurrence_metadata_to_string': flat
+   'server/org_to_text.rs'. Already split into nested functions
+   ('node_parts' and its own); long only because they are counted
+   inside it.
+* Left, best first
+** The rest of 'update_from_and_rerender_buffer_with_approvals_or_preview' (247 lines)
+   'save_buffer.rs'. Still the longest. Natural next pieces: the
+   viewnode-ID room check for a buffer the connection does not hold,
+   the stale-write refusal, the fork confirmation, and the final
+   warning assembly (whose order is the user's: parse, rerender,
+   strandeds, stale, restore, processed, hidden-outside). Safe the
+   same way; the steps' positions are load-bearing ('TODO/problems.org',
+   "The save handler's checks depend on their position in it"), so
+   extract in place, never reorder. Small work each.
+** 'handle_save_buffer_request' (133 lines)
+   'save_buffer.rs'. Its three answers to a pipeline error (preview
+   refusal, 'SaveError' refusal, other error logged and refused) could be
+   one 'send_pipeline_error'. The '(Err (err), _)' arms that read the
+   payload have their own text ("Error reading save payload"), which
+   must stay. Safe, small. Gathering the eleven request fields into one
+   struct would also shorten the pipeline's seventeen arguments, but
+   touches every test that calls the '_with_approvals' entry points.
+** 'text_search_response' (120 lines)
+   'text_search.rs'. Reading the request could return '(Sexp, choice,
+   terms)' or the response to send; each refusal keeps its text and its
+   'tracing::error!'. Safe, small.
+** 'hide_report_lines' and 'apply_sticky_relRepos_in_graph_with_prospective_homes'
+   Both are long because their units share closures over many locals.
+   Turning the closures into a small struct with methods ('label',
+   'visible_members' for the first; 'home_of', 'default_floor_for',
+   'sticky_skgrepo_for', 'resolve_skgrepo' for the second) would let
+   each unit be a function. The user-visible text of both (the hide
+   report's lines; the relRepo refusals) must stay word for word.
+   Medium work, moderate risk; worth it when someone next changes them.
+** The longest files
+   'server/types/viewnode.rs' (1702 lines), 'save_buffer.rs' (1231 after
+   this round), 'parse_metadata_sexp.rs' (1106; see
+   'server-serve-and-handlers.org' for its three seams),
+   'herald_descriptions.rs' (972), 'refresh/visit.rs' (953),
+   'obsidian/export.rs' (949). Not looked at for seams this round.
+   'save_buffer.rs' could move its response payloads
+   ('strandeds_confirmation_response', 'delete_from_confirmation_response',
+   'empty_response_sexp' and kin) to a 'save_buffer/response.rs', beside
+   'save_buffer/request.rs'; moving code unchanged is safe.
