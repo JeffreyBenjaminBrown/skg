@@ -1,3 +1,6 @@
+//! Small git conversions: a git2 diff delta to a 'PathDiffStatus', and
+//! an absolute path to one relative to its gitrepo.
+
 use crate::types::git::{GitDiffStatus, PathDiffStatus};
 
 use git2::{DiffDelta, Delta, Repository};

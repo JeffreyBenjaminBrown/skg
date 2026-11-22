@@ -1,3 +1,7 @@
+//! Reading a gitrepo with git2: 'open_gitrepo', its staged and unstaged
+//! '.skg' changes, a file's content at HEAD or in the index, and the
+//! remote a receiver would fetch it from ('skgrepo_git_remote').
+
 use crate::types::git::PathDiffStatus;
 
 use git2::{Repository, Diff, DiffOptions, Error, ErrorCode, ObjectType};

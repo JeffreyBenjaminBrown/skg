@@ -1,3 +1,8 @@
+//! A skgrepo's git diff as nodes ('compute_diff_for_skgrepo'): the nodes
+//! its '.skg' files add or delete, staged (index against HEAD) and then
+//! unstaged (worktree against index). The diff view reads deleted and
+//! added nodes' titles from it ('serve/handlers/titles_by_gnids.rs').
+
 use crate::dbs::filesystem::retired_keys::{quoted_keys, retired_keys_held};
 use crate::types::git::{ GitDiffStatus, PathDiffStatus, SkgrepoDiff };
 use crate::types::misc::SkgrepoName;

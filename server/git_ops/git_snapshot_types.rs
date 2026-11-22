@@ -1,3 +1,6 @@
+//! The types of a graph read from git ('git_snapshot.rs'):
+//! 'GraphSnapshot' and which tree it was read from ('GitSnapshotKind').
+
 use crate::types::misc::ID;
 use crate::types::nodes::complete::Graphnode;
 
