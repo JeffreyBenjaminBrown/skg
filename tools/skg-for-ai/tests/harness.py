@@ -36,7 +36,24 @@ SHARED_SKGREPO_LABELS = os . path . join (
   REPO_ROOT, "tests", "shared", "herald-skgrepo-labels.sexp" )
 SERVER_BINARY = os . environ . get (
   "SKG_BINARY", os . path . join (REPO_ROOT, "target", "debug", "skg") )
-PORT = int ( os . environ . get ( "SKG_FOR_AI_TEST_PORT", "1793" ))
+
+def port_for_this_checkout ():
+  """1793 in the main checkout; in a linked worktree, the even port
+  'skg_port_for_this_checkout' ('bash/test-runner-lib.sh') derives
+  from its path, so that suites run at once from separate worktrees
+  do not take the same port, nor the port after it."""
+  return subprocess . run (
+    [ "bash", "-c",
+      'source "$1" && skg_port_for_this_checkout 1793 "$2"', "bash",
+      os . path . join (REPO_ROOT, "bash", "test-runner-lib.sh"),
+      REPO_ROOT ],
+    capture_output = True, text = True, check = True ) . stdout . strip ()
+
+# SKG_FOR_AI_TEST_PORT overrides the port; 'bash/all-tests.sh' sets it
+# the same way.
+PORT = int ( os . environ [ "SKG_FOR_AI_TEST_PORT" ]
+             if "SKG_FOR_AI_TEST_PORT" in os . environ
+             else port_for_this_checkout () )
 SERVER_READY_TIMEOUT_SECONDS = 60
 HANDLE_PATTERN = re . compile (r'⟨([0-9a-z]+)[ ⟩]')
 VIEWNODE_ID_PATTERN = re . compile (r'^\*+ \(skg \(vnid ([0-9a-z]+)\)')

@@ -36,7 +36,8 @@ In order, it:
   the rule table and label table pinned beside it and each case's
   context, and compares the text;
 - copies 'test-fixture/' to a scratch data root, starts a server
-  there on port SKG_FOR_AI_TEST_PORT (default 1793), and runs each
+  there on port SKG_FOR_AI_TEST_PORT (default 1793, or in a linked
+  git worktree a port derived from its path), and runs each
   view command of the tool against it, 'forest' with every kind
   ('forest' of an absent ID refused as 'view' of it is);
 - compares each compact view with its file in 'test-expected/', and

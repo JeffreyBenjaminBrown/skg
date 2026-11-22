@@ -37,8 +37,10 @@ never shared or symlinked: a shared one lets one agent's build
 replace the binary another's tests are running. Each sets
 'SKG_FOR_AI_TEST_PORT' to a port of its own before running the AI
 reader's tests or the suite, and no other agent may use the port
-after it, where those tests start a second server; their default,
-1793, collides.
+after it, where those tests start a second server. Their default
+is 1793 in the main checkout and, in a linked worktree, a port
+derived from its path ('skg_port_for_this_checkout' in
+'bash/test-runner-lib.sh'), which two worktrees may still share.
 None runs 'git stash': worktrees share one stash list, and Jeff's
 stashes are in it. None runs 'pkill' or 'killall' by name, which
 kills other agents' servers and Jeff's; each kills only PIDs it
