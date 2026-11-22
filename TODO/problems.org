@@ -345,7 +345,6 @@
   restricted ones included: a read leak, not a write. Found by
   the slice's repeat of the search; filed by the orchestrator.
   Read, not run.
-* Problems noticed while executing plan 08, slice 1 (2026-10-29)
 * Problems noticed while executing plan 19, slice 12 (2026-10-24)
 ** Two texts with a bare "repo"
   The overPrivateText release warning says "selected below its node's
@@ -369,15 +368,6 @@
   Each was run by a throwaway test; the reports are under
   'tests/results/review18/'. The decisions are in
   'TODO/total-diff-view/18_review.org'.
-** A diff-view save after HEAD changes warns of a reinstated member
-  The first save of a diff-view buffer after HEAD changes can warn
-  "Repaired containerFolder under node x: reinstated 1 member(s): ...".
-  A partner folder that 'changed_partner_folders' creates empty
-  during the saved view's completion is filled at its own visit, and
-  'push_repair_warnings' ('server/update_buffer/reconcile/partner_folder.rs')
-  reports the members it creates as reinstated, though the user
-  deleted nothing. Traced in slice 2 of plan 19
-  ('TODO/total-diff-view/progress.org'); not rechecked since.
 ** The readiness summary's foreign-change count goes stale
   'GraphStraddle::with_after' ('server/graph_straddle/build.rs')
   carries the foreign-change count forward without recounting, so
@@ -395,14 +385,6 @@ relationships missed. Also, relationships INTO a node moved more private
 keep their more public repo, leaving its ID there; that one is a server
 gap too. Details, options and questions:
 [[file:repo-move-graph-logic/1_discussion.org][Repo moves do graph logic in the client]].
-* Problems noticed while executing the herald-colors renames (2026-10-04)
-** import-md-and-org integration test fails at baseline
-  Before any herald-colors change, 'bash/integration-tests.sh' fails
-  'import-md-and-org': its 'notes.org' fixture has a heading-like line
-  ("* not a heading") inside a block, which the importer now refuses
-  ("Import preview cannot be applied"), while the test expects that
-  line to be imported as escaped body text. Either the fixture or the
-  test's expectation is stale.
 * Findings from the simplification reconnaissance (2026-09-25)
   Research and proposed slices: [[file:astra-cleans-up.org][Making Skg easier to change]].
   These are source-inspection findings; no application changes or runtime
@@ -429,13 +411,13 @@ gap too. Details, options and questions:
    identity walks. Share immutable identity-transition facts while retaining
    distinct index, validation, write, and view dependency scopes and an
    independent full reconstruction oracle.
-** 'graphnode_by_gnid' takes a config it ignores
-   'graphnode_by_gnid' ('server/dbs/node_lookup.rs') ignores its
-   '_config' argument; its callers include tests
-   ('tests/partner_folder_matrix.rs', 'tests/shared/view_and_save_helpers.rs'),
-   so dropping it changes them. 'tests/mutation_gate.rs' keeps its own
+** 'tests/mutation_gate.rs' copies a projection the server has
+   'tests/mutation_gate.rs' keeps its own
    copy of the projection that 'From<&GraphnodeInRust> for Graphnode'
    ('server/types/nodes/rust.rs') now is.
+   (Split on 2026-11-22 from "'graphnode_by_gnid' takes a config it
+   ignores", now in TODO/DONE/problems.org; the copy is
+   'complete_from_rust'.)
 ** Ordinary saves and node merges have different index application policies
    'server/save.rs::apply_defineNodes' queues Tantivy updates with computed
    context types. 'server/nodeMerge.rs::apply_prepared_nodeMerges' writes
@@ -463,28 +445,6 @@ gap too. Details, options and questions:
   emitted. Computing final ID existence must account for Save, Delete,
   fork, and nodeMerge outcomes together; merely subtracting Delete intents
   would mishandle IDs retained by a merge.
-* Problems noted while cleaning up stray servers (2026-07-26)
-  Context: two cargo-watch processes and one skg were alive at once;
-  the newer skg had died with 'Address already in use'. Root cause is
-  in TODO/DONE/problems.org ("start-servers.sh could not kill the
-  cargo-watch it was trying to kill"), fixed the same day. These are
-  the things I noticed but did NOT change.
-** data/logs/ grows without bound (516 MB as of 2026-07-26)
-   cargo-watch.log 114 MB (681k lines, appended with '>>' across every
-   run since June), server.jsonl 294 MB, server-to-user.log 133 MB.
-   Two costs, one of them not obvious:
-   - Disk: 516 MB of a 452 GB volume already 81% full.
-   - Diagnosis: the log is now the FIRST place to look when the server
-     will not start (see the 2026-07-25 entry below and the
-     skg-wont-start memory), and 'tail' of a 114 MB file interleaves
-     runs with no separator -- the AddrInUse error from this incident
-     sat 156 lines from the end, indistinguishable at a glance from
-     the healthy startup that followed it.
-   Cheapest useful fix: have start_skg_with_restart append a banner
-   line ("=== start-servers.sh run at <date>, script PID <n> ===")
-   before launching cargo-watch, and rotate (mv to .1, keep 2) when
-   the log exceeds some size. Rotation of server.jsonl probably wants
-   to live in the server instead.
 * Problems noted while recovering a wedged server (2026-07-25)
   Context: Jeff reported "I can't start the server -- usually TypeDB is
   borked." TypeDB was innocent and healthy the whole time. The actual
@@ -542,11 +502,6 @@ gap too. Details, options and questions:
    disproportionate, and it is precisely when you can least afford to
    lose the tool (you cannot inspect or delete the offending node
    through the UI, because the UI will not start).
-** data/logs/ is unrotated and now ~540 MB
-   cargo-watch.log 114 MB, server-to-user.log 133 MB, server.jsonl
-   294 MB. server.jsonl in particular grows without bound and made
-   grepping for one node ID slow enough to notice. Suggested fix:
-   rotate or truncate on startup, or cap by size.
 * Problems noted while building recursive set-relRepo (2026-07-22)
   Context: the investigation written up in
   TODO/DONE/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org.
@@ -587,15 +542,6 @@ gap too. Details, options and questions:
    linker error on unchanged code usually means truncated artifacts in
    target/. Cheap, and it would have collapsed this whole investigation
    into one command.
-** Server logs grow without bound
-   data/logs/ currently holds ~500 MB across three files that are only
-   ever appended to, never rotated or truncated:
-   server.jsonl (275 MB), server-to-user.log (124 MB),
-   cargo-watch.log (105 MB, appended with '>>' by start-servers.sh).
-   Nothing trims them. They are also the files a crash leaves NUL-padded,
-   which makes them progressively less pleasant to read. Suggested fix:
-   rotate on startup (keep one previous generation), or cap by size.
-* Problems noted during the fork-fixes arc (TODO/DONE/fork-fixes.org)
 * Problems noted while writing forking-and-privacy.org
 ** Fork deliberate-pick rule is enforced only client-side
    docs/forks.org promises "approving before you have set every
@@ -619,7 +565,6 @@ gap too. Details, options and questions:
    before ranking and truncation. Behaviorally identical (groups are
    per-ID and skgrepo is a function of ID), so this is a doc wording
    nit only.
-* Problems noted during the forks arc (TODO/forks/)
 * Problems found during herald overhaul research
 ** (mostly fixed) Save validation and extraction use different edit-request surfaces
    The save extraction path uses 'collect_savenode_candidates' to define
@@ -652,32 +597,6 @@ gap too. Details, options and questions:
   drop that warning. At current sizes this is fine but worth measuring
   on a larger garden.
 * Other problems
-** Windows packaging request names scripts as top-level =bash/= scripts, but they live in =data/bash/=
-   The requested files =pull-all.sh=, =push-all.sh=, =remote-all.sh=,
-   and =status-all.sh= are not present under top-level =bash/= in this
-   checkout. They exist under =data/bash/=, which appears to be
-   gitignored/private data.
-
-   If these are intended to be packaged for new users, they should
-   probably live in a tracked template/starter-data location, or the
-   Windows packaging plan should explicitly copy them from the private
-   =data/bash/= source.
-
-** 'bash/start-servers.sh' process management is not safe for multiple Skg servers in one container
-   Found while writing docker-unification-strategies.org.
-
-   'start_skg_with_restart' runs broad process kills:
-   - 'pkill -f "cargo watch.*skg"'
-   - cleanup runs 'pkill -f "cargo watch.*skg"' and
-     'pkill -f "cargo run --bin skg"'
-
-   That is fine-ish when each Skg instance has its own container, but in a
-   unified container it means starting or stopping one instance can kill the
-   production server or another coding session.
-
-   Fix direction: manage Skg processes per config/data-root, probably with
-   PID files under the data root's logs/run directory, and split TypeDB
-   lifecycle management from Skg server lifecycle management.
 ** Long-running SKG server can hide code/protocol fixes
    On 2026-05-04, the server process listening on port 1730 was still
    an older / already-running binary. It accepted 'titles by ids'
@@ -736,46 +655,6 @@ gap too. Details, options and questions:
    Possible fixes: watch the config file too, log the active port and
    config path in a user-visible way, or add a client diagnostic that
    explicitly says "config wants port X but no server is listening".
-** Diff analysis still does whole-repo work for tiny diffs
-   Investigated on 2026-05-22;
-   see 'faster-diff-analysis.org'.
-
-   After the changed-file prototype and endpoint snapshot cache, clean
-   diffs are fast and repeated one-change reports are much faster. The
-   next win is cached inverse indexes or reusable 'GraphFacts' keyed by
-   the same endpoint identities.
-** GraphStats rendering still lacks parent-kind context
-   Observed on 2026-05-31 while splitting 'ParentIs' from 'Birth'.
-
-   'server/org_to_text.rs' renders an active vognode's graphStats from only
-   the active vognode metadata. After 'Container' and 'Collector' collapsed
-   to 'ParentIs::Affected', relation collection children and ordinary
-   content children can no longer be distinguished there.
-
-   The local workaround hides an affected node's container count when
-   it is 0 or 1, which preserves the old rendered behavior for relation
-   collection members and ordinary one-container content. A more exact
-   implementation would pass parent tree context into metadata
-   rendering, so a non-vognode child and a normal Vognode child can use
-   different graphStats suppression rules.
-* Problems found while taking over the local-view-update dialog (2026-06-02)
-  Found while answering the open questions in
-  TODO/DONE/local-view-update/problems.org. Each is cross-referenced there.
-** (not a bug, but a simplification) Lock over-approximates the rerender set
-   server/serve/handlers/save_buffer.rs, elisp/skg-request-save.el.
-   The early lock message ('uris_of_views_to_lock') locks every open view
-   sharing any PID with the saved buffer, but only views sharing a
-   *changed* PID receive a 'collateral-view' message
-   ('find_collateral_view_uris'). I checked the client: a buffer that is
-   locked but never rerendered is still unlocked, because
-   'skg--save-result-handler' calls 'skg--unlock-all-save-locked' on
-   save-result (skg-request-save.el:171, and again in its unwind-protect at
-   174). So there is no permanently-locked bug.
-
-   It is therefore only an opportunity to simplify: narrowing the lock to
-   the changed-PID set would make lock and rerender coincide, removing the
-   transient lock on buffers that won't change. See the collateral
-   resolution in TODO/DONE/local-view-update/problems.org.
 * Performance: the save-buffer pathway (see profiling-save.org)
   Profiling the save of an insert-a-child edit (node 846207ef, 'doing')
   found four inefficiencies, in impact order. Full evidence, numbers,
@@ -789,38 +668,6 @@ gap too. Details, options and questions:
    entry in TODO/DONE/problems.org); also consider debouncing commits
    (Tantivy is a rebuildable cache) and dropping the forced per-commit
    'reader.reload()' in production.
-* Problems found during full-schema metaplan 2 research (2026-06-10)
-** (probably fixed) Flaky test: 'ids::save' group in tests/git_diff_view.rs
-   'test_delete_id_scaffolds_respawns' (since renamed
-   'test_delete_id_scaffolds_aborts') fails intermittently when the
-   whole 'git_diff_view' target (or even just its 'ids::save' group)
-   runs under plain 'cargo test', and passes in isolation and under
-   'cargo nextest run' (which gives each test its own process).
-   Confirmed pre-existing: it reproduces at commit 63feeef1, before
-   the full-schema stage-8 work. Probably a shared-resource race
-   among the tests in that target (the kind common-gotchas.org
-   warns about); each uses its own db name, so the shared resource
-   is something else (possibly git or tempdir state under
-   run_save_test). Worth a look before trusting plain 'cargo test'
-   runs of that target.
-* Problems found while planning the diff-mode-policy stage (2026-06-11)
-** 'skg-view-diff-mode' branches on a "\nWarning:" substring
-   elisp/skg-request-git-diff-mode.el.  The git-diff-mode response
-   handler pops a window ('skg-big-nonfatal-message') iff the
-   response 'content' contains the literal substring "\nWarning:";
-   otherwise it echoes via 'message'.  Any future first-message text
-   containing that substring -- a refusal, an error -- pops a window
-   unintentionally.  The diff-mode-policy stage's refusal texts avoid
-   the substring; a typed flag in the response would be the real fix,
-   deferred until a second message kind needs the pop.
-* Problems found while executing the diff-mode-policy stage (2026-06-11)
-** (probably fixed) Flaky test: whole-suite 'cargo nextest run' failed once in text::view
-   'text::view::test_title_diff_staged_shows_staged_scaffolds'
-   failed once during a full parallel 'cargo nextest run'
-   (2026-06-11), then passed on every retry (5x in isolation, full
-   suite re-run).  Same family as the pre-existing 'ids::save'
-   flake above: per-test dbs, so the shared resource is something
-   else.  Not chased.
 * Problems found while investigating test-suite speed (2026-06-12)
   See TODO/DONE/faster-tests.org for the full investigation.
 ** (mostly fixed) Six near-duplicate test-db setup paths
@@ -942,19 +789,6 @@ gap too. Details, options and questions:
   Found while writing TODO/DONE/delete-shared-node/.  The first is the
   reported bug; the others are pre-existing gaps exposed by making
   foreign dangling relationships an intentional state.
-** PhantomUnknown is rendered but silently omitted from content saves
-   Content reconciliation can render a raw unresolved 'contains' member
-   as '(skg (unknown (id ...)))'. Save traversal then ignores the phantom
-   and 'content_members()' collects only affected Active children. Thus
-   an unchanged editable save can remove the dangling membership even
-   though the Unknown remains visibly present in the submitted buffer.
-
-   The existing test
-   tests/dangling_reference_renders_unknown_node.rs proves only that such
-   a buffer saves without an error; it never reloads the parent to check
-   whether the member survived. This needs an explicit round-trip
-   contract and a test of the resulting relationship, not merely the
-   response's error list.
 ** Outbound PartnerFolders discard unresolved raw members
    The outbound accessors in
    server/dbs/in_rust_graph/relation_accessors.rs enumerate relationship
@@ -968,25 +802,6 @@ gap too. Details, options and questions:
    recorder could remove most non-content dangling relationships. These
    paths need raw-ID-aware enumeration and a true Unknown case if the
    deletion policy covers all four structured outbound fields.
-* Herald-system drift found while designing override-ancestry-in-search-results (2026-07-21)
-  Context: the uniform-herald refactor (server/herald_tokens.rs) folded
-  the old per-atom graphStats counts and the per-relation viewStats
-  flags into two assembled token strings, (birthHerald ...) and
-  (rels ...). api-and-formats.org's "Stats metadata" section still
-  described the retired atoms ("Op"/"pO"/"gO"/"Sp"/... and the
-  (graphStats ...) sexp); that section is now REWRITTEN to match, so it
-  is not the open problem. These residuals are:
-** PARTNER_ROLE_VOCAB's glyph column and RelationRole::glyph() are vestigial
-   server/dbs/in_rust_graph/relation_accessors.rs: the third column of
-   PARTNER_ROLE_VOCAB ("}", "Op", "pO", "Sp", ...) and the 'glyph()'
-   accessor no longer drive any rendering -- a role graft's herald
-   is the ancestor-lettered token the uniform grammar assembles, not a
-   fixed glyph. 'glyph()' is called only by its own self-consistency
-   test (relation_accessors.rs:449). The "Op"/"pO" strings actively
-   mislead (they read as the retired scheme). Candidate: delete the
-   glyph column, 'glyph()', and that test -- or, if a fixed per-role
-   glyph is still wanted somewhere, document where. Left alone for now
-   (a self-consistent const + test, out of scope for the search feature).
 * Herald rule-table retirement remains separate (reviewed 2026-09-23)
   The September herald audit rewrote 'api-and-formats.org' to document
   semantic '(rels ...)' facts and linked the user legend in
@@ -995,30 +810,6 @@ gap too. Details, options and questions:
   non-relationship tokens. Its eventual retirement is tracked by
   'TODO/DONE/semantic-heralds-wire/retire-rule-table.org' and is outside the
   September plan; that future work must update this protocol section.
-* Problems confirmed while planning TypeDB removal (2026-09-12)
-** Hidden relationships participate in path and ancestry topology
-   'path_to_first_nonlinearity' calls the legacy, stringly typed
-   'find_related_nodes', which has no active-repo-set argument.
-   'full_containerward_ancestry_from_in_rust_graph' reads 'contained_by'
-   directly, likewise ungated.  Their rendering callers pass the active
-   set only later while inserting nodes.
-
-   The late insertion path does check the exact relSource as well as
-   the endpoint's home.  Once the TypeDB servers were available, all five
-   tests in 'tests/leak_battery.rs' passed, including the rendered
-   containerward case between two public endpoint nodes.  No direct leak
-   is demonstrated here.
-
-   The hidden relationship still shapes the traversal before being discarded.  It
-   can create a false fork that truncates an otherwise linear visible
-   path; in full ancestry, hidden branches share the 'visited' set and can
-   cause a node on a visible branch to be classified as 'Repeated'.  A
-   post-traversal render gate cannot recover the omitted visible suffix.
-   Fix by making the graph-native path and ancestry APIs accept
-   'RelationRole' plus the active skgrepo-set and use the gated directional
-   accessors during traversal.  Retain insertion-time relationship gating as
-   defence-in-depth, and add hidden-sibling-fork and mixed-visibility
-   diamond regressions.
 * Requests holding a raw newline break the line-based protocol (2026-11-12)
 ** Only the streaming sender guards against it
    The server reads one request per line ('server/serve.rs'), and the
