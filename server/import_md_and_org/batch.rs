@@ -88,11 +88,8 @@ pub fn prepare_import_batch_with (
     .map (|(document, built)|
       (document . path . clone (), built . export_target . clone ()))
     .collect ();
-  let existing : Vec<Graphnode> =
-    existing_authoritative_nodes (&runtime . config)?;
-  ensure_runtime_matches_disk (&existing, &runtime . graph)?;
-  check_export_target_conflicts (
-    &export_targets, &runtime . config, &existing)?;
+  check_configured_skgrepos_admit_import (
+    &export_targets, &runtime . config, &runtime . graph)?;
   let record_documents : Vec<(PathBuf, ID)> = documents . iter ()
     . zip (built . iter ())
     . map (|(document, built)| (document . path . clone (), built . root_gnid . clone ()))
@@ -177,11 +174,8 @@ impl PreparedImportBatch {
       return Err ("Input files changed; preview again" . to_string ()); }
     if skgrepo_file_evidence (&runtime . config)? != self . destination_evidence {
       return Err ("Configured repo files changed; preview again" . to_string ()); }
-    let existing : Vec<Graphnode> =
-      existing_authoritative_nodes (&runtime . config)?;
-    ensure_runtime_matches_disk (&existing, &runtime . graph)?;
-    check_export_target_conflicts (
-      &self . export_targets, &runtime . config, &existing)?;
+    check_configured_skgrepos_admit_import (
+      &self . export_targets, &runtime . config, &runtime . graph)?;
     let record_id : ID = self . record_id . ok_or_else (||
       "An empty import has no approval token or record" . to_string ())?;
     let mut nodes : Vec<Graphnode> = self . nodes;
@@ -231,6 +225,20 @@ fn configured_identity_map (
       for extra in &section . extra_ids {
         gnids . insert (extra . 0 . clone (), section . pid . clone ()); } } }
   Ok (gnids)
+}
+
+/// The configured skgrepos' files still match the runtime graph, and
+/// no export root among them claims a path that one of
+/// 'export_targets' would write. The preview checks this, and the
+/// approval checks it again.
+fn check_configured_skgrepos_admit_import (
+  export_targets : &[(PathBuf, String)],
+  config : &SkgConfig,
+  graph : &InRustGraph,
+) -> Result<(), String> {
+  let existing : Vec<Graphnode> = existing_authoritative_nodes (config)?;
+  ensure_runtime_matches_disk (&existing, graph)?;
+  check_export_target_conflicts (export_targets, config, &existing)
 }
 
 fn existing_authoritative_nodes (
