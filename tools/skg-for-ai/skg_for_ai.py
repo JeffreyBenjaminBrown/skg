@@ -274,12 +274,12 @@ def run_command (arguments):
         [ option for option in SEARCH_OPTIONS if getattr (arguments, option) ],
         show )
     require_view_has_headlines (view)
-    view [ "command" ] = arguments . command
+    view . command = arguments . command
     base_name = arguments . name or default_base_name (arguments)
     written_paths = write_view_files (
       connection, view, arguments . out_dir, base_name,
       not arguments . no_summary )
-    release_view (connection, view [ "view_id" ])
+    release_view (connection, view . view_id)
   finally:
     connection . close ()
   for path in written_paths:
@@ -827,7 +827,7 @@ def command_save (arguments):
     written_paths = write_view_files (
       connection, rerendered, saved_view . directory, saved_view . base_name,
       saved_view . sidecar [ "summary" ] )
-    release_view (connection, rerendered [ "view_id" ])
+    release_view (connection, rerendered . view_id)
   finally:
     connection . close ()
   for path in written_paths:
@@ -878,17 +878,18 @@ def command_extend (arguments):
     print ( "Extended: " + processed_summary_text (processed_summary) )
     connection . log_view_event (
       "extended", saved_view . directory, saved_view . base_name )
-    view = { "view_id"     : sidecar [ "view_id" ],
-             "command"     : sidecar [ "command" ],
-             "request"     : sidecar [ "request" ],
-             "content"     : sexp_to_text ( response_field (rerendered, "content") ),
-             "errors"      : [],
-             "warnings"    : response_field (response, "warnings") or [],
-             "processed_summary" : processed_summary }
+    view = RenderedView (
+      view_id  = sidecar [ "view_id" ],
+      command  = sidecar [ "command" ],
+      request  = sidecar [ "request" ],
+      content  = sexp_to_text ( response_field (rerendered, "content") ),
+      errors   = [],
+      warnings = response_field (response, "warnings") or [],
+      processed_summary = processed_summary )
     written_paths = write_view_files (
       connection, view, saved_view . directory, saved_view . base_name,
       sidecar [ "summary" ] )
-    release_view (connection, view [ "view_id" ])
+    release_view (connection, view . view_id)
   finally:
     connection . close ()
   for path in written_paths:
@@ -977,16 +978,17 @@ def command_perspective (arguments):
       ": " + name )
     written_paths = write_view_files (
       connection,
-      { "view_id"     : view_id,
-        "command"     : sidecar [ "command" ],
-        "request"     : sidecar [ "request" ],
-        "content"     : sexp_to_text ( response_field (rerendered, "content") ),
-        "errors"      : [ sexp_to_text (error) for error
-                          in response_field (done, "errors") or [] ],
-        "warnings"    : [ sexp_to_text (warning) for warning
-                          in response_field (done, "warnings") or [] ],
-        "perspective" : perspective,
-        "perspective_name"   : name },
+      RenderedView (
+        view_id  = view_id,
+        command  = sidecar [ "command" ],
+        request  = sidecar [ "request" ],
+        content  = sexp_to_text ( response_field (rerendered, "content") ),
+        errors   = [ sexp_to_text (error) for error
+                     in response_field (done, "errors") or [] ],
+        warnings = [ sexp_to_text (warning) for warning
+                     in response_field (done, "warnings") or [] ],
+        perspective      = perspective,
+        perspective_name = name ),
       saved_view . directory, saved_view . base_name, sidecar [ "summary" ] )
     release_view (connection, view_id)
   except SkgToolError:
@@ -1020,8 +1022,8 @@ def perspective_of_sidecar (sidecar):
   return DEFAULT_PERSPECTIVE
 
 def perspective_fields_of_sidecar (sidecar):
-  """The fields of a view dict ('write_view_files') that carry the
-  perspective a SIDECAR records into a rewrite of its view."""
+  """The fields of a 'RenderedView' that carry the perspective a
+  SIDECAR records into a rewrite of its view."""
   return { "perspective" : perspective_of_sidecar (sidecar),
            "perspective_name"   : sidecar . get ("perspective_name") }
 
@@ -1110,7 +1112,7 @@ def command_new (arguments):
     close_view_on_server (connection, creating_view_id)
     connection . log_event ( "saved new root " + title )
     new_root = next ( ( line for line in
-                        parse_full_view ( rerendered [ "content" ] )
+                        parse_full_view ( rerendered . content )
                         if line . is_headline ), None )
     node_id = ( headline_gnid (new_root . metadata)
                 if new_root is not None and new_root . metadata is not None
@@ -1120,12 +1122,12 @@ def command_new (arguments):
         "The save succeeded, but its re-rendered view names no new node." )
     view = fetch_single_root_view (connection, node_id)
     require_view_has_headlines (view)
-    view [ "command" ] = "view"
+    view . command = "view"
     written_paths = write_view_files (
       connection, view, arguments . out_dir,
       arguments . name or base_name_for ( "view", node_id ),
       not arguments . no_summary )
-    release_view (connection, view [ "view_id" ])
+    release_view (connection, view . view_id)
   finally:
     connection . close ()
   print ( "New node: " + node_id )
@@ -1151,7 +1153,7 @@ def command_diff (arguments):
         ( arguments . name or "diff" ) + "_" +
         buffer_name . replace (" ", "-"),
         not arguments . no_summary )
-      release_view (connection, view [ "view_id" ])
+      release_view (connection, view . view_id)
   finally:
     connection . close ()
   if not written_paths:
@@ -1739,15 +1741,15 @@ def print_messages (messages):
 def require_view_has_headlines (view):
   """A search with no match answers with a message, and a view of an
   ID the graph lacks with an empty buffer: neither is a view."""
-  content = view [ "content" ] or ""
+  content = view . content or ""
   if not any ( HEADLINE_PATTERN . match (line)
                for line in content . split ("\n") ):
     raise SkgToolError (
       ( "The server returned no view: " + content . strip ()
         if content . strip ()
         else "The server returned an empty view; the graph may lack that ID." )
-      + ( " Errors: " + json . dumps ( view [ "errors" ], ensure_ascii = False )
-          if view [ "errors" ] else "" ))
+      + ( " Errors: " + json . dumps ( view . errors, ensure_ascii = False )
+          if view . errors else "" ))
 
 def fetch_single_root_view (connection, node_id, show_overPrivateText = False):
   view_id = "content-view:" + node_id
@@ -1764,11 +1766,12 @@ def fetch_single_root_view (connection, node_id, show_overPrivateText = False):
   open_view_id = response_field (response, "switch-to-view")
   if open_view_id is not None:
     raise SkgViewAlreadyOpen ( node_id, sexp_to_text (open_view_id) )
-  return { "view_id"     : view_id,
-           "request"     : { "id" : node_id },
-           "content"     : response_field (response, "content"),
-           "errors"      : response_field (response, "errors") or [],
-           "warnings"    : response_field (response, "warnings") or [] }
+  return RenderedView (
+    view_id  = view_id,
+    request  = { "id" : node_id },
+    content  = response_field (response, "content"),
+    errors   = response_field (response, "errors") or [],
+    warnings = response_field (response, "warnings") or [] )
 
 # The search options of 'C-c f i', each a flag of 'search'.
 SEARCH_OPTIONS = ( "regex", "body", "operators" )
@@ -1801,12 +1804,13 @@ def fetch_search_view (connection, terms, options = (),
     # no match, or an error: a message, not a view, which has no warnings
     raise SkgToolError ( "The server returned no view: " +
                          response_text_field (response, "content") )
-  return { "view_id"     : "search:" + terms,
-           "request"     : dict ( { "terms" : terms },
-                                  ** { option : True for option in options } ),
-           "content"     : response_field (response, "content") or "",
-           "errors"      : [],
-           "warnings"    : response_field (response, "warnings") or [] }
+  return RenderedView (
+    view_id  = "search:" + terms,
+    request  = dict ( { "terms" : terms },
+                      ** { option : True for option in options } ),
+    content  = response_field (response, "content") or "",
+    errors   = [],
+    warnings = response_field (response, "warnings") or [] )
 
 def fetch_diff_view_buffer (connection, buffer_name):
   """The diff view's buffer BUFFER_NAME, registered on CONNECTION under
@@ -1826,14 +1830,14 @@ def fetch_diff_view_buffer (connection, buffer_name):
       "The server refused the diff view: " + " " . join (errors) +
       " (The diff view needs a connection with no skgrepo restriction, "
       "and each owned skgrepo in a gitrepo with a HEAD commit.)" )
-  return { "view_id"     : view_id,
-           "command"     : "diff",
-           "request"     : { "buffer" : buffer_name },
-           "content"     : content,
-           "errors"      : [],
-           "warnings"    : response_field (response, "warnings") or [],
-           "processed_summary" : response_field (
-             response, "processed-summary" ) }
+  return RenderedView (
+    view_id  = view_id,
+    command  = "diff",
+    request  = { "buffer" : buffer_name },
+    content  = content,
+    errors   = [],
+    warnings = response_field (response, "warnings") or [],
+    processed_summary = response_field (response, "processed-summary") )
 
 def fetch_forest_view (connection, kind, node_id, show_overPrivateText = False):
   """The node's view with the folder KIND under its root, as the
@@ -1857,10 +1861,10 @@ def fetch_view_with_root_folder_request (connection, node_id, view_request,
   # refused as 'view' refuses it.
   require_view_has_headlines (fresh_view)
   requesting_buffer = buffer_with_view_request_on_first_headline (
-    fresh_view [ "content" ], view_request )
+    fresh_view . content, view_request )
   def send_save ():
     return connection . save_buffer (
-      fresh_view [ "view_id" ], requesting_buffer, fresh_view [ "content" ] )
+      fresh_view . view_id, requesting_buffer, fresh_view . content )
   terminal = send_save () [-1]
   if response_type (terminal) == "overPrivateText-telescope-confirmation":
     overPrivateText_answer (
@@ -1870,18 +1874,19 @@ def fetch_view_with_root_folder_request (connection, node_id, view_request,
       "with '--show-overPrivateText' to release it.", to_stderr = True,
       approval = "the withheld rerender is asked for" )
     terminal = release_withheld_save_rerender (
-      connection, terminal, fresh_view [ "view_id" ] )
+      connection, terminal, fresh_view . view_id )
   require_response_type (terminal, "save-result")
   content = response_field (terminal, "content")
   errors = response_field (terminal, "errors") or []
   if not content:
     raise SkgToolError ( "The save that requests the folder failed:\n" +
                          "\n" . join (errors) )
-  return { "view_id"     : fresh_view [ "view_id" ],
-           "request"     : { "id" : node_id, "view_request" : view_request },
-           "content"     : content,
-           "errors"      : errors,
-           "warnings"    : response_field (terminal, "warnings") or [] }
+  return RenderedView (
+    view_id  = fresh_view . view_id,
+    request  = { "id" : node_id, "view_request" : view_request },
+    content  = content,
+    errors   = errors,
+    warnings = response_field (terminal, "warnings") or [] )
 
 def buffer_with_view_request_on_first_headline (buffer_text, view_request):
   """BUFFER_TEXT with '(viewRequests VIEW_REQUEST)' in the metadata of
@@ -1931,10 +1936,32 @@ def release_view (connection, view_id):
 # Writing the files
 # ============================================================
 
+class RenderedView:
+  """A view as the server rendered it, which 'write_view_files' writes
+  as three files. 'view_id' is the server's view ID; 'command' the
+  command the sidecar records ('view', 'search', 'diff', ...), which
+  a view command sets after fetching; 'request' a dict of what it
+  asked for; 'content' the full view's text; 'errors' and 'warnings'
+  the server's; 'processed_summary' the server's, for a buffer of the
+  diff view; 'perspective' and 'perspective_name' the view's
+  perspective, by the server's wire name and its display name."""
+  def __init__ (self, view_id, request, content, errors, warnings,
+                command = None, processed_summary = None,
+                perspective = DEFAULT_PERSPECTIVE, perspective_name = None):
+    self . view_id = view_id
+    self . command = command
+    self . request = request
+    self . content = content
+    self . errors = errors
+    self . warnings = warnings
+    self . processed_summary = processed_summary
+    self . perspective = perspective
+    self . perspective_name = perspective_name
+
 def write_view_files (connection, view, out_dir, base_name, show_summary,
                       unless_compact_differs_from = None):
-  """Write the view's three files; return their paths. The sidecar
-  records the view's perspective: VIEW's
+  """Write the RenderedView VIEW's three files; return their paths. The
+  sidecar records the view's perspective: VIEW's
   'perspective' and 'perspective_name', which a rewrite of a
   view carries from its sidecar ('perspective_fields_of_sidecar'), or
   the root homes, a fresh view's. Given
@@ -1945,7 +1972,7 @@ def write_view_files (connection, view, out_dir, base_name, show_summary,
   full_path    = os . path . join (out_dir, base_name + ".full.org")
   compact_path = os . path . join (out_dir, base_name + ".compact.org")
   sidecar_path = os . path . join (out_dir, base_name + ".view.json")
-  full_text = view [ "content" ]
+  full_text = view . content
   parsed_view = parse_full_view (full_text)
   link_statuses = fetch_link_statuses (connection, parsed_view)
   repo_ownership = fetch_repo_ownership (connection)
@@ -1966,21 +1993,20 @@ def write_view_files (connection, view, out_dir, base_name, show_summary,
   write_text_file (
     sidecar_path,
     json . dumps (
-      { "view_id"      : view [ "view_id" ],
-        "command"      : view [ "command" ],
-        "request"      : view [ "request" ],
-        "perspective" : view . get (
-          "perspective", DEFAULT_PERSPECTIVE ),
-        "perspective_name"   : view . get ("perspective_name"),
+      { "view_id"      : view . view_id,
+        "command"      : view . command,
+        "request"      : view . request,
+        "perspective" : view . perspective,
+        "perspective_name"   : view . perspective_name,
         "port"         : connection . port,
         "full_view"    : os . path . basename (full_path),
         "compact_view" : os . path . basename (compact_path),
-        "errors"       : view [ "errors" ],
-        "warnings"     : view [ "warnings" ],
+        "errors"       : view . errors,
+        "warnings"     : view . warnings,
         "summary"      : show_summary,
         "closed"       : not held },
       indent = 2, ensure_ascii = False ) + "\n" )
-  connection . note_view_written ( view [ "view_id" ], out_dir, base_name )
+  connection . note_view_written ( view . view_id, out_dir, base_name )
   return [ full_path, compact_path, sidecar_path ]
 
 def write_text_file (path, text):
@@ -2972,14 +2998,12 @@ def summary_lines (parsed_view, link_statuses, repo_ownership, view,
     return "# " + ", " . join (
       name + " " + str (count) for name, count in pairs ) + "."
   return ( diff_summary_lines (parsed_view, view)
-           if view [ "command" ] == "diff" else [] ) + [
+           if view . command == "diff" else [] ) + [
     "# skg-for-ai compact view of " + full_file_name +
-      " (view ID " + view [ "view_id" ] + ")" ] + (
-    [ "# Showing " + ( view . get ("perspective_name")
-                       or view . get ("perspective") )
+      " (view ID " + view . view_id + ")" ] + (
+    [ "# Showing " + ( view . perspective_name or view . perspective )
       + " (each root's home skgrepo is the default)." ]
-    if view . get ( "perspective", DEFAULT_PERSPECTIVE )
-       != DEFAULT_PERSPECTIVE else [] ) + [
+    if view . perspective != DEFAULT_PERSPECTIVE else [] ) + [
     "# Each headline ends in its handle ⟨ID HERALDS⟩: ID its viewnode ID,",
     "# the '(vnid ID)' of its metadata in the full view, and HERALDS what a",
     "# client shows for it, but a bare 'aC' (only the parent contains it);",
@@ -3017,10 +3041,10 @@ def summary_lines (parsed_view, link_statuses, repo_ownership, view,
             ( "resolved", resolved_count ),
             ( "unresolved", len (statuses) - resolved_count )) [ : -1 ] +
       ( " (" + unresolved_detail + ")." if unresolved_detail else "." ),
-    facts ( ( "Server errors", len ( view [ "errors" ] )),
-            ( "warnings", len ( view [ "warnings" ] ))) [ : -1 ] +
+    facts ( ( "Server errors", len ( view . errors )),
+            ( "warnings", len ( view . warnings ))) [ : -1 ] +
       ( " (listed in the .view.json file)."
-        if view [ "errors" ] or view [ "warnings" ] else "." ) ]
+        if view . errors or view . warnings else "." ) ]
 
 def diff_summary_lines (parsed_view, view):
   """The processed summary the server sent with a buffer of the diff
@@ -3031,7 +3055,7 @@ def diff_summary_lines (parsed_view, view):
                         and leaves_fact (line . metadata) is not None ]
   processed_count = sum ( 1 for metadata in changed_headlines
                       if headline_is_processed (metadata) )
-  summary = view . get ( "processed_summary" )
+  summary = view . processed_summary
   return [
     "# Processed: " + ( processed_summary_text (summary) if summary
                         else "the server sent no processed summary." ),
@@ -5430,7 +5454,7 @@ def print_save_preview (terminal):
 
 def rerendered_view_of_save (terminal, sidecar):
   """Print the server's answer to the save. Return its re-rendered
-  view, as the view commands describe one; raise if there is none."""
+  view, a 'RenderedView'; raise if there is none."""
   kind = response_type (terminal)
   if kind != "save-result":
     print ( f"Server: {kind}." )
@@ -5460,14 +5484,15 @@ def rerendered_view_of_save (terminal, sidecar):
   if not saved:
     raise SkgToolError (
       "The server refused the save; the files are as they were." )
-  return { "view_id"     : sidecar [ "view_id" ],
-           "command"     : sidecar [ "command" ],
-           "request"     : sidecar [ "request" ],
-           "content"     : content,
-           "errors"      : errors,
-           "warnings"    : warnings,
-           "processed_summary" : processed_summary,
-           ** perspective_fields_of_sidecar (sidecar) }
+  return RenderedView (
+    view_id  = sidecar [ "view_id" ],
+    command  = sidecar [ "command" ],
+    request  = sidecar [ "request" ],
+    content  = content,
+    errors   = errors,
+    warnings = warnings,
+    processed_summary = processed_summary,
+    ** perspective_fields_of_sidecar (sidecar) )
 
 # ============================================================
 # The daemon: one long-lived connection, holding the views its
@@ -5915,13 +5940,14 @@ class SkgForAiDaemon:
     sidecar = saved_view . sidecar
     written_paths = write_view_files (
       self . connection,
-      { "view_id"     : view_id,
-        "command"     : sidecar [ "command" ],
-        "request"     : sidecar [ "request" ],
-        "content"     : content,
-        "errors"      : [],
-        "warnings"    : [],
-        ** perspective_fields_of_sidecar (sidecar) },
+      RenderedView (
+        view_id  = view_id,
+        command  = sidecar [ "command" ],
+        request  = sidecar [ "request" ],
+        content  = content,
+        errors   = [],
+        warnings = [],
+        ** perspective_fields_of_sidecar (sidecar) ),
       saved_view . directory, saved_view . base_name, sidecar [ "summary" ],
       unless_compact_differs_from = saved_view . compact_text )
     if written_paths is None:
