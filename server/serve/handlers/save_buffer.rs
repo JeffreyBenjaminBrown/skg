@@ -27,6 +27,7 @@ use request::{
 };
 use crate::diff_view::change_leaves::BufferProcessedSummary;
 use crate::dbs::in_rust_graph::{
+  InRustGraph, InRustGraphHandle,
   in_rust_graph_coherent_with_nodeInstructions_in, new_handle };
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text
@@ -84,7 +85,7 @@ use crate::types::errors::{BufferValidationError, SaveError, format_save_error_a
 use crate::types::config::SkgConfig;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::save::{
-  NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan };
+  NodeInstruction, PostSkgsaveCommitNoticeCandidate, SavePlan, SkgrepoMove };
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::ViewnodeId;
 use crate::types::views_state::{DiffViewBufferKind, Perspective, ViewforestId, ViewnodeIdRecord};
@@ -97,6 +98,8 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
+use std::ops::ControlFlow;
+use std::sync::Arc;
 
 /// The ordinary terminal message in the save protocol. Hoist, fork, and
 /// text-release confirmations are alternative terminal messages.
@@ -794,87 +797,33 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
     if ! stale_errors . is_empty () {
       return Err (Box::new (SaveError::BufferValidationErrors {
         errors : stale_errors, warnings : parse_warnings, })); }}
-  { // Restore and processed requests write or approve what a skgrepo
-    // restriction may hide: refused unless the connection is
-    // unrestricted.
-    let unrestricted = |what : &str| -> Result<(), Box<dyn Error>> {
-      require_unrestricted (what, skgrepo_restriction)
-        . map_err ( |e| Box::new ( SaveError::BufferValidationErrors {
-            errors : vec! [ crate::types::errors::BufferValidationError::Other (e) ],
-            warnings : parse_warnings . clone (), } ) as Box<dyn Error> ) };
-    if viewforest_has_restore_requests (&viewforest) {
-      unrestricted ("A restore request") ?; }
-    if viewforest_has_processed_requests (&viewforest) {
-      unrestricted ("A processed request") ?; }}
+  error_unless_unrestricted_for_restore_and_processed_requests (
+    &viewforest, skgrepo_restriction, &parse_warnings ) ?;
   if preview { // nothing below has run, so nothing is written or held
     return Ok ( SaveResponse::preview (parse_warnings, hide_report) ); }
   let restore_warnings : Vec<String> =
-    // The restore requests become more graph edits, written from the
-    // before-graph of the graph straddle; built only when needed.
-    if viewforest_has_restore_requests (&viewforest) {
-      let straddle : std::sync::Arc<GraphStraddle> =
-        current_graph_straddle_in_slot (
-          &mut views_state . graph_straddle, &runtime . config,
-          runtime . graph . clone () )
-        . map_err ( |e| Box::new ( SaveError::BufferValidationErrors {
-            errors : vec! [ crate::types::errors::BufferValidationError::Other (
-              format! ( "The restore requests could not be applied: {}", e )) ],
-            warnings : parse_warnings . clone (), } ) as Box<dyn Error> ) ?;
-      add_restore_instructions (
-        &viewforest, &mut nonmerge_nodeInstructions,
-        &runtime . graph, &straddle, &runtime . config )
-    } else { Vec::new () };
+    add_restore_instructions_if_requested (
+      &viewforest, &mut nonmerge_nodeInstructions,
+      &mut views_state . graph_straddle, &runtime . graph, &runtime . config,
+      &parse_warnings ) ?;
   let unrestricted : SkgrepoRestriction =
     SkgrepoRestriction::unrestricted (&runtime . config);
   let restricted_records_left : &SkgrepoRestriction =
-  { // Delete propagation adds collateral writes. Derive them before the
-    // disk Hoist classification so "touched pids" means every telescope
-    // this save will actually rewrite, not only what appeared in the buffer.
-    // Where records the skgrepo restriction keeps out name a deleted
-    // graphnode, the user chooses first whether they go too.
-    let graph_snap = working_graph . load_full ();
-    let restricted_count : usize =
-      restricted_records_naming_deleted_graphnodes (
-        &nonmerge_nodeInstructions, &graph_snap, &runtime . config,
-        skgrepo_restriction );
-    let restricted_records_left : &SkgrepoRestriction =
-      match (restricted_count, delete_from) {
-        (0, _) => &unrestricted,
-        (_, DeleteFrom::NotChosen) =>
-          return Ok ( SaveResponse::delete_from_confirmation (
-            parse_warnings, restricted_count )),
-        (_, DeleteFrom::VisibleRecords) => skgrepo_restriction,
-        (_, DeleteFrom::AllOwnedRecords) => &unrestricted, };
-    apply_delete_propagation_cleanup (
-      &mut nonmerge_nodeInstructions, &graph_snap, &runtime . config,
-      restricted_records_left );
-    restricted_records_left };
+    match propagate_deletes_unless_asking_where (
+      &mut nonmerge_nodeInstructions, &working_graph, &runtime . config,
+      skgrepo_restriction, &unrestricted, delete_from )
+    { ControlFlow::Continue (restricted_records_left) => restricted_records_left,
+      ControlFlow::Break (restricted_count) =>
+        return Ok ( SaveResponse::delete_from_confirmation (
+          parse_warnings, restricted_count )), };
   let strandeds_warnings : Vec<String> =
-  { // What the home skgrepo moves strand (server/from_text/strandeds.rs). This
-    // precedes the Hoist classification, which must see the recorders
-    // that resetting strandeds to their defaults adds.
-    let graph_snap = working_graph . load_full ();
-    let strandeds : Vec<StrandedRelationship> =
-      stranded_relationships (
-        &skgrepo_moves, &nonmerge_nodeInstructions,
-        &graph_snap, &runtime . config );
-    let (raised, asked) : (Vec<&StrandedRelationship>,
-                           Vec<&StrandedRelationship>) =
-      strandeds . iter () . partition ( |stranded| stranded . raised_automatically );
-    match strandeds_review {
-      StrandedsReview::NotReviewed if ! asked . is_empty () =>
+    match reset_strandeds_unless_asking (
+      &mut nonmerge_nodeInstructions, &skgrepo_moves, &working_graph,
+      &runtime . config, strandeds_review )
+    { ControlFlow::Continue (strandeds_warnings) => strandeds_warnings,
+      ControlFlow::Break (asked) =>
         return Ok ( SaveResponse::strandeds_confirmation (
-          parse_warnings, asked . into_iter () . cloned () . collect () )),
-      StrandedsReview::NotReviewed => {},
-      StrandedsReview::Reviewed (chosen) => {
-        let chosen : Vec<&StrandedRelationship> = asked . into_iter ()
-          . filter ( |stranded| chosen . contains (&stranded . relationship) )
-          . collect ();
-        reset_to_default_relationships (
-          &mut nonmerge_nodeInstructions, &chosen, &graph_snap ); }, }
-    reset_to_default_relationships (
-      &mut nonmerge_nodeInstructions, &raised, &graph_snap );
-    raised . into_iter () . map (raised_relationship_warning) . collect () };
+          parse_warnings, asked )), };
   let hoist_candidates : Vec<HoistCandidate> =
     hoist_candidates_from_disk (
       &nonmerge_nodeInstructions, &nodeMerge_pairs, &runtime . config ) ?;
@@ -935,20 +884,9 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
     . collect () };
   let affected_gnids : SaveAffectedIds =
     SaveAffectedIds::from_prepared (&prepared_save);
-  let dirty_conflicts = dirty_view_conflicts (
-    other_views, views_state, &affected_gnids,
-    prepared_save . graph_before_save (),
-    prepared_save . final_candidate ())
-    .map_err (|message| -> Box<dyn Error> {
-      Box::new (SaveError::BufferValidationErrors {
-        errors : vec![crate::types::errors::BufferValidationError::Other (
-          message)],
-        warnings : parse_warnings . clone (), }) }) ?;
-  if ! dirty_conflicts . is_empty () {
-    return Err (Box::new (SaveError::BufferValidationErrors {
-      errors : vec![crate::types::errors::BufferValidationError::Other (
-        format_conflict_error (&dirty_conflicts))],
-      warnings : parse_warnings, })); }
+  error_if_dirty_views_conflict (
+    other_views, views_state, &affected_gnids, &prepared_save,
+    &parse_warnings ) ?;
   // Known limit: only the saving connection's views are re-rendered.
   // Other connections to this server are not refreshed, because the
   // repo watcher drops the server's own writes (server/repo_watch/own_writes.rs).
@@ -961,29 +899,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
       prepared_save . graph_before_save (),
       prepared_save . final_candidate ()))
     .unwrap_or_default ();
-  let mut narrowed_lock_viewforest_ids : Vec<ViewforestId> = collateral_viewforest_ids . clone ();
-  narrowed_lock_viewforest_ids . extend (
-    other_views . iter () . filter (|view| view . dirty)
-      . map (|view| view . viewforest_id . clone ()));
-  narrowed_lock_viewforest_ids . sort_by_key (ViewforestId::repr_in_client);
-  narrowed_lock_viewforest_ids . dedup ();
-  // The client keeps the saved view ID implicitly. Every dirty view stays locked
-  // because its exact buffer snapshot was an input to the conflict decision,
-  // though no dirty view is a collateral target, client-only or not.
-  send_response_with_length_prefix (
-    stream,
-    & tag_sexp_response (
-      TcpToClient::SaveRelaxLock,
-      & format_lock_views_sexp (&narrowed_lock_viewforest_ids) ));
-  if collateral_viewforest_ids . is_empty () {
-    tracing::debug!("save preparation selected no collateral views");
-  } else {
-    tracing::info!(
-      "save preparation selected {} collateral view(s): {:?}",
-      collateral_viewforest_ids . len (),
-      collateral_viewforest_ids . iter ()
-        . map (ViewforestId::repr_in_client)
-        . collect::<Vec<_>> ()); }
+  send_relaxed_lock_and_log_collateral_views (
+    stream, &collateral_viewforest_ids, other_views );
   { // Apply the already-checked preparation. Prominence sources are
     // computed from the post-save graph in the ordinary apply path.
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -1042,6 +959,175 @@ pub async fn update_from_and_rerender_buffer_with_approvals_or_preview (
       response . warnings = warnings; }
     response . hides = hide_report;
     Ok (response) } }
+
+/// Restore and processed requests write or approve what a skgrepo
+/// restriction may hide: refused unless the connection is
+/// unrestricted.
+fn error_unless_unrestricted_for_restore_and_processed_requests (
+  viewforest          : &ViewForest,
+  skgrepo_restriction : &SkgrepoRestriction,
+  parse_warnings      : &[String],
+) -> Result<(), Box<dyn Error>> {
+  let unrestricted = |what : &str| -> Result<(), Box<dyn Error>> {
+    require_unrestricted (what, skgrepo_restriction)
+      . map_err ( |e| Box::new ( SaveError::BufferValidationErrors {
+          errors : vec! [ crate::types::errors::BufferValidationError::Other (e) ],
+          warnings : parse_warnings . to_vec (), } ) as Box<dyn Error> ) };
+  if viewforest_has_restore_requests (viewforest) {
+    unrestricted ("A restore request") ?; }
+  if viewforest_has_processed_requests (viewforest) {
+    unrestricted ("A processed request") ?; }
+  Ok (( )) }
+
+/// The restore requests become more graph edits, written from the
+/// before-graph of the graph straddle; built only when needed.
+/// Returns the warnings of restoring.
+fn add_restore_instructions_if_requested (
+  viewforest                : &ViewForest,
+  nonmerge_nodeInstructions : &mut Vec<NodeInstruction>,
+  graph_straddle_slot       : &mut Option<Arc<GraphStraddle>>,
+  live_graph                : &Arc<InRustGraph>,
+  config                    : &SkgConfig,
+  parse_warnings            : &[String],
+) -> Result<Vec<String>, Box<dyn Error>> {
+  if ! viewforest_has_restore_requests (viewforest) {
+    return Ok (Vec::new ()); }
+  let straddle : Arc<GraphStraddle> =
+    current_graph_straddle_in_slot (
+      graph_straddle_slot, config, live_graph . clone () )
+    . map_err ( |e| Box::new ( SaveError::BufferValidationErrors {
+        errors : vec! [ crate::types::errors::BufferValidationError::Other (
+          format! ( "The restore requests could not be applied: {}", e )) ],
+        warnings : parse_warnings . to_vec (), } ) as Box<dyn Error> ) ?;
+  Ok ( add_restore_instructions (
+    viewforest, nonmerge_nodeInstructions, live_graph, &straddle, config )) }
+
+/// Delete propagation adds collateral writes. Derive them before the
+/// disk Hoist classification so "touched pids" means every telescope
+/// this save will actually rewrite, not only what appeared in the buffer.
+/// Where records the skgrepo restriction keeps out name a deleted
+/// graphnode, the user chooses first whether they go too: unless
+/// 'delete_from' says, this breaks with how many such records there
+/// are, before propagating anything. Otherwise it continues with the
+/// restriction whose hidden records the deletes leave in place.
+fn propagate_deletes_unless_asking_where<'a> (
+  nonmerge_nodeInstructions : &mut Vec<NodeInstruction>,
+  working_graph             : &InRustGraphHandle,
+  config                    : &SkgConfig,
+  skgrepo_restriction       : &'a SkgrepoRestriction,
+  unrestricted              : &'a SkgrepoRestriction,
+  delete_from               : DeleteFrom,
+) -> ControlFlow<usize, &'a SkgrepoRestriction> {
+  let graph_snap : Arc<InRustGraph> = working_graph . load_full ();
+  let restricted_count : usize =
+    restricted_records_naming_deleted_graphnodes (
+      nonmerge_nodeInstructions, &graph_snap, config,
+      skgrepo_restriction );
+  let restricted_records_left : &SkgrepoRestriction =
+    match (restricted_count, delete_from) {
+      (0, _) => unrestricted,
+      (_, DeleteFrom::NotChosen) =>
+        return ControlFlow::Break (restricted_count),
+      (_, DeleteFrom::VisibleRecords) => skgrepo_restriction,
+      (_, DeleteFrom::AllOwnedRecords) => unrestricted, };
+  apply_delete_propagation_cleanup (
+    nonmerge_nodeInstructions, &graph_snap, config,
+    restricted_records_left );
+  ControlFlow::Continue (restricted_records_left) }
+
+/// What the home skgrepo moves strand (server/from_text/strandeds.rs). This
+/// precedes the Hoist classification, which must see the recorders
+/// that resetting strandeds to their defaults adds.
+/// Unreviewed strandeds the user must be asked about break, before
+/// anything is reset. Otherwise the reviewed ones the user chose and
+/// the ones raised automatically are reset to their defaults, and this
+/// continues with a warning for each one raised.
+fn reset_strandeds_unless_asking (
+  nonmerge_nodeInstructions : &mut Vec<NodeInstruction>,
+  skgrepo_moves             : &[SkgrepoMove],
+  working_graph             : &InRustGraphHandle,
+  config                    : &SkgConfig,
+  strandeds_review          : &StrandedsReview,
+) -> ControlFlow<Vec<StrandedRelationship>, Vec<String>> {
+  let graph_snap : Arc<InRustGraph> = working_graph . load_full ();
+  let strandeds : Vec<StrandedRelationship> =
+    stranded_relationships (
+      skgrepo_moves, nonmerge_nodeInstructions,
+      &graph_snap, config );
+  let (raised, asked) : (Vec<&StrandedRelationship>,
+                         Vec<&StrandedRelationship>) =
+    strandeds . iter () . partition ( |stranded| stranded . raised_automatically );
+  match strandeds_review {
+    StrandedsReview::NotReviewed if ! asked . is_empty () =>
+      return ControlFlow::Break (
+        asked . into_iter () . cloned () . collect () ),
+    StrandedsReview::NotReviewed => {},
+    StrandedsReview::Reviewed (chosen) => {
+      let chosen : Vec<&StrandedRelationship> = asked . into_iter ()
+        . filter ( |stranded| chosen . contains (&stranded . relationship) )
+        . collect ();
+      reset_to_default_relationships (
+        nonmerge_nodeInstructions, &chosen, &graph_snap ); }, }
+  reset_to_default_relationships (
+    nonmerge_nodeInstructions, &raised, &graph_snap );
+  ControlFlow::Continue (
+    raised . into_iter () . map (raised_relationship_warning) . collect () ) }
+
+/// Refuse the save if a dirty view the client holds shows something
+/// the prepared save changes ('save_dependencies/').
+fn error_if_dirty_views_conflict (
+  other_views    : &[ClientViewSnapshot],
+  views_state    : &ViewsState,
+  affected_gnids : &SaveAffectedIds,
+  prepared_save  : &PreparedSave,
+  parse_warnings : &[String],
+) -> Result<(), Box<dyn Error>> {
+  let dirty_conflicts = dirty_view_conflicts (
+    other_views, views_state, affected_gnids,
+    prepared_save . graph_before_save (),
+    prepared_save . final_candidate ())
+    .map_err (|message| -> Box<dyn Error> {
+      Box::new (SaveError::BufferValidationErrors {
+        errors : vec![crate::types::errors::BufferValidationError::Other (
+          message)],
+        warnings : parse_warnings . to_vec (), }) }) ?;
+  if ! dirty_conflicts . is_empty () {
+    return Err (Box::new (SaveError::BufferValidationErrors {
+      errors : vec![crate::types::errors::BufferValidationError::Other (
+        format_conflict_error (&dirty_conflicts))],
+      warnings : parse_warnings . to_vec (), })); }
+  Ok (( )) }
+
+/// Narrow the save's lock to the collateral views and the dirty ones,
+/// and log which collateral views the save will rerender.
+fn send_relaxed_lock_and_log_collateral_views (
+  stream                    : &mut TcpStream,
+  collateral_viewforest_ids : &[ViewforestId],
+  other_views               : &[ClientViewSnapshot],
+) {
+  let mut narrowed_lock_viewforest_ids : Vec<ViewforestId> = collateral_viewforest_ids . to_vec ();
+  narrowed_lock_viewforest_ids . extend (
+    other_views . iter () . filter (|view| view . dirty)
+      . map (|view| view . viewforest_id . clone ()));
+  narrowed_lock_viewforest_ids . sort_by_key (ViewforestId::repr_in_client);
+  narrowed_lock_viewforest_ids . dedup ();
+  // The client keeps the saved view ID implicitly. Every dirty view stays locked
+  // because its exact buffer snapshot was an input to the conflict decision,
+  // though no dirty view is a collateral target, client-only or not.
+  send_response_with_length_prefix (
+    stream,
+    & tag_sexp_response (
+      TcpToClient::SaveRelaxLock,
+      & format_lock_views_sexp (&narrowed_lock_viewforest_ids) ));
+  if collateral_viewforest_ids . is_empty () {
+    tracing::debug!("save preparation selected no collateral views");
+  } else {
+    tracing::info!(
+      "save preparation selected {} collateral view(s): {:?}",
+      collateral_viewforest_ids . len (),
+      collateral_viewforest_ids . iter ()
+        . map (ViewforestId::repr_in_client)
+        . collect::<Vec<_>> ()); }}
 
 /// Refuse a save of a view the connection holds that was last
 /// rendered under a skgrepo restriction showing other skgrepos than

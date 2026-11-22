@@ -35,14 +35,9 @@
    'compute_diff_for_every_skgrepo' left the save handler; only
    'titles_by_gnids.rs' calls it.
 * Candidates left, best first
-** Split 'update_from_and_rerender_buffer_with_approvals_or_preview' (~340 lines)
-   'handlers/save_buffer.rs'. The longest function in the territory. Its
-   confirmations (strandeds, delete-from, hoist, fork, text release) are
-   each checked at a fixed point; extracting them changes nothing a client
-   sees, but the order is load-bearing (see 'TODO/problems.org', "The save
-   handler's checks depend on their position in it", which Jeff deferred:
-   tagging a NodeInstruction's provenance needs his yes; extracting the
-   steps in place does not). Read the whole function first; medium work.
+** Done: split 'update_from_and_rerender_buffer_with_approvals_or_preview'
+   Six of its steps are functions of their own, in place and in order;
+   'server-longest-functions.org' says which and what is left of it.
 ** 'parse_metadata_sexp.rs' (1106 lines)
    Three seams: the metadata types (to line ~245), the builder
    'viewnode_from_metadata' (~245-465), and the parser (the rest).
