@@ -12,7 +12,8 @@
 ;;;
 ;;; Starting, connecting, and the plumbing every request uses:
 ;;; - 'skg-client.el': the TCP connection to the server; the require hub.
-;;; - 'skg-config.el': read skgconfig.toml; the skgrepo pickers.
+;;; - 'skg-config.el': read skgconfig.toml.
+;;; - 'skg-picker.el': the minibuffer pickers for a skgrepo or a rung.
 ;;; - 'skg-state.el': session-wide state: connection, handlers.
 ;;; - 'skg-length-prefix.el': split server replies, dispatch each by type.
 ;;; - 'skg-keymaps-and-aliases.el': every key binding and M-x alias.

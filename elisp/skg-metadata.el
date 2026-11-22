@@ -48,6 +48,7 @@
 (require 'org-fold-core)
 (require 'seq)
 (require 'skg-config)
+(require 'skg-picker)
 (require 'skg-metadata-fields)
 (require 'skg-sexpr-search)
 (require 'skg-shared)

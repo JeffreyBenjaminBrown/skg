@@ -22,6 +22,7 @@
 ;;; Code:
 
 (require 'skg-config)
+(require 'skg-picker)
 (require 'cl-lib)
 (require 'skg-length-prefix)
 (require 'skg-request-rerender-all-views)

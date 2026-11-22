@@ -42,9 +42,7 @@ splits a concern over several files that each hold one command
 'skg-request-strip-body-whitespace.el'), Neovim keeps the commands in
 'misc_requests.lua'. Helpers Emacs gets from its own library
 ('read', 'prin1-to-string', reading a field of a response) are
-'sexpr/parse.lua' and 'payload.lua'. One Emacs file holds two
-concerns, which Neovim keeps apart: 'skg-config.el' is 'config.lua'
-and 'picker.lua' (the prompts).
+'sexpr/parse.lua' and 'payload.lua'.
 
 A message has the same words in both clients, and names Neovim's
 keys where Emacs's names a chord. Some of Neovim's begin 'skg: ', in

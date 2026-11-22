@@ -21,6 +21,7 @@
 (require 'org)
 (require 'seq)
 (require 'skg-config)
+(require 'skg-picker)
 (require 'skg-length-prefix)
 (require 'skg-metadata)
 (require 'skg-shared)

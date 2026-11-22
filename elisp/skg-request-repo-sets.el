@@ -9,14 +9,15 @@
 ;;; the switch rerenders every open view in place.
 ;;; 'skg-list-repo-sets' (M-x) lists the restrictions the config
 ;;; offers; 'skg-show-skgrepo-restriction' (M-x) echoes the current
-;;; one. The chooser and the labels are 'skg-config.el's
-;;; ('skg--prompt-for-repo-set'); the rerender stream is
+;;; one. The chooser is 'skg-picker.el's ('skg--prompt-for-repo-set'),
+;;; the labels 'skg-config.el's; the rerender stream is
 ;;; 'skg-request-rerender-all-views.el's ('skg--send-streaming-request').
 ;;;
 ;;; Code:
 
 (require 'skg-buffer)
 (require 'skg-config)
+(require 'skg-picker)
 (require 'skg-length-prefix)
 (require 'skg-lock-buffers)
 (require 'skg-request-rerender-all-views) ; for skg--send-streaming-request

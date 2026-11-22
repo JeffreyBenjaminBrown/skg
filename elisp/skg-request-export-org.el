@@ -17,7 +17,8 @@
 ;;;
 ;;; Code:
 
-(require 'skg-config)         ; skg--prompt-for-repo-set
+(require 'skg-config)
+(require 'skg-picker)         ; skg--prompt-for-repo-set
 (require 'skg-length-prefix)
 (require 'skg-messages)       ; skg-big-nonfatal-message,
                               ; skg--message-list-nonempty-p,

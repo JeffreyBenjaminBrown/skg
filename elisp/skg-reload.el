@@ -118,6 +118,7 @@ the old one open beside the one it makes on its next request."
   '( skg-client
      skg-compare-sexpr
      skg-config
+     skg-picker
      skg-id-search
      skg-linkstack
      skg-push-ancestry

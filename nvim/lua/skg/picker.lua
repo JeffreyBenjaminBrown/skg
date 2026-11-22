@@ -6,7 +6,7 @@
 -- 'completing_read_with_cycle' they share; and ':SkgViewRepoList'
 -- ('view_repo_list'). Reading the config is skg.config's; switching
 -- the skgrepo restriction is skg.repo_sets'.
--- The Lua port of the prompt half of elisp/skg-config.el
+-- The Lua port of elisp/skg-picker.el
 -- ('skg--completing-read-with-cycle' and friends). The elisp built
 -- them on completing-read with S-left/S-right cycling in the
 -- minibuffer; here they ride vim.fn.input with TAB completion plus

@@ -4,9 +4,8 @@
 -- directories ('owned_repos', 'foreign_repos', 'repo_paths',
 -- 'repo_dir'), and the rungs of the skgrepo restriction
 -- ('repo_set_names', 'skgrepo_restriction_label'). The Lua port of
--- elisp/skg-config.el's parsing half. The interactive skgrepo pickers
--- that elisp keeps in the same file (built on completing-read with
--- S-arrow cycling) are skg.picker's, since they are UI, not parsing.
+-- elisp/skg-config.el. The interactive skgrepo pickers are
+-- skg.picker's, as in elisp they are skg-picker.el's.
 -- Like the elisp, this is a hand-rolled line scan of the narrow TOML
 -- subset skgconfig.toml uses, not a general TOML parser.
 

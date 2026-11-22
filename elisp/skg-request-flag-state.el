@@ -20,6 +20,7 @@
 (require 'cl-lib)
 (require 'org)
 (require 'skg-config)
+(require 'skg-picker)
 (require 'skg-length-prefix)
 (require 'skg-metadata)
 (require 'skg-request-relRepo-info) ; for skg--relRepo-requested-value

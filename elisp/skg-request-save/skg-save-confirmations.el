@@ -29,6 +29,7 @@
 (require 'skg-buffer)
 (require 'skg-metadata)
 (require 'skg-config)        ; for skg--owned-repos
+(require 'skg-picker)        ; for skg--completing-read-with-cycle
 ;; skg-request-save requires this file, so these are defined by the
 ;; time any handler here runs.
 (declare-function skg-request-save-buffer "skg-request-save"
