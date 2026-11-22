@@ -1,0 +1,85 @@
+* Refactoring 'tools/skg-for-ai/' for the next agent
+  The territory: 'skg_for_ai.py' (one file, about 6800 lines), its
+  suite 'test_skg_for_ai.py' and its fixtures, and 'README.org'. The
+  tool's command line, everything it prints, the files it writes and
+  the README are read by other agents as their manual: they must stay
+  byte-identical (the README may be corrected where it is false).
+  The suite needs 'target/debug/skg' in the worktree. Run it on a port
+  of your own ('SKG_FOR_AI_TEST_PORT=18793'; it also takes that port
+  plus one), since other worktrees may run it on the default 1793.
+  It takes about 90 seconds.
+* Done
+** A view the tool writes is a 'RenderedView'
+   The fetchers, the save, 'extend', 'perspective' and the daemon used
+   to build a dict with string keys, some optional, that only
+   'write_view_files' and 'summary_lines' documented by reading them.
+   'RenderedView' (section "Writing the files") names the fields and
+   their defaults.
+** 'run_command' dispatches by a table
+   The view commands ('view', 'search', 'forest', 'contains',
+   'links-here') moved into 'run_view_command'.
+** 'command_save' reads its report in 'save_report'
+   And sends in 'send_save_and_write_its_rerender'; 'SaveReport'
+   carries the report's parts. 'command_save' keeps what it prints and
+   when it stops.
+** The file opens with an index of its sections
+   After the imports. Each section has a banner; grep '^# TITLE'.
+** 'change_report_lines' says where an edited headline stands once
+   The local 'edited_place'.
+* Candidates left, best first
+** Split 'skg_for_ai.py' into modules
+   The largest win by far: an agent touching the save reads 2400 lines
+   it could find in one file. In scope only if
+   'python3 tools/skg-for-ai/skg_for_ai.py COMMAND' keeps working from
+   any directory with the standard library only (a sibling module
+   imports fine: the script's folder is 'sys.path[0]'), and the suite
+   passes unchanged: it uses about 33 names as 'skg_for_ai.NAME'
+   ('parse_sexp', 'HeraldTables', 'OutlineHeadline', 'main', ...), so
+   'skg_for_ai.py' would have to 'from MODULE import *' each lower
+   module, which keeps every such name and every call site.
+   What makes it risky: the sections import each other in cycles. As
+   measured (the script was an AST walk over top-level names, by
+   section banner):
+*** A protocol leaf would be clean
+    "S-expressions" plus, from "The connection", 'SkgToolError' and
+    its subclasses, 'request_line', 'response_type', 'response_field',
+    'require_response_type' (and whatever those need). Nothing below
+    it. The file's last lines ('if __name__ == "__main__"') must stay
+    in 'skg_for_ai.py'.
+*** The view-reading cluster needs only the leaf
+    From "The full view, parsed" to "Change facts" (about 950 lines:
+    parsing, facts, heralds, the lens, links, the compact view) needs
+    only the protocol leaf, the constants 'HEADLINE_PATTERN',
+    'LINK_PATTERN', 'SHARED_FOLDER' (which is computed from
+    '__file__': same folder, same value), and 'reads_claims' (in
+    "Words read against the outline"; move it along).
+*** The save cluster has five upward references
+    "Saving an edited compact view" through "The server's answer"
+    (about 2400 lines) needs the two layers above, plus five names
+    from the command layer: 'metadata_text_with_part' (Fetching views),
+    'RenderedView' (Writing the files), 'perspective_fields_of_sidecar'
+    (Commands), 'processed_summary_text' (The summary),
+    'fetch_link_statuses_of_ids' (Links). Those (or "The server's
+    answer", which builds a 'RenderedView') must move down first.
+*** The rest is one cycle
+    Commands, the daemon and the connection use each other
+    ('DaemonConnection' and 'RUNNING_DAEMON', a global the daemon sets
+    with 'global'); leave them together in 'skg_for_ai.py'.
+*** Decide first
+    Whether Jeff wants star imports in the entry module, and the
+    module names. A moved function that reads a mutable global of
+    'skg_for_ai.py' would silently read its own module's copy: check
+    each moved module's free names (an AST walk) before trusting the
+    suite.
+** 'parse_command_line' is 311 lines of argparse
+   Declarative and greppable ('add_parser ( "save"'); splitting it per
+   command would help little.
+** Sidecar reading is repeated
+   'command_close', 'mark_sidecar_closed', 'SavedView' and the daemon's
+   port lookup each open and 'json.load' a sidecar; 'command_close' and
+   'SavedView' each derive the base name by cutting '.view.json'. The
+   suffix literal appears about a dozen times. A 'read_sidecar' and a
+   suffix constant would save little; low value.
+** 'write_view_files' then 'release_view' then printing the paths
+   Six commands do these three steps in a row. A helper would save two
+   lines at each; low value.
