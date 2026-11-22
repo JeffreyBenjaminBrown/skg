@@ -3,7 +3,7 @@
 #[allow (unused_imports)]
 use indoc::indoc; // A macro, which acts like an unused import.
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use skg::dbs::filesystem::one_node::{
   fetch_aliases_from_file,
@@ -51,12 +51,11 @@ fn save_filesystem_preparation_writes_normalized_gnids (
 
 #[test]
 fn test_node_io() {
-  // Create temporary directory for test output
+  // A temporary directory for test output, of this run alone
+  let temp_dir : tempfile::TempDir =
+    tempfile::tempdir () . unwrap ();
   let test_dir : PathBuf =
-    PathBuf::from ("/tmp/file_io_test");
-  let _ = fs::remove_dir_all (&test_dir); // a file left by an earlier run would be read
-  fs::create_dir_all (&test_dir)
-    . unwrap ();
+    temp_dir . path () . to_path_buf ();
 
   // Load config, overriding "output" to point to temp dir
   let config: SkgConfig = load_config_with_overrides(
@@ -81,8 +80,8 @@ fn test_node_io() {
   write_graphnode_to_skgrepo(&reversed, &config) . unwrap();
   let out_filename: PathBuf =
     test_dir . join(&example . pid . 0) . with_extension ("skg");
-  let reversed_filename : &str =
-    "/tmp/file_io_test/reversed.skg";
+  let reversed_filename : PathBuf =
+    test_dir . join ("reversed.skg");
 
   let expected_example_path : &str = "tests/file_io/fixtures/golden/example.skg";
   let expected_reversed_path : &str = "tests/file_io/fixtures/golden/reversed.skg";
@@ -110,10 +109,12 @@ fn test_node_io() {
   assert_eq!(parsed_generated_reversed, parsed_expected_reversed,
              "Generated reversed file doesn't match expected");
 
-  verify_body_not_needed();
+  verify_body_not_needed (&test_dir);
 }
 
-fn verify_body_not_needed() {
+fn verify_body_not_needed (
+  test_dir : &Path,
+) {
   // If a Graphnode's `body` is the empty string,
   // then that field need not be written to disk.
 
@@ -121,12 +122,12 @@ fn verify_body_not_needed() {
   let config: SkgConfig = load_config_with_overrides(
     CONFIG_PATH,
     None,
-    &[("output", PathBuf::from ("/tmp/file_io_test"))],
+    &[("output", test_dir . to_path_buf ())],
   ) . unwrap();
 
   fs::copy ( // seed the output skgrepo with the golden example
     "tests/file_io/fixtures/golden/example.skg",
-    "/tmp/file_io_test/example.skg" ) . unwrap();
+    test_dir . join ("example.skg") ) . unwrap();
   let mut node = graphnode_from_pid_and_skgrepo (
     &config, ID::new ("example"), &SkgrepoName::from ("output") ) . unwrap();
   set_skgrepo_retagging_relRepos ( &mut node, &SkgrepoName::from ("output") );
@@ -138,7 +139,7 @@ fn verify_body_not_needed() {
   let generated_yaml: yaml_serde::Value =
     yaml_serde::from_str (
       &fs::read_to_string (
-        "/tmp/file_io_test/no_unindexed.skg"
+        test_dir . join ("no_unindexed.skg")
       ) . unwrap () ) . unwrap ();
   let expected_yaml: yaml_serde::Value =
     yaml_serde::from_str (
