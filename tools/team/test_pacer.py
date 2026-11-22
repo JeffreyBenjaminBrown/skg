@@ -21,6 +21,19 @@ import unittest
 
 TEAM_FOLDER = os . path . dirname ( os . path . abspath (__file__) )
 
+# How long any wait here lasts before it fails. A wait returns as soon
+# as its condition holds, which takes well under a second on an idle
+# machine. But 'bash/all-tests.sh' runs this at nice 15, and when other
+# suites keep every core busy at a higher priority, each of the dozen
+# short processes a pacer starts before its session (python3, date,
+# ps, ...) can wait seconds for a core. With three busy loops sharing
+# one core, the first test took 18 seconds, though nothing was wrong.
+# So the limit is generous; it is reached only if the pacer is stuck.
+# Under such load the second test can also fail for a real reason: see
+# "the pacer records its session's start time from the wrong process"
+# in TODO/problems.org.
+PATIENCE_SECONDS = 120
+
 USAGE_STAND_IN = """#!/usr/bin/env bash
 now=$(date +%s)
 echo "{\\"session_5h\\": {\\"used_frac\\": 0.0, \\"reset_epoch\\": $((now + 3600))},"
@@ -79,7 +92,7 @@ class PacerTest (unittest . TestCase):
     for process in self . groups:
       try: os . killpg (process . pid, signal . SIGKILL)
       except ProcessLookupError: pass
-      process . wait (timeout = 15)
+      process . wait (timeout = PATIENCE_SECONDS)
     shutil . rmtree (self . root, ignore_errors = True)
 
   def start_pacer (self, output = subprocess . DEVNULL):
@@ -107,7 +120,7 @@ class PacerTest (unittest . TestCase):
       try: os . kill ( int (pid), signal . SIGKILL )
       except ProcessLookupError: pass
 
-  def wait_for (self, condition, what, seconds = 15):
+  def wait_for (self, condition, what, seconds = PATIENCE_SECONDS):
     deadline = time . time () + seconds
     while time . time () < deadline:
       if condition (): return
@@ -116,7 +129,12 @@ class PacerTest (unittest . TestCase):
 
   def assert_refused (self, naming):
     second = self . start_pacer (subprocess . PIPE)
-    output, _ = second . communicate (timeout = 15)
+    started = "pacer started (pid %d)" % second . pid
+    self . wait_for (lambda: second . poll () is not None or started in self . log (),
+                     "the second pacer to refuse")
+    if started in self . log (): # it would run on; say so now, not when a wait gives up
+      self . fail ( "the second pacer started instead of refusing; the log:\n" + self . log () )
+    output, _ = second . communicate (timeout = PATIENCE_SECONDS)
     self . assertEqual (second . returncode, 1, output)
     self . assertIn ("not starting: " + naming, output)
     self . assertIn ("a pacer (pid %d) refused to start: %s" % (second . pid, naming), self . log ())
@@ -136,7 +154,7 @@ class PacerTest (unittest . TestCase):
     self . wait_for (lambda: len (self . sessions_started ()) == 1, "the first pacer's session")
     stamp = self . sessions_started () [0] [0]
     os . kill (first . pid, signal . SIGTERM)
-    first . wait (timeout = 15)
+    first . wait (timeout = PATIENCE_SECONDS)
     subshell = int ( read ( os . path . join (self . dir, "running-session") ) . split () [0] )
     self . assert_refused ("session %s (pid %d), which no living pacer watches," % (stamp, subshell))
     self . assertEqual (len (self . sessions_started ()), 1)
@@ -161,7 +179,7 @@ class PacerTest (unittest . TestCase):
                            str (pacer . pid) )
       # Its session's subshell dies with it, so its running-session file stops nothing.
       os . killpg (pacer . pid, signal . SIGKILL)
-      pacer . wait (timeout = 15)
+      pacer . wait (timeout = PATIENCE_SECONDS)
       self . end_sessions ()
 
 if __name__ == "__main__":
