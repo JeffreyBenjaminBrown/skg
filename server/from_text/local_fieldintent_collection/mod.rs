@@ -104,31 +104,8 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
         graph, skgrepo_restriction );
   let (nodeMerge_acquisitions, suppressed_merges)
     : (Vec<(ID, ID)>, bool)
-    = if skgrepo_restriction . is_unrestricted () {
-        (nodeMerge_acquisitions, false)
-      } else {
-          let restriction : &SkgrepoRestriction = skgrepo_restriction;
-          // A nodeMerge writes both nodes' files; under a restricted
-          // set it is suppressed unless the graph has both nodes and
-          // neither is restricted, and refused when either has a
-          // restricted section (the API doc's "Restricted-skgrepo
-          // nodes").
-          let shown : &dyn Fn (&ID) -> bool = &|gnid : &ID| -> bool {
-            graph . node_is_shown (gnid, restriction) };
-          let before : usize = nodeMerge_acquisitions . len ();
-          let kept : Vec<(ID, ID)> =
-            nodeMerge_acquisitions . into_iter ()
-            . filter ( |(acquirer, acquiree)|
-                shown (acquirer) && shown (acquiree) )
-            . collect ();
-          for (acquirer, acquiree) in &kept {
-            refuse_nodeMerge_with_restricted_sections (
-              config, restriction,
-              &graph . pid_else_raw_id (acquirer),
-              &graph . pid_else_raw_id (acquiree) )
-              . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
-          let suppressed : bool = kept . len () < before;
-          (kept, suppressed) };
+    = suppress_nodeMerges_of_restricted_nodes (
+        nodeMerge_acquisitions, graph, config, skgrepo_restriction ) ?;
   let mut warnings : Vec<String> =
     if suppressed_writes || suppressed_merges {
       vec! [ "Restricted nodes present in saved buffer remain unchanged in graph."
@@ -142,6 +119,38 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
           warnings,
           post_skgsave_commit_notice_candidates },
         nodeMerge_acquisitions )) }
+
+/// The (acquirer, acquiree) pairs the save keeps, and whether it
+/// dropped any. Unrestricted, it keeps them all. A nodeMerge writes
+/// both nodes' files; under a restricted set it is suppressed unless
+/// the graph has both nodes and neither is restricted, and refused
+/// when either has a restricted section (the API doc's
+/// "Restricted-skgrepo nodes").
+fn suppress_nodeMerges_of_restricted_nodes (
+  nodeMerge_acquisitions : Vec<(ID, ID)>,
+  graph                  : &InRustGraph,
+  config                 : &SkgConfig,
+  skgrepo_restriction    : &SkgrepoRestriction,
+) -> Result<(Vec<(ID, ID)>, bool), Box<dyn Error>> {
+  if skgrepo_restriction . is_unrestricted () {
+    return Ok ((nodeMerge_acquisitions, false)); }
+  let restriction : &SkgrepoRestriction = skgrepo_restriction;
+  let shown : &dyn Fn (&ID) -> bool = &|gnid : &ID| -> bool {
+    graph . node_is_shown (gnid, restriction) };
+  let before : usize = nodeMerge_acquisitions . len ();
+  let kept : Vec<(ID, ID)> =
+    nodeMerge_acquisitions . into_iter ()
+    . filter ( |(acquirer, acquiree)|
+        shown (acquirer) && shown (acquiree) )
+    . collect ();
+  for (acquirer, acquiree) in &kept {
+    refuse_nodeMerge_with_restricted_sections (
+      config, restriction,
+      &graph . pid_else_raw_id (acquirer),
+      &graph . pid_else_raw_id (acquiree) )
+      . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
+  let suppressed : bool = kept . len () < before;
+  Ok ((kept, suppressed)) }
 
 /// One warning per orphan graphnode the save creates: a node from a
 /// headline typed under a parent that reads no claims
