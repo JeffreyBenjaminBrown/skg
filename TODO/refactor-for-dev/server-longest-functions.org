@@ -25,6 +25,19 @@
    'repeat' against 'end' and 'until'); see "the clients, measured".
    Two seams were split there, each in both clients at once, so the
    twins keep matching.
+** A third round: six more, four in the server, one in Emacs, one in the AI reader
+   Everything was measured again the same way (no length had moved but
+   those split), and 'tools/skg-for-ai/' too: a Python function from
+   its 'def' line to its last line, as 'ast' reports it, outside the
+   suite ('test_skg_for_ai.py', 'tests/'); see "the AI reader,
+   measured". The six: 'resolve_link', 'rebuild_session_lifetime_stores_in_place',
+   the tail of 'prepare_save_under_mutation_gate',
+   'infer_hides_from_contains_removals', 'skg-validate-linkstack-buffer'
+   and 'predicted_forks'. Each extracted piece is pure or moved whole
+   to the place of its call; each commit message says why no effect
+   moved. The whole suite ('bash/all-tests.sh') checked the round.
+   The measuring scripts are not kept; the paragraphs above and this
+   one say what they count.
 * The measured list
   Lines before; after, for the ones split.
 ** 333 'update_from_and_rerender_buffer_with_approvals_or_preview': seam, done in part (now 220)
@@ -115,12 +128,42 @@
    'server/org_to_text.rs'. Already split into nested functions
    ('node_parts' and its own); long only because they are counted
    inside it.
-** 95 'prepare_save_under_mutation_gate': seam, left (second round)
-   'server/save.rs'. See "left".
-** 95 'infer_hides_from_contains_removals': not read (second round)
+** 95 'prepare_save_under_mutation_gate': seam, done (third round; now 83)
+   'server/save.rs'. Its tail is three pure functions:
+   'graph_both_phases_leave', 'pids_saved_and_gnids_affected_by_both_phases'
+   (what the telescope check reads) and 'identities_the_save_writes'
+   ('PreparedSave::final_write_identities'). What is left is the
+   preparation of both phases, each step a call with its '?'.
+** 95 'infer_hides_from_contains_removals': seam, done (third round; now 79)
    'server/from_text/local_fieldintent_collection/resolve_visibility.rs'.
-** 94 'resolve_link': not read (second round)
-   'server/import_md_and_org/resolve.rs'.
+   'forks_folder_members_with_their_content' lists the members of the
+   hider's forks folder with their content. The 'removed' and
+   'inferred_unhides' blocks are units too, but each reads the 'key'
+   closure and four or five locals; see "left".
+** 94 'resolve_link': seam, done (third round; now 46)
+   'server/import_md_and_org/resolve.rs'. 'link_path_and_search'
+   splits and decodes what a link names (an undecodable path is its
+   'Err', which the caller returns); 'link_target_within_document'
+   finds the node its search addresses.
+** 92 'fmt' of 'BufferValidationError': flat (third round)
+   'server/types/errors.rs'. Its 'Display': one match on the variant.
+** 88 'leaves_named_at': not read (third round)
+   'server/diff_view/processed_requests.rs'.
+** 87 'acquirer_after_nodeMerge': not read (third round)
+   'server/nodeMerge/nodeMergeInstructionTriple.rs'.
+** 85 'resolve_forker_visibility': seam, left (third round)
+   'resolve_visibility.rs'. One loop over the member-as-such signals;
+   see "left".
+** 84 'rebuild_session_lifetime_stores_in_place': seam, done (third round; now 62)
+   'server/serve/handlers/rebuild_session_lifetime_stores.rs'.
+   'validated_graph_from_skg_files' reads, validates and reports the
+   telescope violations; 'recompute_prominence_sources' fills the new
+   search index's prominence. Their log lines stayed in the caller.
+** 83 'stranded_relationships', 82 'supplement_nodeSaveIntent_from_disk', 82 'org_to_viewforest', 81 'extract_nonmergeSavePlan_locally_in_graph', 79 'prepare_graphnode_telescope': not read (third round)
+   In 'server/from_text/' ('strandeds.rs', 'supplement_from_disk.rs',
+   'buffer_to_viewnodes/uninterpreted.rs',
+   'local_fieldintent_collection/mod.rs') and
+   'server/dbs/filesystem/one_node.rs'.
 ** 93 'handle_titles_by_gnids_request_with_skgrepo_set': seam, done (now 41)
    'server/serve/handlers/titles_by_gnids.rs'. Its stages are
    'requested_gnids_else_logged_error' (logs, then returns the text
@@ -143,8 +186,14 @@
 *** 79 'skg--parse-rule-header': flat
     'elisp/skg-sexpr/skg-lens.el'. One 'cond' over the rule grammar,
     and a long docstring.
-*** 75 'skg-validate-linkstack-buffer': seam, left
-    'elisp/skg-linkstack.el'. See "left".
+*** 75 'skg-validate-linkstack-buffer': seam, done (third round; now 52)
+    'elisp/skg-linkstack.el'. One headline is the loop's unit:
+    'skg--linkstack-headline-body-lines' reads its body and moves point
+    past it, 'skg--linkstack-headline-error' returns its error message
+    or nil. Its Neovim twin 'validate_linkstack_buffer' is 34 lines
+    and reads no trees, so it was left. The split was checked on ten
+    buffers against the old code (same result, point and match data);
+    one of them signals, as before ('TODO/problems.org', Emacs).
 *** 71 'skg--rel-at-point': not read
     'elisp/skg-request-relRepo-info.el'; its twin 'rel_at_line' is 55.
 *** 66 'skg--register-rerender-stream-handlers': seam, done (now 22)
@@ -167,22 +216,60 @@
     'nvim/lua/skg/goto_git.lua'.
 *** 58 'configure_view_buffer': not read
     'nvim/lua/skg/buffer.lua'.
+* The AI reader ('tools/skg-for-ai/'), measured (third round)
+  Lines before; after, for the one split. The modules beside
+  'skg_for_ai.py', not its suite.
+** 311 'parse_command_line': flat
+   'command_line.py'. Declarative argparse, one 'add_parser' after
+   another ('skg-for-ai.org' says why it stays).
+** 130 'change_report_lines': seam, left
+   'save.py'. One loop per kind of change (removed, moved, reordered,
+   new, placed, repeated, titles and bodies), but they share six
+   closures ('described', 'place', 'edited_place', the parent keys);
+   see "left".
+** 93 'command_save': not read
+   'save.py'. Already split once ('skg-for-ai.org', "'command_save'
+   reads its report in 'save_report'"); what is left is what it prints
+   and when it stops.
+** 92 'predicted_forks': seam, done (now 70)
+   'save.py'. 'settle_clone_skgrepo' chooses where the clones go (or
+   adds the error line), after the early return for no forks.
+** 91 'request_report_lines': flat
+   'save.py'. One block per kind of request word, mostly literal text.
+** 87 'command_perspective', 80 'summary_lines', 70 'request_token_problems', 69 'expand_relRepo_subtree': not read
+   'view_commands.py', 'compact_view.py', 'edited_compact_view.py',
+   'outline_words.py'.
 * Left, best first
 ** The save request's eleven fields as one struct
    'save_buffer.rs'. 'handle_save_buffer_request' (94 lines) still reads
    eleven request fields into locals and passes them on; one struct
    would also shorten the pipeline's seventeen arguments, but touches
    every test that calls the '_with_approvals' entry points. Medium.
-** 'skg-validate-linkstack-buffer' (75 lines) and its Neovim twin
-   'elisp/skg-linkstack.el'. Reading one headline and its body
-   (returning its entry or its error) is the loop's unit; the error
-   texts must stay word for word. Do the Neovim twin in the same pass.
-   Safe, small.
-** The tail of 'prepare_save_under_mutation_gate' (95 lines)
-   'server/save.rs'. The pids saved and gnids affected by both phases,
-   the telescope warnings from them, and the final write identities
-   are pure computations over the two 'PreparedGraphUpdate's; two
-   functions would name them. Safe, small; less to gain than the rest.
+** The functions measured but not read
+   Seven in the server of 79 to 88 lines, five in the clients, five in
+   the AI reader (each "not read" above). Read each before splitting;
+   several may be flat.
+** 'resolve_forker_visibility' (85 lines) and the rest of 'infer_hides_from_contains_removals' (79)
+   'resolve_visibility.rs'. The loop bodies have units ('drawn_before',
+   'inferred_hides' in the first; 'removed', 'inferred_unhides' in the
+   second), but each reads the 'key' closure (a gnid to its pid by the
+   graph) and four to six locals, so a split adds long argument lists.
+   A function taking 'graph' would rebuild 'key' itself. Pure, so
+   safe; worth it only with names that say what each set is, as the
+   comments there do. An hour.
+** 'change_report_lines' (130 lines, 'tools/skg-for-ai/save.py')
+   Each kind of change is a loop that appends its lines; its closures
+   over 'edited', 'original' and the handle maps would have to become
+   a small class (or arguments) for the loops to be functions. The
+   lines are the tool's output, read by agents as their manual: they
+   must stay byte for byte, and the order of kinds too. Medium.
+** Startup and the rebuild record telescope violations alike
+   'initialize_dbs' ('server/dbs/init.rs') and
+   'validated_graph_from_skg_files' (the rebuild's) both record the
+   load violations in the graph, append them to the graph's warnings
+   and sort those the same way before the report. One function could
+   do those three steps; the report's failure stays different (startup
+   warns, the rebuild fails). Small, safe.
 ** The rest of 'update_from_and_rerender_buffer_with_approvals_or_preview' (220 lines)
    'save_buffer.rs'. Still the longest, but what is left is the
    sequence itself: each step a call, a 'ControlFlow' match or a
@@ -200,8 +287,8 @@
    report's lines; the relRepo refusals) must stay word for word.
    Medium work, moderate risk; worth it when someone next changes them.
 ** The longest files
-   'server/types/viewnode.rs' (1702 lines), 'save_buffer.rs' (1231 after
-   this round), 'parse_metadata_sexp.rs' (1106; see
+   'server/types/viewnode.rs' (1702 lines), 'save_buffer.rs' (1312 in
+   the third round), 'parse_metadata_sexp.rs' (1106; see
    'server-serve-and-handlers.org' for its three seams),
    'herald_descriptions.rs' (972), 'refresh/visit.rs' (953),
    'obsidian/export.rs' (949). Not looked at for seams this round.
