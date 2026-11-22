@@ -166,9 +166,7 @@ response a rerender stream follows."
    'rerender-lock
    (lambda (_tcp-proc payload)
      (unless skg--rerender-overPrivateText-challenged
-       (setq skg-response-handler-map
-             (assoc-delete-all 'overPrivateText-telescope-confirmation
-                               skg-response-handler-map)))
+       (skg--unregister-response-handlers '(overPrivateText-telescope-confirmation)))
      (condition-case err
          (let* ((response (read payload))
                 (lock-entry (assoc 'lock-views response)))

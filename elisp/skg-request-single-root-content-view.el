@@ -42,9 +42,7 @@ STALE-VIEW-ID-RETRY-P is an internal guard that prevents repeated recovery."
     (skg-register-response-handler
      'content-view
      (lambda (tcp-proc payload)
-       (setq skg-response-handler-map
-             (assoc-delete-all 'overPrivateText-telescope-confirmation
-                               skg-response-handler-map))
+       (skg--unregister-response-handlers '(overPrivateText-telescope-confirmation))
        (skg-handle-content-view-sexp
         tcp-proc payload view-id clean-gnid approved-pids
         stale-view-id-retry-p))

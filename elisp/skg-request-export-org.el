@@ -46,9 +46,7 @@ untouched."
     (skg-register-response-handler
      'export-to-org
      (lambda (tcp-proc payload)
-       (setq skg-response-handler-map
-             (assoc-delete-all 'overPrivateText-telescope-confirmation
-                               skg-response-handler-map))
+       (skg--unregister-response-handlers '(overPrivateText-telescope-confirmation))
        (skg--export-to-org-handler tcp-proc payload))
      t)
     (skg--register-overPrivateText-confirmation-instead-of

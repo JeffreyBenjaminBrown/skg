@@ -102,17 +102,13 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
     (skg-register-response-handler
      'search-results
      (lambda (_tcp-proc payload)
-       (setq skg-response-handler-map
-             (assoc-delete-all 'overPrivateText-telescope-confirmation
-                               skg-response-handler-map))
+       (skg--unregister-response-handlers '(overPrivateText-telescope-confirmation))
        (skg--display-search-results payload clean-terms))
      t)
     (skg-register-response-handler
      'overPrivateText-telescope-confirmation
      (lambda (_tcp-proc payload)
-       (setq skg-response-handler-map
-             (assoc-delete-all 'overPrivateText-telescope-confirmation
-                               skg-response-handler-map))
+       (skg--unregister-response-handlers '(overPrivateText-telescope-confirmation))
        (skg--forget-search-results-handler)
        (let* ((response (read payload))
               (prompt (format "%s" (cadr (assoc 'prompt response))))
@@ -134,9 +130,7 @@ and the response it was counted as."
 (defun skg--cancel-locally-failed-search ()
   "Unwind the search handlers after a local send failure."
   (skg--forget-search-results-handler)
-  (setq skg-response-handler-map
-        (assoc-delete-all 'overPrivateText-telescope-confirmation
-                          skg-response-handler-map)))
+  (skg--unregister-response-handlers '(overPrivateText-telescope-confirmation)))
 
 (defvar skg--search-buffer-setup-hook nil
   "Hook run inside a freshly populated search buffer.
