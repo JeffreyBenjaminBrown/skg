@@ -1,0 +1,15 @@
+title: 'C-c v ? : skg-describe-at-point'
+pid: 9f585e04-4c8f-456c-b8a6-a1c9c8c0e610
+body: |2-
+  Says in plain sentences what the headline at point is, when it is a
+  folder (what that kind of folder holds, and how its members relate to
+  the note above it), then what each herald it shows means, one
+  sentence each, the most informative first, with this headline's own
+  numbers and letters read out: for =2/5L=, "5 notes link to this one;
+  2 of them are substantive (they have a body, content, or link to
+  other notes too)". It works from the headline or its body, with
+  heralds shown or hidden. Two lines or fewer show in the echo area,
+  more in the help buffer '*skg describe*'. The server writes the
+  sentences ("Describe heralds" in 'docs/api-and-formats.org'), which
+  Neovim's ':SkgDescribeAtPoint' and skg-for-ai's 'describe' show too.
+  It changes nothing and saves nothing.

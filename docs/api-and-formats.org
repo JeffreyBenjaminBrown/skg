@@ -707,6 +707,32 @@ So far there are these endpoints:
   - A Rust unit test (=herald_rules_cover_the_emittable_vocabulary=)
     pins the table to the metadata vocabulary the server can emit, in
     both directions. It pins atom coverage only, not presentation.
+** Describe heralds
+  - Request: ((request . "describe heralds") (metadata . "(skg ...)")
+    [(folder-change . "processed" | "unprocessed")])
+  - Response: LP response-type "describe-heralds" with
+    =((lines "SENTENCE" ...))=, or =((error "MESSAGE"))= when the
+    metadata does not read.
+  - The metadata is one headline's, as the client's buffer holds it.
+    A client adds the atom =pendingDetachment= when the headline is a
+    pending detachment, and on a folder of the diff view whose
+    members' relationships changed sends =folder-change=, whether
+    every such change is processed: what it draws itself ("Herald
+    rules" above; 'docs/heralds.org', "What the server serves, and
+    what the clients add"). The server reads nothing else but its
+    config, for skgrepo labels and ownership.
+  - The sentences ('server/herald_descriptions.rs'): for a folder,
+    first what it holds and how its members relate to the note above
+    it; then one per herald, with the headline's own counts, ancestor
+    letters and skgrepos read out, ordered by the herald's style, the
+    styles asking more attention first. A sentence is keyed on the
+    path in the metadata of the element that makes its herald appear;
+    a path the rule table renders that no sentence covers reads "No
+    description yet for PATH.", and the unit test
+    =every_herald_the_rule_table_renders_has_a_sentence= requires
+    that there be none (=every_folder_has_a_sentence_beginning_with_its_label=
+    does the same for the folders). 'skg-describe-at-point' (=C-c v
+    ?=), ':SkgDescribeAtPoint' and skg-for-ai's 'describe' show them.
 ** How a message names a headline
 Every message in an =errors= or =warnings= list is Org
 text. Its first line is the message's headline text, which both

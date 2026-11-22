@@ -1,0 +1,8 @@
+title: '<localleader>v? : :SkgDescribeAtPoint'
+pid: 48920e2c-3c65-4062-ba56-765d73c4fa3c
+body: |2-
+  As C-c v ? does in Emacs: says in plain sentences what the headline
+  at point is, when it is a folder, then what each herald it shows
+  means, the most informative first, with its own numbers and letters
+  read out. Two screen lines or fewer show as a message, more in a
+  scratch window below, which q closes. It changes nothing.

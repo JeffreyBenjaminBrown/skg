@@ -8,6 +8,10 @@ body: |2-
   'skg-view-heralds-mode' (=C-c v h=) in Emacs or ':SkgHeraldsToggle'
   (=<localleader>vh=) in Neovim. The expanded metadata is useful when you
   need to inspect the exact derived facts or requests.
+  To read in plain sentences what each herald of one headline means,
+  with its own numbers and letters read out, use 'skg-describe-at-point'
+  (=C-c v ?=) in Emacs or ':SkgDescribeAtPoint' (=<localleader>v?=) in
+  Neovim.
 
   Relationship counts describe the latest rendered graph within the current
   skgrepo restriction. They count distinct visible nodes, including visible
