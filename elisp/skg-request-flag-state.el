@@ -7,6 +7,7 @@
 (require 'skg-config)
 (require 'skg-length-prefix)
 (require 'skg-metadata)
+(require 'skg-request-relRepo-info) ; for skg--relRepo-requested-value
 
 (defconst skg--search-matching-choices
   '("search matching" "no search matching"))

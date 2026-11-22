@@ -516,7 +516,7 @@ def words_with_a_subtree_form (headline):
 
 # The writable partner folders, each with the kind of relationship
 # 'relRepo:NAME subtree' sets from it ('skg--writable-folder-relations'
-# in 'elisp/skg-metadata.el'). The folder's viewparent records the
+# in 'elisp/skg-request-relRepo-info.el'). The folder's viewparent records the
 # relationship to each member that claims; a member of the forks folder
 # claiming nothing either forks the viewparent, recording that in its
 # own file, or is a mirror of it only through others.

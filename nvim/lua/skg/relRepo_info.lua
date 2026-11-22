@@ -10,8 +10,7 @@
 -- relationship of the kind in the subtree. Neither saves. Below them
 -- stand the helpers both drive. Writing the request into the
 -- metadata is skg.metadata's ('write_edit_request_at_line').
--- The Lua port of elisp/skg-request-relRepo-info.el and of the
--- relRepo section of elisp/skg-metadata.el.
+-- The Lua port of elisp/skg-request-relRepo-info.el.
 
 local client = require('skg.client')
 local config = require('skg.config')
