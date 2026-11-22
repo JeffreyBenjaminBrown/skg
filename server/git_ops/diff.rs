@@ -33,7 +33,10 @@ pub fn compute_diff_for_every_skgrepo (
       Ok (diff) => {
         skgrepo_diffs . insert ( skgrepo_name . clone(), diff ); },
       Err (e) => { // Log error but continue with other skgrepos
+        // The target is the module this warning lived in before it
+        // moved here, which 'server.jsonl' and RUST_LOG filters name.
         tracing::warn! (
+          target: "skg::serve::handlers::save_buffer",
           "Failed to compute diff for repo '{}': {}",
           skgrepo_name, e ); }} }
   skgrepo_diffs }
