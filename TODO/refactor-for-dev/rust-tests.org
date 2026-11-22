@@ -43,52 +43,69 @@
 ** Two local save-and-read-collateral helpers call 'save_and_read_collateral'
    ('tests/shared/git_fixture_helpers.rs'), from 'hidden_from_forks.rs'
    and 'partner_folder_order.rs'.
+** A shared-store sub-test names itself once, by 'reset_then_run_subtest!'
+   'server/test_utils.rs'. 'reset_then_run_subtest! (s . reset (FIXTURES),
+   f (&s . config) . await);' is exactly 's . reset ("f", FIXTURES) ?;
+   f (&s . config) . await ?;'. 256 sites in 37 files, rewritten by a
+   script and checked by one that expands each use back and compares
+   with the old text; nextest's test list and every printed sub-test
+   name are unchanged.
+** 'single_root_view_text' for a caller that wants only the view's text
+   'server/test_utils.rs'. 56 sites had destructured
+   'single_root_view' and dropped its pids and viewforest.
+** 'save_and_read_streamed_messages' saves and returns every streamed message
+   'server/test_utils.rs'. 'save_and_read_collateral' filters its
+   result; five sites in 'collateral_delete.rs',
+   'collateral_repo_move.rs', 'viewnode_ids.rs' and
+   'pruned_change_view/editing.rs' had done it by hand.
+** 'saved_view_under_initial_node_limit' in 'editable_view_cascade_and_budget.rs'
+   Ten blocks of eight lines each became one call. Four had read the
+   graph from the unlimited config; reading skgrepos ignores the
+   limit, so the graph is the same.
+** 'skgrepos_config_in_order' builds an ordered config from (name, path, owned)
+   'server/test_utils.rs'. It replaced the hand-built configs of
+   'attribution.rs', 'dependencies_manifest.rs', 'types_disk_home.rs',
+   'telescope_invariants.rs', 'strandeds.rs' and the body of
+   'owned_skgrepos_config_in_order'.
 * Candidates left, best first
-** Give 'single_root_view''s callers that want only the text a helper
-   56 of its 75 call sites write
-   'let (view, _pids, _) : (String, Vec<ID>, _) = single_root_view (...) ?;'
-   and use only the text. A 'single_root_view_text' in test_utils
-   would make each a one-liner. Safe and mechanical (a regex over
-   the destructuring, the compiler catching the rest); 'view_of' in
-   'view_and_save_helpers.rs' is not it, since it strips viewnode IDs.
-** Move 'save_and_read_collateral' into 'server/test_utils.rs'
-   It lives in 'tests/shared/git_fixture_helpers.rs', which not every
-   grouped binary declares, so about ten sites ('collateral_delete.rs',
-   'collateral_repo_move.rs', 'strandeds.rs', 'save_dirty_conflicts.rs',
-   'viewnode_ids.rs', 'pruned_change_view/editing.rs',
-   'what_the_refresh_keeps.rs') still make a stream pair, save, drop
-   the write end and filter the messages by hand. Check each: some
-   keep the save-relax-lock message, some take only the first
-   collateral view, some use the low-level handler rather than the
-   '_test' shim. Moderate work; safe where the shapes truly match.
-** Fold the one-shot saves of 'editable_view_cascade_and_budget.rs'
-   Twelve blocks each build a graph from the config, an empty views
-   state, and call 'save_ignoring_streamed_messages' with
-   '&Err ( String::new () )', returning the saved view. A local
-   helper taking the buffer and config would cut each to two lines.
-   Note that several build the graph from 'config' but save with a
-   clone whose 'initial_node_limit' differs; the helper must keep
-   that (pass both, or argue the graph does not depend on it).
-** ? Shorten the 'all_tests' sub-test dispatch
-   41 files run sub-tests as 's . reset ("NAME", "FIXTURES") ?;
-   NAME (&s . config, &mut s . tantivy) . await ?;' (282 resets),
-   repeating each name. A 'SharedStoreSession' method taking the test
-   function (Rust 2024 'AsyncFnOnce' accepts async fn items) or a
-   'macro_rules!' using 'stringify!' would halve the lines and keep
-   the printed name from drifting from the function. But call shapes
-   vary (sync sub-tests, sub-tests that take only the config,
-   'reset_from_config', 'reset_with_fixture_prep'), and a macro hides
-   what runs; ask Jeff whether he wants it. If he says nothing, it
-   stays.
-** Share the dummy-config builders that include a foreign skgrepo
-   'tests/unit/telescope_invariants.rs'
-   ('foreign_then_two_owned_skgrepo_config'),
-   'tests/unit/types_disk_home.rs', 'tests/unit/repos.rs',
-   'tests/unit/strandeds.rs', 'tests/unit/telescope.rs' and
-   'tests/repo_inheritance_for_non_content.rs' each build an
-   'SkgConfig::dummyFromSkgrepos' by hand with different names,
-   paths and ownership. A builder taking (name, path, owned) triples
-   would explain them; the paths differ, so each must keep its own.
+** ? Make the printed names of 19 sub-tests match their functions
+   'fork.rs', 'move_repo.rs', 'repo_sets.rs',
+   'save/validate_foreign_nodes.rs',
+   'new/buffer_to_viewnodes/add_missing_info.rs',
+   'new/local_fieldintent_collection/extraction.rs'. Each prints a
+   name saying 'repo' (or 'id') where its function says 'skgrepo'
+   (or 'gnid'), so it still takes two lines and a reader searching
+   for the printed name misses the function. Printing the function's
+   name would let 'reset_then_run_subtest!' take them, but changes
+   what a failing run reports: the coordinator must say yes. If no
+   one does, they stay. (Seven more resets are not followed by a
+   call of their name and are not candidates:
+   'forks_under_search_hits.rs', two in 'tests/merge/',
+   'save/extra_id_revocation.rs''s three, 'partner_folder_warnings.rs''s
+   '_impl'.)
+** Let 'reset_then_run_subtest!' take the six fixture-prep resets
+   'mirror_in_place_of_an_extra_id.rs',
+   'forkee_content_named_by_an_extra_id.rs' (two),
+   'hides_by_integration.rs', 'members_typed_into_a_forks_folder.rs'
+   (two) call 'reset_with_fixture_prep' with a closure, then the
+   sub-test. The macro already accepts any reset arguments; the
+   closures span lines, so the gain is only the repeated name. Safe;
+   small.
+** Fold 'extraction.rs''s parse-then-extract preamble
+   'tests/new/local_fieldintent_collection/extraction.rs' (15) and
+   'tests/new/buffer_to_viewnodes/uninterpreted2.rs' (8) each repeat
+   'org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap ()
+   . 0' then 'nodeInstructions_from_tree (...) . unwrap ()'. A local
+   helper per file would cut four lines a test. Safe; read each
+   site, since some go on to use the viewforest.
+** Share the abbreviation-bearing dummy configs
+   'tests/unit/repos.rs', 'heralds.rs' and 'herald_descriptions.rs'
+   build skgrepos with abbreviations, so 'skgrepos_config_in_order'
+   does not fit; 'obsidian_export.rs''s 'config_of' and
+   'tests/repo_inheritance_for_non_content.rs' set no order, so
+   giving them one is not plainly equivalent. A second builder with
+   an abbreviation field would explain the first three. Small value.
 ** Unify 'run_with_skgrepo_set_test_db' with 'run_with_test_stores'
    Left by 'tests-harness-and-bash.org' too: the skgrepo-set runner
-   takes neither the group mutex nor a panic guard.
+   takes neither the group mutex nor a panic guard. Taking them
+   changes how a failing test cleans up, so check it is only that.
