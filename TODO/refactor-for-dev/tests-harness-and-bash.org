@@ -42,6 +42,9 @@
    says the completion sound never plays.
 * Candidates left, best first
 ** Give the integration tests' 'run-test.sh' a shared prologue
+   Mostly done: see 'client-and-integration-tests.org' ('write_test_config',
+   'make_temp_config_in_data_folder', 'run_server_and_client_test_then_exit').
+   What remains is the per-test 'enhanced_cleanup' and fixture backups.
    40 files, 80 to 160 lines each, repeat the same prologue: find a
    port, make 'TEMP_CONFIG' inside 'data/', write a config whose first
    three lines are always the same, start the server, run the client

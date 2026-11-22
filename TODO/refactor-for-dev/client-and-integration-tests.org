@@ -1,0 +1,74 @@
+* Refactoring the clients' tests and the integration tests
+  The territory: what each integration directory runs
+  ('tests/integration/*/run-test.sh', 'test-emacs.el', 'test-nvim.lua'),
+  the Emacs unit tests ('tests/elisp/') and the Neovim specs
+  ('tests/nvim/*_spec.lua'). The shared code they call lives in the
+  harness ('tests/integration/test-lib.sh', 'test-wait.el',
+  'test-nvim-lib.lua', 'tests/nvim/helpers.lua'), which
+  'tests-harness-and-bash.org' covers; helpers were added there because
+  that is where shared test code already lives. 'elisp/skg-test-utils.el'
+  is in 'elisp/', outside this territory.
+** How to check a change here cheaply
+   A 'run-test.sh' can be run without a server: copy
+   'tests/integration/' (old and new) into a scratch folder, append to
+   its 'test-lib.sh' stubs of 'find_available_port' (a fixed port),
+   'start_skg_server' (copy '$TEMP_CONFIG' out), 'run_client_test' and
+   'cleanup', run every script, and diff the configs and exit codes.
+   One directory, both clients: 'cd tests/integration/DIR &&
+   SKG_TEST_CLIENT=nvim ./run-test.sh' (needs 'target/debug/skg').
+   The runner reports 'CLIENT/DIR' for each directory with a
+   'run-test.sh' (Neovim only where 'test-nvim.lua' exists): 80 names.
+* Done
+** An integration test's config is written by 'make_temp_config_in_data_folder' or 'write_test_config'
+   The port pick, the temporary config inside 'data/' and the three
+   lines every config begins with were copied into 39 'run-test.sh';
+   each now passes only its '[[repos]]' tables as a here-doc. Configs
+   are byte-identical to before. 'link-annotations' keeps its own (an
+   extra key before the blank line).
+** A test that checks nothing after its client ends with 'run_server_and_client_test_then_exit'
+   34 scripts ended with the same six lines.
+** An Emacs integration test sets its port with 'skg-test-use-test-port'
+   35 copies of the '$SKG_TEST_PORT' 'let'. 'visit-link' and
+   'link-annotations' keep theirs: they do not load 'test-wait.el',
+   whose save advice they would gain.
+** An Emacs integration test arms its timeout with 'skg-test-arm-timeout'
+   23 copies of the 'run-at-time' lambda; the ones whose messages differ
+   keep their own. Timeouts unchanged.
+** A Neovim integration test finds a buffer with 'T.first_buffer_where' or 'T.view_buffer_showing'
+   Sixteen loops over 'nvim_list_bufs'; four identical
+   'buffer_showing' in the fork tests.
+* Candidates left, best first
+** Back up and restore '.skg' fixtures with two shared helpers
+   15 'run-test.sh' ('aliases-view-request', 'containerward-view-request',
+   'save_collateral_*', 'save_lock_lifecycle', ...) each write a
+   'backup_and_reset_test_data' and 'cleanup_test_data' that copy
+   'NAME.skg' to 'NAME.skg.backup.TIMESTAMP' and back. Two helpers
+   ('back_up_skg_file DIR NAME', 'restore_skg_file_from_backup DIR
+   NAME') would shrink each loop body to a call. Risky in the details:
+   some remove the file when there is no backup, some do not, and the
+   backup and the reset of a file are interleaved in one loop; keep
+   each variant's behaviour, and check the fixture folders are clean
+   ('git status') after each run.
+** Give the Emacs integration tests a 'skg-test-fail'
+   133 '(kill-emacs 1)'; 33 directly follow a '(message "✗ FAIL: ...")'.
+   A 'skg-test-fail FORMAT &rest ARGS' in 'test-wait.el' would replace
+   those pairs; the others interleave buffer dumps and would need a
+   variant taking the buffer. 'all-tests.sh' greps 'FAIL' lines into
+   ALL.org, so the printed text must stay the same.
+** Make the remaining irregular Emacs prologues use the helpers
+   'fork', 'import-md-and-org' and 'view-magit' set the port in other
+   shapes; 'link-annotations' sets it unconditionally; 'visit-link'
+   does not load 'test-wait.el'. Loading it would add the
+   fontify-before-save advice, a change in what those tests exercise,
+   so each needs a look, not a regex.
+** Elisp unit tests: '(with-temp-buffer (org-mode) (insert ...) (goto-char (point-min))'
+   About 100 copies across 'tests/elisp/'. A macro would belong in
+   'elisp/skg-test-utils.el', which is outside this territory; the next
+   agent must be allowed into 'elisp/' for it. Do not touch the two
+   tests that fake 'skg-response-handler-map' in the short shape
+   ('elisp.org' says which).
+** Neovim specs: 'vim.wait(3000, function () ...)' and the fake server
+   32 copies of a 3-second wait and 28 'helpers.connect_to_fake_server'
+   set-ups with the same 'before_each'/'after_each' pair; a helper in
+   'tests/nvim/helpers.lua' could own both. Read the specs first: the
+   waits' predicates differ.
