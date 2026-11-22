@@ -112,6 +112,7 @@ sys . path . insert (0, TOOL_FOLDER)
 import sexp
 import server_connection
 import full_view
+import compact_view
 import skg_for_ai
 
 FIXTURE_FOLDER = os . path . join (TOOL_FOLDER, "test-fixture")
@@ -240,7 +241,7 @@ def failures_of_forks_folder_claims ():
     return headline_of_handle [handle] . metadata
   failures = []
   for handle, pending in [ ( "0c", False ), ( "0d", True ), ( "0e", True ) ]:
-    if skg_for_ai . is_pending_detachment (
+    if compact_view . is_pending_detachment (
         metadata (handle), metadata ("0b"), metadata ("0a") ) != pending:
       failures . append ( f"the forks folder's member {handle} should "
                           f"{'' if pending else 'not '}be a pending detachment" )
@@ -481,7 +482,7 @@ def failures_of_link_annotation_round_trip ():
   failures = []
   for text in [ "See [[id:odd-id][the note]] and [[id:gone-id][gone]].",
                 "[[id:odd-id]] then [[id:odd-id][again ⟦→ typed⟧]]⟦→ typed⟧" ]:
-    annotated = skg_for_ai . annotate_links (text, statuses)
+    annotated = compact_view . annotate_links (text, statuses)
     stripped = skg_for_ai . strip_link_annotations (annotated)
     if stripped != text:
       failures . append (
@@ -502,10 +503,10 @@ def failures_of_link_annotations ():
   failures = []
   link = "[[id:t][a label]]"
   for entry, annotation in LINK_ANNOTATION_CASES:
-    if skg_for_ai . link_annotation (entry) != annotation:
+    if compact_view . link_annotation (entry) != annotation:
       failures . append (
         f"the link annotation of {entry} is "
-        f"{skg_for_ai . link_annotation (entry)!r}, not {annotation!r}" )
+        f"{compact_view . link_annotation (entry)!r}, not {annotation!r}" )
   for annotation in ( [ annotation for _, annotation in LINK_ANNOTATION_CASES ]
                       + [ "⟦✗ missing⟧" ] ):
     text = "see " + link + annotation + ", then more"
@@ -634,7 +635,7 @@ def failures_of_reworded_pairing ():
 # ============================================================
 
 def failures_of_shared_herald_cases ():
-  herald_tables = skg_for_ai . HeraldTables (
+  herald_tables = compact_view . HeraldTables (
     sexp . parse_sexp ( read_file (SHARED_HERALD_RULES) ),
     { sexp . sexp_to_text ( entry [0] ) :
         sexp . sexp_to_text ( entry [1] )
@@ -643,9 +644,9 @@ def failures_of_shared_herald_cases ():
   failures = []
   cases = shared_herald_cases ()
   for name, metadata_text, text, context in cases:
-    rendered = skg_for_ai . herald_text (
+    rendered = compact_view . herald_text (
       sexp . parse_sexp (metadata_text), herald_tables,
-      skg_for_ai . HeraldContext (
+      compact_view . HeraldContext (
         { "folderChange processed" : True,
           "folderChange unprocessed" : False } . get (context),
         context == "pendingDetachment" ))
@@ -904,7 +905,7 @@ def failures_of_raw_and_import (scratch):
   # The compact views render the served rule table; the herald cases
   # above render the pinned one.
   rules = run_tool ([ "raw", '((request . "herald rules"))' ])
-  served = skg_for_ai . herald_tables_of_response (
+  served = compact_view . herald_tables_of_response (
     sexp . parse_sexp ( rules . stdout . split ("\n", 1) [1] ))
   if served . rules != sexp . parse_sexp ( read_file (SHARED_HERALD_RULES) ):
     failures . append ( f"the served herald rules differ from {SHARED_HERALD_RULES}" )
