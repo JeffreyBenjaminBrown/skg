@@ -48,10 +48,14 @@ usage() {
   exit 2
 }
 
+# NAME's line in PORTS is 'NAME PORT [HOME_ID]'. These two read it and assign nothing.
+recorded_port() { awk -v n="$1" '$1==n {print $2}' "$PORTS"; } # NAME: its port, or nothing
+recorded_home() { awk -v n="$1" '$1==n {print $3}' "$PORTS"; } # NAME: its home note, or nothing
+
 port_of() { # prints NAME's port, assigning the next free one if it has none
   mkdir -p "$TEAM"; touch "$PORTS"
   local port
-  port="$(awk -v n="$1" '$1==n {print $2}' "$PORTS")"
+  port="$(recorded_port "$1")"
   if [ -z "$port" ]; then
     port="$(awk 'BEGIN{m=1769} $2>m {m=$2} END{print m+1}' "$PORTS")"
     echo "$1 $port" >> "$PORTS"
@@ -183,7 +187,7 @@ rename() { # OLD NEW: the folder, the ports line, and the readers' configs; the 
   [ ! -e "$TEAM/$new" ] || { echo "'$new' already exists." >&2; exit 1; }
   grep -q "^$new " "$PORTS" && { echo "'$new' is already in $PORTS." >&2; exit 1; }
   for name in "$old" "$new"; do
-    if grep -q "^$name " "$PORTS" && port_is_bound "$(awk -v n="$name" '$1==n {print $2}' "$PORTS")"; then
+    if grep -q "^$name " "$PORTS" && port_is_bound "$(recorded_port "$name")"; then
       echo "The server of '$name' is running; 'down' it first." >&2; exit 1
     fi
   done
@@ -207,7 +211,7 @@ BOOT_NOTE="43b33774-4571-48cc-ae01-0a26dbeb113d" # Claude's "working here as a s
 
 born() { # NAME WHO [JEFFS_NOTE_ID]: 'up', then a home note of the standard shape
   local name="$1" who="$2" jeffs="${3:-}" port views title home view
-  if [ -n "$(awk -v n="$name" '$1==n {print $3}' "$PORTS" 2>/dev/null)" ]; then
+  if [ -n "$(recorded_home "$name" 2>/dev/null)" ]; then
     echo "'$name' already has a home note" >&2; exit 1
   fi
   up "$name"
@@ -244,8 +248,8 @@ prompt() { # NAME MISSION_ID KIND
     *" $kind "*) ;;
     *) echo "'$kind' is not a kind of mission; the kinds are: $MISSION_KINDS" >&2; exit 2 ;;
   esac
-  port="$(awk -v n="$name" '$1==n {print $2}' "$PORTS")"
-  home="$(awk -v n="$name" '$1==n {print $3}' "$PORTS")"
+  port="$(recorded_port "$name")"
+  home="$(recorded_home "$name")"
   [ -n "$port" ] && [ -n "$home" ] \
     || { echo "'$name' has no port or no home note in $PORTS" >&2; exit 1; }
   cat <<PROMPT
