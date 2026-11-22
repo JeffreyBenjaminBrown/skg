@@ -38,6 +38,18 @@
    moved. The whole suite ('bash/all-tests.sh') checked the round.
    The measuring scripts are not kept; the paragraphs above and this
    one say what they count.
+** A fourth round: six more, all in the server
+   Everything was measured again the same way; no length had moved
+   but those split. The functions the third round measured but did
+   not read were read, and some just below them. Six had a real seam
+   and were split: 'extract_nonmergeSavePlan_locally_in_graph',
+   'prepare_graphnode_telescope', 'org_to_viewforest',
+   'supplement_nodeSaveIntent_from_disk',
+   'handle_import_md_and_org_request' and 'foreign_section_warnings'.
+   None of the clients' or the AI reader's functions still unsplit
+   had one worth taking (see their lists). Each piece moved whole and
+   is called where it stood; each commit message says why no effect
+   moved. The whole suite ('bash/all-tests.sh') checked the round.
 * The measured list
   Lines before; after, for the ones split.
 ** 333 'update_from_and_rerender_buffer_with_approvals_or_preview': seam, done in part (now 220)
@@ -147,10 +159,15 @@
    finds the node its search addresses.
 ** 92 'fmt' of 'BufferValidationError': flat (third round)
    'server/types/errors.rs'. Its 'Display': one match on the variant.
-** 88 'leaves_named_at': not read (third round)
-   'server/diff_view/processed_requests.rs'.
-** 87 'acquirer_after_nodeMerge': not read (third round)
-   'server/nodeMerge/nodeMergeInstructionTriple.rs'.
+** 88 'leaves_named_at': flat (fourth round)
+   'server/diff_view/processed_requests.rs'. One match on the
+   viewnode's kind (vognode, property member, change viewnode), its
+   arms 11 to 38 lines, each pushing to one list.
+** 87 'acquirer_after_nodeMerge': flat (fourth round)
+   'server/nodeMerge/nodeMergeInstructionTriple.rs'. One commented
+   block per field of the merged node (flags, IDs, contains, aliases,
+   forks, hides), each a few lines over the shared 'key',
+   'combine_rel_partners' and 'not_own'; it already reads as a table.
 ** 85 'resolve_forker_visibility': seam, left (third round)
    'resolve_visibility.rs'. One loop over the member-as-such signals;
    see "left".
@@ -159,11 +176,59 @@
    'validated_graph_from_skg_files' reads, validates and reports the
    telescope violations; 'recompute_prominence_sources' fills the new
    search index's prominence. Their log lines stayed in the caller.
-** 83 'stranded_relationships', 82 'supplement_nodeSaveIntent_from_disk', 82 'org_to_viewforest', 81 'extract_nonmergeSavePlan_locally_in_graph', 79 'prepare_graphnode_telescope': not read (third round)
-   In 'server/from_text/' ('strandeds.rs', 'supplement_from_disk.rs',
-   'buffer_to_viewnodes/uninterpreted.rs',
-   'local_fieldintent_collection/mod.rs') and
+** 83 'stranded_relationships': seam, not worth it (fourth round)
+   'server/from_text/strandeds.rs'. The recorders of a moved node's
+   relationships could be named (seven lines), but the judgment of
+   each relationship reads five closures ('resolve', 'home_before',
+   'home_after', 'recorder_after') and 'seen'; what a split would save
+   is small.
+** 82 'supplement_nodeSaveIntent_from_disk': seam, done (fourth round; now 22)
+   'server/from_text/supplement_from_disk.rs'. Its two cases are
+   'supplement_nodeSaveIntent_of_new_node' and
+   'supplement_nodeSaveIntent_from_disk_node'; the refusal to strip a
+   foreign node's attribution stays first, in the caller.
+** 82 'org_to_viewforest': seam, done (fourth round; now 58)
+   'server/from_text/buffer_to_viewnodes/uninterpreted.rs'.
+   'drop_repeated_viewnode_ids_and_resolve_gnids' is the first pass over
+   the headlines; 'level_jump_error' words the error for a headline
+   with no parent. The tree-building loop is what is left.
+** 81 'extract_nonmergeSavePlan_locally_in_graph': seam, done (fourth round; now 58)
+   'server/from_text/local_fieldintent_collection/mod.rs'.
+   'suppress_nodeMerges_of_restricted_nodes' keeps or refuses the
+   nodeMerges under a skgrepo restriction, as its sibling
+   'suppress_writes_to_restricted_nodes' does the writes.
+** 79 'prepare_graphnode_telescope': seam, done (fourth round; now 41)
    'server/dbs/filesystem/one_node.rs'.
+   'error_unless_every_section_is_owned', 'section_writes' and
+   'deletions_of_owned_sections_not_written', in that order.
+** 79 'prepare_graph_update': seam, not worth it (fourth round)
+   'server/dbs/in_rust_graph/prepared_update.rs'. Already a sequence
+   of named calls, each in its tracing span, then one log line and the
+   refusals.
+** 78 'foreign_section_warnings': seam, done (fourth round; now 17)
+   'server/telescope/dependencies_manifest.rs'. Its two kinds of
+   warning are 'illegal_section_warnings' and
+   'disputed_foreign_order_warnings', appended in that order.
+** 78 'discover_roots': seam, left (fourth round)
+   'server/export_org.rs'. Two loops over the sorted nodes: the
+   markers (with their instructions), then the roots they mark. Both
+   push to 'warnings'; see "left".
+** 77 'reload_changed_skg_files': seam, not worth it (fourth round)
+   'server/repo_watch/reload.rs'. A sequence whose pure pieces
+   (grouping the files by pid, recording illegal edits in the
+   candidate, counting files per skgrepo) are five to seven lines
+   each; the effects (the swap, the search-index delta, the warnings
+   and the log line) are already single calls.
+** 76 'handle_import_md_and_org_request': seam, done (fourth round; now 22)
+   'server/serve/handlers/import_md_and_org.rs'. Its "apply" and
+   "preview" arms are 'apply_approved_import' and 'preview_import'.
+** 79 'fetch_all_graphnodestats_in_rust', 78 'validate_local_structure', 77 'parse_save_request_envelope', 77 'leaves_recorded_by', 77 'apply_hiddenoutside_edits', 76 'resolve_forkee_visibility', 73 'set_herald_strings_in_viewnode': not read (fourth round)
+   In 'server/dbs/in_rust_graph/stats.rs',
+   'server/from_text/buffer_to_viewnodes/local.rs',
+   'server/serve/handlers/save_buffer/request.rs',
+   'server/diff_view/change_leaves.rs',
+   'server/from_text/local_fieldintent_collection/resolve_visibility.rs'
+   (two) and 'server/refresh/viewnodestats.rs'.
 ** 93 'handle_titles_by_gnids_request_with_skgrepo_set': seam, done (now 41)
    'server/serve/handlers/titles_by_gnids.rs'. Its stages are
    'requested_gnids_else_logged_error' (logs, then returns the text
@@ -194,8 +259,12 @@
     and reads no trees, so it was left. The split was checked on ten
     buffers against the old code (same result, point and match data);
     one of them signals, as before ('TODO/problems.org', Emacs).
-*** 71 'skg--rel-at-point': not read
+*** 71 'skg--rel-at-point': flat (fourth round)
     'elisp/skg-request-relRepo-info.el'; its twin 'rel_at_line' is 55.
+    A run of guards, each a 'user-error', then one 'cond' over the
+    parent's kind; long by its docstring and its messages. The
+    writable-folder branch could be named, but only together with its
+    Neovim twin, for twelve lines.
 *** 66 'skg--register-rerender-stream-handlers': seam, done (now 22)
     'elisp/skg-request-rerender-all-views.el'. The lock and done
     lambdas call 'skg--rerender-lock-handler' and
@@ -227,28 +296,44 @@
    new, placed, repeated, titles and bodies), but they share six
    closures ('described', 'place', 'edited_place', the parent keys);
    see "left".
-** 93 'command_save': not read
+** 93 'command_save': not worth it (fourth round)
    'save.py'. Already split once ('skg-for-ai.org', "'command_save'
-   reads its report in 'save_report'"); what is left is what it prints
-   and when it stops.
+   reads its report in 'save_report'"); what is left is a 25-line
+   docstring and a run of guards, each printing and stopping, before
+   the one call that sends the save. Read in the fourth round.
 ** 92 'predicted_forks': seam, done (now 70)
    'save.py'. 'settle_clone_skgrepo' chooses where the clones go (or
    adds the error line), after the early return for no forks.
 ** 91 'request_report_lines': flat
    'save.py'. One block per kind of request word, mostly literal text.
-** 87 'command_perspective', 80 'summary_lines', 70 'request_token_problems', 69 'expand_relRepo_subtree': not read
-   'view_commands.py', 'compact_view.py', 'edited_compact_view.py',
-   'outline_words.py'.
+** 87 'command_perspective': not worth it (fourth round)
+   'view_commands.py'. A 17-line docstring and one linear exchange
+   (register, request, approve, check, write the files) inside a
+   'try' whose 'except' releases the view; no stage is long.
+** 80 'summary_lines': flat (fourth round)
+   'compact_view.py'. A few counts, then one list literal of the
+   summary's lines.
+** 70 'request_token_problems', 69 'expand_relRepo_subtree': not read
+   'edited_compact_view.py', 'outline_words.py'.
 * Left, best first
 ** The save request's eleven fields as one struct
    'save_buffer.rs'. 'handle_save_buffer_request' (94 lines) still reads
    eleven request fields into locals and passes them on; one struct
    would also shorten the pipeline's seventeen arguments, but touches
    every test that calls the '_with_approvals' entry points. Medium.
+** 'discover_roots' (78 lines, 'server/export_org.rs')
+   Its two loops are two stages: find the export markers (each with
+   its target and headline choice), then the nodes they mark as roots.
+   'markers_with_their_instructions' and 'roots_of_markers' would each
+   take the sorted nodes and push to the one 'warnings' list, in the
+   same order. Pure but for the warnings; safe; half an hour. The
+   export's warnings must keep their text and order.
 ** The functions measured but not read
-   Seven in the server of 79 to 88 lines, five in the clients, five in
-   the AI reader (each "not read" above). Read each before splitting;
-   several may be flat.
+   Seven in the server of 73 to 79 lines (fourth round), four in the
+   clients ('skg--import-md-and-org-send' and Neovim's three), two
+   in the AI reader (each "not read" above). Read each before
+   splitting; at this length, several will be flat or already named
+   calls.
 ** 'resolve_forker_visibility' (85 lines) and the rest of 'infer_hides_from_contains_removals' (79)
    'resolve_visibility.rs'. The loop bodies have units ('drawn_before',
    'inferred_hides' in the first; 'removed', 'inferred_unhides' in the
@@ -296,3 +381,16 @@
    ('strandeds_confirmation_response', 'delete_from_confirmation_response',
    'empty_response_sexp' and kin) to a 'save_buffer/response.rs', beside
    'save_buffer/request.rs'; moving code unchanged is safe.
+* Is this vein worked out? Nearly.
+  After four rounds, every function of the server, the clients and the
+  AI reader longer than about 80 lines has been read. Each one still
+  long is flat (a table, one match, a literal), already a sequence of
+  named calls, or long because its units share closures over many
+  locals. Splitting by length alone no longer pays. What is left worth
+  doing, best first: 'discover_roots' (a clean two-stage split, small);
+  then, only when someone next changes them, the closure-sharing ones
+  ('hide_report_lines', 'apply_sticky_relRepos_in_graph_with_prospective_homes',
+  'resolve_forker_visibility', 'change_report_lines'), which need a
+  small struct or a long argument list first. The functions of 73 to
+  79 lines not yet read are a lottery with poor odds: read them only
+  while working nearby.
