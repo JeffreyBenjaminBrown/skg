@@ -241,18 +241,31 @@ function M.other_view_buffer_snapshots (save_buf)
   return result
 end
 
+---Undo a save whose request never reached the server: remove its
+---handlers, balancing the pending count for the one-shots, and unlock.
 function M.cancel_locally_failed_save ()
-  for _, response_type in ipairs({ 'save-lock', 'save-result' }) do
-    if state.response_handler_map[response_type] then
-      state.lp_pending_count = math.max(0, state.lp_pending_count - 1) end
-  end
-  for _, response_type in ipairs({
-      'save-lock', 'save-relax-lock', 'collateral-view', 'save-result',
-      'fork-confirmation', 'strandeds-confirmation',
-      'delete-from-confirmation', 'telescope-hoist-confirmation',
-      'overPrivateText-telescope-confirmation' }) do
-    state.response_handler_map[response_type] = nil
-  end
+  M.end_save_stream({ 'save-lock', 'save-result' })
+end
+
+---The save's handlers that are not one-shot: the streaming ones and the
+---alternatives to save-result. Whichever terminal message arrives
+---removes them all.
+M.save_handler_types_not_one_shot = {
+  'save-relax-lock', 'collateral-view', 'fork-confirmation',
+  'strandeds-confirmation', 'delete-from-confirmation',
+  'telescope-hoist-confirmation', 'overPrivateText-telescope-confirmation' }
+
+---End the save stream: remove the save's handlers that are not
+---one-shot, and those of UNFIRED_ONE_SHOT_TYPES with the pending count
+---balanced for each one still registered; then end the stream and
+---unlock every buffer. The save-result handler passes no one-shot
+---types, since the dispatcher removes save-result itself after it
+---runs; an alternative terminal message passes 'save-result', which
+---will never fire.
+---@param unfired_one_shot_types string[]
+function M.end_save_stream (unfired_one_shot_types)
+  state.unregister_response_handlers(M.save_handler_types_not_one_shot)
+  state.unregister_response_handlers(unfired_one_shot_types)
   lock.end_stream()
   lock.unlock_all_save_locked()
 end
@@ -690,15 +703,7 @@ end
 ---@param save_buf integer
 ---@param response any
 function M.save_result_handler (save_buf, response)
-  state.response_handler_map['collateral-view'] = nil
-  state.response_handler_map['save-relax-lock'] = nil
-  state.response_handler_map['fork-confirmation'] = nil
-  state.response_handler_map['strandeds-confirmation'] = nil
-  state.response_handler_map['delete-from-confirmation'] = nil
-  state.response_handler_map['telescope-hoist-confirmation'] = nil
-  state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
-  lock.end_stream()
-  lock.unlock_all_save_locked()
+  M.end_save_stream({})
   local ok, err = pcall(M.handle_save_sexp, save_buf, response)
   lock.unlock_all_save_locked()
   if not ok then
@@ -908,19 +913,7 @@ end
 ---  which the approving re-save carries again
 function M.fork_confirmation_handler (save_buf, response, strandeds_review,
                                       delete_from)
-  state.response_handler_map['collateral-view'] = nil
-  state.response_handler_map['save-relax-lock'] = nil
-  state.response_handler_map['fork-confirmation'] = nil
-  state.response_handler_map['strandeds-confirmation'] = nil
-  state.response_handler_map['delete-from-confirmation'] = nil
-  state.response_handler_map['telescope-hoist-confirmation'] = nil
-  state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
-  if state.response_handler_map['save-result'] then
-    state.response_handler_map['save-result'] = nil
-    state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-  end
-  lock.end_stream()
-  lock.unlock_all_save_locked()
+  M.end_save_stream({ 'save-result' })
   local confirm_buf = nil
   local ok, err = pcall(function ()
     -- The pcall guards only response parsing/display. The interactive
@@ -970,19 +963,7 @@ end
 function M.telescope_hoist_confirmation_handler (
     save_buf, response, approved_forks, fork_skgrepos,
     strandeds_review, delete_from)
-  state.response_handler_map['collateral-view'] = nil
-  state.response_handler_map['save-relax-lock'] = nil
-  state.response_handler_map['fork-confirmation'] = nil
-  state.response_handler_map['strandeds-confirmation'] = nil
-  state.response_handler_map['delete-from-confirmation'] = nil
-  state.response_handler_map['telescope-hoist-confirmation'] = nil
-  state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
-  if state.response_handler_map['save-result'] then
-    state.response_handler_map['save-result'] = nil
-    state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-  end
-  lock.end_stream()
-  lock.unlock_all_save_locked()
+  M.end_save_stream({ 'save-result' })
   local ok, err = pcall(function ()
     local approved_pids = {}
     local telescopes = payload.field(response, 'telescopes') or {}
@@ -1028,18 +1009,7 @@ end
 function M.delete_from_confirmation_handler (
     save_buf, response, approved_forks, fork_skgrepos,
     approved_hoist_pids, strandeds_review)
-  for _, response_type in ipairs({
-      'collateral-view', 'save-relax-lock', 'fork-confirmation',
-      'strandeds-confirmation', 'delete-from-confirmation',
-      'telescope-hoist-confirmation', 'overPrivateText-telescope-confirmation' }) do
-    state.response_handler_map[response_type] = nil
-  end
-  if state.response_handler_map['save-result'] then
-    state.response_handler_map['save-result'] = nil
-    state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-  end
-  lock.end_stream()
-  lock.unlock_all_save_locked()
+  M.end_save_stream({ 'save-result' })
   local ok, err = pcall(function ()
     local count = payload.field_text(response, 'count') or '?'
     local prompt = payload.field_text(response, 'prompt')
@@ -1087,18 +1057,7 @@ end
 function M.strandeds_confirmation_handler (
     save_buf, response, approved_forks, fork_skgrepos,
     approved_hoist_pids, delete_from)
-  for _, response_type in ipairs({
-      'collateral-view', 'save-relax-lock', 'fork-confirmation',
-      'strandeds-confirmation', 'delete-from-confirmation',
-      'telescope-hoist-confirmation', 'overPrivateText-telescope-confirmation' }) do
-    state.response_handler_map[response_type] = nil
-  end
-  if state.response_handler_map['save-result'] then
-    state.response_handler_map['save-result'] = nil
-    state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-  end
-  lock.end_stream()
-  lock.unlock_all_save_locked()
+  M.end_save_stream({ 'save-result' })
   local ok, err = pcall(function ()
     local strandeds = M.strandeds_from_response(response)
     local prompt = payload.field_text(response, 'prompt')
@@ -1200,18 +1159,7 @@ end
 ---Declining keeps the buffers as they are.
 ---@param response any
 function M.save_text_release_confirmation_handler (response)
-  for _, response_type in ipairs({
-      'collateral-view', 'save-relax-lock', 'fork-confirmation',
-      'strandeds-confirmation', 'delete-from-confirmation',
-      'telescope-hoist-confirmation', 'overPrivateText-telescope-confirmation' }) do
-    state.response_handler_map[response_type] = nil
-  end
-  if state.response_handler_map['save-result'] then
-    state.response_handler_map['save-result'] = nil
-    state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-  end
-  lock.end_stream()
-  lock.unlock_all_save_locked()
+  M.end_save_stream({ 'save-result' })
   local approved_pids =
     payload.string_list(payload.field(response, 'pids'))
   local withheld_view_ids =
