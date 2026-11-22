@@ -127,6 +127,7 @@ the old one open beside the one it makes on its next request."
      skg-request-rebuild-session-lifetime-stores
      skg-request-rerender-all-views
      skg-request-save
+     skg-redraw-whole-view
      skg-save-confirmations
      skg-messages
      skg-request-server-warnings

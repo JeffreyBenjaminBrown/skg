@@ -13,7 +13,7 @@
 ;;; Each view is unlocked and updated as its rerender-view arrives.
 
 (require 'skg-length-prefix)
-(require 'skg-request-save) ; for skg-replace-buffer-with-new-content
+(require 'skg-redraw-whole-view) ; for skg--apply-streamed-view-update
 (require 'skg-messages)     ; for skg-big-nonfatal-message
 (require 'skg-buffer)       ; for skg-find-buffer-by-view-id, skg--unsaved-view-buffers
 (require 'skg-lock-buffers)

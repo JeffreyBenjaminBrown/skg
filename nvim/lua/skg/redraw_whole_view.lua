@@ -11,7 +11,7 @@
 -- back. Rewriting only the headlines a save changed is
 -- skg.redraw_delta's; choosing between that and a whole redraw, for
 -- the saved buffer, is skg.save's ('redraw_saved_buffer'). The Lua
--- port of the redraw part of elisp/skg-request-save.el.
+-- port of elisp/skg-redraw-whole-view.el.
 
 local buffer = require('skg.buffer')
 local focus = require('skg.focus')
