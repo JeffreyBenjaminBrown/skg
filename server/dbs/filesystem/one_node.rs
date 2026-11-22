@@ -264,7 +264,27 @@ pub(crate) fn prepare_graphnode_telescope (
       config )
     . map_err ( |e| io::Error::new (
       io::ErrorKind::InvalidData, e ) ) ?;
+  error_unless_every_section_is_owned (pid, &decomposed, config) ?;
+  let prepared_writes : Vec<(SkgrepoName, String, String)> =
+    section_writes (pid, &decomposed, config) ?;
+  let prepared_deletions : Vec<String> =
+    deletions_of_owned_sections_not_written (
+      pid, &prepared_writes, config) ?;
+  Ok ( PreparedTelescopeWrite {
+    pid             : pid . clone (),
+    home            : graphnode . home_skgrepo . clone (),
+    writes          : prepared_writes,
+    deletions       : prepared_deletions,
+    verify_as_hoist,
+  } ) }
 
+/// Refused, before anything is written, when a section of the
+/// decomposed telescope would land in a skgrepo the user does not own.
+fn error_unless_every_section_is_owned (
+  pid        : &ID,
+  decomposed : &DecomposedTelescope,
+  config     : &SkgConfig,
+) -> io::Result<()> {
   let mut offending_skgrepos : Vec<SkgrepoName> = decomposed . sections ()
     . iter ()
     .map ( |(skgrepo, _)| skgrepo )
@@ -282,7 +302,15 @@ pub(crate) fn prepare_graphnode_telescope (
         offending_skgrepos . iter ()
           . map ( |skgrepo| format! ("'{}'", skgrepo) )
           . collect::<Vec<String>> () . join (", ") ))); }
+  Ok (( )) }
 
+/// Each section of the decomposed telescope as (skgrepo, path, YAML),
+/// in the decomposition's order.
+fn section_writes (
+  pid        : &ID,
+  decomposed : &DecomposedTelescope,
+  config     : &SkgConfig,
+) -> io::Result<Vec<(SkgrepoName, String, String)>> {
   let mut prepared_writes : Vec<(SkgrepoName, String, String)> =
     Vec::new ();
   for (skgrepo, node_fs) in decomposed . sections () {
@@ -295,6 +323,16 @@ pub(crate) fn prepare_graphnode_telescope (
       . map_err ( |e| io::Error::new (
         io::ErrorKind::InvalidData, e . to_string () )) ?;
     prepared_writes . push (( skgrepo . clone (), path, yaml )); }
+  Ok (prepared_writes) }
+
+/// The path of the node's section in each owned skgrepo that
+/// 'prepared_writes' writes nothing to, in the configured order: a
+/// section there, if any, is stale.
+fn deletions_of_owned_sections_not_written (
+  pid             : &ID,
+  prepared_writes : &[(SkgrepoName, String, String)],
+  config          : &SkgConfig,
+) -> io::Result<Vec<String>> {
   let written_skgrepos : Vec<SkgrepoName> = prepared_writes . iter ()
     . map ( |(skgrepo, _, _)| skgrepo . clone () )
     . collect ();
@@ -307,14 +345,7 @@ pub(crate) fn prepare_graphnode_telescope (
       . map_err ( |e| io::Error::new (
         io::ErrorKind::NotFound, e) ) ?;
     prepared_deletions . push (path); }
-
-  Ok ( PreparedTelescopeWrite {
-    pid             : pid . clone (),
-    home            : graphnode . home_skgrepo . clone (),
-    writes          : prepared_writes,
-    deletions       : prepared_deletions,
-    verify_as_hoist,
-  } ) }
+  Ok (prepared_deletions) }
 
 
 /// The two shapes 'write_graphnode_telescope' refuses, because
