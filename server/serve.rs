@@ -37,7 +37,7 @@ use crate::serve::handlers::diff_view::handle_diffView_request;
 use crate::serve::handlers::link_statuses::handle_link_statuses_request;
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ request_type_from_request, send_response_with_length_prefix, tag_text_response};
-use crate::types::env::SkgEnv;
+use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::views_state::OpenViews;
 use crate::repo_watch::reload::RepoChangeNotice;
@@ -79,9 +79,9 @@ pub fn serve (
         tracing::error!(error = %e, "Connection failed"); }} }
   Ok (( )) }
 
-/// This function directs requests from the stream to one of
-///   handle_sexp_document_request
-///   handle_text_search_request
+/// Reads one request per line from the client and hands each to
+/// 'dispatch_request'; between requests, tells the client what the
+/// repo watcher reloaded.
 /// API: See docs/api-and-formats.org
 fn handle_emacs (
   mut stream : TcpStream,
@@ -122,159 +122,9 @@ fn handle_emacs (
       Ok (0) => break, // emacs disconnected
       Ok (_n) => {
         tracing::info! ( request = request_header . trim_end (), "Received request" );
-        let runtime = env . runtime_snapshot ();
-        skgrepo_restriction = // A rebuild may have reloaded a config with other skgrepos.
-          skgrepo_restriction . under_config (&runtime . config);
-        match request_type_from_request (&request_header) {
-          // For most types of requests, the header is the entire request, and the reader is no longer needed. For saving, though, the reader still contains the buffer content, so it is passed along.
-          Ok (RequestType::SingleRootContentView) =>
-            handle_single_root_view_request (
-              &mut stream,
-              &request_header,
-              &env,
-              &mut views_state,
-              &skgrepo_restriction ),
-          Ok (RequestType::SaveBuffer) =>
-            // PITFALL: Uses the same BufReader that read the request,
-            // so that any already-buffered header/payload are visible.
-            handle_save_buffer_request (
-              &mut reader,
-              &mut stream,
-              &request_header,
-              &mut env,
-              &mut views_state,
-              &skgrepo_restriction ),
-          Ok (RequestType::CloseView) =>
-            handle_close_view_request (
-              &mut stream,
-              &request_header,
-              &mut views_state ),
-          Ok (RequestType::DeleteReferencesToAbsentNode) =>
-            handle_delete_references_to_absent_node_request (
-              &mut stream, &request_header, &mut env, &mut views_state,
-              &skgrepo_restriction ),
-          Ok (RequestType::TextSearch) =>
-            handle_text_search_request (
-              &mut stream,
-              &request_header,
-              &env,
-              &mut views_state,
-              &skgrepo_restriction ),
-          Ok (RequestType::VerifyConnection) =>
-            handle_verify_connection_request (
-              &mut stream ),
-          Ok (RequestType::Shutdown) =>
-            // Never returns - exits process
-            handle_shutdown_request ( &mut stream, &env ),
-          Ok (RequestType::GetFilePath) =>
-            handle_get_file_path_request_with_skgrepo_set ( &mut stream,
-                                           &request_header,
-                                           &runtime . config,
-                                           &skgrepo_restriction ),
-          Ok (RequestType::TitlesByIds) =>
-            handle_titles_by_gnids_request_with_skgrepo_set (
-              &mut stream, &request_header,
-              &runtime . tantivy_index, &runtime . config,
-              &skgrepo_restriction,
-              &runtime . graph ),
-          Ok (RequestType::LinkStatuses) =>
-            handle_link_statuses_request (
-              &mut stream, &request_header, &runtime . graph,
-              &runtime . config, &skgrepo_restriction ),
-          Ok (RequestType::InvestigateUnknownNode) =>
-            handle_investigate_unknown_node_request (
-              &mut stream, &request_header, &runtime,
-              &skgrepo_restriction ),
-          Ok (RequestType::RelRepoInfo) =>
-            handle_relRepo_info_request (
-              &mut stream, &request_header, &env ),
-          Ok (RequestType::FlagState) =>
-            handle_flag_state_request (
-              &mut stream, &request_header, &env ),
-          Ok (RequestType::ListSkgrepoSets)
-          | Ok (RequestType::SkgrepoRestriction)
-          | Ok (RequestType::SetSkgrepoRestriction) =>
-            handle_skgrepo_set_request (
-              &mut stream,
-              &request_header,
-              &env,
-              &mut views_state,
-              &mut skgrepo_restriction ),
-          Ok (RequestType::DiffView) =>
-            handle_diffView_request (
-              &mut stream, &request_header, &env, &mut views_state,
-              &skgrepo_restriction ),
-          Ok (RequestType::StageAndCommit) =>
-            handle_stage_and_commit_request (
-              &mut stream, &request_header, &env, &mut views_state,
-              &skgrepo_restriction ),
-          Ok (RequestType::ExtendDiffView) =>
-            handle_extend_diff_view_request (
-              &mut stream, &request_header, &env, &mut views_state,
-              &skgrepo_restriction ),
-          Ok (RequestType::HeraldRules) =>
-            handle_herald_rules_request ( &mut stream, &runtime . config ),
-          Ok (RequestType::DescribeHeralds) =>
-            handle_describe_heralds_request (
-              &mut stream, &request_header, &runtime . config ),
-          Ok (RequestType::Repos) =>
-            handle_repos_request (
-              &mut stream, &runtime . config, &skgrepo_restriction ),
-          Ok (RequestType::ServerWarnings) =>
-            handle_server_warnings_request (
-              &mut stream, env . runtime . startup_warnings () ),
-          Ok (RequestType::ExportToOrg) =>
-            handle_export_to_org_request ( &mut stream,
-                                           &runtime . config,
-                                           &request_header ),
-          Ok (RequestType::ImportMdAndOrg) =>
-            handle_import_md_and_org_request (
-              &mut stream, &request_header, &env, &mut pending_import,
-              &skgrepo_restriction ),
-          Ok (RequestType::RebuildSessionLifetimeStores) =>
-            handle_rebuild_session_lifetime_stores_request ( &mut stream,
-                                         &mut env,
-                                         &mut views_state ),
-          Ok (RequestType::StripBodyWhitespace) =>
-            handle_strip_body_whitespace_request ( &mut stream,
-                                                   &mut env ),
-          Ok (RequestType::RerenderAllViews) =>
-            handle_rerender_all_views_request (
-              &mut stream,
-              &request_header,
-              &env,
-              &mut views_state,
-              &skgrepo_restriction ),
-          Ok (RequestType::RerenderViews) =>
-            handle_rerender_views_request (
-              &mut stream,
-              &request_header,
-              &env,
-              &mut views_state,
-              &skgrepo_restriction ),
-          Ok (RequestType::Receipt) =>
-            handle_receipt_request (
-              &mut stream,
-              &request_header,
-              &mut env,
-              &mut views_state,
-              &skgrepo_restriction ),
-          Ok (RequestType::SetPerspective) =>
-            handle_set_perspective_request (
-              &mut stream,
-              &request_header,
-              &env,
-              &mut views_state,
-              &skgrepo_restriction ),
-          Err (err) => {
-            tracing::error!(error = %err, "Error determining request type");
-            send_response_with_length_prefix (
-              &mut stream,
-              & tag_text_response (
-                TcpToClient::Error,
-                & format! (
-                  "Error determining request type: {}",
-                  err ))); } };
+        dispatch_request (
+          &request_header, &mut reader, &mut stream, &mut env,
+          &mut views_state, &mut skgrepo_restriction, &mut pending_import );
         request_header . clear(); }
       Err (ref e)
         if e . kind () == std::io::ErrorKind::WouldBlock
@@ -292,6 +142,165 @@ fn handle_emacs (
       Err (_) => break, // real error
     }}
   tracing::info!(peer = %peer, "Emacs disconnected"); }
+
+/// Answer one request with the handler its type names.
+fn dispatch_request (
+  request_header      : &str,
+  reader              : &mut BufReader<TcpStream>,
+  stream              : &mut TcpStream,
+  env                 : &mut SkgEnv,
+  views_state         : &mut ViewsState,
+  skgrepo_restriction : &mut SkgrepoRestriction,
+  pending_import      : &mut Option<PendingImport>,
+) {
+  let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
+  *skgrepo_restriction = // A rebuild may have reloaded a config with other skgrepos.
+    skgrepo_restriction . under_config (&runtime . config);
+  match request_type_from_request (request_header) {
+    // For most types of requests, the header is the entire request, and the reader is no longer needed. For saving, though, the reader still contains the buffer content, so it is passed along.
+    Ok (RequestType::SingleRootContentView) =>
+      handle_single_root_view_request (
+        stream,
+        request_header,
+        env,
+        views_state,
+        skgrepo_restriction ),
+    Ok (RequestType::SaveBuffer) =>
+      // PITFALL: Uses the same BufReader that read the request,
+      // so that any already-buffered header/payload are visible.
+      handle_save_buffer_request (
+        reader,
+        stream,
+        request_header,
+        env,
+        views_state,
+        skgrepo_restriction ),
+    Ok (RequestType::CloseView) =>
+      handle_close_view_request (
+        stream,
+        request_header,
+        views_state ),
+    Ok (RequestType::DeleteReferencesToAbsentNode) =>
+      handle_delete_references_to_absent_node_request (
+        stream, request_header, env, views_state,
+        skgrepo_restriction ),
+    Ok (RequestType::TextSearch) =>
+      handle_text_search_request (
+        stream,
+        request_header,
+        env,
+        views_state,
+        skgrepo_restriction ),
+    Ok (RequestType::VerifyConnection) =>
+      handle_verify_connection_request (
+        stream ),
+    Ok (RequestType::Shutdown) =>
+      // Never returns - exits process
+      handle_shutdown_request ( stream, env ),
+    Ok (RequestType::GetFilePath) =>
+      handle_get_file_path_request_with_skgrepo_set (
+        stream, request_header, &runtime . config, skgrepo_restriction ),
+    Ok (RequestType::TitlesByIds) =>
+      handle_titles_by_gnids_request_with_skgrepo_set (
+        stream, request_header,
+        &runtime . tantivy_index, &runtime . config,
+        skgrepo_restriction,
+        &runtime . graph ),
+    Ok (RequestType::LinkStatuses) =>
+      handle_link_statuses_request (
+        stream, request_header, &runtime . graph,
+        &runtime . config, skgrepo_restriction ),
+    Ok (RequestType::InvestigateUnknownNode) =>
+      handle_investigate_unknown_node_request (
+        stream, request_header, &runtime,
+        skgrepo_restriction ),
+    Ok (RequestType::RelRepoInfo) =>
+      handle_relRepo_info_request (
+        stream, request_header, env ),
+    Ok (RequestType::FlagState) =>
+      handle_flag_state_request (
+        stream, request_header, env ),
+    Ok (RequestType::ListSkgrepoSets)
+    | Ok (RequestType::SkgrepoRestriction)
+    | Ok (RequestType::SetSkgrepoRestriction) =>
+      handle_skgrepo_set_request (
+        stream,
+        request_header,
+        env,
+        views_state,
+        skgrepo_restriction ),
+    Ok (RequestType::DiffView) =>
+      handle_diffView_request (
+        stream, request_header, env, views_state,
+        skgrepo_restriction ),
+    Ok (RequestType::StageAndCommit) =>
+      handle_stage_and_commit_request (
+        stream, request_header, env, views_state,
+        skgrepo_restriction ),
+    Ok (RequestType::ExtendDiffView) =>
+      handle_extend_diff_view_request (
+        stream, request_header, env, views_state,
+        skgrepo_restriction ),
+    Ok (RequestType::HeraldRules) =>
+      handle_herald_rules_request ( stream, &runtime . config ),
+    Ok (RequestType::DescribeHeralds) =>
+      handle_describe_heralds_request (
+        stream, request_header, &runtime . config ),
+    Ok (RequestType::Repos) =>
+      handle_repos_request (
+        stream, &runtime . config, skgrepo_restriction ),
+    Ok (RequestType::ServerWarnings) =>
+      handle_server_warnings_request (
+        stream, env . runtime . startup_warnings () ),
+    Ok (RequestType::ExportToOrg) =>
+      handle_export_to_org_request (
+        stream, &runtime . config, request_header ),
+    Ok (RequestType::ImportMdAndOrg) =>
+      handle_import_md_and_org_request (
+        stream, request_header, env, pending_import,
+        skgrepo_restriction ),
+    Ok (RequestType::RebuildSessionLifetimeStores) =>
+      handle_rebuild_session_lifetime_stores_request (
+        stream, env, views_state ),
+    Ok (RequestType::StripBodyWhitespace) =>
+      handle_strip_body_whitespace_request ( stream, env ),
+    Ok (RequestType::RerenderAllViews) =>
+      handle_rerender_all_views_request (
+        stream,
+        request_header,
+        env,
+        views_state,
+        skgrepo_restriction ),
+    Ok (RequestType::RerenderViews) =>
+      handle_rerender_views_request (
+        stream,
+        request_header,
+        env,
+        views_state,
+        skgrepo_restriction ),
+    Ok (RequestType::Receipt) =>
+      handle_receipt_request (
+        stream,
+        request_header,
+        env,
+        views_state,
+        skgrepo_restriction ),
+    Ok (RequestType::SetPerspective) =>
+      handle_set_perspective_request (
+        stream,
+        request_header,
+        env,
+        views_state,
+        skgrepo_restriction ),
+    Err (err) => {
+      tracing::error!(error = %err, "Error determining request type");
+      send_response_with_length_prefix (
+        stream,
+        & tag_text_response (
+          TcpToClient::Error,
+          & format! (
+            "Error determining request type: {}",
+            err ))); } }}
 
 /// The answer names, in '(supports (...))', the protocol features a
 /// client cannot otherwise tell an older server lacks, and must not
