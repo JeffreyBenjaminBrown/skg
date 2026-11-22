@@ -6,7 +6,8 @@
 ;;; lock the views while the save runs, and draw what the server
 ;;; answers. 'skg-request-save-buffer' starts a save (the commands that
 ;;; save first call it too); 'skg--send-save-buffer' sends the view,
-;;; its baseline and the other views' snapshots, and registers the
+;;; its baseline and the other views' snapshots, once
+;;; 'skg--register-save-response-handlers' has registered the
 ;;; handlers of the answer stream (save-lock -> save-relax-lock ->
 ;;; collateral-view* -> save-result, or a confirmation in place of
 ;;; save-result); 'skg--save-result-handler' ends the stream, and
@@ -124,85 +125,9 @@ the buffers are locked."
            (content-bytes (encode-coding-string wire-content 'utf-8))
            (content-length (length content-bytes))
            (header (format "Content-Length: %d\r\n\r\n" content-length)))
-      ;; Register handlers in the dispatch map
-      (skg-register-response-handler
-       'save-lock
-       (lambda (_tcp-proc payload)
-         (skg--broad-save-lock-handler payload))
-       t)
-      ;; save-relax-lock carries the post-preparation keep-set: collateral
-      ;; targets plus dirty conflict-check inputs. Buffers locked early that
-      ;; are absent can unlock. The saved buffer stays
-      ;; locked (skg--unlock-non-collateral-buffers keeps saved-view-id) until
-      ;; save-result. Registered non-one-shot (like collateral-view) so it does
-      ;; not add to skg-lp--pending-count: an *invalid* save errors before the
-      ;; server reaches the point that emits save-relax-lock, so a one-shot
-      ;; count would leak (never decremented) and hang the next save's wait.
-      ;; save-result removes it.
-      (skg-register-response-handler
-       'save-relax-lock
-       (lambda (_tcp-proc payload)
-         (skg--save-relax-lock-handler saved-view-id payload))
-       nil)
-      (skg-register-response-handler
-       'collateral-view
-       (lambda (_tcp-proc payload)
-         (skg--collateral-view-handler payload))
-       nil) ;; non-one-shot: fires for each streamed collateral view
-      (skg-register-response-handler
-       'save-result
-       (lambda (_tcp-proc payload)
-         (skg--save-result-handler save-buffer payload))
-       t)
-      ;; fork-confirmation: the alternative terminal message to
-      ;; save-result. The server sends exactly one of the two. Registered
-      ;; non-one-shot (does not bump skg-lp--pending-count); whichever
-      ;; terminal handler fires removes the other (and the fork handler
-      ;; decrements the count for the unfired save-result one-shot), so
-      ;; the pending count balances either way.
-      (skg-register-response-handler
-       'fork-confirmation
-       (lambda (_tcp-proc payload)
-         (skg--fork-confirmation-handler
-          save-buffer payload strandeds-review delete-from))
-       nil)
-      ;; Another alternative terminal: the save's deletes would strip
-      ;; records the skgrepo restriction keeps out. Ask where to delete
-      ;; from, and retry this same save with the choice.
-      (skg-register-response-handler
-       'delete-from-confirmation
-       (lambda (_tcp-proc payload)
-         (skg--delete-from-confirmation-handler
-          save-buffer payload approved-forks fork-skgrepos
-          approved-hoist-pids strandeds-review))
-       nil)
-      ;; Another alternative terminal: a home skgrepo move would strand
-      ;; relationships. Retry this same save with the user's review.
-      (skg-register-response-handler
-       'strandeds-confirmation
-       (lambda (_tcp-proc payload)
-         (skg--strandeds-confirmation-handler
-          save-buffer payload approved-forks fork-skgrepos
-          approved-hoist-pids delete-from))
-       nil)
-      ;; The other alternative terminal. It carries no title/body text; after
-      ;; approval, retry this same save with the exact listed PIDs.
-      (skg-register-response-handler
-       'telescope-hoist-confirmation
-       (lambda (_tcp-proc payload)
-         (skg--telescope-hoist-confirmation-handler
-          save-buffer payload approved-forks fork-skgrepos
-          strandeds-review delete-from))
-       nil)
-      ;; The terminal message of a save whose rerender is withheld. The
-      ;; save was written; approval asks for a rerender of the views it
-      ;; names, not for the save again.
-      (skg-register-response-handler
-       'overPrivateText-telescope-confirmation
-       (lambda (_tcp-proc payload)
-         (skg--save-text-release-confirmation-handler payload))
-       nil)
-
+      (skg--register-save-response-handlers
+       save-buffer saved-view-id approved-forks fork-skgrepos
+       approved-hoist-pids strandeds-review delete-from)
       (skg-lp-reset)
 
       ;; Send the request line first
@@ -211,6 +136,97 @@ the buffers are locked."
       ;; Send the length-prefixed buffer contents
       (process-send-string tcp-proc header)
       (process-send-string tcp-proc wire-content))))
+
+
+(defun skg--register-save-response-handlers (save-buffer saved-view-id
+                                                         approved-forks
+                                                         fork-skgrepos
+                                                         approved-hoist-pids
+                                                         strandeds-review
+                                                         delete-from)
+  "Register the handlers of every message a save of SAVE-BUFFER (the
+view SAVED-VIEW-ID) may be answered with. APPROVED-FORKS,
+FORK-SKGREPOS, APPROVED-HOIST-PIDS, STRANDEDS-REVIEW and DELETE-FROM
+are the answers this save carried, which a confirmation handler
+passes on to its retry."
+  ;; Register handlers in the dispatch map
+  (skg-register-response-handler
+   'save-lock
+   (lambda (_tcp-proc payload)
+     (skg--broad-save-lock-handler payload))
+   t)
+  ;; save-relax-lock carries the post-preparation keep-set: collateral
+  ;; targets plus dirty conflict-check inputs. Buffers locked early that
+  ;; are absent can unlock. The saved buffer stays
+  ;; locked (skg--unlock-non-collateral-buffers keeps saved-view-id) until
+  ;; save-result. Registered non-one-shot (like collateral-view) so it does
+  ;; not add to skg-lp--pending-count: an *invalid* save errors before the
+  ;; server reaches the point that emits save-relax-lock, so a one-shot
+  ;; count would leak (never decremented) and hang the next save's wait.
+  ;; save-result removes it.
+  (skg-register-response-handler
+   'save-relax-lock
+   (lambda (_tcp-proc payload)
+     (skg--save-relax-lock-handler saved-view-id payload))
+   nil)
+  (skg-register-response-handler
+   'collateral-view
+   (lambda (_tcp-proc payload)
+     (skg--collateral-view-handler payload))
+   nil) ;; non-one-shot: fires for each streamed collateral view
+  (skg-register-response-handler
+   'save-result
+   (lambda (_tcp-proc payload)
+     (skg--save-result-handler save-buffer payload))
+   t)
+  ;; fork-confirmation: the alternative terminal message to
+  ;; save-result. The server sends exactly one of the two. Registered
+  ;; non-one-shot (does not bump skg-lp--pending-count); whichever
+  ;; terminal handler fires removes the other (and the fork handler
+  ;; decrements the count for the unfired save-result one-shot), so
+  ;; the pending count balances either way.
+  (skg-register-response-handler
+   'fork-confirmation
+   (lambda (_tcp-proc payload)
+     (skg--fork-confirmation-handler
+      save-buffer payload strandeds-review delete-from))
+   nil)
+  ;; Another alternative terminal: the save's deletes would strip
+  ;; records the skgrepo restriction keeps out. Ask where to delete
+  ;; from, and retry this same save with the choice.
+  (skg-register-response-handler
+   'delete-from-confirmation
+   (lambda (_tcp-proc payload)
+     (skg--delete-from-confirmation-handler
+      save-buffer payload approved-forks fork-skgrepos
+      approved-hoist-pids strandeds-review))
+   nil)
+  ;; Another alternative terminal: a home skgrepo move would strand
+  ;; relationships. Retry this same save with the user's review.
+  (skg-register-response-handler
+   'strandeds-confirmation
+   (lambda (_tcp-proc payload)
+     (skg--strandeds-confirmation-handler
+      save-buffer payload approved-forks fork-skgrepos
+      approved-hoist-pids delete-from))
+   nil)
+  ;; The other alternative terminal. It carries no title/body text; after
+  ;; approval, retry this same save with the exact listed PIDs.
+  (skg-register-response-handler
+   'telescope-hoist-confirmation
+   (lambda (_tcp-proc payload)
+     (skg--telescope-hoist-confirmation-handler
+      save-buffer payload approved-forks fork-skgrepos
+      strandeds-review delete-from))
+   nil)
+  ;; The terminal message of a save whose rerender is withheld. The
+  ;; save was written; approval asks for a rerender of the views it
+  ;; names, not for the save again.
+  (skg-register-response-handler
+   'overPrivateText-telescope-confirmation
+   (lambda (_tcp-proc payload)
+     (skg--save-text-release-confirmation-handler payload))
+   nil))
 
 (defun skg--saved-buffer-baseline ()
   "The current buffer's baseline, `skg-clean-baseline', which every save

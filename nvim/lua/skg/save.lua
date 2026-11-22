@@ -3,7 +3,8 @@
 -- server answers. 'request_save_buffer' starts a save (skg.buffer's
 -- BufWriteCmd calls it, as do the commands that save first);
 -- 'send_save_buffer' sends the view, its baseline and the other
--- views' snapshots, and registers the handlers of the answer stream
+-- views' snapshots, once 'register_save_response_handlers' has
+-- registered the handlers of the answer stream
 -- (save-lock -> save-relax-lock -> collateral-view* -> save-result,
 -- or a confirmation in place of save-result); 'save_result_handler'
 -- ends the stream, and 'redraw_saved_buffer' draws the saved view.
@@ -92,6 +93,25 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
                           delete_from,
                           vim.b[save_buf].skg_diffView_buffer_kind,
                           vim.b[save_buf].skg_perspective)
+  M.register_save_response_handlers(save_buf, saved_view_id,
+    approved_forks, fork_skgrepos, approved_hoist_pids,
+    strandeds_review, delete_from)
+  state.lp_reset()
+  client.send_string(request_line)
+  client.send_string(string.format('Content-Length: %d\r\n\r\n',
+                                   #wire_content))
+  client.send_string(wire_content)
+end
+
+---Register the handlers of every message a save of SAVE_BUF (the view
+---SAVED_VIEW_ID) may be answered with. APPROVED_FORKS, FORK_SKGREPOS,
+---APPROVED_HOIST_PIDS, STRANDEDS_REVIEW and DELETE_FROM are the
+---answers this save carried, which a confirmation handler passes on
+---to its retry.
+function M.register_save_response_handlers (save_buf, saved_view_id,
+                                            approved_forks, fork_skgrepos,
+                                            approved_hoist_pids,
+                                            strandeds_review, delete_from)
   state.register_response_handler('save-lock',
     function (_payload_text, response)
       M.broad_save_lock_handler(response)
@@ -150,11 +170,6 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
     function (_payload_text, response)
       require('skg.save.confirmations').save_text_release_confirmation_handler(response)
     end, false)
-  state.lp_reset()
-  client.send_string(request_line)
-  client.send_string(string.format('Content-Length: %d\r\n\r\n',
-                                   #wire_content))
-  client.send_string(wire_content)
 end
 
 ---Return the current text with transient save atoms, restoring the buffer.
