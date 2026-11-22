@@ -175,20 +175,7 @@ response a rerender stream follows."
    ;; 1. Lock message: unlock buffers not in the view ID list.
    'rerender-lock
    (lambda (_tcp-proc payload)
-     (unless skg--rerender-overPrivateText-challenged
-       (skg--unregister-response-handlers '(overPrivateText-telescope-confirmation)))
-     (condition-case err
-         (let* ((response (read payload))
-                (lock-entry (assoc 'lock-views response)))
-           (when lock-entry
-             (skg--unlock-buffers-not-in-view-id-list
-              (cadr lock-entry))))
-       (error
-        (skg--unlock-all-save-locked)
-        (skg-log 'error 'rerender "rerender-lock handler error: %S" err)
-        (skg-tell-answer-not-applied
-         "rerender-lock" err
-         "every view was unlocked before the rerender redrew it"))))
+     (skg--rerender-lock-handler payload))
    t)
   (skg-register-response-handler
    ;; 2. Per-view update: unlock and update each buffer.
@@ -200,39 +187,63 @@ response a rerender stream follows."
    ;; 3. Done message: clean up and show errors and warnings.
    'rerender-done
    (lambda (_tcp-proc payload)
-     (setq skg-response-handler-map
-           (assoc-delete-all 'rerender-view skg-response-handler-map))
-     (skg--end-stream)
-     (skg--unlock-all-save-locked) ;; safety net
-     (condition-case err
-         (let* ((response (read payload))
-                (errors-list (cadr (assoc 'errors response)))
-                (warnings-list (cadr (assoc 'warnings response))))
-           (when (or (skg--message-list-nonempty-p errors-list)
-                     (skg--message-list-nonempty-p warnings-list))
-             (skg-big-nonfatal-message
-              "*skg rerender messages*"
-              (cond
-               ((and (skg--message-list-nonempty-p errors-list)
-                     (skg--message-list-nonempty-p warnings-list))
-                "Rerender completed with errors and warnings")
-               ((skg--message-list-nonempty-p errors-list)
-                "Rerender completed with errors")
-               (t
-                "Rerender completed with warnings"))
-              (skg-errors-and-warnings-to-org-string
-               errors-list warnings-list))))
-       (error
-        (message "skg: rerender-done handler error: %S" err)))
-     (let ((retry (and skg--rerender-overPrivateText-challenged
-                       skg--rerender-overPrivateText-retry)))
-       (setq skg--rerender-overPrivateText-retry nil
-             skg--rerender-overPrivateText-challenged nil)
-       ;; The dispatcher removes this one-shot handler after return. A
-       ;; zero-delay timer starts the retry after that removal, so the new
-       ;; rerender-done handler is not accidentally deleted with the old one.
-       (when retry (run-at-time 0 nil retry))))
+     (skg--rerender-done-handler payload))
    t))
+
+(defun skg--rerender-lock-handler (payload)
+  "Handle a rerender stream's lock message PAYLOAD: unlock the buffers
+not in its view ID list."
+  (unless skg--rerender-overPrivateText-challenged
+    (skg--unregister-response-handlers '(overPrivateText-telescope-confirmation)))
+  (condition-case err
+      (let* ((response (read payload))
+             (lock-entry (assoc 'lock-views response)))
+        (when lock-entry
+          (skg--unlock-buffers-not-in-view-id-list
+           (cadr lock-entry))))
+    (error
+     (skg--unlock-all-save-locked)
+     (skg-log 'error 'rerender "rerender-lock handler error: %S" err)
+     (skg-tell-answer-not-applied
+      "rerender-lock" err
+      "every view was unlocked before the rerender redrew it"))))
+
+(defun skg--rerender-done-handler (payload)
+  "Handle a rerender stream's done message PAYLOAD: end the stream,
+show its errors and warnings, and start an approved overPrivateText
+retry."
+  (setq skg-response-handler-map
+        (assoc-delete-all 'rerender-view skg-response-handler-map))
+  (skg--end-stream)
+  (skg--unlock-all-save-locked) ;; safety net
+  (condition-case err
+      (let* ((response (read payload))
+             (errors-list (cadr (assoc 'errors response)))
+             (warnings-list (cadr (assoc 'warnings response))))
+        (when (or (skg--message-list-nonempty-p errors-list)
+                  (skg--message-list-nonempty-p warnings-list))
+          (skg-big-nonfatal-message
+           "*skg rerender messages*"
+           (cond
+            ((and (skg--message-list-nonempty-p errors-list)
+                  (skg--message-list-nonempty-p warnings-list))
+             "Rerender completed with errors and warnings")
+            ((skg--message-list-nonempty-p errors-list)
+             "Rerender completed with errors")
+            (t
+             "Rerender completed with warnings"))
+           (skg-errors-and-warnings-to-org-string
+            errors-list warnings-list))))
+    (error
+     (message "skg: rerender-done handler error: %S" err)))
+  (let ((retry (and skg--rerender-overPrivateText-challenged
+                    skg--rerender-overPrivateText-retry)))
+    (setq skg--rerender-overPrivateText-retry nil
+          skg--rerender-overPrivateText-challenged nil)
+    ;; The dispatcher removes this one-shot handler after return. A
+    ;; zero-delay timer starts the retry after that removal, so the new
+    ;; rerender-done handler is not accidentally deleted with the old one.
+    (when retry (run-at-time 0 nil retry))))
 
 ;; A confirmation can arrive inside an otherwise empty rerender stream (the
 ;; delete-references and stage-and-commit commands).  The rerender handler

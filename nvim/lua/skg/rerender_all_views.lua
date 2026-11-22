@@ -197,24 +197,7 @@ end
 function M.register_rerender_stream_handlers ()
   state.register_response_handler('rerender-lock',
     function (_payload_text, response)
-      if not M.overPrivateText_challenged then
-        state.unregister_response_handlers(
-          { 'overPrivateText-telescope-confirmation' })
-      end
-      local ok, err = pcall(function ()
-        local lock_views = payload.field(response, 'lock-views')
-        if lock_views ~= nil then
-          lock.unlock_buffers_not_in_view_id_list(
-            payload.string_list(lock_views)) end
-      end)
-      if not ok then
-        lock.unlock_all_save_locked()
-        log.log('error', 'rerender',
-                'rerender-lock handler error: %s', tostring(err))
-        length_prefix.tell_answer_not_applied(
-          'rerender-lock', err,
-          'every view was unlocked before the rerender redrew it')
-      end
+      M.rerender_lock_handler(response)
     end, true)
   state.register_response_handler('rerender-view',
     function (payload_text, response)
@@ -223,40 +206,70 @@ function M.register_rerender_stream_handlers ()
     end, false) -- non-one-shot: fires for each streamed view
   state.register_response_handler('rerender-done',
     function (_payload_text, response)
-      state.unregister_response_handlers({ 'rerender-view' })
-      lock.end_stream()
-      lock.unlock_all_save_locked() -- safety net
-      local ok, err = pcall(function ()
-        local errors =
-          payload.string_list(payload.field(response, 'errors'))
-        local warnings =
-          payload.string_list(payload.field(response, 'warnings'))
-        if #errors > 0 or #warnings > 0 then
-          local headline
-          if #errors > 0 and #warnings > 0 then
-            headline = 'Rerender completed with errors and warnings'
-          elseif #errors > 0 then
-            headline = 'Rerender completed with errors'
-          else
-            headline = 'Rerender completed with warnings' end
-          messages.big_nonfatal_message(
-            'skg://messages/rerender', headline,
-            messages.errors_and_warnings_to_org_string(
-              errors, warnings))
-        end
-      end)
-      if not ok then
-        vim.notify('skg: rerender-done handler error: '
-                   .. tostring(err))
-      end
-      local retry = M.overPrivateText_challenged and M.overPrivateText_retry or nil
-      M.overPrivateText_retry = nil
-      M.overPrivateText_challenged = false
-      if retry then vim.schedule(retry) end
-      local after_empty = M.after_empty_stream
-      M.after_empty_stream = nil
-      if after_empty then vim.schedule(after_empty) end
+      M.rerender_done_handler(response)
     end, true)
+end
+
+---Handle a rerender stream's lock message: unlock the buffers not in
+---its view ID list.
+function M.rerender_lock_handler (response)
+  if not M.overPrivateText_challenged then
+    state.unregister_response_handlers(
+      { 'overPrivateText-telescope-confirmation' })
+  end
+  local ok, err = pcall(function ()
+    local lock_views = payload.field(response, 'lock-views')
+    if lock_views ~= nil then
+      lock.unlock_buffers_not_in_view_id_list(
+        payload.string_list(lock_views)) end
+  end)
+  if not ok then
+    lock.unlock_all_save_locked()
+    log.log('error', 'rerender',
+            'rerender-lock handler error: %s', tostring(err))
+    length_prefix.tell_answer_not_applied(
+      'rerender-lock', err,
+      'every view was unlocked before the rerender redrew it')
+  end
+end
+
+---Handle a rerender stream's done message: end the stream, show its
+---errors and warnings, and start an approved overPrivateText retry or
+---a confirmation waiting for the empty stream to end.
+function M.rerender_done_handler (response)
+  state.unregister_response_handlers({ 'rerender-view' })
+  lock.end_stream()
+  lock.unlock_all_save_locked() -- safety net
+  local ok, err = pcall(function ()
+    local errors =
+      payload.string_list(payload.field(response, 'errors'))
+    local warnings =
+      payload.string_list(payload.field(response, 'warnings'))
+    if #errors > 0 or #warnings > 0 then
+      local headline
+      if #errors > 0 and #warnings > 0 then
+        headline = 'Rerender completed with errors and warnings'
+      elseif #errors > 0 then
+        headline = 'Rerender completed with errors'
+      else
+        headline = 'Rerender completed with warnings' end
+      messages.big_nonfatal_message(
+        'skg://messages/rerender', headline,
+        messages.errors_and_warnings_to_org_string(
+          errors, warnings))
+    end
+  end)
+  if not ok then
+    vim.notify('skg: rerender-done handler error: '
+               .. tostring(err))
+  end
+  local retry = M.overPrivateText_challenged and M.overPrivateText_retry or nil
+  M.overPrivateText_retry = nil
+  M.overPrivateText_challenged = false
+  if retry then vim.schedule(retry) end
+  local after_empty = M.after_empty_stream
+  M.after_empty_stream = nil
+  if after_empty then vim.schedule(after_empty) end
 end
 
 return M
