@@ -1,3 +1,11 @@
+//! The view's stats of each occurrence, the facts that depend on where
+//! it stands ('set_viewnodestats_in_viewforest'): which relations
+//! explain its place (its birth), which relations it has with its
+//! ancestors, 'cycle', 'repoBoundary', 'omittedBody' and its relRepo.
+//! Each relation shown only where the skgrepo restriction shows its
+//! record. The heralds draw these; the graph's own stats are
+//! 'graphnodestats.rs'.
+
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::attribution::{AttributedSkgrepo, attributed_skgrepo};
 use crate::dbs::in_rust_graph::mirrors::side_of_mirror_shown;
@@ -303,7 +311,7 @@ fn generation_above_a_member (
 /// Record, for the tracked ancestor 'anc_pid' at 'generation', every
 /// relation it is a member of on each side relative to 'node_pid'.
 /// Contains membership is read from the repo-filtered containment
-/// maps; the other four relations from the in-Rust graph. Every flag
+/// maps; the other three relations from the in-Rust graph. Every flag
 /// is relRepo gated: a relationship recorded outside the skgrepo restriction
 /// must not tint an ancestor herald in a more public view (it would
 /// reveal the very relationship the user privatized). The contains

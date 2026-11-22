@@ -1,3 +1,10 @@
+//! The graph's stats of each occurrence in a view: its relation
+//! counts, aliases, extra IDs and flags, as the skgrepo restriction
+//! lets them be seen ('set_graphnodestats_in_viewforest', from
+//! 'dbs/in_rust_graph/stats.rs'). The heralds draw them; the tail of a
+//! refresh ('tail.rs') sets them, with the view's own stats
+//! ('viewnodestats.rs').
+
 use crate::dbs::in_rust_graph::stats::{
   fetch_all_graphnodestats_with_skgrepo_set,
   graphnodestats_for_pid,

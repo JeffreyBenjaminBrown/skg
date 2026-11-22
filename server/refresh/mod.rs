@@ -18,7 +18,16 @@
 //! childless tombstones and gives every viewnode a vnid. The refresh
 //! changes the forest in place and reports nothing of what it changed;
 //! it renders nothing, and its caller renders the forest once it is
-//! done with it.
+//! done with it. The entry point is 'refresh_viewforest', which
+//! 'server/diff_view/buffer_rerender.rs' calls for the diff view;
+//! content views ('server/update_buffer.rs') call it through
+//! 'refresh_content_viewforest'.
+//!
+//! The files not named above: 'mode.rs' (content view or diff view),
+//! 'editability.rs' (which occurrence of a node is editable),
+//! 'ancestry.rs' (where each kind of folder may stand), 'chain.rs'
+//! (the containerward chain under a partner folder's members), and
+//! 'graphnodestats.rs' and 'viewnodestats.rs' (the stats the tail sets).
 
 pub mod ancestry;
 pub mod chain;
