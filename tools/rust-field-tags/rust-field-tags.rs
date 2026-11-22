@@ -8,7 +8,9 @@
 //!
 //! Output goes to stdout in etags TAGS format. Usage:
 //!   rust-field-tags FILE.rs [FILE2.rs ...] > extra-tags.partial
-//! Then append that to the main TAGS file.
+//! Then append that to the main TAGS file. 'bash/etags-rebuild.sh'
+//! does both: it builds this ('cargo build --release -p rust-field-tags')
+//! and appends what it emits.
 
 use std::env;
 use std::fs;
