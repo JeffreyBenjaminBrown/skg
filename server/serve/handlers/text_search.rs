@@ -56,16 +56,29 @@ use std::error::Error;
 use std::net::TcpStream;
 use tantivy::{TantivyDocument, Searcher};
 
-/// Maps each ID to search hits (plural -- IDs can have aliases,
-/// so one ID might get multiple matches).
+/// Maps each ID to its search hits ('MatchGroup').
+pub type MatchGroups =
+  HashMap < ID, MatchGroup >;
+
+/// One node's search hits (plural -- IDs can have aliases,
+/// so one ID might get multiple matches), with the skgrepo of the
+/// first search document that matched it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MatchGroup {
+  pub skgrepo : SkgrepoName,
+  pub matches : Vec<SearchMatch>,
+}
+
+/// One search document that matched, and its score.
 /// The score incorporates a context-based multiplier:
 /// Each result's BM25 score from Tantivy is multiplied by
 /// the multiplier corresponding to its prominence_source.
 /// Non-origins keep their raw score (multiplier = 1).
-pub type MatchGroups =
-  HashMap < ID, ( SkgrepoName,
-                  Vec < ( f32,             // score (after multiplier)
-                          TitleOrAlias ) >) >;
+#[derive(Clone, Debug, PartialEq)]
+pub struct SearchMatch {
+  pub score   : f32, // after multiplier
+  pub matched : TitleOrAlias,
+}
 
 /// The text a search document matched: the node's title, or one of
 /// its aliases. (The search index holds one document per title or
@@ -280,8 +293,8 @@ fn filter_match_groups_to_unrestricted_skgrepos (
   restriction   : &SkgrepoRestriction,
 ) -> MatchGroups {
   matches_by_gnid . into_iter ()
-    . filter ( |(_, (skgrepo, _))|
-      ! SkgrepoRestriction::node_is_restricted (restriction, skgrepo) )
+    . filter ( |(_, group)|
+      ! SkgrepoRestriction::node_is_restricted (restriction, &group . skgrepo) )
     . collect () }
 
 /// Draw the search buffer ('docs/api-and-formats.org', "Text search"):
@@ -483,11 +496,12 @@ pub fn group_matches_by_gnid (
         if let (Some (gnid), Some (title)) = (gnid_opt, title_opt) {
           result_acc
             . entry (gnid)
-            . or_insert_with ( || (
+            . or_insert_with ( || MatchGroup {
               skgrepo,
-              Vec::new () ))
-            . 1
-            . push (( adjusted_score, title )); }},
+              matches : Vec::new () } )
+            . matches
+            . push ( SearchMatch { score   : adjusted_score,
+                                   matched : title } ); }},
       Err (e) => { tracing::error! (
         "Error retrieving document: {}", e ); }} }
   result_acc }
@@ -571,45 +585,40 @@ pub fn build_search_viewforest (
 ) -> (ViewForest, Vec<ID>) {
   let mut viewforest : ViewForest =
     ViewForest::new ();
-  let mut id_entries : Vec < ( &ID,
-                               &SkgrepoName,
-                               &Vec < ( f32, TitleOrAlias ) > ) > =
-    matches_by_gnid . iter ()
-    . map ( |(gnid, (skgrepo, matches))| // flatten
-             (gnid, skgrepo, matches) )
-    . collect ();
+  let mut id_entries : Vec < ( &ID, &MatchGroup ) > =
+    matches_by_gnid . iter () . collect ();
   id_entries . sort_by ( |a, b| { // sort by best score (descending)
     let score_a : f32 =
-      a . 2 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
+      a . 1 . matches . first () . map ( |m| m . score ) . unwrap_or (0.0);
     let score_b : f32 =
-      b . 2 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
+      b . 1 . matches . first () . map ( |m| m . score ) . unwrap_or (0.0);
     score_b . partial_cmp (& score_a)
     . unwrap_or (std::cmp::Ordering::Equal) } );
   let mut search_results : Vec < ID > = Vec::new ();
-  for (gnid, skgrepo, matches) in id_entries . iter ()
+  for (gnid, group) in id_entries . iter ()
         // Suppress before truncation, so a dropped result frees a slot
         // for the next-ranked hit (design corner O2).
         . filter ( |entry| ! suppressed . contains (entry . 0) )
         . take (SEARCH_DISPLAY_LIMIT)
     { search_results . push ( (*gnid) . clone () );
-      let mut sorted_matches : Vec < &(f32, TitleOrAlias) > =
+      let mut sorted_matches : Vec < &SearchMatch > =
         // We borrow from matches_by_id.
         // Sort matches by score descending.
-        matches . iter () . collect ();
+        group . matches . iter () . collect ();
       sorted_matches . sort_by ( |a, b|
-        b . 0 . partial_cmp (&a . 0) . unwrap () );
+        b . score . partial_cmp (&a . score) . unwrap () );
       let title : &str =
         sorted_matches . iter ()
-        . find ( |(_score, matched)| ! matched . is_alias () )
+        . find ( |m| ! m . matched . is_alias () )
         . unwrap_or (&sorted_matches [0])
-        . 1 . text ();
+        . matched . text ();
       let result_treeid : NodeId =
         viewforest . append_root ( mk_writeProtected_viewnode (
           (*gnid) . clone (),
-          (*skgrepo) . clone (),
+          group . skgrepo . clone (),
           title . to_string (),
           true ) );
-      if sorted_matches . iter () . any ( |(_score, matched)| matched . is_alias () ) {
+      if sorted_matches . iter () . any ( |m| m . matched . is_alias () ) {
         viewforest . get_mut (result_treeid) . unwrap ()
           . append ( viewnode_of ( ViewnodeKind::Folder (Folder::Alias) )); }}
   (viewforest, search_results) }

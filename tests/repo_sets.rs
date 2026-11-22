@@ -707,8 +707,11 @@ fn search_enrichment_omits_the_restricted_containers (
     skg::serve::handlers::text_search::MatchGroups::new ();
   matches_by_gnid . insert (
     ID::from ("active-search-hit"),
-    ( SkgrepoName::from ("public"),
-      vec![ (1.0, TitleOrAlias::Title ("unrestricted search hit" . to_string ())) ] ));
+    skg::serve::handlers::text_search::MatchGroup {
+      skgrepo : SkgrepoName::from ("public"),
+      matches : vec![ skg::serve::handlers::text_search::SearchMatch {
+        score   : 1.0,
+        matched : TitleOrAlias::Title ("unrestricted search hit" . to_string ()) } ] } );
   let rendered : String =
     skg::serve::handlers::text_search
       ::search_buffer_for_skgrepo_set_for_test (

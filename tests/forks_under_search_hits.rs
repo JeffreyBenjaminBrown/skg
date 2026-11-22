@@ -19,8 +19,8 @@ use ego_tree::{NodeRef, Tree};
 
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::serve::handlers::text_search::{
-  MatchGroups, TitleOrAlias, build_search_viewforest, draw_search_buffer,
-  suppressed_result_gnids};
+  MatchGroup, MatchGroups, SearchMatch, TitleOrAlias, build_search_viewforest,
+  draw_search_buffer, suppressed_result_gnids};
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::types::config::SkgConfig;
@@ -32,10 +32,13 @@ use skg::types::views_state::ViewnodeIdRecord;
 /// One search hit, as a MatchGroups entry.
 fn hit (
   gnid : &str, skgrepo : &str, title : &str,
-) -> (ID, (SkgrepoName, Vec<(f32, TitleOrAlias)>)) {
+) -> (ID, MatchGroup) {
   ( ID::from (gnid),
-    ( SkgrepoName::from (skgrepo),
-      vec![ (1.0_f32, TitleOrAlias::Title (title . to_string ())) ] ) ) }
+    MatchGroup {
+      skgrepo : SkgrepoName::from (skgrepo),
+      matches : vec![ SearchMatch {
+        score   : 1.0_f32,
+        matched : TitleOrAlias::Title (title . to_string ()) } ] } ) }
 
 #[test]
 fn all_tests () -> Result<(), Box<dyn Error>> {

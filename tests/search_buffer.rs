@@ -24,7 +24,8 @@ use skg::dbs::tantivy::write::update_index_with_nodes;
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
 use skg::serve::handlers::text_search::{
-  MatchGroups, TitleOrAlias, build_search_viewforest, draw_search_buffer,
+  MatchGroup, MatchGroups, SearchMatch, TitleOrAlias, build_search_viewforest,
+  draw_search_buffer,
   handle_text_search_request};
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::reset_then_run_subtest;
@@ -209,8 +210,11 @@ fn an_excluded_overPrivateText_container_leaves_no_trace (
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[hit, container]);
   let matches : MatchGroups =
     [ ( ID::from ("hit"),
-        ( SkgrepoName::from ("public"),
-          vec! [ (1.0, TitleOrAlias::Title ("the hit" . to_string ())) ] )) ]
+        MatchGroup {
+          skgrepo : SkgrepoName::from ("public"),
+          matches : vec! [ SearchMatch {
+            score   : 1.0,
+            matched : TitleOrAlias::Title ("the hit" . to_string ()) } ] } ) ]
     . into_iter () . collect ();
   let drawn = |include_overPrivateText_telescopes : bool|
     -> Result<String, Box<dyn Error>> {
