@@ -505,20 +505,14 @@ fn set_omitted_body (
   { t . viewStats . omitted_body = omitted_body; }}
 
 /// Sets relRepo on the occurrence at treeid (see
-/// 'ViewnodeStats::relRepo' for the full contract).
-/// Computes the (recorder, relation, target) triple that identifies the
-/// binding relationship this position represents -- contains for an ordinary
-/// Vognode-parent content child; the folder's relation for a simple
-/// partner folder member, oriented by which side owns the outbound relationship
-/// (see 'RelationRole::is_first_role') -- then compares the relationship's
-/// actual skgrepo ('InRustGraph::relRepo') against its applicable
-/// relationship default. None on any of: the viewnode does not
-/// stand as a member here ('stands_as_member'); a compound partner folder
-/// (IntegratedElsewhere, HiddenInForkPartner, HiddenByForker,
-/// HiddenOutsideOfForkPartners: no single
-/// 'relation_member_role'); no recorded relationship; a relationship
-/// recorded in a foreign skgrepo; unresolvable homes;
-/// or the skgrepo equalling the default.
+/// 'ViewnodeStats::relRepo' for the full contract): compares the
+/// actual skgrepo ('InRustGraph::relRepo') of the binding relationship
+/// this position represents ('relationship_member_stands_for') against
+/// its applicable relationship default. None on any of: the viewnode
+/// does not stand as a member here ('stands_as_member'); no such
+/// relationship; no recorded relationship; a relationship recorded in
+/// a foreign skgrepo; unresolvable homes; or the skgrepo equalling the
+/// default.
 fn set_relRepo (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
@@ -529,43 +523,15 @@ fn set_relRepo (
   config : &SkgConfig,
 ) {
   let relRepo : Option<SkgrepoName> = 'compute : {
-    let node_pid : ID = {
-      let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
-        & tree . get (treeid) . unwrap () . value () . kind
-      else { break 'compute None; };
-      t . collected_gnid () };
     if ! stands_as_member_here {
       // Not a genuine member at this position (a self-writer standing
       // claiming nothing under a folder, or a node of the containerward
       // chain): there
       // is no binding relationship here to have a skgrepo at all.
       break 'compute None; }
-    let (recorder_pid, relation, target_pid) : (ID, NodeRelation, ID) =
-      match parent_kind_of (tree, treeid) {
-        ParentKind::Vognode (parent_pid) =>
-          (parent_pid, NodeRelation::Contains, node_pid),
-        ParentKind::Folder (folder, folder_treeid) => {
-          let member_role : Option<RelationRole> = match fork_roles {
-            Some (roles) if roles . as_forkee => Some (RelationRole::FORKEE),
-            Some (_) => Some (RelationRole::FORKER),
-            None => folder . relation_member_role (), };
-          let Some (role) : Option<RelationRole> = member_role
-          else { break 'compute None; }; // compound partner folders
-          let Some (described_pid) : Option<ID> =
-            tree . get (folder_treeid) . unwrap () . parent ()
-            . and_then ( |p| p . value () . occurrence_gnid () . cloned () )
-          else { break 'compute None; };
-          if role . is_first_role () {
-            // This position's own node owns the outbound relationship (e.g.
-            // a forker-only member of a forks folder, which itself forks
-            // the node the folder describes).
-            (node_pid . clone (), role . relation, described_pid)
-          } else {
-            // The node the folder describes owns the outbound relationship
-            // (e.g. a claiming forks folder member, which it forks).
-            (described_pid, role . relation, node_pid . clone ())
-          }},
-        ParentKind::Other => break 'compute None, };
+    let Some ((recorder_pid, relation, target_pid)) : Option<(ID, NodeRelation, ID)> =
+      relationship_member_stands_for (tree, treeid, fork_roles)
+    else { break 'compute None; };
     let skgrepo : SkgrepoName =
       match relRepos . relRepo_memoized (&recorder_pid, relation, &target_pid) {
         Some (l) => l, None => break 'compute None, };
@@ -588,6 +554,49 @@ fn set_relRepo (
   if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . relRepo = relRepo; }}
+
+/// The binding relationship the occurrence at 'treeid' represents as
+/// a member of its viewparent, as (recorder, relation, target): for an
+/// ordinary content child, its viewparent's containing it; for a
+/// simple partner folder's member, the folder's relation, oriented by
+/// which side owns the outbound relationship
+/// ('RelationRole::is_first_role'), the role in a forks folder being
+/// the one it stands in ('fork_roles'). None for any other viewnode,
+/// and for a member of a compound partner folder (IntegratedElsewhere,
+/// HiddenInForkPartner, HiddenByForker, HiddenOutsideOfForkPartners:
+/// no single 'relation_member_role').
+fn relationship_member_stands_for (
+  tree       : &Tree<Viewnode>,
+  treeid     : NodeId,
+  fork_roles : Option<&ForksFolderMemberRoles>,
+) -> Option<(ID, NodeRelation, ID)> {
+  let node_pid : ID = {
+    let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
+      & tree . get (treeid) . unwrap () . value () . kind
+    else { return None; };
+    t . collected_gnid () };
+  match parent_kind_of (tree, treeid) {
+    ParentKind::Vognode (parent_pid) =>
+      Some ((parent_pid, NodeRelation::Contains, node_pid)),
+    ParentKind::Folder (folder, folder_treeid) => {
+      let role : RelationRole = match fork_roles {
+        Some (roles) if roles . as_forkee => Some (RelationRole::FORKEE),
+        Some (_) => Some (RelationRole::FORKER),
+        None => folder . relation_member_role (), } ?; // None: a compound partner folder
+      let described_pid : ID =
+        tree . get (folder_treeid) . unwrap () . parent ()
+        . and_then ( |p| p . value () . occurrence_gnid () . cloned () ) ?;
+      Some ( if role . is_first_role () {
+        // This position's own node owns the outbound relationship (e.g.
+        // a forker-only member of a forks folder, which itself forks
+        // the node the folder describes).
+        (node_pid, role . relation, described_pid)
+      } else {
+        // The node the folder describes owns the outbound relationship
+        // (e.g. a claiming forks folder member, which it forks).
+        (described_pid, role . relation, node_pid)
+      }) },
+    ParentKind::Other => None, } }
 
 #[cfg(test)]
 mod relationship_default_tests {
