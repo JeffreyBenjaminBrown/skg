@@ -20,9 +20,9 @@
                   (&optional approved-forks fork-skgrepos approved-hoist-pids
                              strandeds-review delete-from))
 (declare-function skg--end-save-without-save-result "skg-request-save" ())
-(declare-function skg-big-nonfatal-message "skg-request-save"
+(declare-function skg-big-nonfatal-message "skg-messages"
                   (buffer-name message-text content))
-(declare-function skg--message-list-nonempty-p "skg-request-save"
+(declare-function skg--message-list-nonempty-p "skg-messages"
                   (message-list))
 (declare-function skg--save-hides-message "skg-request-save"
                   (hides &optional shown))

@@ -22,7 +22,7 @@
 
 (require 'cl-lib)
 (require 'skg-request-rerender-all-views)
-(require 'skg-request-save)            ; for skg--message-list-nonempty-p
+(require 'skg-messages)                ; for skg--message-list-nonempty-p
 (require 'skg-request-server-warnings) ; for skg--append-to-server-warnings
 (require 'skg-lock-buffers)            ; for skg--stream-in-progress
 (require 'skg-state)

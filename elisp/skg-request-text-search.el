@@ -5,7 +5,7 @@
 (require 'skg-client)
 (require 'skg-buffer)
 (require 'skg-length-prefix)
-(require 'skg-request-save) ; Shared warning presentation.
+(require 'skg-messages) ; Shared warning presentation.
 (require 'heralds-minor-mode)
 
 (defconst skg--project-root

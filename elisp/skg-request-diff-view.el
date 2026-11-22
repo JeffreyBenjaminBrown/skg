@@ -13,7 +13,7 @@
 (require 'skg-log)
 (require 'skg-length-prefix)
 (require 'skg-buffer)
-(require 'skg-request-save) ; For message formatting/display helpers
+(require 'skg-messages) ; For message formatting/display helpers
 (require 'skg-processed) ; for skg--processed-summary-message
 
 (defconst skg-diffView-buffers

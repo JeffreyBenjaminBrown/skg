@@ -5,9 +5,9 @@
 -- 'errors_and_warnings_to_org_string'); and 'with_neovim_bindings',
 -- which rewrites the Emacs chords and command names a server message
 -- names as this client's '<localleader>' keys and ':Skg*' commands.
--- The Lua port of the message-formatting part of
--- elisp/skg-request-save.el ('skg-big-nonfatal-message' and friends),
--- which content views, saves, and the stream consumers all share.
+-- The Lua port of elisp/skg-messages.el ('skg-big-nonfatal-message'
+-- and friends), which content views, saves, and the stream consumers
+-- all share.
 
 local keymaps = require('skg.keymaps')
 

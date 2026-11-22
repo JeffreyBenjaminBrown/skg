@@ -5,7 +5,7 @@
 (require 'skg-buffer)
 (require 'skg-metadata) ; for skg--unknown-node-id-at-point
 (require 'skg-request-rerender-all-views)
-(require 'skg-request-save) ; for skg-big-nonfatal-message
+(require 'skg-messages) ; for skg-big-nonfatal-message
 
 (defun skg-delete-references-to-absent-node ()
   "Remove owned structured references to the unknown viewnode at point."

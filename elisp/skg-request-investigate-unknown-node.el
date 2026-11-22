@@ -10,7 +10,7 @@
 
 (require 'skg-length-prefix)
 (require 'skg-metadata) ; for skg--unknown-node-id-at-point
-(require 'skg-request-save) ; for skg-big-nonfatal-message, skg-report-mode
+(require 'skg-messages) ; for skg-big-nonfatal-message, skg-report-mode
 
 (defun skg-investigate-unknown-node ()
   "Show what git history says about an unknown graphnode.

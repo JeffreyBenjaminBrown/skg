@@ -5,7 +5,7 @@
 (require 'skg-log)
 (require 'skg-length-prefix)
 (require 'skg-buffer)
-(require 'skg-request-save) ; For message formatting/display helpers
+(require 'skg-messages) ; For message formatting/display helpers
 
 (defun skg--single-root-view-request-string (clean-gnid view-id
                                                       &optional approved-pids)

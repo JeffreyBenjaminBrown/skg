@@ -1,13 +1,13 @@
 ;;; -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
-(require 'skg-keymaps-and-aliases) ; for skg-report-mode-map
 (require 'skg-log)
 (require 'skg-length-prefix)
 (require 'skg-org-fold)
 (require 'skg-metadata)
 (require 'skg-buffer)
 (require 'skg-lock-buffers)
+(require 'skg-messages)
 (require 'skg-processed) ; for skg--processed-summary-message
 (require 'skg-redraw-delta)
 (require 'skg-save-confirmations) ; the handlers of the alternatives to save-result
@@ -688,28 +688,6 @@ which would trigger overlay modification-hooks if still present."
         (skg--finish-pending-fork-result save-buffer payload))
     (skg--unlock-all-save-locked)) )
 
-(defun skg--message-list-nonempty-p (message-list)
-  "Return non-nil when MESSAGE-LIST has at least one message."
-  (and (listp message-list)
-       message-list))
-
-(defun skg-errors-and-warnings-to-org-string (errors warnings)
-  "Convert ERRORS and WARNINGS to one org buffer with two sections."
-  (let ((sections nil))
-    (when (skg--message-list-nonempty-p errors)
-      (push (concat "* errors\n"
-                    (mapconcat (lambda (message)
-                                 (concat "** " message))
-                               errors "\n"))
-            sections))
-    (when (skg--message-list-nonempty-p warnings)
-      (push (concat "* warnings\n"
-                    (mapconcat (lambda (message)
-                                 (concat "** " message))
-                               warnings "\n"))
-            sections))
-    (mapconcat #'identity (nreverse sections) "\n")))
-
 (defun skg-handle-save-sexp (sexp-string)
   "Parse and handle save response s-exp.
 Expected shape: ((content ...) (errors (...)) (warnings (...)))."
@@ -892,27 +870,6 @@ COLUMN is a character offset from the line's start; nil means column 0."
     (when window
       (with-selected-window window
         (recenter screen-line)))))
-
-(define-minor-mode skg-report-mode
-  "Minor mode for read-only skg report buffers, such as an unknown node's
-investigation and the import result: links in them can be followed,
-and IDs used."
-  :lighter " skg-report"
-  :keymap skg-report-mode-map)
-
-(defun skg-big-nonfatal-message (buffer-name message-text content)
-  "Display CONTENT in BUFFER-NAME and show MESSAGE-TEXT in minibuffer.
-Return the buffer."
-  (with-current-buffer (get-buffer-create buffer-name)
-    (let ((inhibit-read-only t))
-      (erase-buffer)
-      (insert content)
-      (skg--org-mode-with-options)
-      (set-buffer-modified-p nil)
-      (goto-char (point-min)))
-    (display-buffer buffer-name)
-    (message "%s" message-text)
-    (current-buffer)))
 
 (defun skg-show-save-errors-and-warnings
     (errors warnings content-present)

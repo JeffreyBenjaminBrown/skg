@@ -13,7 +13,7 @@
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org, "Server warnings".
 
 (require 'skg-length-prefix)
-(require 'skg-request-save) ; for skg--message-list-nonempty-p
+(require 'skg-messages) ; for skg--message-list-nonempty-p
 (require 'skg-buffer) ; for skg--org-mode-with-options
 (require 'skg-state)
 

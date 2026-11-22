@@ -8,7 +8,7 @@
 (require 'ert)
 (require 'cl-lib)
 (require 'skg-buffer)
-(require 'skg-request-save) ;; defines skg-report-mode
+(require 'skg-messages) ;; defines skg-report-mode
 (require 'skg-zippy-mode)
 
 (defvar test-skg-zippy--calls nil

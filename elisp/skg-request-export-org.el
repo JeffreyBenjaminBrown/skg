@@ -7,7 +7,7 @@
 
 (require 'skg-config)         ; skg--prompt-for-repo-set
 (require 'skg-length-prefix)
-(require 'skg-request-save)   ; skg-big-nonfatal-message,
+(require 'skg-messages)       ; skg-big-nonfatal-message,
                               ; skg--message-list-nonempty-p,
                               ; skg-errors-and-warnings-to-org-string
 (require 'skg-state)

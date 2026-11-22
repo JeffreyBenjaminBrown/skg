@@ -5,7 +5,7 @@
 (require 'cl-lib)
 (require 'skg-length-prefix)
 (require 'skg-request-rerender-all-views)
-(require 'skg-request-save)
+(require 'skg-messages)
 (require 'skg-state)
 
 (defconst skg--import-md-and-org-response-types
