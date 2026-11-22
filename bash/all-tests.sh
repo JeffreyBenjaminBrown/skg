@@ -4,7 +4,8 @@
 # generated docs and integration tests politely.
 #
 # Results are written here:
-# - tests/results/ALL.org: a plain-text org-mode summary
+# - tests/results/ALL.org: a plain-text org-mode summary, which quotes
+#   the failure lines of each failed suite
 # - tests/results/*.log: individual test results
 # It clears tests/results/ at its start, except the subdirectories
 # named for a plan number (tests/results/06/), which hold the logs of
@@ -115,14 +116,18 @@ echo ""
 
 # Each suite is a function, run from PROJECT_ROOT in a subshell by
 # 'run_suite', which logs it to RESULTS_DIR. To add a suite, define
-# its function and add one 'run_suite' line below; the summary and
-# ALL.org list it from the SUITE_* arrays.
+# its function and the pattern of its failure lines, and add one
+# 'run_suite' line below; the summary and ALL.org list it from the
+# SUITE_* arrays. Under a failed suite, ALL.org quotes the lines of
+# its log that match that pattern ('failure_lines_of_log').
 
 suite_emacs () {
   skg_low_priority "$SCRIPT_DIR/emacs-tests.sh"; }
+EMACS_FAILURE_LINES='^Ran [0-9]+ tests|^[[:space:]]*FAILED[[:space:]]'
 
 suite_nvim () {
   skg_low_priority "$SCRIPT_DIR/nvim-tests.sh"; }
+NVIM_FAILURE_LINES='^(Fail[[:space:]]*\|\||Errors : [1-9])'
 
 suite_nextest () {
   # --build-jobs: without it, cargo compiles/links with every core.
@@ -132,12 +137,14 @@ suite_nextest () {
   skg_low_priority cargo nextest run \
     --build-jobs "$NEXTEST_BUILD_JOBS" \
     --jobs "$NEXTEST_JOBS" --no-fail-fast; }
+NEXTEST_FAILURE_LINES='^[[:space:]]*(Summary|FAIL|TIMEOUT|SIG[A-Z]+|ABORT) \['
 
 suite_doctest () {
   # nextest structurally cannot run doctests, so they get their own
   # phase. --jobs caps build parallelism for politeness, matching the
   # build phase.
   skg_low_priority cargo test --doc --jobs "$BUILD_JOBS"; }
+DOCTEST_FAILURE_LINES='\.\.\. FAILED$|^test result:'
 
 suite_team_tools () {
   # The scripts in tools/team/ that the AI team runs, and those of
@@ -147,6 +154,7 @@ suite_team_tools () {
     echo "== $test_script"
     skg_low_priority python3 "$test_script" || exit 1
   done; }
+TEAM_TOOLS_FAILURE_LINES='^== |^(FAIL|ERROR): '
 
 suite_ai_reader () {
   # tools/skg-for-ai/: it runs target/debug/skg (built in phase 1)
@@ -156,25 +164,31 @@ suite_ai_reader () {
   # from it ('find_available_port'). A suite run at once from another
   # worktree uses another port ('skg_port_for_this_checkout').
   skg_low_priority python3 tools/skg-for-ai/test_skg_for_ai.py; }
+AI_READER_FAILURE_LINES='^FAIL: '
 
 suite_generated_docs () {
   # docs/ and coding-advice/ must be what skg-system/ exports
   # (coding-advice/generated-docs.org), with the binary of phase 1.
   SKG_BIN="$PROJECT_ROOT/target/debug/skg" \
     skg_low_priority bash/check-docs-exported.sh; }
+GENERATED_DOCS_FAILURE_LINES='^(missing|differs from a fresh export|not exported from skg-system/): '
 
 # Parallel arrays, one entry per suite run, in run order:
-#   SUITE_LABELS[k], SUITE_LOGS[k], SUITE_EXITS[k], SUITE_ELAPSED[k]
+#   SUITE_LABELS[k], SUITE_LOGS[k], SUITE_FAILURE_PATTERNS[k],
+#   SUITE_EXITS[k], SUITE_ELAPSED[k]
 SUITE_LABELS=()
 SUITE_LOGS=()
+SUITE_FAILURE_PATTERNS=()
 SUITE_EXITS=()
 SUITE_ELAPSED=()
 
-# Usage: run_suite LABEL LOG-FILE-NAME FUNCTION
+# Usage: run_suite LABEL LOG-FILE-NAME FUNCTION FAILURE-LINE-PATTERN
+# The pattern is an extended regex ('grep -E').
 run_suite () {
   local label="$1"
   local log_name="$2"
   local suite_function="$3"
+  local failure_pattern="$4"
   local t_suite=$SECONDS
   local rc
   echo -n "  $label ... "
@@ -190,19 +204,27 @@ run_suite () {
   fi
   SUITE_LABELS+=("$label")
   SUITE_LOGS+=("$log_name")
+  SUITE_FAILURE_PATTERNS+=("$failure_pattern")
   SUITE_EXITS+=($rc)
   SUITE_ELAPSED+=($((SECONDS - t_suite))); }
 
 echo -e "${YELLOW}Running suites sequentially...${NC}"
 echo ""
 
-run_suite "Emacs tests"     emacs.log          suite_emacs
-run_suite "Neovim tests"    nvim.log           suite_nvim
-run_suite "Nextest"         nextest.log        suite_nextest
-run_suite "Doctests"        doctest.log        suite_doctest
-run_suite "Team tool tests" team-tools.log     suite_team_tools
-run_suite "AI reader tests" ai-reader.log      suite_ai_reader
-run_suite "Generated docs"  generated-docs.log suite_generated_docs
+run_suite "Emacs tests"     emacs.log          suite_emacs \
+  "$EMACS_FAILURE_LINES"
+run_suite "Neovim tests"    nvim.log           suite_nvim \
+  "$NVIM_FAILURE_LINES"
+run_suite "Nextest"         nextest.log        suite_nextest \
+  "$NEXTEST_FAILURE_LINES"
+run_suite "Doctests"        doctest.log        suite_doctest \
+  "$DOCTEST_FAILURE_LINES"
+run_suite "Team tool tests" team-tools.log     suite_team_tools \
+  "$TEAM_TOOLS_FAILURE_LINES"
+run_suite "AI reader tests" ai-reader.log      suite_ai_reader \
+  "$AI_READER_FAILURE_LINES"
+run_suite "Generated docs"  generated-docs.log suite_generated_docs \
+  "$GENERATED_DOCS_FAILURE_LINES"
 
 INTEGRATION_DIR="$PROJECT_ROOT/tests/integration"
 INTEGRATION_NAMES=()   # each entry is "CLIENT/DIR-NAME"
@@ -348,6 +370,22 @@ fi
 
 ORG="$RESULTS_DIR/ALL.org"
 
+# The lines of a failed suite's log worth reading first: those that
+# match PATTERN, without color codes or repeats, at most 30; or, if
+# none match, the log's last 15 lines.
+failure_lines_of_log () {
+  local log_path="$1"
+  local pattern="$2"
+  local uncolored_log
+  local lines
+  uncolored_log="$(sed 's/\x1b\[[0-9;]*m//g' "$log_path" 2>/dev/null)"
+  lines="$(printf '%s\n' "$uncolored_log" \
+    | grep -E -- "$pattern" | awk '!seen[$0]++' | head -n 30)"
+  if [ -z "$lines" ]; then
+    lines="$(printf '%s\n' "$uncolored_log" | tail -n 15)"
+  fi
+  printf '%s\n' "$lines"; }
+
 {
   echo "* results from bash/all-tests.sh"
 
@@ -364,6 +402,13 @@ ORG="$RESULTS_DIR/ALL.org"
       verdict=FAIL
     fi
     echo "** $verdict : ${SUITE_LABELS[$k]} (${SUITE_ELAPSED[$k]}s) [[file:${SUITE_LOGS[$k]}]]"
+    if [ "$verdict" = FAIL ]; then
+      echo "   #+begin_example"
+      failure_lines_of_log "$RESULTS_DIR/${SUITE_LOGS[$k]}" \
+                           "${SUITE_FAILURE_PATTERNS[$k]}" \
+        | sed 's/^/   /'
+      echo "   #+end_example"
+    fi
   done
 
   # Integration
