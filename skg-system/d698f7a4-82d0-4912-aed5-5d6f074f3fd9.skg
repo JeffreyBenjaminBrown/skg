@@ -25,7 +25,7 @@ body: |2-
   graphnode its viewparent hides by no record vanishes, so that a
   graphnode a save unhid leaves it; a hide the skgrepo restriction
   keeps out stays, unwarranted ('mark_claims' in
-  'server/refresh/visit.rs'). In the hidden-by folder
+  'server/refresh/claims.rs'). In the hidden-by folder
   (=hiddenByForkerFolder=) under a member that is no forker as
   such, a forker a cut made a forkee, every member vanishes, so the
   folder goes, as a fresh view would not draw it

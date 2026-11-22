@@ -530,7 +530,7 @@ when that holds anything; once a cut makes that forker a forkee, the
 folder's members vanish and it goes, and so they do under an
 indirect member, whose hides do not apply to the note
 ('is_hiddenByForkerFolder_under_no_forker_as_such' in
-'server/refresh/visit.rs'). A
+'server/refresh/claims.rs'). A
 member as such the refresh draws under an editable occurrence is
 itself such an occurrence: it is drawn editable, as content is (see
 "The extent and the node budget"), so it shows its content less what

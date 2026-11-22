@@ -9,10 +9,10 @@
 //! refresh's rungs ('visit.rs') re-kind its children by the ID rule
 //! ('id_rule.rs'), merge duplicate viewnode siblings, set each
 //! child's warrant against the parent's goal ('goal.rs'), mark the
-//! claims, reinstate what the goal names and no child stands for
-//! (as far as the extent allows, 'extent.rs'), reorder, substitute
-//! mirrors ('substitution.rs'), and fulfill the children's view
-//! requests. In the diff view the goal also holds what HEAD alone
+//! claims ('claims.rs'), reinstate what the goal names and no child
+//! stands for (as far as the extent allows, 'extent.rs'), reorder,
+//! substitute mirrors ('substitution.rs'), and fulfill the children's
+//! view requests. In the diff view the goal also holds what HEAD alone
 //! warrants, and change viewnodes are recomputed in place
 //! ('diff_view.rs'). After the
 //! walk, the tail ('tail.rs') computes the derived facts, prunes the
@@ -32,6 +32,7 @@
 
 pub mod ancestry;
 pub mod chain;
+mod claims;
 mod diff_view;
 mod editability;
 mod extent;

@@ -13,9 +13,10 @@ use crate::refresh::goal::{
 use crate::refresh::goal::partnerFolder_members_in_graph;
 use crate::refresh::id_rule::point_occurrence_at;
 use crate::refresh::Walk;
+use crate::refresh::claims::vanish;
 use crate::refresh::visit::{
   add_hidden_outside_folder, after_drawing, children_of, draw_item,
-  folders_of_relation, vanish, warrant_of_child};
+  folders_of_relation, warrant_of_child};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::moves::{move_after, move_to_first_child};
 use crate::types::viewnode::{

@@ -28,8 +28,9 @@ use crate::refresh::editability::{
   DrawnEditability, EditabilityAndClaim, drawn_occurrence_editability,
   forget_editable_occurrence, occurrence_from_truth, write_protect_occurrence};
 use crate::refresh::diff_view::fold_body_of_drawn_occurrence;
+use crate::refresh::claims::vanish;
 use crate::refresh::visit::{
-  add_containers_folder_under_member, children_of, vanish};
+  add_containers_folder_under_member, children_of};
 use crate::refresh::goal::{Goal, GoalItem, GoalMember};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;

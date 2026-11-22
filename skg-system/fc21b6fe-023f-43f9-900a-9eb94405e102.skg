@@ -18,7 +18,7 @@ body: |2-
   not as a pending detachment: every view the refresh draws gives each
   member of a forks folder the claim the graph gives it
   ('claim_forks_folder_members_as_the_graph_does' in
-  'server/refresh/visit.rs'; 'docs/forks.org', "Claims in a redrawn
+  'server/refresh/claims.rs'; 'docs/forks.org', "Claims in a redrawn
   view"). Where the same save
   removes the claim of a mutual (a detachment), a cut from it only
   hides: the detachment stands. A foreign N can record neither a fork

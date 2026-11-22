@@ -8,7 +8,7 @@ body: |2-
   save redraws, and in any view another client saves, a member your
   note now forks claims, and a forker-only member claims nothing
   ('claim_forks_folder_members_as_the_graph_does' in
-  'server/refresh/visit.rs'). A view the server redraws holds no
+  'server/refresh/claims.rs'). A view the server redraws holds no
   gesture of yours still to be saved: it is one the server drew, or
   one whose gestures the save just carried out. Without this, a view
   drawn before another view made your note fork a forker (by a cut

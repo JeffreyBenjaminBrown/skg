@@ -350,7 +350,7 @@ there too. In the write-protected hides folder (=hiddenFolder=) a
 graphnode its viewparent hides by no record vanishes, so that a
 graphnode a save unhid leaves it; a hide the skgrepo restriction
 keeps out stays, unwarranted ('mark_claims' in
-'server/refresh/visit.rs'). In the hidden-by folder
+'server/refresh/claims.rs'). In the hidden-by folder
 (=hiddenByForkerFolder=) under a member that is no forker as
 such, a forker a cut made a forkee, every member vanishes, so the
 folder goes, as a fresh view would not draw it
@@ -757,7 +757,7 @@ gives F's headline its claim, so that it stands among the forkees,
 not as a pending detachment: every view the refresh draws gives each
 member of a forks folder the claim the graph gives it
 ('claim_forks_folder_members_as_the_graph_does' in
-'server/refresh/visit.rs'; 'docs/forks.org', "Claims in a redrawn
+'server/refresh/claims.rs'; 'docs/forks.org', "Claims in a redrawn
 view"). Where the same save
 removes the claim of a mutual (a detachment), a cut from it only
 hides: the detachment stands. A foreign N can record neither a fork
@@ -1028,7 +1028,7 @@ removes it, and everything under it, from the view, for one of two
 reasons. The graph no longer relates it to its viewparent: a child
 that claims membership under a viewparent whose claims the save
 reads, and whose warrant is not 'ByGraph' (the claims rung,
-'vanish_if_unwarranted' in 'server/refresh/visit.rs'). Or the graph
+'vanish_if_unwarranted' in 'server/refresh/claims.rs'). Or the graph
 no longer has its node: an occurrence in a content view, a view root
 included, whose node is gone or restricted and whose viewparent's
 list does not name it (the ID rule's tombstone answer,

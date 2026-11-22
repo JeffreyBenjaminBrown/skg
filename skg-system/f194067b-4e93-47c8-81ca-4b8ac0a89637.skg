@@ -6,7 +6,7 @@ body: |2-
   reasons. The graph no longer relates it to its viewparent: a child
   that claims membership under a viewparent whose claims the save
   reads, and whose warrant is not 'ByGraph' (the claims rung,
-  'vanish_if_unwarranted' in 'server/refresh/visit.rs'). Or the graph
+  'vanish_if_unwarranted' in 'server/refresh/claims.rs'). Or the graph
   no longer has its node: an occurrence in a content view, a view root
   included, whose node is gone or restricted and whose viewparent's
   list does not name it (the ID rule's tombstone answer,
