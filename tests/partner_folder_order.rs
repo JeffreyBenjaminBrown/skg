@@ -17,16 +17,11 @@
 use crate::view_and_save_helpers::line_containing;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::save_and_rerender;
+use crate::git_fixture_helpers::save_and_read_collateral;
 use std::error::Error;
-use std::io::BufReader;
-use std::net::TcpStream;
 
 use skg::test_utils::{
-  mk_test_tcp_stream_pair,
-  empty_views_state,
-  extract_string_field_from_sexp, graph_handle_from_config,
-  read_all_lp_messages, run_with_test_stores};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+  empty_views_state, graph_handle_from_config, run_with_test_stores};
 use skg::test_utils::{multi_root_view, single_root_view};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -117,21 +112,11 @@ async fn save_view_and_read_collateral (
   graph       : &InRustGraphHandle,
   views_state : &mut ViewsState,
 ) -> Result<(String, Vec<String>), Box<dyn Error>> {
-  let (mut stream, read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response : SaveResponse = update_from_and_rerender_buffer (
-    &mut stream, buffer, config, tantivy, graph,
-    &Ok (viewforest_id . clone ()), views_state ) . await ?;
+  let (response, collateral_views) : (SaveResponse, Vec<String>) =
+    save_and_read_collateral (
+      buffer, viewforest_id, config, tantivy, graph, views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "save must not error; got: {:?}", response . errors );
-  drop (stream);
-  let collateral_views : Vec<String> =
-    read_all_lp_messages ( &mut BufReader::new (read_end) )
-    . into_iter ()
-    . filter ( |message| message . contains ("collateral-view") )
-    . map ( |message| extract_string_field_from_sexp (&message, "content")
-            . expect ("a collateral view has content") )
-    . collect ();
   Ok (( response . saved_view, collateral_views )) }
 
 /// Panic unless the lines containing 'fragments' come in this order.

@@ -9,6 +9,7 @@
 
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::metadata_canon::without_viewnode_ids;
+use crate::git_fixture_helpers::save_and_read_collateral;
 use crate::view_and_save_helpers::node_from_disk;
 use indoc::indoc;
 use skg::assert_metadata_eq;
@@ -16,25 +17,22 @@ use skg::test_utils::{
   save_ignoring_streamed_messages,
   mk_test_tcp_stream_pair,
   empty_views_state,
-  extract_string_field_from_sexp,
   graph_handle_from_config,
-  read_all_lp_messages,
   run_with_shared_test_stores,
-  save_preview_test,
-  update_from_and_rerender_buffer_test as update_from_and_rerender_buffer };
+  save_preview_test };
 use skg::test_utils::single_root_view;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 
 use skg::serve::ViewsState;
+use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::views_state::ViewforestId;
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle,
   };
 
 use std::error::Error;
-use std::io::BufReader;
 use std::net::TcpStream;
 
 async fn save_buffer_for_hidden_from_forks_test (
@@ -61,29 +59,9 @@ async fn save_buffer_and_read_collateral_views (
   graph       : &InRustGraphHandle,
   views_state : &mut ViewsState,
 ) -> Result<(String, Vec<String>), Box<dyn Error>> {
-  let (mut stream, read_end) : (TcpStream, TcpStream) =
-    mk_test_tcp_stream_pair ();
-  let response =
-    update_from_and_rerender_buffer (
-      &mut stream,
-      buffer, config, tantivy, graph,
-      &Ok (viewforest_id . clone ()), views_state
-    ) . await ?;
-  drop (stream);
-  let mut reader : BufReader<TcpStream> =
-    BufReader::new (read_end);
-  let collateral_views : Vec<String> =
-    read_all_lp_messages (&mut reader)
-    . into_iter()
-    // Skip the save-relax-lock message; only collateral-views
-    // carry a content field.
-    . filter ( |msg| msg . contains ("collateral-view") )
-    . map ( |msg|
-      extract_string_field_from_sexp (&msg, "content")
-      . unwrap_or_else (||
-        panic! ("content field not found in collateral-view sexp: {}",
-                msg)) )
-    . collect();
+  let (response, collateral_views) : (SaveResponse, Vec<String>) =
+    save_and_read_collateral (
+      buffer, viewforest_id, config, tantivy, graph, views_state ) . await ?;
   Ok ((response . saved_view, collateral_views)) }
 
 fn remove_e1_subtree (
