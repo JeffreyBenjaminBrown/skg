@@ -91,24 +91,28 @@ from daemon_client import (
 from command_line import parse_command_line, run_command
 from daemon import command_daemon
 
-# The sections of this file, in order, each under a banner of '='
-# (subsections '-') whose first line is the title given here; grep
-# for '^# TITLE' to reach one:
-#   Commands: 'main', the command line, a function per command.
-#   The chain of a headline; What a headline's heralds mean: 'chain'
-#     and 'describe'.
-#   Fetching views; Writing the files ('RenderedView').
-#   The full view, parsed; Facts from one headline's metadata;
-#   Relationship heralds; Links; Repo ownership; The compact view;
-#   Every herald (- The lens; - What a headline's heralds need from the
-#   headlines around it); Change facts; The summary.
-#   Saving an edited compact view (- Words read against the outline;
-#   - 'subtree'; - Rebuilding the full buffer; - The report of changes;
-#   - Placing an existing node; - Forking; - Retyped headlines; - The
-#   fork confirmation; - The save's other questions; - The server's
-#   answer).
-#   The daemon; The connection ('SkgConnection', 'DaemonConnection',
-#   the errors, the response helpers); S-expressions.
+# The modules of this tool, each a file beside this one whose first
+# lines say what it holds, from the command line down:
+#   'command_line': the arguments, and 'run_command', which runs a
+#     command by its function.
+#   The commands, by module:
+#     'view_commands': 'view', 'search', 'forest', 'contains',
+#       'links-here', 'new', 'perspective', 'close'.
+#     'save': 'save'.
+#     'diff_and_commit': 'diff', 'extend', 'commit'.
+#     'receipts': 'receipt'.
+#     'request_commands': 'raw', 'import', 'delete-references',
+#       'restrict'.
+#     'headline_commands': 'chain', 'describe', 'linkstack'.
+#     'daemon': 'daemon'; 'daemon_client': how a command reaches one.
+#   Below the commands: 'edited_compact_view' (an edited compact view,
+#   read for a save); 'views' (fetching a view, writing its three files,
+#   reading them back); 'compact_view' (the compact view, its heralds
+#   and summary); 'full_view' (the full view parsed, and the facts of a
+#   headline's metadata); 'server_connection' (the connection, the
+#   errors, the request and response helpers); 'sexp'.
+# Each module's sections stand under banners of '=' (subsections '-')
+# whose first line is the title; grep for '^# TITLE' to reach one.
 
 def main (argv):
   """Run the command ARGV names; return its exit code. A command whose
