@@ -6,6 +6,15 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* The search-results response is printed by the 'sexp' crate (2026-11-22)
+  'mk_search_results_sexp' ('server/serve/handlers/text_search.rs')
+  prints its Sexp with the crate's 'to_string', which prints an empty
+  string atom as nothing; 'server/serve/util.rs' says every response
+  is printed by 'sexp_to_client_string', which prints it as '""'. So a
+  search whose rendered content, or one of whose warnings, were empty
+  would send '(content )' or a missing warning. Neither happens today
+  (a search with no hits answers with a message), so nothing breaks;
+  printing through 'sexp_to_client_string' would remove the exception.
 * all-tests.sh never plays its completion sound (2026-11-22)
   'bash/all-tests.sh' sets 'BEEP' to a path and an argument in one
   string ("$PROJECT_ROOT/../sound/play-beep.sh beep-soothing") and then

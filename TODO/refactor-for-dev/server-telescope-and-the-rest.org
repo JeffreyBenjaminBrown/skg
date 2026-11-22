@@ -1,0 +1,91 @@
+* Refactoring for dev: 'server/telescope/', the search code, 'main.rs' and the rest
+  The territory: 'server/telescope/', 'server/repo_watch/',
+  'server/skgrepo_sets.rs', 'server/prominence.rs', the text search
+  ('server/serve/handlers/text_search.rs' and 'text_search/', and the
+  search side of 'server/dbs/tantivy.rs' and 'dbs/tantivy/search.rs'),
+  'server/main.rs', 'server/subcommands.rs', and the top-level files
+  of 'server/' no other handoff file claims ('attribution.rs',
+  'receipt.rs', 'metadata_canon.rs', 'org_to_text.rs',
+  'update_buffer.rs', 'view_snapshots.rs', 'view_text_delta.rs',
+  'delete_references_to_absent_node.rs', 'body_view_escape.rs',
+  'consts.rs', 'sexp_string.rs', 'util.rs'). The import and export
+  code ('export_org.rs', 'import_org_roam*', 'import_md_and_org/',
+  'obsidian/') is not part of it, though 'main.rs' calls into it.
+  The Rust tests are grouped into five binaries ('grouped_unit',
+  'grouped_views', ...), so '--test NAME' with a file's name fails;
+  run 'bash/nextest.sh' whole (about fifteen seconds warm, a minute
+  cold). Every refactor below was checked that way, and by the whole
+  suite before merge.
+* Done
+** A text search's response is computed by one function
+   'handle_text_search_request' only sends what 'text_search_response'
+   returns; that function is a list of steps, each refusal or
+   challenge an early return, where the handler nested five matches
+   deep and sent from eight places.
+** A search-index document's shown title is read by one function
+   'displayed_title_of_document' ('server/dbs/tantivy.rs'): the raw
+   title, else 'title_or_alias'. It replaced three copies (two title
+   lookups and 'group_matches_by_gnid'), which also now reads its
+   fields through 'string_field' and 'bool_field_eq_true', made public.
+** 'build_search_viewforest' takes no search terms
+   It ignored them; so did 'search_buffer_for_skgrepo_set_for_test'.
+** skg's 'main' only dispatches; the server starts in 'run_server'
+   Also 'run_check_config', 'assert_herald_styles_consistent',
+   'log_server_binary_and_its_age', 'init_stderr_tracing' (twice
+   inline before) and 'DEFAULT_CONFIG_PATH' (four copies before).
+** The telescope compose's section parse and aliases are functions of their own
+   'prepend_and_anchored_runs' and 'compose_aliases'
+   ('server/telescope/compose.rs'); a never-read 'queue_keys' is gone.
+** A reload batch's nodes are read again by one function
+   'read_changes_of_pids' returns a named 'ReadChanges'
+   ('server/repo_watch/reload.rs'); 'files_of_pids' replaced three
+   copies of a walk.
+* Candidates left, best first
+** Replace the tuples of 'MatchGroups' with named structs
+   'server/serve/handlers/text_search.rs': 'MatchGroups' is
+   'HashMap<ID, (SkgrepoName, Vec<(f32, TitleOrAlias)>)>', read as
+   '. 0', '. 1', '. 2' and '(s, _)' across the file. A struct per hit
+   ('skgrepo', 'matches') and per match ('score', 'matched') would read
+   better. Safe (no wire change), but 'tests/search_buffer.rs',
+   'tests/repo_sets.rs' and 'tests/forks_under_search_hits.rs' build
+   'MatchGroups' literally, so they change with it: more than following
+   a rename, so ask the coordinator first.
+** Deduplicate the title and body selection in 'compose_sections'
+   'server/telescope/compose.rs': two fifteen-line blocks differ only in
+   the field and the warning variants ('TitleBelowHome'/'BodyBelowHome',
+   'NonHomeTitle'/'NonHomeBody'). A helper would take the two warning
+   constructors. Keep the single loop over sections: the warnings
+   interleave title then body per section, and a split into two passes
+   would reorder them.
+** Split 'compose_ordered' further
+   Its dedup-and-merge half (the 'keep' closure, the prepend, the
+   queues after their anchors) is the other half of one section's turn.
+   Pure extraction; the closure's mutable 'seen' needs to become a
+   parameter.
+** Split 'group_matches_by_gnid'
+   'text_search.rs': after the field reads moved out it is still about
+   eighty lines; the per-document score (coverage times prominence
+   multiplier) is a natural function.
+** Split 'run_server' further
+   'server/main.rs': the busy-signal spawn and the repo-watcher start
+   (each about fifteen lines, each with a warning path) could be named.
+   The order of the start is load-bearing (the listener binds before
+   'initialize_dbs' so clients get the busy signal), so keep it in one
+   visible sequence.
+** 'search_buffer_for_skgrepo_set_for_test' is a test helper in production code
+   'text_search.rs'; one test ('tests/repo_sets.rs') calls it. Moving it
+   to that test is safe and small.
+** Leads from 'TODO/problems.org' looked at and left
+*** "Graph updates rediscover identity-change facts across several consumers"
+    Its code is mostly 'server/dbs/in_rust_graph/' (types and dbs); the
+    telescope side is 'telescope/invariants.rs'. Not a mechanical
+    refactor: it shares facts among consumers with different scopes.
+*** "Hidden relationships participate in path and ancestry topology"
+    The functions it names ('path_to_first_nonlinearity',
+    'full_containerward_ancestry_from_in_rust_graph') no longer exist,
+    and 'find_related_nodes' ('server/dbs/in_rust_graph/query.rs') is
+    now called only by tests. The entry is probably obsolete; whoever
+    owns the refresh should confirm and move it to DONE.
+*** "Repo '...' not found in config across ~9 sites"
+    Done earlier: only 'SkgConfig::skgrepo_or_err' and a copy in
+    'server/test_utils.rs' remain.
