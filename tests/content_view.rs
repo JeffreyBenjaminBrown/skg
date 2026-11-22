@@ -7,7 +7,7 @@ use std::io::BufReader;
 use std::net::TcpStream;
 use std::sync::Arc;
 
-use skg::test_utils::{multi_root_view, single_root_view};
+use skg::test_utils::{empty_views_state, multi_root_view, single_root_view};
 use skg::assert_metadata_eq;
 use skg::serve::ViewsState;
 use skg::serve::handlers::single_root_view::handle_single_root_view_request;
@@ -17,7 +17,7 @@ use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
 use skg::types::viewnode::Viewnode;
-use skg::types::views_state::{DiffViewBufferKind, OpenViews, ViewforestId};
+use skg::types::views_state::{DiffViewBufferKind, ViewforestId};
 
 use ego_tree::Tree;
 
@@ -282,8 +282,7 @@ fn a_root_only_of_a_diffView_buffer_gets_a_content_view (
   let env : SkgEnv =
     skg_env_from_parts (config, tantivy, &graph_handle_from_config (config) ?);
   let mut views_state : ViewsState =
-    ViewsState { open_views     : OpenViews::new (),
-                 graph_straddle : None, };
+    empty_views_state ();
   register_view_of_1 (
     config, &env, &mut views_state, "diff-view-of-1",
     Some (DiffViewBufferKind::AllChanges) ) ?;
@@ -307,8 +306,7 @@ fn a_root_of_a_content_view_and_a_diffView_buffer_switches_to_the_content_view (
   let env : SkgEnv =
     skg_env_from_parts (config, tantivy, &graph_handle_from_config (config) ?);
   let mut views_state : ViewsState =
-    ViewsState { open_views     : OpenViews::new (),
-                 graph_straddle : None, };
+    empty_views_state ();
   register_view_of_1 (
     config, &env, &mut views_state, "diff-view-of-1",
     Some (DiffViewBufferKind::AllChanges) ) ?;

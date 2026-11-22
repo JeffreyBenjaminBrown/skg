@@ -14,11 +14,10 @@ use skg::graph_straddle::build::current_graph_straddle_in_slot;
 use skg::graph_straddle::types::{GraphStraddle, Partner};
 use skg::serve::ViewsState;
 use skg::serve::handlers::rebuild_session_lifetime_stores::rebuild_session_lifetime_stores_in_place;
-use skg::test_utils::{copy_dir_all, graph_handle_from_config, skg_env_from_parts};
+use skg::test_utils::{empty_views_state, copy_dir_all, graph_handle_from_config, skg_env_from_parts};
 use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
-use skg::types::views_state::OpenViews;
 use skg::types::viewnode::Existence;
 
 use git2::Repository;
@@ -229,9 +228,7 @@ fn a_rebuild_drops_the_straddle_and_the_next_reads_foreign_files_afresh (
     create_empty_tantivy_index (&config . tantivy_folder) ?;
   let mut env : SkgEnv = skg_env_from_parts (
     &config, &tantivy, &graph_handle_from_config (&config) ? );
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None, };
+  let mut views_state : ViewsState = empty_views_state ();
   let built : Arc<GraphStraddle> = current_graph_straddle_in_slot (
     &mut views_state . graph_straddle, &config,
     env . runtime_snapshot () . graph . clone () ) ?;

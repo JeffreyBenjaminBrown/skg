@@ -17,10 +17,11 @@ use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle};
 use skg::test_utils::{
+  empty_views_state,
   run_with_test_stores, graph_handle_from_config};
 use skg::test_utils::single_root_view;
 use skg::serve::ViewsState;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 use skg::types::misc::ID;
 
 #[test]
@@ -33,9 +34,7 @@ fn collateral_editable_forker_forksFolder_refreshes
     |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views        : OpenViews::new (),
-        graph_straddle    : None, };
+      let mut views_state : ViewsState = empty_views_state ();
       let a_viewforest_id : ViewforestId = ViewforestId::ContentView ("S-a" . into ());
       let b_viewforest_id : ViewforestId = ViewforestId::ContentView ("S-b" . into ());
 

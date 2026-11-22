@@ -19,6 +19,7 @@ use skg::serve::handlers::save_buffer::{
 use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
+  empty_views_state,
   cleanup_test_tantivy, copy_dir_all, extract_string_field_from_sexp,
   graph_handle_from_config, read_all_lp_messages, skg_env_from_parts,
   update_from_and_rerender_buffer_test};
@@ -27,7 +28,7 @@ use skg::types::env::SkgEnv;
 use skg::types::config::{SkgConfig, Skgrepo};
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
 use skg::types::viewnode::Viewnode;
-use skg::types::views_state::{OpenViews, Perspective, ViewforestId};
+use skg::types::views_state::{Perspective, ViewforestId};
 
 use ego_tree::Tree;
 use futures::executor::block_on;
@@ -105,9 +106,7 @@ pub fn git_fixture (
     skgrepos : owned_skgrepos . iter ()
       . map ( |(name, _)| name . to_string () ) . collect (),
     config, tantivy, graph,
-    views_state : ViewsState {
-      open_views     : OpenViews::new (),
-      graph_straddle : None, } } ) }
+    views_state : empty_views_state () } ) }
 
 /// Run 'body' on the 'git_fixture', then remove its search index.
 pub fn with_git_fixture (

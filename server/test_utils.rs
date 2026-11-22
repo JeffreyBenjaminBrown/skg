@@ -438,6 +438,13 @@ pub fn graph_from_config (
   graph . record_illegal_edits (&violations);
   Ok (graph) }
 
+/// The views state of a connection that has opened no view and drawn
+/// no diff view.
+pub fn empty_views_state () -> ViewsState {
+  ViewsState {
+    open_views     : OpenViews::new (),
+    graph_straddle : None, }}
+
 /// Bundle a test's existing handles into a 'SkgEnv'.
 pub fn skg_env_from_parts (
   config        : &SkgConfig,
@@ -484,10 +491,7 @@ pub async fn save_and_rerender (
 ) -> Result<String, Box<dyn Error>> {
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views        : OpenViews::new (),
-    graph_straddle    : None,
-  };
+  let mut views_state : ViewsState = empty_views_state ();
   let listener : TcpListener =
     TcpListener::bind ("127.0.0.1:0") . unwrap ();
   let mut stream : TcpStream =

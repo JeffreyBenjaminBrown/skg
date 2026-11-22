@@ -14,6 +14,7 @@ use crate::view_and_save_helpers::node_from_disk;
 use indoc::indoc;
 use skg::assert_metadata_eq;
 use skg::test_utils::{
+  empty_views_state,
   extract_string_field_from_sexp,
   graph_handle_from_config,
   read_all_lp_messages,
@@ -26,7 +27,7 @@ use skg::types::misc::{ID, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 
 use skg::serve::ViewsState;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle,
   };
@@ -339,9 +340,7 @@ async fn test_deleting_foreign_forkee_content_preserves_branch_edit (
     let graph : InRustGraphHandle =
       (
         graph_handle_from_config (config) ?);
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -370,9 +369,7 @@ async fn test_deleting_foreign_forkee_content_infers_hide (
     let graph : InRustGraphHandle =
       (
         graph_handle_from_config (config) ?);
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -416,9 +413,7 @@ async fn test_removing_forkee_content_from_forker_contains_infers_hide (
     let graph : InRustGraphHandle =
       (
         graph_handle_from_config (config) ?);
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
     let buffer : &str = indoc! {"
       * (skg node (gnid f) (skgRepos (nodeRepo owned))) f
       "};
@@ -448,9 +443,7 @@ async fn test_readding_forkee_content_to_forker_contains_unhides (
     let graph : InRustGraphHandle =
       (
         graph_handle_from_config (config) ?);
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
     let buffer : &str = indoc! {"
       * (skg node (gnid g) (skgRepos (nodeRepo owned))) g
       ** (skg node (gnid c) (skgRepos (nodeRepo foreign)) writeProtected) c
@@ -486,9 +479,7 @@ async fn test_placing_and_removing_a_fork_of_forkee_content_hides_what_it_forks 
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
       graph_handle_from_config (config) ?;
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
     let placed : &str = indoc! {"
       * (skg node (gnid f) (skgRepos (nodeRepo owned))) f
       ** (skg node (gnid r) (skgRepos (nodeRepo foreign)) writeProtected) r
@@ -523,9 +514,7 @@ async fn test_removing_a_fork_of_forkee_content_hides_what_it_forks (
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
       graph_handle_from_config (config) ?;
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
     let buffer : &str = indoc! {"
       * (skg node (gnid g) (skgRepos (nodeRepo owned))) g
       "};
@@ -569,9 +558,7 @@ async fn test_a_preview_and_a_save_say_what_they_hide (
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
       graph_handle_from_config (config) ?;
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
     let removed : &str = indoc! {"
       * (skg node (gnid g) (skgRepos (nodeRepo owned))) g
       "};
@@ -618,9 +605,7 @@ async fn test_a_save_says_why_a_removal_hides_nothing (
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
       graph_handle_from_config (config) ?;
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
     let placed : &str = indoc! {"
       * (skg node (gnid f) (skgRepos (nodeRepo owned))) f
       ** (skg node (gnid y) (skgRepos (nodeRepo foreign)) writeProtected) y
@@ -657,9 +642,7 @@ async fn test_placing_a_fork_of_a_hidden_node_keeps_its_hide (
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
       graph_handle_from_config (config) ?;
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
     let buffer : &str = indoc! {"
       * (skg node (gnid h) (skgRepos (nodeRepo owned))) h
       ** (skg node (gnid r) (skgRepos (nodeRepo foreign)) writeProtected) r
@@ -686,9 +669,7 @@ async fn test_replacing_a_fork_with_its_original_hides_nothing (
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
       graph_handle_from_config (config) ?;
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
     let buffer : &str = indoc! {"
       * (skg node (gnid g) (skgRepos (nodeRepo owned))) g
       ** (skg node (gnid m) (skgRepos (nodeRepo owned))) m
@@ -712,9 +693,7 @@ async fn test_collateral_view_reflects_newly_hidden_forkee_content (
     let graph : InRustGraphHandle =
       (
         graph_handle_from_config (config) ?);
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
     let saved_viewforest_id : ViewforestId =
       ViewforestId::ContentView (
         "collateral-hide-saved" . to_string());
@@ -784,9 +763,7 @@ async fn test_moving_foreign_forkee_content_to_forker_does_not_hide (
     let graph : InRustGraphHandle =
       (
         graph_handle_from_config (config) ?);
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -831,9 +808,7 @@ async fn test_moving_foreign_forkee_content_into_another_owned_note_does_not_hid
     let graph : InRustGraphHandle =
       (
         graph_handle_from_config (config) ?);
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -878,9 +853,7 @@ async fn test_a_node_placed_under_a_foreign_forkee_is_refused (
     let graph : InRustGraphHandle =
       (
         graph_handle_from_config (config) ?);
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -925,9 +898,7 @@ async fn test_a_node_placed_under_an_owned_forkee_joins_it (
     let graph : InRustGraphHandle =
       (
         graph_handle_from_config (config) ?);
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
     let edited : String =
       indoc! {"
               * (skg node (gnid a) (skgRepos (nodeRepo owned))) a
@@ -1014,9 +985,7 @@ async fn test_forkee_and_compound_partner_folders (
       let graph : InRustGraphHandle =
         (
           graph_handle_from_config (config) ?);
-      let mut views_state : ViewsState = ViewsState {
-        open_views            : OpenViews::new (),
-        graph_straddle        : None,};
+      let mut views_state : ViewsState = empty_views_state ();
       let (mut stream, _read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer (
@@ -1078,9 +1047,7 @@ async fn test_hidden_within_but_none_without (
       let graph : InRustGraphHandle =
         (
           graph_handle_from_config (config) ?);
-      let mut views_state : ViewsState = ViewsState {
-        open_views            : OpenViews::new (),
-        graph_straddle        : None,};
+      let mut views_state : ViewsState = empty_views_state ();
       let (mut stream, _read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer (
@@ -1107,9 +1074,7 @@ async fn test_moving_hidden_forkee_content_to_visible_branch_infers_unhide (
     let graph : InRustGraphHandle =
       (
         graph_handle_from_config (config) ?);
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -1156,9 +1121,7 @@ async fn test_collateral_view_reflects_newly_unhidden_forkee_content (
     let graph : InRustGraphHandle =
       (
         graph_handle_from_config (config) ?);
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
     let saved_viewforest_id : ViewforestId =
       ViewforestId::ContentView (
         "collateral-unhide-saved" . to_string());
@@ -1225,9 +1188,7 @@ async fn test_deleting_from_hiddenin_folder_does_not_unhide (
     let graph : InRustGraphHandle =
       (
         graph_handle_from_config (config) ?);
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -1301,9 +1262,7 @@ async fn test_hidden_without_but_none_within (
       let graph : InRustGraphHandle =
         (
           graph_handle_from_config (config) ?);
-      let mut views_state : ViewsState = ViewsState {
-        open_views            : OpenViews::new (),
-        graph_straddle        : None,};
+      let mut views_state : ViewsState = empty_views_state ();
       let (mut stream, _read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer (
@@ -1326,9 +1285,7 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
     let graph : InRustGraphHandle =
       (
         graph_handle_from_config (config) ?);
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None,};
+    let mut views_state : ViewsState = empty_views_state ();
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
@@ -1438,9 +1395,7 @@ async fn test_overlapping_hidden_within (
       let graph : InRustGraphHandle =
         (
           graph_handle_from_config (config) ?);
-      let mut views_state : ViewsState = ViewsState {
-        open_views            : OpenViews::new (),
-        graph_straddle        : None,};
+      let mut views_state : ViewsState = empty_views_state ();
       let (mut stream, _read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer (

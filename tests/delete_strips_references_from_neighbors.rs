@@ -33,7 +33,7 @@ use skg::dbs::filesystem::one_node::{
   graphnode_from_pid_and_skgrepo as load_nc};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::save::update_graph_minus_nodeMerges;
-use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config,
+use skg::test_utils::{empty_views_state, run_with_shared_test_stores, graph_handle_from_config,
                       read_lp_message, extract_string_field_from_sexp,
                       skg_env_from_parts};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
@@ -43,7 +43,7 @@ use skg::serve::handlers::delete_references_to_absent_node::
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::single_root_view;
 use skg::types::env::SkgEnv;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex, SkgrepoName, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
@@ -99,9 +99,7 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
   let mut env : SkgEnv = skg_env_from_parts (
     config, tantivy, &graph );
   let restriction     : SkgrepoRestriction = SkgrepoRestriction::default_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   for (viewforest_id, root) in [("affected", "owner"),
                       ("clean-unrelated", "unrelated"),
                       ("dirty-unrelated", "unrelated-dirty")] {
@@ -217,10 +215,7 @@ async fn delete_preserves_foreign_referencer (
     config, &foreign, ID::from ("cheese") ) ?;
   let foreign_before : Vec<u8> = fs::read (&foreign_path) ?;
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views        : OpenViews::new (),
-    graph_straddle    : None,
-  };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let input_org_text : &str = indoc! {"
@@ -261,9 +256,7 @@ async fn delete_in_foreign_forkee_rerenders_as_unknown (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
@@ -295,9 +288,7 @@ async fn delete_in_foreign_hiddenoutside_rerenders_as_unknown (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
@@ -338,10 +329,7 @@ async fn delete_strips_references_impl (
 
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-        open_views            : OpenViews::new (),
-        graph_straddle        : None,
-        };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let _response = update_from_and_rerender_buffer (
@@ -488,10 +476,7 @@ async fn strip_pass_handles_extra_ids_impl (
   "};
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-        open_views            : OpenViews::new (),
-        graph_straddle        : None,
-        };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let _response = update_from_and_rerender_buffer (

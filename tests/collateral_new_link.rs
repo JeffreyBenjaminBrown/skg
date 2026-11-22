@@ -12,9 +12,10 @@ use crate::git_fixture_helpers::save_and_read_collateral;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::serve::ViewsState;
 use skg::test_utils::{
+  empty_views_state,
   graph_handle_from_config, run_with_test_stores, single_root_view};
 use skg::types::misc::ID;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 
 /// A clean view of A shows A's mentionerFolder, holding M. A save of
 /// X's view whose only change is a link to A redraws A's view
@@ -29,9 +30,7 @@ fn a_clean_view_of_a_graphnode_is_redrawn_when_another_gains_a_link_to_it
     |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views        : OpenViews::new (),
-        graph_straddle    : None, };
+      let mut views_state : ViewsState = empty_views_state ();
       let a_viewforest_id : ViewforestId =
         ViewforestId::ContentView ("new-link-A" . into ());
       let x_viewforest_id : ViewforestId =

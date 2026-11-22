@@ -15,14 +15,14 @@ use skg::dbs::node_lookup::graphnode_by_gnid;
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::test_utils::{graph_handle_from_config, single_root_view};
+use skg::test_utils::{empty_views_state, graph_handle_from_config, single_root_view};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::types::errors::SaveError;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::errors::format_save_error_as_org;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 
 /// Save 'buf' as a view of 'root'.
 pub async fn save (
@@ -32,9 +32,7 @@ pub async fn save (
   tantivy : &mut TantivyIndex,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None, };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   update_from_and_rerender_buffer (

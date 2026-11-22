@@ -30,12 +30,12 @@ use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
+use skg::test_utils::{empty_views_state, graph_handle_from_config, run_with_shared_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::types::errors::SaveError;
 use skg::types::config::SkgConfig;
 use skg::types::misc::TantivyIndex;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 
 const FIXTURES : &str = "tests/forks_folder/fixtures";
 
@@ -270,9 +270,7 @@ async fn a_relRepo_request_on_a_forker_is_refused (
   let requested : String = view . replace (
     f, &f . replacen (" noClaim", " noClaim (editRequest (relRepo main))", 1) );
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None, };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let refusal : String = match update_from_and_rerender_buffer (

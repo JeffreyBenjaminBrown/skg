@@ -29,6 +29,7 @@ use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
+  empty_views_state,
   extract_string_field_from_sexp, graph_handle_from_config,
   read_all_lp_messages, run_with_shared_test_stores, skg_env_from_parts};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
@@ -37,7 +38,7 @@ use skg::types::env::SkgEnv;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
 use skg::types::viewnode::Viewnode;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 
 #[test]
 fn all_tests
@@ -69,10 +70,6 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-fn empty_views_state () -> ViewsState {
-  ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None, }}
 
 /// Save 'buffer' as the view 'viewforest_id'; return the saved view and the
 /// contents of the collateral views the save sent. Panics on a refusal.

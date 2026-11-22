@@ -24,13 +24,14 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::receipt::handle_receipt_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
+  empty_views_state,
   graph_handle_from_config, read_lp_message, run_with_shared_test_stores,
   single_root_view, skg_env_from_parts};
 use skg::types::env::SkgEnv;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 
 #[test]
 fn all_tests
@@ -72,8 +73,7 @@ fn session (
 ) -> Result<Session, Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let restriction : SkgrepoRestriction = SkgrepoRestriction::default_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views : OpenViews::new (), graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   for (viewforest_id, root) in views {
     let (_text, pids, tree) = single_root_view (config, Some (tantivy), &ID::from (*root)) ?;
     views_state . open_views . register_view (

@@ -13,6 +13,7 @@ use skg::dbs::in_rust_graph::{
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
+  empty_views_state,
   cleanup_test_tantivy,
   copy_dir_all,
   extract_string_field_from_sexp,
@@ -22,7 +23,7 @@ use skg::test_utils::multi_root_view;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
 use skg::types::nodes::complete::Graphnode;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
@@ -68,9 +69,7 @@ fn test_skgrepo_move_updates_collateral_view_metadata (
         "initial view should show b in public:\n{}",
         initial_buffer );
 
-      let mut views_state : ViewsState = ViewsState {
-        open_views        : OpenViews::new (),
-        graph_straddle    : None, };
+      let mut views_state : ViewsState = empty_views_state ();
       let viewforest_id_1 : ViewforestId =
         ViewforestId::ContentView ( "repo-move-buffer-1" . to_string() );
       let viewforest_id_2 : ViewforestId =
@@ -157,9 +156,7 @@ fn successful_save_consumes_relRepo_edit_request (
     assert_ne! (save_input, initial_buffer,
       "fixture rendering should expose b's unrestricted-node metadata");
 
-    let mut views_state : ViewsState = ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None, };
+    let mut views_state : ViewsState = empty_views_state ();
     let (mut stream, _read_end) = mk_test_tcp_stream_pair ();
     let response : SaveResponse = update_from_and_rerender_buffer (
       &mut stream, &save_input, &config, &tantivy, &graph,

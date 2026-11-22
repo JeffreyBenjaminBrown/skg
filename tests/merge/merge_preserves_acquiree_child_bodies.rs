@@ -9,13 +9,13 @@ use skg::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::serve::ViewsState;
 use skg::test_utils::{
+  empty_views_state,
   audit_inrustgraph_or_panic, graph_handle_from_config, run_with_test_stores,
 };
 use skg::test_utils::update_from_and_rerender_buffer_test
   as update_from_and_rerender_buffer;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
-use skg::types::views_state::OpenViews;
 
 
 #[test]
@@ -51,10 +51,7 @@ async fn merge_preserves_acquiree_child_bodies_impl (
 
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views        : OpenViews::new (),
-    graph_straddle    : None,
-  };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (

@@ -16,11 +16,11 @@ use std::error::Error;
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 
-use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
+use skg::test_utils::{empty_views_state, run_with_shared_test_stores, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::test_utils::multi_root_view;
 use skg::serve::ViewsState;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -61,9 +61,6 @@ async fn save_buffer (
     &Ok ( ViewforestId::ContentView ("view of n" . to_string ()) ),
     views_state ) . await }
 
-fn fresh_views_state () -> ViewsState {
-  ViewsState { open_views     : OpenViews::new (),
-               graph_straddle : None } }
 
 fn line_containing<'a> (
   buf      : &'a str,
@@ -89,7 +86,7 @@ async fn write_protected_folder_repairs_warn_impl (
   let folder_request : String = initial_buffer . replacen (
     "node ",
     "node (viewRequests (folder hides))", 1 );
-  let mut views_state : ViewsState = fresh_views_state ();
+  let mut views_state : ViewsState = empty_views_state ();
   let complete_buffer : String =
     save_buffer (&folder_request, config, tantivy, &graph, &mut views_state)
     . await ? . saved_view;
@@ -176,7 +173,7 @@ async fn failed_save_carries_warnings_with_errors (
 ";
       let result : Result<SaveResponse, Box<dyn Error>> =
         save_buffer (buffer, config, tantivy, &graph,
-                     &mut fresh_views_state ()) . await;
+                     &mut empty_views_state ()) . await;
       let err : Box<dyn Error> = match result {
         Ok (_)  => panic! ("save should fail (idFolder edited)"),
         Err (e) => e, };

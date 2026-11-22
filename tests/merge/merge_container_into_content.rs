@@ -19,10 +19,9 @@ use std::net::TcpStream;
 use std::path::Path;
 
 use skg::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
-use skg::test_utils::{run_with_test_stores, graph_handle_from_config, audit_inrustgraph_or_panic};
+use skg::test_utils::{empty_views_state, run_with_test_stores, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
-use skg::types::views_state::OpenViews;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::types::config::SkgConfig;
@@ -57,10 +56,7 @@ async fn merge_container_into_content_impl (
 
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-        open_views            : OpenViews::new (),
-        graph_straddle        : None,
-        };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (

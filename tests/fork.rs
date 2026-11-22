@@ -27,7 +27,7 @@ use skg::from_text::buffer_to_validated_saveplan_with_fork_skgrepos;
 use skg::org_to_text::viewforest_to_string;
 use skg::serve::ViewsState;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
+use skg::test_utils::{empty_views_state, graph_handle_from_config, run_with_shared_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_approval_test;
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_skgrepos_test;
@@ -37,7 +37,7 @@ use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, ForkSpec, SaveNode};
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 
 /// A foreign node N (title "N-original", contains [N1, N2]) lives under
 /// an owned container P. The buffer makes N editable and edits its
@@ -330,9 +330,7 @@ async fn a_reply_under_an_unread_message_integrates_it (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let view_id : ViewforestId = ViewforestId::ContentView ("content-view:f" . to_string ());
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let unread_shown : String = reader_view_with_unread_list (
     config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
   let replied : String = with_child_typed_under (&unread_shown, "m1", "my reply");
@@ -402,9 +400,7 @@ async fn a_reply_under_ones_own_unfiled_fork_files_the_original (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let view_id : ViewforestId = ViewforestId::ContentView ("content-view:f" . to_string ());
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let unread_shown : String = reader_view_with_unread_list (
     config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
   let replied : String = with_child_typed_under (&unread_shown, "m2r", "a later reply");
@@ -438,9 +434,7 @@ async fn a_headline_typed_under_the_foreign_forkee_itself_is_refused (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let view_id : ViewforestId = ViewforestId::ContentView ("content-view:f" . to_string ());
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let unread_shown : String = reader_view_with_unread_list (
     config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
   let typed : String = with_child_typed_under (
@@ -472,9 +466,7 @@ async fn a_reply_deeper_in_an_unread_message_integrates_the_message (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let view_id : ViewforestId = ViewforestId::ContentView ("content-view:f" . to_string ());
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let unread_shown : String = reader_view_with_unread_list (
     config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
   let replied : String = with_child_typed_under (&unread_shown, "q1", "my answer");
@@ -515,9 +507,7 @@ async fn a_third_partys_reply_in_anothers_unread_list_warns (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let view_id : ViewforestId = ViewforestId::ContentView ("content-view:f" . to_string ());
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let unread_shown : String = reader_view_with_unread_list (
     config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
   let replied : String = with_child_typed_under (&unread_shown, "m1", "a third party's reply");
@@ -595,9 +585,7 @@ async fn explicit_fork_round_trip_and_refork_refusal (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
@@ -684,9 +672,7 @@ async fn fork_no_owned_ancestor_defaults (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
@@ -719,9 +705,7 @@ async fn fork_user_set_skgrepo_wins (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let fork_skgrepos : HashMap<ID, SkgrepoName> =
     HashMap::from ([ ( ID::from ("N"), SkgrepoName::from ("owned2") ) ]);
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
@@ -825,9 +809,7 @@ async fn fork_confirmation_gates_skgsave_commit (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
 
   // Unapproved save -> fork-confirmation, nothing skgsave-committed.
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
@@ -926,9 +908,7 @@ async fn fork_from_bare_new_child_skgsave_commits (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
@@ -981,9 +961,7 @@ async fn forking_a_note_one_already_forks_is_refused (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   update_from_and_rerender_buffer (
@@ -1079,9 +1057,7 @@ async fn fork_fixture_files (
   // The save and its coherence check share this fixture-local handle.
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
@@ -1119,9 +1095,7 @@ async fn fork_round_trip (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
     ( graph_handle_from_config (config) ? );
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   update_from_and_rerender_buffer (
@@ -1166,9 +1140,7 @@ async fn fork_collateral_rerender_substitutes_too (
   let saved_viewforest_id : ViewforestId = ViewforestId::ContentView ("saved-P" . to_string ());
   let collateral_viewforest_id : ViewforestId = ViewforestId::SearchView (
     "P before fork" . to_string ());
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let graph_snap = graph . load_full ();
   views_state . open_views . register_view (
     &graph_snap, saved_viewforest_id . clone (), p_view . clone (), &pids, &SkgrepoRestriction::unrestricted (config) );

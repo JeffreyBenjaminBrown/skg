@@ -14,11 +14,10 @@ use std::net::TcpStream;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
+use skg::test_utils::{empty_views_state, run_with_shared_test_stores, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::types::config::SkgConfig;
 use skg::types::misc::TantivyIndex;
-use skg::types::views_state::OpenViews;
 
 #[test]
 fn all_tests
@@ -56,9 +55,7 @@ async fn a_noClaim_child_under_an_id_folder_survives_the_rerender (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None };
+  let mut views_state : ViewsState = empty_views_state ();
   let buffer : &str = "\
 * (skg node (gnid n) (skgRepos (nodeRepo main))) n
 ** (skg idFolder)

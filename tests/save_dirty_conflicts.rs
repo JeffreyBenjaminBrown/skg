@@ -10,6 +10,7 @@ use skg::dbs::node_lookup::graphnode_from_graph;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::ClientViewSnapshot;
 use skg::test_utils::{
+  empty_views_state,
   extract_string_field_from_sexp, graph_handle_from_config,
   read_all_lp_messages, run_with_test_stores,
   update_from_and_rerender_buffer_with_snapshots_test,
@@ -19,7 +20,7 @@ use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
 use skg::types::errors::SaveError;
 use skg::types::errors::format_save_error_as_org;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 
 fn dirty_buffer_snapshot (
   viewforest_id : &str,
@@ -49,10 +50,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
     "/tmp/tantivy-test-save-dirty-conflicts",
     |config, tantivy| Box::pin (async move {
       let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views        : OpenViews::new (),
-        graph_straddle    : None,
-      };
+      let mut views_state : ViewsState = empty_views_state ();
       let saved_viewforest_id : ViewforestId = ViewforestId::ContentView ("saved-a" . into ());
       let (a_view, _, _) = single_root_view (
         config, Some (tantivy), &ID::from ("A")) ?;
@@ -144,10 +142,7 @@ fn missing_or_unparseable_dirty_baseline_refuses () -> Result<(), Box<dyn Error>
         dirty_buffer_snapshot (
           "malformed-baseline", Some ("** starts too deep"), "* new node"),
       ] {
-        let mut views_state : ViewsState = ViewsState {
-          open_views        : OpenViews::new (),
-          graph_straddle    : None,
-        };
+        let mut views_state : ViewsState = empty_views_state ();
         let (mut stream, _) = mk_test_tcp_stream_pair ();
         let result = update_from_and_rerender_buffer_with_snapshots_test (
           &mut stream, &a_view, config, tantivy, &graph,
@@ -177,10 +172,7 @@ async fn save_beside_one_dirty_view (
   dirty_baseline : &str,
   dirty_current  : &str,
 ) -> Result<(), Box<dyn Error>> {
-  let mut views_state : ViewsState = ViewsState {
-    open_views        : OpenViews::new (),
-    graph_straddle    : None,
-  };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _) = mk_test_tcp_stream_pair ();
   update_from_and_rerender_buffer_with_snapshots_test (
     &mut stream, saved_text, config, tantivy, graph,
@@ -416,10 +408,7 @@ fn a_dirty_view_of_a_linker_is_not_redrawn_by_a_save_of_its_link_target
     "/tmp/tantivy-test-save-dirty-linker-not-redrawn",
     |config, tantivy| Box::pin (async move {
       let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views        : OpenViews::new (),
-        graph_straddle    : None,
-      };
+      let mut views_state : ViewsState = empty_views_state ();
       let (l_view, l_pids, l_forest) = single_root_view (
         config, Some (tantivy), &ID::from ("L")) ?;
       for viewforest_id in ["clean-l", "dirty-l"] {

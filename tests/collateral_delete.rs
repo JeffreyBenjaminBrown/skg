@@ -19,6 +19,7 @@ use skg::dbs::in_rust_graph::{
   InRustGraphHandle};
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::test_utils::{
+  empty_views_state,
   run_with_test_stores, graph_handle_from_config,
   read_all_lp_messages};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
@@ -26,7 +27,7 @@ use skg::test_utils::{
   multi_root_view, single_root_view};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 use skg::types::misc::ID;
 use skg::types::viewnode::Viewnode;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
@@ -43,9 +44,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
     |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views        : OpenViews::new (),
-        graph_straddle    : None, };
+      let mut views_state : ViewsState = empty_views_state ();
       let p_viewforest_id : ViewforestId = ViewforestId::ContentView ("collat-del-P" . into ());
       let l_viewforest_id : ViewforestId = ViewforestId::ContentView ("collat-del-L" . into ());
 
@@ -140,9 +139,7 @@ fn a_deleted_root_vanishes_and_a_buffer_may_end_with_no_roots
     |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views        : OpenViews::new (),
-        graph_straddle    : None, };
+      let mut views_state : ViewsState = empty_views_state ();
       let both_viewforest_id : ViewforestId =
         ViewforestId::ContentView ("collat-del-root-both" . into ());
       let l_viewforest_id : ViewforestId =

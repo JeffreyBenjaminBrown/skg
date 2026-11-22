@@ -16,16 +16,14 @@ use skg::graph_straddle::types::GraphStraddle;
 use skg::git_ops::stage_and_commit::{
   ChangedSkgPath, PreparedCommits, changed_skg_paths_by_stem, commit_prepared,
   prepare_commits};
-use skg::serve::ViewsState;
 use skg::serve::handlers::stage_and_commit::{
   CommitReport, CommitScope, StageAndCommitAnswer, commit_nodes,
   stage_and_commit, stage_and_commit_response_sexp};
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::{cleanup_test_tantivy, graph_handle_from_config, skg_env_from_parts};
+use skg::test_utils::{empty_views_state, cleanup_test_tantivy, graph_handle_from_config, skg_env_from_parts};
 use skg::types::env::SkgEnv;
 use skg::types::config::{SkgConfig, Skgrepo};
 use skg::types::misc::{ID, SkgrepoName};
-use skg::types::views_state::OpenViews;
 
 use git2::{Index, IndexAddOption, ObjectType, Repository, Signature, Status, StatusOptions, Tree, TreeWalkMode, TreeWalkResult};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -91,7 +89,7 @@ fn scratch (
     skgrepos : skgrepos . iter () . filter ( |(name, _)| *name != "theirs" )
       . map ( |(name, _)| name . to_string () ) . collect (),
     config, tantivy, graph,
-    views_state : ViewsState { open_views : OpenViews::new (), graph_straddle : None } } ) }
+    views_state : empty_views_state () } ) }
 
 /// Run 'body' on the 'scratch' fixture, then remove its search index.
 fn with_scratch (

@@ -6,7 +6,7 @@ use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted
   ::org_to_viewforest;
-use skg::test_utils::{graph_handle_from_config, run_with_test_stores};
+use skg::test_utils::{empty_views_state, graph_handle_from_config, run_with_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test
   as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
@@ -15,7 +15,7 @@ use skg::types::config::SkgConfig;
 use skg::types::misc::{members_of, ID, TantivyIndex};
 use skg::types::nodes::complete::{
   Graphnode, Flag, flag_is_true};
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 
 use std::error::Error;
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
@@ -30,9 +30,7 @@ fn deleting_the_flags_folder_is_accepted_and_inert (
     "/tmp/tantivy-test-flags-folder-deletion",
     |config, tantivy| Box::pin (async move {
       let graph : InRustGraphHandle = graph_handle_from_config (config)?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views        : OpenViews::new (),
-        graph_straddle    : None, };
+      let mut views_state : ViewsState = empty_views_state ();
       let (mut stream, _read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       let viewforest_id : Result<ViewforestId, String> = Ok (
@@ -91,9 +89,7 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config)?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views        : OpenViews::new (),
-    graph_straddle    : None, };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let viewforest_id : Result<ViewforestId, String> = Ok (

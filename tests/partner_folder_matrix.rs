@@ -33,10 +33,11 @@ use skg::types::misc::SkgrepoName;
 use skg::test_utils::graph_handle_from_config;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::test_utils::{
+  empty_views_state,
   multi_root_view, multi_root_view_with_skgrepo_set};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, MSV, TantivyIndex, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
@@ -119,9 +120,7 @@ async fn save (
   tantivy : &mut TantivyIndex,
   graph   : &InRustGraphHandle,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let mut views_state : ViewsState = ViewsState {
-    open_views        : OpenViews::new (),
-    graph_straddle    : None, };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   update_from_and_rerender_buffer (

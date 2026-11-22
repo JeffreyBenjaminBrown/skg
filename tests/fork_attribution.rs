@@ -18,15 +18,13 @@ use std::collections::HashMap;
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::serve::ViewsState;
-use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores, single_root_view};
+use skg::test_utils::{empty_views_state, graph_handle_from_config, run_with_shared_test_stores, single_root_view};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_skgrepos_test;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
 use skg::types::nodes::attribution::Attribution;
 use skg::types::nodes::complete::Graphnode;
-use skg::types::views_state::OpenViews;
 
 /// The foreign N, made editable under the owned P, retitled: saving
 /// forks it into P's skgrepo, 'owned'.
@@ -58,8 +56,6 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-fn fresh_views_state () -> ViewsState {
-  ViewsState { open_views : OpenViews::new (), graph_straddle : None } }
 
 /// The owned note that forks 'original', as on disk.
 fn fork_of (
@@ -81,7 +77,7 @@ async fn fork_n (
   let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer_with_fork_skgrepos_test (
     &mut stream, FORK_BUFFER, config, tantivy, graph,
-    &Err ( String::new () ), &mut fresh_views_state (),
+    &Err ( String::new () ), &mut empty_views_state (),
     /* approved_forks = */ true, &HashMap::new () ) . await ?;
   assert! ( response . errors . is_empty (), "the fork must save: {:?}", response . errors );
   fork_of (config, "N") }
@@ -130,7 +126,7 @@ async fn a_fork_of_a_fork_records_the_note_it_forked (
   let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer_with_fork_skgrepos_test (
     &mut stream, &explicit_fork, config, tantivy, &graph,
-    &Err ( String::new () ), &mut fresh_views_state (), true,
+    &Err ( String::new () ), &mut empty_views_state (), true,
     &HashMap::from ([ ( clone . pid . clone (), SkgrepoName::from ("owned2") ) ]) ) . await ?;
   assert! ( response . errors . is_empty (), "the second fork must save: {:?}", response . errors );
   let second : Graphnode = fork_of (config, &clone . pid . 0) ?;
@@ -159,7 +155,7 @@ async fn a_plain_child_of_an_attributed_fork_says_its_home (
   let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
     &mut stream, &buffer, config, tantivy, &graph,
-    &Err ( String::new () ), &mut fresh_views_state () ) . await ?;
+    &Err ( String::new () ), &mut empty_views_state () ) . await ?;
   assert! ( response . errors . is_empty (), "the child must save: {:?}", response . errors );
   let child_line : &str = response . saved_view . lines ()
     . find ( |line| line . ends_with (" plain child") )
@@ -188,7 +184,7 @@ async fn stripping_an_attribution_removes_it_and_its_herald (
   let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
     &mut stream, &buffer, config, tantivy, &graph,
-    &Err ( String::new () ), &mut fresh_views_state () ) . await ?;
+    &Err ( String::new () ), &mut empty_views_state () ) . await ?;
   assert! ( response . errors . is_empty (), "the strip must save: {:?}", response . errors );
   let after : Graphnode = fork_of (config, "N") ?;
   assert_eq! ( after . attribution, None );

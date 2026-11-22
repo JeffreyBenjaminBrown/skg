@@ -22,13 +22,14 @@ use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 
 use skg::test_utils::{
+  empty_views_state,
   extract_string_field_from_sexp, graph_handle_from_config,
   read_all_lp_messages, run_with_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::test_utils::{multi_root_view, single_root_view};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
 
@@ -161,9 +162,7 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views     : OpenViews::new (),
-    graph_straddle : None, };
+  let mut views_state : ViewsState = empty_views_state ();
   let n_viewforest_id : ViewforestId = ViewforestId::ContentView ("order-n" . into ());
   let u_viewforest_id : ViewforestId = ViewforestId::ContentView ("order-u" . into ());
   let (n_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("n")) ?;

@@ -19,13 +19,13 @@ use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::net::TcpStream;
 
 use skg::assert_metadata_eq;
+use skg::test_utils::empty_views_state;
 use skg::test_utils::single_root_view;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
-use skg::types::views_state::OpenViews;
 use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 
 #[test]
@@ -89,10 +89,7 @@ async fn buffer_with_unknownnode_child_saves_cleanly_impl (
   "};
   let graph : InRustGraphHandle =
     new_handle (InRustGraph::new ());
-  let mut views_state : ViewsState = ViewsState {
-        open_views            : OpenViews::new (),
-        graph_straddle        : None,
-        };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (

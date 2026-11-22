@@ -16,6 +16,7 @@ use skg::sexp_string::quote_sexp_string;
 use skg::serve::handlers::text_search::TitleOrAlias;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
+  empty_views_state,
   run_with_skgrepo_set_test_db, search_gnids_for_skgrepo_set_for_test,
   titles_for_skgrepo_set_for_test};
 use skg::dbs::node_lookup::graphnode_from_graph;
@@ -39,7 +40,7 @@ use skg::types::save::{NodeInstruction, SaveNode};
 use skg::types::viewnode::{
   Viewnode,
   viewforest_root_viewnode};
-use skg::types::views_state::{OpenViews, Perspective, ViewState, ViewforestId, ViewnodeIdRecord};
+use skg::types::views_state::{Perspective, ViewState, ViewforestId, ViewnodeIdRecord};
 
 use std::collections::{BTreeSet, HashSet};
 use std::error::Error;
@@ -145,9 +146,7 @@ fn mirror_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
       let mut restriction : SkgrepoRestriction =
         SkgrepoRestriction::unrestricted (config);
       let mut views_state : ViewsState =
-        ViewsState { 
-                     open_views        : OpenViews::new (),
-                     graph_straddle    : None };
+        empty_views_state ();
       let viewforest_id : ViewforestId =
         ViewforestId::SearchView ("ovr-sub" . to_string ());
       views_state . open_views . views . insert (
@@ -387,9 +386,7 @@ async fn skgrepo_set_switch_rerenders_views (
           config,
           SkgrepoName::from ("public"))?;
       let mut views_state : ViewsState =
-        ViewsState {
-          open_views        : OpenViews::new (),
-          graph_straddle    : None, };
+        empty_views_state ();
       let viewforest_id : ViewforestId =
         ViewforestId::SearchView ("shared ranking term" . to_string ());
       views_state . open_views . views . insert (
@@ -443,8 +440,7 @@ fn a_save_of_a_view_rendered_under_another_restriction_is_refused (
     SkgrepoRestriction::named (config, SkgrepoName::from ("public")) ?;
   let mut restriction : SkgrepoRestriction = public . clone ();
   let mut views_state : ViewsState =
-    ViewsState { open_views     : OpenViews::new (),
-                 graph_straddle : None, };
+    empty_views_state ();
   let viewforest_id : ViewforestId =
     ViewforestId::ContentView ("root-view" . to_string ());
   let recorded_skgrepos = |views_state : &ViewsState| -> BTreeSet<SkgrepoName> {

@@ -15,7 +15,7 @@ use skg::dbs::in_rust_graph::{
   };
 use skg::assert_metadata_eq;
 use skg::metadata_canon::{viewnode_id_atom_of, with_viewnode_id_atom, without_viewnode_ids};
-use skg::test_utils::{run_with_test_stores, graph_handle_from_config};
+use skg::test_utils::{empty_views_state, run_with_test_stores, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -24,7 +24,7 @@ use skg::test_utils::multi_root_view;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
 use skg::types::tree::forest::ViewForest;
-use skg::types::views_state::{OpenViews, ViewforestId};
+use skg::types::views_state::ViewforestId;
 use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
@@ -194,9 +194,7 @@ async fn test_editable_view_ample_budget (
         let graph : InRustGraphHandle =
           (
             graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = ViewsState {
-          open_views            : OpenViews::new (),
-          graph_straddle        : None,};
+        let mut views_state : ViewsState = empty_views_state ();
         let (mut stream, _read_end) : (TcpStream, TcpStream) =
           mk_test_tcp_stream_pair ();
         let response = update_from_and_rerender_buffer (
@@ -263,9 +261,7 @@ async fn test_editable_view_limit_5_or_6 (
         let graph : InRustGraphHandle =
           (
             graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = ViewsState {
-          open_views            : OpenViews::new (),
-          graph_straddle        : None,};
+        let mut views_state : ViewsState = empty_views_state ();
         let (mut stream, _read_end) : (TcpStream, TcpStream) =
           mk_test_tcp_stream_pair ();
         let response_5 = update_from_and_rerender_buffer (
@@ -280,9 +276,7 @@ async fn test_editable_view_limit_5_or_6 (
         let graph : InRustGraphHandle =
           (
             graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = ViewsState {
-          open_views            : OpenViews::new (),
-          graph_straddle        : None,};
+        let mut views_state : ViewsState = empty_views_state ();
         let (mut stream, _read_end) : (TcpStream, TcpStream) =
           mk_test_tcp_stream_pair ();
         let response_6 = update_from_and_rerender_buffer (
@@ -368,9 +362,7 @@ async fn test_editable_view_limit_1_to_4 (
         let graph : InRustGraphHandle =
           (
             graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = ViewsState {
-          open_views            : OpenViews::new (),
-          graph_straddle        : None,};
+        let mut views_state : ViewsState = empty_views_state ();
         let (mut stream, _read_end) : (TcpStream, TcpStream) =
           mk_test_tcp_stream_pair ();
         let response_1 = update_from_and_rerender_buffer (
@@ -384,9 +376,7 @@ async fn test_editable_view_limit_1_to_4 (
         let graph : InRustGraphHandle =
           (
             graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = ViewsState {
-          open_views            : OpenViews::new (),
-          graph_straddle        : None,};
+        let mut views_state : ViewsState = empty_views_state ();
         let (mut stream, _read_end) : (TcpStream, TcpStream) =
           mk_test_tcp_stream_pair ();
         let response_4 = update_from_and_rerender_buffer (
@@ -451,9 +441,7 @@ async fn test_editable_view_conflicting (
         let graph : InRustGraphHandle =
           (
             graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = ViewsState {
-          open_views            : OpenViews::new (),
-          graph_straddle        : None,};
+        let mut views_state : ViewsState = empty_views_state ();
         let (mut stream, _read_end) : (TcpStream, TcpStream) =
           mk_test_tcp_stream_pair ();
         let response = update_from_and_rerender_buffer (
@@ -506,9 +494,7 @@ async fn test_editable_view_with_cycle (
         let graph : InRustGraphHandle =
           (
             graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = ViewsState {
-          open_views            : OpenViews::new (),
-          graph_straddle        : None,};
+        let mut views_state : ViewsState = empty_views_state ();
         let (mut stream, _read_end) : (TcpStream, TcpStream) =
           mk_test_tcp_stream_pair ();
         let response = update_from_and_rerender_buffer (
@@ -554,9 +540,7 @@ async fn test_editable_view_with_repeat (
         let graph : InRustGraphHandle =
           (
             graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = ViewsState {
-          open_views            : OpenViews::new (),
-          graph_straddle        : None,};
+        let mut views_state : ViewsState = empty_views_state ();
         let (mut stream, _read_end) : (TcpStream, TcpStream) =
           mk_test_tcp_stream_pair ();
         let response = update_from_and_rerender_buffer (
@@ -611,9 +595,7 @@ async fn test_editable_view_request_cleared (
         let graph : InRustGraphHandle =
           (
             graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = ViewsState {
-          open_views            : OpenViews::new (),
-          graph_straddle        : None,};
+        let mut views_state : ViewsState = empty_views_state ();
         let (mut stream, _read_end) : (TcpStream, TcpStream) =
           mk_test_tcp_stream_pair ();
         let response = update_from_and_rerender_buffer (
@@ -723,9 +705,7 @@ async fn test_editable_view_request_on_an_editable_node (
 ) -> Result<(), Box<dyn Error>> {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views     : OpenViews::new (),
-        graph_straddle : None,};
+      let mut views_state : ViewsState = empty_views_state ();
       let (viewforest_id, opened) : (ViewforestId, String) = {
         let mut config : SkgConfig = config . clone ();
         config . initial_node_limit = 1;
@@ -781,9 +761,7 @@ async fn test_editable_view_request_moves_editability_back (
       config . initial_node_limit = 100;
       let graph : InRustGraphHandle =
         graph_handle_from_config (&config) ?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views     : OpenViews::new (),
-        graph_straddle : None,};
+      let mut views_state : ViewsState = empty_views_state ();
       let (viewforest_id, opened) : (ViewforestId, String) =
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["1", "12"] ) ?;
@@ -869,9 +847,7 @@ async fn test_budget_aliasfolder_is_neutral (
         let graph : InRustGraphHandle =
           (
             graph_handle_from_config (&config) ?);
-        let mut views_state : ViewsState = ViewsState {
-          open_views            : OpenViews::new (),
-          graph_straddle        : None,};
+        let mut views_state : ViewsState = empty_views_state ();
         let (mut stream, _read_end) : (TcpStream, TcpStream) =
           mk_test_tcp_stream_pair ();
         let response = update_from_and_rerender_buffer (
@@ -932,9 +908,7 @@ async fn test_writeProtect_request_keeps_children_editable (
       config . initial_node_limit = 100;
       let graph : InRustGraphHandle =
         graph_handle_from_config (&config) ?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views     : OpenViews::new (),
-        graph_straddle : None,};
+      let mut views_state : ViewsState = empty_views_state ();
       let (viewforest_id, opened) : (ViewforestId, String) =
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["12"] ) ?;
@@ -978,9 +952,7 @@ async fn test_writeProtect_subtree_request (
       config . initial_node_limit = 100;
       let graph : InRustGraphHandle =
         graph_handle_from_config (&config) ?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views     : OpenViews::new (),
-        graph_straddle : None,};
+      let mut views_state : ViewsState = empty_views_state ();
       let (viewforest_id, opened) : (ViewforestId, String) =
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["12"] ) ?;
@@ -1017,9 +989,7 @@ async fn test_writeProtect_request_on_a_writeProtected_occurrence (
       config . initial_node_limit = 100;
       let graph : InRustGraphHandle =
         graph_handle_from_config (&config) ?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views     : OpenViews::new (),
-        graph_straddle : None,};
+      let mut views_state : ViewsState = empty_views_state ();
       let (viewforest_id, opened) : (ViewforestId, String) =
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["1", "12"] ) ?;
@@ -1053,9 +1023,7 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
       config . initial_node_limit = 100;
       let graph : InRustGraphHandle =
         graph_handle_from_config (&config) ?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views     : OpenViews::new (),
-        graph_straddle : None,};
+      let mut views_state : ViewsState = empty_views_state ();
       let (viewforest_id, opened) : (ViewforestId, String) =
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["1", "12"] ) ?;
@@ -1137,9 +1105,7 @@ async fn test_retained_content_node_is_shown_once (
       config . initial_node_limit = 100;
       let graph : InRustGraphHandle =
         graph_handle_from_config (&config) ?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views     : OpenViews::new (),
-        graph_straddle : None,};
+      let mut views_state : ViewsState = empty_views_state ();
       let (viewforest_id, opened) : (ViewforestId, String) =
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["1"] ) ?;
@@ -1189,9 +1155,7 @@ async fn test_a_smaller_budget_write_protects_nothing_already_shown (
 ) -> Result<(), Box<dyn Error>> {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views     : OpenViews::new (),
-        graph_straddle : None,};
+      let mut views_state : ViewsState = empty_views_state ();
       let (viewforest_id, opened) : (ViewforestId, String) = {
         let mut config : SkgConfig = config . clone ();
         config . initial_node_limit = 100;
@@ -1228,9 +1192,7 @@ async fn test_a_request_claimed_elsewhere_leaves_no_member (
       config . initial_node_limit = 100;
       let graph : InRustGraphHandle =
         graph_handle_from_config (&config) ?;
-      let mut views_state : ViewsState = ViewsState {
-        open_views     : OpenViews::new (),
-        graph_straddle : None,};
+      let mut views_state : ViewsState = empty_views_state ();
       let input : &str = indoc! {"
         * (skg node (gnid 1) (skgRepos (nodeRepo main)) (viewRequests editableView)) 1
         ** (skg node (gnid 12)) 12

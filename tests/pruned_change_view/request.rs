@@ -14,7 +14,6 @@ use skg::metadata_canon::viewnode_id_atom_of;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::handle_save_buffer_request;
 use skg::test_utils::read_all_lp_messages;
-use skg::types::views_state::OpenViews;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::serve::util::sexp_to_client_string;
 use skg::test_utils::extract_string_field_from_sexp;
@@ -22,7 +21,7 @@ use skg::serve::handlers::close_view::handle_close_view_request;
 use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use skg::serve::handlers::diff_view::handle_diffView_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::{graph_handle_from_config, skg_env_from_parts};
+use skg::test_utils::{empty_views_state, graph_handle_from_config, skg_env_from_parts};
 use skg::types::env::SkgEnv;
 use skg::types::views_state::{DiffViewBufferKind, ViewforestId};
 
@@ -126,8 +125,7 @@ fn a_save_of_a_diffView_buffer_not_held_keeps_its_viewnode_ids (
         viewnode_id_atom_of (first_headline) . unwrap (), "(vnid zz)", 1 ),
       1 );
     let saved_on_a_new_connection = |f : &mut Fixture, fields : &str| -> String {
-      let mut views_state : ViewsState = ViewsState {
-        open_views : OpenViews::new (), graph_straddle : None };
+      let mut views_state : ViewsState = empty_views_state ();
       save_through_the_handler (
         f, &mut views_state,
         &format! ( "((request . \"save buffer\") (view-id . \"diff-view-1\"){})",
@@ -172,8 +170,7 @@ fn a_processed_requests_saves_delta_lists_the_requesting_headline (
       &|line| line . contains ("(editRequest (processed))") );
     let mc : String = viewnode_id_of_line (
       &|line| line . starts_with ("* ") && line . contains ("(gnid mc)") );
-    let mut views_state : ViewsState = ViewsState {
-      open_views : OpenViews::new (), graph_straddle : None };
+    let mut views_state : ViewsState = empty_views_state ();
     let answer : String = save_through_the_handler (
       f, &mut views_state,
       "((request . \"save buffer\") (view-id . \"diff-view-1\") (diff-view-buffer . \"all changes\"))",

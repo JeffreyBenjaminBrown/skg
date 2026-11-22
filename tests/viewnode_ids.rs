@@ -17,6 +17,7 @@ use skg::metadata_canon::{viewnode_id_atom_of, without_viewnode_ids};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
+  empty_views_state,
   extract_string_field_from_sexp, graph_handle_from_config,
   read_all_lp_messages, run_with_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
@@ -27,7 +28,7 @@ use skg::types::viewnode::{
   Folder, ViewnodeId, Viewnode, viewforest_root_viewnode,
   viewnode_of, ViewnodeKind};
 use skg::types::views_state::{
-  LARGEST_CARRIED_VIEWNODE_ID_COUNTER, OpenViews, ViewforestId, ViewnodeIdRecord};
+  LARGEST_CARRIED_VIEWNODE_ID_COUNTER, ViewforestId, ViewnodeIdRecord};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::HashSet;
@@ -106,9 +107,6 @@ async fn save_view (
             response . errors, buffer );
   Ok (( response, streamed )) }
 
-fn fresh_views_state () -> ViewsState {
-  ViewsState { open_views     : OpenViews::new (),
-               graph_straddle : None } }
 
 /// The viewnode ID of the one headline of 'buffer' that, viewnode IDs aside,
 /// contains 'needle'.
@@ -163,7 +161,7 @@ fn every_headline_of_a_new_view_has_its_own_viewnode_id (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = fresh_views_state ();
+  let mut views_state : ViewsState = empty_views_state ();
   let buffer : String = open_view (
     config, tantivy, &graph, &mut views_state, VIEW_OF_A, "a" ) ?;
   let atoms : Vec<String> = viewnode_id_atoms (&buffer);
@@ -187,7 +185,7 @@ async fn a_viewnode_id_survives_a_save_and_a_rerender (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = fresh_views_state ();
+  let mut views_state : ViewsState = empty_views_state ();
   let buffer : String = open_view (
     config, tantivy, &graph, &mut views_state, VIEW_OF_A, "a" ) ?;
   let other : String = open_view (
@@ -217,7 +215,7 @@ async fn a_copied_headline_gets_a_fresh_viewnode_id_and_the_original_keeps_its_o
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = fresh_views_state ();
+  let mut views_state : ViewsState = empty_views_state ();
   let buffer : String = open_view (
     config, tantivy, &graph, &mut views_state, VIEW_OF_A, "a" ) ?;
   let p_line : &str = buffer . lines ()
@@ -243,7 +241,7 @@ async fn a_moved_headline_keeps_its_viewnode_id (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = fresh_views_state ();
+  let mut views_state : ViewsState = empty_views_state ();
   let buffer : String = open_view (
     config, tantivy, &graph, &mut views_state, VIEW_OF_A, "a" ) ?;
   let b_line : &str = buffer . lines ()
@@ -270,7 +268,7 @@ async fn a_typed_headline_gets_a_viewnode_id (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = fresh_views_state ();
+  let mut views_state : ViewsState = empty_views_state ();
   let buffer : String = open_view (
     config, tantivy, &graph, &mut views_state, VIEW_OF_A, "a" ) ?;
   let typed : String = format! ("{}** a typed child\n", buffer);
@@ -293,7 +291,7 @@ async fn a_save_against_a_view_not_held_keeps_the_buffers_viewnode_ids (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let buffer : String = open_view (
-    config, tantivy, &graph, &mut fresh_views_state (), VIEW_OF_A, "a" ) ?;
+    config, tantivy, &graph, &mut empty_views_state (), VIEW_OF_A, "a" ) ?;
   let b_line : &str = buffer . lines ()
     . find ( |line| line . contains ("node (gnid b) ") )
     . expect ("b is shown");
@@ -308,7 +306,7 @@ async fn a_save_against_a_view_not_held_keeps_the_buffers_viewnode_ids (
   let edited : String = format! ( // a copy of p and a typed headline, appended
     "{}* {}\n** a child typed into a view not held\n",
     with_b_renumbered_high, p_line . trim_start_matches ('*') . trim_start () );
-  let mut views_state : ViewsState = fresh_views_state ();
+  let mut views_state : ViewsState = empty_views_state ();
   let (saved, _) : (SaveResponse, Vec<String>) = save_view (
     &edited, config, tantivy, &graph, &mut views_state, VIEW_OF_A ) . await ?;
   let saved_atoms : Vec<String> = viewnode_id_atoms (&saved . saved_view);
@@ -344,7 +342,7 @@ async fn a_view_not_held_carrying_a_huge_viewnode_id_is_refused (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let buffer : String = open_view (
-    config, tantivy, &graph, &mut fresh_views_state (), VIEW_OF_A, "a" ) ?;
+    config, tantivy, &graph, &mut empty_views_state (), VIEW_OF_A, "a" ) ?;
   let b_line : &str = buffer . lines ()
     . find ( |line| line . contains ("node (gnid b) ") )
     . expect ("b is shown");
@@ -358,7 +356,7 @@ async fn a_view_not_held_carrying_a_huge_viewnode_id_is_refused (
   let refused = update_from_and_rerender_buffer (
     &mut stream, &edited, config, tantivy, &graph,
     &Ok ( ViewforestId::ContentView (VIEW_OF_A . to_string ()) ),
-    &mut fresh_views_state () ) . await;
+    &mut empty_views_state () ) . await;
   let message : String = match refused {
     Err (e) => format! ("{:?}", e),
     Ok (response) => format! ("{:?}", response . errors), };
@@ -375,7 +373,7 @@ async fn an_unknown_viewnode_id_is_dropped (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = fresh_views_state ();
+  let mut views_state : ViewsState = empty_views_state ();
   let buffer : String = open_view (
     config, tantivy, &graph, &mut views_state, VIEW_OF_A, "a" ) ?;
   let b_line : &str = buffer . lines ()

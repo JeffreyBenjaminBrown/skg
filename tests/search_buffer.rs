@@ -28,7 +28,7 @@ use skg::serve::handlers::text_search::{
   MatchGroups, TitleOrAlias, build_search_viewforest, draw_search_buffer,
   handle_text_search_request};
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::{extract_string_field_from_sexp, graph_handle_from_config,
+use skg::test_utils::{empty_views_state, extract_string_field_from_sexp, graph_handle_from_config,
                       read_all_lp_messages, set_skgrepo_retagging_relRepos,
                       skg_env_from_parts};
 use skg::test_utils::run_with_shared_test_stores;
@@ -38,7 +38,7 @@ use skg::types::misc::{ID, SkgrepoName, TantivyIndex, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::nodes::tantivy::GraphnodeInTantivy;
 use skg::types::tree::forest::ViewForest;
-use skg::types::views_state::{OpenViews, ViewforestId, ViewnodeIdRecord};
+use skg::types::views_state::{ViewforestId, ViewnodeIdRecord};
 
 #[test]
 fn all_tests
@@ -69,9 +69,7 @@ fn search (
   let env : SkgEnv =
     skg_env_from_parts (config, tantivy, &graph);
   let mut views_state : ViewsState =
-    ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None, };
+    empty_views_state ();
   let all : SkgrepoRestriction =
     SkgrepoRestriction::unrestricted (config);
   let (mut server, client) : (TcpStream, TcpStream) =

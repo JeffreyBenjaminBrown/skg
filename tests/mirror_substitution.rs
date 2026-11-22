@@ -49,6 +49,7 @@ use skg::assert_metadata_eq;
 use skg::serve::ViewsState;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
+  empty_views_state,
   run_with_shared_test_stores,
   graph_handle_from_config};
 use skg::test_utils::{
@@ -58,7 +59,7 @@ use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
-use skg::types::views_state::{OpenViews, Perspective, ViewforestId};
+use skg::types::views_state::{Perspective, ViewforestId};
 use skg::serve::handlers::perspective::handle_set_perspective_request;
 use skg::serve::handlers::rerender_views::handle_rerender_views_request;
 use skg::serve::handlers::text_search::handle_text_search_request;
@@ -571,9 +572,7 @@ async fn save_under_set (
   let mut env : skg::types::env::SkgEnv =
     skg::test_utils::skg_env_from_parts (
       config, tantivy, &graph );
-  let mut views_state : ViewsState = ViewsState {
-    open_views        : OpenViews::new (),
-    graph_straddle    : None, };
+  let mut views_state : ViewsState = empty_views_state ();
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response =
@@ -916,7 +915,7 @@ fn connection_holding_a_view_of (
   let (view, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view (config, Some (tantivy), root_gnids) ?;
   let mut views_state : ViewsState =
-    ViewsState { open_views : OpenViews::new (), graph_straddle : None };
+    empty_views_state ();
   views_state . open_views . register_view (
     & env . runtime_snapshot () . graph,
     ViewforestId::from_client_string (view_id . to_string ()),
@@ -1581,7 +1580,7 @@ fn a_replaced_search_hit_stays_a_hit (
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let env : SkgEnv = skg_env_from_parts (config, tantivy, &graph);
   let mut views_state : ViewsState =
-    ViewsState { open_views : OpenViews::new (), graph_straddle : None };
+    empty_views_state ();
   let mut search = |terms : &str| -> String {
     let messages : Vec<String> = messages_answering (
       &format! ( "((request . \"text search\") (terms . \"{}\") (regex . \"false\") (body . \"false\") (operators . \"false\"))",

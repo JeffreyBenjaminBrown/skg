@@ -20,13 +20,14 @@ use skg::serve::handlers::save_buffer::handle_save_buffer_request;
 use skg::serve::handlers::single_root_view::handle_single_root_view_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
+  empty_views_state,
   copy_dir_all, extract_string_field_from_sexp, graph_handle_from_config,
   load_config_with_overrides, read_all_lp_messages, skg_env_from_parts};
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::types::env::SkgEnv;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{SkgrepoName, TantivyIndex};
-use skg::types::views_state::{OpenViews, Perspective, ViewforestId};
+use skg::types::views_state::{Perspective, ViewforestId};
 
 use crate::tcp_stream_pair::mk_test_tcp_stream_pair;
 use std::error::Error;
@@ -143,7 +144,7 @@ fn a_withheld_save_rerender_is_released_by_rerendering_its_views
   () -> Result<(), Box<dyn Error>> {
   let mut f : Fixture = fixture () ?;
   let mut connection : ViewsState =
-    ViewsState { open_views : OpenViews::new (), graph_straddle : None };
+    empty_views_state ();
   let view : String =
     open_tele_view (&f, &mut connection);
   assert! ( view . contains ("A title kept private"), "{}", view );
@@ -234,7 +235,7 @@ fn a_privacy_challenge_stops_a_perspective_switch_until_approved
   () -> Result<(), Box<dyn Error>> {
   let f : Fixture = fixture () ?;
   let mut connection : ViewsState =
-    ViewsState { open_views : OpenViews::new (), graph_straddle : None };
+    empty_views_state ();
   let view : String = open_tele_view (&f, &mut connection);
   assert! ( view . contains ("(gnid child)"), "{}", view );
   let view_id : ViewforestId = ViewforestId::from_client_string ("tele-view" . to_string ());

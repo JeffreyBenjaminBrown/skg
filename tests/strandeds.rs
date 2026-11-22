@@ -18,6 +18,7 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::{
   SaveResponse, update_from_and_rerender_buffer_with_approvals};
 use skg::test_utils::{
+  empty_views_state,
   cleanup_test_tantivy, copy_dir_all, extract_string_field_from_sexp,
   read_all_lp_messages, skg_env_from_parts};
 use skg::test_utils::multi_root_view;
@@ -25,7 +26,7 @@ use skg::types::env::SkgEnv;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
 use skg::types::nodes::complete::Graphnode;
-use skg::types::views_state::{OpenViews, Perspective, ViewforestId};
+use skg::types::views_state::{Perspective, ViewforestId};
 use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
@@ -68,9 +69,7 @@ fn fixture (
   Ok ( Fixture {
     _dir : dir, config, tantivy,
     graph : new_handle ( InRustGraph::from_graphnodes (&nodes) ),
-    views_state : ViewsState {
-      open_views        : OpenViews::new (),
-      graph_straddle    : None, } } ) }
+    views_state : empty_views_state () } ) }
 
 /// Render a view of 'roots', registered under 'viewforest_id'.
 fn open_view (
