@@ -273,6 +273,11 @@ fn normalize_and_coalesce_nodeInstructions (
   }
 }
 
+/// The identity half of a graph update: which gnids the batch
+/// affects and who carries each before and after, the identity
+/// errors, the extra IDs the batch would revoke, and the recorders
+/// whose relationships must be reindexed because a gnid changed
+/// carrier.
 fn validate_identity_and_derive_changes (
   config           : &SkgConfig,
   base             : &InRustGraph,
@@ -288,17 +293,67 @@ fn validate_identity_and_derive_changes (
   let deleted_pids : HashSet<ID> = nodeInstructions . iter ()
     . filter_map (NodeInstruction::deleted_gnid)
     . cloned () . collect ();
+  let affected_gnids : HashSet<ID> =
+    gnids_the_batch_affects (base, &touched_pids, nodeInstructions);
+  let claims : BTreeMap<ID, CarriersForId> =
+    carriers_claiming_each_gnid (
+      base, &touched_pids, &affected_gnids, nodeInstructions);
+  let errors : Vec<CompleteGraphError> =
+    identity_errors (config, &claims, nodeInstructions);
+  let revocations : Vec<ExtraIdRevocation> =
+    extra_id_revocations (base, nodeInstructions);
+  let (canonicalization_changes, identity_acquisitions)
+    : (Vec<CanonicalizationChange>, Vec<IdentityAcquisition>) =
+    carrier_changes (base, &claims, &affected_gnids);
+  let recorders_to_reindex : HashSet<ID> =
+    recorders_to_reindex_after_carrier_changes (
+      base, &touched_pids, &canonicalization_changes);
+  #[cfg(test)]
+  let identity_base_lookup_bound : usize =
+    touched_pids . len () + affected_gnids . len () * 4 + saved_pids . len ();
+  (GraphChangeSet {
+    touched_pids,
+    saved_pids,
+    deleted_pids,
+    affected_gnids,
+    canonicalization_changes,
+    identity_acquisitions,
+    recorders_to_reindex,
+    fork_rule_pids_to_check      : HashSet::new (),
+    telescope_recorders_to_check : HashSet::new (),
+    #[cfg(test)]
+    identity_base_lookup_bound,
+  }, errors, revocations)
+}
+
+/// Every pid the batch touches, every extra ID those nodes carried
+/// before, and every gnid a saved node carries after.
+fn gnids_the_batch_affects (
+  base             : &InRustGraph,
+  touched_pids     : &HashSet<ID>,
+  nodeInstructions : &[NodeInstruction],
+) -> HashSet<ID> {
   let mut affected_gnids : HashSet<ID> = HashSet::new ();
-  for pid in &touched_pids {
+  for pid in touched_pids {
     affected_gnids . insert (pid . clone ());
     if let Some (old) = base . nodes . get (pid) {
       affected_gnids . extend (old . extra_ids . iter () . cloned ()); }}
   for nodeInstruction in nodeInstructions {
     if let NodeInstruction::Save (SaveNode (node)) = nodeInstruction {
       affected_gnids . extend (node . all_gnids () . cloned ()); }}
+  affected_gnids }
 
+/// For each affected gnid, the nodes that will carry it after the
+/// batch, as a pid or as an extra ID: the untouched nodes of 'base'
+/// that carry it now, and the saved nodes that carry it.
+fn carriers_claiming_each_gnid (
+  base             : &InRustGraph,
+  touched_pids     : &HashSet<ID>,
+  affected_gnids   : &HashSet<ID>,
+  nodeInstructions : &[NodeInstruction],
+) -> BTreeMap<ID, CarriersForId> {
   let mut claims : BTreeMap<ID, CarriersForId> = BTreeMap::new ();
-  for gnid in &affected_gnids {
+  for gnid in affected_gnids {
     if base . nodes . contains_key (gnid) && ! touched_pids . contains (gnid) {
       claims . entry (gnid . clone ()) . or_default ()
         . primary . insert (gnid . clone ()); }
@@ -313,9 +368,18 @@ fn validate_identity_and_derive_changes (
       for extra in &node . extra_ids {
         claims . entry (extra . clone ()) . or_default ()
           . extra . insert (node . pid . clone ()); }}}
+  claims }
 
+/// A gnid two nodes carry as an extra ID, a gnid one node carries as
+/// its pid and another as an extra ID, and a saved node whose home
+/// skgrepo is not configured; sorted.
+fn identity_errors (
+  config           : &SkgConfig,
+  claims           : &BTreeMap<ID, CarriersForId>,
+  nodeInstructions : &[NodeInstruction],
+) -> Vec<CompleteGraphError> {
   let mut errors : Vec<CompleteGraphError> = Vec::new ();
-  for (gnid, carriers) in &claims {
+  for (gnid, carriers) in claims {
     if carriers . extra . len () > 1 {
       errors . push (CompleteGraphError::DuplicateExtraId {
         gnid     : gnid . clone (),
@@ -339,7 +403,14 @@ fn validate_identity_and_derive_changes (
           skgrepo : node . home_skgrepo . clone (),
         }); }} }
   errors . sort_by_key ( |error| format! ("{:?}", error) );
+  errors }
 
+/// Each saved node that would drop an extra ID it carries in 'base',
+/// with the IDs it drops; sorted by pid.
+fn extra_id_revocations (
+  base             : &InRustGraph,
+  nodeInstructions : &[NodeInstruction],
+) -> Vec<ExtraIdRevocation> {
   let mut revocations : Vec<ExtraIdRevocation> = Vec::new ();
   for nodeInstruction in nodeInstructions {
     if let NodeInstruction::Save (SaveNode (node)) = nodeInstruction {
@@ -357,7 +428,16 @@ fn validate_identity_and_derive_changes (
           dropped_gnids,
         }); }} }
   revocations . sort_by ( |left, right| left . pid . cmp (&right . pid) );
+  revocations }
 
+/// Each affected gnid whose carrier the batch changes, in gnid
+/// order; and of those, each that ends with a carrier, as an
+/// acquisition.
+fn carrier_changes (
+  base           : &InRustGraph,
+  claims         : &BTreeMap<ID, CarriersForId>,
+  affected_gnids : &HashSet<ID>,
+) -> (Vec<CanonicalizationChange>, Vec<IdentityAcquisition>) {
   let mut canonicalization_changes : Vec<CanonicalizationChange> = Vec::new ();
   let mut identity_acquisitions : Vec<IdentityAcquisition> = Vec::new ();
   let mut sorted_affected_gnids : Vec<ID> = affected_gnids . iter () . cloned ()
@@ -365,7 +445,7 @@ fn validate_identity_and_derive_changes (
   sorted_affected_gnids . sort ();
   for gnid in sorted_affected_gnids {
     let old_carrier : Option<ID> = base . pid_of (&gnid);
-    let new_carrier : Option<ID> = final_carrier_of (&claims, &gnid);
+    let new_carrier : Option<ID> = final_carrier_of (claims, &gnid);
     if old_carrier != new_carrier {
       canonicalization_changes . push (CanonicalizationChange {
         gnid        : gnid . clone (),
@@ -378,33 +458,24 @@ fn validate_identity_and_derive_changes (
           old_carrier,
           new_carrier,
         }); }} }
+  (canonicalization_changes, identity_acquisitions) }
 
+/// The touched pids, and every recorder whose relationships 'base'
+/// indexes under the old key of a gnid that changes carrier.
+fn recorders_to_reindex_after_carrier_changes (
+  base                     : &InRustGraph,
+  touched_pids             : &HashSet<ID>,
+  canonicalization_changes : &[CanonicalizationChange],
+) -> HashSet<ID> {
   let mut recorders_to_reindex : HashSet<ID> = touched_pids . clone ();
-  for change in &canonicalization_changes {
+  for change in canonicalization_changes {
     let old_key : &ID = change . old_carrier . as_ref ()
       . unwrap_or (&change . gnid);
     let new_key : &ID = change . new_carrier . as_ref ()
       . unwrap_or (&change . gnid);
     if old_key != new_key {
       recorders_to_reindex . extend (inbound_recorders_at (base, old_key)); }}
-
-  #[cfg(test)]
-  let identity_base_lookup_bound : usize =
-    touched_pids . len () + affected_gnids . len () * 4 + saved_pids . len ();
-  (GraphChangeSet {
-    touched_pids,
-    saved_pids,
-    deleted_pids,
-    affected_gnids,
-    canonicalization_changes,
-    identity_acquisitions,
-    recorders_to_reindex,
-    fork_rule_pids_to_check      : HashSet::new (),
-    telescope_recorders_to_check : HashSet::new (),
-    #[cfg(test)]
-    identity_base_lookup_bound,
-  }, errors, revocations)
-}
+  recorders_to_reindex }
 
 fn final_carrier_of (
   claims    : &BTreeMap<ID, CarriersForId>,
