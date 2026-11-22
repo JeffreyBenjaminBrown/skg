@@ -4,8 +4,10 @@
 # generated docs and integration tests politely.
 #
 # Results are written here:
-# - tests/results/ALL.org: a plain-text org-mode summary, which quotes
-#   the failure lines of each failed suite and integration test
+# - tests/results/ALL.org: a plain-text org-mode summary, whose first
+#   lines name each failure and its log, and which quotes the failure
+#   lines of each failed suite and integration test (and of a failed
+#   build, after which nothing else runs)
 # - tests/results/*.log: individual test results
 # It clears tests/results/ at its start, except the subdirectories
 # named for a plan number (tests/results/06/), which hold the logs of
@@ -82,6 +84,38 @@ find "$RESULTS_DIR" -mindepth 1 -maxdepth 1 \
        -regex '.*/[0-9]+([._][0-9]+)*' \) \
   -exec rm -rf {} +
 
+# ── ALL.org ─────────────────────────────────────────────────
+
+ORG="$RESULTS_DIR/ALL.org"
+ORG_TITLE="* results from bash/all-tests.sh"
+
+# The lines of a failed suite's log worth reading first: those that
+# match PATTERN, without color codes or repeats, at most 30; or, if
+# none match, the log's last 15 lines.
+failure_lines_of_log () {
+  local log_path="$1"
+  local pattern="$2"
+  local uncolored_log
+  local lines
+  uncolored_log="$(sed 's/\x1b\[[0-9;]*m//g' "$log_path" 2>/dev/null)"
+  lines="$(printf '%s\n' "$uncolored_log" \
+    | grep -E -- "$pattern" | awk '!seen[$0]++' | head -n 30)"
+  if [ -z "$lines" ]; then
+    lines="$(printf '%s\n' "$uncolored_log" | tail -n 15)"
+  fi
+  printf '%s\n' "$lines"; }
+
+# Under ALL.org's title, when anything failed: each failure, by the
+# log that holds its errors, so that ALL.org's first lines name them.
+# Each argument is "WHAT [[file:LOG]]".
+org_list_of_failures () {
+  [ $# -gt 0 ] || return 0
+  echo "  Failed (their failure lines are quoted below):"
+  local failure
+  for failure in "$@"; do
+    echo "  - $failure"
+  done; }
+
 T_START=$SECONDS
 BUILD_JOBS="$(skg_positive_int_or_default "${SKG_CARGO_BUILD_JOBS:-}" 2)"
 NEXTEST_BUILD_JOBS="$(skg_positive_int_or_default \
@@ -107,6 +141,15 @@ else
   echo -e "${RED}FAILED${NC}"
   echo ""
   cat "$RESULTS_DIR/build.log"
+  {
+    echo "$ORG_TITLE"
+    org_list_of_failures "Build [[file:build.log]]"
+    echo "** FAIL : Build (${ELAPSED_BUILD}s) [[file:build.log]]"
+    echo "   #+begin_example"
+    failure_lines_of_log "$RESULTS_DIR/build.log" '^error|^ *--> ' \
+      | sed 's/^/   /'
+    echo "   #+end_example"
+  } > "$ORG"
   exit 1
 fi
 
@@ -137,7 +180,8 @@ suite_nextest () {
   skg_low_priority cargo nextest run \
     --build-jobs "$NEXTEST_BUILD_JOBS" \
     --jobs "$NEXTEST_JOBS" --no-fail-fast; }
-NEXTEST_FAILURE_LINES='^[[:space:]]*(Summary|FAIL|TIMEOUT|SIG[A-Z]+|ABORT) \['
+# 'panicked at' names the file and line of a failed assertion.
+NEXTEST_FAILURE_LINES='^[[:space:]]*(Summary|FAIL|TIMEOUT|SIG[A-Z]+|ABORT) \[|panicked at '
 
 suite_doctest () {
   # nextest structurally cannot run doctests, so they get their own
@@ -374,26 +418,18 @@ fi
 
 # ── Write ALL.org ─────────────────────────────────────────────
 
-ORG="$RESULTS_DIR/ALL.org"
-
-# The lines of a failed suite's log worth reading first: those that
-# match PATTERN, without color codes or repeats, at most 30; or, if
-# none match, the log's last 15 lines.
-failure_lines_of_log () {
-  local log_path="$1"
-  local pattern="$2"
-  local uncolored_log
-  local lines
-  uncolored_log="$(sed 's/\x1b\[[0-9;]*m//g' "$log_path" 2>/dev/null)"
-  lines="$(printf '%s\n' "$uncolored_log" \
-    | grep -E -- "$pattern" | awk '!seen[$0]++' | head -n 30)"
-  if [ -z "$lines" ]; then
-    lines="$(printf '%s\n' "$uncolored_log" | tail -n 15)"
-  fi
-  printf '%s\n' "$lines"; }
+FAILURES_WITH_LOGS=()   # each "WHAT [[file:LOG]]"
+for k in "${!SUITE_LABELS[@]}"; do
+  [ ${SUITE_EXITS[$k]} -eq 0 ] && continue
+  FAILURES_WITH_LOGS+=("${SUITE_LABELS[$k]} [[file:${SUITE_LOGS[$k]}]]")
+done
+for name in "${RETRY_STILL_FAILING[@]}"; do
+  FAILURES_WITH_LOGS+=("integration test $name [[file:$(integration_log_name retry "$name")]]")
+done
 
 {
-  echo "* results from bash/all-tests.sh"
+  echo "$ORG_TITLE"
+  org_list_of_failures "${FAILURES_WITH_LOGS[@]}"
 
   # Build
   if [ $ELAPSED_BUILD -ge 0 ]; then
@@ -418,7 +454,6 @@ failure_lines_of_log () {
   done
 
   # Integration
-  n_pass=$((n_total - n_real))
   if [ $n_real -eq 0 ]; then
     echo "** PASS ($n_total of $n_total) : Integration tests"
   else
