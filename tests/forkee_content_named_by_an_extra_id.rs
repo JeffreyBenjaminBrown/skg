@@ -26,6 +26,7 @@ use std::error::Error;
 use crate::view_and_save_helpers::{
   contains_of, content_of, depth, hides_of, ids, is_a_fixpoint, line_of, refusal_of,
   save_cleanly, skg_files, under, view_of, without_subtree_of};
+use skg::reset_then_run_subtest;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
@@ -54,10 +55,10 @@ fn all_tests
     "skg-test-forkee-content-named-by-an-extra-id",
     |s| Box::pin ( async move {
       for case in [FOREIGN_FORKEE, OWNED_FORKEE] {
-        s . reset ("an_unchanged_save_hides_nothing", FIXTURES) ?;
-        an_unchanged_save_hides_nothing (&case, &s . config, &mut s . tantivy) . await ?;
-        s . reset ("a_cut_hides_what_was_cut_alone", FIXTURES) ?;
-        a_cut_hides_what_was_cut_alone (&case, &s . config, &mut s . tantivy) . await ?;
+        reset_then_run_subtest! (s . reset (FIXTURES),
+          an_unchanged_save_hides_nothing (&case, &s . config, &mut s . tantivy) . await);
+        reset_then_run_subtest! (s . reset (FIXTURES),
+          a_cut_hides_what_was_cut_alone (&case, &s . config, &mut s . tantivy) . await);
         s . reset_with_fixture_prep (
           "a_hidden_child_moved_back_out_is_unhidden", FIXTURES,
           |root| { std::fs::write (
@@ -74,8 +75,8 @@ fn all_tests
                                case . note, case . note, case . forkee, case . extra )) ?;
                    Ok (( )) } ) ?;
         a_hidden_child_moved_into_the_note_is_unhidden (&case, &s . config, &mut s . tantivy) . await ?; }
-      s . reset ("a_cut_from_one_forkee_of_a_child_another_shows_by_an_extra_id_conflicts", FIXTURES) ?;
-      a_cut_from_one_forkee_of_a_child_another_shows_by_an_extra_id_conflicts (&s . config, &mut s . tantivy) . await ?;
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_cut_from_one_forkee_of_a_child_another_shows_by_an_extra_id_conflicts (&s . config, &mut s . tantivy) . await);
       Ok (( )) } )) }
 
 //

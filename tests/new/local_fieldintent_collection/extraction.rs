@@ -19,6 +19,7 @@ use skg::from_text::local_fieldintent_collection::traverse::collect_instructions
 use skg::from_text::local_fieldintent_collection::types::{
   MemberAsSuch, MemberAsSuchVisibility };
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
+use skg::reset_then_run_subtest;
 use skg::test_utils::extract_graphnode_if_save_else_error;
 use skg::test_utils::{instruction_gnids, saved_node_by_gnid, run_with_shared_test_stores, graph_handle_from_config, graph_from_config};
 use skg::types::errors::BufferValidationError;
@@ -703,71 +704,35 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-new-lic-extraction",
     |s| Box::pin ( async move {
-      s . reset_from_config (
-        "forkee_as_such_child_list_removal_does_not_save_forkee",
-        FORKEE_EDIT_CONFIG) ?;
-      forkee_as_such_child_list_removal_does_not_save_forkee (
-        &s . config ) . await ?;
-      s . reset_from_config (
-        "forkee_as_such_child_removal_is_not_foreign_contains_edit",
-        FORKEE_EDIT_CONFIG) ?;
-      forkee_as_such_child_removal_is_not_foreign_contains_edit (
-        &s . config ) . await ?;
-      s . reset_from_config (
-        "forkee_as_such_child_list_removal_infers_forker_hide",
-        FORKEE_EDIT_CONFIG) ?;
-      forkee_as_such_child_list_removal_infers_forker_hide (
-        &s . config ) . await ?;
-      s . reset_from_config (
-        "moving_forkee_as_such_child_to_forker_does_not_hide",
-        FORKEE_EDIT_CONFIG) ?;
-      moving_forkee_as_such_child_to_forker_does_not_hide (
-        &s . config ) . await ?;
-      s . reset_from_config (
-        "forkee_as_such_visible_child_removes_forker_hide",
-        "tests/hidden_from_forks/fixtures-hidden-within-but-none-without/skgconfig.toml") ?;
-      forkee_as_such_visible_child_removes_forker_hide (
-        &s . config ) . await ?;
-      s . reset_from_config (
-        "forkee_as_such_unhide_preserves_unrelated_hides",
-        "tests/hidden_from_forks/fixtures-every-kind-of-folder/skgconfig.toml") ?;
-      forkee_as_such_unhide_preserves_unrelated_hides (
-        &s . config ) . await ?;
-      s . reset_from_config (
-        "overlapping_forkee_hiderel_conflict_rejects_save",
-        "tests/hidden_from_forks/fixtures-overlapping-forkees/skgconfig.toml") ?;
-      overlapping_forkee_hiderel_conflict_rejects_save (
-        &s . config ) . await ?;
-      s . reset_from_config (
-        "ordinary_owned_child_list_edit_still_changes_contains",
-        FORKEE_EDIT_CONFIG) ?;
-      ordinary_owned_child_list_edit_still_changes_contains (
-        &s . config ) . await ?;
+      reset_then_run_subtest! (s . reset_from_config (FORKEE_EDIT_CONFIG),
+        forkee_as_such_child_list_removal_does_not_save_forkee ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config (FORKEE_EDIT_CONFIG),
+        forkee_as_such_child_removal_is_not_foreign_contains_edit ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config (FORKEE_EDIT_CONFIG),
+        forkee_as_such_child_list_removal_infers_forker_hide ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config (FORKEE_EDIT_CONFIG),
+        moving_forkee_as_such_child_to_forker_does_not_hide ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config ("tests/hidden_from_forks/fixtures-hidden-within-but-none-without/skgconfig.toml"),
+        forkee_as_such_visible_child_removes_forker_hide ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config ("tests/hidden_from_forks/fixtures-every-kind-of-folder/skgconfig.toml"),
+        forkee_as_such_unhide_preserves_unrelated_hides ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config ("tests/hidden_from_forks/fixtures-overlapping-forkees/skgconfig.toml"),
+        overlapping_forkee_hiderel_conflict_rejects_save ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config (FORKEE_EDIT_CONFIG),
+        ordinary_owned_child_list_edit_still_changes_contains ( &s . config ) . await);
       s . reset_from_config (
         "ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_forkee",
         FORKEE_EDIT_CONFIG) ?;
       ordinary_same_gnid_occurrence_keeps_contains_edit_when_also_as_forkee (
         &s . config ) . await ?;
-      s . reset_from_config (
-        "recursive_descendant_under_as_forkee_keeps_own_contains_edit",
-        FORKEE_EDIT_CONFIG) ?;
-      recursive_descendant_under_as_forkee_keeps_own_contains_edit (
-        &s . config ) . await ?;
-      s . reset_from_config (
-        "foreign_forkee_as_such_title_edit_is_rejected",
-        FORKEE_EDIT_CONFIG) ?;
-      foreign_forkee_as_such_title_edit_is_rejected (
-        &s . config ) . await ?;
-      s . reset_from_config (
-        "owned_as_forkee_title_edit_is_saved",
-        FORKEE_EDIT_CONFIG) ?;
-      owned_as_forkee_title_edit_is_saved (
-        &s . config ) . await ?;
-      s . reset_from_config (
-        "owned_as_forkee_body_edit_is_saved",
-        FORKEE_EDIT_CONFIG) ?;
-      owned_as_forkee_body_edit_is_saved (
-        &s . config ) . await ?;
+      reset_then_run_subtest! (s . reset_from_config (FORKEE_EDIT_CONFIG),
+        recursive_descendant_under_as_forkee_keeps_own_contains_edit ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config (FORKEE_EDIT_CONFIG),
+        foreign_forkee_as_such_title_edit_is_rejected ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config (FORKEE_EDIT_CONFIG),
+        owned_as_forkee_title_edit_is_saved ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config (FORKEE_EDIT_CONFIG),
+        owned_as_forkee_body_edit_is_saved ( &s . config ) . await);
       Ok (( )) } )) }
 
 async fn forkee_as_such_child_list_removal_does_not_save_forkee (

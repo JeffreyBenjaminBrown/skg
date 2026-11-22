@@ -22,6 +22,7 @@ use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::serve::ViewsState;
 use skg::serve::handlers::receipt::handle_receipt_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{
   mk_test_tcp_stream_pair,
   empty_views_state,
@@ -40,23 +41,22 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-receipt",
     |s| Box::pin ( async move {
-      s . reset ("a_receipt_previews_then_forks_the_item_and_hides_it", fixtures) ?;
-      a_receipt_previews_then_forks_the_item_and_hides_it (
-        &s . config, &s . tantivy ) ?;
-      s . reset ("a_receipt_goes_under_the_fork_the_reader_holds", fixtures) ?;
-      a_receipt_goes_under_the_fork_the_reader_holds (&s . config, &s . tantivy) ?;
-      s . reset ("an_item_in_two_mailboxes_needs_one_named", fixtures) ?;
-      an_item_in_two_mailboxes_needs_one_named (&s . config, &s . tantivy) ?;
-      s . reset ("an_item_in_no_mailbox_is_forked_where_the_reader_says", fixtures) ?;
-      an_item_in_no_mailbox_is_forked_where_the_reader_says (&s . config, &s . tantivy) ?;
-      s . reset ("an_item_already_hidden_still_gets_its_receipt", fixtures) ?;
-      an_item_already_hidden_still_gets_its_receipt (&s . config, &s . tantivy) ?;
-      s . reset ("an_item_more_private_than_its_mailbox_suggests_no_skgrepo", fixtures) ?;
-      an_item_more_private_than_its_mailbox_suggests_no_skgrepo (&s . config, &s . tantivy) ?;
-      s . reset ("a_receipt_for_a_reply_hides_the_message_it_forks", fixtures) ?;
-      a_receipt_for_a_reply_hides_the_message_it_forks (&s . config, &s . tantivy) ?;
-      s . reset ("a_receipt_for_a_note_of_ones_own_goes_under_it", fixtures) ?;
-      a_receipt_for_a_note_of_ones_own_goes_under_it (&s . config, &s . tantivy) ?;
+      reset_then_run_subtest! (s . reset (fixtures),
+        a_receipt_previews_then_forks_the_item_and_hides_it ( &s . config, &s . tantivy ));
+      reset_then_run_subtest! (s . reset (fixtures),
+        a_receipt_goes_under_the_fork_the_reader_holds (&s . config, &s . tantivy));
+      reset_then_run_subtest! (s . reset (fixtures),
+        an_item_in_two_mailboxes_needs_one_named (&s . config, &s . tantivy));
+      reset_then_run_subtest! (s . reset (fixtures),
+        an_item_in_no_mailbox_is_forked_where_the_reader_says (&s . config, &s . tantivy));
+      reset_then_run_subtest! (s . reset (fixtures),
+        an_item_already_hidden_still_gets_its_receipt (&s . config, &s . tantivy));
+      reset_then_run_subtest! (s . reset (fixtures),
+        an_item_more_private_than_its_mailbox_suggests_no_skgrepo (&s . config, &s . tantivy));
+      reset_then_run_subtest! (s . reset (fixtures),
+        a_receipt_for_a_reply_hides_the_message_it_forks (&s . config, &s . tantivy));
+      reset_then_run_subtest! (s . reset (fixtures),
+        a_receipt_for_a_note_of_ones_own_goes_under_it (&s . config, &s . tantivy));
       Ok (( )) } )) }
 
 /// The handler's environment and a connection's views.

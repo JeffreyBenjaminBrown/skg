@@ -36,6 +36,7 @@ use crate::view_and_save_helpers::{
   contains_of, depth, forks_of, hides_of, ids, line_of, node, refusal_of,
   save, save_cleanly, skg_files, view_of, with_line_after_subtree_of};
 use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::reset_then_run_subtest;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
@@ -48,18 +49,18 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-moved-headlines-whose-content-was-not-drawn",
     |s| Box::pin ( async move {
-      s . reset ("a_child_moved_out_of_the_hidden_in_folder_keeps_its_content", FIXTURES) ?;
-      a_child_moved_out_of_the_hidden_in_folder_keeps_its_content (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_child_moved_out_of_the_integrated_elsewhere_folder_keeps_its_content", FIXTURES) ?;
-      a_child_moved_out_of_the_integrated_elsewhere_folder_keeps_its_content (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_member_moved_out_of_the_forks_folder_keeps_its_content", FIXTURES) ?;
-      a_member_moved_out_of_the_forks_folder_keeps_its_content (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_foreign_member_moved_out_forks_nothing", FIXTURES) ?;
-      a_foreign_member_moved_out_forks_nothing (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_forker_moved_out_keeps_its_content", FIXTURES) ?;
-      a_forker_moved_out_keeps_its_content (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_headline_typed_under_a_moved_member_joins_no_list", FIXTURES) ?;
-      a_headline_typed_under_a_moved_member_joins_no_list (&s . config, &mut s . tantivy) . await ?;
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_child_moved_out_of_the_hidden_in_folder_keeps_its_content (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_child_moved_out_of_the_integrated_elsewhere_folder_keeps_its_content (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_member_moved_out_of_the_forks_folder_keeps_its_content (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_foreign_member_moved_out_forks_nothing (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_forker_moved_out_keeps_its_content (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_headline_typed_under_a_moved_member_joins_no_list (&s . config, &mut s . tantivy) . await);
       Ok (( )) } )) }
 
 //

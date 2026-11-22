@@ -26,6 +26,7 @@ use std::collections::BTreeMap;
 use crate::view_and_save_helpers::{
   content_of, first_forks_folders_members, ids, is_a_fixpoint, line_of, node,
   save_cleanly, skg_files, under, view_of, without_subtree_of};
+use skg::reset_then_run_subtest;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{TantivyIndex, members_of};
@@ -39,16 +40,16 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-flat-forks-folders",
     |s| Box::pin ( async move {
-      s . reset ("a_forks_folder_takes_the_graphs_and_the_configs_order", FIXTURES) ?;
-      a_forks_folder_takes_the_graphs_and_the_configs_order (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_forks_folder_is_flat_and_saves_unchanged", FIXTURES) ?;
-      a_forks_folder_is_flat_and_saves_unchanged (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_forks_request_on_a_member_draws_its_forks_folder", FIXTURES) ?;
-      a_forks_request_on_a_member_draws_its_forks_folder (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("deleting_an_indirect_member_hides_it", FIXTURES) ?;
-      deleting_an_indirect_member_hides_it (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_cut_from_an_indirect_member_makes_the_note_fork_it", FIXTURES) ?;
-      a_cut_from_an_indirect_member_makes_the_note_fork_it (&s . config, &mut s . tantivy) . await ?;
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_forks_folder_takes_the_graphs_and_the_configs_order (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_forks_folder_is_flat_and_saves_unchanged (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_forks_request_on_a_member_draws_its_forks_folder (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        deleting_an_indirect_member_hides_it (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_cut_from_an_indirect_member_makes_the_note_fork_it (&s . config, &mut s . tantivy) . await);
       Ok (( )) } )) }
 
 //

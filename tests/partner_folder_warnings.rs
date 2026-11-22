@@ -15,6 +15,7 @@
 use crate::view_and_save_helpers::line_containing;
 use std::error::Error;
 
+use skg::reset_then_run_subtest;
 use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, run_with_shared_test_stores, graph_handle_from_config};
 use skg::test_utils::multi_root_view;
 use skg::serve::ViewsState;
@@ -36,9 +37,8 @@ fn all_tests
       s . reset ("write_protected_folder_repairs_warn", fixtures) ?;
       write_protected_folder_repairs_warn_impl (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("failed_save_carries_warnings_with_errors", fixtures) ?;
-      failed_save_carries_warnings_with_errors (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (fixtures),
+        failed_save_carries_warnings_with_errors ( &s . config, &mut s . tantivy ) . await);
       Ok (( )) } )) }
 
 /// Save 'buf' as the view of n. The save registers the view in

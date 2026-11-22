@@ -31,6 +31,7 @@ use std::collections::BTreeMap;
 use crate::view_and_save_helpers::{
   content_of, depth, ids, is_a_fixpoint, line_of, node, save_cleanly, skg_files,
   under, view_of, with_line_after_subtree_of, without_subtree_of};
+use skg::reset_then_run_subtest;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{TantivyIndex, members_of};
@@ -44,12 +45,12 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-forks-meet",
     |s| Box::pin ( async move {
-      s . reset ("rs_view_shows_n_and_its_forks", FIXTURES) ?;
-      rs_view_shows_n_and_its_forks (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("cutting_x4_from_n_in_rs_view_hides_it_in_r", FIXTURES) ?;
-      cutting_x4_from_n_in_rs_view_hides_it_in_r (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("moving_y_from_t_into_n_makes_n_fork_t", FIXTURES) ?;
-      moving_y_from_t_into_n_makes_n_fork_t (&s . config, &mut s . tantivy) . await ?;
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        rs_view_shows_n_and_its_forks (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        cutting_x4_from_n_in_rs_view_hides_it_in_r (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        moving_y_from_t_into_n_makes_n_fork_t (&s . config, &mut s . tantivy) . await);
       Ok (( )) } )) }
 
 //

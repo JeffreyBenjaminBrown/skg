@@ -48,6 +48,7 @@ use crate::view_and_save_helpers::{
   save_cleanly, skg_files, under, view_of, with_line_after_subtree_of};
 use skg::metadata_canon::without_viewnode_ids;
 use skg::skgrepo_sets::SkgrepoRestriction;
+use skg::reset_then_run_subtest;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex, members_of};
@@ -77,32 +78,32 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-forkers-drawn-editable",
     |s| Box::pin ( async move {
-      s . reset ("an_unchanged_save_of_an_editable_forker_writes_nothing", FIXTURES) ?;
-      an_unchanged_save_of_an_editable_forker_writes_nothing (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_fresh_view_draws_forkers_after_forkees_editable", FIXTURES) ?;
-      a_fresh_view_draws_forkers_after_forkees_editable (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_forkers_folders_stand_in_order", FIXTURES) ?;
-      a_forkers_folders_stand_in_order (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_forkers_own_view_lists_every_mirror_flat", FIXTURES) ?;
-      a_forkers_own_view_lists_every_mirror_flat (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("an_unchanged_fresh_view_writes_nothing", FIXTURES) ?;
-      an_unchanged_fresh_view_writes_nothing (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("an_owned_forkers_title_is_saved", FIXTURES) ?;
-      an_owned_forkers_title_is_saved (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_foreign_forkers_title_is_refused", FIXTURES) ?;
-      a_foreign_forkers_title_is_refused (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_child_typed_under_an_owned_forker_joins_its_content", FIXTURES) ?;
-      a_child_typed_under_an_owned_forker_joins_its_content (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_child_typed_under_a_foreign_forker_is_refused", FIXTURES) ?;
-      a_child_typed_under_a_foreign_forker_is_refused (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_node_moved_under_an_owned_forker_joins_its_content", FIXTURES) ?;
-      a_node_moved_under_an_owned_forker_joins_its_content (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_node_moved_under_a_foreign_forker_is_refused", FIXTURES) ?;
-      a_node_moved_under_a_foreign_forker_is_refused (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_hide_moved_out_under_a_forker_is_unhidden", FIXTURES) ?;
-      a_hide_moved_out_under_a_forker_is_unhidden (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_write_protected_forker_stays_until_its_note_is_extended", FIXTURES) ?;
-      a_write_protected_forker_stays_until_its_note_is_extended (&s . config, &mut s . tantivy) . await ?;
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        an_unchanged_save_of_an_editable_forker_writes_nothing (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_fresh_view_draws_forkers_after_forkees_editable (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_forkers_folders_stand_in_order (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_forkers_own_view_lists_every_mirror_flat (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        an_unchanged_fresh_view_writes_nothing (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        an_owned_forkers_title_is_saved (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_foreign_forkers_title_is_refused (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_child_typed_under_an_owned_forker_joins_its_content (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_child_typed_under_a_foreign_forker_is_refused (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_node_moved_under_an_owned_forker_joins_its_content (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_node_moved_under_a_foreign_forker_is_refused (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_hide_moved_out_under_a_forker_is_unhidden (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_write_protected_forker_stays_until_its_note_is_extended (&s . config, &mut s . tantivy) . await);
       Ok (( )) } )) }
 
 //

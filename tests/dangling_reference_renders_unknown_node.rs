@@ -17,6 +17,7 @@ use indoc::indoc;
 use std::error::Error;
 
 use skg::assert_metadata_eq;
+use skg::reset_then_run_subtest;
 use skg::test_utils::save_ignoring_streamed_messages;
 use skg::test_utils::empty_views_state;
 use skg::test_utils::single_root_view;
@@ -32,14 +33,10 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-dangling-reference-renders-unknown-node",
     |s| Box::pin ( async move {
-      s . reset ("test_dangling_reference_renders_unknown_node",
-                 "tests/dangling_reference_renders_unknown_node/fixtures") ?;
-      test_dangling_reference_renders_unknown_node (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_buffer_with_unknownnode_child_saves_cleanly",
-                 "tests/dangling_reference_renders_unknown_node/fixtures-save-roundtrip") ?;
-      test_buffer_with_unknownnode_child_saves_cleanly (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset ("tests/dangling_reference_renders_unknown_node/fixtures"),
+        test_dangling_reference_renders_unknown_node ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/dangling_reference_renders_unknown_node/fixtures-save-roundtrip"),
+        test_buffer_with_unknownnode_child_saves_cleanly ( &s . config, &mut s . tantivy ) . await);
       Ok (( )) } )) }
 
 async fn test_dangling_reference_renders_unknown_node (

@@ -5,6 +5,7 @@ use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_viewforest;
 use skg::nodeMerge::merge_nodes;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{run_with_shared_test_stores, tantivy_contains_gnid, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, MSV, TantivyIndex, SkgrepoName, members_of};
@@ -45,15 +46,10 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-merge-nodes",
     |s| Box::pin ( async move {
-      s . reset ("test_merge_2_into_1", fixtures) ?;
-      test_merge_2_into_1 (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_merge_1_into_2", fixtures) ?;
-      test_merge_1_into_2 (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_inrustgraph_queries_resolve_aliases_after_merge", fixtures) ?;
-      test_inrustgraph_queries_resolve_aliases_after_merge (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (fixtures), test_merge_2_into_1 ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures), test_merge_1_into_2 ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        test_inrustgraph_queries_resolve_aliases_after_merge ( &s . config, &mut s . tantivy ) . await);
       Ok (( )) } )) }
 
 async fn test_merge_2_into_1 (

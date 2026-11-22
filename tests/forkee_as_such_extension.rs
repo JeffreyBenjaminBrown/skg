@@ -14,6 +14,7 @@
 use std::error::Error;
 
 use skg::metadata_canon::without_viewnode_ids;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::test_utils::multi_root_view;
 use skg::types::config::SkgConfig;
@@ -27,12 +28,10 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-forkee-as-such-extension",
     |s| Box::pin ( async move {
-      s . reset ("forkee_as_such_extension_hides_and_substitutes", fixtures) ?;
-      forkee_as_such_extension_hides_and_substitutes (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("folder_members_never_substitute", fixtures) ?;
-      folder_members_never_substitute (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (fixtures),
+        forkee_as_such_extension_hides_and_substitutes ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        folder_members_never_substitute ( &s . config, &mut s . tantivy ) . await);
       Ok (( )) } )) }
 
 /// The lines of 'buf', each tagged with its nearest enclosing folder

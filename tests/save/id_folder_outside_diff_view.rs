@@ -12,6 +12,7 @@ use std::error::Error;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, run_with_shared_test_stores, graph_handle_from_config};
 use skg::types::config::SkgConfig;
 use skg::types::misc::TantivyIndex;
@@ -23,9 +24,8 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-save-id-folder-outside-diff-view",
     |s| Box::pin ( async move {
-      s . reset ("a_noClaim_child_under_an_id_folder_survives_the_rerender", fixtures) ?;
-      a_noClaim_child_under_an_id_folder_survives_the_rerender (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (fixtures),
+        a_noClaim_child_under_an_id_folder_survives_the_rerender ( &s . config, &mut s . tantivy ) . await);
       Ok (( )) } )) }
 
 /// Save 'buffer', asserting that it saves; return the rerendered view.

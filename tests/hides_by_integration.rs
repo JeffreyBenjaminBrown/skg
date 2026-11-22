@@ -46,6 +46,7 @@ use crate::view_and_save_helpers::{
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::skgrepo_sets::SkgrepoRestriction;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{multi_root_view_with_skgrepo_set, run_with_shared_test_stores};
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
@@ -58,18 +59,17 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-hides-by-integration",
     |s| Box::pin ( async move {
-      s . reset ("what_the_user_keeps_elsewhere_stands_in_its_own_folder", FIXTURES) ?;
-      what_the_user_keeps_elsewhere_stands_in_its_own_folder (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_move_into_an_owned_note_hides_nothing", FIXTURES) ?;
-      a_move_into_an_owned_note_hides_nothing (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_cut_hides_the_child", FIXTURES) ?;
-      a_cut_hides_the_child (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_child_moved_from_the_note_into_an_owned_note_hides_nothing", FIXTURES) ?;
-      a_child_moved_from_the_note_into_an_owned_note_hides_nothing (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_child_removed_from_the_note_alone_is_hidden", FIXTURES) ?;
-      a_child_removed_from_the_note_alone_is_hidden (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_child_no_owned_note_keeps_shows_again", FIXTURES) ?;
-      a_child_no_owned_note_keeps_shows_again (&s . config, &mut s . tantivy) . await ?;
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        what_the_user_keeps_elsewhere_stands_in_its_own_folder (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_move_into_an_owned_note_hides_nothing (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES), a_cut_hides_the_child (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_child_moved_from_the_note_into_an_owned_note_hides_nothing (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_child_removed_from_the_note_alone_is_hidden (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_child_no_owned_note_keeps_shows_again (&s . config, &mut s . tantivy) . await);
       s . reset_with_fixture_prep (
         "an_existing_hide_of_a_kept_child_stands_in_the_hidden_in_folder", FIXTURES,
         |root| { std::fs::write (
@@ -77,18 +77,18 @@ fn all_tests
                    "pid: M\ntitle: M\ncontains:\n- d\n- z\nforks:\n- x\nhides:\n- a\n" ) ?;
                  Ok (( )) } ) ?;
       an_existing_hide_of_a_kept_child_stands_in_the_hidden_in_folder (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("under_a_narrowing_what_it_keeps_out_shows", FIXTURES) ?;
-      under_a_narrowing_what_it_keeps_out_shows (&s . config, &s . tantivy) ?;
-      s . reset ("a_move_from_a_forker_as_such_into_an_owned_note_hides_nothing", FIXTURES) ?;
-      a_move_from_a_forker_as_such_into_an_owned_note_hides_nothing (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_cut_from_an_indirect_member_hides_the_child", FIXTURES) ?;
-      a_cut_from_an_indirect_member_hides_the_child (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_move_from_an_indirect_member_into_an_owned_note_hides_nothing", FIXTURES) ?;
-      a_move_from_an_indirect_member_into_an_owned_note_hides_nothing (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_member_standing_in_the_folder_names_its_new_keeper", FIXTURES) ?;
-      a_member_standing_in_the_folder_names_its_new_keeper (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("under_a_foreign_note_what_it_contains_is_not_kept_by_the_user", FIXTURES) ?;
-      under_a_foreign_note_what_it_contains_is_not_kept_by_the_user (&s . config, &mut s . tantivy) . await ?;
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        under_a_narrowing_what_it_keeps_out_shows (&s . config, &s . tantivy));
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_move_from_a_forker_as_such_into_an_owned_note_hides_nothing (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_cut_from_an_indirect_member_hides_the_child (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_move_from_an_indirect_member_into_an_owned_note_hides_nothing (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_member_standing_in_the_folder_names_its_new_keeper (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        under_a_foreign_note_what_it_contains_is_not_kept_by_the_user (&s . config, &mut s . tantivy) . await);
       Ok (( )) } )) }
 
 //

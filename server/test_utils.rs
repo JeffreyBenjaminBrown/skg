@@ -375,6 +375,23 @@ where
     test_result_after_cleanup (test_result, cleanup_result, &temp_fixtures) } );
   result }
 
+/// Resets a 'SharedStoreSession' for a sub-test, naming the sub-test
+/// after the function it then calls, so the name is written once.
+///   reset_then_run_subtest! (s . reset (FIXTURES),
+///                            f (&s . config) . await);
+/// is exactly
+///   s . reset ("f", FIXTURES) ?;
+///   f (&s . config) . await ?;
+/// The reset may be any 'SharedStoreSession' reset whose first
+/// argument is the sub-test's name.
+#[macro_export]
+macro_rules! reset_then_run_subtest {
+  ( $session:ident . $reset:ident ( $($reset_arg:expr),+ $(,)? ),
+    $subtest:ident ( $($subtest_arg:tt)* ) $($after_call:tt)* ) => {
+    $session . $reset ( stringify! ($subtest), $($reset_arg),+ ) ?;
+    $subtest ( $($subtest_arg)* ) $($after_call)* ?; };
+}
+
 /// Whether 'text', parsed over 'graph' and refreshed again by
 /// 'refresh' and rendered, comes back as it was: the fixpoint of the
 /// refresh. Err says how not. The refresh's unit tests

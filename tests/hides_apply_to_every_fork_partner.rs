@@ -29,6 +29,7 @@ use std::error::Error;
 use crate::view_and_save_helpers::{depth, hides_of, ids, line_of, save, view_of};
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::reset_then_run_subtest;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::config::SkgConfig;
 use skg::types::misc::TantivyIndex;
@@ -41,16 +42,16 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-hides-apply-to-every-fork-partner",
     |s| Box::pin ( async move {
-      s . reset ("a_hide_only_a_forker_explains_stands_under_that_forker", FIXTURES) ?;
-      a_hide_only_a_forker_explains_stands_under_that_forker (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("editing_the_hidden_outside_folder_unhides_and_hides", FIXTURES) ?;
-      editing_the_hidden_outside_folder_unhides_and_hides (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("an_unhide_under_a_forker_survives_the_hidden_outside_folder", FIXTURES) ?;
-      an_unhide_under_a_forker_survives_the_hidden_outside_folder (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("removing_a_child_a_forker_contains_hides_it", FIXTURES) ?;
-      removing_a_child_a_forker_contains_hides_it (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("emptying_the_hidden_outside_folder_lets_it_go", FIXTURES) ?;
-      emptying_the_hidden_outside_folder_lets_it_go (&s . config, &mut s . tantivy) . await ?;
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_hide_only_a_forker_explains_stands_under_that_forker (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        editing_the_hidden_outside_folder_unhides_and_hides (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        an_unhide_under_a_forker_survives_the_hidden_outside_folder (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        removing_a_child_a_forker_contains_hides_it (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        emptying_the_hidden_outside_folder_lets_it_go (&s . config, &mut s . tantivy) . await);
       Ok (( )) } )) }
 
 //

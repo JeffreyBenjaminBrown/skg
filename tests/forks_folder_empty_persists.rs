@@ -14,6 +14,7 @@
 use indoc::indoc;
 use std::error::Error;
 
+use skg::reset_then_run_subtest;
 use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, run_with_shared_test_stores, graph_handle_from_config};
 use skg::serve::ViewsState;
 
@@ -29,12 +30,10 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-forks-folder-empty-persists",
     |s| Box::pin ( async move {
-      s . reset ("test_empty_forks_folder_persists", fixtures) ?;
-      test_empty_forks_folder_persists (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_empty_hider_folder_is_removed", fixtures) ?;
-      test_empty_hider_folder_is_removed (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (fixtures),
+        test_empty_forks_folder_persists ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        test_empty_hider_folder_is_removed ( &s . config, &mut s . tantivy ) . await);
       Ok (( )) } )) }
 
 async fn test_empty_forks_folder_persists (

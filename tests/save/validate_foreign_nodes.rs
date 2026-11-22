@@ -3,6 +3,7 @@
 use indoc::indoc;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::from_text::buffer_to_validated_saveplan;
+use skg::reset_then_run_subtest;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::errors::{SaveError, BufferValidationError};
 use skg::types::config::SkgConfig;
@@ -19,39 +20,30 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-save-validate-foreign-nodes",
     |s| Box::pin ( async move {
-      s . reset_from_config ("test_unmodified_foreign_node_allowed", CONFIG_PATH) ?;
-      test_unmodified_foreign_node_allowed (
-        &s . config ) . await ?;
+      reset_then_run_subtest! (s . reset_from_config (CONFIG_PATH),
+        test_unmodified_foreign_node_allowed ( &s . config ) . await);
       s . reset_from_config ("test_modified_foreign_node_forks_with_default_repo", CONFIG_PATH) ?;
       test_modified_foreign_node_forks_with_default_skgrepo (
         &s . config ) . await ?;
       s . reset_from_config ("test_modified_foreign_node_body_forks_with_default_repo", CONFIG_PATH) ?;
       test_modified_foreign_node_body_forks_with_default_skgrepo (
         &s . config ) . await ?;
-      s . reset_from_config ("test_writeProtected_foreign_node_filtered", CONFIG_PATH) ?;
-      test_writeProtected_foreign_node_filtered (
-        &s . config ) . await ?;
-      s . reset_from_config ("test_owned_node_unchanged_behavior", CONFIG_PATH) ?;
-      test_owned_node_unchanged_behavior (
-        &s . config ) . await ?;
-      s . reset_from_config ("test_delete_foreign_node_rejected", CONFIG_PATH) ?;
-      test_delete_foreign_node_rejected (
-        &s . config ) . await ?;
-      s . reset_from_config ("test_new_foreign_node_rejected", CONFIG_PATH) ?;
-      test_new_foreign_node_rejected (
-        &s . config ) . await ?;
-      s . reset_from_config ("test_mixed_owned_and_foreign_nodes", CONFIG_PATH) ?;
-      test_mixed_owned_and_foreign_nodes (
-        &s . config ) . await ?;
-      s . reset_from_config ("test_merge_with_foreign_acquirer_rejected", CONFIG_PATH) ?;
-      test_merge_with_foreign_acquirer_rejected (
-        &s . config ) . await ?;
-      s . reset_from_config ("test_merge_with_foreign_acquiree_rejected", CONFIG_PATH) ?;
-      test_merge_with_foreign_acquiree_rejected (
-        &s . config ) . await ?;
-      s . reset_from_config ("test_merge_with_both_owned_allowed", CONFIG_PATH) ?;
-      test_merge_with_both_owned_allowed (
-        &s . config ) . await ?;
+      reset_then_run_subtest! (s . reset_from_config (CONFIG_PATH),
+        test_writeProtected_foreign_node_filtered ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config (CONFIG_PATH),
+        test_owned_node_unchanged_behavior ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config (CONFIG_PATH),
+        test_delete_foreign_node_rejected ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config (CONFIG_PATH),
+        test_new_foreign_node_rejected ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config (CONFIG_PATH),
+        test_mixed_owned_and_foreign_nodes ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config (CONFIG_PATH),
+        test_merge_with_foreign_acquirer_rejected ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config (CONFIG_PATH),
+        test_merge_with_foreign_acquiree_rejected ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config (CONFIG_PATH),
+        test_merge_with_both_owned_allowed ( &s . config ) . await);
       Ok (( )) } )) }
 
 async fn test_unmodified_foreign_node_allowed (

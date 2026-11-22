@@ -14,6 +14,7 @@ use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use skg::sexp_string::quote_sexp_string;
 use skg::serve::handlers::text_search::TitleOrAlias;
 use skg::skgrepo_sets::SkgrepoRestriction;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{
   saved_node_by_gnid,
   save_gnids,
@@ -61,36 +62,28 @@ fn all_tests
       s . reset ("repo_set_switch_rerenders_views", fixtures) ?;
       skgrepo_set_switch_rerenders_views (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("content_view_omits_restricted_contained_nodes", fixtures) ?;
-      content_view_omits_restricted_contained_nodes (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (fixtures),
+        content_view_omits_restricted_contained_nodes ( &s . config, &mut s . tantivy ) . await);
       s . reset ("search_filters_restricted_repos_before_ranking_and_truncation", fixtures) ?;
       search_filters_restricted_skgrepos_before_ranking_and_truncation (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("tombstone_in_buffer_does_not_drive_contains", fixtures) ?;
-      tombstone_in_buffer_does_not_drive_contains (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (fixtures),
+        tombstone_in_buffer_does_not_drive_contains ( &s . config, &mut s . tantivy ) . await);
       s . reset ("restricted_repo_search_and_save_work_together_end_to_end", fixtures) ?;
       restricted_skgrepo_search_and_save_work_together_end_to_end (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("the_containerward_chain_stops_before_a_restricted_container", fixtures) ?;
-      the_containerward_chain_stops_before_a_restricted_container (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("tombstones_under_folders_save_without_error", fixtures) ?;
-      tombstones_under_folders_save_without_error (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("tombstone_in_forks_folder_does_not_contribute_to_forks", fixtures) ?;
-      tombstone_in_forks_folder_does_not_contribute_to_forks (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("weave_preserves_omitted_restricted_content_members", fixtures) ?;
-      weave_preserves_omitted_restricted_content_members (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("restricted_save_preserves_invisible_fork_targets", fixtures) ?;
-      restricted_save_preserves_invisible_fork_targets (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_save_of_a_view_rendered_under_another_restriction_is_refused", fixtures) ?;
-      a_save_of_a_view_rendered_under_another_restriction_is_refused (
-        &s . config, &mut s . tantivy ) ?;
+      reset_then_run_subtest! (s . reset (fixtures),
+        the_containerward_chain_stops_before_a_restricted_container ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        tombstones_under_folders_save_without_error ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        tombstone_in_forks_folder_does_not_contribute_to_forks ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        weave_preserves_omitted_restricted_content_members ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        restricted_save_preserves_invisible_fork_targets ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        a_save_of_a_view_rendered_under_another_restriction_is_refused ( &s . config, &mut s . tantivy ));
       Ok (( )) } )) }
 
 /// PIN (the mirror-substitution-across-switch case,

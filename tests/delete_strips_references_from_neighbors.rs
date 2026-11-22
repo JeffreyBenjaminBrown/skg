@@ -32,6 +32,7 @@ use skg::dbs::filesystem::one_node::{
   graphnode_from_pid_and_skgrepo as load_nc};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::save::update_graph_minus_nodeMerges;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{save_ignoring_streamed_messages, mk_test_tcp_stream_pair, empty_views_state, run_with_shared_test_stores, graph_handle_from_config,
                       read_lp_message, extract_string_field_from_sexp,
                       skg_env_from_parts};
@@ -55,34 +56,20 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-delete-strips-references-from-neighbors",
     |s| Box::pin ( async move {
-      s . reset ("test_delete_strips_references_from_neighbors",
-                 "tests/delete_strips_references_from_neighbors/fixtures") ?;
-      test_delete_strips_references_from_neighbors (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_strip_pass_amends_user_supplied_savenode",
-                 "tests/delete_strips_references_from_neighbors/fixtures-with-existing-save") ?;
-      test_strip_pass_amends_user_supplied_savenode (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_strip_pass_handles_extra_ids",
-                 "tests/delete_strips_references_from_neighbors/fixtures-extra-ids") ?;
-      test_strip_pass_handles_extra_ids (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("delete_preserves_foreign_referencer",
-                 "tests/delete_strips_references_from_neighbors/fixtures-cross-owner") ?;
-      delete_preserves_foreign_referencer (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("delete_in_foreign_forkee_rerenders_as_unknown",
-                 "tests/delete_strips_references_from_neighbors/fixtures-cross-owner") ?;
-      delete_in_foreign_forkee_rerenders_as_unknown (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("delete_in_foreign_hiddenoutside_rerenders_as_unknown",
-                 "tests/delete_strips_references_from_neighbors/fixtures-cross-owner") ?;
-      delete_in_foreign_hiddenoutside_rerenders_as_unknown (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("absent_reference_cleanup_handler_confirms_then_rewrites",
-                 "tests/delete_strips_references_from_neighbors/fixtures-absent-reference-command") ?;
-      absent_reference_cleanup_handler_confirms_then_rewrites (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset ("tests/delete_strips_references_from_neighbors/fixtures"),
+        test_delete_strips_references_from_neighbors ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/delete_strips_references_from_neighbors/fixtures-with-existing-save"),
+        test_strip_pass_amends_user_supplied_savenode ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/delete_strips_references_from_neighbors/fixtures-extra-ids"),
+        test_strip_pass_handles_extra_ids ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/delete_strips_references_from_neighbors/fixtures-cross-owner"),
+        delete_preserves_foreign_referencer ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/delete_strips_references_from_neighbors/fixtures-cross-owner"),
+        delete_in_foreign_forkee_rerenders_as_unknown ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/delete_strips_references_from_neighbors/fixtures-cross-owner"),
+        delete_in_foreign_hiddenoutside_rerenders_as_unknown ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/delete_strips_references_from_neighbors/fixtures-absent-reference-command"),
+        absent_reference_cleanup_handler_confirms_then_rewrites ( &s . config, &mut s . tantivy ) . await);
       Ok (( )) } )) }
 
 /// The command is a two-step protocol when text links would be left alone:

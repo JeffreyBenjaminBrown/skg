@@ -7,6 +7,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::{
   org_to_viewforest};
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::types::errors::BufferValidationError;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo_gnid, compare_viewnode_trees, graph_from_config};
 use skg::types::viewnode::{
   PropertyMember, Viewnode, ViewnodeKind, Vognode};
@@ -27,10 +28,8 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-new-add-missing-info",
     |s| Box::pin ( async move {
-      s . reset ("test_add_missing_info_comprehensive",
-                 "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
-      test_add_missing_info_comprehensive (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset ("tests/new/buffer_to_viewnodes/add_missing_info/fixtures"),
+        test_add_missing_info_comprehensive ( &s . config, &mut s . tantivy ) . await);
       s . reset ("test_repo_inheritance_multi_level",
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
       test_skgrepo_inheritance_multi_level (
@@ -39,22 +38,14 @@ fn all_tests
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
       test_repoless_folder_member_gets_graph_skgrepo (
         &s . config ) . await ?;
-      s . reset ("test_child_of_writeProtected_occurrence_inherits_its_gnid_skgrepo",
-                 "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
-      test_child_of_writeProtected_occurrence_inherits_its_gnid_skgrepo (
-        &s . config ) . await ?;
-      s . reset ("test_new_headline_inherits_through_ghosts_and_folders",
-                 "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
-      test_new_headline_inherits_through_ghosts_and_folders (
-        &s . config ) . await ?;
-      s . reset ("test_new_headline_at_top_level_is_refused",
-                 "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
-      test_new_headline_at_top_level_is_refused (
-        &s . config ) . await ?;
-      s . reset ("test_provenance_records_what_the_parse_invented",
-                 "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
-      test_provenance_records_what_the_parse_invented (
-        &s . config ) . await ?;
+      reset_then_run_subtest! (s . reset ("tests/new/buffer_to_viewnodes/add_missing_info/fixtures"),
+        test_child_of_writeProtected_occurrence_inherits_its_gnid_skgrepo ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset ("tests/new/buffer_to_viewnodes/add_missing_info/fixtures"),
+        test_new_headline_inherits_through_ghosts_and_folders ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset ("tests/new/buffer_to_viewnodes/add_missing_info/fixtures"),
+        test_new_headline_at_top_level_is_refused ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset ("tests/new/buffer_to_viewnodes/add_missing_info/fixtures"),
+        test_provenance_records_what_the_parse_invented ( &s . config ) . await);
       Ok (( )) } )) }
 
 /// The provenance keeps apart what the parse invented: a new headline

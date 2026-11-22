@@ -26,6 +26,7 @@ use skg::from_text::buffer_to_validated_saveplan_with_fork_skgrepos;
 use skg::org_to_text::viewforest_to_string;
 use skg::serve::ViewsState;
 use skg::skgrepo_sets::SkgrepoRestriction;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{save_ignoring_streamed_messages, mk_test_tcp_stream_pair, empty_views_state, graph_handle_from_config, run_with_shared_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_approval_test;
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_skgrepos_test;
@@ -143,46 +144,31 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-fork",
     |s| Box::pin ( async move {
-      s . reset ("fork_save_instruction", fixtures) ?;
-      fork_save_instruction (
-        &s . config ) . await ?;
-      s . reset ("fork_fixture_files", fixtures) ?;
-      fork_fixture_files (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("fork_round_trip", fixtures) ?;
-      fork_round_trip (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("fork_collateral_rerender_substitutes_too", fixtures) ?;
-      fork_collateral_rerender_substitutes_too (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("forking_a_note_one_already_forks_is_refused", fixtures) ?;
-      forking_a_note_one_already_forks_is_refused (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (fixtures), fork_save_instruction ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset (fixtures), fork_fixture_files ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures), fork_round_trip ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        fork_collateral_rerender_substitutes_too ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        forking_a_note_one_already_forks_is_refused ( &s . config, &mut s . tantivy ) . await);
       s . reset ("fork_repo_restricted", fixtures) ?;
       fork_skgrepo_restricted (
         &s . config ) . await ?;
-      s . reset ("fork_confirmation_gates_skgsave_commit", fixtures) ?;
-      fork_confirmation_gates_skgsave_commit (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("fork_from_bare_new_child_plan", fixtures) ?;
-      fork_from_bare_new_child_plan (
-        &s . config ) . await ?;
+      reset_then_run_subtest! (s . reset (fixtures),
+        fork_confirmation_gates_skgsave_commit ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures), fork_from_bare_new_child_plan ( &s . config ) . await);
       s . reset ("fork_new_parent_adopts_relationship_repos", fixtures) ?;
       fork_new_parent_adopts_relationship_skgrepos (
         &s . config ) . await ?;
-      s . reset ("fork_from_bare_new_child_skgsave_commits", fixtures) ?;
-      fork_from_bare_new_child_skgsave_commits (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("explicitly_foreign_new_child_still_rejected", fixtures) ?;
-      explicitly_foreign_new_child_still_rejected (
-        &s . config ) . await ?;
+      reset_then_run_subtest! (s . reset (fixtures),
+        fork_from_bare_new_child_skgsave_commits ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        explicitly_foreign_new_child_still_rejected ( &s . config ) . await);
       let two_owned : &str = "tests/fork/fixtures-two-owned";
-      s . reset ("fork_no_owned_ancestor_defaults", two_owned) ?;
-      fork_no_owned_ancestor_defaults (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("fork_user_set_skgrepo_wins", two_owned) ?;
-      fork_user_set_skgrepo_wins (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (two_owned),
+        fork_no_owned_ancestor_defaults ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (two_owned),
+        fork_user_set_skgrepo_wins ( &s . config, &mut s . tantivy ) . await);
       s . reset ("fork_default_prefers_unrestricted_owned_repo", two_owned) ?;
       fork_default_prefers_unrestricted_owned_skgrepo (
         &s . config ) . await ?;
@@ -195,35 +181,23 @@ fn all_tests
       s . reset ("disagreeing_new_child_repos_leave_clone_repo_unconfirmed", two_owned) ?;
       disagreeing_new_child_skgrepos_leave_clone_skgrepo_unconfirmed (
         &s . config ) . await ?;
-      s . reset ("clone_skgrepo_inferred_from_a_moved_writeProtected_ancestor", two_owned) ?;
-      clone_skgrepo_inferred_from_a_moved_writeProtected_ancestor (
-        &s . config ) . await ?;
-      s . reset ("explicit_fork_save_instruction", fixtures) ?;
-      explicit_fork_save_instruction (
-        &s . config ) . await ?;
-      s . reset ("explicit_fork_on_unknown_node_errors", fixtures) ?;
-      explicit_fork_on_unknown_node_errors (
-        &s . config ) . await ?;
-      s . reset ("explicit_fork_round_trip_and_refork_refusal", fixtures) ?;
-      explicit_fork_round_trip_and_refork_refusal (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (two_owned),
+        clone_skgrepo_inferred_from_a_moved_writeProtected_ancestor ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset (fixtures), explicit_fork_save_instruction ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset (fixtures), explicit_fork_on_unknown_node_errors ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        explicit_fork_round_trip_and_refork_refusal ( &s . config, &mut s . tantivy ) . await);
       let mail : &str = "tests/fork/fixtures-mail";
-      s . reset ("a_reply_under_an_unread_message_integrates_it", mail) ?;
-      a_reply_under_an_unread_message_integrates_it (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_reply_deeper_in_an_unread_message_integrates_the_message", mail) ?;
-      a_reply_deeper_in_an_unread_message_integrates_the_message (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_reply_under_ones_own_unfiled_fork_files_the_original", mail) ?;
-      a_reply_under_ones_own_unfiled_fork_files_the_original (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_headline_typed_under_the_foreign_forkee_itself_is_refused", mail) ?;
-      a_headline_typed_under_the_foreign_forkee_itself_is_refused (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_third_partys_reply_in_anothers_unread_list_warns",
-                 "tests/fork/fixtures-mail-third-party") ?;
-      a_third_partys_reply_in_anothers_unread_list_warns (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (mail),
+        a_reply_under_an_unread_message_integrates_it ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (mail),
+        a_reply_deeper_in_an_unread_message_integrates_the_message ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (mail),
+        a_reply_under_ones_own_unfiled_fork_files_the_original ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (mail),
+        a_headline_typed_under_the_foreign_forkee_itself_is_refused ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/fork/fixtures-mail-third-party"),
+        a_third_partys_reply_in_anothers_unread_list_warns ( &s . config, &mut s . tantivy ) . await);
       Ok (( )) } )) }
 
 /// The buffer with a headline 'title' typed as the first child of the

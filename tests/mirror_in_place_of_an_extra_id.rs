@@ -20,6 +20,7 @@ use std::path::PathBuf;
 
 use crate::view_and_save_helpers::{contains_of, depth, ids, line_of, save};
 use skg::skgrepo_sets::SkgrepoRestriction;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{
   multi_root_view_from_perspective, run_with_shared_test_stores, single_root_view};
 use skg::types::config::SkgConfig;
@@ -34,10 +35,10 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-mirror-in-place-of-an-extra-id",
     |s| Box::pin ( async move {
-      s . reset ("a_mirror_in_place_of_an_extra_id_keeps_its_headline", FIXTURES) ?;
-      a_mirror_in_place_of_an_extra_id_keeps_its_headline (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_root_in_place_of_an_extra_id_of_what_it_shows_is_unmarked", FIXTURES) ?;
-      a_root_in_place_of_an_extra_id_of_what_it_shows_is_unmarked (&s . config, &mut s . tantivy) . await ?;
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_mirror_in_place_of_an_extra_id_keeps_its_headline (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_root_in_place_of_an_extra_id_of_what_it_shows_is_unmarked (&s . config, &mut s . tantivy) . await);
       s . reset_with_fixture_prep (
         "a_containers_folder_omits_the_original_a_mirror_above_stands_for", FIXTURES,
         |root| { std::fs::write ( root . join ("owned/base/X.skg"),

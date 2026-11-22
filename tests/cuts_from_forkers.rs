@@ -27,6 +27,7 @@ use std::collections::BTreeMap;
 use crate::view_and_save_helpers::{
   content_of, first_forks_folders_members, ids, line_of, node, refusal_of,
   save_cleanly, skg_files, under, view_of, without_subtree_of};
+use skg::reset_then_run_subtest;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex, members_of};
@@ -40,16 +41,16 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-cuts-from-forkers",
     |s| Box::pin ( async move {
-      s . reset ("a_child_cut_from_a_forker_and_pasted_makes_it_a_mutual", FIXTURES) ?;
-      a_child_cut_from_a_forker_and_pasted_makes_it_a_mutual (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_cut_without_a_paste_hides_what_was_cut", FIXTURES) ?;
-      a_cut_without_a_paste_hides_what_was_cut (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_cut_under_a_foreign_note_is_refused", FIXTURES) ?;
-      a_cut_under_a_foreign_note_is_refused (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_cut_that_would_make_n_fork_what_it_contains_is_refused", FIXTURES) ?;
-      a_cut_that_would_make_n_fork_what_it_contains_is_refused (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_cut_from_a_mutual_detached_in_the_same_save_only_hides", FIXTURES) ?;
-      a_cut_from_a_mutual_detached_in_the_same_save_only_hides (&s . config, &mut s . tantivy) . await ?;
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_child_cut_from_a_forker_and_pasted_makes_it_a_mutual (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_cut_without_a_paste_hides_what_was_cut (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_cut_under_a_foreign_note_is_refused (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_cut_that_would_make_n_fork_what_it_contains_is_refused (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_cut_from_a_mutual_detached_in_the_same_save_only_hides (&s . config, &mut s . tantivy) . await);
       Ok (( )) } )) }
 
 //

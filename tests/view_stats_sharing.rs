@@ -15,6 +15,7 @@
 // save (the viewStats parser errors on unknown atoms, so this also
 // pins the parse arms).
 
+use skg::reset_then_run_subtest;
 use skg::test_utils::save_and_rerender;
 use skg::metadata_canon::without_viewnode_ids;
 use std::error::Error;
@@ -32,12 +33,10 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-view-stats-sharing",
     |s| Box::pin ( async move {
-      s . reset ("sharing_view_stats_appear_and_roundtrip", fixtures) ?;
-      sharing_view_stats_appear_and_roundtrip (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("forking_the_viewparent_is_position_relative", fixtures) ?;
-      forking_the_viewparent_is_position_relative (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (fixtures),
+        sharing_view_stats_appear_and_roundtrip ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        forking_the_viewparent_is_position_relative ( &s . config, &mut s . tantivy ) . await);
       Ok (( )) } )) }
 
 fn lines_containing<'a> (

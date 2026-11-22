@@ -13,6 +13,7 @@ use crate::git_fixture_helpers::save_and_read_collateral;
 use crate::view_and_save_helpers::node_from_disk;
 use indoc::indoc;
 use skg::assert_metadata_eq;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{
   save_ignoring_streamed_messages,
   mk_test_tcp_stream_pair,
@@ -215,98 +216,52 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-hidden-from-forks",
     |s| Box::pin ( async move {
-      s . reset ("test_deleting_foreign_forkee_content_preserves_branch_edit",
-        "tests/hidden_from_forks/fixtures-forkee-edit") ?;
-      test_deleting_foreign_forkee_content_preserves_branch_edit (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_deleting_foreign_forkee_content_infers_hide",
-        "tests/hidden_from_forks/fixtures-forkee-edit") ?;
-      test_deleting_foreign_forkee_content_infers_hide (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_removing_forkee_content_from_forker_contains_infers_hide",
-        "tests/hidden_from_forks/fixtures-clone-edit") ?;
-      test_removing_forkee_content_from_forker_contains_infers_hide (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_readding_forkee_content_to_forker_contains_unhides",
-        "tests/hidden_from_forks/fixtures-clone-edit") ?;
-      test_readding_forkee_content_to_forker_contains_unhides (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_placing_and_removing_a_fork_of_forkee_content_hides_what_it_forks",
-        "tests/hidden_from_forks/fixtures-fork-of-forkee-content") ?;
-      test_placing_and_removing_a_fork_of_forkee_content_hides_what_it_forks (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_removing_a_fork_of_forkee_content_hides_what_it_forks",
-        "tests/hidden_from_forks/fixtures-fork-of-forkee-content") ?;
-      test_removing_a_fork_of_forkee_content_hides_what_it_forks (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_a_preview_and_a_save_say_what_they_hide",
-        "tests/hidden_from_forks/fixtures-fork-of-forkee-content") ?;
-      test_a_preview_and_a_save_say_what_they_hide (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_a_save_says_why_a_removal_hides_nothing",
-        "tests/hidden_from_forks/fixtures-fork-of-forkee-content") ?;
-      test_a_save_says_why_a_removal_hides_nothing (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_placing_a_fork_of_a_hidden_node_keeps_its_hide",
-        "tests/hidden_from_forks/fixtures-fork-of-forkee-content") ?;
-      test_placing_a_fork_of_a_hidden_node_keeps_its_hide (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_replacing_a_fork_with_its_original_hides_nothing",
-        "tests/hidden_from_forks/fixtures-fork-of-forkee-content") ?;
-      test_replacing_a_fork_with_its_original_hides_nothing (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_collateral_view_reflects_newly_hidden_forkee_content",
-        "tests/hidden_from_forks/fixtures-forkee-edit") ?;
-      test_collateral_view_reflects_newly_hidden_forkee_content (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_moving_foreign_forkee_content_to_forker_does_not_hide",
-        "tests/hidden_from_forks/fixtures-forkee-edit") ?;
-      test_moving_foreign_forkee_content_to_forker_does_not_hide (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_moving_foreign_forkee_content_into_another_owned_note_does_not_hide",
-        "tests/hidden_from_forks/fixtures-forkee-edit") ?;
-      test_moving_foreign_forkee_content_into_another_owned_note_does_not_hide (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_a_node_placed_under_a_foreign_forkee_is_refused",
-        "tests/hidden_from_forks/fixtures-forkee-edit") ?;
-      test_a_node_placed_under_a_foreign_forkee_is_refused (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_a_node_placed_under_an_owned_forkee_joins_it",
-        "tests/hidden_from_forks/fixtures-forkee-edit") ?;
-      test_a_node_placed_under_an_owned_forkee_joins_it (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset_from_config ("test_forkee_and_compound_partner_folders",
-        "tests/hidden_from_forks/fixtures-every-kind-of-folder/skgconfig.toml") ?;
-      test_forkee_and_compound_partner_folders (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset_from_config ("test_hidden_within_but_none_without",
-        "tests/hidden_from_forks/fixtures-hidden-within-but-none-without/skgconfig.toml") ?;
-      test_hidden_within_but_none_without (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_moving_hidden_forkee_content_to_visible_branch_infers_unhide",
-        "tests/hidden_from_forks/fixtures-hidden-within-but-none-without") ?;
-      test_moving_hidden_forkee_content_to_visible_branch_infers_unhide (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_collateral_view_reflects_newly_unhidden_forkee_content",
-        "tests/hidden_from_forks/fixtures-hidden-within-but-none-without") ?;
-      test_collateral_view_reflects_newly_unhidden_forkee_content (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_deleting_from_hiddenin_folder_does_not_unhide",
-        "tests/hidden_from_forks/fixtures-hidden-within-but-none-without") ?;
-      test_deleting_from_hiddenin_folder_does_not_unhide (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset_from_config ("test_hidden_without_but_none_within",
-        "tests/hidden_from_forks/fixtures-hidden-without-but-none-within/skgconfig.toml") ?;
-      test_hidden_without_but_none_within (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_adding_to_hiddenoutside_folder_hides_and_moves_inside",
-        "tests/hidden_from_forks/fixtures-hidden-without-but-none-within") ?;
-      test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset_from_config ("test_overlapping_hidden_within",
-        "tests/hidden_from_forks/fixtures-overlapping-hidden-within/skgconfig.toml") ?;
-      test_overlapping_hidden_within (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-forkee-edit"),
+        test_deleting_foreign_forkee_content_preserves_branch_edit ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-forkee-edit"),
+        test_deleting_foreign_forkee_content_infers_hide ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-clone-edit"),
+        test_removing_forkee_content_from_forker_contains_infers_hide ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-clone-edit"),
+        test_readding_forkee_content_to_forker_contains_unhides ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-fork-of-forkee-content"),
+        test_placing_and_removing_a_fork_of_forkee_content_hides_what_it_forks ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-fork-of-forkee-content"),
+        test_removing_a_fork_of_forkee_content_hides_what_it_forks ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-fork-of-forkee-content"),
+        test_a_preview_and_a_save_say_what_they_hide ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-fork-of-forkee-content"),
+        test_a_save_says_why_a_removal_hides_nothing ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-fork-of-forkee-content"),
+        test_placing_a_fork_of_a_hidden_node_keeps_its_hide ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-fork-of-forkee-content"),
+        test_replacing_a_fork_with_its_original_hides_nothing ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-forkee-edit"),
+        test_collateral_view_reflects_newly_hidden_forkee_content ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-forkee-edit"),
+        test_moving_foreign_forkee_content_to_forker_does_not_hide ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-forkee-edit"),
+        test_moving_foreign_forkee_content_into_another_owned_note_does_not_hide ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-forkee-edit"),
+        test_a_node_placed_under_a_foreign_forkee_is_refused ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-forkee-edit"),
+        test_a_node_placed_under_an_owned_forkee_joins_it ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset_from_config ("tests/hidden_from_forks/fixtures-every-kind-of-folder/skgconfig.toml"),
+        test_forkee_and_compound_partner_folders ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset_from_config ("tests/hidden_from_forks/fixtures-hidden-within-but-none-without/skgconfig.toml"),
+        test_hidden_within_but_none_without ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-hidden-within-but-none-without"),
+        test_moving_hidden_forkee_content_to_visible_branch_infers_unhide ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-hidden-within-but-none-without"),
+        test_collateral_view_reflects_newly_unhidden_forkee_content ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-hidden-within-but-none-without"),
+        test_deleting_from_hiddenin_folder_does_not_unhide ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset_from_config ("tests/hidden_from_forks/fixtures-hidden-without-but-none-within/skgconfig.toml"),
+        test_hidden_without_but_none_within ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/hidden_from_forks/fixtures-hidden-without-but-none-within"),
+        test_adding_to_hiddenoutside_folder_hides_and_moves_inside ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset_from_config ("tests/hidden_from_forks/fixtures-overlapping-hidden-within/skgconfig.toml"),
+        test_overlapping_hidden_within ( &s . config, &mut s . tantivy ) . await);
       Ok (( )) } )) }
 
 async fn test_deleting_foreign_forkee_content_preserves_branch_edit (

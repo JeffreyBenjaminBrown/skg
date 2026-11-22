@@ -27,6 +27,7 @@ use skg::serve::handlers::text_search::{
   MatchGroups, TitleOrAlias, build_search_viewforest, draw_search_buffer,
   handle_text_search_request};
 use skg::skgrepo_sets::SkgrepoRestriction;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{mk_test_tcp_stream_pair, empty_views_state, extract_string_field_from_sexp, graph_handle_from_config,
                       read_all_lp_messages, set_skgrepo_retagging_relRepos,
                       skg_env_from_parts};
@@ -46,15 +47,12 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-search-buffer",
     |s| Box::pin ( async move {
-      s . reset ("a_search_without_hits_answers_in_one_message", fixtures) ?;
-      a_search_without_hits_answers_in_one_message (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_search_answers_with_the_search_buffer_in_one_message", fixtures) ?;
-      a_search_answers_with_the_search_buffer_in_one_message (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_title_hit_with_aliases_draws_no_alias_folder", fixtures) ?;
-      a_title_hit_with_aliases_draws_no_alias_folder (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (fixtures),
+        a_search_without_hits_answers_in_one_message ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        a_search_answers_with_the_search_buffer_in_one_message ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        a_title_hit_with_aliases_draws_no_alias_folder ( &s . config, &mut s . tantivy ) . await);
       Ok (( )) } )) }
 
 /// Search for 'terms' under the skgrepo restriction its most private skgrepo (no restriction), and return every

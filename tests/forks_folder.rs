@@ -28,6 +28,7 @@ use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, graph_handle_from_config, run_with_shared_test_stores};
 use skg::types::errors::SaveError;
 use skg::types::config::SkgConfig;
@@ -42,24 +43,23 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-forks-folder",
     |s| Box::pin ( async move {
-      s . reset ("the_folder_holds_forkees_mutuals_then_forkers", FIXTURES) ?;
-      the_folder_holds_forkees_mutuals_then_forkers (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("an_unchanged_save_writes_nothing", FIXTURES) ?;
-      an_unchanged_save_writes_nothing (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_typed_member_is_forked", FIXTURES) ?;
-      a_typed_member_is_forked (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("deleting_a_forkee_ends_the_fork", FIXTURES) ?;
-      deleting_a_forkee_ends_the_fork (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("deleting_a_mutual_ends_the_fork_and_hides_it", FIXTURES) ?;
-      deleting_a_mutual_ends_the_fork_and_hides_it (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("detaching_a_mutual_ends_the_fork_only", FIXTURES) ?;
-      detaching_a_mutual_ends_the_fork_only (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("deleting_a_forker_hides_it_until_the_hide_is_removed", FIXTURES) ?;
-      deleting_a_forker_hides_it_until_the_hide_is_removed (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("attaching_a_forker_makes_it_a_mutual", FIXTURES) ?;
-      attaching_a_forker_makes_it_a_mutual (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_relRepo_request_on_a_forker_is_refused", FIXTURES) ?;
-      a_relRepo_request_on_a_forker_is_refused (&s . config, &mut s . tantivy) . await ?;
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        the_folder_holds_forkees_mutuals_then_forkers (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        an_unchanged_save_writes_nothing (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES), a_typed_member_is_forked (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        deleting_a_forkee_ends_the_fork (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        deleting_a_mutual_ends_the_fork_and_hides_it (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        detaching_a_mutual_ends_the_fork_only (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        deleting_a_forker_hides_it_until_the_hide_is_removed (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        attaching_a_forker_makes_it_a_mutual (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_relRepo_request_on_a_forker_is_refused (&s . config, &mut s . tantivy) . await);
       Ok (( )) } )) }
 
 //

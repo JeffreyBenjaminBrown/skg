@@ -27,6 +27,7 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::skgrepo_sets::SkgrepoRestriction;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{
   mk_test_tcp_stream_pair,
   empty_views_state,
@@ -47,27 +48,17 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-retain-or-entombstone-then-prune",
     |s| Box::pin ( async move {
-      s . reset ("stale_content_vanishes", main) ?;
-      stale_content_vanishes (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_pasted_copy_beside_a_member_merges_into_it", main) ?;
-      a_pasted_copy_beside_a_member_merges_into_it (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_moved_member_vanishes_where_it_was_and_is_drawn_where_it_went", main) ?;
-      a_moved_member_vanishes_where_it_was_and_is_drawn_where_it_went (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_folder_member_kept_unwarranted_is_warranted_when_its_membership_returns", main) ?;
-      a_folder_member_kept_unwarranted_is_warranted_when_its_membership_returns (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("duplicate_members_merge", main) ?;
-      duplicate_members_merge (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("editable_duplicates_merge_with_their_content", main) ?;
-      editable_duplicates_merge_with_their_content (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_stale_alias_vanishes", main) ?;
-      a_stale_alias_vanishes (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (main), stale_content_vanishes ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (main),
+        a_pasted_copy_beside_a_member_merges_into_it ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (main),
+        a_moved_member_vanishes_where_it_was_and_is_drawn_where_it_went ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (main),
+        a_folder_member_kept_unwarranted_is_warranted_when_its_membership_returns ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (main), duplicate_members_merge ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (main),
+        editable_duplicates_merge_with_their_content ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (main), a_stale_alias_vanishes ( &s . config, &mut s . tantivy ) . await);
       Ok (( )) } )) }
 
 

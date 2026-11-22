@@ -34,6 +34,7 @@ use std::error::Error;
 use crate::view_and_save_helpers::{
   contains_of, content_of, forks_of, hides_of, ids, line_of, save_cleanly,
   skg_files, view_of, with_line_after_subtree_of, without_subtree_of};
+use skg::reset_then_run_subtest;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
@@ -46,18 +47,18 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-members-typed-into-a-forks-folder",
     |s| Box::pin ( async move {
-      s . reset ("a_claiming_member_typed_with_some_children_hides_nothing", FIXTURES) ?;
-      a_claiming_member_typed_with_some_children_hides_nothing (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_claiming_member_typed_with_no_children_hides_nothing", FIXTURES) ?;
-      a_claiming_member_typed_with_no_children_hides_nothing (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_claiming_member_typed_while_its_child_leaves_an_owned_note_hides_nothing", FIXTURES) ?;
-      a_claiming_member_typed_while_its_child_leaves_an_owned_note_hides_nothing (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_member_typed_claiming_nothing_while_its_child_leaves_an_owned_note_hides_nothing", FIXTURES) ?;
-      a_member_typed_claiming_nothing_while_its_child_leaves_an_owned_note_hides_nothing (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_member_typed_claiming_nothing_with_some_children_hides_nothing", FIXTURES) ?;
-      a_member_typed_claiming_nothing_with_some_children_hides_nothing (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_member_typed_claiming_nothing_with_no_children_writes_nothing", FIXTURES) ?;
-      a_member_typed_claiming_nothing_with_no_children_writes_nothing (&s . config, &mut s . tantivy) . await ?;
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_claiming_member_typed_with_some_children_hides_nothing (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_claiming_member_typed_with_no_children_hides_nothing (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_claiming_member_typed_while_its_child_leaves_an_owned_note_hides_nothing (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_member_typed_claiming_nothing_while_its_child_leaves_an_owned_note_hides_nothing (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_member_typed_claiming_nothing_with_some_children_hides_nothing (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_member_typed_claiming_nothing_with_no_children_writes_nothing (&s . config, &mut s . tantivy) . await);
       s . reset_with_fixture_prep (
         "a_cut_from_a_member_shown_before_the_save_hides_it", FIXTURES,
         |root| { std::fs::write (

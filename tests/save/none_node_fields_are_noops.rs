@@ -4,6 +4,7 @@ use std::error::Error;
 
 use skg::dbs::filesystem::one_node::optgraphnode_from_gnid;
 use skg::from_text::supplement_from_disk::{ canonicalize_gnids_from_disk, detect_skgrepo_move, supplement_unspecified_fields_from_disk, };
+use skg::reset_then_run_subtest;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{
@@ -21,15 +22,12 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-save-none-node-fields-are-noops",
     |s| Box::pin ( async move {
-      s . reset ("test_none_aliases_get_replaced_with_disk_aliases", fixtures) ?;
-      test_none_aliases_get_replaced_with_disk_aliases (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_none_forks_get_replaced_with_disk_forks", fixtures) ?;
-      test_none_forks_get_replaced_with_disk_forks (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_none_hides_get_replaced_with_disk_hides", fixtures) ?;
-      test_none_hides_get_replaced_with_disk_hides (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (fixtures),
+        test_none_aliases_get_replaced_with_disk_aliases ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        test_none_forks_get_replaced_with_disk_forks ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        test_none_hides_get_replaced_with_disk_hides ( &s . config, &mut s . tantivy ) . await);
       Ok (( )) } )) }
 
 async fn supplement_from_disk_then_extract_graphnode (

@@ -38,6 +38,7 @@
 // forks L, contains L1 and hides L2; V, in
 // "main", contains J, and Y, in "main", links to it.
 
+use skg::reset_then_run_subtest;
 use skg::test_utils::{save_added_forks, save_and_rerender};
 use indoc::indoc;
 use std::error::Error;
@@ -92,107 +93,72 @@ fn all_tests
     "skg-test-mirror-substitution",
     |s| Box::pin ( async move {
       let apart : &str = "tests/mirror_substitution/fixtures-apart";
-      s . reset ("de_novo_rendering_shows_the_mirror_marked", apart) ?;
-      de_novo_rendering_shows_the_mirror_marked (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("save_roundtrips_to_original_and_is_a_fixpoint", apart) ?;
-      save_roundtrips_to_original_and_is_a_fixpoint (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("extraction_honors_inPlaceOf", fixtures) ?;
-      extraction_honors_inPlaceOf (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_second_owned_fork_saves_and_the_original_stands", fixtures) ?;
-      a_second_owned_fork_saves_and_the_original_stands (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("an_owned_mutual_pair_saves_and_the_original_stands", fixtures) ?;
-      an_owned_mutual_pair_saves_and_the_original_stands (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset_from_config ("the_perspectives_skgrepo_and_visibility_gate_substitution",
-                             "tests/mirror_substitution/fixtures-multi/skgconfig.toml") ?;
-      the_perspectives_skgrepo_and_visibility_gate_substitution (
-        &s . config ) . await ?;
-      s . reset_from_config ("chain_half_visible_keeps_the_original",
-                             "tests/mirror_substitution/fixtures-chain/skgconfig.toml") ?;
-      chain_half_visible_keeps_the_original (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (apart),
+        de_novo_rendering_shows_the_mirror_marked ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (apart),
+        save_roundtrips_to_original_and_is_a_fixpoint ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        extraction_honors_inPlaceOf ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        a_second_owned_fork_saves_and_the_original_stands ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        an_owned_mutual_pair_saves_and_the_original_stands ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset_from_config ("tests/mirror_substitution/fixtures-multi/skgconfig.toml"),
+        the_perspectives_skgrepo_and_visibility_gate_substitution ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset_from_config ("tests/mirror_substitution/fixtures-chain/skgconfig.toml"),
+        chain_half_visible_keeps_the_original ( &s . config, &mut s . tantivy ) . await);
       let foreign_root : &str =
         "tests/mirror_substitution/fixtures-foreign-root";
-      s . reset ("a_view_follows_the_perspective_of_its_roots_home", foreign_root) ?;
-      a_view_follows_the_perspective_of_its_roots_home (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("under_a_foreign_root_a_save_roundtrips_its_homes_mirror", foreign_root) ?;
-      under_a_foreign_root_a_save_roundtrips_its_homes_mirror (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror", foreign_root) ?;
-      the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror (
-        &s . config ) . await ?;
-      s . reset ("under_a_foreign_root_a_forked_child_is_shown_as_the_original", foreign_root) ?;
-      under_a_foreign_root_a_forked_child_is_shown_as_the_original (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_forked_foreign_root_follows_its_clones_home", foreign_root) ?;
-      a_forked_foreign_root_follows_its_clones_home (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_switched_view_follows_a_skgrepos_perspective_until_switched_back", foreign_root) ?;
-      a_switched_view_follows_a_skgrepos_perspective_until_switched_back (
-        &s . config, &mut s . tantivy ) ?;
-      s . reset ("a_switch_of_perspective_re_points_a_substituted_content_child", foreign_root) ?;
-      a_switch_of_perspective_re_points_a_substituted_content_child (
-        &s . config, &mut s . tantivy ) ?;
-      s . reset ("a_re_pointed_content_child_draws_its_forks_folder_afresh",
-                 "tests/mirror_substitution/fixtures-re-pointed-child") ?;
-      a_re_pointed_content_child_draws_its_forks_folder_afresh (
-        &s . config, &mut s . tantivy ) ?;
-      s . reset ("the_first_declared_mirror_stands_where_the_perspectives_skgrepo_holds_none",
-                 "tests/mirror_substitution/fixtures-third-author") ?;
-      the_first_declared_mirror_stands_where_the_perspectives_skgrepo_holds_none (
-        &s . config, &mut s . tantivy ) ?;
-      s . reset ("a_switch_to_a_skgrepo_is_refused_where_it_would_change_nothing", foreign_root) ?;
-      a_switch_to_a_skgrepo_is_refused_where_it_would_change_nothing (
-        &s . config, &mut s . tantivy ) ?;
-      s . reset ("next_cycles_through_every_perspective_that_shows_the_view_differently", foreign_root) ?;
-      next_cycles_through_every_perspective_that_shows_the_view_differently (
-        &s . config, &mut s . tantivy ) ?;
-      s . reset ("a_perspective_stays_in_the_cycle_where_another_hides_what_it_forks", foreign_root) ?;
-      a_perspective_stays_in_the_cycle_where_another_hides_what_it_forks (
-        &s . config, &mut s . tantivy ) ?;
-      s . reset ("the_root_homes_are_named_in_the_order_of_their_first_roots", foreign_root) ?;
-      the_root_homes_are_named_in_the_order_of_their_first_roots (
-        &s . config, &mut s . tantivy ) ?;
-      s . reset ("next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_homes", foreign_root) ?;
-      next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_homes (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_perspective_replaces_the_root_and_the_root_homes_restore_it", foreign_root) ?;
-      a_perspective_replaces_the_root_and_the_root_homes_restore_it (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_replaced_root_shows_its_own_containers", foreign_root) ?;
-      a_replaced_root_shows_its_own_containers (
-        &s . config, &mut s . tantivy ) ?;
+      reset_then_run_subtest! (s . reset (foreign_root),
+        a_view_follows_the_perspective_of_its_roots_home ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (foreign_root),
+        under_a_foreign_root_a_save_roundtrips_its_homes_mirror ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (foreign_root),
+        the_tamper_check_accepts_any_mirror_and_refuses_a_non_mirror ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset (foreign_root),
+        under_a_foreign_root_a_forked_child_is_shown_as_the_original ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (foreign_root),
+        a_forked_foreign_root_follows_its_clones_home ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (foreign_root),
+        a_switched_view_follows_a_skgrepos_perspective_until_switched_back ( &s . config, &mut s . tantivy ));
+      reset_then_run_subtest! (s . reset (foreign_root),
+        a_switch_of_perspective_re_points_a_substituted_content_child ( &s . config, &mut s . tantivy ));
+      reset_then_run_subtest! (s . reset ("tests/mirror_substitution/fixtures-re-pointed-child"),
+        a_re_pointed_content_child_draws_its_forks_folder_afresh ( &s . config, &mut s . tantivy ));
+      reset_then_run_subtest! (s . reset ("tests/mirror_substitution/fixtures-third-author"),
+        the_first_declared_mirror_stands_where_the_perspectives_skgrepo_holds_none ( &s . config, &mut s . tantivy ));
+      reset_then_run_subtest! (s . reset (foreign_root),
+        a_switch_to_a_skgrepo_is_refused_where_it_would_change_nothing ( &s . config, &mut s . tantivy ));
+      reset_then_run_subtest! (s . reset (foreign_root),
+        next_cycles_through_every_perspective_that_shows_the_view_differently ( &s . config, &mut s . tantivy ));
+      reset_then_run_subtest! (s . reset (foreign_root),
+        a_perspective_stays_in_the_cycle_where_another_hides_what_it_forks ( &s . config, &mut s . tantivy ));
+      reset_then_run_subtest! (s . reset (foreign_root),
+        the_root_homes_are_named_in_the_order_of_their_first_roots ( &s . config, &mut s . tantivy ));
+      reset_then_run_subtest! (s . reset (foreign_root),
+        next_from_a_perspective_that_left_the_cycle_goes_back_to_the_root_homes ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (foreign_root),
+        a_perspective_replaces_the_root_and_the_root_homes_restore_it ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (foreign_root),
+        a_replaced_root_shows_its_own_containers ( &s . config, &mut s . tantivy ));
       let replaced_root_folders : &str =
         "tests/mirror_substitution/fixtures-replaced-root-folders";
-      s . reset ("a_replaced_root_shows_its_own_default_folders", replaced_root_folders) ?;
-      a_replaced_root_shows_its_own_default_folders (
-        &s . config, &mut s . tantivy ) ?;
-      s . reset ("a_replaced_root_redraws_the_folders_it_was_asked_for", replaced_root_folders) ?;
-      a_replaced_root_redraws_the_folders_it_was_asked_for (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_replaced_search_hit_stays_a_hit", replaced_root_folders) ?;
-      a_replaced_search_hit_stays_a_hit (
-        &s . config, &mut s . tantivy ) ?;
-      s . reset ("a_save_following_a_skgrepos_perspective_shows_a_new_fork_in_place", foreign_root) ?;
-      a_save_following_a_skgrepos_perspective_shows_a_new_fork_in_place (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_held_view_follows_whatever_its_save_names", foreign_root) ?;
-      a_held_view_follows_whatever_its_save_names (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("the_tamper_check_accepts_a_mirror_whatever_perspective_the_save_names", foreign_root) ?;
-      the_tamper_check_accepts_a_mirror_whatever_perspective_the_save_names (
-        &s . config ) ?;
-      s . reset ("deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_another_mirror", foreign_root) ?;
-      deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_another_mirror (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_deleted_mirror_keeps_its_original_but_a_removed_one_does_not", foreign_root) ?;
-      a_deleted_mirror_keeps_its_original_but_a_removed_one_does_not (
-        &s . config ) ?;
+      reset_then_run_subtest! (s . reset (replaced_root_folders),
+        a_replaced_root_shows_its_own_default_folders ( &s . config, &mut s . tantivy ));
+      reset_then_run_subtest! (s . reset (replaced_root_folders),
+        a_replaced_root_redraws_the_folders_it_was_asked_for ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (replaced_root_folders),
+        a_replaced_search_hit_stays_a_hit ( &s . config, &mut s . tantivy ));
+      reset_then_run_subtest! (s . reset (foreign_root),
+        a_save_following_a_skgrepos_perspective_shows_a_new_fork_in_place ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (foreign_root),
+        a_held_view_follows_whatever_its_save_names ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (foreign_root),
+        the_tamper_check_accepts_a_mirror_whatever_perspective_the_save_names ( &s . config ));
+      reset_then_run_subtest! (s . reset (foreign_root),
+        deleting_the_users_fork_in_a_foreign_parent_leaves_the_parent_and_shows_another_mirror ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (foreign_root),
+        a_deleted_mirror_keeps_its_original_but_a_removed_one_does_not ( &s . config ));
       Ok (( )) } )) }
 
 fn marked_lines<'a> (

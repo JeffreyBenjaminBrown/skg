@@ -14,6 +14,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use skg::from_text::local_fieldintent_collection::{
   extract_nonmergeSavePlan_locally, NonmergeSavePlan };
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{instruction_gnids, saved_node_by_gnid, run_with_shared_test_stores, graph_handle_from_config, graph_from_config};
 use skg::types::errors::BufferValidationError;
 use skg::types::config::SkgConfig;
@@ -45,34 +46,20 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-new-lic-pipeline",
     |s| Box::pin ( async move {
-      s . reset ("pipeline_basic_mixed_tree",
-                 "tests/merge/merge_nodes/fixtures") ?;
-      pipeline_basic_mixed_tree (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset_from_config ("pipeline_forkee_hiderels",
-                             FORKEE_EDIT_CONFIG) ?;
-      pipeline_forkee_hiderels (
-        &s . config ) . await ?;
-      s . reset ("pipeline_write_protected_folder_member_edits",
-                 "tests/merge/merge_nodes/fixtures") ?;
-      pipeline_write_protected_folder_member_edits (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("pipeline_restricted_subtree",
-                 "tests/merge/merge_nodes/fixtures") ?;
-      pipeline_restricted_subtree (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("pipeline_ghost_subtree",
-                 "tests/merge/merge_nodes/fixtures") ?;
-      pipeline_ghost_subtree (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("pipeline_nodeMerge_requests",
-                 "tests/merge/merge_nodes/fixtures") ?;
-      pipeline_nodeMerge_requests (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset_from_config ("pipeline_rejects_text_claim_mismatch",
-                             FORKEE_EDIT_CONFIG) ?;
-      pipeline_rejects_text_claim_mismatch (
-        &s . config ) . await ?;
+      reset_then_run_subtest! (s . reset ("tests/merge/merge_nodes/fixtures"),
+        pipeline_basic_mixed_tree ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset_from_config (FORKEE_EDIT_CONFIG),
+        pipeline_forkee_hiderels ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset ("tests/merge/merge_nodes/fixtures"),
+        pipeline_write_protected_folder_member_edits ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/merge/merge_nodes/fixtures"),
+        pipeline_restricted_subtree ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/merge/merge_nodes/fixtures"),
+        pipeline_ghost_subtree ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/merge/merge_nodes/fixtures"),
+        pipeline_nodeMerge_requests ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset_from_config (FORKEE_EDIT_CONFIG),
+        pipeline_rejects_text_claim_mismatch ( &s . config ) . await);
       Ok (( )) } )) }
 
 async fn pipeline_basic_mixed_tree (

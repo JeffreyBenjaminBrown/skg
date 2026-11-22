@@ -6,6 +6,7 @@ use std::io::BufReader;
 use std::net::TcpStream;
 use std::sync::Arc;
 
+use skg::reset_then_run_subtest;
 use skg::test_utils::{mk_test_tcp_stream_pair, empty_views_state, multi_root_view, single_root_view};
 use skg::assert_metadata_eq;
 use skg::serve::ViewsState;
@@ -27,34 +28,20 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-content-view",
     |s| Box::pin ( async move {
-      s . reset ("test_multi_root_view_logic",
-                 "tests/content_view/fixtures-2") ?;
-      test_multi_root_view_logic (
-        &s . config ) . await ?;
-      s . reset ("test_single_root_view_with_cycle",
-                 "tests/content_view/fixtures-shared-cycle") ?;
-      test_single_root_view_with_cycle (
-        &s . config ) . await ?;
-      s . reset ("test_multi_root_view_with_shared_nodes",
-                 "tests/content_view/fixtures-shared-cycle") ?;
-      test_multi_root_view_with_shared_nodes (
-        &s . config ) . await ?;
-      s . reset ("test_multi_root_view_with_node_limit",
-                 "tests/content_view/fixtures-shared-cycle") ?;
-      test_multi_root_view_with_node_limit (
-        &s . config ) . await ?;
-      s . reset ("test_limit_with_multiple_sibling_groups",
-                 "tests/content_view/fixtures-3") ?;
-      test_limit_with_multiple_sibling_groups (
-        &s . config ) . await ?;
-      s . reset ("a_root_only_of_a_diffView_buffer_gets_a_content_view",
-                 "tests/content_view/fixtures-2") ?;
-      a_root_only_of_a_diffView_buffer_gets_a_content_view (
-        &s . config, &s . tantivy ) ?;
-      s . reset ("a_root_of_a_content_view_and_a_diffView_buffer_switches_to_the_content_view",
-                 "tests/content_view/fixtures-2") ?;
-      a_root_of_a_content_view_and_a_diffView_buffer_switches_to_the_content_view (
-        &s . config, &s . tantivy ) ?;
+      reset_then_run_subtest! (s . reset ("tests/content_view/fixtures-2"),
+        test_multi_root_view_logic ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset ("tests/content_view/fixtures-shared-cycle"),
+        test_single_root_view_with_cycle ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset ("tests/content_view/fixtures-shared-cycle"),
+        test_multi_root_view_with_shared_nodes ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset ("tests/content_view/fixtures-shared-cycle"),
+        test_multi_root_view_with_node_limit ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset ("tests/content_view/fixtures-3"),
+        test_limit_with_multiple_sibling_groups ( &s . config ) . await);
+      reset_then_run_subtest! (s . reset ("tests/content_view/fixtures-2"),
+        a_root_only_of_a_diffView_buffer_gets_a_content_view ( &s . config, &s . tantivy ));
+      reset_then_run_subtest! (s . reset ("tests/content_view/fixtures-2"),
+        a_root_of_a_content_view_and_a_diffView_buffer_switches_to_the_content_view ( &s . config, &s . tantivy ));
       Ok (( )) } )) }
 
 async fn test_multi_root_view_logic (

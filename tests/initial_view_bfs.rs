@@ -3,6 +3,7 @@
 use indoc::indoc;
 use std::error::Error;
 
+use skg::reset_then_run_subtest;
 use skg::test_utils::multi_root_view;
 use skg::assert_metadata_eq;
 use skg::test_utils::run_with_shared_test_stores;
@@ -18,19 +19,14 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-initial-view-bfs",
     |s| Box::pin ( async move {
-      s . reset ("test_bfs_limit_across_multiple_trees", fixtures) ?;
-      test_bfs_limit_across_multiple_trees (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_bfs_limit_9_three_branches", fixtures) ?;
-      test_bfs_limit_9_three_branches (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_bfs_limit_8_two_branches", fixtures) ?;
-      test_bfs_limit_8_two_branches (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_budget_reaches_forkees_and_content_in_level_order",
-                 "tests/initial_view_bfs/fixtures-content-vs-forkees") ?;
-      test_budget_reaches_forkees_and_content_in_level_order (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (fixtures),
+        test_bfs_limit_across_multiple_trees ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        test_bfs_limit_9_three_branches ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        test_bfs_limit_8_two_branches ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/initial_view_bfs/fixtures-content-vs-forkees"),
+        test_budget_reaches_forkees_and_content_in_level_order ( &s . config, &mut s . tantivy ) . await);
       Ok (( )) } )) }
 
 async fn test_bfs_limit_across_multiple_trees (

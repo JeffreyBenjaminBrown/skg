@@ -27,6 +27,7 @@ use crate::view_and_save_helpers::{
   skg_files, under, view_of, with_line_after_subtree_of, without_subtree_of};
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::reset_then_run_subtest;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex, members_of};
@@ -40,30 +41,30 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-forkees-drawn-editable",
     |s| Box::pin ( async move {
-      s . reset ("a_fresh_view_draws_each_forkee_editable", FIXTURES) ?;
-      a_fresh_view_draws_each_forkee_editable (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("an_unchanged_save_writes_nothing", FIXTURES) ?;
-      an_unchanged_save_writes_nothing (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("cutting_from_an_owned_forkee_hides", FIXTURES) ?;
-      cutting_from_an_owned_forkee_hides (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("an_owned_forkees_title_is_saved", FIXTURES) ?;
-      an_owned_forkees_title_is_saved (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_foreign_forkees_title_is_refused", FIXTURES) ?;
-      a_foreign_forkees_title_is_refused (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_child_typed_under_an_owned_forkee_joins_its_content", FIXTURES) ?;
-      a_child_typed_under_an_owned_forkee_joins_its_content (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_child_typed_under_a_foreign_forkee_is_refused", FIXTURES) ?;
-      a_child_typed_under_a_foreign_forkee_is_refused (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_node_moved_under_an_owned_forkee_joins_its_content", FIXTURES) ?;
-      a_node_moved_under_an_owned_forkee_joins_its_content (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_node_moved_under_a_foreign_forkee_is_refused", FIXTURES) ?;
-      a_node_moved_under_a_foreign_forkee_is_refused (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_spent_budget_leaves_forkees_write_protected", FIXTURES) ?;
-      a_spent_budget_leaves_forkees_write_protected (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_write_protected_forkee_stays_until_its_forker_is_extended", FIXTURES) ?;
-      a_write_protected_forkee_stays_until_its_forker_is_extended (&s . config, &mut s . tantivy) . await ?;
-      s . reset ("a_cut_under_a_foreign_forker_is_refused", FIXTURES) ?;
-      a_cut_under_a_foreign_forker_is_refused (&s . config, &mut s . tantivy) . await ?;
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_fresh_view_draws_each_forkee_editable (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        an_unchanged_save_writes_nothing (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        cutting_from_an_owned_forkee_hides (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        an_owned_forkees_title_is_saved (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_foreign_forkees_title_is_refused (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_child_typed_under_an_owned_forkee_joins_its_content (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_child_typed_under_a_foreign_forkee_is_refused (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_node_moved_under_an_owned_forkee_joins_its_content (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_node_moved_under_a_foreign_forkee_is_refused (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_spent_budget_leaves_forkees_write_protected (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_write_protected_forkee_stays_until_its_forker_is_extended (&s . config, &mut s . tantivy) . await);
+      reset_then_run_subtest! (s . reset (FIXTURES),
+        a_cut_under_a_foreign_forker_is_refused (&s . config, &mut s . tantivy) . await);
       Ok (( )) } )) }
 
 //

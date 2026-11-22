@@ -9,6 +9,7 @@ use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::save::update_graph_minus_nodeMerges;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::errors::{SaveError, BufferValidationError};
 
@@ -61,21 +62,18 @@ fn all_tests
       s . reset ("test_move_node_to_another_owned_repo", "tests/move_repo/fixtures") ?;
       test_move_node_to_another_owned_skgrepo (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_move_node_referenced_by_extra_id", "tests/move_repo/fixtures") ?;
-      test_move_node_referenced_by_extra_id (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_move_multiple_nodes", "tests/move_repo/fixtures") ?;
-      test_move_multiple_nodes (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset ("tests/move_repo/fixtures"),
+        test_move_node_referenced_by_extra_id ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset ("tests/move_repo/fixtures"),
+        test_move_multiple_nodes ( &s . config, &mut s . tantivy ) . await);
       s . reset ("test_move_to_foreign_repo_rejected", "tests/move_repo/fixtures") ?;
       test_move_to_foreign_skgrepo_rejected (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_move_from_foreign_repo_rejected", "tests/move_repo/fixtures") ?;
       test_move_from_foreign_skgrepo_rejected (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_move_and_merge_simultaneously_rejected", "tests/move_repo/fixtures") ?;
-      test_move_and_merge_simultaneously_rejected (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset ("tests/move_repo/fixtures"),
+        test_move_and_merge_simultaneously_rejected ( &s . config, &mut s . tantivy ) . await);
       s . reset ("test_no_repo_change_produces_no_moves", "tests/move_repo/fixtures") ?;
       test_no_skgrepo_change_produces_no_moves (
         &s . config, &mut s . tantivy ) . await ?;

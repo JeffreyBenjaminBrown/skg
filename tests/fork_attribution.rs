@@ -17,6 +17,7 @@ use std::collections::HashMap;
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
+use skg::reset_then_run_subtest;
 use skg::test_utils::{save_ignoring_streamed_messages, mk_test_tcp_stream_pair, empty_views_state, graph_handle_from_config, run_with_shared_test_stores, single_root_view};
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_skgrepos_test;
 use skg::types::config::SkgConfig;
@@ -40,18 +41,14 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-fork-attribution",
     |s| Box::pin ( async move {
-      s . reset ("a_fork_records_and_shows_its_attribution", fixtures) ?;
-      a_fork_records_and_shows_its_attribution (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_fork_of_a_fork_records_the_note_it_forked", fixtures) ?;
-      a_fork_of_a_fork_records_the_note_it_forked (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_plain_child_of_an_attributed_fork_says_its_home", fixtures) ?;
-      a_plain_child_of_an_attributed_fork_says_its_home (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("stripping_an_attribution_removes_it_and_its_herald", fixtures) ?;
-      stripping_an_attribution_removes_it_and_its_herald (
-        &s . config, &mut s . tantivy ) . await ?;
+      reset_then_run_subtest! (s . reset (fixtures),
+        a_fork_records_and_shows_its_attribution ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        a_fork_of_a_fork_records_the_note_it_forked ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        a_plain_child_of_an_attributed_fork_says_its_home ( &s . config, &mut s . tantivy ) . await);
+      reset_then_run_subtest! (s . reset (fixtures),
+        stripping_an_attribution_removes_it_and_its_herald ( &s . config, &mut s . tantivy ) . await);
       Ok (( )) } )) }
 
 

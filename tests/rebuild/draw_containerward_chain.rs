@@ -3,6 +3,7 @@
 use indoc::indoc;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::refresh::Truth;
+use skg::reset_then_run_subtest;
 use skg::test_utils::draw_containerward_chains_under_members;
 use skg::refresh::mode::RefreshMode;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
@@ -23,9 +24,8 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-rebuild-attach-containerward-chain",
     |s| Box::pin ( async move {
-      s . reset ("a_chain_branches_and_shows_a_repeat_as_a_leaf",
-                 "tests/rebuild/fixtures-fork-extension") ?;
-      a_chain_branches_and_shows_a_repeat_as_a_leaf (&s . config) ?;
+      reset_then_run_subtest! (s . reset ("tests/rebuild/fixtures-fork-extension"),
+        a_chain_branches_and_shows_a_repeat_as_a_leaf (&s . config));
       Ok (( )) } )) }
 
 /// a11's containers are a1 and a2; a1's are a and a1 itself, a2's are
