@@ -630,6 +630,15 @@
    Rare; not escaped. Robust fix would require org link-syntax
    escaping of anchors/labels.
 * Emacs client ('elisp/')
+** The linkstack buffer signals on a last headline with no body and no final newline (2026-11-22)
+  'skg-validate-linkstack-buffer' ('elisp/skg-linkstack.el') reads a
+  headline's body from the start of the line after it
+  ('skg--linkstack-headline-body-lines'). When the headline is the
+  buffer's last line and the buffer does not end in a newline ("* a\nid-a\n* b"),
+  that start is past the end, and C-x C-s in *skg-linkstack* signals
+  'args-out-of-range' instead of saying "headline 'b' must have exactly
+  one body line", which Neovim's 'validate_linkstack_buffer' says.
+  Nothing is lost: the stack is left as it was.
 ** A request's 'skg-lp-reset' can drop another request's reply (2026-11-19)
   Seen measuring saves: a link-status request sent while views were
   being opened never got its reply handled, and stayed in

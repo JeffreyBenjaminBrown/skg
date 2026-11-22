@@ -399,44 +399,21 @@ Returns (error MESSAGE) if validation fails."
             (let* ( ( level (length (match-string 1)) )
                     ( title (match-string 2) )
                     ( above-level (if headlines (car (car headlines)) 0) )
-                    ( body-start (1+ (line-end-position)) )
-                    ( body-end nil ))
-              (progn ;; Find where the body ends:
-                ;; either at the next headline or at end of buffer.
-                (forward-line 1)
-                (setq body-end
-                      (if (re-search-forward "^\\*" nil t)
-                          (progn (beginning-of-line) (point))
-                        (point-max) )))
-              (let* ( ( body-text (buffer-substring-no-properties
-                                   body-start body-end) )
-                      ( body-lines (seq-filter
-                                    (lambda (line)
-                                      (not (string-empty-p
-                                            (string-trim line) )))
-                                    (split-string body-text "\n") ))
-                      ( edge-and-label
-                        (if (= level 1)
-                            (cons nil title)
-                          (skg--linkstack-edge-and-label-of-title title)) ))
-                (cond
-                 ((> level (1+ above-level))
-                  (setq error-msg
-                        (format "headline '%s' is more than one level below the headline above it"
-                                title) ))
-                 ((not edge-and-label)
-                  (setq error-msg
-                        (format "headline '%s' must begin with its edge to the headline above it, such as (aC)"
-                                title) ))
-                 ((/= (length body-lines) 1)
-                  (setq error-msg
-                        (format "headline '%s' must have exactly one body line"
-                                title) ))
-                 (t (push (list level
-                                (string-trim (car body-lines)) ;; the id
-                                (cdr edge-and-label)
-                                (car edge-and-label))
-                          headlines) )) ))
+                    ( body-lines (skg--linkstack-headline-body-lines) )
+                    ( edge-and-label
+                      (if (= level 1)
+                          (cons nil title)
+                        (skg--linkstack-edge-and-label-of-title title)) )
+                    ( headline-error
+                      (skg--linkstack-headline-error
+                       title level above-level edge-and-label body-lines) ))
+              (if headline-error
+                  (setq error-msg headline-error)
+                (push (list level
+                            (string-trim (car body-lines)) ;; the id
+                            (cdr edge-and-label)
+                            (car edge-and-label))
+                      headlines) ))
           (;; Not a headline with a valid title.
            ;; Could be a blank line, or a headline with empty title.
            if (looking-at "^\\*")
@@ -449,6 +426,46 @@ Returns (error MESSAGE) if validation fails."
         ;; nreverse so first headline in buffer = head of stack
         (list 'success (skg--linkstack-forest-of-headlines
                         (nreverse headlines) )) )) ))
+
+(defun skg--linkstack-headline-body-lines ()
+  "The non-blank lines of the body of the linkstack buffer's headline
+at point, each as written. Leaves point where the body ends: at the
+next headline, or at the end of the buffer."
+  (let ( ( body-start (1+ (line-end-position)) )
+         ( body-end nil ))
+    (progn ;; Find where the body ends:
+      ;; either at the next headline or at end of buffer.
+      (forward-line 1)
+      (setq body-end
+            (if (re-search-forward "^\\*" nil t)
+                (progn (beginning-of-line) (point))
+              (point-max) )))
+    (let ( ( body-text (buffer-substring-no-properties
+                        body-start body-end) ))
+      (seq-filter
+       (lambda (line)
+         (not (string-empty-p
+               (string-trim line) )))
+       (split-string body-text "\n") )) ))
+
+(defun skg--linkstack-headline-error
+    (title level above-level edge-and-label body-lines)
+  "Why the linkstack buffer's headline titled TITLE is invalid, or nil.
+LEVEL is its level and ABOVE-LEVEL that of the headline above it (0
+when it is the first). EDGE-AND-LABEL is what
+`skg--linkstack-edge-and-label-of-title' read of TITLE (nil when TITLE
+has no edge), or (nil . TITLE) for a top-level headline. BODY-LINES
+are the non-blank lines of its body."
+  (cond
+   ((> level (1+ above-level))
+    (format "headline '%s' is more than one level below the headline above it"
+            title) )
+   ((not edge-and-label)
+    (format "headline '%s' must begin with its edge to the headline above it, such as (aC)"
+            title) )
+   ((/= (length body-lines) 1)
+    (format "headline '%s' must have exactly one body line"
+            title) )) )
 
 (defun skg--linkstack-edge-and-label-of-title (title)
   "(EDGE . LABEL) of TITLE, the title of a linkstack buffer's headline
