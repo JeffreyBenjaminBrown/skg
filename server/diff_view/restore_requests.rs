@@ -199,7 +199,7 @@ fn relationship_at_head (
   key    : &RelationshipKey,
 ) -> Option<RestoredRelationship> {
   let recorder : Graphnode = graphnode_from_graph (before, &key . recorder) ?;
-  let list : &[RelPartner<ID>] = relation_list (&recorder, key . relation) ?;
+  let list : &[RelPartner<ID>] = recorder . rel_partners_for_relation (key . relation) ?;
   let (index, partner) : (usize, &RelPartner<ID>) =
     list . iter () . enumerate () . find ( |(_, partner)|
       before . pid_else_raw_id (&partner . member) == key . member ) ?;
@@ -208,17 +208,6 @@ fn relationship_at_head (
     stored_member : partner . member . clone (),
     index,
     relRepo       : partner . relRepo . clone () } ) }
-
-/// A recorder's list of the relation, as a slice; None for links.
-fn relation_list (
-  node     : &Graphnode,
-  relation : NodeRelation,
-) -> Option<&[RelPartner<ID>]> {
-  match relation {
-    NodeRelation::Contains      => Some ( &node . contains ),
-    NodeRelation::Forks         => Some ( node . forks . or_default () ),
-    NodeRelation::Hides => Some ( node . hides . or_default () ),
-    NodeRelation::LinksTo       => None, } }
 
 /// The relationships each restoreRel request in 'viewforest' stands
 /// for (none when its headline stands for none, as under an
@@ -281,7 +270,7 @@ fn add_relationship (
     &mut instructions [index] else { unreachable! ("found as a Save") };
   let live_list : Vec<RelPartner<ID>> =
     graphnode_from_graph (live, &key . recorder)
-    . and_then ( |node| relation_list (&node, key . relation)
+    . and_then ( |node| node . rel_partners_for_relation (key . relation)
                         . map ( |list| list . to_vec () ))
     . unwrap_or_default ();
   let list : &mut Vec<RelPartner<ID>> = match key . relation {

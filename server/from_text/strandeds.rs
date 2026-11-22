@@ -115,7 +115,8 @@ pub fn stranded_relationships (
         . unwrap_or_default ();
       let forks_after : Vec<RelPartner<ID>> =
         recorder . forks . or_default () . to_vec ();
-      for partner in relation_list (&recorder, relation) {
+      for partner in recorder . rel_partners_for_relation (relation)
+                       . unwrap_or_default () {
         let member : ID = resolve (&partner . member);
         if recorder_pid != *moved && member != *moved { continue; }
         if ! config . skgrepo_is_owned (&partner . relRepo) {
@@ -188,17 +189,6 @@ pub fn raised_relationship_warning (
     stranded . relationship . relation . relation_name (),
     stranded . relationship . member,
     stranded . relRepo, stranded . new_default, stranded . relRepo ) }
-
-/// The relationships in a node's list for 'relation'.
-fn relation_list (
-  node     : &Graphnode,
-  relation : NodeRelation,
-) -> Vec<RelPartner<ID>> {
-  match relation {
-    NodeRelation::Contains      => node . contains . clone (),
-    NodeRelation::Forks         => node . forks . or_default () . to_vec (),
-    NodeRelation::Hides => node . hides . or_default () . to_vec (),
-    NodeRelation::LinksTo       => Vec::new (), } }
 
 fn relation_list_mut (
   node     : &mut Graphnode,

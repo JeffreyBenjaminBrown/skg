@@ -7,6 +7,7 @@
 //! a 'GraphnodeInRust' ('rust.rs'). Also 'Flag', 'flag_is_true',
 //! 'set_flag' and 'empty_graphnode'.
 
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::nodes::attribution::Attribution;
@@ -113,6 +114,18 @@ impl Graphnode {
     restriction : &'a SkgrepoRestriction,
   ) -> impl Iterator<Item = &'a RelPartner<String>> + 'a {
     SkgrepoRestriction::visible_records (restriction, self . aliases . or_default ()) }
+
+  /// The node's list of 'relation', as a slice; None for links,
+  /// which a graphnode does not record.
+  pub fn rel_partners_for_relation (
+    &self,
+    relation : NodeRelation,
+  ) -> Option<&[RelPartner<ID>]> {
+    match relation {
+      NodeRelation::Contains => Some ( &self . contains ),
+      NodeRelation::Forks    => Some ( self . forks . or_default () ),
+      NodeRelation::Hides    => Some ( self . hides . or_default () ),
+      NodeRelation::LinksTo  => None, } }
 
   pub fn all_gnids (&self) -> impl Iterator<Item = &ID> {
     std::iter::once (&self . pid)
