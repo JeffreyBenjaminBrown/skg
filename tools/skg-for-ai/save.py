@@ -346,7 +346,7 @@ def metadata_text_without_atom (metadata_text, atom):
 
 def placed_node_metadata_text (headline):
   """The metadata the clients' 'skg-paste-node' writes
-  ('skg--insert-node-from-entry' in 'elisp/skg-id-search.el'): the ID,
+  ('skg--insert-node-from-entry' in 'elisp/skg-linkstack.el'): the ID,
   'writeProtected', and an editable-view request unless the buffer
   already holds an editable occurrence of the node."""
   return ( "(skg node (gnid " + headline . placed_pid + ") writeProtected" +
@@ -657,7 +657,7 @@ def assign_placed_view_requests (edited, headline_of_handle):
   """Each resolved placed node asks for an editable view unless the
   rebuilt buffer already holds an editable occurrence of its node, or
   one that asks to be made editable: a buffer holds at most one, as
-  'skg--buffer-has-editable-occurrence-p' in 'elisp/skg-id-search.el'
+  'skg--buffer-has-editable-occurrence-p' in 'elisp/skg-linkstack.el'
   checks before a paste. Placed nodes are taken in order, so of two
   placements of one node the first asks."""
   for index, headline in enumerate (edited):

@@ -98,3 +98,95 @@ drop an ignored argument. Not reached: nothing. The plans and
 problems commits were not read,
 since they are documents. Nothing was built or run but scratch
 copies of the Python client.
+* second review
+A second independent review, of the 40 commits merged after the
+first, from 36dbb58c2 to 3f93a106a, all claimed safe. It too found
+no change that a running editor client or the server's protocol
+would show, nor any test that checks less or no longer runs. What
+it found is cosmetic, or in the advice. Nothing was fixed but two
+comments in 'tools/skg-for-ai/save.py'.
+** found
+*** Integration tests print a little more, which nothing reads
+Commits 6abdfc2b6 and 9f8d11b5d changed what the tests print. Eight
+'run-test.sh' scripts now print one blank line they did not before:
+fork, fork-chain, fork-owned, fork-repo, forks-meet,
+restated-forks-members, view-magit and view-magit-removed-member.
+Fourteen Emacs tests now print "Using test port: N" through the
+shared 'skg-test-use-test-port'. 'bash/all-tests.sh' judges these
+tests by exit status alone. Two of the fourteen, diff-view and
+diff-view-motions, record messages to check them, but clear the
+record before each check. Sure; cosmetic.
+*** The advice no longer warns that two suites at once share a temp path
+Commit eeb7bd7e9 changed 'coding-advice/orchestration.org'. Before,
+it said to serialize full runs because "two at once collide on fixed
+temp paths and the Tantivy writer". Now it says to serialize them
+"in one worktree (each run wipes 'tests/results/')", which implies
+that runs in two worktrees are safe. Most of that is true: the store
+tests' fixtures and indexes are per process
+('path_for_this_process' in 'server/test_utils.rs'). But
+'tests/file_io.rs', lines 55 to 141, deletes and rewrites the fixed
+folder '/tmp/file_io_test'. Two worktrees whose suites reach that test
+at the same moment can each delete the other's files mid-test. Sure
+that the folder is shared; the window is small, and it does not
+change what a user sees.
+*** Two comments sent a reader to the wrong Emacs file (fixed here)
+Commit 4a4562718 moved the linkstack's functions into
+'elisp/skg-linkstack.el'. Two docstrings in
+'tools/skg-for-ai/save.py', at lines 349 and 660, still said that
+'skg--insert-node-from-entry' and
+'skg--buffer-has-editable-occurrence-p' were in
+'elisp/skg-id-search.el'. They now name 'skg-linkstack.el'. The
+other comments that name 'skg-id-search.el' are still true.
+** covered
+Read closely, with nothing to report beyond the above:
+- the three repairs. b59a9f73b gives the warning back its old target;
+  the crate is 'skg' with its library at 'server/lib.rs', so the
+  name is the same. 79b65d7b1 makes '-I' work, and its check still
+  runs first among the checks that need no server. 86331aa08 is
+  right about exit statuses: 'shutdown' and the ctrlc handler exit 0;
+  a bad config, a held port and a refused skgrepo exit non-zero.
+  A SIGKILL, which no handler can catch, still counts as a failure;
+- the server's logic commits 72fd02b87, 2615961a7 (the method it
+  calls has the same body), 526194bcf (both old 'relation_list's
+  match the new method, links giving none) and cf537cebb (the
+  warnings and their order are unchanged);
+- the clients' 393b520c8 (each pair of copies was identical) and
+  ae87d98be. In ae87d98be every handler type that the shared
+  function now removes is registered with the one-shot flag that
+  makes it lower the pending count exactly where the old code did:
+  the 'overPrivateText' confirmations, 'rerender-view' and the
+  import's three are not one-shot, while 'search-results' and the
+  absent-reference cleanup's three are. Also 1a26cf07f (the
+  'dotimes' result is the same list) and 456777739;
+- the advice in eeb7bd7e9. Its other claims hold: the second server
+  takes the port after the given one, a run clears 'tests/results/',
+  every 'server/' module opens with '//!', and the files it names
+  exist. "A third the size" was not checked;
+- every test edit. A sub-reviewer expanded the 256 uses of
+  'reset_then_run_subtest!' (36dbb58c2) and the 56 uses of
+  'single_root_view_text' (fee2544c0) back into the old code by
+  script. Every file matched its parent. It read by eye the six
+  sites in 56e0eda95, the ten in ca2a2fbcb and the six configs in
+  36baa08fb, finding the same assertions, limits and skgrepo order.
+  One assertion in 'tests/pruned_change_view/editing.rs' now runs
+  after the stream is read rather than before, and checks the same.
+  Another sub-reviewer grouped the integration tests' removed blocks
+  (6abdfc2b6, 4d1fefb2b, 9f8d11b5d, 47845fb12) and found each the
+  same as its helper in config keys, port, exit status, timeout,
+  message and exit code. It read dc0330c0b by eye: each Lua search
+  keeps its predicate and returns the first match.
+Checked by machine, comparing the moved lines or syntax trees:
+- 47ad428e7, 4a4562718 and e6a230902, whose removed and added blocks
+  differ only in headers, 'require's and 'provide's;
+- the AI reader's test split, bd0c61dd8. Every function is the same
+  syntax tree as before, and 'main' runs the same checks in the same
+  order. Since 1437a08b0, an argument other than a group name or
+  '--update-expected' exits 2, where before it was ignored; the one
+  caller, 'bash/all-tests.sh', passes none;
+- the module splits 9fa5a8147, dad5ce9df and 6c242f916, whose
+  definitions are the same trees. No module, at each commit or on
+  main, uses a global name it does not define or import, or an
+  attribute that a module of the tool lacks.
+Not read: the plans and problems commits (86262e08b, 774b15c62,
+5f0dc5c4f and the 'plans:' ones), since they are documents. Nothing
+was built or run.
