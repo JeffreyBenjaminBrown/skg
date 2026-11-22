@@ -1,0 +1,174 @@
+#+title: Forests through mirrors
+* What Jeff asked
+"Most kinds of forest should traverse through mirrors. ... the user
+sometimes requests a containerward forest. That thing should traverse
+not just in the containerward direction, but also in any mirrorward
+direction."
+
+A forest is what a folder request draws ('C-c l', skg-for-ai's 'forest
+KIND ID'): the partners of a note in one relation, each with its
+containerward chain (its containers, theirs, and so on up). The mirrors
+of a note are the notes joined to it by forks, either way
+('docs/mirrors.org', "Mirrors").
+* What is built
+The containerward chain passes through mirrors
+('server/refresh/chain.rs', 'list_mirrors_of_chain_occurrence'; the
+docs: 'docs/mirrors.org', "Forests through mirrors"). The member of a
+partner folder, and each note of its chain, that has a fork partner
+holds its forks folder, first among its children, as a search hit
+already does. The folder lists its mirrors, write-protected, each
+with its own containers in a folded containers folder, whose members
+carry their chains in turn. A set of mirrors is listed once per view,
+at the first of its notes the refresh reaches
+('Walk::pids_whose_mirrors_are_listed'), so a cycle of containment and
+forks ends.
+** How a mirror step is drawn, and why
+As its own level, in a forks folder, rather than as one node for the
+class. Two reasons. The every-mirror work draws a class as one node
+only where substitution acts, in content; the chain is a raw position
+('docs/mirrors.org', "Mirror substitution": "partner folder members and
+the containerward chain" show the raw node), so each chain note must
+stay itself. And a forks folder under a write-protected note, members
+write-protected with their containers in a containers folder, is
+already what a search hit shows, and what the root of a content view
+shows for its own mirrors; nothing new to learn.
+** An example, as skg-for-ai draws it
+N is mine; MN, mine, contains it and forks TA, theirs; TR contains TA.
+A, theirs, is N's forkee, and Q, theirs, forks A.
+
+#+begin_example
+  * N
+  ** ☮ These also contain it.
+  *** MN ☮
+  **** Its mirrors are these.
+  ***** TA ☮ bK ⌂:theirs
+  ****** ☮ These also contain it.
+  ******* TR ☮ (folded)
+  **** MR ☮
+  ** Its mirrors are these.
+  *** A bK ⌂:theirs
+  **** ☮ These also contain it.
+  ***** TA ☮ (folded; listed under MN already, so no forks folder here)
+  ****** TR ☮
+  *** Q ⌂:theirs
+  **** ☮ These also contain it.
+  ***** TQ ☮ (folded)
+#+end_example
+
+Before, MN showed only MR: TA and TR, where their version of MN sits,
+were missing.
+* Every traversal, before and now
+** The containerward chain under a containers folder ('C-c l c', 'forest containers', a fresh view's root)
+Before: containers only. The root's own mirrors were listed, with
+their containers, by the root's default forks folder, but no note of
+the chain listed its mirrors. Now: through mirrors, as above.
+** The chain under the other partner folders (mentioners, hides, the forks folder's members, search hits)
+The same code, so the same change: every chain passes through
+mirrors. The step of the folder itself is unchanged; see the choices
+below.
+** The contentward tree of a content view
+Before and now: through mirrors, by substitution (one mirror stands in
+each place), and an editable note's forks folder lists the others.
+** The forks folder ('C-c l f', 'forest forks')
+Before and now: every mirror, flat. Mirrors are its relation; it
+needs no change. Its members' containers pass through mirrors now.
+** Search
+Hits were already grouped by class, each hit's forks folder listing
+the rest. Its containers chains pass through mirrors now.
+** 'C-c v a' (ancestry)
+Client-side: it copies the headline's ancestors in the buffer; no
+graph walk. An ancestry through a chain's forks folder now shows the
+mirror step, since the view does.
+** The diff view's chains and pruned ancestry
+Not built: see the choices.
+** Org export
+Follows stored 'contains'; not a view. Left alone: an export writes
+what a user's notes contain.
+** Path finding
+The server has none.
+** Search prominence
+A containerward walk that ranks hits; not drawn. Left alone.
+* Choices left to Jeff, not built
+** Mentioners of a note's mirrors
+A link names one ID. Is a link to your fork a link to my note?
+Options:
+*** A. Exact, as now
+#+begin_example
+  * N
+  ** ☮ These link to it.
+  *** L1              (L1's text links to N)
+#+end_example
+*** B. Every mirror's mentioners in one folder
+#+begin_example
+  * N
+  ** ☮ These link to it.
+  *** L1              (links to N)
+  *** L2              (links to M, N's fork: no herald says so today)
+#+end_example
+This needs new vocabulary to say which mirror each names.
+*** C. Per mirror, under the forks folder
+#+begin_example
+  * N
+  ** ☮ These link to it.
+  *** L1
+  ** Its mirrors are these.
+  *** M
+  **** ☮ These link to it.
+  ***** L2
+#+end_example
+Existing vocabulary: 'C-c l m' on M draws exactly this today.
+*** Recommendation
+A by default; C drawn when asked ('C-c l m' on a note with mirrors
+could also ask for it on each member of its forks folder). A link is
+its author's choice of version, and following it lands exactly there
+('docs/mirrors.org', "Direct visits are exact"). The "IDs compared as
+equivalence classes" commits of 2026-11-17 do not bear on this: they
+equate one note's own IDs (its pid and extra IDs), not its mirrors.
+** Hides
+'C-c l h' lists who hides a note and what it hides. A hide is local
+to one fork pair: F, forking G, hides x of G's content. Through mirrors
+the hiders folder of N would also list F', which hides M, a mirror of
+N, in another forkee's content:
+#+begin_example
+  * N
+  ** ☮ (hiders folder)
+  *** F               (F hides N)
+  *** F'              (F' hides M; N is shown everywhere F' shows anything)
+#+end_example
+Recommendation: an exception. A hide of M says nothing about N.
+** The diff view
+Its chains, and the pruned ancestry that picks its roots, walk the
+union of HEAD and the worktree; it substitutes nothing. Through
+mirrors:
+#+begin_example
+  * P (changed)
+  ** P's chain
+  *** Q
+  **** (forks folder)
+  ***** Q' (theirs, unchanged)
+  ****** (Q''s containers)
+#+end_example
+Recommendation: an exception. Its chains place a change; a mirror of
+an unchanged container adds reading, not placement.
+* Size, on copies of data/jeff/public (owned) and data/claude/public (foreign)
+Debug build, each figure the best of three, through skg-for-ai.
+| view                                  | headlines before | after | time before | after |
+|---------------------------------------+------------------+-------+-------------+-------|
+| forest containers a8822df7 (most grown) |                3 |    49 | 0.30s       | 0.31s |
+| forest containers 98eca62a            |                6 |    42 | 0.21s       | 0.23s |
+| forest containers 35079578            |                4 |    36 | 0.21s       | 0.22s |
+| forest containers 036a168e            |               18 |    30 | 0.22s       | 0.22s |
+| view "to Jeff"                        |              960 |   989 | 0.54s       | 0.57s |
+| view "mail"                           |             1073 |  1136 | 0.58s       | 0.59s |
+| forest mentioners "mail"              |             1079 |  1142 | 1.10s       | 1.13s |
+| search fork                           |              629 |   791 | 0.43s       | 0.44s |
+| search commit                         |              619 |   726 | 0.45s       | 0.41s |
+| search review                         |              353 |   383 | 0.37s       | 0.39s |
+Of 34,010 notes, 1,398 have a containers forest that grows; the
+most, by 24 distinct notes.
+* Found on the way, fixed
+A forks folder under a write-protected note (a search hit's, or now a
+chain note's) drew its forker-only and indirect members unwarranted at
+the second refresh: the printer writes no 'noClaim' where claims are
+not read, so read back they claimed. 'set_warrants' now clears such
+claims first, as 'mark_claims' did a step later.
