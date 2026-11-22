@@ -1,0 +1,78 @@
+* Module headers: finding code from the module tree
+  The territory: the '//!' header of every module file and every mod
+  file in 'server/', and the headers of the test binaries in 'tests/'.
+  The goal: an agent that knows nothing reads 'server/lib.rs', then
+  one module's header, and is at the right file in two or three short
+  reads. Only comments change, so 'cargo build' and 'cargo test --doc'
+  suffice between commits.
+* Conventions
+** What a header says, in this order
+   What the module is for, in a user's words first; then what it
+   owns and its entry points, each named in single quotes; then what
+   it does not do, naming the file that does. Two to eight lines;
+   longer only for central modules ('lib.rs', 'serve.rs',
+   'from_text.rs', 'save_buffer.rs', the refresh).
+** A parent lists its children
+   A mod file, or a 'foo.rs' beside a 'foo/' folder, lists each child
+   with a phrase ("- 'child': what it is for."), so the tree descends
+   by headers alone. 'lib.rs' groups the top-level modules by what a
+   user does: requests, data, drawing views, saving, the diff view,
+   import and export.
+** Paths and names
+   A path in a header is relative to 'server/' (or to the file's own
+   folder when it names a sibling); a cited function or type must
+   exist. The check below found every cited name.
+** No history
+   A header says what is. "Once", "today's", "no longer", "used to"
+   are history; the commit log holds that.
+** Doctests
+   A '//!' line indented four spaces after a blank '//!' line would
+   become a doctest. List continuations are indented two or three.
+** Checking that headers cite real things
+   Extract each quoted 'name' or 'path.rs' from the '//!' lines of
+   every file (an awk loop over 'match'), and look for it in the code
+   outside '//!' lines, or in the file tree. Run it after editing
+   headers; it is a few lines of shell.
+* Done
+** Every module of 'server/' has a header
+   Every directory: 'dbs/', 'types/', 'serve/' (the handlers' mod file
+   lists every request by what it serves), 'from_text/', 'nodeMerge/',
+   'refresh/', 'git_ops/', 'graph_straddle/', 'telescope/', the two
+   importers, the top-level files, 'lib.rs' and 'main.rs'.
+   'diff_view/', 'obsidian/' and 'repo_watch/' already had parent
+   headers listing their children and were left as they were.
+** False comments corrected
+   'dbs/mod.rs' spoke of re-exports it does not have; 'stats.rs' and
+   'viewnodestats.rs' miscounted relations; the 'Graphnode' header
+   named a 'home_repo' field and a 'From' write that do not exist;
+   'supplement_from_disk.rs' spoke of 'Option' where it is 'MSV';
+   two doc comments named 'read_all_skg_files_from_repos'; the
+   background writer's and three other headers told history.
+** The test binaries' headers list their modules by behaviour
+   'tests/grouped_*.rs'. 'grouped_unit.rs' says why tests are grouped
+   and that 'tests/unit/' holds the library's own unit tests.
+* Left, best first
+** One header per test file in 'tests/'
+   About 110 top-level test files have no '//!' header; most open
+   with a 'cargo nextest' line and a '//' paragraph saying what they
+   pin. Turning that paragraph into a two-line '//!' header (what
+   behaviour, which server file) would let an agent go from a failing
+   test to its subject without reading it. Safe (comments only); about
+   a session's work, best done binary by binary, reading each file's
+   opening comment and test names.
+** Verify the headers this pass kept
+   The headers of 'diff_view/', 'obsidian/', 'repo_watch/',
+   'export_org.rs', the heralds, 'local_fieldintent_collection/' and
+   most handlers were kept after a citation check, not a full read.
+   Long ones ('save_staleness.rs', 'parse_metadata_sexp.rs',
+   'resolve_visibility.rs', 'traverse.rs') hold design notes, which
+   could move under a short what-it-is opening. Safe; moderate work.
+** Delete 'server/abandoned/'
+   Nothing compiles it: 'lib.rs' declares no 'abandoned' module, and
+   the folder its one 'mod' names is gone. Its header now says so.
+   Deleting it is safe (dead by construction) but is a code change,
+   outside a comments-only pass.
+** 'tests/unit/' files
+   The library's unit tests, each included by '#[path]' from its
+   module. A few have headers ('export_org.rs'); the rest could get
+   one line each. Safe; small.
