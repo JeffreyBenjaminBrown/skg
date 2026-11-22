@@ -21,7 +21,7 @@ use crate::dbs::in_rust_graph::fork_rules::{
   validate_fork_rules_of_affected_notes,
 };
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
+use crate::types::save::{NodeInstruction, SaveNode};
 use crate::telescope::invariants::derive_affected_telescope_recorders;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -266,7 +266,7 @@ fn normalize_and_coalesce_nodeInstructions (
   let mut final_by_pid : HashMap<ID, (usize, NodeInstruction)> = HashMap::new ();
   for (position, nodeInstruction) in filesystem_nodeInstructions . iter () . enumerate () {
     final_by_pid . insert (
-      definition_pid (nodeInstruction) . clone (),
+      nodeInstruction . gnid () . clone (),
       (position, nodeInstruction . clone ()) ); }
   let mut positioned : Vec<(usize, NodeInstruction)> =
     final_by_pid . into_values () . collect ();
@@ -285,18 +285,15 @@ fn validate_identity_and_derive_changes (
   nodeInstructions : &[NodeInstruction],
 ) -> (GraphChangeSet, Vec<CompleteGraphError>, Vec<ExtraIdRevocation>) {
   let touched_pids : HashSet<ID> = nodeInstructions . iter ()
-    . map ( |nodeInstruction| definition_pid (nodeInstruction) . clone () )
+    . map ( |nodeInstruction| nodeInstruction . gnid () . clone () )
     . collect ();
   let saved_pids : HashSet<ID> = nodeInstructions . iter ()
-    . filter_map ( |nodeInstruction| match nodeInstruction {
-      NodeInstruction::Save (SaveNode (node)) => Some (node . pid . clone ()),
-      NodeInstruction::Delete (_)             => None, } )
+    . filter_map (NodeInstruction::saved_graphnode)
+    . map ( |node| node . pid . clone () )
     . collect ();
   let deleted_pids : HashSet<ID> = nodeInstructions . iter ()
-    . filter_map ( |nodeInstruction| match nodeInstruction {
-      NodeInstruction::Save (_) => None,
-      NodeInstruction::Delete (DeleteNode { gnid, .. }) => Some (gnid . clone ()), } )
-    . collect ();
+    . filter_map (NodeInstruction::deleted_gnid)
+    . cloned () . collect ();
   let mut affected_gnids : HashSet<ID> = HashSet::new ();
   for pid in &touched_pids {
     affected_gnids . insert (pid . clone ());
@@ -422,15 +419,6 @@ fn final_carrier_of (
   let carriers : &CarriersForId = claims . get (gnid) ?;
   carriers . primary . first () . or_else (|| carriers . extra . first ())
     . cloned ()
-}
-
-fn definition_pid (
-  nodeInstruction : &NodeInstruction,
-) -> &ID {
-  match nodeInstruction {
-    NodeInstruction::Save (SaveNode (node))       => &node . pid,
-    NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid,
-  }
 }
 
 #[cfg(test)]

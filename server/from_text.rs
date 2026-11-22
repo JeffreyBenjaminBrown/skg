@@ -418,10 +418,7 @@ fn dead_link_warnings (
   use crate::types::links::links_from_node;
   let saved_nodes : Vec<&Graphnode> =
     node_instructions . iter ()
-    . filter_map ( |dn| match dn {
-        crate::types::save::NodeInstruction::Save (
-          crate::types::save::SaveNode (n) ) => Some (n),
-        _ => None } )
+    . filter_map (NodeInstruction::saved_graphnode)
     . chain ( fork_specs . iter () . map ( |spec| & spec . clone . 0 ) )
     . collect ();
   let created_this_save : HashSet<&ID> = {

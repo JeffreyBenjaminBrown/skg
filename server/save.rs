@@ -462,10 +462,8 @@ pub(crate) fn apply_delete_propagation_cleanup (
     && SkgrepoRestriction::record_is_visible (
       restricted_records_left, &record . relRepo ) };
   let deleted_primary_pids : HashSet<ID> = node_defs . iter ()
-    . filter_map ( |d| match d {
-      NodeInstruction::Delete (dn) => Some ( dn . gnid . clone ()),
-      NodeInstruction::Save (_)    => None } )
-    . collect ();
+    . filter_map (NodeInstruction::deleted_gnid)
+    . cloned () . collect ();
   if deleted_primary_pids . is_empty () { return; }
 
   let deleted_id_set : HashSet<ID> =
@@ -473,9 +471,8 @@ pub(crate) fn apply_delete_propagation_cleanup (
 
   { // The recorder-collection pass: append "save-it-unchanged" SaveNodes for recorders of a deleted ID not already covered by the user's nodeInstructions. As-is, these would have no effect, but the ID-stripping pass strips some IDs.
     let user_save_pids : HashSet<ID> = node_defs . iter ()
-      . filter_map ( |d| match d {
-        NodeInstruction::Save (SaveNode (n)) => Some ( n . pid . clone ()),
-        NodeInstruction::Delete (_)          => None } )
+      . filter_map (NodeInstruction::saved_graphnode)
+      . map ( |n| n . pid . clone ())
       . collect ();
     let mut referencer_pids : HashSet<ID> =
       recorders_of_deleted_graphnodes (&deleted_primary_pids, graph_snap);
@@ -524,9 +521,8 @@ pub(crate) fn restricted_records_naming_deleted_graphnodes (
   if skgrepo_restriction . is_unrestricted () { return 0; }
   let restriction : &SkgrepoRestriction = skgrepo_restriction;
   let deleted_primary_pids : HashSet<ID> = node_defs . iter ()
-    . filter_map ( |d| match d {
-      NodeInstruction::Delete (dn) => Some ( graph_snap . pid_else_raw_id (&dn . gnid) ),
-      NodeInstruction::Save (_)    => None } )
+    . filter_map (NodeInstruction::deleted_gnid)
+    . map ( |gnid| graph_snap . pid_else_raw_id (gnid) )
     . collect ();
   let deleted_id_set : HashSet<ID> =
     ids_of_deleted_graphnodes (&deleted_primary_pids, graph_snap);
@@ -726,19 +722,15 @@ pub(crate) fn update_tantivy_from_nodeInstructions (
     delete_nodes_by_gnid_from_index(
       // Delete all IDs, be they from Saves or Deletes.
       // (The entry for each Save is then recreated.)
-      instructions . iter() . map(|instr| match instr {
-        NodeInstruction::Save(SaveNode (node)) => &node . pid,
-        NodeInstruction::Delete(DeleteNode { gnid, .. }) => gnid }),
+      instructions . iter() . map (NodeInstruction::gnid),
       &mut writer,
       tantivy_index)? ; }
   // Add documents only for non-deletion nodeInstructions.
   // Convert to GraphnodeInTantivy (narrow) at the boundary.
   let nodes_to_add: Vec<GraphnodeInTantivy> =
     instructions . iter()
-    . filter_map( |instr| match instr {
-        NodeInstruction::Save(SaveNode (node)) =>
-          Some ( GraphnodeInTantivy::from (node) ),
-        NodeInstruction::Delete (_) => None } )
+    . filter_map (NodeInstruction::saved_graphnode)
+    . map (GraphnodeInTantivy::from)
     . collect();
   let processed_count: usize =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(

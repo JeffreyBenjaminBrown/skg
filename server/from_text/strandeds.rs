@@ -71,17 +71,13 @@ pub fn stranded_relationships (
   if skgrepo_moves . is_empty () { return Vec::new (); }
   let saves : HashMap<ID, &Graphnode> =
     instructions . iter ()
-    . filter_map ( |instruction| match instruction {
-      NodeInstruction::Save (SaveNode (node)) =>
-        Some (( node . pid . clone (), node )),
-      NodeInstruction::Delete (_) => None, } )
+    . filter_map (NodeInstruction::saved_graphnode)
+    . map ( |node| ( node . pid . clone (), node ))
     . collect ();
   let deleted : HashSet<ID> =
     instructions . iter ()
-    . filter_map ( |instruction| match instruction {
-      NodeInstruction::Delete (delete) => Some (delete . gnid . clone ()),
-      NodeInstruction::Save (_) => None, } )
-    . collect ();
+    . filter_map (NodeInstruction::deleted_gnid)
+    . cloned () . collect ();
   let resolve = |gnid : &ID| -> ID {
     graph . pid_else_raw_id (gnid) };
   let home_before = |gnid : &ID| -> Option<SkgrepoName> {

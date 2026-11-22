@@ -63,7 +63,7 @@ use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::save::{
-  DeleteNode, ForkSpec, NodeInstruction, SaveNode, SkgrepoMove,
+  ForkSpec, NodeInstruction, SaveNode, SkgrepoMove,
   UneditedStaleGraphnode};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewnodeKind, Vognode};
@@ -309,9 +309,7 @@ fn buffer_written_pids (
   fork_specs       : &[ForkSpec],
 ) -> BTreeSet<ID> {
   nodeInstructions . iter ()
-    . map ( |nodeInstruction| match nodeInstruction {
-      NodeInstruction::Save (SaveNode (node)) => &node . pid,
-      NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid, } )
+    . map (NodeInstruction::gnid)
     . chain ( fork_specs . iter () . map ( |fork_spec| &fork_spec . original_gnid ))
     . map ( |gnid| graph . pid_else_raw_id (gnid) )
     . collect () }

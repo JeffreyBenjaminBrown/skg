@@ -68,9 +68,9 @@ pub fn add_restore_instructions (
   let exists_after_the_save = |pid : &ID| -> bool {
     restored_pids . contains (pid)
     || ( live . pid_of (pid) . is_some ()
-         && ! instructions . iter () . any ( |instruction| matches! (
-              instruction, NodeInstruction::Delete (delete)
-              if live . pid_of (&delete . gnid) . as_ref () == Some (pid) )) ) };
+         && ! instructions . iter ()
+              . filter_map (NodeInstruction::deleted_gnid)
+              . any ( |gnid| live . pid_of (gnid) . as_ref () == Some (pid) )) };
   let mut relationships : Vec<RestoredRelationship> = Vec::new ();
   let mut restored_in_order : Vec<&ID> = restored_pids . iter () . collect ();
   restored_in_order . sort (); // so that the writes do not depend on hash order
@@ -149,7 +149,7 @@ fn restore_nodes (
     { continue; }
     let headline : HeadlineName = node . value () . headline_name ();
     let saved_already : bool = instructions . iter () . any (
-      |instruction| instruction_gnid (instruction) == &h . gnid );
+      |instruction| instruction . gnid () == &h . gnid );
     let graphnode : Option<Graphnode> =
       graphnode_from_graph (before, &h . gnid);
     match graphnode {
@@ -166,14 +166,6 @@ fn restore_nodes (
         instructions . push (
           NodeInstruction::Save ( SaveNode (graphnode) )); }, }}
   restored }
-
-/// The ID a NodeInstruction writes or deletes.
-fn instruction_gnid (
-  instruction : &NodeInstruction,
-) -> &ID {
-  match instruction {
-    NodeInstruction::Save (SaveNode (graphnode)) => &graphnode . pid,
-    NodeInstruction::Delete (delete) => &delete . gnid, } }
 
 /// The relationships in which 'pid' is the member at HEAD, from the
 /// before-graph's inbound indexes. Links live in text, so they are not

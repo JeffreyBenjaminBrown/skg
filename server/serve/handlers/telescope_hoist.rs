@@ -96,10 +96,8 @@ pub fn repair_saves_for_unwritten_candidates (
   config            : &SkgConfig,
 ) -> io::Result<Vec<NodeInstruction>> {
   let already_written : HashSet<ID> = node_instructions . iter ()
-    .filter_map ( |node_instruction| match node_instruction {
-      NodeInstruction::Save (SaveNode (node)) => Some (node . pid . clone ()),
-      NodeInstruction::Delete (_)             => None,
-    } )
+    .filter_map (NodeInstruction::saved_graphnode)
+    .map ( |node| node . pid . clone () )
     .collect ();
   let mut repairs : Vec<NodeInstruction> = Vec::new ();
   for candidate in candidates {

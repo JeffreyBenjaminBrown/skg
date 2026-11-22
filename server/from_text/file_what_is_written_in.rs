@@ -71,9 +71,7 @@ pub fn file_forkee_members_written_in (
 ) -> Result<(), String> {
   let written : HashSet<ID> =
     node_instructions . iter ()
-    . map ( |instruction| match instruction {
-      NodeInstruction::Save (SaveNode (node)) => node . pid . clone (),
-      NodeInstruction::Delete (delete) => delete . gnid . clone (), } )
+    . map ( |instruction| instruction . gnid () . clone () )
     . chain ( fork_specs . iter () . map ( |spec| spec . original_gnid . clone () ))
     . map ( |gnid| graph . pid_else_raw_id (&gnid) )
     . collect ();

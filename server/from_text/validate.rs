@@ -348,10 +348,8 @@ pub(super) fn validate_no_simultaneous_delete_and_nodeMerge (
   if nodeMerge_pairs . is_empty() { return Ok (()); }
   let deleted_pids : HashSet<ID> =
     node_instructions . iter ()
-    . filter_map ( |instruction| match instruction {
-      NodeInstruction::Delete (DeleteNode { gnid, .. }) =>
-        Some (graph . pid_else_raw_id (gnid)),
-      NodeInstruction::Save (_) => None, } )
+    . filter_map (NodeInstruction::deleted_gnid)
+    . map ( |gnid| graph . pid_else_raw_id (gnid) )
     . collect ();
   let mut errors : Vec<BufferValidationError> = Vec::new();
   for (acquirer, acquiree) in nodeMerge_pairs {

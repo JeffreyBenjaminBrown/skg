@@ -351,6 +351,31 @@ impl NodeInstruction {
     matches!(self, NodeInstruction::Save (_))
   }
 
+  /// The gnid this instruction saves or deletes: a Save's pid, a
+  /// Delete's gnid.
+  pub fn gnid (
+    &self
+  ) -> &ID {
+    match self {
+      NodeInstruction::Save (SaveNode (node))           => &node . pid,
+      NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid, } }
+
+  /// The graphnode a Save writes; None for a Delete.
+  pub fn saved_graphnode (
+    &self
+  ) -> Option<&Graphnode> {
+    match self {
+      NodeInstruction::Save (SaveNode (node)) => Some (node),
+      NodeInstruction::Delete (_)             => None, } }
+
+  /// The gnid a Delete removes; None for a Save.
+  pub fn deleted_gnid (
+    &self
+  ) -> Option<&ID> {
+    match self {
+      NodeInstruction::Delete (DeleteNode { gnid, .. }) => Some (gnid),
+      NodeInstruction::Save (_)                         => None, } }
+
   /// Split a slice of NodeInstructions into (deletes, saves),
   /// cloning each item.
   pub fn partition_save_and_delete (

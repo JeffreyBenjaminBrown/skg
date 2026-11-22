@@ -18,7 +18,7 @@ use crate::consts::{
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::tantivy::prominence_update::update_prominence_sources;
 use crate::types::misc::{ID, TantivyIndex};
-use crate::types::save::{NodeInstruction, SaveNode};
+use crate::types::save::NodeInstruction;
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::links::links_from_node;
 
@@ -135,9 +135,7 @@ pub fn prominence_sources_for_saved_from_inRustGraph (
 ) -> HashMap<ID, String> {
   let saved : Vec<&Graphnode> =
     node_defs . iter ()
-    . filter_map ( |instr| match instr {
-      NodeInstruction::Save (SaveNode (node)) => Some (node),
-      NodeInstruction::Delete (_) => None } )
+    . filter_map (NodeInstruction::saved_graphnode)
     . collect ();
   if saved . is_empty () { return HashMap::new (); }
   let saved_gnids : HashSet<ID> =

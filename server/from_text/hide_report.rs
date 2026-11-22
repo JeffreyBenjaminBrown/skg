@@ -29,7 +29,7 @@ use crate::refresh::goal::{ContainsAfterSave, forks_folder_members_shown, owned_
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig};
 use crate::types::nodes::complete::Graphnode;
-use crate::types::save::{ForkSpec, NodeInstruction, SaveNode};
+use crate::types::save::{ForkSpec, NodeInstruction};
 
 use std::collections::{HashMap, HashSet};
 
@@ -44,17 +44,13 @@ pub fn hide_report_lines (
 ) -> Vec<String> {
   let saved : Vec<&Graphnode> =
     node_instructions . iter ()
-    . filter_map ( |instruction| match instruction {
-        NodeInstruction::Save (SaveNode (node)) => Some (node),
-        NodeInstruction::Delete (_) => None, } )
+    . filter_map (NodeInstruction::saved_graphnode)
     . chain ( fork_specs . iter () . map ( |spec| & spec . clone . 0 ))
     . collect ();
   let deleted : HashSet<ID> =
     node_instructions . iter ()
-    . filter_map ( |instruction| match instruction {
-        NodeInstruction::Delete (delete) =>
-          Some ( graph . pid_else_raw_id (& delete . gnid) ),
-        NodeInstruction::Save (_) => None, } )
+    . filter_map (NodeInstruction::deleted_gnid)
+    . map ( |gnid| graph . pid_else_raw_id (gnid) )
     . collect ();
   let titles : HashMap<ID, String> = // the plan's titles, which a new clone has only here
     saved . iter ()

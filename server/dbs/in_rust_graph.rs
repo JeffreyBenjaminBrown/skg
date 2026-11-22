@@ -223,11 +223,7 @@ fn coalesced_final_nodeInstructions (
 ) -> Vec<&NodeInstruction> {
   let mut by_pid : HashMap<&ID, (usize, &NodeInstruction)> = HashMap::new ();
   for (position, nodeInstruction) in nodeInstructions . iter () . enumerate () {
-    let pid : &ID = match nodeInstruction {
-      NodeInstruction::Save (SaveNode (node))       => &node . pid,
-      NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid,
-    };
-    by_pid . insert (pid, (position, nodeInstruction)); }
+    by_pid . insert (nodeInstruction . gnid (), (position, nodeInstruction)); }
   let mut positioned : Vec<(usize, &NodeInstruction)> =
     by_pid . into_values () . collect ();
   positioned . sort_by_key (|(position, _)| *position);
@@ -273,11 +269,9 @@ pub fn apply_nodeInstructions_to_inRustGraph (
   let base : InRustGraph = candidate . clone ();
   let nodeInstructions : Vec<&NodeInstruction> =
     coalesced_final_nodeInstructions (node_defs);
-  let touched_pids : HashSet<ID> = nodeInstructions . iter () . map (|nodeInstruction|
-    match nodeInstruction {
-      NodeInstruction::Save (SaveNode (node))       => node . pid . clone (),
-      NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid . clone (),
-    }) . collect ();
+  let touched_pids : HashSet<ID> = nodeInstructions . iter ()
+    . map ( |nodeInstruction| nodeInstruction . gnid () . clone () )
+    . collect ();
   let mut affected_gnids : HashSet<ID> = touched_pids . clone ();
 
   // Install the complete final identity state before rebuilding any forward
