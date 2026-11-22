@@ -29,23 +29,34 @@
    'SkgConfig', 'Skgrepo', the foreign-order types, 'SkgrepoOwner',
    the run-folder functions and the config's serde defaults moved
    unchanged out of 'misc.rs'. (Done by the 'server/serve/' agent.)
+** A prepared graph update coalesces its instructions as the graph applies them
+   'normalize_and_coalesce_nodeInstructions'
+   ('server/dbs/in_rust_graph/prepared_update.rs') calls
+   'coalesced_final_nodeInstructions' ('server/dbs/in_rust_graph.rs'),
+   the last instruction per gnid in the order those stand, where it
+   kept its own copy.
+** A save error's Org text lives beside its one-line text
+   'format_save_error_as_org', the Org text of each
+   'BufferValidationError' and 'SaveError''s 'Display' moved unchanged
+   from 'server/types/save.rs' to the end of 'server/types/errors.rs',
+   so both texts of a message are in one file. Callers (one handler,
+   eight tests) import it from there.
 * Candidates left, best first
-** 'tests/mutation_gate.rs' keeps a private copy of a 'From' projection
-   'complete_from_rust' there duplicates 'From<&GraphnodeInRust> for
-   Graphnode' ('server/types/nodes/rust.rs'). Dropping it is a test edit
-   that checks no less; small.
 ** 'server/types/viewnode.rs' (1702 lines)
    The biggest file in the territory: the viewnode types, then their
    impls from line ~773 ('Folder' alone ~190 lines of impl). The diff
-   facts types at its head ('ChangeFacts', 'DiffChange', 'DiffObject',
-   'ProcessedRequest') could be their own file. Not surveyed closely.
-** 'NodeInstruction' coalescing is written twice
-   'coalesced_final_nodeInstructions' ('server/dbs/in_rust_graph.rs')
-   and 'normalize_and_coalesce_nodeInstructions'
-   ('server/dbs/in_rust_graph/prepared_update.rs') both keep the last
-   instruction per gnid in first-position order, one by reference and
-   one by value after normalizing. A shared helper is small and safe;
-   check that both orderings really agree first.
+   facts types at its head ('ChangeFacts', 'LeavesFact', 'DiffChange',
+   'Existence', 'DiffObject', 'ProcessedRequest') and the change
+   viewnodes ('ChangeViewnode', 'ChangesetMarkerKind', 'OtherChange',
+   'PropertyMember') could be a 'viewnode/diff.rs'. Safe (a move), but
+   about 45 files import those types, most of them outside this
+   territory (diff_view, refresh, heralds, the parser, tests), so every
+   one needs an import edit; do it when no other agent works in those
+   files.
+** 'tests/mutation_gate.rs' keeps a private copy of a 'From' projection
+   'complete_from_rust' there duplicates 'From<&GraphnodeInRust> for
+   Graphnode' ('server/types/nodes/rust.rs'). Dropping it is a test edit
+   that checks no less; small, but in the tests' territory.
 ** 'identities_in_nodeInstruction' ('server/save.rs')
    Every ID of a Save (pid and extra IDs) or a Delete's gnid; it could
-   be a 'NodeInstruction' method beside 'gnid'. Small.
+   be a 'NodeInstruction' method beside 'gnid'. Small, little value.

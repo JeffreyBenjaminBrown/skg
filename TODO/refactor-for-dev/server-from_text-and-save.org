@@ -38,36 +38,64 @@
    branches in 'tests/move_repo.rs'.
 ** 'graphnode_from_graphnodeInRust' is 'From<&GraphnodeInRust> for Graphnode'
    Done by the 'server/types/' agent ('server/types/nodes/rust.rs').
+** Visibility resolution names its forkee step
+   The forkee loop inline in 'resolve_visibility'
+   ('server/from_text/local_fieldintent_collection/resolve_visibility.rs')
+   is 'resolve_forkee_visibility', beside 'resolve_forker_visibility';
+   'resolve_visibility' now reads as its stages in order.
+** A nodeMerge rebuilds Tantivy through one function
+   'rebuild_tantivy_from_disk' ('server/nodeMerge.rs') reads, checks and
+   rebuilds; its caller words the failure once, where three identical
+   closures did.
+** Aliases get their sticky relRepos from their own function
+   'apply_sticky_relRepos_to_aliases' ('server/from_text/supplement_from_disk.rs')
+   is the alias block of 'apply_sticky_relRepos_in_graph_with_prospective_homes',
+   moved unchanged; it shares none of that function's closures.
 * Candidates left, best first
-** The Tantivy rebuild in 'apply_prepared_nodeMerges'
-   ('server/nodeMerge.rs') maps three errors with one identical closure;
-   a 'rebuild_tantivy_from_disk' function would hold it. Small and safe.
-   Larger: 'merge_nodes_with_hoist_approval' and
-   'update_graph_minus_nodeMerges_with_hoist_approval' share their shape
-   (prepare graph update, prepare filesystem, telescope warnings, apply,
-   emit), but their index policies differ on purpose ('TODO/problems.org',
-   "Ordinary saves and node merges have different index application
-   policies"); unify only after stating that contract.
-** 'apply_sticky_relRepos_in_graph_with_prospective_homes' (187 lines)
-   In 'server/from_text/supplement_from_disk.rs'. The explicit-relRepo
-   checks (unconfigured, not owned, more public than home) appear for
-   relations and again for aliases, with slightly different
-   user-visible messages, which a shared check must keep word for word.
-   The four list blocks (contains, forks, hides, aliases) could each be
-   a function; the closures they share make that a moderate edit.
-** 'hide_report_lines' (162 lines, 'server/from_text/hide_report.rs')
+** Split 'resolve_visibility.rs' by step
+   'server/from_text/local_fieldintent_collection/resolve_visibility.rs'
+   (about 890 lines) is now one orchestrator ('resolve_visibility') and
+   one function per step: the conflict check, the contains-removal
+   inference (with 'member_it_stands_for', which 'server/receipt.rs' and
+   'hide_report.rs' import), adding children under a member as such,
+   the forkee and forker steps, the forks-folder removals, and the
+   hidden-outside edits. A folder module with one file per step would
+   let an agent changing one step read a fifth of the file. Safe (code
+   moves unchanged), but the shared helpers ('members_with_visible_records',
+   'forks_folder_members_drawn', 'kept_elsewhere_before_save',
+   'owned_notes_containing_after_save', 'refusal_to_change_what_a_foreign_note_hides',
+   'signals_of_role') become 'pub(super)', and the module header's
+   policy text must be divided with the code. Moderate work.
+** The forkee and forker steps are near-duplicates
+   'resolve_forkee_visibility' and 'resolve_forker_visibility' compute
+   'drawn_before', the unhides and the refusal the same way, with
+   differences that matter (where the set-aside folder is subtracted;
+   the forker step adds a fork). A shared helper for the unhides
+   ('visible' and in the member's content, as the hides name them) is
+   small and safe; unifying 'drawn_before' is not, without tests aimed
+   at each difference.
+** The rest of 'apply_sticky_relRepos_in_graph_with_prospective_homes'
+   Still about 140 lines. The explicit-relRepo checks (unconfigured,
+   not owned, more public than home) are written for relations
+   ('resolve_skgrepo') and for aliases, with different user-visible
+   messages, which a shared check must keep word for word. The
+   contains, forks and hides blocks use the function's closures, so
+   splitting them needs those closures turned into a small struct.
+** The nodeMerge and ordinary-save apply paths share their shape
+   'merge_nodes_with_hoist_approval' and
+   'update_graph_minus_nodeMerges_with_hoist_approval' both prepare the
+   graph update, prepare the filesystem, collect telescope warnings,
+   apply, then emit; their index policies differ on purpose
+   ('TODO/problems.org', "Ordinary saves and node merges have different
+   index application policies"). Unify only after stating that
+   contract.
+** 'hide_report_lines' (157 lines, 'server/from_text/hide_report.rs')
    The "Hides nothing" reasoning for one removed child could be its own
    function, but it reads a dozen locals and closures; worth it only
    when someone next changes that report.
-** 'server/from_text/local_fieldintent_collection/resolve_visibility.rs'
-   The territory's biggest file (879 lines), with four functions over a
-   hundred lines ('resolve_visibility', 'apply_hiddenoutside_edits',
-   'infer_hides_from_contains_removals', 'resolve_forker_visibility').
-   Not surveyed closely.
 ** The test-only entry points in 'server/from_text.rs'
    'buffer_to_validated_saveplan' and
    'buffer_to_validated_saveplan_with_fork_skgrepos' are called only by
-   tests, which build the graph from disk through them; their comments
-   call them "transitional compatibility". The module comment names
-   'buffer_to_validated_saveplan' as the purpose of 'from_text::', where
-   production calls the '_with_fork_skgrepos_in_graph' form.
+   tests (a dozen files), which build the graph from disk through them.
+   Moving them to 'test_utils' changes every such test's import; safe,
+   wide, low value.
