@@ -190,3 +190,57 @@ Checked by machine, comparing the moved lines or syntax trees:
 Not read: the plans and problems commits (86262e08b, 774b15c62,
 5f0dc5c4f and the 'plans:' ones), since they are documents. Nothing
 was built or run.
+* third review
+A third independent review, of the 14 commits merged after the
+second, from 9d03b7902 to c04d79ce1. Twelve split a long function,
+nine in 'server/' and three in the Emacs and Neovim clients; the
+other two are plans. It found no behaviour change: each split runs
+the same effects in the same order, with the same texts. Nothing was
+fixed.
+** found
+Nothing. Each kind of slip a split can make was looked for, and here
+is why each is absent:
+- Early returns. Every helper that can refuse returns a 'Result' or a
+  'ControlFlow' that its caller turns, with '?' or a 'match', into
+  the same return as before: the save pipeline's two confirmations
+  (delete-from, strandeds) still return before anything is
+  propagated or reset; the text search's and the titles answer's
+  refusals still return before any search or send.
+- Effects in order. The save's early lock is still sent before the
+  buffer is read; its relaxed lock is still sent after the dirty-view
+  check and before the apply, with the same debug or info line after
+  it. The busy-signal thread is still spawned before the shutdown
+  handler is installed.
+- Error texts and log lines. Every message and 'tracing' call is
+  word for word, and each stays in its module, so its target is the
+  same. The error type of a '?' that moved into 'spawn_busysignal_thread'
+  is 'Box<dyn Error>' in both functions.
+- Values. Each 'parse_warnings . clone ()' became '. to_vec ()' of
+  the same slice. The save's warnings are joined in the same order;
+  the hiddenoutside warnings, now computed before the others are
+  joined, come from a function that only reads. A downcast through
+  '&Box<dyn Error>' still reaches 'dyn Error'. 'string_field' in the
+  search index reads exactly what the eight copies read, with the
+  same defaults.
+- The clients. The save's nine handlers are registered with the same
+  types, one-shot flags and closures, before the length-prefix reset.
+  In Emacs the file is lexically bound and none of the seven
+  arguments the closures capture is a special variable. In Neovim
+  every upvalue of the new functions is a parameter or one of the
+  module's top-level 'local's ('payload', 'lock', 'log', 'messages',
+  'length_prefix', 'state'), declared before them; none was a local
+  of the old enclosing function. No new name shadows or redefines
+  another.
+** covered
+Read closely, old body against new pieces, with nothing to report:
+- 'server/': 9d03b7902 (identity check), 747eeb0ca (fieldIntents per
+  position, also compared by machine with indentation stripped),
+  6fffd8ca1, ca3b92acf and 692252ddc (the save handler and
+  pipeline), 502a5c589 (single-root view), e5f18ea16 (prominence
+  update), 350d53bbb (server start), c6758cd36 (text search) and
+  7262ba7f1 (titles by IDs);
+- the clients: 0cae1bce7 (save handlers) and 251a6789c (rerender
+  lock and done handlers), each in both Emacs and Neovim.
+Not read: the plans commits f2ae1efb9 and c04d79ce1, and the
+handoff-file edits inside 6fffd8ca1 and 350d53bbb, since they are
+documents. Nothing was built or run.
