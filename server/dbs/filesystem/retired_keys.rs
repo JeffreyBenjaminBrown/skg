@@ -4,7 +4,7 @@
 //! 'subscribesTo' and 'overrides' became one key, 'forks', and
 //! 'hidesFromSubs' became 'hides' (as did the October 2026 names of
 //! the first two, 'subscribes_to' and 'overrides_view_of').
-//! 'GraphnodeOnDisk' no longer has fields for them, and serde would
+//! 'GraphnodeOnDisk' has no fields for them, and serde would
 //! drop an unknown key silently; the next save of the section would
 //! then erase it. So a worktree file holding one is unreadable, and a
 //! git tree holding one is refused. The one-time tool

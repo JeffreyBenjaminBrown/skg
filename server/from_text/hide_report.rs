@@ -1,7 +1,7 @@
 //! What a save hides and stops hiding, in words a user can read
 //! ('docs/api-and-formats.org', "Save buffer": the '(hides ...)'
 //! entry). A hide is never typed: the server infers it from what left
-//! a forker's content ('resolve_visibility.rs'), or from an edit
+//! a forker's content ('local_fieldintent_collection/resolve_visibility.rs'), or from an edit
 //! of a hidden folder. So a gesture that hides nothing looks, in the
 //! buffer, just like one that works; these lines tell them apart.
 //! .

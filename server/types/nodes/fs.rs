@@ -9,8 +9,8 @@
 //! "- anchor: ID" lines, so a membership moving between sections
 //! diffs as a clean one-line delete/add pair. Unordered relations
 //! and aliases are plain lists. A field a section omits is a field
-//! that section has no opinion about. Today's single-section files
-//! parse unchanged (title present, no anchors).
+//! that section has no opinion about. A node with one section is one
+//! file with a title and no anchors.
 //!
 //! Conversions:
 //! - 'GraphnodeOnDisk::into_section_slices' feeds the composition
