@@ -364,8 +364,11 @@ function M.visit_link ()
   end
 end
 
+---Run GOTO_FN, then close the buffer it was called from, discarding
+---its edits. The '*_and_close_this' functions here and in skg.goto_git
+---use it.
 ---@param goto_fn fun() the goto to run before closing this buffer
-local function goto_then_close (goto_fn)
+function M.goto_then_close (goto_fn)
   local buf = vim.api.nvim_get_current_buf()
   goto_fn()
   if vim.api.nvim_buf_is_valid(buf) then
@@ -375,12 +378,12 @@ local function goto_then_close (goto_fn)
 end
 
 function M.goto_and_close_this ()
-  goto_then_close(M.goto_id_near_point)
+  M.goto_then_close(M.goto_id_near_point)
 end
 
 ---@param gnid string|nil
 function M.goto_by_id_and_close_this (gnid)
-  goto_then_close(function () M.goto_by_id(gnid) end)
+  M.goto_then_close(function () M.goto_by_id(gnid) end)
 end
 
 return M

@@ -203,23 +203,25 @@ position, or nil (with a message) when no headline carries the ID."
         (org-reveal)) ;; open the folds hiding it
       headline-start)))
 
+(defun skg--goto-then-close (goto-fn)
+  "Call GOTO-FN, then kill the buffer it was called from, if it is
+still live. The commands whose names end in -and-close-this use it."
+  (let ((buf (current-buffer)))
+    (funcall goto-fn)
+    (when (buffer-live-p buf)
+      (kill-buffer buf))))
+
 (defun skg-goto-and-close-this ()
   "Like `skg-goto', but also kill the buffer it was called from
 once the goto request has been issued."
   (interactive)
-  (let ((buf (current-buffer)))
-    (skg-goto)
-    (when (buffer-live-p buf)
-      (kill-buffer buf))))
+  (skg--goto-then-close #'skg-goto))
 
 (defun skg-goto-by-id-and-close-this (gnid)
   "Like `skg-goto-by-id', but also kill the buffer it was called
 from once the goto request has been issued."
   (interactive "sNode ID: ")
-  (let ((buf (current-buffer)))
-    (skg-goto-by-id gnid)
-    (when (buffer-live-p buf)
-      (kill-buffer buf))))
+  (skg--goto-then-close (lambda () (skg-goto-by-id gnid))))
 
 (defun skg-id-next ()
   "Move point to the next ID occurrence.

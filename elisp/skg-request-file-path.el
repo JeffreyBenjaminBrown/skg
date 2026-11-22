@@ -55,19 +55,13 @@ file section and the user is informed."
   "Like `skg-goto-in-magit', but also kill the buffer it was called
 from once the request has been issued."
   (interactive)
-  (let ((buf (current-buffer)))
-    (skg-goto-in-magit)
-    (when (buffer-live-p buf)
-      (kill-buffer buf))))
+  (skg--goto-then-close #'skg-goto-in-magit))
 
 (defun skg-goto-in-magit-parent-and-close-this ()
   "Like `skg-goto-in-magit-parent', but also kill the buffer it was
 called from once the request has been issued."
   (interactive)
-  (let ((buf (current-buffer)))
-    (skg-goto-in-magit-parent)
-    (when (buffer-live-p buf)
-      (kill-buffer buf))))
+  (skg--goto-then-close #'skg-goto-in-magit-parent))
 
 (defun skg--magit-node-info-at-point ()
   "Return a cons (id . repo) for the node on the current line,

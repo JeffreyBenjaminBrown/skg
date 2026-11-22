@@ -239,22 +239,12 @@ function M.goto_in_git_parent ()
   end)
 end
 
----@param goto_fn fun()
-local function goto_then_close (goto_fn)
-  local buf = vim.api.nvim_get_current_buf()
-  goto_fn()
-  if vim.api.nvim_buf_is_valid(buf) then
-    vim.bo[buf].modified = false
-    vim.api.nvim_buf_delete(buf, { force = true })
-  end
-end
-
 function M.goto_in_git_and_close_this ()
-  goto_then_close(M.goto_in_git)
+  id_search.goto_then_close(M.goto_in_git)
 end
 
 function M.goto_in_git_parent_and_close_this ()
-  goto_then_close(M.goto_in_git_parent)
+  id_search.goto_then_close(M.goto_in_git_parent)
 end
 
 return M
