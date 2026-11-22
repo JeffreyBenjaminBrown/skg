@@ -10,9 +10,12 @@
 # server/, it signals this script, which stops the binary and exits,
 # and cargo-watch starts a fresh copy.
 #
-# A run that ends quickly (a bad config, say, or a port still held)
-# doubles the pause before the next, up to a minute, so a server that
-# cannot start retries slowly instead of filling the log.
+# A run that ends quickly (a bad config, say, or a port still held, or
+# a skgrepo the server refuses) doubles the pause before the next. After
+# QUICK_EXITS_BEFORE_GIVING_UP quick runs in a row, this script stops
+# trying and exits with status 1, rather than retrying forever a server
+# that cannot start; the server's last error is just above, in the same
+# log. A run that lasts resets both the pause and the count.
 
 PROFILE_DIR="$1"
 SKG_CONFIG="$2"
@@ -22,7 +25,7 @@ if [ -z "$PROFILE_DIR" ] || [ -z "$SKG_CONFIG" ]; then
 fi
 
 QUICK_EXIT_SECONDS=30 # a run shorter than this counts as failing to start
-MAX_PAUSE_SECONDS=60
+QUICK_EXITS_BEFORE_GIVING_UP=5 # pausing 2, 4, 8 and 16 s between them
 skg_pid=""
 pause_pid=""
 
@@ -37,6 +40,7 @@ stop_skg_and_exit() {
 trap stop_skg_and_exit TERM INT HUP
 
 pause_seconds=1
+quick_exits_in_a_row=0
 while true; do
   started_at=$SECONDS
   "$PROFILE_DIR/skg" "$SKG_CONFIG" &
@@ -45,10 +49,15 @@ while true; do
   status=$?
   skg_pid=""
   if (( SECONDS - started_at < QUICK_EXIT_SECONDS )); then
-    pause_seconds=$(( pause_seconds * 2 > MAX_PAUSE_SECONDS
-                      ? MAX_PAUSE_SECONDS : pause_seconds * 2 ))
+    quick_exits_in_a_row=$(( quick_exits_in_a_row + 1 ))
+    pause_seconds=$(( pause_seconds * 2 ))
   else
+    quick_exits_in_a_row=0
     pause_seconds=1
+  fi
+  if (( quick_exits_in_a_row >= QUICK_EXITS_BEFORE_GIVING_UP )); then
+    echo "skg exited with status $status; $quick_exits_in_a_row runs in a row each ended within $QUICK_EXIT_SECONDS s, so giving up. Its error is above."
+    exit 1
   fi
   echo "skg exited with status $status; running it again in $pause_seconds s."
   sleep "$pause_seconds" &

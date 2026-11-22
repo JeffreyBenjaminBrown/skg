@@ -26,6 +26,9 @@
 #   The rerun loop, bash/run-skg-rerunning-on-exit.sh, runs the server,
 #   and runs it again whenever it exits, so killing the server (by its
 #   PID, or with the 'shutdown' request) reruns it, rereading the config.
+#   It gives up after 5 runs in a row that each end within 30 s (a
+#   server that cannot start); without --hot-reload this script then
+#   exits too, printing where the error is.
 #   Hot reload is off unless given --hot-reload: nothing watches server/,
 #   and an edit there takes effect only when this script is run again.
 #   With --hot-reload, cargo-watch also rebuilds and restarts the server
@@ -76,8 +79,8 @@ preflight_check_config() {
   # (the 'check-config' subcommand runs the same load_config the server
   # runs at startup). A malformed skgconfig.toml otherwise makes skg
   # exit(1) before binding port 1730, and the rerun loop reruns it,
-  # crash-looping (with backoff) with the error buried in
-  # the script log, which presents as a connection failure. Catching
+  # failing (with backoff) until the loop gives up, the error buried
+  # in the script log, which presents as a connection failure. Catching
   # it here, in red, turns that into an obvious fix.
   echo ""
   echo "Validating config: $CONFIG"
@@ -165,7 +168,7 @@ kill_stale_skg() {
 
 wait_for_free_api_port() {
   # Refuse to launch into an occupied port: skg would exit(1), and the
-  # rerun loop would rerun it, silently, forever.
+  # rerun loop would rerun it, silently, until it gave up.
   local port
   port="$( skg_api_port )"
   if [ -z "$port" ]; then return 0; fi
@@ -222,6 +225,14 @@ run_skg_without_hot_reload() {
   echo "Rerun loop stdout-stderr go to $SCRIPT_LOG"
   bash/run-skg-rerunning-on-exit.sh "$PROFILE_DIR" "$CONFIG" \
     >> "$SCRIPT_LOG" 2>&1
+  local status=$?
+  if [ "$status" -ne 0 ]; then
+    echo "=================================================================="
+    echo "ERROR: skg kept failing to start, so the rerun loop gave up."
+    echo "The server's error is near the end of $SCRIPT_LOG"
+    echo "=================================================================="
+    exit "$status"
+  fi
 }
 
 cleanup() { # trap handler for graceful shutdown
