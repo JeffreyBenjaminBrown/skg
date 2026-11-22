@@ -41,6 +41,14 @@
    from 'server/types/save.rs' to the end of 'server/types/errors.rs',
    so both texts of a message are in one file. Callers (one handler,
    eight tests) import it from there.
+** Two private copies of a config or graphnode query are gone
+   'SkgConfig::skgrepo_is_foreign' is public, and save validation
+   ('server/from_text/validate.rs') calls it where it kept an identical
+   copy. 'Graphnode::rel_partners_for_relation'
+   ('server/types/nodes/complete.rs') gives a node's list of a relation,
+   once spelled in 'server/from_text/strandeds.rs' and
+   'server/diff_view/restore_requests.rs'. (Done by the agent of all of
+   'server/'.)
 * Candidates left, best first
 ** 'server/types/viewnode.rs' (1702 lines)
    The biggest file in the territory: the viewnode types, then their

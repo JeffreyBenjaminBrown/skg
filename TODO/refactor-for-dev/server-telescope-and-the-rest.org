@@ -40,23 +40,25 @@
    'read_changes_of_pids' returns a named 'ReadChanges'
    ('server/repo_watch/reload.rs'); 'files_of_pids' replaced three
    copies of a walk.
+** A node's search hits are a 'MatchGroup' of 'SearchMatch'es
+   'MatchGroups' ('server/serve/handlers/text_search.rs') mapped each
+   ID to a tuple of a skgrepo and '(score, title-or-alias)' pairs. The
+   four tests that build or read one follow the type. (Done by the
+   agent of all of 'server/'.)
+** A section's title and body are selected by one function
+   'select_text_scalar' ('server/telescope/compose.rs') takes the two
+   warning constructors; the one loop over sections stays, so the
+   warnings still interleave title, then body. (Done by the agent of
+   all of 'server/'.)
 * Candidates left, best first
-** Replace the tuples of 'MatchGroups' with named structs
-   'server/serve/handlers/text_search.rs': 'MatchGroups' is
-   'HashMap<ID, (SkgrepoName, Vec<(f32, TitleOrAlias)>)>', read as
-   '. 0', '. 1', '. 2' and '(s, _)' across the file. A struct per hit
-   ('skgrepo', 'matches') and per match ('score', 'matched') would read
-   better. Safe (no wire change), but 'tests/search_buffer.rs',
-   'tests/repo_sets.rs' and 'tests/forks_under_search_hits.rs' build
-   'MatchGroups' literally, so they change with it: more than following
-   a rename, so ask the coordinator first.
-** Deduplicate the title and body selection in 'compose_sections'
-   'server/telescope/compose.rs': two fifteen-line blocks differ only in
-   the field and the warning variants ('TitleBelowHome'/'BodyBelowHome',
-   'NonHomeTitle'/'NonHomeBody'). A helper would take the two warning
-   constructors. Keep the single loop over sections: the warnings
-   interleave title then body per section, and a split into two passes
-   would reorder them.
+** ? A search hit is ranked by its first match, not its best
+   'build_search_viewforest' sorts hits by 'matches . first ()', the
+   first document Tantivy returned for the node, while its comment
+   says "best score"; the adjusted score (coverage, prominence) can
+   make another match better. Possibly a bug, so not a refactor: it
+   belongs in 'TODO/problems.org' (not added; another agent held that
+   file). Changing it changes the order of search results, so it needs
+   Jeff's yes; if he says nothing, it stays.
 ** Split 'compose_ordered' further
    Its dedup-and-merge half (the 'keep' closure, the prepend, the
    queues after their anchors) is the other half of one section's turn.

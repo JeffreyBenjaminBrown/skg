@@ -38,27 +38,27 @@
    repo-wide pathspec names today's files, and records a latent slip
    of the same kind in 'diff.rs' (a gitrepo-relative path joined to
    the skgrepo's path).
+** Which changed nodes a commit takes lives in 'server/diff_view/commit_choice.rs'
+   'CommitChoice', its two builders and the hold-back rule moved
+   unchanged out of 'change_leaves.rs' (now about 720 lines), which
+   keeps the change-forest, the processed summary, and
+   'reresolved_extra_ids_of' (now 'pub(crate)') and 'title_in_straddle',
+   which both files use. The two docs citing the rule's file follow.
+   (Done by the agent of all of 'server/'.)
+** A restore request reads a recorder's list by 'rel_partners_for_relation'
+   'Graphnode::rel_partners_for_relation' ('server/types/nodes/complete.rs')
+   replaced 'relation_list' here ('restore_requests.rs') and its copy
+   in 'server/from_text/strandeds.rs'. (Done by the agent of all of
+   'server/'.)
 * Candidates left, best first
-** Split the commit choice off 'server/diff_view/change_leaves.rs' (1000 lines)
-   From 'WaitReason' to 'title_in_straddle' (about 300 lines) is the
-   rule of what a commit takes ('CommitChoice', 'hold_back_waiting_nodes',
-   'merge_needs'); the rest is the change-forest. A file
-   'commit_choice.rs' would let an agent read either alone. The move
-   is mechanical ('reresolved_extra_ids_of' is shared; make it
-   'pub(crate)'), but 'docs/diff-view.org' cites 'hold_back_waiting_nodes'
-   in 'change_leaves.rs' and 'docs/api-and-formats.org' says "the
-   choice of nodes in change_leaves.rs"; their notes in 'skg-system/'
-   must change in the same commit (edit the '.skg' text, then
-   'bash/export-docs.sh'; see 'server-refresh-and-heralds.org'). Callers: 'change_viewnodes.rs'
-   ('title_in_straddle'), 'server/serve/handlers/stage_and_commit.rs',
-   'tests/unit/change_leaves.rs' and
-   'tests/pruned_change_view/commit_processed.rs'.
 ** One helper for "the HEAD tree, else 'it has no HEAD commit'"
    'server/git_ops/stage_and_commit.rs' spells it in
    'skg_paths_differing_from_head', 'prepare_commits' and
-   'head_holds_tree'; and three functions open a skgrepo's gitrepo
-   with "not in a git repository" (two wordings). Small saving; the
-   messages must stay word for word.
+   'head_holds_tree' (three lines each; 'commit_one' peels to a commit,
+   not a tree, so it stays); and three functions open a skgrepo's
+   gitrepo with "not in a git repository" (two wordings). Small
+   saving; the messages must stay word for word, and 'prepare_commits'
+   wraps its message in 'in_skgrepo' where the others do not.
 ** Inline 'relationships_to_viewparent' ('processed_requests.rs')
    It only unwraps 'relationship_keys_to_viewparent', whose Option
    exists for '?'. Trivial.
