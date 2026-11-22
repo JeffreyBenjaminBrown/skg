@@ -1,8 +1,23 @@
-// Binary grouping: every tests/*.rs file
-// used to be its own ~quarter-GB test binary; after any change to
-// server/ code, relinking all of them dominated the test cycle.
-// Cargo.toml sets autotests = false and declares a few [[test]]
-// targets; this one gathers the db-free unit-style files.
+//! One of the five test binaries. Cargo.toml sets 'autotests = false'
+//! and declares five '[[test]]' targets, each gathering many 'tests/'
+//! files as modules, so that a change to 'server/' relinks five
+//! binaries rather than one per file. This one gathers the unit-style
+//! files, each about one module, format or request:
+//! - formats and parsing: body_yaml_format, metadata_grammar,
+//!   metadata_fields_table, change_facts_metadata, links, types;
+//! - loading and config: dbs, init_refusal, multi_skgrepo_loading,
+//!   multi_skgrepo_errors, skgrepo_path_validation,
+//!   skgrepo_inheritance_for_non_content, runtime_generation,
+//!   server_warnings, subcommand_usage, import_org_roam;
+//! - search and Tantivy: tantivy, serve_text_search_test, prominence,
+//!   titles_by_gnids;
+//! - drawing: render_util, herald_tokens, graphnodestats_hiding,
+//!   forks_folder_by_default;
+//! - git: git_ops, investigate_unknown_node;
+//! - the helpers themselves: test_utils.
+//! The other binaries: 'grouped_views.rs', 'grouped_forks.rs',
+//! 'grouped_saves.rs', 'grouped_repos.rs'. The library's own unit tests
+//! are in 'tests/unit/', each included by its module in 'server/'.
 
 #[path = "shared/git_fixture_helpers.rs"]
 #[allow(dead_code)] // This target uses only some of the helpers.

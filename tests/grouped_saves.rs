@@ -1,6 +1,17 @@
-// Binary grouping: save-pipeline, merge,
-// and parsing/extraction tests. See tests/grouped_unit.rs for why
-// test files are grouped into a few [[test]] targets.
+//! Test binary (see 'grouped_unit.rs' for why tests are grouped):
+//! saving, and what a save leaves on disk and in the stores.
+//! - parsing a saved buffer and extracting its instructions: new
+//!   (its modules follow 'server/from_text/');
+//! - the save request and its pipeline: save, save_request_envelope,
+//!   save_rerender_release, mutation_gate, file_io;
+//! - stale and conflicting buffers: save_stale_buffers,
+//!   members_as_such_and_stale_buffers, save_dirty_conflicts;
+//! - deletes and dangling IDs: delete_strips_references_from_neighbors,
+//!   dangling_reference_renders_unknown_node,
+//!   write_protected_should_not_count_as_donotdelete, orphan_warning;
+//! - merges: merge;
+//! - moving between skgrepos: strandeds;
+//! - reloading: rebuild, reload_config, repo_watch.
 
 #[path = "shared/git_fixture_helpers.rs"]
 #[allow(dead_code)] // This target uses only some of the helpers.

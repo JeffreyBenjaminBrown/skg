@@ -1,6 +1,11 @@
-// Binary grouping: view rendering and
-// forkee-visibility tests. See tests/grouped_unit.rs for why
-// test files are grouped into a few [[test]] targets.
+//! Test binary (see 'grouped_unit.rs' for why tests are grouped):
+//! drawing views.
+//! - content views and their budget: content_view, initial_view_bfs,
+//!   editable_view_cascade_and_budget;
+//! - viewnode IDs: viewnode_ids;
+//! - the containerward chain: containerward_chain;
+//! - forks in a view: hidden_from_forks, forks_folder_empty_persists,
+//!   forkee_heralds.
 
 #[path = "shared/git_fixture_helpers.rs"]
 #[allow(dead_code)] // This target uses only some of the helpers.

@@ -1,6 +1,15 @@
-// Binary grouping: multi-repo, skgrepo-set,
-// and skgrepo/storage-layer tests. See tests/grouped_unit.rs for why test
-// files are grouped into a few [[test]] targets.
+//! Test binary (see 'grouped_unit.rs' for why tests are grouped):
+//! several skgrepos, the skgrepo restriction, and the diff view.
+//! - the skgrepo restriction: skgrepo_sets, leak_battery, hidden_nodes,
+//!   foreign_hidden, illegal_edits, restricted_graphnode_in_the_buffer,
+//!   requests_refused_under_a_narrowing,
+//!   forker_hides_under_a_narrowing, hide_inference_under_a_narrowing,
+//!   fork_merge_delete_under_a_narrowing;
+//! - moving a node between skgrepos: move_skgrepo;
+//! - the diff view and git: graph_straddle, graph_straddle_engines,
+//!   pruned_change_view, diff_view, processed_requests;
+//! - views: search_buffer, redraw_delta, viewnode_id_stability,
+//!   editability_carrier.
 
 #[path = "shared/git_fixture_helpers.rs"]
 #[allow(dead_code)] // This target uses only some of the helpers.

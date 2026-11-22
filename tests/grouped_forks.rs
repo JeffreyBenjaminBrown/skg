@@ -1,8 +1,27 @@
-// Binary grouping: forks / partner folder
-// tests. See tests/grouped_unit.rs for why test files are grouped
-// into a few [[test]] targets.
-// Store-using tests across this binary are serialized by the fixture mutex in
-// server/test_utils.rs when plain `cargo test` runs them in one process.
+//! Test binary (see 'grouped_unit.rs' for why tests are grouped):
+//! forks, mirrors and partner folders, and the views a save redraws.
+//! - forking: fork, fork_attribution, receipt, forks_meet,
+//!   cuts_from_forkers, hides_by_integration,
+//!   hides_apply_to_every_fork_partner;
+//! - forks folders and their members: forks_folder, flat_forks_folders,
+//!   forkees_drawn_editable, forkers_drawn_editable,
+//!   forkee_as_such_extension, forkee_content_named_by_an_extra_id,
+//!   members_typed_into_a_forks_folder, forks_under_search_hits;
+//! - mirrors: mirror_substitution, mirror_in_place_of_an_extra_id;
+//! - partner folders: partner_folder_matrix, partner_folder_order,
+//!   partner_folder_warnings, extend_partner_folder_member;
+//! - collateral redraws after a save: collateral_partner_folder,
+//!   collateral_forkee_staleness, collateral_delete,
+//!   collateral_new_link, collateral_skgrepo_move;
+//! - what the refresh keeps and draws: what_the_refresh_keeps,
+//!   idempotence (a refresh is a fixpoint),
+//!   moved_headlines_whose_content_was_not_drawn,
+//!   children_of_a_raw_root_are_raw, view_stats_sharing;
+//! - a save's writes to nodes the skgrepo restriction keeps out:
+//!   restricted_suppression.
+//! Store-using tests across this binary are serialized by the fixture
+//! mutex in 'server/test_utils.rs' when plain 'cargo test' runs them in
+//! one process.
 
 #[path = "shared/git_fixture_helpers.rs"]
 #[allow(dead_code)] // This target uses only some of the helpers.
