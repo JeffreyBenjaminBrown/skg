@@ -173,8 +173,6 @@ mirrors there too, as forkers of M."
               (test-fail "the buffer was renamed: %s" (buffer-name)))
             (message "✓ the root is %s" shown)))))))
 
-(run-at-time 60 nil (lambda ()
-                      (message "TIMEOUT: Integration test timed out!")
-                      (kill-emacs 1)))
+(skg-test-arm-timeout 60)
 
 (integration-test-perspective)

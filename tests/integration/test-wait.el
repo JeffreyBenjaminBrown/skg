@@ -28,6 +28,22 @@ make it 'skg-port' and say so. The analog of what
       (setq skg-port (string-to-number test-port))
       (message "Using test port: %d" skg-port))))
 
+(defun skg-test-arm-timeout (timeout-secs &optional phase-variable)
+  "Fail the test after TIMEOUT-SECS if it has not ended: say
+\"TIMEOUT: Integration test timed out!\", then, when PHASE-VARIABLE
+(a symbol, usually 'integration-test-phase') is given, its value as
+the last phase, and exit 1. Returns the timer. The analog of
+'arm_timeout' in 'test-nvim-lib.lua'."
+  (run-at-time timeout-secs nil
+               #'skg-test--time-out phase-variable))
+
+(defun skg-test--time-out (phase-variable)
+  "The end of a test that 'skg-test-arm-timeout' armed."
+  (message "TIMEOUT: Integration test timed out!")
+  (when phase-variable
+    (message "Last phase: %s" (symbol-value phase-variable)))
+  (kill-emacs 1))
+
 (defun skg-test-without-viewnode-ids (text)
   "TEXT without its viewnode IDs: every '(vnid X)' atom, and the space
 before it. A literal of expected buffer text does not spell them."

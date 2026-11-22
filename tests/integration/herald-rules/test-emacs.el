@@ -41,9 +41,7 @@
                (kill-emacs 0)))))))
 
 ;; Set a timeout in case things hang
-(run-at-time 15 nil (lambda ()
-                      (message "TIMEOUT: Integration test timed out!")
-                      (kill-emacs 1)))
+(skg-test-arm-timeout 15)
 
 ;; Run the test
 (integration-test-herald-rules)

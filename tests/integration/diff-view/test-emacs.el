@@ -376,10 +376,5 @@ last written, so a left-out file of unchanged size looks clean there."
   (kill-emacs 0))
 
 (progn
-  (run-at-time
-   180 nil
-   (lambda ()
-     (message "TIMEOUT: Integration test timed out!")
-     (message "Last phase: %s" integration-test-phase)
-     (kill-emacs 1)))
+  (skg-test-arm-timeout 180 'integration-test-phase)
   (run-all-tests))

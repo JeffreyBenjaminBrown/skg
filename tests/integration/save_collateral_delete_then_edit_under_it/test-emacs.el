@@ -333,11 +333,6 @@ the headline carries (skgRepos (nodeRepo main))."
   (kill-emacs 0))
 
 (progn ;; Run the test with a timeout in case things hang.
-  (run-at-time
-   40 nil
-   (lambda ()
-     (message "TIMEOUT: Integration test timed out!")
-     (message "Last phase: %s" integration-test-phase)
-     (kill-emacs 1)))
+  (skg-test-arm-timeout 40 'integration-test-phase)
   ( ;; the test
    run-all-tests))

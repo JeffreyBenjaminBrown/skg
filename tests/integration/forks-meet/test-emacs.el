@@ -216,9 +216,7 @@ and acts on the atoms only when a save redraws the buffer."
 
 (skg-test-use-test-port)
 
-(run-at-time 60 nil (lambda ()
-                      (message "TIMEOUT: Integration test timed out!")
-                      (kill-emacs 1)))
+(skg-test-arm-timeout 60)
 
 (skg-tcp-connect-to-rust)
 (unless (skg-herald-rules-ensure)

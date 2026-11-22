@@ -159,11 +159,6 @@
               (kill-emacs 1))))))))
 
 (progn ;; Run the test with a timeout in case things hang.
-  (run-at-time
-   20 nil
-   (lambda ()
-     (message "TIMEOUT: Integration test timed out!")
-     (message "Last phase: %s" integration-test-phase)
-     (kill-emacs 1)))
+  (skg-test-arm-timeout 20 'integration-test-phase)
   ( ;; the test
    run-all-tests))
