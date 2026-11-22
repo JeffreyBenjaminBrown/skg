@@ -83,7 +83,15 @@ Standard library only. The README beside this file explains the
 formats; the protocol is in 'docs/api-and-formats.org'.
 """
 
+import os
 import sys
+
+# The tool's other modules are files beside this one. Python puts this
+# folder on 'sys.path' itself, but not under 'python3 -I' (or '-P', or
+# PYTHONSAFEPATH), so the tool puts it there.
+TOOL_FOLDER = os . path . dirname ( os . path . realpath (__file__) )
+if TOOL_FOLDER not in sys . path:
+  sys . path . insert (0, TOOL_FOLDER)
 
 from server_connection import NO_PORT_MESSAGE, SkgToolError
 from daemon_client import (

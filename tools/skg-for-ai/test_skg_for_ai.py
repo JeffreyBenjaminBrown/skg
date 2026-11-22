@@ -6,6 +6,7 @@ It needs a built server, 'target/debug/skg' ('cargo build --bin skg'),
 or the binary SKG_BINARY names.
 
 In order, it:
+- checks that the tool runs under 'python3 -I', from another folder;
 - checks that a save's envelope carries the saved buffer's baseline;
 - checks that a command needing a server, given no port, no sidecar
   and no daemon, is refused before it connects, there being no
@@ -166,6 +167,7 @@ def main (argv):
     prefix = "skg-for-ai-test-runtime-" )
   os . environ . pop ( "SKG_PORT", None )
   failures = []
+  failures += failures_of_isolated_run ()
   failures += failures_of_title_matching ()
   failures += failures_of_save_envelope ()
   failures += failures_of_commit_result_text ()
@@ -473,6 +475,23 @@ def failures_of_no_default_port ():
     socket . socket . connect = original_connect
     shutil . rmtree (folder, ignore_errors = True)
   return failures
+
+def failures_of_isolated_run ():
+  """Under 'python3 -I', which leaves the script's folder off
+  'sys.path', and from another folder, the tool still finds its
+  modules: '--help' exits 0 and prints its usage."""
+  folder = tempfile . mkdtemp ( prefix = "skg-for-ai-test-isolated-" )
+  try:
+    completed = subprocess . run (
+      [ sys . executable, "-I", os . path . join (TOOL_FOLDER, "skg_for_ai.py"),
+        "--help" ],
+      capture_output = True, text = True, cwd = folder )
+  finally:
+    shutil . rmtree (folder, ignore_errors = True)
+  if completed . returncode != 0 or not completed . stdout . startswith ("usage:"):
+    return [ f"'python3 -I skg_for_ai.py --help': exit {completed . returncode}, "
+             f"stdout {completed . stdout!r}, stderr {completed . stderr!r}" ]
+  return []
 
 def failures_of_link_annotation_round_trip ():
   """A save strips exactly the link annotations a view wrote, even one
