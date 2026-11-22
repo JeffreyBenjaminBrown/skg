@@ -176,16 +176,8 @@ pub fn export_to_org (
   output_base : &Path,
 ) -> Result<ExportReport, Box<dyn Error>> {
   let mut warnings : Vec<String> = Vec::new ();
-  let by_pid : HashMap<ID, &Graphnode> =
-    nodes . iter ()
-    . map ( |n| (n . pid . clone (), n) )
-    . collect ();
-  let alias_to_pid : HashMap<ID, ID> = {
-    let mut m : HashMap<ID, ID> = HashMap::new ();
-    for n in nodes {
-      for extra in &n . extra_ids {
-        m . insert ( extra . clone (), n . pid . clone () ); }}
-    m };
+  let by_pid : HashMap<ID, &Graphnode> = nodes_by_pid (nodes);
+  let alias_to_pid : HashMap<ID, ID> = pid_of_each_extra_id (nodes);
 
   let (roots_by_pid, marker_pids) : (HashMap<ID, ExportRoot>,
                                      HashSet<ID>) =
@@ -245,16 +237,8 @@ pub fn export_candidate_pids (
   restriction : &SkgrepoRestriction,
   nodes  : &[Graphnode],
 ) -> Vec<ID> {
-  let by_pid : HashMap<ID, &Graphnode> =
-    nodes . iter ()
-    . map ( |node| (node . pid . clone (), node) )
-    . collect ();
-  let alias_to_pid : HashMap<ID, ID> = {
-    let mut aliases : HashMap<ID, ID> = HashMap::new ();
-    for node in nodes {
-      for extra in &node . extra_ids {
-        aliases . insert (extra . clone (), node . pid . clone ()); }}
-    aliases };
+  let by_pid : HashMap<ID, &Graphnode> = nodes_by_pid (nodes);
+  let alias_to_pid : HashMap<ID, ID> = pid_of_each_extra_id (nodes);
   let mut ignored_warnings : Vec<String> = Vec::new ();
   let (roots_by_pid, marker_pids) = discover_roots (
     nodes, &alias_to_pid, restriction, &mut ignored_warnings );
@@ -280,10 +264,7 @@ pub(crate) fn claimed_export_targets (
 ) -> Result<Vec<(ID, String)>, String> {
   let restriction : SkgrepoRestriction =
     SkgrepoRestriction::unrestricted (config);
-  let aliases : HashMap<ID, ID> = nodes . iter ()
-    .flat_map (|node| node . extra_ids . iter ()
-      .map (|extra| (extra . clone (), node . pid . clone ())))
-    .collect ();
+  let aliases : HashMap<ID, ID> = pid_of_each_extra_id (nodes);
   let mut warnings : Vec<String> = Vec::new ();
   let (roots, _) = discover_roots (nodes, &aliases, &restriction, &mut warnings);
   Ok (roots . into_values ()
@@ -676,10 +657,8 @@ fn rewrite_links (
   for (range, link) in links_with_wrapped_labels_and_ranges_from_text (text) {
     out . push_str (&text [copied_up_to .. range . start]);
     copied_up_to = range . end;
-    let uid : ID = link . gnid;
     let label : &str = &link . label;
-    let pid : ID =
-      alias_to_pid . get (&uid) . cloned () . unwrap_or (uid);
+    let pid : ID = resolve_pid (&link . gnid, alias_to_pid);
     out . push_str (& match homes . get (&pid) {
       Some (home) => org_link_for_home (home, current_target, label),
       None => {
@@ -807,6 +786,23 @@ fn defuse_headline_lines (
 //
 // Small shared helpers
 //
+
+fn nodes_by_pid (
+  nodes : &[Graphnode],
+) -> HashMap<ID, &Graphnode> {
+  nodes . iter ()
+    . map ( |node| (node . pid . clone (), node) )
+    . collect () }
+
+/// Each extra ID of a node in 'nodes', mapped to that node's PID.
+/// 'resolve_pid' reads it.
+fn pid_of_each_extra_id (
+  nodes : &[Graphnode],
+) -> HashMap<ID, ID> {
+  nodes . iter ()
+    . flat_map ( |node| node . extra_ids . iter ()
+                 . map ( |extra| (extra . clone (), node . pid . clone ()) ))
+    . collect () }
 
 fn resolve_pid (
   gnid           : &ID,
