@@ -113,6 +113,7 @@ import sexp
 import server_connection
 import full_view
 import compact_view
+import views
 import skg_for_ai
 
 FIXTURE_FOLDER = os . path . join (TOOL_FOLDER, "test-fixture")
@@ -197,9 +198,9 @@ def failures_of_perspective_names ():
                           ( "root authors", "root homes" ),
                           ( None, "root homes" ) ]:
     sidecar = {} if recorded is None else { "perspective" : recorded }
-    if skg_for_ai . perspective_of_sidecar (sidecar) != read:
+    if views . perspective_of_sidecar (sidecar) != read:
       failures . append ( f"a sidecar recording {recorded!r} is read as "
-                          f"{skg_for_ai . perspective_of_sidecar (sidecar)!r}, not {read!r}" )
+                          f"{views . perspective_of_sidecar (sidecar)!r}, not {read!r}" )
   for words, name in [ ( [], "next" ), ( [ "next" ], "next" ),
                        ( [ "root", "homes" ], "root homes" ),
                        ( [ "skgrepo main" ], "skgrepo main" ),
@@ -234,7 +235,7 @@ def failures_of_forks_folder_claims ():
            "(view (rels (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) k\n" )
   compact = ( "* n ⟨0a⟩\n** ⟨0b⟩\n*** f ⟨0c relRepo:main⟩\n"
               "*** e ⟨0d⟩\n*** m ⟨0e⟩\n*** k ⟨0g relRepo:main⟩\n" )
-  headline_of_handle = skg_for_ai . headlines_by_viewnode_id (
+  headline_of_handle = views . headlines_by_viewnode_id (
     full_view . parse_full_view (full) )
   edited = skg_for_ai . parse_edited_compact_view (compact)
   def metadata (handle):
