@@ -142,34 +142,19 @@ pub fn compose_sections (
     composed . home = sections . first ()
       . map ( |(skgrepo, _)| skgrepo . clone () );
     for (skgrepo, section) in sections {
-      if let Some (title) = &section . title {
-        match &composed . title_skgrepo {
-          None => {
-            composed . title = Some (title . clone ());
-            composed . title_skgrepo = Some (skgrepo . clone ());
-            if composed . home . as_ref () != Some (skgrepo) {
-              warnings . push ( CompositionWarning::TitleBelowHome {
-                home : composed . home . clone ()
-                  . expect ("a section establishes the home"),
-                title_at : skgrepo . clone (), } ); }}
-          Some (selected_at) =>
-            warnings . push ( CompositionWarning::NonHomeTitle {
-              skgrepo     : skgrepo . clone (),
-              selected_at : selected_at . clone (), } ), }}
-      if let Some (body) = &section . body {
-        match &composed . body_skgrepo {
-          None => {
-            composed . body = Some (body . clone ());
-            composed . body_skgrepo = Some (skgrepo . clone ());
-            if composed . home . as_ref () != Some (skgrepo) {
-              warnings . push ( CompositionWarning::BodyBelowHome {
-                home : composed . home . clone ()
-                  . expect ("a section establishes the home"),
-                body_at : skgrepo . clone (), } ); }}
-          Some (selected_at) =>
-            warnings . push ( CompositionWarning::NonHomeBody {
-              skgrepo     : skgrepo . clone (),
-              selected_at : selected_at . clone (), } ), }} }
+      // One loop, title then body per section: the warnings interleave so.
+      select_text_scalar (
+        skgrepo, &section . title, &composed . home,
+        &mut composed . title, &mut composed . title_skgrepo,
+        |home, title_at| CompositionWarning::TitleBelowHome { home, title_at },
+        |skgrepo, selected_at| CompositionWarning::NonHomeTitle { skgrepo, selected_at },
+        &mut warnings );
+      select_text_scalar (
+        skgrepo, &section . body, &composed . home,
+        &mut composed . body, &mut composed . body_skgrepo,
+        |home, body_at| CompositionWarning::BodyBelowHome { home, body_at },
+        |skgrepo, selected_at| CompositionWarning::NonHomeBody { skgrepo, selected_at },
+        &mut warnings ); }
     if composed . title . is_none () {
       warnings . push ( CompositionWarning::MissingTitle ); }}
   composed . contains = compose_ordered (
@@ -191,6 +176,35 @@ pub fn compose_sections (
     else { None };
   composed . aliases = compose_aliases (sections, &mut warnings);
   (composed, warnings) }
+
+/// One section's turn at a text scalar (its title or its body,
+/// 'text'): the first section in fold order to carry one selects it,
+/// into 'selected' and 'selected_at', with the warning 'below_home'
+/// (home, where it sits) when that section is not the home; a later
+/// one is not selected, with the warning 'not_selected' (this
+/// section's skgrepo, where the selected one sits).
+fn select_text_scalar (
+  skgrepo      : &SkgrepoName,
+  text         : &Option<String>,
+  home         : &Option<SkgrepoName>,
+  selected     : &mut Option<String>,
+  selected_at  : &mut Option<SkgrepoName>,
+  below_home   : impl Fn (SkgrepoName, SkgrepoName) -> CompositionWarning,
+  not_selected : impl Fn (SkgrepoName, SkgrepoName) -> CompositionWarning,
+  warnings     : &mut Vec<CompositionWarning>,
+) {
+  let Some (text) : &Option<String> = text else { return; };
+  match selected_at {
+    None => {
+      *selected = Some (text . clone ());
+      *selected_at = Some (skgrepo . clone ());
+      if home . as_ref () != Some (skgrepo) {
+        warnings . push ( below_home (
+          home . clone () . expect ("a section establishes the home"),
+          skgrepo . clone () )); }}
+    Some (selected_at) =>
+      warnings . push ( not_selected (
+        skgrepo . clone (), selected_at . clone () )), }}
 
 /// The aliases' compose, None if no section mentions them: a union
 /// like the unordered relations', but members are strings, deduped
