@@ -96,3 +96,31 @@
    The server's check, adapted: extract each quoted 'name' from the
    comment lines before a file's first 'local' or 'M' line, and look
    for it in the code of 'nvim/' and 'elisp/', or in the file tree.
+* The Emacs client ('elisp/')
+** Where the index is
+   A newcomer reads 'elisp/skg-init.el' first: it loads the client,
+   and its Commentary lists every file of 'elisp/' and its
+   subfolders with a phrase, grouped by what a user does (views and
+   search, editing metadata, saving and redrawing, the diff view,
+   import and export, plumbing), as 'server/lib.rs' groups the
+   server's modules.
+** What a header says
+   Emacs's own layout ('lisp-mnt.el' reads its summary with
+   'lm-summary'). Line 1 is
+   ';;; FILE.el --- SUMMARY  -*- lexical-binding: t; -*-' (the cookie
+   must stay on line 1). Then ';;; Commentary:', a paragraph in the
+   server's order: what the file is for in a user's words (the
+   command, its 'C-c' chord from 'skg-keymaps-and-aliases.el', the
+   buffer or redraw), its entry points in single quotes, and what it
+   leaves to which file ('skg-x.el'). Design notes, pitfalls and
+   protocol notes follow after a line holding only ';;;'. Then
+   ';;; Code:' and the first form.
+** Twins
+   A file with a Neovim twin ('docs/nvim-client-deviations.org', "The
+   two clients' names match") says the same things; the twin's header
+   ends "The Lua port of elisp/FILE.el". When a move changes which
+   Emacs file holds a thing, correct the twin's last line too.
+** Checking that headers cite real things
+   The server's check, adapted: extract each quoted 'name' from the
+   lines before ';;; Code:', and look for it in 'elisp/', 'nvim/' or
+   the file tree.

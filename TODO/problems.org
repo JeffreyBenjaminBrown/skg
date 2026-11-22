@@ -419,7 +419,7 @@ gap too. Details, options and questions:
    and align the commands; consider server-owned preview logic if such
    graph-dependent policies continue to multiply. The Emacs-only policy
    tables ('skg--writable-folder-relations',
-   'skg--relRepo-unsupported-folder-atoms' in 'elisp/skg-metadata.el')
+   'skg--relRepo-unsupported-folder-atoms' in 'elisp/skg-request-relRepo-info.el')
    should then be served or shared, not copied into Neovim (noted from
    [[file:herald-colors/2_plan.org][the herald-colors plan]], 2026-10-04).
 ** Graph updates rediscover identity-change facts across several consumers

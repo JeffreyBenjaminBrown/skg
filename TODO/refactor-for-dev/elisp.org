@@ -37,8 +37,39 @@ require cycle.
 'skg--register-overPrivateText-confirmation-instead-of'
 ('elisp/skg-length-prefix.el'), used by the export to org, the
 single-root content view and the readable-ids title lookup.
+** Second pass: the relRepo helpers live with 'skg-set-relRepo'
+They moved from 'skg-metadata.el' to 'skg-request-relRepo-info.el',
+which now holds what its Neovim twin 'relRepo_info.lua' holds.
+** Second pass: every removal of the overPrivateText handler is shared
+The six hand-written 'assoc-delete-all' removals of
+'overPrivateText-telescope-confirmation' call
+'skg--unregister-response-handlers'.
+** Second pass: the report buffers have their own file
+'skg-messages.el' holds 'skg-big-nonfatal-message',
+'skg-errors-and-warnings-to-org-string', 'skg--message-list-nonempty-p'
+and 'skg-report-mode'; ten files that required the save only for them
+require it instead.
+** Second pass: restore requests and change facts have their own files
+'skg-restore-requests.el' (the two restore commands, where a restoreRel
+may stand) and 'skg-change-facts.el' (the '(diff ...)' facts, a
+folder's change) left 'skg-metadata.el', matching their Neovim twins.
+The folder atoms and 'skg--relationship-removed-p' stay in
+'skg-metadata.el', which the pending detachment there needs.
+** Second pass: redrawing a whole view has its own file
+'skg-redraw-whole-view.el' holds 'skg--apply-streamed-view-update',
+'skg-replace-buffer-with-new-content', the fold-atom and point-position
+helpers, the twin of 'redraw_whole_view.lua'. 'skg-request-save.el' is
+down to about 540 lines: the request, its envelope, the stream
+handlers and the saved buffer's redraw choice.
+** Second pass: every file has an Emacs-style header
+Line 1 is ';;; FILE.el --- SUMMARY' with the lexical-binding cookie;
+then ';;; Commentary:' (what it is for in a user's words, its entry
+points and keys, what it leaves to which file) and ';;; Code:'.
+'skg-init.el', the file a newcomer reads first, lists every file with
+a phrase, grouped by what a user does. 'module-headers.org' records
+the convention.
 * Candidates left, best first
-** The save's five retry answers travel as positional arguments
+** ? The save's five retry answers travel as positional arguments (waits for Jeff; if he says nothing it stays)
 'skg-request-save-buffer', 'skg--send-save-buffer',
 'skg--save-request-sexp' and every confirmation handler pass
 APPROVED-FORKS FORK-SKGREPOS APPROVED-HOIST-PIDS STRANDEDS-REVIEW
@@ -47,27 +78,58 @@ fork buffer even stores two in buffer-locals to pass them on. One
 plist or 'cl-defstruct' of "the answers this save carries" would
 remove most of that. Risky: 'skg-request-save-buffer' is an
 interactive command whose optional arguments a user could call, and
-the confirmation tests assert the positional re-save arguments, so
-the tests would need more than a rename. Probably needs Jeff's
-agreement.
-** 'skg-metadata.el' (about 1640 lines) is a grab bag
-Its sections (detach/attach, repo moves, relRepo and the
-relationship-kind menus, the diff view's restore requests, change
-facts, changed folders, pending detachment, metadata rewriting) are
-marked by ';;;' headers. The relRepo menus and 'skg-set-relRepo-recursive'
-(roughly lines 264 to 700) and the diff-view predicates (763 to 1060)
-look like real seams. Risk: many files require 'skg-metadata' for a
-single helper; check each moved function's callers' requires.
-** Remaining hand-written removals of one confirmation handler
-'(setq skg-response-handler-map (assoc-delete-all
-'overPrivateText-telescope-confirmation ...))' still appears in
-'skg-request-text-search.el' (three times), the rerender, export and
-single-root answer handlers. Small; check the tests' fixture shapes
-first (see above).
-** The rest of 'skg-request-save.el' (942 lines)
-'skg--replace-buffer-keeping-viewnode-points-and-folds' and its fold
-and point helpers (about 200 lines) serve the rerender stream as much
-as the save, and could be their own file. Many files require
-'skg-request-save' only for 'skg-big-nonfatal-message'; moving that
-family (it and 'skg-show-save-errors-and-warnings', 'skg-report-mode')
-to a small file would shrink those dependencies.
+the confirmation tests assert the positional re-save arguments.
+** The linkstack is half of 'skg-id-search.el' (868 lines)
+Lines from 'skg--linkstack-tree' (about 294) to the end, less the ID
+predicates in the middle ('skg--point-in-metadata-p' through
+'skg--point-on-skg-filename-p'), are the linkstack: push, paste, pop,
+its trees and its editable buffer. Neovim keeps them in
+'linkstack.lua', and 'docs/nvim-client-deviations.org' lists this as a
+deviation. A move to 'skg-linkstack.el' would match the twin; then
+correct that doc through its note in 'skg-system/' and export. Safe
+(moves); check each moved function's callers' requires
+('skg-push-ancestry.el' pushes trees) and the minibuffer bindings.
+** 'skg-config.el' also holds the prompts
+Its prompting functions are Neovim's 'picker.lua'; the same kind of
+move as the linkstack, smaller.
+** Docstrings that name wrong arguments or tell history
+The header pass left code and docstrings alone but found: the
+docstrings of 'skg-request-save-buffer', 'skg--save-request-sexp' and
+'skg--telescope-hoist-confirmation-handler' name FORK-APPROVED and
+FORK-REPOS for APPROVED-FORKS and FORK-SKGREPOS; 'skg-import-md-and-org'
+names DESTINATION-REPO for DESTINATION-SKGREPO; 'skg--stream-in-progress'
+names a "diff-toggle" stream nothing has; 'heralds--transform-rules'
+and 'skg-request-herald-rules' describe a connect-time fetch that
+'skg-herald-rules-ensure' replaced; 'skg--magit-count-id-in-hunks'
+says lines where it counts matches. Docstrings show in 'C-h f', so a
+reviewer may count them user-visible text; otherwise safe, minutes.
+** Small hidden dependencies and dead code
+'skg-sexpr-search.el' calls 'cl-some' without requiring 'cl-lib'
+(it works because 'skg-compare-sexpr' loads it). 'skg-visit-link'
+('skg-id-search.el') has no caller and no key; 'skg-sexp-at-or-after-point'
+only tests call. 'elisp/abandoned/' is loaded by nothing and its
+minor mode is broken; 'bash/compile-elisp.sh' skips 'abandoned/' but
+compiles 'experim/read-only.el', a scratch file. A require, and
+deleting 'abandoned/' and 'experim/' (proved dead with rg), are safe;
+'skg-visit-link' is a command a user could call by M-x, so it waits
+for Jeff.
+** Two small twin mismatches
+'skg--processed-node-added-p' sits in 'skg-processed.el', its twin in
+'change_facts.lua'; it could join 'skg-change-facts.el'.
+'skg--ghost-sexp-p' sits in 'skg-metadata.el' (its
+'skg--vognode-sexp-p' needs it), its twin in 'restore_requests.lua';
+leave it. Safe; minutes.
+** Byte-compiler warnings that hide new ones
+'bash/compile-elisp.sh' prints a dozen: magit functions not known to
+be defined and unknown slots ('skg-request-file-path.el'),
+'shell-mode-map' free ('skg-keymaps-and-aliases.el'), an unused 'index'
+('skg-redraw-whole-view.el', in 'skg--content-with-fold-atoms').
+'declare-function', a 'defvar' and renaming 'index' to '_index' would
+silence them, so a new warning stands out. Safe; small. Do not touch
+'skg-keymaps-and-aliases.el' beyond a 'defvar': 'skg-reload' keeps it.
+** 'skg-metadata.el' (about 960 lines) still mixes concerns
+Detach and attach, home-skgrepo moves, the merge request, the pending
+detachment, metadata predicates and readers, metadata rewriting (edit
+requests placed by rank) and headline-line text helpers. Its Neovim
+twin 'metadata.lua' holds the same mix, so a split here should split
+both clients alike, or the naming rule breaks. Moderate value.
