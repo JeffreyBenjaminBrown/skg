@@ -957,6 +957,9 @@ Wait for "Server ready." in 'server.log', then run the tool with
 * Tests
 'python3 tools/skg-for-ai/test_skg_for_ai.py' runs them, given a built
 server ('cargo build --bin skg'; 'SKG_BINARY' names another binary).
+The checks are in 'tests/', a module per group, which its docstring
+lists ('reading_checks', 'daemon_checks', ...); given the names of
+groups, it runs only those.
 First it checks the title normalizer of "Retyped headlines" on a few
 titles, and the fuzzy match on pairs that must match, pairs that must
 not, and pairs at each threshold, and that pairing is one to one,

@@ -113,6 +113,8 @@ In order, it:
 - on a ninth scratch server, over mail, writes read receipts with
   'receipt'.
 '--update-expected' rewrites the expected files instead of comparing.
+Given the names of groups ('daemon_checks reviewing_checks'), it runs
+only those, in the order above.
 """
 
 import os
@@ -149,6 +151,12 @@ from writing_checks import failures_of_writing
 
 def main (argv):
   update_expected = "--update-expected" in argv
+  groups = [ argument for argument in argv if argument != "--update-expected" ]
+  unknown = [ group for group in groups if group not in GROUP_NAMES ]
+  if unknown:
+    print ( "Unknown group(s): " + ", " . join (unknown) + ". The groups: "
+            + ", " . join (GROUP_NAMES) + ".", file = sys . stderr )
+    sys . exit (2)
   # The tool's commands find a daemon by a socket in XDG_RUNTIME_DIR,
   # and take a port from SKG_PORT: the test's own folder, and no
   # SKG_PORT, keep its commands and daemons apart from any others.
@@ -156,20 +164,12 @@ def main (argv):
     prefix = "skg-for-ai-test-runtime-" )
   os . environ . pop ( "SKG_PORT", None )
   failures = []
-  failures += failures_of_isolated_run ()
-  failures += failures_of_title_matching ()
-  failures += failures_of_save_envelope ()
-  failures += failures_of_commit_result_text ()
-  failures += failures_of_preview_support ()
-  failures += failures_of_no_default_port ()
-  failures += failures_of_link_annotation_round_trip ()
-  failures += failures_of_link_annotations ()
-  failures += failures_of_shared_herald_cases ()
-  failures += failures_of_forks_folder_claims ()
-  failures += failures_of_chains ()
-  failures += failures_of_describe_requests ()
-  failures += failures_of_perspective_names ()
-  failures += failures_against_scratch_servers (update_expected)
+  if not groups or "no_server_checks" in groups:
+    failures += failures_of_checks_needing_no_server ()
+  failures += failures_against_scratch_servers (
+    update_expected,
+    [ group for group in SCRATCH_SERVER_GROUPS
+      if not groups or group [0] in groups ] )
   shutil . rmtree ( os . environ [ "XDG_RUNTIME_DIR" ], ignore_errors = True )
   for failure in failures:
     print ( "FAIL: " + failure )
@@ -177,41 +177,74 @@ def main (argv):
     sys . exit (1)
   print ( "PASS" + ( " (expected files rewritten)" if update_expected else "" ))
 
+def failures_of_checks_needing_no_server ():
+  return ( failures_of_isolated_run ()
+           + failures_of_title_matching ()
+           + failures_of_save_envelope ()
+           + failures_of_commit_result_text ()
+           + failures_of_preview_support ()
+           + failures_of_no_default_port ()
+           + failures_of_link_annotation_round_trip ()
+           + failures_of_link_annotations ()
+           + failures_of_shared_herald_cases ()
+           + failures_of_forks_folder_claims ()
+           + failures_of_chains ()
+           + failures_of_describe_requests ()
+           + failures_of_perspective_names () )
+
 # ============================================================
 # The scratch server
 # ============================================================
 
-def failures_against_scratch_servers (update_expected):
-  """The reading checks on one scratch server, then the writing
-  checks on another, then the placing and forking checks on a third,
-  then the other words' on a fourth, then the reviewing checks on a
-  fifth, then the daemon's on a sixth, then those of two owned
-  skgrepos on a seventh, those three with their owned skgrepos
-  gitrepos; each on its own copy of the fixture. Then the checks of
-  a view's perspective, on an eighth, over a copy of the
-  perspective integration test's data. Last, the receipts', on a
-  ninth, over mail ('RECEIPT_FIXTURE_FILES')."""
-  if not os . path . exists (SERVER_BINARY):
+# Each group that needs a scratch server: its module's name, and its
+# failures given UPDATE_EXPECTED. The reading checks on one scratch
+# server, then the writing checks on another, then the placing and
+# forking checks on a third, then the other words' on a fourth, then
+# the reviewing checks on a fifth, then the daemon's on a sixth, then
+# those of two owned skgrepos on a seventh, those three with their
+# owned skgrepos gitrepos; each on its own copy of the fixture. Then
+# the checks of a view's perspective, on an eighth, over a copy of
+# the perspective integration test's data. Last, the receipts', on a
+# ninth, over mail ('RECEIPT_FIXTURE_FILES').
+SCRATCH_SERVER_GROUPS = [
+  ( "reading_checks",
+    lambda update_expected : failures_on_a_scratch_server (
+      lambda scratch, data_root :
+        failures_of_reading (scratch, data_root, update_expected) )),
+  ( "writing_checks",
+    lambda update_expected : failures_on_a_scratch_server (failures_of_writing) ),
+  ( "placing_and_forking_checks",
+    lambda update_expected :
+      failures_on_a_scratch_server (failures_of_placing_and_forking) ),
+  ( "more_words_checks",
+    lambda update_expected : failures_on_a_scratch_server (failures_of_more_words) ),
+  ( "reviewing_checks",
+    lambda update_expected : failures_on_a_scratch_server (
+      failures_of_reviewing, owned_skgrepo_in_git = True )),
+  ( "daemon_checks",
+    lambda update_expected : failures_on_a_scratch_server (
+      failures_of_daemon, owned_skgrepo_in_git = True )),
+  ( "two_owned_skgrepos_checks",
+    lambda update_expected : failures_on_a_scratch_server (
+      failures_of_two_owned_skgrepos, owned_skgrepo_in_git = True,
+      with_private_skgrepo = True )),
+  ( "perspective_checks",
+    lambda update_expected : failures_on_a_scratch_server (
+      failures_of_perspective, make_data_root = copy_perspective_fixture )),
+  ( "receipts_checks",
+    lambda update_expected : failures_on_a_scratch_server (
+      failures_of_receipts, make_data_root = write_receipt_fixture )) ]
+GROUP_NAMES = ( [ "no_server_checks" ]
+                + [ name for name, _ in SCRATCH_SERVER_GROUPS ] )
+
+def failures_against_scratch_servers (update_expected, groups):
+  """The failures of GROUPS, each (NAME, FAILURES) of
+  'SCRATCH_SERVER_GROUPS', in order."""
+  if groups and not os . path . exists (SERVER_BINARY):
     return [ f"no server binary at {SERVER_BINARY}; run 'cargo build --bin skg'" ]
-  return ( failures_on_a_scratch_server (
-             lambda scratch, data_root :
-               failures_of_reading (scratch, data_root, update_expected) )
-           + failures_on_a_scratch_server (failures_of_writing)
-           + failures_on_a_scratch_server (failures_of_placing_and_forking)
-           + failures_on_a_scratch_server (failures_of_more_words)
-           + failures_on_a_scratch_server (
-               failures_of_reviewing, owned_skgrepo_in_git = True )
-           + failures_on_a_scratch_server (
-               failures_of_daemon, owned_skgrepo_in_git = True )
-           + failures_on_a_scratch_server (
-               failures_of_two_owned_skgrepos, owned_skgrepo_in_git = True,
-               with_private_skgrepo = True )
-           + failures_on_a_scratch_server (
-               failures_of_perspective,
-               make_data_root = copy_perspective_fixture )
-           + failures_on_a_scratch_server (
-               failures_of_receipts,
-               make_data_root = write_receipt_fixture ) )
+  return [ failure
+           for _, failures_of_group in groups
+           for failure in failures_of_group (update_expected) ]
 
 if __name__ == "__main__":
   main ( sys . argv [ 1 : ] )
