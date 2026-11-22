@@ -117,6 +117,7 @@ import views
 import edited_compact_view
 import save
 import view_commands
+import diff_and_commit
 import skg_for_ai
 
 FIXTURE_FOLDER = os . path . join (TOOL_FOLDER, "test-fixture")
@@ -382,7 +383,7 @@ def failures_of_commit_result_text ():
     ' (waiting ()) (unmarkable (("h" "H" ("its file changed in a way the diff view does not show (formatting, say)"))'
     ' ("t" "T" ("its file changed in a way the diff view does not show (formatting, say)"))))'
     ' (errors ()) (warnings ()))' )
-  text = skg_for_ai . commit_result_text (response)
+  text = diff_and_commit . commit_result_text (response)
   expected = ( "Committed 1 node, in main (9c1e40d2). 2 changed nodes are left;"
                " 2 of them changed in ways no mark covers, which 'commit --all'"
                " or Git can commit: 'H' (its file changed in a way the diff view does not show (formatting, say));"
