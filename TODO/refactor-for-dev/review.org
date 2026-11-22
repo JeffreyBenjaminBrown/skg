@@ -1,0 +1,100 @@
+* review of the day's commits
+An independent review of the 136 commits from a4fe3fbcc to
+725612186, all claimed safe, that looked for what the tests cannot
+catch. It found no change that a running editor client or the
+server's protocol would show. The only behaviour changes are in the
+start scripts, the AI client's launch and the logs. Nothing was
+fixed. The graph note "refactoring for cheaper development" says
+the same, under "by part of the code".
+** found
+*** The rerun loop counts a clean shutdown as a failed start, and gives up after five
+The rerun loop is 'bash/run-skg-rerunning-on-exit.sh', lines 52 and
+58. Commit 817a97535 meant to change behaviour, so it is not a
+refactor. Before, the loop reran the server forever, pausing at most
+a minute. Now it exits with status 1 after five runs in a row that
+each end within 30 s. It counts a run as quick whatever its exit
+status, so a 'shutdown' request or a kill by PID counts the same as
+a crash. Two cases show the difference. First, a server shut down or
+killed five times, each within 30 s of its start: before, the loop
+reran it each time; now 'start-servers.sh' exits and prints "ERROR:
+skg kept failing to start" though nothing failed. Second, with
+'--hot-reload', a server that cannot start because its port is held:
+before, it came back within a minute of the port being freed; now it
+stays down until the next edit under 'server/'. Sure of how it works;
+medium sure it matters.
+*** The AI client no longer runs under 'python3 -I' or from a lone copy
+Line 88 of 'tools/skg-for-ai/skg_for_ai.py' now opens with 'from
+server_connection import ...'. It changed in the split into modules,
+598fa8c66 to 7b26bba0c. Before, the script was one file that used
+only the standard library, so it ran however it was started. Now it
+needs its own folder on 'sys.path'. Under 'python3 -I' (which implies
+'-P') or with 'PYTHONSAFEPATH=1', or when 'skg_for_ai.py' is copied
+alone to another folder, it stops at once with "ModuleNotFoundError:
+No module named 'server_connection'". A reviewer reproduced this on
+scratch copies. Nothing in the repo runs it so, but agents are often
+told to run Python with '-I'. Sure it happens; little sure it matters.
+*** One log warning's target changed module, which only the JSON log shows
+The warning is "Failed to compute diff for repo", now at line 37 of
+'server/git_ops/diff.rs'. Commit 6f5c4af38 moved it there from
+'server/serve/handlers/save_buffer.rs'. Its tracing target is the
+module that holds it, so it went from 'skg::serve::handlers::save_buffer'
+to 'skg::git_ops::diff'. The terminal and 'server-to-user.log' leave
+targets out, but 'server.jsonl' records them; Jeff's config turns it
+on with 'timing_log = true'. A 'RUST_LOG' that names the old module
+no longer reaches the warning. Nothing reads the field
+('generate_report.py' does not). No other moved Rust code holds a
+tracing call. Sure; trivial.
+*** The test summary's Emacs and Neovim FAIL lines gain a space
+Line 338 of 'bash/all-tests.sh' now pads with "printf '%-14s'" and a
+space, since commit 7a21540ac. On a failed run, the terminal summary's
+"Emacs tests" and "Neovim tests" FAIL lines now have one more space
+before "(see"; 'ALL.org' is the same byte for byte. The commit's
+message says so. Sure; cosmetic.
+*** The handler-removal helpers rely on every type they name being one-shot
+This is fragile, not wrong today. The helpers are
+'skg--unregister-response-handlers' in Emacs and
+'unregister_response_handlers' in Neovim, from 4758bb8da and
+13a4f805e; the save endings and the overPrivateText retries were
+built on them. The old copies lowered the pending-request count for
+any handler they removed. The new ones lower it only for a handler
+registered one-shot. Every type they are given today is one-shot, so
+nothing changes. If a type is ever registered otherwise, the count
+will stay high and the next request may hang. Sure it is not a bug
+today.
+** covered
+Read closely, all of them, with nothing to report beyond the above:
+- the Rust server's logic commits, 38 of them, from 43282e4a2 to
+  34e6342c7, among them every "one function where copies were"
+  merge;
+- d2db709d5 and its repair 564211acb, which restores the dropped
+  warning with the same words and conditions;
+- the Emacs and Neovim logic commits;
+- the Python client's logic commits b1eca926c, 3e89f9696, 025551b78
+  and d05947c29;
+- the bash and team-tool commits;
+- every test edit, in all six Rust test commits and in the test
+  parts of the server commits.
+The test reviewer found no assertion lost or weakened.
+Checked by machine as pure moves, comparing the lines each commit
+removed with those it added:
+- 'server/' moves 85ade849d, a9aa46e4b, f8887ec4d, 6f5c4af38,
+  9a86a072f, 1ed144f85, a2f07474b and 1e8578f81;
+- the Emacs and Neovim moves;
+- the sixteen commits of the Python split (by syntax tree; the one
+  global, 'RUNNING_DAEMON', is read live).
+Checked to change comments only: the module-header commits and the
+Neovim header pass, 60c43a2ae. No comment there feeds a help text:
+the server uses no 'clap', and the Python client's argparse reads no
+'__doc__'.
+The two fixes that were not refactors are sound:
+- 725612186: the pacer now names its session's own process, reading
+  '$BASHPID' outside '$( )'.
+- 71ae55542: 'stop-servers.sh' compares field 22 of
+  '/proc/PID/stat', read at the start, with the same field read now.
+  A start from before that commit is refused once, as its message
+  says.
+Sampled only: 0e95e083c, 2d3bc7047 and 6d4f52d41, which rename or
+drop an ignored argument. Not reached: nothing. The plans and
+problems commits were not read,
+since they are documents. Nothing was built or run but scratch
+copies of the Python client.
