@@ -1,0 +1,89 @@
+* Refactoring for dev: 'server/from_text/', 'server/nodeMerge/', 'server/save.rs'
+  The territory: everything under 'server/from_text/' and
+  'server/nodeMerge/', plus 'server/from_text.rs', 'server/nodeMerge.rs'
+  and 'server/save.rs'. The focused tests for it are
+  'bash/nextest.sh --lib --test grouped_forks --test grouped_saves
+  --test grouped_repos --test grouped_unit' (about a minute warm).
+* Done
+** Save planning reads as its stages
+   'buffer_to_validated_saveplan_with_fork_skgrepos_in_graph'
+   ('server/from_text.rs') was 233 lines. Its parse and structural
+   checks are 'parse_and_validate_buffer', its flag-edit check
+   'errors_for_flag_edits', the inputs deciding each clone's skgrepo
+   'clone_skgrepo_inputs_from_viewforest' and 'default_clone_skgrepo'.
+   The refusal carrying the parse warnings is one closure, 'refusal'.
+** An ordinary save's apply step returns no search index
+   'apply_nodeInstructions' ('server/save.rs') always returned
+   'Ok (None)'; it returns '()' now, and the comments no longer say the
+   ordinary step can rebuild Tantivy. Only the nodeMerge step can.
+** Delete propagation shares its ID and recorder lookups
+   'apply_delete_propagation_cleanup' and
+   'restricted_records_naming_deleted_graphnodes' both call
+   'ids_of_deleted_graphnodes' and 'recorders_of_deleted_graphnodes'.
+** The nodeMerge's acquirer builder is named for what it builds
+   'three_nodeMerged_graphnodes' is 'acquirer_after_nodeMerge'; its
+   inputs 'acquirer_from_disk'/'acquiree_from_disk', read from the
+   graph the save's ordinary nodeInstructions leave, are
+   'acquirer_before_nodeMerge'/'acquiree_before_nodeMerge'.
+** Aliases combine through the same function as the other lists
+   'combined_rel_partners' ('server/nodeMerge/nodeMergeInstructionTriple.rs')
+   is generic over the member type.
+* Candidates left, best first
+** Accessors on 'NodeInstruction' for its saved graphnode and deleted gnid
+   The 'filter_map' over 'NodeInstruction::Save (SaveNode (n)) => Some (n),
+   _ => None' (and its Delete twin) is written out about fifteen times:
+   four in 'server/save.rs', two each in 'server/from_text/hide_report.rs'
+   and 'server/from_text/strandeds.rs', one in 'server/from_text/validate.rs'
+   and in 'from_text.rs' ('dead_link_warnings'), and outside the territory
+   in 'server/dbs/in_rust_graph/prepared_update.rs', 'server/prominence.rs',
+   'server/serve/handlers/telescope_hoist.rs' and 'save_staleness.rs'.
+   Two methods in 'server/types/save.rs' would replace them. Low risk;
+   it needs that file, outside this territory. 'hide_report_lines' and
+   'dead_link_warnings' also both chain the fork clones onto the saved
+   nodes; a 'SavePlan'-side helper could serve both.
+** 'update_graph_minus_nodeMerges' always returns 'Ok (None)'
+   Its 'Option<TantivyIndex>' (and its '_with_hoist_approval' twin's) is
+   never 'Some'. Returning '()' is honest but changes call sites in
+   'tests/move_repo.rs' (four, which then drop dead 'if let Some'
+   branches), 'tests/save/extra_id_revocation.rs', 'server/test_utils.rs'
+   and two handlers. A test edit that is not a rename needs the
+   coordinator's word.
+** 'graphnode_from_graphnodeInRust' does not belong in 'server/save.rs'
+   Its other users are 'server/receipt.rs' and
+   'server/delete_references_to_absent_node.rs', and it repeats the
+   projection 'TODO/problems.org' lists under "Node-to-complete
+   projections and lookup adapters multiply change sites". It belongs
+   beside the node types; that change spans 'server/types/' and
+   'server/dbs/'.
+** The Tantivy rebuild in 'apply_prepared_nodeMerges'
+   ('server/nodeMerge.rs') maps three errors with one identical closure;
+   a 'rebuild_tantivy_from_disk' function would hold it. Small and safe.
+   Larger: 'merge_nodes_with_hoist_approval' and
+   'update_graph_minus_nodeMerges_with_hoist_approval' share their shape
+   (prepare graph update, prepare filesystem, telescope warnings, apply,
+   emit), but their index policies differ on purpose ('TODO/problems.org',
+   "Ordinary saves and node merges have different index application
+   policies"); unify only after stating that contract.
+** 'apply_sticky_relRepos_in_graph_with_prospective_homes' (187 lines)
+   In 'server/from_text/supplement_from_disk.rs'. The explicit-relRepo
+   checks (unconfigured, not owned, more public than home) appear for
+   relations and again for aliases, with slightly different
+   user-visible messages, which a shared check must keep word for word.
+   The four list blocks (contains, forks, hides, aliases) could each be
+   a function; the closures they share make that a moderate edit.
+** 'hide_report_lines' (162 lines, 'server/from_text/hide_report.rs')
+   The "Hides nothing" reasoning for one removed child could be its own
+   function, but it reads a dozen locals and closures; worth it only
+   when someone next changes that report.
+** 'server/from_text/local_fieldintent_collection/resolve_visibility.rs'
+   The territory's biggest file (879 lines), with four functions over a
+   hundred lines ('resolve_visibility', 'apply_hiddenoutside_edits',
+   'infer_hides_from_contains_removals', 'resolve_forker_visibility').
+   Not surveyed closely.
+** The test-only entry points in 'server/from_text.rs'
+   'buffer_to_validated_saveplan' and
+   'buffer_to_validated_saveplan_with_fork_skgrepos' are called only by
+   tests, which build the graph from disk through them; their comments
+   call them "transitional compatibility". The module comment names
+   'buffer_to_validated_saveplan' as the purpose of 'from_text::', where
+   production calls the '_with_fork_skgrepos_in_graph' form.
