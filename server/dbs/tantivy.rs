@@ -150,10 +150,7 @@ pub fn title_and_skgrepo_by_gnid (
        found for ID {}. Falling back to first title_or_alias.",
       gnid ); }
   let title : String =
-    string_field ( &doc, tantivy_index . raw_title_field )
-      . filter ( |s| ! s . is_empty () )
-      . or_else ( || string_field (
-        &doc, tantivy_index . title_or_alias_field )) ?;
+    displayed_title_of_document ( tantivy_index, &doc ) ?;
   let skgrepo : SkgrepoName = SkgrepoName::from (
     string_field ( &doc, tantivy_index . skgrepo_field )
       . unwrap_or_default () . as_str () );
@@ -184,14 +181,8 @@ pub fn titles_by_gnids (
         "titles_by_ids: no is_title=\"true\" document \
          found for ID {}. Falling back to first title_or_alias.",
         gnid ); }
-    // Prefer the un-reduced raw title (only on is_title="true" docs);
-    // fall back to 'title_or_alias' for the alias-only fallback case,
-    // which has no raw_title stored.
     let title : Option<String> =
-      string_field ( &doc, tantivy_index . raw_title_field )
-        . filter ( |s| !s . is_empty () )
-        . or_else ( || string_field (
-          &doc, tantivy_index . title_or_alias_field ));
+      displayed_title_of_document ( tantivy_index, &doc );
     if let Some (t) = title
     { result . insert ( gnid . clone (), t ); } }
   result }
@@ -256,7 +247,20 @@ fn load_doc_or_warn (
         gnid, addr, e );
       None }} }
 
-fn bool_field_eq_true (
+/// The title a search-index document shows: its un-reduced
+/// 'raw_title' (so a link in the title shows as '[[id:X][label]]'),
+/// which only is_title="true" documents carry, else its
+/// 'title_or_alias', which for an alias document is the alias.
+pub fn displayed_title_of_document (
+  tantivy_index : &TantivyIndex,
+  doc           : &TantivyDocument,
+) -> Option<String> {
+  string_field ( doc, tantivy_index . raw_title_field )
+    . filter ( |s| ! s . is_empty () )
+    . or_else ( || string_field (
+      doc, tantivy_index . title_or_alias_field )) }
+
+pub fn bool_field_eq_true (
   doc   : &TantivyDocument,
   field : schema::Field,
 ) -> bool {
@@ -265,7 +269,7 @@ fn bool_field_eq_true (
     . map ( |s| s == "true" )
     . unwrap_or (false) }
 
-fn string_field (
+pub fn string_field (
   doc   : &TantivyDocument,
   field : schema::Field,
 ) -> Option<String> {

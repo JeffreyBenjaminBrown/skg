@@ -10,6 +10,8 @@ use coverage::{CoverageMatcher, build_coverage_matcher, coverage_factor};
 
 use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::prominence::ProminenceSource;
+use crate::dbs::tantivy::{
+  bool_field_eq_true, displayed_title_of_document, string_field};
 use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
 use crate::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
@@ -47,7 +49,6 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::net::TcpStream;
 use tantivy::{TantivyDocument, Searcher};
-use tantivy::schema::document::Value;
 
 /// Maps each ID to search hits (plural -- IDs can have aliases,
 /// so one ID might get multiple matches).
@@ -439,47 +440,26 @@ pub fn group_matches_by_gnid (
       Ok (retrieved_doc) => {
         let retrieved_doc : TantivyDocument = retrieved_doc;
         let gnid_opt : Option < ID > =
-          retrieved_doc
-            . get_first ( tantivy_index . id_field )
-            . and_then ( |v| v . as_str() )
-            . map ( |s| ID::from (s) );
-        // Prefer raw_title (un-reduced, only on is_title="true"
-        // docs) so a link in the title shows as
-        // `[[id:X][label]]` in search results. For alias-doc hits
-        // raw_title is empty/absent, so fall back to
-        // title_or_alias, which holds the alias literal.
+          string_field ( &retrieved_doc, tantivy_index . id_field )
+            . map (ID::from);
+        // Prefer raw_title (see 'displayed_title_of_document'), so a
+        // link in the title shows as `[[id:X][label]]` in search
+        // results; an alias-doc hit shows its alias.
         let title_opt : Option < TitleOrAlias > = {
-          let raw : Option<String> =
-            retrieved_doc
-              . get_first ( tantivy_index . raw_title_field )
-              . and_then ( |v| v . as_str () )
-              . map ( |s| s . to_string () )
-              . filter ( |s| ! s . is_empty () );
           let is_title : bool =
-            retrieved_doc
-              . get_first ( tantivy_index . is_title_field )
-              . and_then ( |v| v . as_str () )
-              == Some ("true");
-          raw . or_else ( || retrieved_doc
-            . get_first ( tantivy_index . title_or_alias_field )
-            . and_then ( |v| v . as_str() )
-            . map ( |s| s . to_string() ))
+            bool_field_eq_true ( &retrieved_doc, tantivy_index . is_title_field );
+          displayed_title_of_document ( tantivy_index, &retrieved_doc )
             . map ( |text| if is_title { TitleOrAlias::Title (text) }
                            else { TitleOrAlias::Alias (text) } ) };
         // Read title_or_alias separately for coverage counting --
         // it's the field the search index actually matched against.
         let searchable_title : String =
-          retrieved_doc
-            . get_first ( tantivy_index . title_or_alias_field )
-            . and_then ( |v| v . as_str () )
-            . map ( |s| s . to_string () )
+          string_field ( &retrieved_doc, tantivy_index . title_or_alias_field )
             . unwrap_or_default ();
         let skgrepo : SkgrepoName =
           SkgrepoName::from (
-            retrieved_doc
-              . get_first ( tantivy_index . skgrepo_field )
-              . and_then ( |v| v . as_str () )
-              . unwrap_or ("") );
+            string_field ( &retrieved_doc, tantivy_index . skgrepo_field )
+              . unwrap_or_default () . as_str () );
         { // Per-document skgrepo filtering, before grouping: an
           // alias document carries the alias's relRepo as
           // its skgrepo, so a restricted search must drop it here
@@ -489,10 +469,8 @@ pub fn group_matches_by_gnid (
           if ! SkgrepoRestriction::record_is_visible (restriction, &skgrepo) {
             continue; }}
         let origin_type : Option < ProminenceSource > =
-          retrieved_doc
-            . get_first ( tantivy_index . prominence_source_field )
-            . and_then ( |v| v . as_str () )
-            . and_then ( ProminenceSource::from_label );
+          string_field ( &retrieved_doc, tantivy_index . prominence_source_field )
+            . and_then ( |label| ProminenceSource::from_label (&label) );
         let multiplier : f32 =
           origin_type . map_or ( 1.0, |t| t . multiplier() );
         let coverage : f32 =
