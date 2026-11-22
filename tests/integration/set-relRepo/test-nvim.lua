@@ -8,8 +8,8 @@
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(25)
 
-local metadata = require('skg.metadata')
 local picker = require('skg.picker')
+local relRepo_info = require('skg.relRepo_info')
 
 require('skg.single_root_content_view')
   .request_single_root_content_view_from_id('r')
@@ -38,7 +38,7 @@ T.check(T.wait_for(function ()
           return select(2, line_of_k()):find('(relRepo secret)', 1, true)
         end), 'a relRepo request was written: ' .. select(2, line_of_k()))
 T.check(vim.deep_equal(seen_choices,
-                       { 'private', 'secret', metadata.relRepo_no_override }),
+                       { 'private', 'secret', relRepo_info.relRepo_no_override }),
         'the prompt offered the skgrepos from the default on: '
           .. vim.inspect(seen_choices))
 

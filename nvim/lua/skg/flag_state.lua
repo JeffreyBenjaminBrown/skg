@@ -7,6 +7,7 @@ local focus = require('skg.focus')
 local metadata = require('skg.metadata')
 local payload = require('skg.payload')
 local picker = require('skg.picker')
+local relRepo_info = require('skg.relRepo_info')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -35,7 +36,7 @@ end
 ---@return boolean did it replace a pending relRepo request?
 local function stamp_search_matching_request (line, desired)
   local replaced_relRepo_request =
-    metadata.relRepo_requested_value(line) ~= nil
+    relRepo_info.relRepo_requested_value(line) ~= nil
   metadata.write_edit_request_at_line(line, {
     sexpr.symbol('flag'), sexpr.symbol('noSearchMatching'),
     sexpr.symbol(desired and 'true' or 'false') }, 'node')

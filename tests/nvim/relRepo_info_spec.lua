@@ -73,7 +73,7 @@ describe('skg.relRepo_info', function ()
     run_with_reply('((response-type relRepo-info) (default "private")'
                    .. ' (current "trusted"))')
     assert.are.equal(1, #prompts)
-    assert.are.same({ 'private', 'trusted', metadata.relRepo_no_override },
+    assert.are.same({ 'private', 'trusted', relRepo_info.relRepo_no_override },
                     prompts[1].choices)
     assert.are.equal('trusted', prompts[1].prefill)
     assert.is_truthy(metadata.line_text(2):find('(relRepo private)', 1, true))
@@ -82,7 +82,7 @@ describe('skg.relRepo_info', function ()
   it('starts at the default when the current is more public', function ()
     -- Mirrors test-relRepo-handler-more-public-current-prefills-default.
     helpers.buffer_with(content_child, 2)
-    answer = metadata.relRepo_no_override
+    answer = relRepo_info.relRepo_no_override
     run_with_reply('((response-type relRepo-info) (default "private")'
                    .. ' (current "public"))')
     assert.are.equal('private', prompts[1].prefill)
@@ -101,11 +101,11 @@ describe('skg.relRepo_info', function ()
   it('offers every repo on an error reply', function ()
     -- Mirrors test-relRepo-handler-error-offers-full-ladder.
     helpers.buffer_with(content_child, 2)
-    answer = metadata.relRepo_no_override
+    answer = relRepo_info.relRepo_no_override
     run_with_reply('((response-type relRepo-info)'
                    .. " (error \"member 'kid' is not in the graph\"))")
     assert.are.same({ 'public', 'private', 'trusted',
-                      metadata.relRepo_no_override }, prompts[1].choices)
+                      relRepo_info.relRepo_no_override }, prompts[1].choices)
     assert.is_falsy(metadata.line_text(2):find('relRepo'))
   end)
 
@@ -119,7 +119,7 @@ describe('skg.relRepo_info', function ()
     answer = 'trusted'
     relRepo_info.set_relRepo()
     assert.are.equal(0, #sent)
-    assert.are.same({ 'private', 'trusted', metadata.relRepo_no_override },
+    assert.are.same({ 'private', 'trusted', relRepo_info.relRepo_no_override },
                     prompts[1].choices)
     assert.is_truthy(metadata.line_text(3):find('(relRepo trusted)', 1, true))
   end)

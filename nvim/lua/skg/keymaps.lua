@@ -93,7 +93,7 @@ M.commands = {
                          desc = 'Change repo here and in matching descendants' },
   SetRelRepo = { module = 'skg.relRepo_info', fn = 'set_relRepo',
                  desc = 'Request the relRepo of the relationship at point' },
-  SetRelRepoRecursive = { module = 'skg.metadata', fn = 'set_relRepo_recursive',
+  SetRelRepoRecursive = { module = 'skg.relRepo_info', fn = 'set_relRepo_recursive',
                           desc = 'Request a relRepo for each relationship of a kind in the subtree' },
   Detach = { module = 'skg.metadata', fn = 'detach',
              desc = "Write noClaim: the save takes it out of its parent's list" },

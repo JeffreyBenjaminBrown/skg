@@ -8,6 +8,7 @@ local helpers = dofile(
 local compare = require('skg.sexpr.compare')
 local metadata = require('skg.metadata')
 local picker = require('skg.picker')
+local relRepo_info = require('skg.relRepo_info')
 local sexpr = require('skg.sexpr.parse')
 local sexpr_cycling = require('skg.sexpr_edit.sexpr_cycling')
 
@@ -708,7 +709,7 @@ describe('skg.metadata relRepo gesture', function ()
       '* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder',
       '** (skg node (gnid kid) (skgRepos (nodeRepo public))) kid' })
     assert.are.same({ recorder = 'recorder', member = 'kid',
-                      relation = 'contains' }, metadata.rel_at_line(2))
+                      relation = 'contains' }, relRepo_info.rel_at_line(2))
   end)
 
   it("classifies a writable folder's member", function ()
@@ -717,7 +718,7 @@ describe('skg.metadata relRepo gesture', function ()
       '** (skg forksFolder)',
       '*** (skg node (gnid seen) (skgRepos (nodeRepo public)) writeProtected) seen' })
     assert.are.same({ recorder = 'anchor', member = 'seen',
-                      relation = 'forks' }, metadata.rel_at_line(3))
+                      relation = 'forks' }, relRepo_info.rel_at_line(3))
   end)
 
   it("refuses a writable folder's member in words that name the"
@@ -731,7 +732,7 @@ describe('skg.metadata relRepo gesture', function ()
           "Could not find the folder's viewparent" } }) do
       buffer_with({ case[1], '** (skg forksFolder)',
         '*** (skg node (gnid seen) (skgRepos (nodeRepo public))) seen' })
-      local ok, refusal = pcall(metadata.rel_at_line, 3)
+      local ok, refusal = pcall(relRepo_info.rel_at_line, 3)
       assert.is_false(ok)
       assert.are.equal(case[2], refusal)
     end
@@ -742,14 +743,14 @@ describe('skg.metadata relRepo gesture', function ()
       '* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder',
       '** (skg node (gnid kid) (skgRepos (nodeRepo public)) writeProtected) kid' })
     assert.are.same({ recorder = 'recorder', member = 'kid',
-                      relation = 'contains' }, metadata.rel_at_line(2))
+                      relation = 'contains' }, relRepo_info.rel_at_line(2))
   end)
 
   it('refuses under a write-protected parent', function ()
     buffer_with({
       '* (skg node (gnid recorder) (skgRepos (nodeRepo public)) writeProtected) recorder',
       '** (skg node (gnid kid) (skgRepos (nodeRepo public))) kid' })
-    assert.is_truthy(refusal(metadata.rel_at_line, 2):find('write-protected', 1, true))
+    assert.is_truthy(refusal(relRepo_info.rel_at_line, 2):find('write-protected', 1, true))
   end)
 
   it("refuses on a write-protected folder's member", function ()
@@ -757,7 +758,7 @@ describe('skg.metadata relRepo gesture', function ()
       '* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder',
       '** (skg hiderFolder)',
       '*** (skg node (gnid sub) (skgRepos (nodeRepo public))) sub' })
-    local err = refusal(metadata.rel_at_line, 3)
+    local err = refusal(relRepo_info.rel_at_line, 3)
     assert.is_truthy(err:find('write-protected', 1, true))
     assert.is_truthy(err:find('hiderFolder'))
   end)
@@ -769,57 +770,57 @@ describe('skg.metadata relRepo gesture', function ()
       '** (skg forksFolder)',
       '*** (skg node (gnid forker) (skgRepos (nodeRepo public)) noClaim) forker',
       '*** (skg node (gnid forkee) (skgRepos (nodeRepo public))) forkee' })
-    assert.is_truthy(refusal(metadata.rel_at_line, 3):find('claims nothing', 1, true))
+    assert.is_truthy(refusal(relRepo_info.rel_at_line, 3):find('claims nothing', 1, true))
     assert.are.same({ recorder = 'recorder', member = 'forkee', relation = 'forks' },
-                    metadata.rel_at_line(4))
+                    relRepo_info.rel_at_line(4))
   end)
 
   it('refuses on a root headline', function ()
     buffer_with('* (skg node (gnid x) (skgRepos (nodeRepo public))) x')
-    assert.is_truthy(refusal(metadata.rel_at_line, 1):find('Root headline'))
+    assert.is_truthy(refusal(relRepo_info.rel_at_line, 1):find('Root headline'))
   end)
 
   it('refuses off an occurrence', function ()
     buffer_with({
       '* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder',
       '** (skg aliasFolder) aliases' })
-    refusal(metadata.rel_at_line, 2)
+    refusal(relRepo_info.rel_at_line, 2)
   end)
 
   it('offers the ladder from the default on', function ()
     local ladder = { 'public', 'private', 'trusted' }
     assert.are.same({ 'private', 'trusted' },
-                    metadata.relRepo_choices(ladder, 'private'))
-    assert.are.same(ladder, metadata.relRepo_choices(ladder, 'public'))
+                    relRepo_info.relRepo_choices(ladder, 'private'))
+    assert.are.same(ladder, relRepo_info.relRepo_choices(ladder, 'public'))
     assert.are.same({ 'trusted' },
-                    metadata.relRepo_choices(ladder, 'trusted'))
+                    relRepo_info.relRepo_choices(ladder, 'trusted'))
   end)
 
   it('offers the whole ladder without a known default', function ()
     assert.are.same({ 'public', 'private' },
-                    metadata.relRepo_choices({ 'public', 'private' }, nil))
-    assert.are.same({ 'public', 'private' }, metadata.relRepo_choices(
+                    relRepo_info.relRepo_choices({ 'public', 'private' }, nil))
+    assert.are.same({ 'public', 'private' }, relRepo_info.relRepo_choices(
       { 'public', 'private' }, 'unknown'))
   end)
 
   it('writes the relRepo request', function ()
     buffer_with('* (skg node (gnid x) (skgRepos (nodeRepo public))) x')
-    metadata.apply_relRepo_choice(1, 'trusted')
+    relRepo_info.apply_relRepo_choice(1, 'trusted')
     assert.is_truthy(buffer_text():find('(relRepo trusted)', 1, true))
   end)
 
   it('keeps an existing view fact', function ()
     buffer_with(
       '* (skg node (gnid x) (skgRepos (nodeRepo public)) (view cycle)) x')
-    metadata.apply_relRepo_choice(1, 'public')
+    relRepo_info.apply_relRepo_choice(1, 'public')
     assert.is_truthy(buffer_text():find('cycle', 1, true))
     assert.is_truthy(buffer_text():find('(relRepo public)', 1, true))
   end)
 
   it('removes only the pending request with no override', function ()
     buffer_with('* (skg node (gnid x) (skgRepos (nodeRepo public) (relRepo private)) (editRequest (relRepo trusted))) x')
-    local message = metadata.apply_relRepo_choice(
-      1, metadata.relRepo_no_override)
+    local message = relRepo_info.apply_relRepo_choice(
+      1, relRepo_info.relRepo_no_override)
     assert.is_truthy(message:find('sticky'))
     assert.is_falsy(buffer_text():find('editRequest'))
     assert.is_truthy(buffer_text():find(
@@ -828,10 +829,10 @@ describe('skg.metadata relRepo gesture', function ()
 
   it('keeps the processed request', function ()
     buffer_with('* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest (relRepo trusted) (processed rel))) x')
-    metadata.apply_relRepo_choice(1, 'private')
+    relRepo_info.apply_relRepo_choice(1, 'private')
     assert.is_truthy(buffer_text():find(
       '(editRequest (relRepo private) (processed rel)))', 1, true))
-    metadata.apply_relRepo_choice(1, metadata.relRepo_no_override)
+    relRepo_info.apply_relRepo_choice(1, relRepo_info.relRepo_no_override)
     assert.is_truthy(buffer_text():find('(editRequest (processed rel)))', 1, true))
   end)
 
@@ -840,20 +841,20 @@ describe('skg.metadata relRepo gesture', function ()
       '* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest (processed rel))) x',
       '* (skg node (gnid y) (skgRepos (nodeRepo public)) (editRequest (unprocessed))) y',
       '* (skg node (gnid z) (skgRepos (nodeRepo public)) (editRequest delete (processed))) z' })
-    assert.is_false(metadata.node_edit_request_at_line_p(1))
-    metadata.apply_relRepo_choice(1, 'private')
+    assert.is_false(relRepo_info.node_edit_request_at_line_p(1))
+    relRepo_info.apply_relRepo_choice(1, 'private')
     assert.is_truthy(metadata.line_text(1):find(
       '(editRequest (relRepo private) (processed rel)))', 1, true))
-    assert.is_false(metadata.node_edit_request_at_line_p(2))
-    assert.is_true(metadata.node_edit_request_at_line_p(3))
-    refusal(metadata.apply_relRepo_choice, 3, 'private')
+    assert.is_false(relRepo_info.node_edit_request_at_line_p(2))
+    assert.is_true(relRepo_info.node_edit_request_at_line_p(3))
+    refusal(relRepo_info.apply_relRepo_choice, 3, 'private')
   end)
 
   it('changes nothing removing an absent override', function ()
     buffer_with('* (skg node (gnid x) (skgRepos (nodeRepo public))) x')
     local before = buffer_text()
-    local message = metadata.apply_relRepo_choice(
-      1, metadata.relRepo_no_override)
+    local message = relRepo_info.apply_relRepo_choice(
+      1, relRepo_info.relRepo_no_override)
     assert.is_truthy(message:find('nothing to remove'))
     assert.are.equal(before, buffer_text())
   end)
@@ -863,11 +864,11 @@ describe('skg.metadata relRepo gesture', function ()
       '* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder',
       '** (skg aliasFolder)',
       '*** (skg alias) nickname' })
-    metadata.apply_relRepo_choice(3, 'trusted')
+    relRepo_info.apply_relRepo_choice(3, 'trusted')
     assert.are.equal('*** (skg alias (editRequest (relRepo trusted))) nickname',
                      metadata.line_text(3))
-    assert.are.equal('trusted', metadata.relRepo_requested_value(3))
-    metadata.apply_relRepo_choice(3, metadata.relRepo_no_override)
+    assert.are.equal('trusted', relRepo_info.relRepo_requested_value(3))
+    relRepo_info.apply_relRepo_choice(3, relRepo_info.relRepo_no_override)
     assert.are.equal('*** (skg alias) nickname', metadata.line_text(3))
   end)
 
@@ -875,11 +876,11 @@ describe('skg.metadata relRepo gesture', function ()
     buffer_with({
       '* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder',
       '** (skg unknown (gnid na) (skgRepos (relRepo private)))' })
-    metadata.apply_relRepo_choice(2, 'trusted')
+    relRepo_info.apply_relRepo_choice(2, 'trusted')
     assert.is_truthy(metadata.line_text(2):find(
       'unknown (gnid na) (skgRepos (relRepo private)) (editRequest (relRepo trusted))',
       1, true))
-    metadata.apply_relRepo_choice(2, metadata.relRepo_no_override)
+    relRepo_info.apply_relRepo_choice(2, relRepo_info.relRepo_no_override)
     assert.is_truthy(metadata.line_text(2):find(
       '(skgRepos (relRepo private))', 1, true))
     assert.is_falsy(metadata.line_text(2):find('editRequest'))
@@ -889,8 +890,8 @@ describe('skg.metadata relRepo gesture', function ()
     buffer_with({
       '* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder',
       '** (skg restricted (gnid h) (skgRepos (relRepo private)))' })
-    assert.are.equal('h', metadata.rel_at_line(2).member)
-    metadata.apply_relRepo_choice(2, 'trusted')
+    assert.are.equal('h', relRepo_info.rel_at_line(2).member)
+    relRepo_info.apply_relRepo_choice(2, 'trusted')
     assert.is_truthy(metadata.line_text(2):find(
       'restricted (gnid h) (skgRepos (relRepo private)) (editRequest (relRepo trusted))',
       1, true))
@@ -902,7 +903,7 @@ describe('skg.metadata relRepo gesture', function ()
       '* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder',
       '** (skg node (gnid a) (skgRepos (nodeRepo public))) a',
       '** (skg node (gnid b) (skgRepos (nodeRepo public)) (editRequest delete)) b' })
-    refusal(metadata.set_relRepo_recursive_walk, 1, 'content', 'trusted')
+    refusal(relRepo_info.set_relRepo_recursive_walk, 1, 'content', 'trusted')
     assert.is_falsy(metadata.line_text(2):find('relRepo'))
   end)
 
@@ -921,7 +922,7 @@ describe('skg.metadata relRepo gesture', function ()
 
   it("walks the kind 'content'", function ()
     buffer_with(recursive_content_tree)
-    assert.are.equal(3, metadata.set_relRepo_recursive_walk(
+    assert.are.equal(3, relRepo_info.set_relRepo_recursive_walk(
       1, 'content', 'trusted'))
     for _, gnid in ipairs({ 'a', 'b', 'e' }) do
       assert.is_truthy(text_of_id(gnid):find('(relRepo trusted)', 1, true))
@@ -932,7 +933,7 @@ describe('skg.metadata relRepo gesture', function ()
 
   it("walks the kind 'forkee'", function ()
     buffer_with(recursive_content_tree)
-    assert.are.equal(1, metadata.set_relRepo_recursive_walk(
+    assert.are.equal(1, relRepo_info.set_relRepo_recursive_walk(
       1, 'forkee', 'private'))
     assert.is_truthy(text_of_id('g'):find('(relRepo private)', 1, true))
     for _, gnid in ipairs({ 'r', 'a', 'b', 'c', 'd', 'e', 'f', 'h' }) do
@@ -941,7 +942,7 @@ describe('skg.metadata relRepo gesture', function ()
 
   it("includes the start's own relationship", function ()
     buffer_with(recursive_content_tree)
-    assert.are.equal(2, metadata.set_relRepo_recursive_walk(
+    assert.are.equal(2, relRepo_info.set_relRepo_recursive_walk(
       line_of_id('a'), 'content', 'trusted'))
     assert.is_truthy(text_of_id('a'):find('(relRepo trusted)', 1, true))
     assert.is_truthy(text_of_id('b'):find('(relRepo trusted)', 1, true))
@@ -953,7 +954,7 @@ describe('skg.metadata relRepo gesture', function ()
       '** (skg hiderFolder)',
       '*** (skg node (gnid s) (skgRepos (nodeRepo public))) s',
       '**** (skg node (gnid sc) (skgRepos (nodeRepo public))) sc' })
-    assert.are.equal(0, metadata.set_relRepo_recursive_walk(
+    assert.are.equal(0, relRepo_info.set_relRepo_recursive_walk(
       1, 'content', 'trusted'))
     assert.is_falsy(buffer_text():find('relRepo'))
   end)
@@ -965,11 +966,11 @@ describe('skg.metadata relRepo gesture', function ()
       '** (skg forksFolder)',
       '*** (skg node (gnid g) (skgRepos (nodeRepo public))) g' }
     buffer_with(tree)
-    assert.are.equal(0, metadata.set_relRepo_recursive_walk(
+    assert.are.equal(0, relRepo_info.set_relRepo_recursive_walk(
       1, 'forkee', 'trusted'))
     assert.is_falsy(text_of_id('g'):find('relRepo'))
     buffer_with(tree)
-    assert.are.equal(0, metadata.set_relRepo_recursive_walk(
+    assert.are.equal(0, relRepo_info.set_relRepo_recursive_walk(
       2, 'forkee', 'trusted'))
     assert.is_falsy(text_of_id('g'):find('relRepo'))
   end)
@@ -979,13 +980,13 @@ describe('skg.metadata relRepo gesture', function ()
       '* (skg node (gnid r) (skgRepos (nodeRepo public))) r',
       '** (skg node (gnid a) (skgRepos (nodeRepo public) (relRepo trusted)) (editRequest (relRepo trusted))) a',
       '*** (skg node (gnid b) (skgRepos (nodeRepo public) (relRepo private)) (editRequest (relRepo private))) b' })
-    assert.are.equal(2, metadata.set_relRepo_recursive_walk(
-      1, 'content', metadata.relRepo_no_override))
+    assert.are.equal(2, relRepo_info.set_relRepo_recursive_walk(
+      1, 'content', relRepo_info.relRepo_no_override))
     assert.is_falsy(buffer_text():find('editRequest'))
   end)
 
   it('offers the two writable kinds among the four relations', function ()
-    local tree = metadata.relationship_kind_menu_tree()
+    local tree = relRepo_info.relationship_kind_menu_tree()
     local relations, kinds = {}, {}
     for _, relation in ipairs(tree) do
       table.insert(relations, relation.relation)
@@ -1002,18 +1003,18 @@ describe('skg.metadata relRepo gesture', function ()
     local notified = {}
     local original_notify = vim.notify
     vim.notify = function (message) table.insert(notified, message) end
-    metadata.relationship_kind_menu_choose(nil, function (kind)
+    relRepo_info.relationship_kind_menu_choose(nil, function (kind)
       chosen = kind end)
-    metadata.relationship_kind_menu_choose(
+    relRepo_info.relationship_kind_menu_choose(
       { role = 'forker', kind = false,
-        description = metadata.relationship_role_menu_prose
+        description = relRepo_info.relationship_role_menu_prose
                         .forker.description },
       function (kind) chosen = kind end)
     vim.notify = original_notify
     assert.is_nil(chosen)
     assert.are.equal(1, #notified)
     assert.is_truthy(notified[1]:find("child's position", 1, true))
-    metadata.relationship_kind_menu_choose(
+    relRepo_info.relationship_kind_menu_choose(
       { role = 'content', kind = 'content' },
       function (kind) chosen = kind end)
     assert.are.equal('content', chosen)
@@ -1035,13 +1036,13 @@ describe('skg.metadata relRepo gesture', function ()
       return 'trusted' end
     local notified = {}
     vim.notify = function (message) table.insert(notified, message) end
-    local ok, err = pcall(metadata.set_relRepo_recursive)
+    local ok, err = pcall(relRepo_info.set_relRepo_recursive)
     vim.ui.select = original_select
     picker.completing_read_with_cycle = original_read
     vim.notify = original_notify
     assert.is_true(ok, tostring(err))
     assert.are.same({ 'public', 'private', 'trusted',
-                      metadata.relRepo_no_override }, seen_choices)
+                      relRepo_info.relRepo_no_override }, seen_choices)
     for _, gnid in ipairs({ 'a', 'b', 'e' }) do
       assert.is_truthy(text_of_id(gnid):find('(relRepo trusted)', 1, true))
     end
