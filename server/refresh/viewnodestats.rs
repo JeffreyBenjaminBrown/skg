@@ -320,10 +320,8 @@ fn flag_ancestor_relations (
 ) {
   let contains_rel_is_visible : &mut dyn FnMut (&ID, &ID) -> bool =
     &mut |recorder : &ID, target : &ID| -> bool {
-    restriction . is_unrestricted ()
-    || relRepos . relRepo_memoized (recorder, NodeRelation::Contains, target)
-       . is_some_and ( |relRepo| SkgrepoRestriction::record_is_visible (
-         restriction, &relRepo )) };
+    record_of_relationship_is_visible (
+      restriction, relRepos, recorder, NodeRelation::Contains, target ) };
   // Contains, via the maps. inbound: ancestor contains node.
   if content_to_containers . get (node_pid)
     . map_or (false, |s| s . contains (anc_pid))
@@ -364,10 +362,23 @@ fn relationship_is_visible (
     if member_role . is_first_role () { (member, node) }
     else { (node, member) };
   graph . relation_membership_is_real (node, member, member_role)
-  && ( restriction . is_unrestricted ()
-       || relRepos . relRepo_memoized (recorder, member_role . relation, target)
-          . is_some_and ( |relRepo| SkgrepoRestriction::record_is_visible (
-            restriction, &relRepo )) ) }
+  && record_of_relationship_is_visible (
+    restriction, relRepos, recorder, member_role . relation, target ) }
+
+/// Whether the skgrepo restriction shows the record, in 'recorder''s
+/// list, of its 'relation' to 'target': always when it keeps nothing
+/// out, else when there is such a record and its relRepo is visible.
+fn record_of_relationship_is_visible (
+  restriction : &SkgrepoRestriction,
+  relRepos    : &mut RelRepoLookup,
+  recorder    : &ID,
+  relation    : NodeRelation,
+  target      : &ID,
+) -> bool {
+  restriction . is_unrestricted ()
+  || relRepos . relRepo_memoized (recorder, relation, target)
+     . is_some_and ( |relRepo| SkgrepoRestriction::record_is_visible (
+       restriction, &relRepo )) }
 
 /// The birth facts -- which relations explain this occurrence, on which
 /// side of it, accounting for which ancestor -- read from the kind of
