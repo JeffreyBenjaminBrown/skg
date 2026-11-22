@@ -5,7 +5,7 @@
 #
 # Results are written here:
 # - tests/results/ALL.org: a plain-text org-mode summary, which quotes
-#   the failure lines of each failed suite
+#   the failure lines of each failed suite and integration test
 # - tests/results/*.log: individual test results
 # It clears tests/results/ at its start, except the subdirectories
 # named for a plan number (tests/results/06/), which hold the logs of
@@ -233,6 +233,12 @@ INTEGRATION_EXITS=()
 INTEGRATION_ELAPSED=()
 INTEGRATION_FAILED=()  # entries are "CLIENT/DIR-NAME"
 
+# The lines of an integration run's log that say what failed: the
+# tests' own FAIL and TIMEOUT lines ('test-nvim-lib.lua',
+# 'test-wait.el'), their last phase, and the harness's ERROR lines
+# ('test-lib.sh').
+INTEGRATION_FAILURE_LINES='FAIL|TIMEOUT|ERROR|Last phase:|panicked'
+
 # The log of one integration run. PREFIX is 'integration' for the
 # primary run and 'retry' for the retry; NAME is "CLIENT/DIR-NAME".
 integration_log_name () {
@@ -444,6 +450,12 @@ failure_lines_of_log () {
       [ ${RETRY_EXITS[$j]} -ne 0 ] || continue
       name="${RETRY_NAMES[$j]}"
       echo "**** FAIL  $name (${RETRY_ELAPSED[$j]}s) [[file:$(integration_log_name retry "$name")]]"
+      echo "     #+begin_example"
+      failure_lines_of_log \
+        "$RESULTS_DIR/$(integration_log_name retry "$name")" \
+        "$INTEGRATION_FAILURE_LINES" \
+        | sed 's/^/     /'
+      echo "     #+end_example"
     done
     for j in "${!RETRY_NAMES[@]}"; do
       [ ${RETRY_EXITS[$j]} -eq 0 ] || continue
