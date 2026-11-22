@@ -11,7 +11,8 @@ use crate::pruned_change_view::common::{all_changes_view, open_all_changes_buffe
 
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::diff_view::change_leaves::{
-  ChangeLeaves, LeafKey, NodeAspect, ProcessedSummary, WaitReason};
+  ChangeLeaves, LeafKey, NodeAspect, ProcessedSummary};
+use skg::diff_view::commit_choice::WaitReason;
 use skg::graph_straddle::types::GraphStraddle;
 use skg::git_ops::stage_and_commit::{
   ChangedSkgPath, PreparedCommits, changed_skg_paths_by_stem, commit_prepared,

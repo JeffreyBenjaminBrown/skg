@@ -9,6 +9,7 @@
 //!   that say it;
 //! - 'change_viewnodes.rs': the diff view's own viewnodes;
 //! - 'change_leaves.rs': the change-forest leaves and whether they are processed;
+//! - 'commit_choice.rs': which changed nodes a commit takes;
 //! - 'other_changes.rs': the changes to a node's files that no other
 //!   leaf records;
 //! - 'processed_store.rs': the marks the user set;
@@ -20,6 +21,7 @@
 pub mod buffer_rerender;
 pub mod change_leaves;
 pub mod change_viewnodes;
+pub mod commit_choice;
 pub mod changes;
 pub mod named_leaf_set;
 pub mod pruned_change_view;

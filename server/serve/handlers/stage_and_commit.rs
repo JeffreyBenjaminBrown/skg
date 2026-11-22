@@ -28,10 +28,11 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::complete_validation::validated_graph;
 use crate::dbs::in_rust_graph::relation_accessors::RelationshipKey;
 use crate::diff_view::change_leaves::{
-  BufferProcessedSummary, CommitChoice, LeafKey, ProcessedSummary,
-  WaitingNode, processed_commit_choice, processed_response_sexp,
-  processed_response_trailing_entries, processed_summary,
-  title_in_straddle, whole_commit_choice};
+  BufferProcessedSummary, LeafKey, ProcessedSummary,
+  processed_response_sexp, processed_response_trailing_entries,
+  processed_summary, title_in_straddle};
+use crate::diff_view::commit_choice::{
+  CommitChoice, WaitingNode, processed_commit_choice, whole_commit_choice};
 use crate::diff_view::processed_store::ProcessedStore;
 use crate::diff_view::other_changes::{
   FILE_NOT_AS_SKG_WRITES_IT, files_hold_more_than_their_node};

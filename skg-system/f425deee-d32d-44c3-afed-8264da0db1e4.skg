@@ -16,7 +16,7 @@ body: |2-
     nothing; one listing it in the worktree only needs the two
     ('merge_needs').
   The rule is applied in rounds until a round holds nothing back
-  ('hold_back_waiting_nodes', 'server/diff_view/change_leaves.rs'). So
+  ('hold_back_waiting_nodes', 'server/diff_view/commit_choice.rs'). So
   a node needing a waiting node waits too, and every chain of waits
   ends at a node that is not processed. Each waiting node names the
   first by title of the nodes it needs that do not go in; for a merge,

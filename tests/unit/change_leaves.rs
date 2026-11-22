@@ -1,6 +1,7 @@
 // Unit tests for the change-forest, over graph straddles built in memory.
 
 use super::*;
+use crate::diff_view::commit_choice::WaitReason;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::viewnode::{OrderedList, OtherChange};

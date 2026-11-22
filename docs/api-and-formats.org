@@ -1072,7 +1072,7 @@ keeps them as text ('TODO/problems.org').
       The rerender stream is empty.
   - Logic: =server/serve/handlers/stage_and_commit.rs=,
     =server/git_ops/stage_and_commit.rs=, and the choice of nodes in
-    =server/diff_view/change_leaves.rs=.
+    =server/diff_view/commit_choice.rs=.
 ** Extend diff view
   - Request: =((request . "extend diff view") (view-id . "VIEW_ID"))=,
     where VIEW_ID names a buffer of the diff view. The client

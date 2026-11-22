@@ -65,4 +65,4 @@ body: |2-
         The rerender stream is empty.
     - Logic: =server/serve/handlers/stage_and_commit.rs=,
       =server/git_ops/stage_and_commit.rs=, and the choice of nodes in
-      =server/diff_view/change_leaves.rs=.
+      =server/diff_view/commit_choice.rs=.
