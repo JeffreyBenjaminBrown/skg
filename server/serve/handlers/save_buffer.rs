@@ -22,7 +22,6 @@ use crate::from_text::strandeds::{
   StrandedsReview, StrandedRelationship,
   raised_relationship_warning, reset_to_default_relationships,
   stranded_relationships};
-use crate::git_ops::diff::compute_diff_for_skgrepo;
 use crate::save::{
   apply_delete_propagation_cleanup,
   DeleteFrom,
@@ -70,7 +69,6 @@ use crate::serve::util::{
 use crate::from_text::fork::build_fork_confirmation_buffer;
 use crate::types::env::SkgEnv;
 use crate::types::errors::{BufferValidationError, SaveError, format_save_error_as_org};
-use crate::types::git::SkgrepoDiff;
 use crate::types::config::SkgConfig;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::save::{
@@ -87,7 +85,6 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
-use std::path::Path;
 
 /// The ordinary terminal message in the save protocol. Hoist, fork, and
 /// text-release confirmations are alternative terminal messages.
@@ -1412,23 +1409,6 @@ fn post_skgsave_commit_hiddenoutside_warnings (
         label (member), containing_forkees . join (", ") )); }}
   warnings
 }
-
-pub fn compute_diff_for_every_skgrepo (
-  config : &SkgConfig
-) -> HashMap<SkgrepoName, SkgrepoDiff> {
-  let mut skgrepo_diffs : HashMap<SkgrepoName, SkgrepoDiff> =
-    HashMap::new();
-  for (skgrepo_name, skgrepo_config) in &config . skgrepos {
-    let skgrepo_path : &Path =
-      Path::new ( &skgrepo_config . path );
-    match compute_diff_for_skgrepo (skgrepo_path) {
-      Ok (diff) => {
-        skgrepo_diffs . insert ( skgrepo_name . clone(), diff ); },
-      Err (e) => { // Log error but continue with other skgrepos
-        tracing::warn! (
-          "Failed to compute diff for repo '{}': {}",
-          skgrepo_name, e ); }} }
-  skgrepo_diffs }
 
 /// Every other open view sharing at least one PID with the saved view.
 /// Over-approximates true collateral (which requires parsing the buffer

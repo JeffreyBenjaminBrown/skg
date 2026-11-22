@@ -1,9 +1,11 @@
-//! A skgrepo's git diff as nodes ('compute_diff_for_skgrepo'): the nodes
+//! A skgrepo's git diff as nodes ('compute_diff_for_skgrepo', or
+//! 'compute_diff_for_every_skgrepo' for all of them): the nodes
 //! its '.skg' files add or delete, staged (index against HEAD) and then
 //! unstaged (worktree against index). The diff view reads deleted and
 //! added nodes' titles from it ('serve/handlers/titles_by_gnids.rs').
 
 use crate::dbs::filesystem::retired_keys::{quoted_keys, retired_keys_held};
+use crate::types::config::SkgConfig;
 use crate::types::git::{ GitDiffStatus, PathDiffStatus, SkgrepoDiff };
 use crate::types::misc::SkgrepoName;
 use crate::types::nodes::fs::GraphnodeOnDisk;
@@ -12,9 +14,29 @@ use crate::types::nodes::complete::Graphnode;
 use super::misc::path_relative_to_gitrepo;
 use super::read_gitrepo::{ get_file_content_at_head, get_file_content_at_index, get_staged_changed_skg_files, get_unstaged_changed_skg_files, open_gitrepo, };
 
+use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::path::{Path, PathBuf};
 use std::fs;
+
+/// Each configured skgrepo's diff ('compute_diff_for_skgrepo'), by
+/// name. A skgrepo whose diff fails is logged and left out.
+pub fn compute_diff_for_every_skgrepo (
+  config : &SkgConfig
+) -> HashMap<SkgrepoName, SkgrepoDiff> {
+  let mut skgrepo_diffs : HashMap<SkgrepoName, SkgrepoDiff> =
+    HashMap::new();
+  for (skgrepo_name, skgrepo_config) in &config . skgrepos {
+    let skgrepo_path : &Path =
+      Path::new ( &skgrepo_config . path );
+    match compute_diff_for_skgrepo (skgrepo_path) {
+      Ok (diff) => {
+        skgrepo_diffs . insert ( skgrepo_name . clone(), diff ); },
+      Err (e) => { // Log error but continue with other skgrepos
+        tracing::warn! (
+          "Failed to compute diff for repo '{}': {}",
+          skgrepo_name, e ); }} }
+  skgrepo_diffs }
 
 /// The nodes of the skgrepo's '.skg' files that git sees added or
 /// deleted: in the git index since HEAD (staged), then in the worktree

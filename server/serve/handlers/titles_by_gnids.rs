@@ -10,7 +10,7 @@ use crate::serve::handlers::text_release::{
   approved_pids_from_request,
   challenge_response,
   decide_for_overPrivateText_pids};
-use crate::serve::handlers::save_buffer::compute_diff_for_every_skgrepo;
+use crate::git_ops::diff::compute_diff_for_every_skgrepo;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, sexp_to_client_string};
 use crate::sexp_string::quote_sexp_string;
