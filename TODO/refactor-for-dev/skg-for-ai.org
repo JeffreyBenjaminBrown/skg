@@ -1,5 +1,6 @@
 * Refactoring 'tools/skg-for-ai/' for the next agent
-  The territory: 'skg_for_ai.py' (one file, about 6800 lines), its
+  The territory: 'skg_for_ai.py' (the entry, with 'main' and an index
+  of the modules) and the modules beside it (about 7000 lines), its
   suite 'test_skg_for_ai.py' and its fixtures, and 'README.org'. The
   tool's command line, everything it prints, the files it writes and
   the README are read by other agents as their manual: they must stay
@@ -26,51 +27,53 @@
    After the imports. Each section has a banner; grep '^# TITLE'.
 ** 'change_report_lines' says where an edited headline stands once
    The local 'edited_place'.
+** 'skg_for_ai.py' is split into modules, one concern each
+   'skg_for_ai.py' keeps 'main' and an index of the modules: which
+   module holds each command, and what lies below the commands. Each
+   module beside it says in its first lines what it holds, and
+   imports from the others by name: 'command_line' (the arguments
+   and 'run_command'); the commands, in 'view_commands', 'save',
+   'diff_and_commit', 'receipts', 'request_commands',
+   'headline_commands' and 'daemon' ('daemon_client' is how a command
+   reaches one); below them 'edited_compact_view', 'views',
+   'compact_view', 'full_view', 'server_connection' and 'sexp'. No
+   import cycle: each module imports only from those below it.
+   The code moved unchanged, one module per commit, but for one
+   adaptation: 'RUNNING_DAEMON' lives in 'server_connection' (with
+   'connect_to_server', which reads it), and the daemon, which sets
+   it, and 'command_commit', which reads it, name it
+   'server_connection . RUNNING_DAEMON'. A moved function that read
+   a mutable global of another module would read a stale copy; this
+   is the only global any code rebinds ('global' appears nowhere
+   else). The tests read the tool's names from their modules
+   ('sexp . parse_sexp', ...).
+   A few helpers moved down to the module that first needs them:
+   'metadata_form' to 'sexp'; 'first_number' and
+   'ancestor_generations' to 'full_view'; 'count_phrase',
+   'is_editable_node' and 'reads_claims' to 'compact_view'; the
+   overPrivateText helpers and 'response_text_field' to
+   'server_connection'; 'release_withheld_save_rerender' and the
+   sidecar helpers to 'views'; 'NEW_NODE_HANDLE_WORD',
+   'described_handle' and 'descendant_indices' to
+   'edited_compact_view'.
+   Running the tool now writes '__pycache__/' beside it (gitignored);
+   no module may import 'skg_for_ai', which runs as '__main__' and
+   would be loaded a second time.
 * Candidates left, best first
-** Split 'skg_for_ai.py' into modules
-   The largest win by far: an agent touching the save reads 2400 lines
-   it could find in one file. In scope only if
-   'python3 tools/skg-for-ai/skg_for_ai.py COMMAND' keeps working from
-   any directory with the standard library only (a sibling module
-   imports fine: the script's folder is 'sys.path[0]'), and the suite
-   passes unchanged: it uses about 33 names as 'skg_for_ai.NAME'
-   ('parse_sexp', 'HeraldTables', 'OutlineHeadline', 'main', ...), so
-   'skg_for_ai.py' would have to 'from MODULE import *' each lower
-   module, which keeps every such name and every call site.
-   What makes it risky: the sections import each other in cycles. As
-   measured (the script was an AST walk over top-level names, by
-   section banner):
-*** A protocol leaf would be clean
-    "S-expressions" plus, from "The connection", 'SkgToolError' and
-    its subclasses, 'request_line', 'response_type', 'response_field',
-    'require_response_type' (and whatever those need). Nothing below
-    it. The file's last lines ('if __name__ == "__main__"') must stay
-    in 'skg_for_ai.py'.
-*** The view-reading cluster needs only the leaf
-    From "The full view, parsed" to "Change facts" (about 950 lines:
-    parsing, facts, heralds, the lens, links, the compact view) needs
-    only the protocol leaf, the constants 'HEADLINE_PATTERN',
-    'LINK_PATTERN', 'SHARED_FOLDER' (which is computed from
-    '__file__': same folder, same value), and 'reads_claims' (in
-    "Words read against the outline"; move it along).
-*** The save cluster has five upward references
-    "Saving an edited compact view" through "The server's answer"
-    (about 2400 lines) needs the two layers above, plus five names
-    from the command layer: 'metadata_text_with_part' (Fetching views),
-    'RenderedView' (Writing the files), 'perspective_fields_of_sidecar'
-    (Commands), 'processed_summary_text' (The summary),
-    'fetch_link_statuses_of_ids' (Links). Those (or "The server's
-    answer", which builds a 'RenderedView') must move down first.
-*** The rest is one cycle
-    Commands, the daemon and the connection use each other
-    ('DaemonConnection' and 'RUNNING_DAEMON', a global the daemon sets
-    with 'global'); leave them together in 'skg_for_ai.py'.
-*** Decide first
-    Whether Jeff wants star imports in the entry module, and the
-    module names. A moved function that reads a mutable global of
-    'skg_for_ai.py' would silently read its own module's copy: check
-    each moved module's free names (an AST walk) before trusting the
-    suite.
+** Split 'save.py' (1380 lines) at the server dialogue
+   'save.py' holds the rebuild and the report (what a preview shows)
+   and, from "The fork confirmation" on, the answers to the server's
+   questions and its rerender (what '--yes' does). Two modules would
+   halve what an agent reads to change either. Safe as the first split
+   was (move unchanged, check free names); the sections already form
+   the seam. An hour's work with the script the first split used
+   (rebuild it: an AST walk assigning each top-level name a module and
+   generating the imports).
+** Split 'compact_view.py' (990 lines): the heralds apart
+   Relationship heralds, the lens and the herald contexts (about 450
+   lines) are one concern, the compact tree, links and summary
+   another. Same safety and cost as above; check that the herald half
+   needs nothing from the other.
 ** 'parse_command_line' is 311 lines of argparse
    Declarative and greppable ('add_parser ( "save"'); splitting it per
    command would help little.
