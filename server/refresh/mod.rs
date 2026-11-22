@@ -11,9 +11,10 @@
 //! child's warrant against the parent's goal ('goal.rs'), mark the
 //! claims, reinstate what the goal names and no child stands for
 //! (as far as the extent allows, 'extent.rs'), reorder, substitute
-//! mirrors, and fulfill the children's view requests. In the diff
-//! view the goal also holds what HEAD alone warrants, and change
-//! viewnodes are recomputed in place ('diff_view.rs'). After the
+//! mirrors ('substitution.rs'), and fulfill the children's view
+//! requests. In the diff view the goal also holds what HEAD alone
+//! warrants, and change viewnodes are recomputed in place
+//! ('diff_view.rs'). After the
 //! walk, the tail ('tail.rs') computes the derived facts, prunes the
 //! childless tombstones and gives every viewnode a vnid. The refresh
 //! changes the forest in place and reports nothing of what it changed;
@@ -38,6 +39,7 @@ pub(crate) mod goal;
 pub mod graphnodestats;
 mod id_rule;
 pub mod mode;
+mod substitution;
 mod tail;
 pub mod viewnodestats;
 mod visit;

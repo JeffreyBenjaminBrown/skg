@@ -30,7 +30,7 @@ body: |2-
   perspective's list ranks first of the node it stands for, re-pointed
   where it stands; from the root homes that is the node itself, since
   it stands in its own home ('substitute_roots' in
-  =server/refresh/visit.rs=). A re-pointed root's
+  =server/refresh/substitution.rs=). A re-pointed root's
   folders are drawn afresh for the node it now shows, as a fresh view of
   it draws them ('redraw_folders'): its containers folder; where the root
   is editable, its forks folder where it has a fork partner;

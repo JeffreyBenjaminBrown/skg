@@ -208,7 +208,7 @@ too, from every perspective: each root shows the mirror its
 perspective's list ranks first of the node it stands for, re-pointed
 where it stands; from the root homes that is the node itself, since
 it stands in its own home ('substitute_roots' in
-=server/refresh/visit.rs=). A re-pointed root's
+=server/refresh/substitution.rs=). A re-pointed root's
 folders are drawn afresh for the node it now shows, as a fresh view of
 it draws them ('redraw_folders'): its containers folder; where the root
 is editable, its forks folder where it has a fork partner;
@@ -411,7 +411,7 @@ not perform interactive mirror substitution.
 - [[file:../server/serve/handlers/single_root_view.rs][exact direct visits]]
 - [[file:../server/dbs/in_rust_graph/mirrors.rs][mirrors, and which one stands]]
 - [[file:../server/dbs/in_rust_graph/fork_rules.rs][what an owned note may not fork, contain or hide]]
-- [[file:../server/refresh/visit.rs][substitution and raw positions ('substitute_mirrors')]]
+- [[file:../server/refresh/substitution.rs][substitution and raw positions ('substitute_mirrors')]]
 - [[file:../server/refresh/chain.rs][the containerward chain through mirrors ('list_mirrors_of_chain_occurrence')]]
 - [[file:../server/rerender_pass.rs][saved-view fork replacement and collateral rerendering]]
 - [[file:../server/types/views_state.rs][open-view root registration]]

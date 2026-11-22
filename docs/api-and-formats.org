@@ -2145,7 +2145,7 @@ remove graph context.
 Where a node N stands as content of an editable occurrence in a
 content view, the refresh shows instead the mirror of N that the
 perspective's skgrepo list ranks first, never in the diff view
-('substitute_mirrors' in =server/refresh/visit.rs=;
+('substitute_mirrors' in =server/refresh/substitution.rs=;
 =docs/mirrors.org=, "Mirror substitution", says what N's mirrors are
 and how a tie is broken). The mirrors of N are N and the notes joined
 to it by =forks= relationships, followed either way, under the
@@ -2177,7 +2177,7 @@ A root stands for its original: the node its =(inPlaceOf N)=
 names, else itself; and its home is the tree's root home. It shows
 the mirror of the original its perspective's list ranks first,
 marked =(inPlaceOf N)= unless it is the original
-('substitute_roots' in =server/refresh/visit.rs=). From the root homes
+('substitute_roots' in =server/refresh/substitution.rs=). From the root homes
 that is the original itself, since it stands in its own home, so a
 fresh view, and a view switched back, shows the node asked for, and so
 does a search buffer each of its hits. The root is
