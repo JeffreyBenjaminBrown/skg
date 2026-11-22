@@ -468,13 +468,8 @@ pub(crate) fn apply_delete_propagation_cleanup (
     . collect ();
   if deleted_primary_pids . is_empty () { return; }
 
-  let deleted_id_set : HashSet<ID> = { // include each deleted node's extra_ids
-    let mut s : HashSet<ID> = deleted_primary_pids . clone ();
-    for pid in &deleted_primary_pids {
-      if let Some (rust) = graph_snap . get (pid) {
-        for e in &rust . extra_ids {
-          s . insert ( e . clone () ); }}}
-    s };
+  let deleted_id_set : HashSet<ID> =
+    ids_of_deleted_graphnodes (&deleted_primary_pids, graph_snap);
 
   { // The recorder-collection pass: append "save-it-unchanged" SaveNodes for recorders of a deleted ID not already covered by the user's nodeInstructions. As-is, these would have no effect, but the ID-stripping pass strips some IDs.
     let user_save_pids : HashSet<ID> = node_defs . iter ()
@@ -482,15 +477,8 @@ pub(crate) fn apply_delete_propagation_cleanup (
         NodeInstruction::Save (SaveNode (n)) => Some ( n . pid . clone ()),
         NodeInstruction::Delete (_)          => None } )
       . collect ();
-    let mut referencer_pids : HashSet<ID> = HashSet::new ();
-    for deleted in &deleted_primary_pids { // Recorderward relmaps are keyed by primary pid (id_to_pid_if_found resolves extra_ids during index construction), so iterating the primary pids of deletes is sufficient to find every referencer.
-      for inverse in [
-        &graph_snap . contained_by,
-        &graph_snap . forkers_of,
-        &graph_snap . hiders_of, ] {
-        if let Some (set) = inverse . get (deleted) {
-          for pid in set {
-            referencer_pids . insert ( pid . clone () ); }} } }
+    let mut referencer_pids : HashSet<ID> =
+      recorders_of_deleted_graphnodes (&deleted_primary_pids, graph_snap);
     referencer_pids . retain ( |p|
       graph_snap . get (p)
       . map ( |node| config . skgrepo_is_owned (&node . home_skgrepo)
@@ -540,21 +528,12 @@ pub(crate) fn restricted_records_naming_deleted_graphnodes (
       NodeInstruction::Delete (dn) => Some ( graph_snap . pid_else_raw_id (&dn . gnid) ),
       NodeInstruction::Save (_)    => None } )
     . collect ();
-  let deleted_id_set : HashSet<ID> = deleted_primary_pids . iter ()
-    . flat_map ( |pid| std::iter::once (pid . clone ())
-                 . chain ( graph_snap . get (pid) . into_iter ()
-                           . flat_map ( |node| node . extra_ids . iter () . cloned () )) )
-    . collect ();
-  let referencer_pids : HashSet<&ID> = deleted_primary_pids . iter ()
-    . flat_map ( |deleted| [ &graph_snap . contained_by,
-                             &graph_snap . forkers_of,
-                             &graph_snap . hiders_of, ]
-                 . into_iter ()
-                 . filter_map ( move |inverse| inverse . get (deleted) )
-                 . flatten () )
+  let deleted_id_set : HashSet<ID> =
+    ids_of_deleted_graphnodes (&deleted_primary_pids, graph_snap);
+  let referencer_pids : HashSet<ID> =
+    recorders_of_deleted_graphnodes (&deleted_primary_pids, graph_snap);
+  referencer_pids . iter ()
     . filter ( |pid| ! deleted_primary_pids . contains (*pid) )
-    . collect ();
-  referencer_pids . into_iter ()
     . filter_map ( |pid| graph_snap . get (pid) )
     . filter ( |node| config . skgrepo_is_owned (&node . home_skgrepo) )
     . map ( |node| records_of_graphnodeInRust (node) . into_iter ()
@@ -563,6 +542,36 @@ pub(crate) fn restricted_records_naming_deleted_graphnodes (
                          restriction, &record . relRepo ))
             . count () )
     . sum () }
+
+/// The deleted graphnodes' pids and each one's extra IDs, as the graph
+/// knows them: a referencer may have recorded any of them.
+fn ids_of_deleted_graphnodes (
+  deleted_primary_pids : &HashSet<ID>,
+  graph_snap           : &InRustGraph,
+) -> HashSet<ID> {
+  deleted_primary_pids . iter ()
+    . flat_map ( |pid| std::iter::once (pid . clone ())
+                 . chain ( graph_snap . get (pid) . into_iter ()
+                           . flat_map ( |node| node . extra_ids . iter () . cloned () )) )
+    . collect () }
+
+/// Every node that contains, forks or hides a deleted graphnode. The
+/// recorderward relmaps are keyed by primary pid (id_to_pid_if_found
+/// resolves extra_ids during index construction), so the primary pids
+/// of the deletes find every recorder. A deleted graphnode can be one.
+fn recorders_of_deleted_graphnodes (
+  deleted_primary_pids : &HashSet<ID>,
+  graph_snap           : &InRustGraph,
+) -> HashSet<ID> {
+  deleted_primary_pids . iter ()
+    . flat_map ( |deleted| [ &graph_snap . contained_by,
+                             &graph_snap . forkers_of,
+                             &graph_snap . hiders_of, ]
+                 . into_iter ()
+                 . filter_map ( move |inverse| inverse . get (deleted) )
+                 . flatten () )
+    . cloned ()
+    . collect () }
 
 /// Every record of the three outbound list fields of 'node'.
 fn records_of_graphnodeInRust (
