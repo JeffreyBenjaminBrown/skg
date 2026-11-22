@@ -4491,6 +4491,10 @@ def change_report_lines (edited, original, headline_of_handle):
     if isinstance (key, tuple):
       return "under the new headline '" + edited [ key [1] ] . title + "'"
     return "under " + described (key)
+  def edited_place (index):
+    """Where the edited headline at INDEX stands, as the report says it."""
+    key = edited_parent_key (index)
+    return "at the top level" if key is None else place (key)
   def depth_below_parent (outline, index):
     parent = outline [index] . parent
     return outline [index] . level - (
@@ -4552,8 +4556,7 @@ def change_report_lines (edited, original, headline_of_handle):
     lines . append (
       "New: " + ( "'" + headline . title + "'" if headline . title
                   else "an untitled headline" ) +
-      ", " + ( "at the top level" if edited_parent_key (index) is None
-               else place ( edited_parent_key (index) )) +
+      ", " + edited_place (index) +
       ( f" (with a {body_lines}-line body)" if body_lines else "" ) + "." )
   for index, headline in enumerate (edited):
     if not headline . is_placed ():
@@ -4561,8 +4564,7 @@ def change_report_lines (edited, original, headline_of_handle):
     lines . append (
       "Placed: " + compact_handle_text (headline) + " '" +
       headline . report_title () + "', " +
-      ( "at the top level" if edited_parent_key (index) is None
-        else place ( edited_parent_key (index) )) +
+      edited_place (index) +
       ( ", write-protected, since the view already holds an editable "
         "occurrence of it"
         if headline . placed_pid is not None
@@ -4570,8 +4572,7 @@ def change_report_lines (edited, original, headline_of_handle):
   for index in repeated_indices:
     lines . append (
       "Repeated: " + described ( edited [index] . handle ) + ", again " +
-      ( "at the top level" if edited_parent_key (index) is None
-        else place ( edited_parent_key (index) )) +
+      edited_place (index) +
       ": a second occurrence of the same node." )
   changed_bodies = []
   for handle, index in first_edited_index_of_handle . items ():
