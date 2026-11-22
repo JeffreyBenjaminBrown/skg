@@ -110,6 +110,7 @@ REPO_ROOT = os . path . dirname ( os . path . dirname (TOOL_FOLDER) )
 sys . dont_write_bytecode = True
 sys . path . insert (0, TOOL_FOLDER)
 import sexp
+import server_connection
 import skg_for_ai
 
 FIXTURE_FOLDER = os . path . join (TOOL_FOLDER, "test-fixture")
@@ -292,7 +293,7 @@ def failures_of_chains ():
                    if skg_for_ai . headline_viewnode_id (line . metadata) == handle )
     try:
       return skg_for_ai . chain_text (headlines, index)
-    except skg_for_ai . SkgToolError as error:
+    except server_connection . SkgToolError as error:
       return "refused: " + str (error)
   failures = []
   for handle, expected in [
@@ -360,7 +361,7 @@ def failures_of_save_envelope ():
   """A save's envelope carries the saved buffer, its baseline (the
   text the server last drew for it), and the other views, each string
   quoted."""
-  envelope = skg_for_ai . save_envelope_text (
+  envelope = server_connection . save_envelope_text (
     '* edited "λ"\n', '* drawn "λ"\n', "()" )
   expected = ( '((saved-buffer "* edited \\"λ\\"\n") '
                '(baseline "* drawn \\"λ\\"\n") (other-views ()))' )
@@ -420,7 +421,7 @@ def failures_of_no_default_port ():
   connects to anything or writes anything; 'linkstack show', which
   needs no server, still runs."""
   failures = []
-  expected_stderr = "skg_for_ai: " + skg_for_ai . NO_PORT_MESSAGE + "\n"
+  expected_stderr = "skg_for_ai: " + server_connection . NO_PORT_MESSAGE + "\n"
   connections = []
   def refuse_to_connect (*arguments, **keywords):
     connections . append (arguments)
@@ -439,8 +440,8 @@ def failures_of_no_default_port ():
       try:
         skg_for_ai . main (argv)
         failures . append ( f"{described} without a port was not refused" )
-      except skg_for_ai . SkgToolError as error:
-        if str (error) != skg_for_ai . NO_PORT_MESSAGE:
+      except server_connection . SkgToolError as error:
+        if str (error) != server_connection . NO_PORT_MESSAGE:
           failures . append ( f"{described} without a port said {error}" )
       if connections:
         failures . append ( f"{described} without a port tried to connect" )
