@@ -1,0 +1,57 @@
+* Refactoring for dev: 'server/types/' and 'server/dbs/'
+  The territory: everything under 'server/types/' and 'server/dbs/'.
+  A change there forces call-site edits across 'server/'. Every
+  refactor below was checked by 'bash/nextest.sh' (the whole Rust
+  suite, about fifteen seconds warm) and the whole suite before merge.
+* Done
+** A 'NodeInstruction' says its gnid, saved graphnode and deleted gnid
+   'gnid', 'saved_graphnode' and 'deleted_gnid' ('server/types/save.rs')
+   replace the Save/Delete matches written out in a dozen files, and
+   two private copies of 'gnid' ('definition_pid', 'instruction_gnid').
+** An ordinary save without nodeMerges returns no search index
+   'update_graph_minus_nodeMerges' and its '_with_hoist_approval' form
+   return '()', not an always-'None' 'Option<TantivyIndex>'.
+** A graphnode in the in-Rust graph converts to a 'Graphnode' by 'From'
+   'impl From<&GraphnodeInRust> for Graphnode' ('server/types/nodes/rust.rs')
+   replaces three copies of the projection ('graphnode_from_graphnodeInRust',
+   'complete_from_rust', the body of 'graphnode_from_graph').
+** A graph lookup that cannot fail returns an 'Option'
+   'opt_graphnode_by_gnid' (always 'Ok', config ignored) and
+   'graphnode_graphFirst_by_pid_and_skgrepo' (skgrepo and config
+   ignored, a copy of 'graphnode_by_gnid') are gone; their callers use
+   'graphnode_from_graph' or 'graphnode_by_gnid' ('server/dbs/node_lookup.rs').
+** A config names its missing skgrepo through one method
+   'SkgConfig::skgrepo_or_err' ('server/types/misc.rs') holds the
+   message "Repo '...' not found in config", once written at eight sites.
+* Candidates left, best first
+** 'graphnode_by_gnid' takes a config it ignores
+   'server/dbs/node_lookup.rs'. Dropping '_config' is mechanical and
+   safe (compile-checked), but four of its eleven callers are tests
+   ('tests/partner_folder_matrix.rs', 'tests/shared/view_and_save_helpers.rs'),
+   which then change by more than a rename; it needs the coordinator's
+   word. 'tests/mutation_gate.rs' also keeps a private copy of the
+   'From<&GraphnodeInRust>' projection ('complete_from_rust') that it
+   could drop, under the same condition.
+** Split 'server/types/misc.rs' (993 lines) along its seams
+   It holds 'ID', 'MSV', 'RelPartner', 'SkgrepoName', 'Skgrepo',
+   'SkgConfig' (two impl blocks, at ~354 and ~605) and 'TantivyIndex'.
+   An agent looking for the config type would not guess "misc". A
+   'config.rs' holding 'SkgConfig', 'Skgrepo' and the foreign-order
+   types is the clear seam. Safe (moves only), but about seventy files
+   import 'SkgConfig' from 'types::misc', so the diff is wide; a
+   re-export would be the legacy shim the rules forbid.
+** 'server/types/viewnode.rs' (1702 lines)
+   The biggest file in the territory: the viewnode types, then their
+   impls from line ~773 ('Folder' alone ~190 lines of impl). The diff
+   facts types at its head ('ChangeFacts', 'DiffChange', 'DiffObject',
+   'ProcessedRequest') could be their own file. Not surveyed closely.
+** 'NodeInstruction' coalescing is written twice
+   'coalesced_final_nodeInstructions' ('server/dbs/in_rust_graph.rs')
+   and 'normalize_and_coalesce_nodeInstructions'
+   ('server/dbs/in_rust_graph/prepared_update.rs') both keep the last
+   instruction per gnid in first-position order, one by reference and
+   one by value after normalizing. A shared helper is small and safe;
+   check that both orderings really agree first.
+** 'identities_in_nodeInstruction' ('server/save.rs')
+   Every ID of a Save (pid and extra IDs) or a Delete's gnid; it could
+   be a 'NodeInstruction' method beside 'gnid'. Small.

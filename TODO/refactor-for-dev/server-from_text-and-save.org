@@ -28,33 +28,17 @@
 ** Aliases combine through the same function as the other lists
    'combined_rel_partners' ('server/nodeMerge/nodeMergeInstructionTriple.rs')
    is generic over the member type.
+** A 'NodeInstruction' says its gnid, saved graphnode and deleted gnid
+   Done by the 'server/types/' agent: 'gnid', 'saved_graphnode' and
+   'deleted_gnid' ('server/types/save.rs') replace the matches. The
+   fork clones chained onto the saved nodes in 'hide_report_lines' and
+   'dead_link_warnings' are left; each is now one line.
+** 'update_graph_minus_nodeMerges' returns '()'
+   Done by the 'server/types/' agent, with the dead 'if let Some'
+   branches in 'tests/move_repo.rs'.
+** 'graphnode_from_graphnodeInRust' is 'From<&GraphnodeInRust> for Graphnode'
+   Done by the 'server/types/' agent ('server/types/nodes/rust.rs').
 * Candidates left, best first
-** Accessors on 'NodeInstruction' for its saved graphnode and deleted gnid
-   The 'filter_map' over 'NodeInstruction::Save (SaveNode (n)) => Some (n),
-   _ => None' (and its Delete twin) is written out about fifteen times:
-   four in 'server/save.rs', two each in 'server/from_text/hide_report.rs'
-   and 'server/from_text/strandeds.rs', one in 'server/from_text/validate.rs'
-   and in 'from_text.rs' ('dead_link_warnings'), and outside the territory
-   in 'server/dbs/in_rust_graph/prepared_update.rs', 'server/prominence.rs',
-   'server/serve/handlers/telescope_hoist.rs' and 'save_staleness.rs'.
-   Two methods in 'server/types/save.rs' would replace them. Low risk;
-   it needs that file, outside this territory. 'hide_report_lines' and
-   'dead_link_warnings' also both chain the fork clones onto the saved
-   nodes; a 'SavePlan'-side helper could serve both.
-** 'update_graph_minus_nodeMerges' always returns 'Ok (None)'
-   Its 'Option<TantivyIndex>' (and its '_with_hoist_approval' twin's) is
-   never 'Some'. Returning '()' is honest but changes call sites in
-   'tests/move_repo.rs' (four, which then drop dead 'if let Some'
-   branches), 'tests/save/extra_id_revocation.rs', 'server/test_utils.rs'
-   and two handlers. A test edit that is not a rename needs the
-   coordinator's word.
-** 'graphnode_from_graphnodeInRust' does not belong in 'server/save.rs'
-   Its other users are 'server/receipt.rs' and
-   'server/delete_references_to_absent_node.rs', and it repeats the
-   projection 'TODO/problems.org' lists under "Node-to-complete
-   projections and lookup adapters multiply change sites". It belongs
-   beside the node types; that change spans 'server/types/' and
-   'server/dbs/'.
 ** The Tantivy rebuild in 'apply_prepared_nodeMerges'
    ('server/nodeMerge.rs') maps three errors with one identical closure;
    a 'rebuild_tantivy_from_disk' function would hold it. Small and safe.
