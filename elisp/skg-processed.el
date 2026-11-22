@@ -355,11 +355,6 @@ folder, so that it stands in its viewparent's content."
               (not (skg--folder-atom
                     (skg--metadata-sexp-at-point-or-nil)))))))
 
-(defun skg--processed-node-added-p (metadata-sexp)
-  "Non-nil when METADATA-SEXP's headline is a new node: its '(diff ...)'
-says '(node added)'."
-  (eq (cadr (skg--processed-form metadata-sexp 'node)) 'added))
-
 (defun skg--processed-request-at-point (processed objects)
   "A request that marks (PROCESSED non-nil) or unmarks the leaves on
 OBJECTS of the headline at point, with how many leaves it touches

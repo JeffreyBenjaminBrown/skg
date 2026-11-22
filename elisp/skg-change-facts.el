@@ -5,8 +5,9 @@
 ;;; Say what the diff view shows changed at a headline, and whether
 ;;; the user marked that change processed, by reading its change
 ;;; facts, the '(diff ...)' part of its metadata: what changed
-;;; ('skg--processed-form', 'skg--processed-leaves') and whether it is
-;;; processed ('skg--objects-processed-p'); and whether a folder is
+;;; ('skg--processed-form', 'skg--processed-node-added-p',
+;;; 'skg--processed-leaves') and whether it is processed
+;;; ('skg--objects-processed-p'); and whether a folder is
 ;;; changed, by its members' relationships, and processed
 ;;; ('skg--folder-change-processed',
 ;;; 'skg--folder-change-processed-at-point'). The heralds
@@ -34,6 +35,11 @@ atom."
 (defun skg--processed-form (metadata-sexp key)
   "The (KEY ...) part of METADATA-SEXP's '(diff ...)' form, or nil."
   (assq key (cdr (skg--processed-diff-form metadata-sexp))))
+
+(defun skg--processed-node-added-p (metadata-sexp)
+  "Non-nil when METADATA-SEXP's headline is a new node: its '(diff ...)'
+says '(node added)'."
+  (eq (cadr (skg--processed-form metadata-sexp 'node)) 'added))
 
 (defun skg--processed-leaves (metadata-sexp)
   "The '(leaves N OBJECT...)' fact of the headline with METADATA-SEXP,
