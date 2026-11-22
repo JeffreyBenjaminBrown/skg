@@ -164,7 +164,7 @@ fn read_graph_snapshot_per_skgrepo (
     let label : String =
       format! ("read repo '{}' from {:?}", skgrepo_name, kind);
     let read : Result<Vec<(SkgrepoName, GraphnodeOnDisk)>, TreeReadError> =
-      profile_step_result (&label, || match kind {
+      profile_step (&label, || match kind {
         GitSnapshotKind::Head =>
           read_skgrepo_from_tree (config, &skgrepo_name, None),
         GitSnapshotKind::Tree (tree) =>
@@ -237,21 +237,6 @@ where
   let start : Instant =
     Instant::now ();
   let result : T =
-    f ();
-  profile_log (label, start . elapsed ());
-  result
-}
-
-fn profile_step_result<T, E, F> (
-  label : &str,
-  f     : F,
-) -> Result<T, E>
-where
-  F : FnOnce () -> Result<T, E>,
-{
-  let start : Instant =
-    Instant::now ();
-  let result : Result<T, E> =
     f ();
   profile_log (label, start . elapsed ());
   result
