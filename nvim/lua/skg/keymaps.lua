@@ -143,6 +143,8 @@ M.commands = {
                   desc = 'View and edit the linkstack' },
   ViewWithoutMetadata = { module = 'skg.metadata', fn = 'view_without_metadata',
                           desc = 'Copy the selection, metadata stripped, to a new buffer' },
+  DescribeAtPoint = { module = 'skg.describe_heralds', fn = 'describe_at_point',
+                      desc = 'Say what the headline at point and each of its heralds mean' },
   IdNext = { module = 'skg.id_search', fn = 'id_next',
              desc = 'Hop to the next id (metadata or inline link)' },
   IdPrev = { module = 'skg.id_search', fn = 'id_prev',
@@ -427,6 +429,7 @@ M.content_view_bindings = {
   { 'vs', 'ViewLinkstack' },               -- C-c v s
   { 'vu', 'ToggleForkDedupOverlay' },      -- C-c v u
   { 'vw', 'ViewWithoutMetadata' },       -- C-c v w
+  { 'v?', 'DescribeAtPoint' },           -- C-c v ?
   { 'in', 'IdNext' },                    -- C-c i n
   { 'ip', 'IdPrev' },                    -- C-c i p
   { 'u', 'PushId' },                     -- C-c u
