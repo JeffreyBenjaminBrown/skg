@@ -502,37 +502,49 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
         m . relRepo = config . more_private_of (
           unclamped, recorder_home . clone () );
         m . member = raw_disk_member (disk, &submitted); }} }
-  { // Aliases are relation partners too: explicit request, then
-    // sticky skgrepo by alias text, then the recorder's home. Their
-    // floor is always the recorder home because aliases have no target.
-    let disk : &[RelPartner<String>] =
-      disk_node . aliases . or_default ();
-    if let MSV::Specified (v) = &mut supplemented . aliases {
-      for m in v . iter_mut () {
-        let explicit_skgrepo : Option<&SkgrepoName> =
-          explicit . aliases . get (&m . member);
-        if let Some (skgrepo) = explicit_skgrepo {
-          if config . skgrepo_position (skgrepo) . is_none () {
-            return Err ( format! (
-              "Cannot save {} (alias '{}'): requested unconfigured repo '{}'.",
-              recorder_pid, m . member, skgrepo )); }
-          if ! config . skgrepo_is_owned (skgrepo) {
-            return Err ( format! (
-              "Cannot save {} (alias '{}'): requested non-owned relRepo '{}'. Alias relRepos must be owned.",
-              recorder_pid, m . member, skgrepo )); }
-          if config . is_strictly_more_public (skgrepo, &recorder_home) {
-            return Err ( format! (
-              "Cannot save {} (alias '{}'): requested repo '{}' is more public than the recorder's home '{}'.",
-              recorder_pid, m . member, skgrepo, recorder_home )); }
-          m . relRepo = skgrepo . clone ();
-        } else {
-          let sticky_or_default : SkgrepoName = disk . iter ()
-            . find ( |d| d . member == m . member )
-            . map ( |d| d . relRepo . clone () )
-            . unwrap_or_else ( || recorder_home . clone () );
-          m . relRepo = config . more_private_of (
-            sticky_or_default, recorder_home . clone () ); } }} }
+  apply_sticky_relRepos_to_aliases (
+    &mut supplemented . aliases,
+    disk_node . aliases . or_default (),
+    &explicit . aliases, &recorder_pid, &recorder_home, config ) ?;
   Ok (supplemented) }
+
+/// Aliases are relation partners too: explicit request, then
+/// sticky skgrepo by alias text, then the recorder's home. Their
+/// floor is always the recorder home because aliases have no target.
+fn apply_sticky_relRepos_to_aliases (
+  aliases       : &mut MSV<RelPartner<String>>,
+  disk          : &[RelPartner<String>],
+  explicit      : &HashMap<String, SkgrepoName>,
+  recorder_pid  : &ID,
+  recorder_home : &SkgrepoName,
+  config        : &SkgConfig,
+) -> Result<(), String> {
+  if let MSV::Specified (v) = aliases {
+    for m in v . iter_mut () {
+      let explicit_skgrepo : Option<&SkgrepoName> =
+        explicit . get (&m . member);
+      if let Some (skgrepo) = explicit_skgrepo {
+        if config . skgrepo_position (skgrepo) . is_none () {
+          return Err ( format! (
+            "Cannot save {} (alias '{}'): requested unconfigured repo '{}'.",
+            recorder_pid, m . member, skgrepo )); }
+        if ! config . skgrepo_is_owned (skgrepo) {
+          return Err ( format! (
+            "Cannot save {} (alias '{}'): requested non-owned relRepo '{}'. Alias relRepos must be owned.",
+            recorder_pid, m . member, skgrepo )); }
+        if config . is_strictly_more_public (skgrepo, recorder_home) {
+          return Err ( format! (
+            "Cannot save {} (alias '{}'): requested repo '{}' is more public than the recorder's home '{}'.",
+            recorder_pid, m . member, skgrepo, recorder_home )); }
+        m . relRepo = skgrepo . clone ();
+      } else {
+        let sticky_or_default : SkgrepoName = disk . iter ()
+          . find ( |d| d . member == m . member )
+          . map ( |d| d . relRepo . clone () )
+          . unwrap_or_else ( || recorder_home . clone () );
+        m . relRepo = config . more_private_of (
+          sticky_or_default, recorder_home . clone () ); } }}
+  Ok (( )) }
 
 /// A new hide's relRepo: at least the more private of the endpoints'
 /// homes, and at least as private as some partner on record for it
