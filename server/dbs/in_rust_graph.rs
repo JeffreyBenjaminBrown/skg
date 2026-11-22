@@ -228,6 +228,8 @@ pub(crate) fn inbound_recorders_at (
   recorders
 }
 
+/// The last instruction for each gnid, in the order those last
+/// instructions stand in 'nodeInstructions'.
 fn coalesced_final_nodeInstructions (
   nodeInstructions : &[NodeInstruction],
 ) -> Vec<&NodeInstruction> {

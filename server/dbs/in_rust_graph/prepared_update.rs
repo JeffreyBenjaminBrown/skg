@@ -7,7 +7,7 @@
 
 use crate::dbs::in_rust_graph::{
   InRustGraph, InRustGraphHandle, apply_nodeInstructions_to_inRustGraph,
-  inbound_recorders_at,
+  coalesced_final_nodeInstructions, inbound_recorders_at,
 };
 use crate::dbs::in_rust_graph::complete_validation::{
   CompleteGraphError, format_complete_graph_errors,
@@ -25,7 +25,7 @@ use crate::types::misc::ID;
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::telescope::invariants::derive_affected_telescope_recorders;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
@@ -264,19 +264,12 @@ fn normalize_and_coalesce_nodeInstructions (
         node . normalize_gnids (); }
       nodeInstruction } )
     . collect ();
-  let mut final_by_pid : HashMap<ID, (usize, NodeInstruction)> = HashMap::new ();
-  for (position, nodeInstruction) in filesystem_nodeInstructions . iter () . enumerate () {
-    final_by_pid . insert (
-      nodeInstruction . gnid () . clone (),
-      (position, nodeInstruction . clone ()) ); }
-  let mut positioned : Vec<(usize, NodeInstruction)> =
-    final_by_pid . into_values () . collect ();
-  positioned . sort_by_key ( |(position, _)| *position );
+  let final_graph_nodeInstructions : Vec<NodeInstruction> =
+    coalesced_final_nodeInstructions (&filesystem_nodeInstructions)
+    . into_iter () . cloned () . collect ();
   NormalizedNodeInstructionBatch {
     filesystem_nodeInstructions,
-    final_graph_nodeInstructions : positioned . into_iter ()
-      . map ( |(_, nodeInstruction)| nodeInstruction )
-      . collect (),
+    final_graph_nodeInstructions,
   }
 }
 
