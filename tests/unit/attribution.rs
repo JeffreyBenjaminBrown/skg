@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_utils::skgrepos_config_in_order;
 
 use crate::types::nodes::fs::GraphnodeOnDisk;
 
@@ -80,9 +81,6 @@ fn a_reader_without_the_field_reads_the_file_and_ignores_it () {
 // The git facts, on a gitrepo made here
 // ------------------------------------------------------------
 
-use crate::types::config::Skgrepo;
-use std::collections::HashMap;
-
 const THEIR_URL : &str = "git@github.com:Ed/notes.git";
 
 /// A gitrepo 'theirs', with a remote, holding N.skg in one commit, and
@@ -112,22 +110,10 @@ fn fixture () -> Fixture {
     Some ("HEAD"), &signature, &signature, "N", &tree, &[] ) . unwrap ();
   Fixture { _root : root, theirs, mine, commit : commit . to_string () } }
 
-fn config_naming (
-  names : &[(&str, &std::path::Path, bool)], // name, path, owned
-) -> SkgConfig {
-  let skgrepos : HashMap<SkgrepoName, Skgrepo> = names . iter ()
-    . map ( |(name, path, owned)| ( SkgrepoName::from (*name), Skgrepo {
-      name : SkgrepoName::from (*name), abbreviation : None,
-      path : path . to_path_buf (), owned : *owned } ))
-    . collect ();
-  let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (skgrepos);
-  config . skgrepo_order = names . iter () . map ( |(name, _, _)| SkgrepoName::from (*name) ) . collect ();
-  config }
-
 #[test]
 fn a_fork_records_the_remote_the_commit_and_whether_the_file_was_committed () {
   let f : Fixture = fixture ();
-  let config : SkgConfig = config_naming (&[ ("mine", &f . mine, true), ("theirs", &f . theirs, false) ]);
+  let config : SkgConfig = skgrepos_config_in_order (&[ ("mine", &f . mine, true), ("theirs", &f . theirs, false) ]);
   let attribution : Attribution = attribution_at_fork (
     &config, &ID::new ("N"), &SkgrepoName::from ("theirs"), &SkgrepoName::from ("mine") )
     . unwrap ();
@@ -151,14 +137,14 @@ fn the_herald_names_the_skgrepo_with_the_recorded_remote_by_its_current_name () 
   let recorded : Attribution = Attribution {
     original : ID::new ("N"), skgrepo : SkgrepoName::from ("theirs"),
     remote_hash : Some ( remote_hash_of_url (THEIR_URL) ), commit : None, uncommitted : false };
-  let renamed : SkgConfig = config_naming (&[ ("mine", &f . mine, true), ("eds-notes", &f . theirs, false) ]);
+  let renamed : SkgConfig = skgrepos_config_in_order (&[ ("mine", &f . mine, true), ("eds-notes", &f . theirs, false) ]);
   assert_eq! ( attributed_skgrepo (&renamed, &recorded),
                AttributedSkgrepo::Loaded ( SkgrepoName::from ("eds-notes") ));
-  let without : SkgConfig = config_naming (&[ ("mine", &f . mine, true) ]);
+  let without : SkgConfig = skgrepos_config_in_order (&[ ("mine", &f . mine, true) ]);
   assert_eq! ( attributed_skgrepo (&without, &recorded),
                AttributedSkgrepo::Unverified ( SkgrepoName::from ("theirs") ));
   let no_remote : Attribution = Attribution { remote_hash : None, .. recorded . clone () };
-  let mine_named_theirs : SkgConfig = config_naming (&[ ("theirs", &f . mine, true) ]);
+  let mine_named_theirs : SkgConfig = skgrepos_config_in_order (&[ ("theirs", &f . mine, true) ]);
   assert_eq! ( attributed_skgrepo (&mine_named_theirs, &no_remote),
                AttributedSkgrepo::Loaded ( SkgrepoName::from ("theirs") ),
                "with no remote recorded, a skgrepo of the name with no remote is taken" );
@@ -170,7 +156,7 @@ fn the_herald_names_the_skgrepo_with_the_recorded_remote_by_its_current_name () 
 #[test]
 fn doubtful_attributions_are_reported_and_rewritten () {
   let f : Fixture = fixture ();
-  let config : SkgConfig = config_naming (&[ ("mine", &f . mine, true), ("eds-notes", &f . theirs, false) ]);
+  let config : SkgConfig = skgrepos_config_in_order (&[ ("mine", &f . mine, true), ("eds-notes", &f . theirs, false) ]);
   let lost : Attribution = Attribution {
     original : ID::new ("N"), skgrepo : SkgrepoName::from ("theirs"),
     remote_hash : None, commit : Some ( f . commit . clone () ), uncommitted : false };

@@ -8,35 +8,24 @@ use super::{
   foreign_section_warnings, read_foreign_manifest_orders,
   write_dependencies_manifests};
 use crate::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
-use crate::types::config::{ForeignManifestOrder, SkgConfig, Skgrepo};
+use crate::test_utils::skgrepos_config_in_order;
+use crate::types::config::{ForeignManifestOrder, SkgConfig};
 use crate::types::misc::{ID, SkgrepoName};
 
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn config_at (
   data_root : &std::path::Path,
   entries   : &[(&str, &str, bool)], // (name, relative path, owned)
 ) -> SkgConfig {
-  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
-    HashMap::new ();
-  for (name, rel, owned) in entries {
-    let path : PathBuf = data_root . join (rel);
-    std::fs::create_dir_all (&path) . unwrap ();
-    skgrepos . insert (
-      SkgrepoName::from (*name),
-      Skgrepo {
-        name         : SkgrepoName::from (*name),
-        abbreviation : None,
-        path,
-        owned : *owned, } ); }
-  let mut config : SkgConfig =
-    SkgConfig::dummyFromSkgrepos (skgrepos);
-  config . data_root = data_root . to_path_buf ();
-  config . skgrepo_order =
+  let skgrepos : Vec<(&str, PathBuf, bool)> =
     entries . iter ()
-    . map ( |(name, _, _)| SkgrepoName::from (*name) )
+    . map ( |(name, rel, owned)| (*name, data_root . join (rel), *owned) )
     . collect ();
+  for (_, path, _) in &skgrepos {
+    std::fs::create_dir_all (path) . unwrap (); }
+  let mut config : SkgConfig = skgrepos_config_in_order (&skgrepos);
+  config . data_root = data_root . to_path_buf ();
   config }
 
 #[test]

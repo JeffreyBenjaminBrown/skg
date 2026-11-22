@@ -7,14 +7,13 @@ use super::{TelescopeViolation, affected_telescope_warnings,
             derive_affected_telescope_recorders, telescope_violations_of,
             validate_all_telescopes};
 use crate::dbs::in_rust_graph::{InRustGraph, apply_nodeInstructions_to_inRustGraph};
-use crate::test_utils::{graphnode_at, owned_skgrepos_config_in_order};
-use crate::types::config::{SkgConfig, Skgrepo};
+use crate::test_utils::{graphnode_at, owned_skgrepos_config_in_order, skgrepos_config_in_order};
+use crate::types::config::SkgConfig;
 use crate::types::misc::{ID, MSV, RelPartner, SkgrepoName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
 
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::path::PathBuf;
+use std::collections::{BTreeMap, HashSet};
 
 /// public < private, per repo_order (dummy configs otherwise fall
 /// back to alphabetical order, where "private" < "public" would
@@ -68,25 +67,9 @@ fn private_membership_of_a_public_member_is_fine (
 /// A foreign "fred" (most public, as the loader requires), then the
 /// owned public < private.
 fn foreign_then_two_owned_skgrepo_config () -> SkgConfig {
-  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
-    HashMap::new ();
-  for (name, owned) in [ ("fred", false),
-                         ("public", true),
-                         ("private", true) ] {
-    skgrepos . insert (
-      SkgrepoName::from (name),
-      Skgrepo {
-        name         : SkgrepoName::from (name),
-        abbreviation : None,
-        path         : PathBuf::from (name),
-        owned, } ); }
-  let mut config : SkgConfig =
-    SkgConfig::dummyFromSkgrepos (skgrepos);
-  config . skgrepo_order = vec! [
-    SkgrepoName::from ("fred"),
-    SkgrepoName::from ("public"),
-    SkgrepoName::from ("private") ];
-  config }
+  skgrepos_config_in_order ( &[ ("fred",    "fred",    false),
+                                ("public",  "public",  true),
+                                ("private", "private", true) ] ) }
 
 #[test]
 fn a_foreign_recorder_never_leaks_but_an_owned_one_still_can (

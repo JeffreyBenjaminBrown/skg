@@ -998,20 +998,29 @@ pub fn graphnode_at (
 pub fn owned_skgrepos_config_in_order (
   names : &[&str],
 ) -> SkgConfig {
-  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
-    HashMap::new ();
-  for name in names {
-    skgrepos . insert (
+  skgrepos_config_in_order (
+    & names . iter ()
+      . map ( |name| (*name, format! ("owned/{}", name), true) )
+      . collect::<Vec<_>> () ) }
+
+/// A config of the skgrepos 'skgrepos', each a (name, path, owned)
+/// triple without an abbreviation, most public first.
+pub fn skgrepos_config_in_order<P : AsRef<Path>> (
+  skgrepos : &[(&str, P, bool)],
+) -> SkgConfig {
+  let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (
+    skgrepos . iter ()
+    . map ( |(name, path, owned)| (
       SkgrepoName::from (*name),
-      Skgrepo {
-        name         : SkgrepoName::from (*name),
-        abbreviation : None,
-        path         : PathBuf::from ( format! ("owned/{}", name) ),
-        owned        : true, } ); }
-  let mut config : SkgConfig =
-    SkgConfig::dummyFromSkgrepos (skgrepos);
+      Skgrepo { name         : SkgrepoName::from (*name),
+                abbreviation : None,
+                path         : path . as_ref () . to_path_buf (),
+                owned        : *owned } ))
+    . collect () );
   config . skgrepo_order =
-    names . iter () . map ( |n| SkgrepoName::from (*n) ) . collect ();
+    skgrepos . iter ()
+    . map ( |(name, _, _)| SkgrepoName::from (*name) )
+    . collect ();
   config }
 
 /// Example Graphnode for use in tests.

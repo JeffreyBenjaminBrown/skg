@@ -3,22 +3,15 @@
 // order is public, private, trusted.
 
 use super::*;
-use crate::types::config::Skgrepo;
+use crate::test_utils::skgrepos_config_in_order;
 use crate::types::misc::SkgrepoChange;
 use crate::types::nodes::complete::empty_graphnode;
 
-use std::path::PathBuf;
 
 fn config () -> SkgConfig {
-  let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (
-    [ "public", "private", "trusted" ] . into_iter ()
-    . map ( |name| ( SkgrepoName::from (name), Skgrepo {
-      name : SkgrepoName::from (name), abbreviation : None,
-      path : PathBuf::from ("/nonexistent") . join (name), owned : true } ))
-    . collect () );
-  config . skgrepo_order = [ "public", "private", "trusted" ] . into_iter ()
-    . map (SkgrepoName::from) . collect ();
-  config }
+  skgrepos_config_in_order ( &[ ("public",  "/nonexistent/public",  true),
+                                ("private", "/nonexistent/private", true),
+                                ("trusted", "/nonexistent/trusted", true) ] ) }
 
 /// A node at 'home' containing each (member, relRepo).
 fn node (

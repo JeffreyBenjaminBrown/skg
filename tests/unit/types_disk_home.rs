@@ -1,6 +1,5 @@
 use super::*;
-use std::collections::HashMap;
-use super::super::config::Skgrepo;
+use crate::test_utils::skgrepos_config_in_order;
 
 fn skgrepo_name (s: &str) -> SkgrepoName { SkgrepoName ( s . to_string () ) }
 fn gnid        (s: &str) -> ID         { ID ( s . to_string () ) }
@@ -22,24 +21,10 @@ fn home_from_disk_is_the_most_public_section () {
   std::fs::create_dir_all (&public_path)  . unwrap ();
   std::fs::create_dir_all (&private_path) . unwrap ();
   let make_config = || -> SkgConfig {
-    let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
-      HashMap::new ();
-    for (name, path, owned) in
-      [ ("foreign", foreign_path . clone (), false),
-        ("zed",     public_path  . clone (), true),
-        ("alpha",   private_path . clone (), true) ] {
-      skgrepos . insert ( skgrepo_name (name), Skgrepo {
-        name         : skgrepo_name (name),
-        abbreviation : None,
-        path,
-        owned, } ); }
-    let mut config : SkgConfig =
-      SkgConfig::dummyFromSkgrepos (skgrepos);
-    config . skgrepo_order = // most public first
-      vec! [ skgrepo_name ("foreign"),
-             skgrepo_name ("zed"),
-             skgrepo_name ("alpha") ];
-    config };
+    skgrepos_config_in_order ( &[ // most public first
+      ("foreign", &foreign_path, false),
+      ("zed",     &public_path,  true),
+      ("alpha",   &private_path, true) ] ) };
   { // The foreign section is the home; the owned ones are illegal edits.
     std::fs::write ( foreign_path . join ("N.skg"),
                      "pid: N\ntitle: unrelated foreign N\n" ) . unwrap ();
