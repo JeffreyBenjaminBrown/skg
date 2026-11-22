@@ -45,6 +45,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
+/// The config the server and the subcommands read when none is given.
+const DEFAULT_CONFIG_PATH : &str = "data/jeff/skgconfig.toml";
+
 fn main() -> Result<(), Box<dyn Error>> {
   let args: Vec<String> = env::args() . collect();
 
@@ -58,19 +61,11 @@ fn main() -> Result<(), Box<dyn Error>> {
       return Ok (( )); }}
 
   if args . len() > 1 && args[1] == "import-org-roam" {
-    tracing_subscriber::fmt()
-      . with_env_filter (
-        tracing_subscriber::EnvFilter::try_from_default_env ()
-        . unwrap_or_else ( |_| tracing_subscriber::EnvFilter::new ("info") ) )
-      . init ();
+    init_stderr_tracing ();
     return run_import (&args); }
 
   if args . len() > 1 && args[1] == "export-org" {
-    tracing_subscriber::fmt()
-      . with_env_filter (
-        tracing_subscriber::EnvFilter::try_from_default_env ()
-        . unwrap_or_else ( |_| tracing_subscriber::EnvFilter::new ("info") ) )
-      . init ();
+    init_stderr_tracing ();
     return run_export_org (&args); }
 
   if args . len() > 1 && args[1] == "export-obsidian" {
@@ -88,72 +83,71 @@ fn main() -> Result<(), Box<dyn Error>> {
     return run_attribution_command (&args); }
 
   if args . len() > 1 && args[1] == "check-config" {
-    // Pre-flight used by bash/start-servers.sh: run the same
-    // 'load_config' the server runs at startup (TOML parse +
-    // skgrepo-set/path validation) and exit 0/1, reporting a bad config
-    // exactly the way the real startup does (via 'die_bad_config'). No
-    // tracing and no file walk. Its warnings (unknown keys) are
-    // printed, one per line, and do not change the exit status.
-    let config_path: String =
-      if args . len() > 2 { args[2] . clone() }
-      else { "data/jeff/skgconfig.toml" . to_string() };
-    return match load_config (&config_path) {
-      Ok (( _config, warnings )) => {
-        for warning in &warnings {
-          println! ("Warning: {}", warning); }
-        Ok (( )) },
-      Err (e) => die_bad_config (&config_path, e) }; }
+    return run_check_config (&args); }
 
-  // The real server start. load_config runs on every launch -- via
-  // start-servers.sh, a cargo-watch auto-restart, or a manual
-  // 'cargo run' -- so routing its failure through 'die_bad_config'
-  // guarantees a bad skgconfig.toml is reported clearly (in red on a
-  // terminal) no matter how skg was (re)started, rather than the
-  // default '?' that dumps an unreadable Debug blob of the whole file.
   let config_path: String =
     if args . len() > 1 { args[1] . clone() } // config from command line, if given
-    else { "data/jeff/skgconfig.toml" . to_string() }; // default config
+    else { DEFAULT_CONFIG_PATH . to_string() }; // default config
+  run_server (&config_path) }
+
+/// Log to stderr only, at the level RUST_LOG names (by default
+/// "info"): what the subcommands that log use, in place of the
+/// server's 'init_tracing'.
+fn init_stderr_tracing (
+) {
+  tracing_subscriber::fmt()
+    . with_env_filter (
+      tracing_subscriber::EnvFilter::try_from_default_env ()
+      . unwrap_or_else ( |_| tracing_subscriber::EnvFilter::new ("info") ) )
+    . init (); }
+
+/// Pre-flight used by bash/start-servers.sh: run the same
+/// 'load_config' the server runs at startup (TOML parse +
+/// skgrepo-set/path validation) and exit 0/1, reporting a bad config
+/// exactly the way the real startup does (via 'die_bad_config'). No
+/// tracing and no file walk. Its warnings (unknown keys) are
+/// printed, one per line, and do not change the exit status.
+fn run_check_config (
+  args : &[String],
+) -> Result<(), Box<dyn Error>> {
+  let config_path: String =
+    if args . len() > 2 { args[2] . clone() }
+    else { DEFAULT_CONFIG_PATH . to_string() };
+  match load_config (&config_path) {
+    Ok (( _config, warnings )) => {
+      for warning in &warnings {
+        println! ("Warning: {}", warning); }
+      Ok (( )) },
+    Err (e) => die_bad_config (&config_path, e) }}
+
+/// The real server start. load_config runs on every launch -- via
+/// start-servers.sh, a cargo-watch auto-restart, or a manual
+/// 'cargo run' -- so routing its failure through 'die_bad_config'
+/// guarantees a bad skgconfig.toml is reported clearly (in red on a
+/// terminal) no matter how skg was (re)started, rather than the
+/// default '?' that dumps an unreadable Debug blob of the whole file.
+/// The connections that arrive before the graph is loaded are each
+/// told the server is initializing ('busysignal_accept_loop').
+fn run_server (
+  config_path : &str,
+) -> Result<(), Box<dyn Error>> {
   { // The run folder follows the config path as given (made absolute,
     // not canonical), so a symlinked config gets its folder beside the
     // symlink, where the start script and the clients look.
     let config_path_as_given : PathBuf =
-      absolute (&config_path)
-      . unwrap_or_else ( |_| PathBuf::from (&config_path) );
+      absolute (config_path)
+      . unwrap_or_else ( |_| PathBuf::from (config_path) );
     set_run_folder_from_config_path_as_given (&config_path_as_given); }
   let (config, config_warnings) : (SkgConfig, Vec<String>) =
-    match load_config (&config_path) {
+    match load_config (config_path) {
       Ok (loaded) => loaded,
-      Err (e)     => die_bad_config (&config_path, e) };
+      Err (e)     => die_bad_config (config_path, e) };
 
   init_tracing (&config);
   for warning in &config_warnings {
     tracing::warn! ("{}", warning); }
-
-  { // shared/herald-styles.json is embedded at compile time, so an
-    // inconsistency in it is a build defect, not a runtime condition.
-    let herald_style_problems : Vec<String> =
-      herald_styles_inconsistencies ();
-    assert! ( herald_style_problems . is_empty (),
-              "shared/herald-styles.json is inconsistent:\n{}",
-              herald_style_problems . join ("\n") ); }
-
-  { // Log which binary this is and how old it is, so a stale
-    // long-running server (one predating a code change) is obvious
-    // from the logs.
-    let exe : std::path::PathBuf =
-      std::env::current_exe ()
-      . unwrap_or_else ( |_| "unknown" . into () );
-    let age : String =
-      exe . metadata ()
-      . and_then ( |m| m . modified () )
-      . ok () . and_then ( |t| t . elapsed () . ok () )
-      . map ( |d| { let s : u64 = d . as_secs ();
-                    format! ( "{}h {}m {}s",
-                              s / 3600, (s % 3600) / 60, s % 60 ) } )
-      . unwrap_or_else ( || "unknown" . to_string () );
-    tracing::info! ( exe = %exe . display (),
-                     binary_age = %age,
-                     "Server binary" ); }
+  assert_herald_styles_consistent ();
+  log_server_binary_and_its_age ();
 
   let listener: TcpListener = // precedes initialize_dbs so Emacs can connect during init
     TcpListener::bind (
@@ -178,7 +172,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         init_done_clone,
         &logs_dir_for_busysignal ); } );
 
-  install_shutdown_signal_handler (&config);
+  install_shutdown_signal_handler ();
 
   let ( env,
         InitContextHandoff { had_id_set,
@@ -233,6 +227,36 @@ fn main() -> Result<(), Box<dyn Error>> {
     . map_err ( |e| Box::new (e)
                  as Box<dyn Error>) ?;
   Ok (( )) }
+
+/// shared/herald-styles.json is embedded at compile time, so an
+/// inconsistency in it is a build defect, not a runtime condition.
+fn assert_herald_styles_consistent (
+) {
+  let herald_style_problems : Vec<String> =
+    herald_styles_inconsistencies ();
+  assert! ( herald_style_problems . is_empty (),
+            "shared/herald-styles.json is inconsistent:\n{}",
+            herald_style_problems . join ("\n") ); }
+
+/// Log which binary this is and how old it is, so a stale
+/// long-running server (one predating a code change) is obvious
+/// from the logs.
+fn log_server_binary_and_its_age (
+) {
+  let exe : std::path::PathBuf =
+    std::env::current_exe ()
+    . unwrap_or_else ( |_| "unknown" . into () );
+  let age : String =
+    exe . metadata ()
+    . and_then ( |m| m . modified () )
+    . ok () . and_then ( |t| t . elapsed () . ok () )
+    . map ( |d| { let s : u64 = d . as_secs ();
+                  format! ( "{}h {}m {}s",
+                            s / 3600, (s % 3600) / 60, s % 60 ) } )
+    . unwrap_or_else ( || "unknown" . to_string () );
+  tracing::info! ( exe = %exe . display (),
+                   binary_age = %age,
+                   "Server binary" ); }
 
 /// The attribution subcommands ('docs/forks.org', "Attribution"):
 ///   check-attributions CONFIG
@@ -382,7 +406,6 @@ fn play_ready_sound_in_background (
 /// SIGTERM and SIGHUP coverage;
 /// without it, only SIGINT would be caught.
 fn install_shutdown_signal_handler (
-  _config : &SkgConfig,
 ) {
   ctrlc::set_handler ( move || {
     tracing::info! ("Received shutdown signal...");
@@ -460,7 +483,7 @@ fn run_export_org (
     . collect ();
   let config_path : String =
     if ! positional . is_empty () { positional[0] . clone () }
-    else { "data/jeff/skgconfig.toml" . to_string() };
+    else { DEFAULT_CONFIG_PATH . to_string() };
   let config : SkgConfig =
     load_config (&config_path) ? . 0;
   let restriction : SkgrepoRestriction =
@@ -511,7 +534,7 @@ fn run_export_obsidian (
 ) -> Result<(), Box<dyn Error>> {
   let config_path : String =
     args . get (2) . cloned ()
-    . unwrap_or_else ( || "data/jeff/skgconfig.toml" . to_string () );
+    . unwrap_or_else ( || DEFAULT_CONFIG_PATH . to_string () );
   let config : SkgConfig =
     load_config (&config_path) ? . 0;
   let skgrepo : SkgrepoName = match args . get (3) {
