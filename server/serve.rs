@@ -8,6 +8,7 @@ pub mod util;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::delete_references_to_absent_node::handle_delete_references_to_absent_node_request;
+use crate::serve::handlers::describe_heralds::handle_describe_heralds_request;
 use crate::serve::handlers::relRepo_info::handle_relRepo_info_request;
 use crate::serve::handlers::flag_state::handle_flag_state_request;
 use crate::serve::handlers::export_to_org::handle_export_to_org_request;
@@ -213,6 +214,9 @@ fn handle_emacs (
               &skgrepo_restriction ),
           Ok (RequestType::HeraldRules) =>
             handle_herald_rules_request ( &mut stream, &runtime . config ),
+          Ok (RequestType::DescribeHeralds) =>
+            handle_describe_heralds_request (
+              &mut stream, &request_header, &runtime . config ),
           Ok (RequestType::Repos) =>
             handle_repos_request (
               &mut stream, &runtime . config, &skgrepo_restriction ),

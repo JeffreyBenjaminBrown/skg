@@ -13,6 +13,7 @@ pub enum RequestType {
   Shutdown,
   GetFilePath,
   HeraldRules,
+  DescribeHeralds,
   RebuildSessionLifetimeStores,
   RerenderAllViews,
   RerenderViews,
@@ -50,6 +51,7 @@ impl RequestType {
       "shutdown"                 => Ok (RequestType::Shutdown),
       "get file path"            => Ok (RequestType::GetFilePath),
       "herald rules"             => Ok (RequestType::HeraldRules),
+      "describe heralds"         => Ok (RequestType::DescribeHeralds),
       "rebuild session-lifetime stores"              => Ok (RequestType::RebuildSessionLifetimeStores),
       "rerender all views"       => Ok (RequestType::RerenderAllViews),
       "rerender views"           => Ok (RequestType::RerenderViews),
@@ -97,6 +99,7 @@ pub enum TcpToClient {
   SearchResults, // The search buffer: the hits, each with what the enrichment draws under it. Or a message to the user, when there are no hits or the search failed.
   GetFilePath,
   HeraldRules,
+  DescribeHeralds, // The sentences describing one headline's heralds, '(lines "..." ...)', or '(error "...")'.
   VerifyConnection,
   Shutdown,
   RebuildSessionLifetimeStores,
@@ -152,6 +155,7 @@ impl TcpToClient {
       TcpToClient::SearchResults    => "search-results",
       TcpToClient::GetFilePath      => "get-file-path",
       TcpToClient::HeraldRules      => "herald-rules",
+      TcpToClient::DescribeHeralds  => "describe-heralds",
       TcpToClient::VerifyConnection => "verify-connection",
       TcpToClient::Shutdown         => "shutdown",
       TcpToClient::RebuildSessionLifetimeStores       => "rebuild-session-lifetime-stores",

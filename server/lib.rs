@@ -11,6 +11,7 @@ pub mod obsidian;
 pub mod from_text;
 pub mod git_ops;
 pub mod graph_straddle;
+pub mod herald_descriptions;
 pub mod herald_tokens;
 pub mod heralds;
 pub mod import_org_roam;

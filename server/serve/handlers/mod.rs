@@ -1,5 +1,6 @@
 pub mod close_view;
 pub mod delete_references_to_absent_node;
+pub mod describe_heralds;
 pub mod relRepo_info;
 pub mod flag_state;
 pub mod export_to_org;

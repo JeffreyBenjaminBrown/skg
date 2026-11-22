@@ -51,7 +51,7 @@ use crate::types::viewnode::{
   ViewnodeStats, Warrant};
 
 use serde_json::Value;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::OnceLock;
 
 /// 'shared/herald-styles.json', embedded at compile time. Its
@@ -840,6 +840,67 @@ pub fn node_heralds_keys_in_rule_table () -> HashSet<&'static str> {
   rules_in_rule_table () . into_iter ()
     . filter_map ( |rule| rule . node_heralds_key )
     . collect () }
+
+/// The path of every rule in the table that emits text, with the
+/// style it emits in (its own, or else the nearest one above it). A
+/// rule's path is the labels from the root down to it, joined by '/',
+/// leaving out the root "skg", the WHEN rules, which match no element
+/// of their own, and ANY, which matches the values of the element its
+/// parent matched: so it is the path, in a headline's metadata, of
+/// the element that makes the rule emit ("view/noWarrant",
+/// "editRequest/delete"). Where two rules share a path, the first
+/// one's style is kept. 'server/herald_descriptions.rs' keys its
+/// sentences on these paths.
+pub fn text_emitting_rule_paths (
+) -> BTreeMap<String, Option<&'static str>> {
+  fn collect (
+    rule            : &HeraldRule,
+    path            : &[&'static str],
+    inherited_style : Option<&'static str>,
+    out             : &mut BTreeMap<String, Option<&'static str>>,
+  ) {
+    let here : Vec<&'static str> = match rule . label {
+      Some (label) if rule . when . is_empty ()
+                      && label != "skg" && label != "ANY" =>
+        [ path, &[label] ] . concat (),
+      _ => path . to_vec (), };
+    let style : Option<&'static str> = rule . style () . or (inherited_style);
+    let emits_text : bool = rule . children . iter ()
+      . any ( |child| ! matches! (child, RuleChild::Rule (_)) );
+    if emits_text && ! here . is_empty () {
+      out . entry ( here . join ("/") ) . or_insert (style); }
+    for child in & rule . children {
+      if let RuleChild::Rule (r) = child {
+        collect ( r, &here, style, out ); }}}
+  let mut out : BTreeMap<String, Option<&'static str>> = BTreeMap::new ();
+  collect ( &herald_rule_table (), &[], None, &mut out );
+  out }
+
+/// The literal text of every rule at PATH ('text_emitting_rule_paths'),
+/// in table order: for a folder's atom, the words of its label.
+pub fn rule_texts_at_path (
+  path : &str,
+) -> Vec<&'static str> {
+  fn collect (
+    rule   : &HeraldRule,
+    here   : &str,
+    wanted : &str,
+    out    : &mut Vec<&'static str>,
+  ) {
+    let here : String = match rule . label {
+      Some (label) if rule . when . is_empty ()
+                      && label != "skg" && label != "ANY" =>
+        if here . is_empty () { label . to_string () }
+        else { format! ("{}/{}", here, label) },
+      _ => here . to_string (), };
+    for child in & rule . children {
+      match child {
+        RuleChild::Str (text) if here == wanted => out . push (text),
+        RuleChild::Rule (r) => collect ( r, &here, wanted, out ),
+        _ => (), }}}
+  let mut out : Vec<&'static str> = Vec::new ();
+  collect ( &herald_rule_table (), "", path, &mut out );
+  out }
 
 /// The root rule and every rule nested in it.
 fn rules_in_rule_table () -> Vec<HeraldRule> {
