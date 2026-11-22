@@ -16,6 +16,7 @@ use crate::git_ops::git_snapshot::forget_cached_git_snapshots;
 use crate::telescope::invariants::{TelescopeViolation, report_telescope_violations};
 use crate::telescope::dependencies_manifest::{
   foreign_section_warnings, write_dependencies_manifests};
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::complete_validation::validated_graph;
 use crate::types::env::SkgEnv;
 use crate::serve::ViewsState;
@@ -82,37 +83,15 @@ pub fn rebuild_session_lifetime_stores_in_place (
       load_config (&config_path)
       . map_err ( |e| format! (
         "Reloading config from {}: {}", config_path, e) ) ?;
-    let (nodes, load_violations)
-      : (Vec<Graphnode>, Vec<(ID, TelescopeViolation)>) =
-      read_all_skg_files_from_skgrepos_collecting_violations (&fresh_config)
-      . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
-    let (mut fresh_graph, mut graph_warnings, fork_rule_warnings) =
-      validated_graph (&fresh_config, &nodes)
-      . map_err (|e| format! ("Complete graph validation failed:\n{}", e)) ?;
-    fresh_graph . record_illegal_edits (&load_violations);
-    graph_warnings . extend (load_violations);
-    graph_warnings . sort_by (|(pid_a, a), (pid_b, b)|
-      pid_a . cmp (pid_b)
-        . then_with (|| a . to_string () . cmp (&b . to_string ())));
-    report_telescope_violations (
-      &graph_warnings, &fresh_config . data_root )
-      . map_err (|e| format! ("Writing telescope warnings: {}", e)) ?;
+    let (nodes, fresh_graph, fork_rule_warnings)
+      : (Vec<Graphnode>, InRustGraph, Vec<String>) =
+      validated_graph_from_skg_files (&fresh_config) ?;
     let (fresh_config, new_tantivy) : (SkgConfig, TantivyIndex) =
       rebuild_tantivy_as_generation (
         &fresh_config, &nodes, runtime . generation + 1)
       . map_err ( |e| format! ("Tantivy rebuild failed: {}", e) ) ?;
     tracing::info!("Session-lifetime graph candidate and Tantivy rebuilt.");
-    let had_id_set = had_id_set_from_nodes (&nodes);
-    let all_node_gnids = nodes . iter ()
-      . map ( |n| n . pid . clone () )
-      . collect ();
-    let mentioned_gnids = mentioned_gnids_from_nodes (&nodes);
-    let (map_to_content, map_to_containers) =
-      content_maps_from_nodes (&nodes);
-    compute_and_store_prominence_sources (
-      &new_tantivy, &had_id_set, &all_node_gnids,
-      &mentioned_gnids, &map_to_content, &map_to_containers )
-      . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;
+    recompute_prominence_sources (&new_tantivy, &nodes) ?;
     tracing::info!("Context rankings recomputed.");
     forget_cached_git_snapshots () ?;
     let restart_only_warnings : Vec<String> =
@@ -144,6 +123,52 @@ pub fn rebuild_session_lifetime_stores_in_place (
     // rebuilt live graph was read from.
     views_state . graph_straddle = None; }
   result }
+
+/// Every '.skg' file of the skgrepos 'fresh_config' lists, read and
+/// validated into a graph that records the files' telescope
+/// violations; all the violations, sorted by pid, are written to the
+/// telescope report. Returns the nodes read (the search index and the
+/// prominence sources are built from them), the graph, and the
+/// fork-rule warnings. The 'Err' is the rebuild's failure message.
+fn validated_graph_from_skg_files (
+  fresh_config : &SkgConfig,
+) -> Result<(Vec<Graphnode>, InRustGraph, Vec<String>), String> {
+  let (nodes, load_violations)
+    : (Vec<Graphnode>, Vec<(ID, TelescopeViolation)>) =
+    read_all_skg_files_from_skgrepos_collecting_violations (fresh_config)
+    . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
+  let (mut fresh_graph, mut graph_warnings, fork_rule_warnings) =
+    validated_graph (fresh_config, &nodes)
+    . map_err (|e| format! ("Complete graph validation failed:\n{}", e)) ?;
+  fresh_graph . record_illegal_edits (&load_violations);
+  graph_warnings . extend (load_violations);
+  graph_warnings . sort_by (|(pid_a, a), (pid_b, b)|
+    pid_a . cmp (pid_b)
+      . then_with (|| a . to_string () . cmp (&b . to_string ())));
+  report_telescope_violations (
+    &graph_warnings, &fresh_config . data_root )
+    . map_err (|e| format! ("Writing telescope warnings: {}", e)) ?;
+  Ok ((nodes, fresh_graph, fork_rule_warnings)) }
+
+/// Each node's prominence source, recomputed from 'nodes' and stored in
+/// 'tantivy_index' ('compute_and_store_prominence_sources'). The 'Err'
+/// is the rebuild's failure message.
+fn recompute_prominence_sources (
+  tantivy_index : &TantivyIndex,
+  nodes         : &[Graphnode],
+) -> Result<(), String> {
+  let had_id_set = had_id_set_from_nodes (nodes);
+  let all_node_gnids = nodes . iter ()
+    . map ( |n| n . pid . clone () )
+    . collect ();
+  let mentioned_gnids = mentioned_gnids_from_nodes (nodes);
+  let (map_to_content, map_to_containers) =
+    content_maps_from_nodes (nodes);
+  compute_and_store_prominence_sources (
+    tantivy_index, &had_id_set, &all_node_gnids,
+    &mentioned_gnids, &map_to_content, &map_to_containers )
+    . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;
+  Ok (( )) }
 
 /// The settings 'fresh' changes from 'live' that the running server
 /// cannot apply: it listens on one port and sets up its logs once.
