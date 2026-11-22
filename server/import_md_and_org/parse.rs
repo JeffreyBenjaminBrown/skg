@@ -71,6 +71,15 @@ pub struct ParsedLink {
   pub reference_id : Option<String>,
 }
 
+/// What an Org property drawer says of its headline (or, before the
+/// first headline, of its file).
+#[derive(Default)]
+struct OrgDrawerMetadata {
+  id        : Option<String>,
+  custom_id : Option<String>,
+  aliases   : Vec<String>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SourceEdit {
   pub range : Range<usize>,
@@ -124,13 +133,13 @@ pub fn parse_document (
     DocumentFormat::Markdown => parse_markdown_headings (&mut document),
     DocumentFormat::Org => {
       parse_org_headings (&mut document);
-      let (title, aliases, id, custom_id) =
+      let (title, drawer) : (Option<String>, OrgDrawerMetadata) =
         parse_org_file_metadata (&document);
       let root : &mut ParsedSection = &mut document . sections [0];
       if let Some (title) = title { root . title = title; }
-      root . aliases = aliases;
-      root . explicit_id = id;
-      root . custom_id = custom_id; }
+      root . aliases = drawer . aliases;
+      root . explicit_id = drawer . id;
+      root . custom_id = drawer . custom_id; }
   }
   parse_markdown_links (&mut document);
   if format == DocumentFormat::Markdown {
@@ -450,14 +459,13 @@ fn markdown_heading_title (
   } else { first_line . trim () . to_string () }
 }
 
+/// The file's '#+title:', and what its file-level property drawer says.
 fn parse_org_file_metadata (
   document : &ParsedDocument,
-) -> (Option<String>, Vec<String>, Option<String>, Option<String>) {
+) -> (Option<String>, OrgDrawerMetadata) {
   let lines : Vec<(usize, &str)> = lines_with_offsets (&document . text);
   let mut title : Option<String> = None;
-  let mut aliases : Vec<String> = Vec::new ();
-  let mut id : Option<String> = None;
-  let mut custom_id : Option<String> = None;
+  let mut drawer : OrgDrawerMetadata = OrgDrawerMetadata::default ();
   let first_heading : usize = document . sections . get (1)
     . map (|section| section . heading . start)
     . unwrap_or (document . text . len ());
@@ -472,12 +480,8 @@ fn parse_org_file_metadata (
       lines [..index] . iter () . all (|(_, earlier)| {
         let earlier : &str = earlier . trim ();
         earlier . is_empty () || earlier . starts_with ("#+") }) {
-      let metadata : (Option<String>, Option<String>, Vec<String>) =
-        org_drawer_metadata (&lines, index);
-      id = metadata . 0;
-      custom_id = metadata . 1;
-      aliases = metadata . 2; } }
-  (title, aliases, id, custom_id)
+      drawer = org_drawer_metadata (&lines, index); } }
+  (title, drawer)
 }
 
 fn parse_org_headings (
@@ -494,20 +498,19 @@ fn parse_org_headings (
     let line_end : usize = *start + line . len ();
     if inside_blocks . iter () . any (|inside| inside . headline . start == *start) {
       continue; } // an error, recorded below
-    let (id, custom_id, aliases) :
-      (Option<String>, Option<String>, Vec<String>) =
+    let drawer : OrgDrawerMetadata =
       if lines . get (index + 1) . is_some_and (|(_, next)|
         next . trim () . eq_ignore_ascii_case (":PROPERTIES:")) {
         org_drawer_metadata (&lines, index + 1)
-      } else { (None, None, Vec::new ()) };
+      } else { OrgDrawerMetadata::default () };
     document . sections . push (ParsedSection {
       level,
       title,
       heading : *start..line_end,
       body : line_end..line_end,
-      explicit_id : id,
-      custom_id,
-      aliases,
+      explicit_id : drawer . id,
+      custom_id : drawer . custom_id,
+      aliases : drawer . aliases,
     }); }
   document . errors . extend (inside_blocks . into_iter () . map (|inside|
     Diagnostic { range   : inside . headline . clone (),
@@ -527,23 +530,22 @@ fn org_heading (
   Some ((level, line [level + 1..] . trim_end () . to_string ()))
 }
 
+/// The drawer whose ':PROPERTIES:' line is 'lines[start]'.
 fn org_drawer_metadata (
   lines : &[(usize, &str)],
   start : usize,
-) -> (Option<String>, Option<String>, Vec<String>) {
-  let mut id : Option<String> = None;
-  let mut custom_id : Option<String> = None;
-  let mut aliases : Vec<String> = Vec::new ();
+) -> OrgDrawerMetadata {
+  let mut drawer : OrgDrawerMetadata = OrgDrawerMetadata::default ();
   for (_, line) in lines . iter () . skip (start + 1) {
     let trimmed : &str = line . trim ();
     if trimmed . eq_ignore_ascii_case (":END:") { break; }
     if let Some (value) = org_property (trimmed, ":ID:") {
-      id = Some (value . trim () . to_string ()); }
+      drawer . id = Some (value . trim () . to_string ()); }
     if let Some (value) = org_property (trimmed, ":CUSTOM_ID:") {
-      custom_id = Some (value . trim () . to_string ()); }
+      drawer . custom_id = Some (value . trim () . to_string ()); }
     if let Some (value) = org_property (trimmed, ":ROAM_ALIASES:") {
-      aliases = crate::import_org_roam::parse::parse_roam_aliases (value . trim ()); } }
-  (id, custom_id, aliases)
+      drawer . aliases = crate::import_org_roam::parse::parse_roam_aliases (value . trim ()); } }
+  drawer
 }
 
 fn org_property <'a> (
