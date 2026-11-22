@@ -16,7 +16,7 @@ use skg::consts::{BUSYSIGNAL_POLL_INTERVAL_MS, BUSYSIGNAL_READ_TIMEOUT_MS};
 use skg::prominence::{compute_and_store_prominence_sources, MapToContent, MapToContainers};
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::heralds::herald_styles_inconsistencies;
+use skg::herald_conformance::herald_styles_inconsistencies;
 use skg::export_org::{
   export_candidate_pids, export_to_org, ExportReport};
 use skg::obsidian::export::{RenderedVault, export_skgrepo_to_vault};

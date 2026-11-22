@@ -22,7 +22,8 @@
 //! first ('STYLES_MOST_INFORMATIVE_FIRST'); the folder's sentence
 //! before them all.
 
-use crate::heralds::{emittable_kind_atoms, herald_styles, text_emitting_rule_paths};
+use crate::herald_conformance::emittable_kind_atoms;
+use crate::heralds::{herald_styles, text_emitting_rule_paths};
 use crate::types::config::SkgConfig;
 use crate::types::misc::SkgrepoName;
 use crate::types::nodes::complete::Flag;

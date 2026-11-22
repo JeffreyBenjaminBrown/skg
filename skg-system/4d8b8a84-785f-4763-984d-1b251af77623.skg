@@ -31,7 +31,7 @@ body: |2-
     "(other files)", or "its forks changed"), and ✓ when processed, from 'folder_heralds' in
     'shared/herald-styles.json'.
   The conformance test counts =pendingDetachment= among the atoms the
-  metadata may hold ('client_computed_atoms' in 'server/heralds.rs'),
+  metadata may hold ('client_computed_atoms' in 'server/herald_conformance.rs'),
   so that the rule table may render it. The code is
   'heralds-from-metadata' in 'elisp/heralds-minor-mode.el' and
   'sexp_for_lens' in 'nvim/lua/skg/heralds.lua'.

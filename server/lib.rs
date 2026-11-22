@@ -24,7 +24,8 @@
 //! - 'org_to_text': a view's tree as Org text.
 //! - 'view_text_delta': which headlines of a redrawn view changed.
 //! - 'heralds', 'herald_tokens', 'herald_descriptions': the marks
-//!   drawn beside a headline, and what they mean.
+//!   drawn beside a headline, and what they mean; 'herald_conformance'
+//!   checks the herald table against what the server emits.
 //! - 'prominence': which nodes search ranks higher.
 //!
 //! Saving:
@@ -64,6 +65,7 @@ pub mod obsidian;
 pub mod from_text;
 pub mod git_ops;
 pub mod graph_straddle;
+pub mod herald_conformance;
 pub mod herald_descriptions;
 pub mod herald_tokens;
 pub mod heralds;

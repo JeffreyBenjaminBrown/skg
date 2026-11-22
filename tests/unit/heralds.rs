@@ -1,4 +1,8 @@
 use super::*;
+use crate::herald_conformance::{
+  atoms_in_rule_table, emittable_kind_atoms, emittable_metadata_atoms,
+  herald_styles_inconsistencies, herald_styles_inconsistencies_of,
+  when_kinds_in_rule_table};
 
 use std::collections::HashSet;
 
