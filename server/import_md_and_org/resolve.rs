@@ -3,7 +3,7 @@
 use super::build::BuiltDocument;
 use super::parse::{
   Diagnostic, LinkSyntax, ParsedDocument, ParsedLink,
-  SourceEdit, rendered_range,
+  SourceEdit, ranges_overlap, rendered_range,
 };
 use crate::types::misc::ID;
 use crate::types::nodes::complete::normalize_body;
@@ -66,8 +66,7 @@ pub fn resolve_document_links (
             document . diagnostics . push (Diagnostic {
               range : link . range . clone (), message : warning }); }
           if document . source_edits . iter () . any (|edit|
-            edit . range . start < link . range . end &&
-            link . range . start < edit . range . end) {
+            ranges_overlap (&edit . range, &link . range)) {
             document . diagnostics . push (Diagnostic {
               range : link . range . clone (),
               message : "Link overlaps another repo conversion; left unchanged"
@@ -90,8 +89,7 @@ pub fn resolve_document_links (
                     reference_id), }); } } } }
         LinkTarget::ExternalFile (replacement) => {
           if ! document . source_edits . iter () . any (|edit|
-            edit . range . start < link . range . end &&
-            link . range . start < edit . range . end) {
+            ranges_overlap (&edit . range, &link . range)) {
             document . source_edits . push (SourceEdit {
               range : link . range . clone (), replacement }); } }
         LinkTarget::Unresolved (message) => {
@@ -101,8 +99,7 @@ pub fn resolve_document_links (
       let Some (node_index) = built [document_index] . footnote_node_indices
         . get (&reference . name) else { continue; };
       if document . source_edits . iter () . any (|edit|
-        edit . range . start < reference . range . end &&
-        reference . range . start < edit . range . end) {
+        ranges_overlap (&edit . range, &reference . range)) {
         document . diagnostics . push (Diagnostic {
           range : reference . range . clone (),
           message : "Footnote reference overlaps another conversion; left unchanged"
@@ -204,9 +201,7 @@ fn build_address_index (
       used_slugs . insert (slug . clone ());
       index . markdown_fragments . insert ((document_index, slug), gnid); }
     for (name, offset) in named_targets (document) {
-      let section_index : usize = document . sections . iter () . enumerate ()
-        .filter (|(_, section)| section . heading . start <= offset)
-        .map (|(index, _)| index) . last () . unwrap_or (0);
+      let section_index : usize = section_at_offset (document, offset);
       let gnid : ID = built [document_index] . nodes [section_index] . pid . clone ();
       index . named_targets . entry ((document_index, name))
         . or_default () . push (gnid); } }
@@ -241,7 +236,7 @@ fn named_targets (
     let end : usize = start + 2 + end_offset + 2;
     cursor = end;
     if document . literal_ranges . iter () . any (|range|
-      range . start < end && start < range . end) { continue; }
+      ranges_overlap (range, &(start..end))) { continue; }
     let name : &str = &document . text [start + 2..end - 2];
     if ! name . is_empty () { targets . push ((name . to_string (), start)); } }
   targets

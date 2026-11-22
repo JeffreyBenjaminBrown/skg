@@ -342,7 +342,7 @@ fn warn_markdown_wiki_links (
         . to_string (), }); }
 }
 
-fn ranges_overlap (
+pub(crate) fn ranges_overlap (
   left : &Range<usize>,
   right : &Range<usize>,
 ) -> bool {
