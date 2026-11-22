@@ -1,3 +1,20 @@
+* The git_diff_view test matcher ignored bare metadata atoms (noted 2026-07-08; obsolete 2026-11-22)
+   'assert_buffer_contains' (tests/git_diff_view/common.rs) matches
+   each expected line by star depth, title, and PARENTHESIZED
+   metadata fragments only ('extract_metadata_fragments'). Bare
+   atoms -- 'folded', 'focused', 'writeProtected', 'bodyFolded' -- are
+   invisible to it, in both directions: an expected atom missing
+   from the actual line, or a stray atom appearing in it, cannot
+   fail these tests. Found 2026-07-08 while adding the
+   begin-folded rule for hidden folders: a probe atom inserted into an
+   expected line still passed. Regressions in fold/focus/writeProtected
+   marking on diff views are therefore unpinned by that suite
+   (tests elsewhere, e.g. tests/hidden_from_subscriptions.rs, use
+   exact assert_eq! and do pin them). Suggested fix: also compare
+   the bare-atom sets of the two lines in 'line_matches'.
+  Obsolete: 'tests/git_diff_view/' and its matcher went with the old
+  git diff view (commit c6039925e). Its successor, 'tests/diff_view/',
+  has no such matcher.
 * Parallel Neovim test runs shared one ShaDa file (noted 2026-10-04; fixed 2026-11-22)
   'bash/nvim-tests.sh' and the Neovim integration runs start Neovims
   that all write '~/.local/state/nvim/shada/main.shada'. Interrupted

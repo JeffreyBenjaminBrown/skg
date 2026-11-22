@@ -6,6 +6,12 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* all-tests.sh never plays its completion sound (2026-11-22)
+  'bash/all-tests.sh' sets 'BEEP' to a path and an argument in one
+  string ("$PROJECT_ROOT/../sound/play-beep.sh beep-soothing") and then
+  tests '[ -x "$BEEP" ]', which no file passes; so the sound never
+  plays, and '--no-sound' changes nothing. (The script is also absent
+  in the container.) Splitting the path from the argument would fix it.
 * 'detach' can show where no save would detach anything (2026-11-20)
   The clients draw =detach= ('pendingDetachment', 'docs/heralds.org')
   from a headline's own metadata and its parent's, so it can be wrong
@@ -546,20 +552,6 @@ gap too. Details, options and questions:
    which makes them progressively less pleasant to read. Suggested fix:
    rotate on startup (keep one previous generation), or cap by size.
 * Problems noted during the fork-fixes arc (TODO/DONE/fork-fixes.org)
-** The git_diff_view test matcher ignores bare metadata atoms
-   'assert_buffer_contains' (tests/git_diff_view/common.rs) matches
-   each expected line by star depth, title, and PARENTHESIZED
-   metadata fragments only ('extract_metadata_fragments'). Bare
-   atoms -- 'folded', 'focused', 'writeProtected', 'bodyFolded' -- are
-   invisible to it, in both directions: an expected atom missing
-   from the actual line, or a stray atom appearing in it, cannot
-   fail these tests. Found 2026-07-08 while adding the
-   begin-folded rule for hidden folders: a probe atom inserted into an
-   expected line still passed. Regressions in fold/focus/writeProtected
-   marking on diff views are therefore unpinned by that suite
-   (tests elsewhere, e.g. tests/hidden_from_subscriptions.rs, use
-   exact assert_eq! and do pin them). Suggested fix: also compare
-   the bare-atom sets of the two lines in 'line_matches'.
 * Problems noted while writing forking-and-privacy.org
 ** Fork deliberate-pick rule is enforced only client-side
    docs/forks.org promises "approving before you have set every
@@ -824,11 +816,15 @@ gap too. Details, options and questions:
    refactor proposed in TODO/faster-tests.org.
    Mostly fixed 2026-06-12: hidden_from_subscriptions' and
    move_source's private helpers are deleted (their tests use
-   SharedDbSession). Still alive, each with remaining callers:
-   'setup_test_dbs' in git_diff_view/common.rs (the two unconverted
-   single-test files), 'run_with_source_set_test_db'
-   (inactive_suppression, partner_col_matrix), and
-   collateral_source_move's local setup.
+   SharedDbSession). Still alive on 2026-11-22 (the TypeDB-era names
+   above are gone; these are their successors):
+   'run_with_skgrepo_set_test_db' (server/test_utils.rs; leak_battery,
+   partner_folder_matrix, repo_sets, restricted_suppression), which,
+   unlike 'run_with_test_stores', neither takes
+   'TEST_STORE_GROUPS_MUTEX' nor cleans up after a panic;
+   'setup_test_stores' in tests/collateral_repo_move.rs; and the
+   one-line 'setup_multi_skgrepo_test' and 'cleanup_test' wrappers in
+   tests/forks_folder_by_default.rs.
 * Problems found while adding skg-stage-moves (2026-06-13)
 ** (latent, by-design-dependent) Diff helpers use a repo-wide pathspec
    'get_staged_changed_skg_files' and 'get_unstaged_changed_skg_files'
