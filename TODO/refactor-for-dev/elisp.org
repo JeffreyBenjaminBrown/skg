@@ -68,7 +68,40 @@ points and keys, what it leaves to which file) and ';;; Code:'.
 'skg-init.el', the file a newcomer reads first, lists every file with
 a phrase, grouped by what a user does. 'module-headers.org' records
 the convention.
+** Third pass: the linkstack has its own file
+'skg-linkstack.el' holds what 'skg-id-search.el' held of the stack
+(push, paste, pop, its trees, its editable buffer), the twin of
+'linkstack.lua'; 'skg-id-search.el' is down to about 390 lines.
+'tools/skg-for-ai/save.py' (another territory) still cites
+'skg--insert-node-from-entry' and
+'skg--buffer-has-editable-occurrence-p' in 'skg-id-search.el'.
+** Third pass: the skgrepo pickers have their own file
+'skg-picker.el' holds the minibuffer prompts and
+'skg-view-repo-list', the twin of 'picker.lua'; 'skg-config.el' only
+reads the config. 'docs/nvim-client-deviations.org' no longer lists
+Emacs files that hold two concerns.
+** Third pass: the go-then-close commands share 'skg--goto-then-close'
+The four commands ending in -and-close-this ('skg-id-search.el',
+'skg-request-file-path.el') call it; Neovim's twins share
+'id_search.goto_then_close'.
+** Third pass: the byte compiler warns only of magit's slots
+'skg-sexpr-search.el' requires 'cl-lib'; the magit and shell maps
+have 'defvar's in 'skg-keymaps-and-aliases.el', the magit functions
+'declare-function's in 'skg-request-file-path.el'. Three 'Unknown
+slot' warnings remain there ('oref' on magit sections, which are
+unknown when magit is not installed at compile time).
+** Third pass: 'skg--processed-node-added-p' is in 'skg-change-facts.el'
+Beside 'skg--processed-form', as in 'change_facts.lua'.
 * Candidates left, best first
+** 'skg-metadata.el' (about 1000 lines) still mixes concerns
+Detach and attach, home-skgrepo moves, the merge request, the pending
+detachment, metadata predicates and readers, metadata rewriting (edit
+requests placed by rank) and headline-line text helpers. Its Neovim
+twin 'metadata.lua' holds the same mix, so split both clients alike
+in one pass: detach, attach and the pending detachment first (Neovim's
+'nvim.org' names the lines), the skgrepo moves second. Moves only, so
+safe; the heralds read the pending detachment, so check the requires
+on both sides. About an hour per client per seam.
 ** ? The save's five retry answers travel as positional arguments (waits for Jeff; if he says nothing it stays)
 'skg-request-save-buffer', 'skg--send-save-buffer',
 'skg--save-request-sexp' and every confirmation handler pass
@@ -79,20 +112,7 @@ plist or 'cl-defstruct' of "the answers this save carries" would
 remove most of that. Risky: 'skg-request-save-buffer' is an
 interactive command whose optional arguments a user could call, and
 the confirmation tests assert the positional re-save arguments.
-** The linkstack is half of 'skg-id-search.el' (868 lines)
-Lines from 'skg--linkstack-tree' (about 294) to the end, less the ID
-predicates in the middle ('skg--point-in-metadata-p' through
-'skg--point-on-skg-filename-p'), are the linkstack: push, paste, pop,
-its trees and its editable buffer. Neovim keeps them in
-'linkstack.lua', and 'docs/nvim-client-deviations.org' lists this as a
-deviation. A move to 'skg-linkstack.el' would match the twin; then
-correct that doc through its note in 'skg-system/' and export. Safe
-(moves); check each moved function's callers' requires
-('skg-push-ancestry.el' pushes trees) and the minibuffer bindings.
-** 'skg-config.el' also holds the prompts
-Its prompting functions are Neovim's 'picker.lua'; the same kind of
-move as the linkstack, smaller.
-** Docstrings that name wrong arguments or tell history
+** ? Docstrings that name wrong arguments or tell history (waits for Jeff; if he says nothing they stay)
 The header pass left code and docstrings alone but found: the
 docstrings of 'skg-request-save-buffer', 'skg--save-request-sexp' and
 'skg--telescope-hoist-confirmation-handler' name FORK-APPROVED and
@@ -103,33 +123,13 @@ and 'skg-request-herald-rules' describe a connect-time fetch that
 'skg-herald-rules-ensure' replaced; 'skg--magit-count-id-in-hunks'
 says lines where it counts matches. Docstrings show in 'C-h f', so a
 reviewer may count them user-visible text; otherwise safe, minutes.
-** Small hidden dependencies and dead code
-'skg-sexpr-search.el' calls 'cl-some' without requiring 'cl-lib'
-(it works because 'skg-compare-sexpr' loads it). 'skg-visit-link'
-('skg-id-search.el') has no caller and no key; 'skg-sexp-at-or-after-point'
+** ? Dead code a user could still reach, or that Jeff kept (waits for Jeff; if he says nothing it stays)
+'skg-visit-link' ('skg-id-search.el') has no caller and no key, but
+is a command a user could call by M-x; 'skg-sexp-at-or-after-point'
 only tests call. 'elisp/abandoned/' is loaded by nothing and its
-minor mode is broken; 'bash/compile-elisp.sh' skips 'abandoned/' but
-compiles 'experim/read-only.el', a scratch file. A require, and
-deleting 'abandoned/' and 'experim/' (proved dead with rg), are safe;
-'skg-visit-link' is a command a user could call by M-x, so it waits
-for Jeff.
-** Two small twin mismatches
-'skg--processed-node-added-p' sits in 'skg-processed.el', its twin in
-'change_facts.lua'; it could join 'skg-change-facts.el'.
-'skg--ghost-sexp-p' sits in 'skg-metadata.el' (its
-'skg--vognode-sexp-p' needs it), its twin in 'restore_requests.lua';
-leave it. Safe; minutes.
-** Byte-compiler warnings that hide new ones
-'bash/compile-elisp.sh' prints a dozen: magit functions not known to
-be defined and unknown slots ('skg-request-file-path.el'),
-'shell-mode-map' free ('skg-keymaps-and-aliases.el'), an unused 'index'
-('skg-redraw-whole-view.el', in 'skg--content-with-fold-atoms').
-'declare-function', a 'defvar' and renaming 'index' to '_index' would
-silence them, so a new warning stands out. Safe; small. Do not touch
-'skg-keymaps-and-aliases.el' beyond a 'defvar': 'skg-reload' keeps it.
-** 'skg-metadata.el' (about 960 lines) still mixes concerns
-Detach and attach, home-skgrepo moves, the merge request, the pending
-detachment, metadata predicates and readers, metadata rewriting (edit
-requests placed by rank) and headline-line text helpers. Its Neovim
-twin 'metadata.lua' holds the same mix, so a split here should split
-both clients alike, or the naming rule breaks. Moderate value.
+minor mode is broken, and 'elisp/experim/read-only.el' is scratch
+that 'bash/compile-elisp.sh' compiles; 'skg-init.el' says both are
+kept on purpose ("dead code kept as reference", "scratch").
+** Leave 'skg--ghost-sexp-p' in 'skg-metadata.el'
+Its twin is in 'restore_requests.lua', but 'skg--vognode-sexp-p' in
+'skg-metadata.el' needs it; moving it would make a require cycle.
