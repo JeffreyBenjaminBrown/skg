@@ -1,0 +1,95 @@
+* Refactoring the Neovim client ('nvim/') for the next agent
+Behaviour-preserving refactors only; see the brief's rules. Things to
+know before any change here follow.
+** The unit specs take seconds; the integration tests need a server
+'bash/nvim-tests.sh' runs every 'tests/nvim/*_spec.lua' in about four
+seconds. The 'test-nvim.lua' of an integration directory runs by
+itself with 'cd tests/integration/DIR && SKG_TEST_CLIENT=nvim
+./run-test.sh'; it starts its own server on a free port.
+** Commands name their module and function as strings
+'M.commands' in 'nvim/lua/skg/keymaps.lua' resolves each ':Skg*'
+command's module and function lazily, by name. Moving a command's
+function means editing its entry there (never its Ex name). No spec
+checks that every entry resolves; after such a move, require each
+entry's module headless and check that its 'fn' is a function.
+** Never use 'git stash' in a worktree
+The stash is shared by every worktree of the repository and holds
+Jeff's old entries; a 'stash' with nothing to save followed by 'stash
+pop' applies one of his.
+** Two modules that need each other: one requires the other lazily
+LuaJIT refuses a require cycle at load time. 'skg.save' reaches
+'skg.save.confirmations' only by a 'require' inside the handlers it
+registers; the confirmations require 'skg.save' at the top.
+** Tests stub module fields, so call through the module table
+Specs replace 'save.request_save_buffer' and the like on the module
+table. Code must call such functions as 'save.request_save_buffer(...)'
+at call time, not through a local captured at load.
+** The dispatcher removes a one-shot handler after it runs
+'length_prefix.dispatch_by_type' calls a handler, then removes it if
+one-shot and decrements the pending count. A handler must therefore
+not unregister its own one-shot type ('save.end_save_stream' takes the
+unfired one-shot types for that reason).
+* Done
+** 'unregister_response_handlers' moved to 'skg.state'
+It sat in 'rerender_all_views.lua'; it now sits beside
+'register_response_handler' in 'nvim/lua/skg/state.lua'.
+** Every end of a save stream goes through 'save.end_save_stream'
+The save-result handler, the five alternative terminal handlers and
+'cancel_locally_failed_save' share it and the list
+'save.save_handler_types_not_one_shot', instead of seven copies of the
+removal, count balancing and unlock.
+** overPrivateText confirmations share a prompt and a registration
+'length_prefix.when_overPrivateText_approved' and
+'length_prefix.register_overPrivateText_confirmation_instead_of', used
+by the rerender stream, the readable-ids title lookup, the export to
+org and the single-root content view. They mirror the Emacs helpers.
+** The save's confirmation handlers have their own module
+'nvim/lua/skg/save/confirmations.lua' ('skg.save.confirmations') holds
+the fork, telescope-hoist, delete-from, strandeds and text-release
+handlers, the fork-confirmation buffer, 'approve_fork', 'decline_fork'
+and 'fork_repo_placeholder'. 'save.lua' fell from 1420 to about 890
+lines.
+** The relRepo gesture's helpers live in 'relRepo_info.lua'
+The relRepo section of 'metadata.lua' (about 500 lines: menu choices,
+the relationship at a line, 'set_relRepo_recursive') moved beside
+'set_relRepo', which drives it. 'metadata.first_value_at_path' became
+public for it. 'metadata.lua' fell from 2012 to about 1500 lines.
+* Candidates left, best first
+** 'metadata.lua' (about 1500 lines) is still a grab bag
+Its diff-view part -- the restore requests, the processed-change
+predicates ('processed_form' to 'folder_change_processed_at_line',
+roughly lines 919 to 1135) and the pending-detachment predicates
+(1136 to 1320) -- reads like a module of its own, or of
+'processed.lua'. Worth it: an agent changing the diff view would read
+200 lines, not 1500. Risk: 'processed.lua', 'heralds.lua' and many
+specs call these as 'metadata.X'; list every caller with 'rg' first,
+and watch for require cycles (does 'processed' require something that
+requires it?).
+** The save's five retry answers travel as positional arguments
+'save.request_save_buffer', 'send_save_buffer', 'save_request_sexp'
+and each handler in 'skg.save.confirmations' pass APPROVED_FORKS
+FORK_SKGREPOS APPROVED_HOIST_PIDS STRANDEDS_REVIEW DELETE_FROM in that
+order, each handler re-passing four; the fork buffer stores two in
+'vim.b' to pass them on. One table of "the answers this save carries"
+would remove most of that. Risky: 'request_save_buffer' is the ':Skg
+Save' command's function and the specs assert the positional re-save
+arguments; the Emacs client has the same shape, and the two should
+change together. Needs Jeff's agreement.
+** The save's view-replacement helpers serve the rerender too
+'save.apply_streamed_view_update',
+'replace_buffer_keeping_viewnode_points_and_folds' and their fold and
+point helpers ('save.lua', roughly lines 400 to 680) are called by the
+rerender stream ('rerender_all_views.lua') as much as by the save, and
+could be their own module. Moderate: tests stub
+'save.replace_buffer_with_new_content' ('redraw_delta_spec.lua') and
+'save.broad_save_lock_handler' (an integration test), so those stubs
+would follow the move.
+** Remaining hand-written removals of the overPrivateText handler
+'text_search.lua' (three), and the answer handlers of the export and
+the single-root view, still write
+'state.response_handler_map[...] = nil'; 'text_search' could use
+'register_overPrivateText_confirmation_instead_of' if its own prompt
+('&Include' / '&Exclude' and a choice string) were a parameter. Small.
+** Not surveyed
+'heralds.lua' (834 lines), 'processed.lua' (688) and 'keymaps.lua'
+(532) were not read for seams.
