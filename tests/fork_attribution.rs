@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::reset_then_run_subtest;
-use skg::test_utils::{save_ignoring_streamed_messages, mk_test_tcp_stream_pair, empty_views_state, graph_handle_from_config, run_with_shared_test_stores, single_root_view};
+use skg::test_utils::{save_ignoring_streamed_messages, mk_test_tcp_stream_pair, empty_views_state, graph_handle_from_config, run_with_shared_test_stores, single_root_view_text};
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_skgrepos_test;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
@@ -100,7 +100,7 @@ async fn a_fork_records_and_shows_its_attribution (
   assert_eq! ( clone . attribution, Some ( Attribution {
     original : ID::from ("N"), skgrepo : SkgrepoName::from ("foreign"),
     remote_hash : None, commit : None, uncommitted : false } ));
-  let (p_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("P")) ?;
+  let p_view : String = single_root_view_text (config, Some (tantivy), &ID::from ("P")) ?;
   let clone_line : &str = line_naming (&p_view, &clone . pid);
   assert! ( clone_line . contains ("(attribution foreign) repoBoundary)"),
     "the clone, under a note of its own skgrepo, names the skgrepo it was forked from:\n{}",
@@ -143,7 +143,7 @@ async fn a_plain_child_of_an_attributed_fork_says_its_home (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let clone : Graphnode = fork_n (config, tantivy, &graph) . await ?;
-  let (p_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("P")) ?;
+  let p_view : String = single_root_view_text (config, Some (tantivy), &ID::from ("P")) ?;
   let clone_line : &str = line_naming (&p_view, &clone . pid);
   let buffer : String = p_view . replacen (
     clone_line, &format! ( "{}\n*** plain child", clone_line ), 1 );
@@ -168,7 +168,7 @@ async fn stripping_an_attribution_removes_it_and_its_herald (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let clone : Graphnode = fork_n (config, tantivy, &graph) . await ?;
-  let (p_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("P")) ?;
+  let p_view : String = single_root_view_text (config, Some (tantivy), &ID::from ("P")) ?;
   let clone_line : &str = line_naming (&p_view, &clone . pid);
   let stripped_line : String = clone_line . replacen (
     "(skgRepos (nodeRepo owned))",
@@ -184,7 +184,7 @@ async fn stripping_an_attribution_removes_it_and_its_herald (
   assert_eq! ( ( &after . title, &after . contains, &after . forks ),
                ( &clone . title, &clone . contains, &clone . forks ),
                "only the attribution goes" );
-  let (p_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("P")) ?;
+  let p_view : String = single_root_view_text (config, Some (tantivy), &ID::from ("P")) ?;
   let clone_line : &str = line_naming (&p_view, &clone . pid);
   assert! ( ! clone_line . contains ("attribution") && ! clone_line . contains ("repoBoundary"),
     "the stripped clone, under a note of its own skgrepo, shows no herald:\n{}", p_view );

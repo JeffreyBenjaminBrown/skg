@@ -7,7 +7,7 @@ use std::net::TcpStream;
 use std::sync::Arc;
 
 use skg::reset_then_run_subtest;
-use skg::test_utils::{mk_test_tcp_stream_pair, empty_views_state, multi_root_view, single_root_view};
+use skg::test_utils::{mk_test_tcp_stream_pair, empty_views_state, multi_root_view, single_root_view, single_root_view_text};
 use skg::assert_metadata_eq;
 use skg::serve::ViewsState;
 use skg::serve::handlers::single_root_view::handle_single_root_view_request;
@@ -77,9 +77,7 @@ async fn test_single_root_view_with_cycle (
 ) -> Result<(), Box<dyn Error>> {
   {
       // Test with node "a" which has a cycle (a -> b -> c -> b)
-      let (result, _pids, _)
-        : (String, Vec<ID>, _)
-        = single_root_view ( config, None,
+      let result : String = single_root_view_text ( config, None,
                              &ID ( "a" . to_string () )
                            ) ?;
 
@@ -235,8 +233,7 @@ async fn test_limit_with_multiple_sibling_groups (
       let mut test_config = config . clone();
       test_config . initial_node_limit = 4;
 
-      let (result, _pids, _) : (String, Vec<ID>, _)
-      = single_root_view ( &test_config, None,
+      let result : String = single_root_view_text ( &test_config, None,
                            &ID ( "1" . to_string () )
                          ) ?;
 

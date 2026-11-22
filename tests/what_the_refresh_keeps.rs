@@ -34,7 +34,7 @@ use skg::test_utils::{
   extract_string_field_from_sexp, graph_handle_from_config,
   read_all_lp_messages, run_with_shared_test_stores, skg_env_from_parts};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
-use skg::test_utils::single_root_view;
+use skg::test_utils::single_root_view_text;
 use skg::types::env::SkgEnv;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
@@ -165,7 +165,7 @@ async fn stale_content_vanishes (
   let mut views_state : ViewsState = empty_views_state ();
   let first_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-k-1" . into ());
   let second_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-k-2" . into ());
-  let (k_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("k")) ?;
+  let k_view : String = single_root_view_text (config, Some (tantivy), &ID::from ("k")) ?;
   save_view ( &k_view, &first_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   let without_content : String =
@@ -204,7 +204,7 @@ async fn a_pasted_copy_beside_a_member_merges_into_it (
   let mut views_state : ViewsState = empty_views_state ();
   let first_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-k-1" . into ());
   let second_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-k-2" . into ());
-  let (k_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("k")) ?;
+  let k_view : String = single_root_view_text (config, Some (tantivy), &ID::from ("k")) ?;
   let with_copy : String = {
     let mc_line : String = k_view . lines ()
       . find ( |line| line . contains ("(gnid mc)") )
@@ -246,7 +246,7 @@ async fn a_moved_member_vanishes_where_it_was_and_is_drawn_where_it_went (
   let mut views_state : ViewsState = empty_views_state ();
   let first_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-k-1" . into ());
   let second_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-k-2" . into ());
-  let (k_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("k")) ?;
+  let k_view : String = single_root_view_text (config, Some (tantivy), &ID::from ("k")) ?;
   save_view ( &k_view, &first_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   let m_under_l : String = // m directly follows l, so one level deeper it is l's
@@ -284,7 +284,7 @@ async fn a_folder_member_kept_unwarranted_is_warranted_when_its_membership_retur
   let mut views_state : ViewsState = empty_views_state ();
   let x_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-x" . into ());
   let b_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-b" . into ());
-  let (x_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("x")) ?;
+  let x_view : String = single_root_view_text (config, Some (tantivy), &ID::from ("x")) ?;
   let (x_view, _) : (String, Vec<String>) = save_view (
     &x_view . replacen (
       "node ",
@@ -301,7 +301,7 @@ async fn a_folder_member_kept_unwarranted_is_warranted_when_its_membership_retur
       1 ) };
   save_view ( &with_note, &x_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
-  let (b_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("b")) ?;
+  let b_view : String = single_root_view_text (config, Some (tantivy), &ID::from ("b")) ?;
   let (b_view, collateral_views) : (String, Vec<String>) = save_view (
     &without_lines_containing (
       &without_lines_containing (&b_view, "(gnid x)"), "(gnid xc)" ),
@@ -434,7 +434,7 @@ async fn a_stale_alias_vanishes (
   let mut views_state : ViewsState = empty_views_state ();
   let first_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-al-1" . into ());
   let second_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-al-2" . into ());
-  let (al_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("al")) ?;
+  let al_view : String = single_root_view_text (config, Some (tantivy), &ID::from ("al")) ?;
   let requesting : String = al_view . replacen (
     "node ",
     "node (viewRequests (folder aliases))", 1 );

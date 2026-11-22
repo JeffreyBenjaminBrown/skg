@@ -4,7 +4,7 @@ use indoc::indoc;
 use skg::assert_metadata_eq;
 use skg::test_utils::load_config_with_overrides;
 use skg::test_utils::remove_test_dir;
-use skg::test_utils::single_root_view;
+use skg::test_utils::single_root_view_text;
 use skg::types::config::SkgConfig;
 use skg::types::misc::ID;
 
@@ -36,8 +36,8 @@ fn test_forks_folder_appears_for_forkers(
     let test_name = "skg-test-forks-folder-by-default";
     let config =
       setup_multi_skgrepo_test (test_name) . await?;
-    let (result, _pids, _) : (String, Vec<ID>, _) =
-      single_root_view( &config, None, &ID("1" . to_string())
+    let result : String =
+      single_root_view_text ( &config, None, &ID("1" . to_string())
                       )?;
     println!("forks folder test result:\n{}", result);
 

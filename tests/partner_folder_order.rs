@@ -22,7 +22,7 @@ use std::error::Error;
 
 use skg::test_utils::{
   empty_views_state, graph_handle_from_config, run_with_test_stores};
-use skg::test_utils::{multi_root_view, single_root_view};
+use skg::test_utils::{multi_root_view, single_root_view, single_root_view_text};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::views_state::ViewforestId;
@@ -141,7 +141,7 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
   let mut views_state : ViewsState = empty_views_state ();
   let n_viewforest_id : ViewforestId = ViewforestId::ContentView ("order-n" . into ());
   let u_viewforest_id : ViewforestId = ViewforestId::ContentView ("order-u" . into ());
-  let (n_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("n")) ?;
+  let n_view : String = single_root_view_text (config, Some (tantivy), &ID::from ("n")) ?;
   let (n_view, _) : (String, Vec<String>) = save_view_and_read_collateral (
     &n_view . replacen (
       "node ",

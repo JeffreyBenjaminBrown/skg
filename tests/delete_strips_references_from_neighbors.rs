@@ -41,6 +41,7 @@ use skg::serve::handlers::delete_references_to_absent_node::
   handle_delete_references_to_absent_node_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::single_root_view;
+use skg::test_utils::single_root_view_text;
 use skg::types::env::SkgEnv;
 use skg::types::views_state::ViewforestId;
 use skg::types::config::SkgConfig;
@@ -227,7 +228,7 @@ async fn delete_preserves_foreign_referencer (
   assert! ( members_of (&cheese . contains)
             . contains (&ID::from ("victim-alt")),
     "foreign raw membership must survive deletion" );
-  let (fresh_view, _, _) = single_root_view (
+  let fresh_view : String = single_root_view_text (
     config, Some (tantivy), &ID::from ("cheese") ) ?;
   assert! (fresh_view . contains ("unknown (gnid victim-alt)"),
     "the raw foreign original must retain its extra ID as Unknown after the \
@@ -256,7 +257,7 @@ async fn delete_in_foreign_forkee_rerenders_as_unknown (
               . contains ("(gnid forker)"),
     "the buffer whose foreign root was forked must immediately be rooted at the fork: {}",
     response . saved_view);
-  let (fresh, _, _) = single_root_view (
+  let fresh : String = single_root_view_text (
     config, Some (tantivy), &ID::from ("forker") ) ?;
   assert! (fresh . contains ("unknown (gnid victim-alt)"),
     "the raw foreign forkee must retain the deleted node's extra ID as \
@@ -283,7 +284,7 @@ async fn delete_in_foreign_hiddenoutside_rerenders_as_unknown (
   assert! (response . saved_view . contains ("unknown (gnid victim-alt)"),
     "a retained foreign hide must become its raw extra ID immediately: {}",
     response . saved_view);
-  let (fresh, _, _) = single_root_view (
+  let fresh : String = single_root_view_text (
     config, Some (tantivy), &ID::from ("hide-forker") ) ?;
   assert! (fresh . contains ("unknown (gnid victim-alt)"),
     "immediate hidden-outside rerender must match a fresh render: {}", fresh);

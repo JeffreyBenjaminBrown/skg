@@ -31,6 +31,7 @@ use skg::test_utils::{save_ignoring_streamed_messages, mk_test_tcp_stream_pair, 
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_approval_test;
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_skgrepos_test;
 use skg::test_utils::single_root_view;
+use skg::test_utils::single_root_view_text;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex, members_of};
@@ -351,7 +352,7 @@ async fn a_reply_under_an_unread_message_integrates_it (
     redrawn );
   // A fresh view draws t editable too, its count saying one message
   // is unread.
-  let (fresh, _pids, _tree) = single_root_view (config, Some (tantivy), &ID::from ("f")) ?;
+  let fresh : String = single_root_view_text (config, Some (tantivy), &ID::from ("f")) ?;
   assert! ( subtree_of (&fresh, & clone . pid . 0) . iter ()
               . any ( |line| line . ends_with (" my reply") )
             && first_says (&subtree_of (&fresh, "t"), "(unintegrated 1)"),
@@ -1060,8 +1061,8 @@ async fn fork_round_trip (
 
   // Reopen P de-novo. N is P's content; mirror substitution shows the
   // clone in its place with (inPlaceOf N).
-  let (p_view, _pids, _) =
-    single_root_view (
+  let p_view : String =
+    single_root_view_text (
       config, Some (tantivy), &ID::from ("P") ) ?;
   assert! ( p_view . contains ("(inPlaceOf N)"),
     "the clone must be shown in N's place with (inPlaceOf N):\n{}",

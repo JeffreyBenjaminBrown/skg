@@ -22,7 +22,7 @@ use crate::view_and_save_helpers::{contains_of, depth, ids, line_of, save};
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::reset_then_run_subtest;
 use skg::test_utils::{
-  multi_root_view_from_perspective, run_with_shared_test_stores, single_root_view};
+  multi_root_view_from_perspective, run_with_shared_test_stores, single_root_view_text};
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
 use skg::types::views_state::Perspective;
@@ -76,7 +76,7 @@ async fn a_mirror_in_place_of_an_extra_id_keeps_its_headline (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let (view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("P")) ?;
+  let view : String = single_root_view_text (config, Some (tantivy), &ID::from ("P")) ?;
   let r_line : &str = line_of (&view, "R");
   assert! ( r_line . contains ("(inPlaceOf X)"), "R stands in X's place:\n{}", view );
   let folded_r_line : String = r_line . replacen (" node (gnid R)", " folded node (gnid R)", 1);
@@ -117,7 +117,7 @@ async fn a_containers_folder_omits_the_original_a_mirror_above_stands_for (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let (view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("P")) ?;
+  let view : String = single_root_view_text (config, Some (tantivy), &ID::from ("P")) ?;
   let w_line : &str = view . lines () // R's own child, after X's in R's forks folder
     . filter ( |line| line . contains ("(gnid W)") ) . last () . unwrap ();
   let typed : String = format! ( "{}\n{} (skg containerFolder)\n",

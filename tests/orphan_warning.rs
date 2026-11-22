@@ -20,6 +20,7 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, run_with_test_stores, graph_handle_from_config};
 use skg::test_utils::single_root_view;
+use skg::test_utils::single_root_view_text;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, SkgrepoName, TantivyIndex};
 use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
@@ -150,8 +151,8 @@ fn view_of_four_with_two_write_protected (
   config  : &SkgConfig,
   tantivy : &TantivyIndex,
 ) -> Result<String, Box<dyn Error>> {
-  let (four, _pids, _viewforest) =
-    single_root_view ( config, Some (tantivy), &ID::from ("four") ) ?;
+  let four : String =
+    single_root_view_text ( config, Some (tantivy), &ID::from ("four") ) ?;
   let two_line : String = line_of_two (&four);
   assert! ( two_line . starts_with ("*** ") && two_line . contains ("writeProtected"),
             "two is write-protected in four's containers folder:\n{}", four );

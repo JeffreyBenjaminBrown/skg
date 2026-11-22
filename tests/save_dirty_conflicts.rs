@@ -16,6 +16,7 @@ use skg::test_utils::{
   update_from_and_rerender_buffer_with_snapshots_test,
 };
 use skg::test_utils::single_root_view;
+use skg::test_utils::single_root_view_text;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
 use skg::types::errors::SaveError;
@@ -52,7 +53,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
       let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = empty_views_state ();
       let saved_viewforest_id : ViewforestId = ViewforestId::ContentView ("saved-a" . into ());
-      let (a_view, _, _) = single_root_view (
+      let a_view : String = single_root_view_text (
         config, Some (tantivy), &ID::from ("A")) ?;
       let edited_a : String = a_view . replace (
         "A links to [[id:X][X]]", "[[id:X][X]] [[id:A][A]]");
@@ -86,7 +87,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
                "no relaxation or collateral update precedes refusal: {:?}",
                messages);
 
-      let (c_view, _, _) = single_root_view (
+      let c_view : String = single_root_view_text (
         config, Some (tantivy), &ID::from ("C")) ?;
       let dirty_c : String = format! ("{}\nindependent edit", c_view);
       // The collateral fixture contains only endpoint X as an occurrence.
@@ -135,7 +136,7 @@ fn missing_or_unparseable_dirty_baseline_refuses () -> Result<(), Box<dyn Error>
     "/tmp/tantivy-test-save-dirty-invalid",
     |config, tantivy| Box::pin (async move {
       let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-      let (a_view, _, _) = single_root_view (
+      let a_view : String = single_root_view_text (
         config, Some (tantivy), &ID::from ("A")) ?;
       for buffer_snapshot in [
         dirty_buffer_snapshot ("missing-baseline", None, "* new node"),
@@ -191,7 +192,7 @@ fn root_headline_of_view (
   tantivy : &TantivyIndex,
   gnid    : &str,
 ) -> Result<String, Box<dyn Error>> {
-  let (view, _, _) = single_root_view (
+  let view : String = single_root_view_text (
     config, Some (tantivy), &ID::from (gnid)) ?;
   let root_headline : &str = view . lines () . next ()
     . ok_or ("an empty view") ?;
@@ -209,12 +210,12 @@ fn a_merge_request_target_is_not_a_dirty_view_dependency
     "/tmp/tantivy-test-save-dirty-merge-target",
     |config, tantivy| Box::pin (async move {
       let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-      let (c_view, _, _) = single_root_view (
+      let c_view : String = single_root_view_text (
         config, Some (tantivy), &ID::from ("C")) ?;
       let c_requesting_merge : String = c_view . replacen (
         "(skg ", "(skg (editRequest (merge B)) ", 1);
       assert_ne! (c_requesting_merge, c_view);
-      let (b_view, _, _) = single_root_view (
+      let b_view : String = single_root_view_text (
         config, Some (tantivy), &ID::from ("B")) ?;
       let retitled_b : String = b_view . replace (
         "B links to [[id:X][X]]", "B, retitled, links to [[id:X][X]]");
@@ -241,11 +242,11 @@ fn a_link_target_is_not_a_dirty_view_dependency
     "/tmp/tantivy-test-save-dirty-link-target",
     |config, tantivy| Box::pin (async move {
       let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-      let (c_view, _, _) = single_root_view (
+      let c_view : String = single_root_view_text (
         config, Some (tantivy), &ID::from ("C")) ?;
       let c_linking_x : String = format! (
         "{}\nsee [[id:X][X]]", c_view . trim_end ());
-      let (x_view, _, _) = single_root_view (
+      let x_view : String = single_root_view_text (
         config, Some (tantivy), &ID::from ("X")) ?;
       let retitled_x : String = x_view . replace (
         "shared X", "shared X, retitled");
@@ -272,7 +273,7 @@ fn a_dirty_view_showing_a_graphnode_refuses_a_save_of_it
     "/tmp/tantivy-test-save-dirty-shown-target",
     |config, tantivy| Box::pin (async move {
       let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-      let (x_view, _, _) = single_root_view (
+      let x_view : String = single_root_view_text (
         config, Some (tantivy), &ID::from ("X")) ?;
       let dirty_x : String = format! ("{}\nlocal edit", x_view . trim_end ());
       let retitled_x : String = x_view . replace (
@@ -308,10 +309,10 @@ fn a_dirty_view_of_a_linker_does_not_refuse_a_save_of_its_link_target
     "/tmp/tantivy-test-save-dirty-linker",
     |config, tantivy| Box::pin (async move {
       let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-      let (l_view, _, _) = single_root_view (
+      let l_view : String = single_root_view_text (
         config, Some (tantivy), &ID::from ("L")) ?;
       let dirty_l : String = format! ("{}\nlocal edit", l_view . trim_end ());
-      let (t_view, _, _) = single_root_view (
+      let t_view : String = single_root_view_text (
         config, Some (tantivy), &ID::from ("T")) ?;
       let retitled_t : String = t_view . replace (
         "T is a target", "T is a target, retitled");
@@ -342,7 +343,7 @@ fn a_dirty_view_showing_a_graphnode_does_not_refuse_a_save_that_only_links_to_it
       let t_view : String = root_headline_of_view (
         config, tantivy, "T") ?;
       let dirty_t : String = format! ("{}\nlocal edit", t_view);
-      let (y_view, _, _) = single_root_view (
+      let y_view : String = single_root_view_text (
         config, Some (tantivy), &ID::from ("Y")) ?;
       let y_linking_t : String = format! (
         "{}\nsee [[id:T][T]]", y_view . trim_end ());
@@ -373,7 +374,7 @@ fn a_dirty_view_showing_a_graphnode_refuses_a_save_of_its_containers_content_lis
       let t_view : String = root_headline_of_view (
         config, tantivy, "T") ?;
       let dirty_t : String = format! ("{}\nlocal edit", t_view);
-      let (p_view, _, _) = single_root_view (
+      let p_view : String = single_root_view_text (
         config, Some (tantivy), &ID::from ("P")) ?;
       let p_without_t : String = p_view . lines ()
         . filter (|line| ! line . contains ("T is a target"))
@@ -418,7 +419,7 @@ fn a_dirty_view_of_a_linker_is_not_redrawn_by_a_save_of_its_link_target
           l_forest . clone (), &l_pids,
           &SkgrepoRestriction::unrestricted (config)); }
       let dirty_l : String = format! ("{}\nlocal edit", l_view . trim_end ());
-      let (t_view, _, _) = single_root_view (
+      let t_view : String = single_root_view_text (
         config, Some (tantivy), &ID::from ("T")) ?;
       let retitled_t : String = t_view . replace (
         "T is a target", "T is a target, retitled");

@@ -13,7 +13,7 @@ use skg::dbs::node_lookup::graphnode_by_gnid;
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, graph_handle_from_config, single_root_view};
+use skg::test_utils::{save_ignoring_streamed_messages, empty_views_state, graph_handle_from_config, single_root_view_text};
 use skg::types::errors::SaveError;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex, members_of};
@@ -41,7 +41,7 @@ pub fn view_of (
   tantivy : &TantivyIndex,
   root    : &str,
 ) -> Result<String, Box<dyn Error>> {
-  let (view, _, _) = single_root_view (config, Some (tantivy), &ID::from (root)) ?;
+  let view : String = single_root_view_text (config, Some (tantivy), &ID::from (root)) ?;
   Ok ( without_viewnode_ids (&view) ) }
 
 /// Save 'buf', which must save cleanly; the saved view, without

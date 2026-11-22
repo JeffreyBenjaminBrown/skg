@@ -20,7 +20,7 @@ use skg::assert_metadata_eq;
 use skg::reset_then_run_subtest;
 use skg::test_utils::save_ignoring_streamed_messages;
 use skg::test_utils::empty_views_state;
-use skg::test_utils::single_root_view;
+use skg::test_utils::single_root_view_text;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex};
@@ -43,8 +43,8 @@ async fn test_dangling_reference_renders_unknown_node (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      let (rendered, _pids, _) =
-        single_root_view (
+      let rendered : String =
+        single_root_view_text (
           config, None,
           &ID ( "parent" . to_string () ) ) ?;
       println!("Rendered:\n{}", rendered);
@@ -91,7 +91,7 @@ async fn buffer_with_unknownnode_child_saves_cleanly_impl (
   if ! response . errors . is_empty () {
     panic! ("save returned errors instead of completing: {:?}",
             response . errors); }
-  let (rerendered, _, _) = single_root_view (
+  let rerendered : String = single_root_view_text (
     config, None, &ID::from ("parent") ) ?;
   assert! ( rerendered . contains ("unknown (gnid ghost)"),
     "an unchanged Unknown must preserve its raw relationship member: {}",

@@ -13,7 +13,7 @@ use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::serve::ViewsState;
 use skg::test_utils::{
   empty_views_state,
-  graph_handle_from_config, run_with_test_stores, single_root_view};
+  graph_handle_from_config, run_with_test_stores, single_root_view_text};
 use skg::types::misc::ID;
 use skg::types::views_state::ViewforestId;
 
@@ -35,8 +35,8 @@ fn a_clean_view_of_a_graphnode_is_redrawn_when_another_gains_a_link_to_it
         ViewforestId::ContentView ("new-link-A" . into ());
       let x_viewforest_id : ViewforestId =
         ViewforestId::ContentView ("new-link-X" . into ());
-      let (a_view, _a_pids, _a_vf) =
-        single_root_view (
+      let a_view : String =
+        single_root_view_text (
           config, Some (tantivy), &ID::from ("A") ) ?;
       let (a_response, _) =
         save_and_read_collateral (
@@ -50,8 +50,8 @@ fn a_clean_view_of_a_graphnode_is_redrawn_when_another_gains_a_link_to_it
                 && ! a_response . saved_view . contains ("(gnid X)"),
         "A's mentionerFolder should hold M alone:\n{}",
         a_response . saved_view );
-      let (x_view, _x_pids, _x_vf) =
-        single_root_view (
+      let x_view : String =
+        single_root_view_text (
           config, Some (tantivy), &ID::from ("X") ) ?;
       let (response, collateral_views) =
         save_and_read_collateral (

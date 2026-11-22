@@ -22,6 +22,7 @@ use skg::test_utils::{
   run_with_shared_test_stores,
   save_preview_test };
 use skg::test_utils::single_root_view;
+use skg::test_utils::single_root_view_text;
 use skg::types::config::SkgConfig;
 use skg::types::misc::{ID, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
@@ -273,9 +274,7 @@ async fn test_deleting_foreign_forkee_content_preserves_branch_edit (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = empty_views_state ();
 
-    let (initial_view, _pids, _)
-      : (String, Vec<ID>, _)
-      = single_root_view(
+    let initial_view : String = single_root_view_text (
           &config, None,
           &ID ("r" . to_string()) )?;
     let extended : String =
@@ -302,9 +301,7 @@ async fn test_deleting_foreign_forkee_content_infers_hide (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = empty_views_state ();
 
-    let (initial_view, _pids, _)
-      : (String, Vec<ID>, _)
-      = single_root_view(
+    let initial_view : String = single_root_view_text (
           &config, None,
           &ID ("r" . to_string()) )?;
     let extended : String =
@@ -692,9 +689,7 @@ async fn test_moving_foreign_forkee_content_to_forker_does_not_hide (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = empty_views_state ();
 
-    let (initial_view, _pids, _)
-      : (String, Vec<ID>, _)
-      = single_root_view(
+    let initial_view : String = single_root_view_text (
           &config, None,
           &ID ("r" . to_string()) )?;
     let extended : String =
@@ -737,9 +732,7 @@ async fn test_moving_foreign_forkee_content_into_another_owned_note_does_not_hid
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = empty_views_state ();
 
-    let (initial_view, _pids, _)
-      : (String, Vec<ID>, _)
-      = single_root_view(
+    let initial_view : String = single_root_view_text (
           &config, None,
           &ID ("r" . to_string()) )?;
     let extended : String =
@@ -782,9 +775,7 @@ async fn test_a_node_placed_under_a_foreign_forkee_is_refused (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = empty_views_state ();
 
-    let (initial_view, _pids, _)
-      : (String, Vec<ID>, _)
-      = single_root_view(
+    let initial_view : String = single_root_view_text (
           &config, None,
           &ID ("r" . to_string()) )?;
     let extended : String =
@@ -878,9 +869,7 @@ async fn test_forkee_and_compound_partner_folders (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
 
-    let (initial_view, _pids, _)
-      : (String, Vec<ID>, _)
-      = single_root_view(
+    let initial_view : String = single_root_view_text (
           &config, None,
           &ID("R" . to_string()) )?;
     println!("Initial view from R:\n{}", initial_view);
@@ -944,9 +933,7 @@ async fn test_hidden_within_but_none_without (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-    let (initial_view, _pids, _)
-      : (String, Vec<ID>, _)
-      = single_root_view( &config, None,
+    let initial_view : String = single_root_view_text ( &config, None,
                           &ID("R" . to_string()) )?;
     println!("Initial view from R:\n{}", initial_view);
 
@@ -997,9 +984,7 @@ async fn test_moving_hidden_forkee_content_to_visible_branch_infers_unhide (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = empty_views_state ();
 
-    let (initial_view, _pids, _)
-      : (String, Vec<ID>, _)
-      = single_root_view(
+    let initial_view : String = single_root_view_text (
           &config, None,
           &ID ("R" . to_string()) )?;
     let extended : String =
@@ -1111,9 +1096,7 @@ async fn test_deleting_from_hiddenin_folder_does_not_unhide (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = empty_views_state ();
 
-    let (initial_view, _pids, _)
-      : (String, Vec<ID>, _)
-      = single_root_view(
+    let initial_view : String = single_root_view_text (
           &config, None,
           &ID ("R" . to_string()) )?;
     let extended : String =
@@ -1157,9 +1140,7 @@ async fn test_hidden_without_but_none_within (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-    let (initial_view, _pids, _)
-      : (String, Vec<ID>, _)
-      = single_root_view( &config, None,
+    let initial_view : String = single_root_view_text ( &config, None,
                           &ID("R" . to_string()) )?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_view = indoc! {
@@ -1205,9 +1186,7 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = empty_views_state ();
 
-    let (initial_view, _pids, _)
-      : (String, Vec<ID>, _)
-      = single_root_view(
+    let initial_view : String = single_root_view_text (
           &config, None,
           &ID ("R" . to_string()) )?;
     let edited : String =
@@ -1281,9 +1260,7 @@ async fn test_overlapping_hidden_within (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-    let (initial_view, _pids, _)
-      : (String, Vec<ID>, _)
-      = single_root_view( &config, None,
+    let initial_view : String = single_root_view_text ( &config, None,
                           &ID("R" . to_string()) )?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_view = indoc! {

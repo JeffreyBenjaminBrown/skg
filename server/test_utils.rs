@@ -1106,6 +1106,17 @@ pub fn single_root_view (
     tantivy_index,
     & [ root_gnid . clone () ] ) }
 
+/// The text of 'single_root_view', for a caller that wants nothing
+/// else from it.
+pub fn single_root_view_text (
+  config        : &SkgConfig,
+  tantivy_index : Option<&TantivyIndex>,
+  root_gnid     : &ID,
+) -> Result<String, Box<dyn Error>> {
+  let (text, _pids, _viewforest) : (String, Vec<ID>, Tree<Viewnode>) =
+    single_root_view (config, tantivy_index, root_gnid) ?;
+  Ok (text) }
+
 /// A fresh content view of 'root_gnids', as a content-view request
 /// draws it ('multi_root_view_via_runtime'), from the fixture's files
 /// ('multi_root_view_inner').

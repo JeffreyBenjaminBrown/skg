@@ -1,5 +1,5 @@
 use skg::test_utils::load_config_with_overrides;
-use skg::test_utils::single_root_view;
+use skg::test_utils::single_root_view_text;
 use skg::types::config::SkgConfig;
 use skg::types::misc::ID;
 use std::error::Error;
@@ -11,7 +11,7 @@ fn one_forkee_has_contextual_counts_under_two_forkers (
     "tests/forkee_heralds/fixtures/skgconfig.toml",
     Some ("skg-test-forkee-heralds"), &[] ) ?;
   for (forker, numerator) in [("A1", 1), ("A2", 2)] {
-    let (view, _, _) : (String, Vec<ID>, _) = single_root_view (
+    let view : String = single_root_view_text (
       &config, None, &ID::from (forker) ) ?;
     let b_line : &str = view . lines ()
       . find (|line| line . contains ("(gnid B)"))

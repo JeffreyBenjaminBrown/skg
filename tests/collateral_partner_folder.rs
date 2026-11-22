@@ -25,6 +25,7 @@ use skg::test_utils::{
   empty_views_state,
   run_with_test_stores, graph_handle_from_config};
 use skg::test_utils::single_root_view;
+use skg::test_utils::single_root_view_text;
 use skg::serve::ViewsState;
 use skg::types::views_state::ViewforestId;
 use skg::types::misc::ID;
@@ -46,8 +47,8 @@ fn collateral_partner_folder_update_and_warning_scoping
       // Render N, explicitly request its forks folder, and save it
       // under the view ID that will be updated collaterally.  forksFolder
       // is no longer part of the default presentation.
-      let (n_view, _n_pids, _n_vf) =
-        single_root_view (
+      let n_view : String =
+        single_root_view_text (
           config, Some (tantivy), &ID::from ("N") ) ?;
       let n_folder_request : String = n_view . replacen (
         "node ",
@@ -129,8 +130,8 @@ fn a_member_added_at_a_later_visit_gets_its_chain
       let mut views_state : ViewsState = empty_views_state ();
       let n_viewforest_id : ViewforestId = ViewforestId::ContentView ("chain-N" . into ());
       let t_viewforest_id : ViewforestId = ViewforestId::ContentView ("chain-T" . into ());
-      let (n_view, _n_pids, _n_vf) =
-        single_root_view (
+      let n_view : String =
+        single_root_view_text (
           config, Some (tantivy), &ID::from ("N") ) ?;
       let (n_response, _) =
         save_and_read_collateral (
