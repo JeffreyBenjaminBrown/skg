@@ -1,0 +1,73 @@
+* Refactoring the Emacs client ('elisp/') for the next agent
+Behaviour-preserving refactors only; see the brief's rules. Two
+things to know before any change here follow.
+** A new file must be registered with 'skg-reload'
+'skg-reload' unloads every feature in 'skg--reload-unloaded-features'
+('elisp/skg-reload.el'), and 'tests/elisp/test-skg-reload.el' fails
+if a provided feature is in neither that list nor
+'skg--reload-kept-features'. A new file's feature goes in the first.
+New functions must not go in the kept files ('skg-log',
+'skg-buffer', 'skg-keymaps-and-aliases').
+** Some tests fake the handler map in a shorter shape
+Several Emacs tests build 'skg-response-handler-map' with entries
+shaped '(TYPE . HANDLER)', not the real '(TYPE HANDLER . ONE-SHOT-P)'
+('test-skg-delete-from-confirmation.el',
+'test-skg-strandeds-confirmation.el'). Code those tests reach must
+keep removing entries by presence ('assoc-delete-all' and an 'assoc'
+check), not through 'skg--unregister-response-handlers', which reads
+the flag and signals on the short shape.
+* Done
+** 'skg--unregister-response-handlers' moved to 'skg-state.el'
+It sat in 'skg-request-rerender-all-views.el'; it now sits beside
+'skg-register-response-handler', and the absent-reference cleanup,
+the text search and the rerender's overPrivateText confirmation use
+it instead of their own loops.
+** A save's alternative terminal messages share one ending
+'skg--end-save-without-save-result' and the list
+'skg--save-response-types-not-one-shot' ('elisp/skg-request-save.el')
+replace six copies of the same handler-removal code.
+** The save's confirmation handlers have their own file
+'elisp/skg-request-save/skg-save-confirmations.el' holds the fork,
+delete-from, strandeds, telescope-hoist and text-release handlers and
+the fork confirmation buffer's commands. 'skg-request-save' requires
+it; it reaches back only through 'declare-function', so there is no
+require cycle.
+** overPrivateText confirmations share a prompt and a registration
+'skg--when-overPrivateText-approved' and
+'skg--register-overPrivateText-confirmation-instead-of'
+('elisp/skg-length-prefix.el'), used by the export to org, the
+single-root content view and the readable-ids title lookup.
+* Candidates left, best first
+** The save's five retry answers travel as positional arguments
+'skg-request-save-buffer', 'skg--send-save-buffer',
+'skg--save-request-sexp' and every confirmation handler pass
+APPROVED-FORKS FORK-SKGREPOS APPROVED-HOIST-PIDS STRANDEDS-REVIEW
+DELETE-FROM in that order, each handler re-passing four of them; the
+fork buffer even stores two in buffer-locals to pass them on. One
+plist or 'cl-defstruct' of "the answers this save carries" would
+remove most of that. Risky: 'skg-request-save-buffer' is an
+interactive command whose optional arguments a user could call, and
+the confirmation tests assert the positional re-save arguments, so
+the tests would need more than a rename. Probably needs Jeff's
+agreement.
+** 'skg-metadata.el' (about 1640 lines) is a grab bag
+Its sections (detach/attach, repo moves, relRepo and the
+relationship-kind menus, the diff view's restore requests, change
+facts, changed folders, pending detachment, metadata rewriting) are
+marked by ';;;' headers. The relRepo menus and 'skg-set-relRepo-recursive'
+(roughly lines 264 to 700) and the diff-view predicates (763 to 1060)
+look like real seams. Risk: many files require 'skg-metadata' for a
+single helper; check each moved function's callers' requires.
+** Remaining hand-written removals of one confirmation handler
+'(setq skg-response-handler-map (assoc-delete-all
+'overPrivateText-telescope-confirmation ...))' still appears in
+'skg-request-text-search.el' (three times), the rerender, export and
+single-root answer handlers. Small; check the tests' fixture shapes
+first (see above).
+** The rest of 'skg-request-save.el' (942 lines)
+'skg--replace-buffer-keeping-viewnode-points-and-folds' and its fold
+and point helpers (about 200 lines) serve the rerender stream as much
+as the save, and could be their own file. Many files require
+'skg-request-save' only for 'skg-big-nonfatal-message'; moving that
+family (it and 'skg-show-save-errors-and-warnings', 'skg-report-mode')
+to a small file would shrink those dependencies.
