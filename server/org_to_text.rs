@@ -1,3 +1,9 @@
+//! Rendering a viewforest as the Org text a client shows
+//! ('viewforest_to_string'): each viewnode's stars, its '(skg ...)'
+//! metadata ('viewnode_to_string'), title and body. Reading that text
+//! back is 'from_text/buffer_to_viewnodes/uninterpreted.rs' and
+//! 'serve/parse_metadata_sexp.rs'.
+
 use crate::refresh::ancestry::parent_reads_claims;
 use crate::attribution::AttributedSkgrepo;
 use crate::serve::util::sexp_to_client_string;

@@ -1,3 +1,6 @@
+//! 'path_from_pid_and_skgrepo' (a node's '.skg' file in a skgrepo) and
+//! 'setlike_vector_subtraction'.
+
 use crate::types::config::{SkgConfig, Skgrepo};
 use crate::types::misc::{ID, SkgrepoName};
 use std::collections::HashSet;

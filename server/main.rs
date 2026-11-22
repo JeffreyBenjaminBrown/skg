@@ -1,10 +1,13 @@
-//! USAGE:
-//! There is an optional command-line argument: the config file path.
-//! See docs/api-and-formats.org § skgconfig.toml,
-//! or the config at data/jeff/skgconfig.toml.
-//!
-//! Subcommand: import-org-roam <org-dir> <skg-output-dir> <repo-name>
-//! Converts org-roam .org files to .skg files.
+//! The 'skg' binary. With no argument, or a config file's path, it runs
+//! the server ('run_server'): it loads the config, builds the stores
+//! ('dbs/init.rs'), starts the repo watcher, and serves clients
+//! ('serve.rs'). With a subcommand's name it runs that subcommand
+//! instead ('subcommands.rs' holds their usage): 'import-org-roam',
+//! 'export-org', 'export-obsidian', 'import-obsidian',
+//! 'check-obsidian-vault', the attribution commands
+//! ('check-attributions', 'fix-attributions', 'show-forked-original')
+//! and 'check-config'. 'main' only dispatches. The config file is
+//! described in 'docs/api-and-formats.org', "skgconfig.toml".
 
 use skg::attribution::{
   attribution_problems, forked_original_at_fork_time, owned_attributed_files,

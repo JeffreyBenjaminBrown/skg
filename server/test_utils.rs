@@ -1,3 +1,11 @@
+//! Helpers for the tests in 'tests/' and the unit tests, not called by
+//! the server: test stores and their cleanup ('run_with_test_stores',
+//! 'run_with_shared_test_stores', 'TestStoreGuard'), test configs
+//! ('load_config_with_overrides'), saving and rendering a buffer as a
+//! client would ('save_and_rerender', 'single_root_view',
+//! 'multi_root_view'), comparing viewnode trees, and reading the
+//! server's length-prefixed messages ('read_lp_message').
+
 mod guard;
 pub use guard::TestStoreGuard;
 

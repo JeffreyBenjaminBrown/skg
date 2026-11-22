@@ -1,3 +1,14 @@
+//! A save's second half: carrying out a validated plan ('SavePlan',
+//! built by 'from_text.rs'). 'prepare_save_under_mutation_gate' checks
+//! everything and writes nothing ('PreparedSave'): the ordinary
+//! nodeInstructions' candidate graph, then the nodeMerges built from it.
+//! 'PreparedSave::apply' then writes the files, swaps in the in-Rust
+//! graph, and queues the Tantivy update, first for the ordinary
+//! instructions, then for the nodeMerges ('server/nodeMerge.rs'). Also a
+//! delete's cleanup of the references to what it deleted
+//! ('apply_delete_propagation_cleanup', 'DeleteFrom'). The request, and
+//! the rerender after, are 'serve/handlers/save_buffer.rs'.
+
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::prominence::prominence_sources_for_saved_from_inRustGraph;
 use crate::dbs::filesystem::one_node::{

@@ -1,3 +1,7 @@
+//! Tuning numbers: Tantivy's search and write limits, the search
+//! ranking's multipliers and coverage exponent, the default port and
+//! initial node limit, and the startup busy signal's timing.
+
 /// Tantivy returns at most this many raw results per search.
 /// Context-based reranking can reorder results arbitrarily,
 /// so this must be large enough to capture every match.

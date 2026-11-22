@@ -1,3 +1,6 @@
+//! 'TestStoreGuard': removes a test's Tantivy folder if the test panics
+//! before its own cleanup.
+
 use crate::test_utils::cleanup_test_tantivy;
 
 use std::path::PathBuf;
