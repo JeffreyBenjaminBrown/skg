@@ -1,3 +1,9 @@
+//! The "rebuild session-lifetime stores" request: re-read the config
+//! and every '.skg' file, and swap in a new in-Rust graph and Tantivy
+//! index ('rebuild_session_lifetime_stores_in_place', which other code
+//! calls after rewriting files). An invalid config leaves the old
+//! stores live; a changed setting only a restart applies is warned of.
+
 use crate::prominence::{
   compute_and_store_prominence_sources,
   content_maps_from_nodes,

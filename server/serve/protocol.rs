@@ -1,3 +1,8 @@
+//! The names on the wire: 'RequestType', every request a client may
+//! send, read from its '(request . "NAME")' field, and 'TcpToClient',
+//! every message type the server answers with. The fields each carries
+//! are in 'docs/api-and-formats.org' and in each handler.
+
 /// See api-and-formats.org for details.
 /// Enum of all request types the server recognizes.
 /// The client format is a string in the s-exp

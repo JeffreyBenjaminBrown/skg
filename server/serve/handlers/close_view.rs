@@ -1,3 +1,6 @@
+//! The "close view" request: forget one open view, and the graph
+//! straddle once no buffer of the diff view is open.
+
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{

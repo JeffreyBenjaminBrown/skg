@@ -1,3 +1,10 @@
+//! The wire's plumbing, shared by every handler: reading a request's
+//! fields ('request_type_from_request', 'value_from_request_sexp',
+//! 'viewforest_id_from_request'), building an answer's s-expressions
+//! ('tag_sexp_response', 'tag_text_response', the 'format_*_sexp' and
+//! '*_entry_sexp' builders), and sending it length-prefixed
+//! ('send_response_with_length_prefix').
+
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::views_state::ViewforestId;

@@ -1,3 +1,10 @@
+//! The "delete references to absent node" request: remove every owned
+//! relationship to an ID that names no node. It first answers with a
+//! preview of the links it would leave, and rewrites only when the
+//! request carries that preview's approval; then it rerenders the open
+//! views that show what changed. Refused under a skgrepo restriction.
+//! The rewrite itself is 'server/delete_references_to_absent_node.rs'.
+
 use crate::rerender_pass::DiffViewBufferRerender;
 use crate::delete_references_to_absent_node::{
   preview, preview_warning_org, result_org, rewrite };

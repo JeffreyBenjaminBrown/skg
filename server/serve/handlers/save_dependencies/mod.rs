@@ -1,3 +1,9 @@
+//! What a save touches, and which open views it would clobber: the
+//! IDs a save touches and their neighborhood before and after it
+//! ('SaveAffectedIds'), which selects the clean views to redraw; and
+//! the dirty views that hold a copy of a node it changes
+//! ('dirty_view_conflicts'), which refuse the save.
+
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, UPDATE_RELEVANT_ORDINARY_RELATIONS,

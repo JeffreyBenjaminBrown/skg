@@ -1,3 +1,7 @@
+//! The "titles by ids" request: the title of each ID, from Tantivy,
+//! and for a node the diff view shows as deleted or added, from the
+//! git diff.
+
 use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::dbs::tantivy::{title_and_skgrepo_by_gnid, titles_by_gnids};
 use crate::dbs::in_rust_graph::InRustGraph;

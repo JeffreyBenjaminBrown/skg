@@ -1,3 +1,8 @@
+//! The "import md and org" request: import Markdown and Org files as
+//! nodes. It answers first with a preview ('PendingImport', kept by the
+//! connection), and writes only when the client approves it. The
+//! import itself is 'server/import_md_and_org/'.
+
 use crate::import_md_and_org::batch::{
   ImportPreparation, PreparedImportBatch, prepare_import_batch};
 use crate::serve::protocol::TcpToClient;

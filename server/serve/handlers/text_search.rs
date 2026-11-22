@@ -1,3 +1,9 @@
+//! The "text search" request: search Tantivy ('dbs/tantivy/search.rs'),
+//! group the hits by node ('group_matches_by_gnid'), rank them (with
+//! 'text_search/coverage.rs'), and answer with a search buffer
+//! ('draw_search_buffer', 'build_search_viewforest'), or with the
+//! overPrivateText challenge when the hits might reveal such text.
+
 mod coverage;
 
 use coverage::{CoverageMatcher, build_coverage_matcher, coverage_factor};

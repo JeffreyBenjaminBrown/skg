@@ -1,3 +1,8 @@
+//! The skgrepo restriction requests: list the skgrepo sets, report the
+//! connection's restriction, or switch it ('set_skgrepo_restriction'),
+//! rerendering every open view in place under the new one. What a
+//! restriction is, is 'server/skgrepo_sets.rs'.
+
 use crate::rerender_pass::DiffViewBufferRerender;
 use crate::serve::ViewsState;
 use crate::serve::rerender_stream::{

@@ -1,3 +1,7 @@
+//! The "single root content view" request: draw a new view rooted at
+//! one node ('render_initial_view' in 'server/update_buffer.rs'), or
+//! name the open view already rooted there.
+
 use crate::types::env::SkgEnv;
 use crate::serve::ViewsState;
 use crate::update_buffer::multi_root_view_via_runtime;

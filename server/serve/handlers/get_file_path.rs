@@ -1,3 +1,7 @@
+//! The "get file path" request: the path of a node's '.skg' file in a
+//! given skgrepo, if that skgrepo is shown under the connection's
+//! skgrepo restriction.
+
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   value_from_request_sexp,

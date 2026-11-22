@@ -1,3 +1,20 @@
+//! The TCP server a client talks to. 'serve' accepts each connection on
+//! its own thread; 'handle_emacs' reads one request per line, hands each to
+//! 'dispatch_request', which picks its handler by request type, and
+//! between requests tells the client what the repo watcher reloaded.
+//! A connection's own state is 'ViewsState' (its open views and its
+//! graph straddle); the stores are in 'SkgEnv'. The protocol is
+//! 'docs/api-and-formats.org'.
+//! - 'handlers': one file per request type (and the save's helpers).
+//! - 'protocol': the request and response type names ('RequestType',
+//!   'TcpToClient').
+//! - 'util': reading request fields and writing length-prefixed answers.
+//! - 'rerender_stream': rerendering open views outside a save, and
+//!   streaming them to the client.
+//! - 'parse_metadata_sexp': reading a headline's '(skg ...)' metadata.
+//! - 'metadata_fields': the table of which headline kind takes which
+//!   field, shared with the clients.
+
 pub mod handlers;
 pub mod metadata_fields;
 pub mod parse_metadata_sexp;

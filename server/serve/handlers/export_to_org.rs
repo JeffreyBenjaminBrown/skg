@@ -1,3 +1,7 @@
+//! The "export to org" request: export every export root, under the
+//! requested skgrepo restriction, into the directory it names, reading
+//! the '.skg' files fresh. The export itself is 'server/export_org.rs'.
+
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::export_org::{
   export_candidate_pids, export_to_org, ExportReport};

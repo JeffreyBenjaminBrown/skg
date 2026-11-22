@@ -1,3 +1,16 @@
+//! The "save buffer" request, skg's central write: a saved buffer
+//! becomes a plan ('from_text.rs'), the plan is carried out
+//! ('save.rs'), and the saved view and every other open view it
+//! changed are rerendered and streamed back ('rerender_pass.rs').
+//! 'handle_save_buffer_request' reads the request and sends the early
+//! lock; 'update_from_and_rerender_buffer' and its '_with_*' forms run
+//! the pipeline. Instead of saving, the answer may be a preview or a
+//! confirmation to ask for (forks, strandeds, deletes under a skgrepo
+//! restriction, telescope hoists, overPrivateText text). The request's
+//! fields and answers are 'docs/api-and-formats.org', "Save buffer".
+//! Stale graphnodes are 'save_staleness.rs'; conflicting dirty views,
+//! 'save_dependencies/'.
+
 use crate::diff_view::change_leaves::BufferProcessedSummary;
 use crate::dbs::in_rust_graph::{
   in_rust_graph_coherent_with_nodeInstructions_in, new_handle };
