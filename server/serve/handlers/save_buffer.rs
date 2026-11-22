@@ -337,14 +337,9 @@ pub fn handle_save_buffer_request (
   {
     (Ok (_envelope), Err (error_msg)) if preview =>
       send_preview_refusal (stream, vec! [ error_msg ], Vec::new ()),
-    (Ok (_envelope), Err (error_msg)) => {
+    (Ok (_envelope), Err (error_msg)) =>
       // The envelope was read, so the stream stays in step; the save is refused.
-      send_response_with_length_prefix (
-        stream,
-        & tag_sexp_response (
-          TcpToClient::SaveResult,
-          & sexp_to_client_string ( &empty_response_sexp (
-            &error_msg, &[], &save_point_position )) )); }
+      send_save_refusal (stream, &error_msg, &[], &save_point_position),
     (Ok (envelope), Ok ((named_diffView_buffer_kind, perspective))) => {
       if let (Ok (viewforest_id), false) =
         (&viewforest_id_from_request_result, preview) {
@@ -373,54 +368,7 @@ pub fn handle_save_buffer_request (
         { Ok (mut save_response) => {
             save_response . save_point_position =
               save_point_position . clone ();
-            if save_response . preview {
-              send_response_with_length_prefix (
-                stream,
-                & tag_sexp_response (
-                  TcpToClient::SavePreview,
-                  & save_response . to_preview_sexp_string () ));
-              return; }
-            if let Some (count) = save_response . delete_from_confirmation {
-              send_response_with_length_prefix (
-                stream,
-                & tag_sexp_response (
-                  TcpToClient::DeleteFromConfirmation,
-                  & delete_from_confirmation_response (count) ));
-              return; }
-            if let Some (strandeds) = &save_response . strandeds_confirmation {
-              send_response_with_length_prefix (
-                stream,
-                & tag_sexp_response (
-                  TcpToClient::StrandedsConfirmation,
-                  & strandeds_confirmation_response (strandeds) ));
-              return; }
-            match (&save_response . hoist_confirmation,
-                   &save_response . fork_confirmation,
-                   &save_response . text_release_confirmation) {
-              (Some (candidates), _, _) =>
-                send_response_with_length_prefix (
-                  stream,
-                  & tag_sexp_response (
-                    TcpToClient::TelescopeHoistConfirmation,
-                    &hoist_confirmation_response (candidates) )),
-              (None, Some (to_minibuffer), _) =>
-                // A save that found forks and was not approved: nothing
-                // skgsave-committed; send the confirmation buffer instead of a
-                // save-result.
-                send_response_with_length_prefix (
-                  stream,
-                  & tag_sexp_response (
-                    TcpToClient::ForkConfirmation,
-                    & format_fork_confirmation_response_sexp (
-                      & save_response . saved_view, to_minibuffer ))),
-              (None, None, Some (confirmation)) =>
-                send_response_with_length_prefix (stream, confirmation),
-              (None, None, None) =>
-                send_response_with_length_prefix (
-                  stream,
-                  & tag_sexp_response (
-                    TcpToClient::SaveResult,
-                    & save_response . to_sexp_string () )), }}
+            send_save_response (stream, &save_response); }
           Err (err) if preview => {
             // A preview the save would refuse: its errors, as a save's.
             let (errors, warnings) : (Vec<String>, Vec<String>) =
@@ -444,28 +392,15 @@ pub fn handle_save_buffer_request (
                 SaveError::BufferValidationErrors { warnings, .. } =>
                   warnings,
                 _ => &[], };
-              let response_sexp : String =
-                sexp_to_client_string ( &empty_response_sexp (
-                  & format_save_error_as_org (save_error),
-                  warnings,
-                  & save_point_position ));
-              send_response_with_length_prefix (
-                stream,
-                & tag_sexp_response (
-                  TcpToClient::SaveResult, & response_sexp ));
+              send_save_refusal (
+                stream, & format_save_error_as_org (save_error),
+                warnings, & save_point_position );
             } else {
               let error_msg : String =
                 format!("Error processing buffer content: {}", err);
               tracing::error!("{}", error_msg);
-              let response_sexp : String =
-                sexp_to_client_string ( &empty_response_sexp (
-                  &error_msg,
-                  &[],
-                  &save_point_position ));
-              send_response_with_length_prefix (
-                stream,
-                & tag_sexp_response (
-                  TcpToClient::SaveResult, &response_sexp )); }} }}; }
+              send_save_refusal (
+                stream, &error_msg, &[], &save_point_position ); }} }}; }
     (Err (err), _) if preview =>
       send_preview_refusal (
         stream,
@@ -475,15 +410,64 @@ pub fn handle_save_buffer_request (
       let error_msg : String =
         format! ("NOTHING WAS SAVED\n\nError reading save payload: {}", err );
       tracing::error! ( "{}", error_msg );
-      let response_sexp : String =
-        sexp_to_client_string ( &empty_response_sexp (
-          &error_msg,
-          &[],
-          &save_point_position ));
+      send_save_refusal (
+        stream, &error_msg, &[], &save_point_position ); }} }
+
+/// Send the answer to a save the pipeline finished: a preview's,
+/// a confirmation the save asks for (each checked in this order),
+/// or else its save-result.
+fn send_save_response (
+  stream        : &mut TcpStream,
+  save_response : &SaveResponse,
+) {
+  if save_response . preview {
+    send_response_with_length_prefix (
+      stream,
+      & tag_sexp_response (
+        TcpToClient::SavePreview,
+        & save_response . to_preview_sexp_string () ));
+    return; }
+  if let Some (count) = save_response . delete_from_confirmation {
+    send_response_with_length_prefix (
+      stream,
+      & tag_sexp_response (
+        TcpToClient::DeleteFromConfirmation,
+        & delete_from_confirmation_response (count) ));
+    return; }
+  if let Some (strandeds) = &save_response . strandeds_confirmation {
+    send_response_with_length_prefix (
+      stream,
+      & tag_sexp_response (
+        TcpToClient::StrandedsConfirmation,
+        & strandeds_confirmation_response (strandeds) ));
+    return; }
+  match (&save_response . hoist_confirmation,
+         &save_response . fork_confirmation,
+         &save_response . text_release_confirmation) {
+    (Some (candidates), _, _) =>
       send_response_with_length_prefix (
         stream,
         & tag_sexp_response (
-          TcpToClient::SaveResult, &response_sexp )); }} }
+          TcpToClient::TelescopeHoistConfirmation,
+          &hoist_confirmation_response (candidates) )),
+    (None, Some (to_minibuffer), _) =>
+      // A save that found forks and was not approved: nothing
+      // skgsave-committed; send the confirmation buffer instead of a
+      // save-result.
+      send_response_with_length_prefix (
+        stream,
+        & tag_sexp_response (
+          TcpToClient::ForkConfirmation,
+          & format_fork_confirmation_response_sexp (
+            & save_response . saved_view, to_minibuffer ))),
+    (None, None, Some (confirmation)) =>
+      send_response_with_length_prefix (stream, confirmation),
+    (None, None, None) =>
+      send_response_with_length_prefix (
+        stream,
+        & tag_sexp_response (
+          TcpToClient::SaveResult,
+          & save_response . to_sexp_string () )), } }
 
 pub fn parse_save_request_envelope (
   content   : &str,
@@ -634,6 +618,21 @@ fn sexp_atom_string (
     Sexp::Atom (Atom::S (text)) => Ok (text . clone ()),
     _ => Err (format! ("Malformed {}: expected text", context) . into ()), }
 }
+
+/// Answer a refused save: 'save-result' with no content, the refusal
+/// as its one error, and the request's point position.
+fn send_save_refusal (
+  stream              : &mut TcpStream,
+  error               : &str,
+  warnings            : &[String],
+  save_point_position : &Option<SavePointPosition>,
+) {
+  send_response_with_length_prefix (
+    stream,
+    & tag_sexp_response (
+      TcpToClient::SaveResult,
+      & sexp_to_client_string ( &empty_response_sexp (
+        error, warnings, save_point_position )) )); }
 
 /// Create an s-expression with nil content and an error message.
 fn empty_response_sexp (
@@ -832,9 +831,6 @@ fn delete_from_confirmation_response (
     Sexp::List ( vec! [ atom ("count"), Sexp::Atom ( Atom::I (count as i64) ) ] ),
     Sexp::List ( vec! [ atom ("prompt"), atom (&prompt) ] ), ] ) . to_string () }
 
-/// Whether this save request carries '(approved-forks . "true")', set by
-/// the client when the user approves a fork-confirmation. Absent or any
-/// other value means not approved.
 /// Answer a preview whose save would be refused: 'save-preview' with
 /// no hides and the refusal's errors and warnings.
 fn send_preview_refusal (
@@ -860,6 +856,9 @@ fn preview_from_request (
     . map ( |v| v == "true" )
     . unwrap_or (false) }
 
+/// Whether this save request carries '(approved-forks . "true")', set by
+/// the client when the user approves a fork-confirmation. Absent or any
+/// other value means not approved.
 fn fork_approved_from_request (
   request : &str,
 ) -> bool {
