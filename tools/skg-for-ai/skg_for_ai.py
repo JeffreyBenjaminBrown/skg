@@ -723,42 +723,20 @@ def command_save (arguments):
       "Nothing was saved: some titles hold a handle's bracket; see above." )
   connection = connection_for_saved_view (saved_view)
   try:
-    ownership = fetch_repo_ownership (connection)
-    errors = handle_error_lines (edited, saved_view . headline_of_handle)
-    word_check = ( OutlineWordCheck () if errors else outline_word_check (
-      edited, saved_view . headline_of_handle, ownership ))
-    errors = ( errors or word_check . error_lines
-               or resolve_placed_nodes (connection, edited)
-               or resolve_merge_acquirees (connection, edited)
-               or retyped_headline_error_lines (
-                    edited, original, saved_view . headline_of_handle ))
-    assign_placed_view_requests (edited, saved_view . headline_of_handle)
-    reworded_pairs = [] if errors else reworded_headline_pairs (edited, original)
-    if arguments . keep_ids:
-      give_new_headlines_their_removed_handles (edited, reworded_pairs)
-    questions = (
-      [] if arguments . keep_ids or arguments . all_new
-      else reworded_question_lines (
-             edited, reworded_pairs, saved_view . headline_of_handle ))
-    changes = [] if errors else change_report_lines (
-      edited, original, saved_view . headline_of_handle )
-    forks = PredictedForks () if errors else predicted_forks (
-      edited, original, saved_view . headline_of_handle, ownership,
-      arguments . fork_into, bool (changes) )
-    errors = errors + forks . error_lines
-    changes = [] if errors else changes + forks . lines + questions
+    report = save_report (connection, saved_view, edited, original, arguments)
     print (report_head)
-    for line in errors + (
-        changes + word_check . note_lines if changes
-        else [] if errors else word_check . note_lines + [ "No changes." ] ):
+    for line in report . error_lines + (
+        report . change_lines + report . note_lines if report . change_lines
+        else [] if report . error_lines
+        else report . note_lines + [ "No changes." ] ):
       print (line)
-    if errors:
+    if report . error_lines:
       raise SkgToolError (
         "Nothing was saved: some handles are in error; see above." )
-    if not changes:
+    if not report . change_lines:
       print ( "Nothing to save." )
       return
-    if questions:
+    if report . question_lines:
       print ( "Not saved. Answer the questions with '--keep-ids' or "
               "'--all-new', or on each new headline (its removed handle, or "
               "'⟨new⟩'), and run again with '--yes' to save." )
@@ -782,36 +760,99 @@ def command_save (arguments):
                 "the save's answer will say what it hid." )
       print ( "Not saved. Run again with '--yes' to save." )
       return
-    answers = SaveAnswers ()
-    for attempt in range (SAVE_ATTEMPTS_LIMIT):
-      messages = connection . save_buffer (
-        saved_view . sidecar [ "view_id" ], buffer_text,
-        saved_view . full_text,
-        saved_view . sidecar [ "request" ] . get ("buffer"), answers,
-        perspective_of_sidecar (saved_view . sidecar) )
-      if response_type ( messages [-1] ) not in SAVE_QUESTION_TYPES:
-        break
-      answer_save_question ( messages [-1], answers, arguments, forks )
-    terminal = messages [-1]
-    if response_type (terminal) == "overPrivateText-telescope-confirmation":
-      overPrivateText_answer (
-        terminal, arguments . show_overPrivateText, "the save succeeded, but ",
-        "The save succeeded, but its re-rendered view is withheld; the files "
-        "are out of date. View the node again with '--show-overPrivateText'.",
-        approval = "the withheld rerender is asked for" )
-      terminal = release_withheld_save_rerender (
-        connection, terminal, saved_view . sidecar [ "view_id" ] )
-    rerendered = rerendered_view_of_save ( terminal, saved_view . sidecar )
-    connection . log_view_event (
-      "saved", saved_view . directory, saved_view . base_name )
-    written_paths = write_view_files (
-      connection, rerendered, saved_view . directory, saved_view . base_name,
-      saved_view . sidecar [ "summary" ] )
-    release_view (connection, rerendered . view_id)
+    written_paths = send_save_and_write_its_rerender (
+      connection, saved_view, buffer_text, arguments, report . forks )
   finally:
     connection . close ()
   for path in written_paths:
     print (path)
+
+class SaveReport:
+  """What 'save_report' finds in an edited compact view. 'error_lines'
+  stop the save. 'change_lines' are the changes, then the forks
+  ('forks', a 'PredictedForks') and the questions; none when there are
+  errors. 'question_lines' ask whether new headlines reword removed
+  ones, and stop the save until answered. 'note_lines' say what the
+  handles' words leave out."""
+  def __init__ (self, error_lines, change_lines, question_lines,
+                note_lines, forks):
+    self . error_lines = error_lines
+    self . change_lines = change_lines
+    self . question_lines = question_lines
+    self . note_lines = note_lines
+    self . forks = forks
+
+def save_report (connection, saved_view, edited, original, arguments):
+  """Read EDITED, the edited compact view's outline, against ORIGINAL,
+  the full view's: its errors, its changes, the forks it would make and
+  the questions it raises, as a 'SaveReport'. It completes EDITED as
+  the save needs it: a placed node's title and request, and with
+  '--keep-ids' the removed handles of new headlines that reword
+  removed ones. A placed node and a merge's acquiree are looked up
+  on CONNECTION."""
+  ownership = fetch_repo_ownership (connection)
+  errors = handle_error_lines (edited, saved_view . headline_of_handle)
+  word_check = ( OutlineWordCheck () if errors else outline_word_check (
+    edited, saved_view . headline_of_handle, ownership ))
+  errors = ( errors or word_check . error_lines
+             or resolve_placed_nodes (connection, edited)
+             or resolve_merge_acquirees (connection, edited)
+             or retyped_headline_error_lines (
+                  edited, original, saved_view . headline_of_handle ))
+  assign_placed_view_requests (edited, saved_view . headline_of_handle)
+  reworded_pairs = [] if errors else reworded_headline_pairs (edited, original)
+  if arguments . keep_ids:
+    give_new_headlines_their_removed_handles (edited, reworded_pairs)
+  questions = (
+    [] if arguments . keep_ids or arguments . all_new
+    else reworded_question_lines (
+           edited, reworded_pairs, saved_view . headline_of_handle ))
+  changes = [] if errors else change_report_lines (
+    edited, original, saved_view . headline_of_handle )
+  forks = PredictedForks () if errors else predicted_forks (
+    edited, original, saved_view . headline_of_handle, ownership,
+    arguments . fork_into, bool (changes) )
+  errors = errors + forks . error_lines
+  changes = [] if errors else changes + forks . lines + questions
+  return SaveReport ( error_lines = errors, change_lines = changes,
+                      question_lines = questions,
+                      note_lines = word_check . note_lines, forks = forks )
+
+def send_save_and_write_its_rerender (connection, saved_view, buffer_text,
+                                      arguments, forks):
+  """Send the save of BUFFER_TEXT, answering the server's questions as
+  ARGUMENTS say and approving only the forks FORKS predicts
+  ('answer_save_question'); release a withheld rerender when
+  '--show-overPrivateText' allows; print the server's answer, and
+  write its re-rendered view over SAVED_VIEW's three files. Return
+  their paths."""
+  answers = SaveAnswers ()
+  for attempt in range (SAVE_ATTEMPTS_LIMIT):
+    messages = connection . save_buffer (
+      saved_view . sidecar [ "view_id" ], buffer_text,
+      saved_view . full_text,
+      saved_view . sidecar [ "request" ] . get ("buffer"), answers,
+      perspective_of_sidecar (saved_view . sidecar) )
+    if response_type ( messages [-1] ) not in SAVE_QUESTION_TYPES:
+      break
+    answer_save_question ( messages [-1], answers, arguments, forks )
+  terminal = messages [-1]
+  if response_type (terminal) == "overPrivateText-telescope-confirmation":
+    overPrivateText_answer (
+      terminal, arguments . show_overPrivateText, "the save succeeded, but ",
+      "The save succeeded, but its re-rendered view is withheld; the files "
+      "are out of date. View the node again with '--show-overPrivateText'.",
+      approval = "the withheld rerender is asked for" )
+    terminal = release_withheld_save_rerender (
+      connection, terminal, saved_view . sidecar [ "view_id" ] )
+  rerendered = rerendered_view_of_save ( terminal, saved_view . sidecar )
+  connection . log_view_event (
+    "saved", saved_view . directory, saved_view . base_name )
+  written_paths = write_view_files (
+    connection, rerendered, saved_view . directory, saved_view . base_name,
+    saved_view . sidecar [ "summary" ] )
+  release_view (connection, rerendered . view_id)
+  return written_paths
 
 def command_extend (arguments):
   """Send "extend diff view" for a buffer of the diff view,
