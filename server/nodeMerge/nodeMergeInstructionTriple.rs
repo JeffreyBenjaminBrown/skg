@@ -142,29 +142,11 @@ fn acquirer_after_nodeMerge(
       acquiree_before_nodeMerge . extra_ids . clone() );
     updated_acquirer . extra_ids =
       dedup_vector (combined_extra_ids); }
-  // Combining lists of relation partners (compose both, concatenate
-  // acquiree-after-acquirer, dedup, decompose): relRepos are preserved, so
-  // a merge cannot silently de-privatize a relationship. On a member both
-  // sides carry, the more private skgrepo wins (the safe tie-break); every
-  // skgrepo clamps at the acquirer's home, since no section may be more
-  // public than its home.
   let key = |gnid : &ID| -> ID { graph . pid_else_raw_id (gnid) };
   let combine_rel_partners =
     |lists : &[&[RelPartner<ID>]]| -> Vec<RelPartner<ID>> {
-      let home    : &SkgrepoName = & updated_acquirer . home_skgrepo;
-      let mut out : Vec<RelPartner<ID>> = Vec::new ();
-      for list in lists {
-        for m in *list {
-          let skgrepo : SkgrepoName = config . more_private_of (
-            m . relRepo . clone (), home . clone () );
-          match out . iter_mut ()
-            . find ( |o| key (&o . member) == key (&m . member) ) {
-            Some (existing) => {
-              existing . relRepo = config . more_private_of (
-                existing . relRepo . clone (), skgrepo ); }
-            None => out . push ( RelPartner::at_relRepo (
-              skgrepo, m . member . clone () )), }} }
-      out };
+      combined_rel_partners (
+        lists, & updated_acquirer . home_skgrepo, config, &key ) };
   let new_contains : HashSet<ID> = // acquirer's old content + acquiree's old content, by pid (the preserver is new, and hidden by neither)
     members_of (& acquirer_before_nodeMerge . contains) . iter ()
     . chain ( members_of (& acquiree_before_nodeMerge . contains) . iter () )
@@ -183,20 +165,11 @@ fn acquirer_after_nodeMerge(
     combined };
   { // Union aliases (parallel to extra_ids): a merged node should
     // still be findable by the acquiree's old aliases.
-    let mut combined : Vec<RelPartner<String>> = Vec::new ();
-    for list in [ acquirer_before_nodeMerge . aliases . or_default (),
-                  acquiree_before_nodeMerge . aliases . or_default () ] {
-      for m in list {
-        let skgrepo : SkgrepoName = config . more_private_of (
-          m . relRepo . clone (),
-          updated_acquirer . home_skgrepo . clone () );
-        match combined . iter_mut ()
-          . find ( |o| o . member == m . member ) {
-          Some (existing) => {
-            existing . relRepo = config . more_private_of (
-              existing . relRepo . clone (), skgrepo ); }
-          None => combined . push ( RelPartner::at_relRepo (
-            skgrepo, m . member . clone () )), }} }
+    let combined : Vec<RelPartner<String>> = combined_rel_partners (
+      & [ acquirer_before_nodeMerge . aliases . or_default (),
+          acquiree_before_nodeMerge . aliases . or_default () ],
+      & updated_acquirer . home_skgrepo, config,
+      & |alias : &String| -> String { alias . clone () } );
     updated_acquirer . aliases =
       MSV::Specified (combined); }
   { // Combine forks
@@ -227,6 +200,33 @@ fn acquirer_after_nodeMerge(
     updated_acquirer . hides =
       MSV::Specified (combined); }
   Ok (updated_acquirer) }
+
+/// Combines lists of relation partners (compose both, concatenate
+/// acquiree-after-acquirer, dedup, decompose): relRepos are preserved, so
+/// a merge cannot silently de-privatize a relationship. On a member both
+/// sides carry ('key' says which members are one), the more private
+/// skgrepo wins (the safe tie-break); every skgrepo clamps at the
+/// acquirer's home, since no section may be more public than its home.
+/// Each record is kept as the first list naming its member names it.
+fn combined_rel_partners<M : Clone, K : PartialEq> (
+  lists  : &[&[RelPartner<M>]],
+  home   : &SkgrepoName,
+  config : &SkgConfig,
+  key    : &dyn Fn (&M) -> K,
+) -> Vec<RelPartner<M>> {
+  let mut out : Vec<RelPartner<M>> = Vec::new ();
+  for list in lists {
+    for m in *list {
+      let skgrepo : SkgrepoName = config . more_private_of (
+        m . relRepo . clone (), home . clone () );
+      match out . iter_mut ()
+        . find ( |o| key (&o . member) == key (&m . member) ) {
+        Some (existing) => {
+          existing . relRepo = config . more_private_of (
+            existing . relRepo . clone (), skgrepo ); }
+        None => out . push ( RelPartner::at_relRepo (
+          skgrepo, m . member . clone () )), }} }
+  out }
 
 /// The ids 'node' shows as unintegrated content of the members of
 /// its forks folder: contained by some member its forks folder shows
