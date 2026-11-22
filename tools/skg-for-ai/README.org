@@ -365,6 +365,22 @@ id', 'pop link' and 'pop node' ('C-c O i', 'O l', 'O n') print the
 same and remove the entry. The tool has no cursor, so pasting is
 writing what it prints into a compact view.
 
+'chain VIEW HANDLE' prints the chain of the headline HANDLE in VIEW
+(its sidecar, full or compact view, or a folder holding one view):
+a link to each note from the view's top-level one down to it,
+folders skipped, joined by the graph edge its metadata records
+between each note and the next, as the clients' 'skg-push-ancestry'
+('C-c U') pushes it and 'C-c o l' pastes it: '/' contains, '\'
+is contained by, '~' forks or is forked by, '->' links to, '<-' is
+linked to by, 'hides', 'is hidden by'. So '[[id:A][a]] / [[id:B][b]] ~
+[[id:C][c]]' says a contains b, and c is a fork partner of b, in b's
+forks folder. The edge is the relation that put the note there (its
+'(birth ...)'), else the first of contains, forks, links to and hides
+whose '(rels ...)' names the note above among its ancestors. Where no
+edge joins a note to the one above (an indirect member of a forks
+folder, say), it refuses, naming both. It needs no server, and keeps
+no stack: write what it prints where the chain is wanted.
+
 Options, after the command: '--port N' for every command ('save',
 'extend', 'close' and 'perspective' require the sidecar's; a
 command run through a daemon's folder talks to the daemon's server
@@ -403,7 +419,7 @@ command that needs a server and is given no port, by '--port',
 folder, is refused before it connects to anything: it prints one line
 saying to name the server with '--port PORT' or 'SKG_PORT', and exits
 1. 'daemon' needs a port too. Commands that need no server run
-without one: 'linkstack' but 'push', 'daemon --stop', and
+without one: 'linkstack' but 'push', 'chain', 'daemon --stop', and
 'delete-references' without '--yes'.
 
 * The files it writes
@@ -1985,7 +2001,8 @@ round and its answer reads as it is.
 | C-c v l                    | skg-restrict-repo-set                            | 'restrict NAME', '--foreign shown' or 'hidden', through a daemon; '--show-overPrivateText'                                                                    |
 | M-x                        | skg-list-repo-sets, skg-show-skgrepo-restriction | 'restrict' with no argument                                                                                                                                   |
 | C-c v r, C-c v R           | skg-readable-ids-mode, -refresh                  | Emacs-only by nature                                                                                                                                          |
-| C-c u, C-c v s             | skg-id-push, skg-view-linkstack                  | 'linkstack push ID-OR-LINK', 'linkstack show'; the stack is a file in '--out-dir'                                                                             |
+| C-c u, C-c v s             | skg-push-id, skg-view-linkstack                  | 'linkstack push ID-OR-LINK', 'linkstack show'; the stack is a file in '--out-dir'                                                                             |
+| C-c U                      | skg-push-ancestry                                | 'chain VIEW HANDLE' prints the chain a paste would insert; the tool's stack keeps none                                                                        |
 | C-c o i, O i; C-c o l, O l | skg-paste-id, skg-pop-id, -link                  | 'linkstack paste id' or 'link', 'linkstack pop id' or 'link' print what to write                                                                              |
 | C-c o n, C-c O n           | skg-paste-node, skg-pop-node                     | 'linkstack paste node', 'linkstack pop node' print 'LABEL ⟨node:ID⟩'                                                                                          |
 | C-c v w                    | skg-view-without-metadata                        | needs nothing: the compact view, but for its handles                                                                                                          |

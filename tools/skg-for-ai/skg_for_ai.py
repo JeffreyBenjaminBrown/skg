@@ -189,6 +189,8 @@ def command_needs_named_port (arguments):
     return False
   if arguments . command == "linkstack":
     return arguments . action == "push"
+  if arguments . command == "chain":
+    return False
   if arguments . command == "delete-references":
     return arguments . yes
   return True
@@ -233,6 +235,9 @@ def run_command (arguments):
     return
   if arguments . command == "linkstack":
     command_linkstack (arguments)
+    return
+  if arguments . command == "chain":
+    command_chain (arguments)
     return
   connection = connect_to_server (arguments . port)
   try:
@@ -532,6 +537,20 @@ def parse_command_line (argv):
     "--show-overPrivateText", action = "store_true",
     help = ( "approve releasing text from overPrivateText telescopes the "
              "views would show under the new restriction" ))
+  chain_parser = commands . add_parser (
+    "chain",
+    help = ( "print the chain of the headline HANDLE in VIEW: links to the "
+             "notes from the view's top down to it, joined by the graph's "
+             "edges ('/' contains, '~' forks, '->' links to, 'hides'), as "
+             "the clients' 'C-c U' pushes and 'C-c o l' pastes it; it needs "
+             "no server" ),
+    parents = [ port_option ] )
+  chain_parser . add_argument (
+    "view_files",
+    help = ( "the view's BASE.view.json, BASE.full.org or BASE.compact.org, "
+             "or a directory holding only one view" ))
+  chain_parser . add_argument (
+    "handle", help = "the headline's handle: its viewnode ID, as '0d'" )
   linkstack_parser = commands . add_parser (
     "linkstack",
     help = ( "the linkstack, kept in OUT_DIR: 'push ID-OR-LINK', 'paste "
@@ -1476,6 +1495,104 @@ def command_linkstack (arguments):
           [ arguments . argument ] )
   if arguments . action == "pop":
     write_linkstack ( path, stack [ 1 : ] )
+
+# ============================================================
+# The chain of a headline: its view-ancestry as links joined by the
+# graph's edges, as the clients' 'skg-push-ancestry' ('C-c U') pushes
+# it and 'skg-paste-link' pastes it ('elisp/skg-push-ancestry.el').
+# ============================================================
+
+# The relations an ancestry edge can be, in the order the edge prefers
+# them when no birth fact chooses one; and what each reads as in a
+# chain, between a note (first) and the one below it, by side: 'in'
+# where the note above relates to the one below, 'out' the reverse.
+ANCESTRY_RELATIONS = ( "contains", "forks", "linksTo", "hides" )
+ANCESTRY_EDGE_TEXTS = {
+  "contains" : { "in" : "/",     "out" : "\\" },
+  "forks"    : { "in" : "~",     "out" : "~" },
+  "linksTo"  : { "in" : "->",    "out" : "<-" },
+  "hides"    : { "in" : "hides", "out" : "is hidden by" } }
+
+def command_chain (arguments):
+  """Print the chain of the headline whose handle is HANDLE in VIEW:
+  the notes from the view's top-level one down to it, folder
+  headlines skipped, each a link '[[id:ID][TITLE]]', joined by the
+  edge the metadata records between them ('ancestry_edge'). Refuses,
+  naming the two notes, where no edge joins a note to the one above."""
+  parsed_view = load_saved_view (arguments . view_files) . parsed_view
+  headlines = [ line for line in parsed_view if line . is_headline ]
+  index = next ( ( i for i, line in enumerate (headlines)
+                   if headline_viewnode_id (line . metadata) == arguments . handle ),
+                 None )
+  if index is None:
+    raise SkgToolError ( f"No headline of the view has the handle {arguments . handle}." )
+  if headline_gnid ( headlines [index] . metadata ) is None:
+    raise SkgToolError ( f"The headline {arguments . handle} is no note: "
+                         "a folder, say, which no chain can end in." )
+  print ( chain_text ( headlines, index ))
+
+def chain_text (headlines, index):
+  """The chain of the headline HEADLINES [INDEX], root first."""
+  below = headlines [index]
+  pieces = [ chain_link (below) ]
+  while True:
+    found = nearest_note_above (headlines, headlines . index (below))
+    if found is None:
+      return " " . join ( reversed (pieces) )
+    above, generation = found
+    edge = ancestry_edge ( below . metadata, generation )
+    if edge is None:
+      raise SkgToolError (
+        f"No edge of the graph joins '{below . title}' to '{above . title}', "
+        "the note above it in this view, so no chain runs through them." )
+    relation, sides = edge
+    pieces += [ ANCESTRY_EDGE_TEXTS [relation] [ sides [0] ], chain_link (above) ]
+    below = above
+
+def chain_link (headline):
+  return f"[[id:{headline_gnid (headline . metadata)}][{headline . title}]]"
+
+def nearest_note_above (headlines, index):
+  """( HEADLINE, GENERATION ) of the nearest ancestor of HEADLINES
+  [INDEX] that names a node, GENERATION levels up, counting the
+  headlines between (folders) as ancestor generations do; None at the
+  top."""
+  level = len ( headlines [index] . stars . strip () )
+  generation = 0
+  for candidate in reversed ( headlines [ : index ] ):
+    candidate_level = len ( candidate . stars . strip () )
+    if candidate_level < level:
+      generation += level - candidate_level
+      level = candidate_level
+      if headline_gnid (candidate . metadata) is not None:
+        return ( candidate, generation )
+  return None
+
+def ancestry_edge (metadata, generation):
+  """( RELATION, SIDES ) joining the headline of METADATA to its
+  ancestor GENERATION levels up, as 'skg--ancestry-edge' reads it: a
+  birth fact for GENERATION chooses the relation, else the first of
+  ANCESTRY_RELATIONS whose '(rels ...)' sides name GENERATION. None
+  if no relation does."""
+  view = metadata_form (metadata, "view")
+  born = next ( ( fact for fact in ( metadata_form (view, "birth") or [] ) [ 1 : ]
+                  if isinstance (fact, list) and len (fact) > 2
+                  and fact [2] == generation ),
+                None )
+  relation = str ( born [0] ) if born else next (
+    ( name for name in ANCESTRY_RELATIONS
+      if ancestry_sides (metadata, name, generation) ), None )
+  if relation is None:
+    return None
+  sides = ancestry_sides (metadata, relation, generation) or [ str ( born [1] ) ]
+  if relation != "forks":
+    sides = [ str ( born [1] ) ] if born else sides [ : 1 ]
+  return ( relation, sides )
+
+def ancestry_sides (metadata, relation, generation):
+  return [ side for side in ( "in", "out" )
+           if generation in ( relation_side (metadata, relation, side)
+                              or ( 0, [] ) ) [1] ]
 
 def linkstack_entry_to_push (argument, port):
   """(ID, LABEL) for ARGUMENT, a link (its label, else the node's title)
@@ -5302,10 +5419,11 @@ RESPONSE_TYPE_PATTERN = re . compile ( r'^\(\(response-type ([^\s()]+)\)' )
 SIDECAR_COMMANDS = ( "save", "extend", "close", "perspective" )
 # The commands that always run in their own process: 'raw' speaks the
 # protocol directly, 'import' binds its approval to a connection of
-# its own, and 'linkstack' keeps a file, asking the server at most for
-# a title. ('commit --all' runs here too unless '--yes' answers for
-# it: only a commit of everything can ask for a typed yes.)
-COMMANDS_NEVER_SENT_TO_A_DAEMON = ( "raw", "import", "linkstack" )
+# its own, 'linkstack' keeps a file, asking the server at most for
+# a title, and 'chain' reads a view's files alone. ('commit --all'
+# runs here too unless '--yes' answers for it: only a commit of
+# everything can ask for a typed yes.)
+COMMANDS_NEVER_SENT_TO_A_DAEMON = ( "raw", "import", "linkstack", "chain" )
 
 def command_daemon (arguments):
   """Run a daemon for the folder '--out-dir' until it is stopped, or

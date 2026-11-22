@@ -165,6 +165,7 @@ def main (argv):
   failures += failures_of_link_annotations ()
   failures += failures_of_shared_herald_cases ()
   failures += failures_of_forks_folder_claims ()
+  failures += failures_of_chains ()
   failures += failures_of_perspective_names ()
   failures += failures_against_scratch_servers (update_expected)
   shutil . rmtree ( os . environ [ "XDG_RUNTIME_DIR" ], ignore_errors = True )
@@ -258,6 +259,59 @@ def failures_of_forks_folder_claims ():
               folder . edit_request_words (), folder . asks_subtree () )
     if found != asked:
       failures . append ( f"the handle of {text!r} asks {found!r}, not {asked!r}" )
+  return failures
+
+# ============================================================
+# Chains ('chain VIEW HANDLE')
+# ============================================================
+
+# Jeff's example: a contains b, whose forks folder holds c, which b
+# forks; a mentioner folder's member, born of its link though it also
+# contains the note; and a mirror joined to its folder's note by no
+# edge.
+CHAIN_VIEW = """* (skg (vnid 0a) node (gnid a)) a
+** (skg (vnid 0b) node (gnid b) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) b
+*** (skg (vnid 0c) forksFolder)
+**** (skg (vnid 0d) node (gnid c) (view (rels (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) c
+**** (skg (vnid 0e) node (gnid m) (view (rels (forks (in 1))))) m
+*** (skg (vnid 0f) mentionerFolder)
+**** (skg (vnid 0g) node (gnid r) (view (rels (contains (out 1 (ancestors 2))) (linksTo (out 1 (ancestors 2)))) (birth (linksTo out 2)))) r
+***** (skg (vnid 0h) node (gnid h) (view (rels (hides (out 1 (ancestors 1)))))) h
+"""
+
+def failures_of_chains ():
+  """A chain joins each note to the one above it by the edge its
+  metadata records, folders skipped, and refuses a step no edge
+  joins; 'chain' prints it."""
+  headlines = [ line for line in skg_for_ai . parse_full_view (CHAIN_VIEW)
+                if line . is_headline ]
+  def chain_of (handle):
+    index = next ( i for i, line in enumerate (headlines)
+                   if skg_for_ai . headline_viewnode_id (line . metadata) == handle )
+    try:
+      return skg_for_ai . chain_text (headlines, index)
+    except skg_for_ai . SkgToolError as error:
+      return "refused: " + str (error)
+  failures = []
+  for handle, expected in [
+      ( "0a", "[[id:a][a]]" ),
+      ( "0d", "[[id:a][a]] / [[id:b][b]] ~ [[id:c][c]]" ),
+      ( "0g", "[[id:a][a]] / [[id:b][b]] <- [[id:r][r]]" ),
+      ( "0h", "[[id:a][a]] / [[id:b][b]] <- [[id:r][r]] is hidden by [[id:h][h]]" ),
+      ( "0e", "refused: No edge of the graph joins 'm' to 'b', the note above "
+              "it in this view, so no chain runs through them." ) ]:
+    if chain_of (handle) != expected:
+      failures . append ( f"the chain of {handle} is {chain_of (handle)!r}, not {expected!r}" )
+  folder = tempfile . mkdtemp ( prefix = "skg-for-ai-chain-" )
+  for name, text in [ ( "v.full.org", CHAIN_VIEW ), ( "v.compact.org", "" ),
+                      ( "v.view.json", json . dumps ({ "full_view" : "v.full.org",
+                                                       "compact_view" : "v.compact.org" }) ) ]:
+    with open ( os . path . join (folder, name), "w", encoding = "utf-8" ) as file:
+      file . write (text)
+  printed = run_tool ([ "chain", os . path . join (folder, "v.full.org"), "0d" ])
+  if printed . stdout . strip () != "[[id:a][a]] / [[id:b][b]] ~ [[id:c][c]]":
+    failures . append ( f"'chain' printed {printed . stdout!r} {printed . stderr!r}" )
+  shutil . rmtree (folder, ignore_errors = True)
   return failures
 
 # ============================================================
