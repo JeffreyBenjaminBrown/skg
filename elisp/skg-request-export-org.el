@@ -51,25 +51,10 @@ untouched."
                                skg-response-handler-map))
        (skg--export-to-org-handler tcp-proc payload))
      t)
-    (skg-register-response-handler
-     'overPrivateText-telescope-confirmation
-     (lambda (_tcp-proc payload)
-       (setq skg-response-handler-map
-             (assoc-delete-all 'overPrivateText-telescope-confirmation
-                               skg-response-handler-map))
-       (when (assoc 'export-to-org skg-response-handler-map)
-         (setq skg-response-handler-map
-               (assoc-delete-all 'export-to-org
-                                 skg-response-handler-map))
-         (setq skg-lp--pending-count
-               (max 0 (1- skg-lp--pending-count))))
-       (let* ((response (read payload))
-              (prompt (format "%s" (cadr (assoc 'prompt response))))
-              (pids (mapcar (lambda (pid) (format "%s" pid))
-                            (cadr (assoc 'pids response)))))
-         (when (y-or-n-p (concat prompt " "))
-           (skg-export-some-to-org repo-set output-dir pids))))
-     nil)
+    (skg--register-overPrivateText-confirmation-instead-of
+     'export-to-org
+     (lambda (_tcp-proc pids)
+       (skg-export-some-to-org repo-set output-dir pids)))
     (skg-lp-reset)
     (process-send-string
      tcp-proc

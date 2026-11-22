@@ -29,6 +29,36 @@ void until Emacs restarts."
                    answer
                    (error-message-string err))))
 
+(defun skg--when-overPrivateText-approved (payload on-approval)
+  "Ask the prompt of PAYLOAD, an overPrivateText-telescope-confirmation,
+and if the user approves, call ON-APPROVAL with the PIDs it lists, as
+strings: the telescopes whose text the retried request may show."
+  (let* ((response (read payload))
+         (prompt (format "%s" (cadr (assoc 'prompt response))))
+         (pids (mapcar (lambda (pid) (format "%s" pid))
+                       (cadr (assoc 'pids response)))))
+    (when (y-or-n-p (concat prompt " "))
+      (funcall on-approval pids))))
+
+(defun skg--register-overPrivateText-confirmation-instead-of (answer-type retry)
+  "Register the handler of an overPrivateText-telescope-confirmation,
+which the server sends instead of ANSWER-TYPE, a one-shot answer, when
+that answer would show text from overPrivateText telescopes. It is not
+one-shot, so only ANSWER-TYPE counts toward the pending responses.
+When it fires, both handlers are removed (balancing ANSWER-TYPE's
+count), and if the user approves (`skg--when-overPrivateText-approved'),
+RETRY is called with the TCP-PROC that brought the confirmation and
+the PIDs approved."
+  (skg-register-response-handler
+   'overPrivateText-telescope-confirmation
+   (lambda (tcp-proc payload)
+     (skg--unregister-response-handlers
+      (list 'overPrivateText-telescope-confirmation answer-type))
+     (skg--when-overPrivateText-approved
+      payload
+      (lambda (pids) (funcall retry tcp-proc pids))))
+   nil))
+
 (defun skg-lp-handle-generic-chunk (tcp-proc chunk)
   "Consumes the message stream in chunks. When a message is completed, dispatches it and continues for the remaining chunks. In more detail:
 .

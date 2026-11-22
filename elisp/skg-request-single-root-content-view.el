@@ -49,29 +49,12 @@ STALE-VIEW-ID-RETRY-P is an internal guard that prevents repeated recovery."
         tcp-proc payload view-id clean-gnid approved-pids
         stale-view-id-retry-p))
      t)
-    ;; Alternative to content-view. Keep it non-one-shot so only the
-    ;; content-view branch contributes to the pending-response count.
-    (skg-register-response-handler
-     'overPrivateText-telescope-confirmation
-     (lambda (tcp-proc payload)
-       (setq skg-response-handler-map
-             (assoc-delete-all 'overPrivateText-telescope-confirmation
-                               skg-response-handler-map))
-       (when (assoc 'content-view skg-response-handler-map)
-         (setq skg-response-handler-map
-               (assoc-delete-all 'content-view
-                                 skg-response-handler-map))
-         (setq skg-lp--pending-count
-               (max 0 (1- skg-lp--pending-count))))
-       (let* ((response (read payload))
-              (prompt (format "%s" (cadr (assoc 'prompt response))))
-              (pids (mapcar (lambda (pid) (format "%s" pid))
-                            (cadr (assoc 'pids response)))))
-         (when (y-or-n-p (concat prompt " "))
-           (skg-request-single-root-content-view-from-id
-            clean-gnid tcp-proc pids view-id
-            stale-view-id-retry-p))))
-     nil)
+    (skg--register-overPrivateText-confirmation-instead-of
+     'content-view
+     (lambda (tcp-proc pids) ;; the connection that brought the confirmation
+       (skg-request-single-root-content-view-from-id
+        clean-gnid tcp-proc pids view-id
+        stale-view-id-retry-p)))
     (skg-lp-reset)
     (process-send-string tcp-proc request-s-exp)) )
 

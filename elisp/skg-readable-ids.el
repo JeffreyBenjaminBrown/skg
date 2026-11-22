@@ -182,13 +182,11 @@ BUFFER-GENERATION and BUF are captured for the response handler."
         (message "skg-readable-ids: privacy challenge without pending request")
       (setq skg-lp--pending-count
             (max 0 (1- skg-lp--pending-count)))
-      (let* ((response (read payload))
-             (prompt (format "%s" (cadr (assoc 'prompt response))))
-             (pids (mapcar (lambda (pid) (format "%s" pid))
-                           (cadr (assoc 'pids response)))))
-        (when (y-or-n-p (concat prompt " "))
-          (skg-readable-ids--request-titles
-           (nth 2 entry) (nth 0 entry) (nth 1 entry) pids))))))
+      (skg--when-overPrivateText-approved
+       payload
+       (lambda (pids)
+         (skg-readable-ids--request-titles
+          (nth 2 entry) (nth 0 entry) (nth 1 entry) pids))))))
 
 (defun skg-readable-ids--handle-next-response (payload)
   "Handle PAYLOAD for the oldest pending titles-by-ids request."
