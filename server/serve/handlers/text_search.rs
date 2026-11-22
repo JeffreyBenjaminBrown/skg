@@ -142,26 +142,11 @@ fn text_search_response (
   views_state      : &mut ViewsState,
   restriction      : &SkgrepoRestriction,
 ) -> String {
-  let sexp : Sexp = match sexp::parse (request) {
-    Ok (s) => s,
-    Err (e) => {
-      let err : String = format! (
-        "Failed to parse S-expression: {}", e );
-      tracing::error! ( "{}", err );
-      return search_results_text (&err); } };
-  let search_choice : Option<SearchOverPrivateTextChoice> =
-    match search_choice_from_request (&sexp) {
-      Ok (choice) => choice,
-      Err (error) => return search_results_text (&error), };
-  let search_terms : String =
-    match extract_v_from_kv_pair_in_sexp ( &sexp, "terms" ) {
-      Ok (search_terms) => search_terms,
-      Err (err) => {
-        let error_msg : String =
-          format! (
-            "Error extracting search terms: {}", err );
-        tracing::error! ( "{}", error_msg ) ;
-        return search_results_text (&error_msg); }};
+  let TextSearchRequest { sexp, search_choice, search_terms }
+    : TextSearchRequest =
+    match text_search_request_else_response (request) {
+      Ok (read) => read,
+      Err (response) => return response, };
   // Wait for any in-flight background search-index writes to tantivy-commit, so
   // the search reflects every save issued so far (read-your-writes).
   wait_for_tantivy_writes_idle ();
@@ -185,28 +170,11 @@ fn text_search_response (
     operators : bool_key ( &sexp, "operators" ),
     exclude_overPrivateText_telescope : ! include_overPrivateText_telescopes,
   };
-  let (best_matches, searcher) : (Vec<(f32, tantivy::DocAddress)>, Searcher) =
-    match search_index ( &runtime . tantivy_index,
-                         &search_terms,
-                         &search_opts ) {
-      Ok (found) => found,
-      Err (e) =>
-        return search_results_text (
-          & format! ("Error querying the search index: {}", e) ), };
-  if best_matches . is_empty () {
-    return search_results_text ("No matches found."); }
   let matches_by_gnid : MatchGroups =
-    filter_match_groups_to_unrestricted_skgrepos (
-      group_matches_by_gnid (
-      best_matches,
-      searcher,
-      &runtime . tantivy_index,
-      &search_terms,
-      &search_opts,
-      restriction ),
-      restriction );
-  if matches_by_gnid . is_empty () {
-    return search_results_text ("No matches found."); }
+    match visible_match_groups_else_response (
+      &runtime . tantivy_index, &search_terms, &search_opts, restriction )
+    { Ok (matches_by_gnid) => matches_by_gnid,
+      Err (response) => return response, };
   let suppressed : HashSet<ID> =
     suppressed_result_gnids (
       &matches_by_gnid,
@@ -248,14 +216,97 @@ fn text_search_response (
         return search_results_text (
           "The search buffer reached the release boundary without approval." ),
       TextReleaseDecision::Allow => Vec::new (), };
+  register_search_view (
+    views_state, &runtime . graph, &search_terms, viewforest, &drawn_pids,
+    restriction );
+  mk_search_results_sexp ( &rendered, &warnings ) }
+
+/// What a text search request asks: its S-expression (which also
+/// holds the search's flags), the user's choice about overPrivateText
+/// telescopes if it was made, and the search terms.
+struct TextSearchRequest {
+  sexp          : Sexp,
+  search_choice : Option<SearchOverPrivateTextChoice>,
+  search_terms  : String,
+}
+
+/// Read a text search request; else the 'search-results' text to
+/// answer with, saying what could not be read.
+fn text_search_request_else_response (
+  request : &str,
+) -> Result<TextSearchRequest, String> {
+  let sexp : Sexp = match sexp::parse (request) {
+    Ok (s) => s,
+    Err (e) => {
+      let err : String = format! (
+        "Failed to parse S-expression: {}", e );
+      tracing::error! ( "{}", err );
+      return Err ( search_results_text (&err) ); } };
+  let search_choice : Option<SearchOverPrivateTextChoice> =
+    match search_choice_from_request (&sexp) {
+      Ok (choice) => choice,
+      Err (error) => return Err ( search_results_text (&error) ), };
+  let search_terms : String =
+    match extract_v_from_kv_pair_in_sexp ( &sexp, "terms" ) {
+      Ok (search_terms) => search_terms,
+      Err (err) => {
+        let error_msg : String =
+          format! (
+            "Error extracting search terms: {}", err );
+        tracing::error! ( "{}", error_msg ) ;
+        return Err ( search_results_text (&error_msg) ); }};
+  Ok ( TextSearchRequest { sexp, search_choice, search_terms } ) }
+
+/// The search's hits, grouped by node, that 'restriction' lets the
+/// user see; else the 'search-results' text to answer with: the
+/// search index's error, or that nothing matched.
+fn visible_match_groups_else_response (
+  tantivy_index : &TantivyIndex,
+  search_terms  : &str,
+  search_opts   : &SearchOptions,
+  restriction   : &SkgrepoRestriction,
+) -> Result<MatchGroups, String> {
+  let (best_matches, searcher) : (Vec<(f32, tantivy::DocAddress)>, Searcher) =
+    match search_index ( tantivy_index,
+                         search_terms,
+                         search_opts ) {
+      Ok (found) => found,
+      Err (e) =>
+        return Err ( search_results_text (
+          & format! ("Error querying the search index: {}", e) )), };
+  if best_matches . is_empty () {
+    return Err ( search_results_text ("No matches found.") ); }
+  let matches_by_gnid : MatchGroups =
+    filter_match_groups_to_unrestricted_skgrepos (
+      group_matches_by_gnid (
+      best_matches,
+      searcher,
+      tantivy_index,
+      search_terms,
+      search_opts,
+      restriction ),
+      restriction );
+  if matches_by_gnid . is_empty () {
+    return Err ( search_results_text ("No matches found.") ); }
+  Ok (matches_by_gnid) }
+
+/// Register the drawn search buffer as the view of its terms,
+/// replacing a prior search with the same terms.
+fn register_search_view (
+  views_state  : &mut ViewsState,
+  graph        : &InRustGraph,
+  search_terms : &str,
+  viewforest   : ViewForest,
+  drawn_pids   : &[ID],
+  restriction  : &SkgrepoRestriction,
+) {
   let viewforest_id : ViewforestId =
-    ViewforestId::SearchView ( search_terms . clone () );
+    ViewforestId::SearchView ( search_terms . to_string () );
   if views_state . open_views . views . contains_key (&viewforest_id) {
     // Replace prior search with the same terms.
     views_state . open_views . unregister_view (&viewforest_id); }
   views_state . open_views . register_view (
-    &runtime . graph, viewforest_id, viewforest, &drawn_pids, restriction );
-  mk_search_results_sexp ( &rendered, &warnings ) }
+    graph, viewforest_id, viewforest, drawn_pids, restriction ); }
 
 /// TEXT, a message to the user, as the 'search-results'.
 fn search_results_text (
