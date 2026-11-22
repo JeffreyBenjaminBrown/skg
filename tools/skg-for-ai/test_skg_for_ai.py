@@ -111,6 +111,7 @@ sys . dont_write_bytecode = True
 sys . path . insert (0, TOOL_FOLDER)
 import sexp
 import server_connection
+import full_view
 import skg_for_ai
 
 FIXTURE_FOLDER = os . path . join (TOOL_FOLDER, "test-fixture")
@@ -233,7 +234,7 @@ def failures_of_forks_folder_claims ():
   compact = ( "* n ⟨0a⟩\n** ⟨0b⟩\n*** f ⟨0c relRepo:main⟩\n"
               "*** e ⟨0d⟩\n*** m ⟨0e⟩\n*** k ⟨0g relRepo:main⟩\n" )
   headline_of_handle = skg_for_ai . headlines_by_viewnode_id (
-    skg_for_ai . parse_full_view (full) )
+    full_view . parse_full_view (full) )
   edited = skg_for_ai . parse_edited_compact_view (compact)
   def metadata (handle):
     return headline_of_handle [handle] . metadata
@@ -286,11 +287,11 @@ def failures_of_chains ():
   """A chain joins each note to the one above it by the edge its
   metadata records, folders skipped, and refuses a step no edge
   joins; 'chain' prints it."""
-  headlines = [ line for line in skg_for_ai . parse_full_view (CHAIN_VIEW)
+  headlines = [ line for line in full_view . parse_full_view (CHAIN_VIEW)
                 if line . is_headline ]
   def chain_of (handle):
     index = next ( i for i, line in enumerate (headlines)
-                   if skg_for_ai . headline_viewnode_id (line . metadata) == handle )
+                   if full_view . headline_viewnode_id (line . metadata) == handle )
     try:
       return skg_for_ai . chain_text (headlines, index)
     except server_connection . SkgToolError as error:
@@ -324,7 +325,7 @@ def failures_of_chains ():
 def failures_of_describe_requests ():
   """'describe' sends the headline's metadata as the full view holds
   it, with 'pendingDetachment' on a pending detachment."""
-  view = skg_for_ai . parse_full_view (
+  view = full_view . parse_full_view (
     CHAIN_VIEW + "** (skg (vnid 0i) node (gnid d) noClaim) d\n" )
   failures = []
   for handle, expected in [
