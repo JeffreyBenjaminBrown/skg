@@ -126,13 +126,9 @@ def writes_jeff(cmd):
             hits.append(part.strip())
     return hits
 
-def check(since, until, before, after, log_path):
-    """Returns (report lines, counts line, lines to read)."""
-    inwin = lambda t: since <= t <= until
-    out, flagged = [], []
-
-    # 1. Jeff's server: saves, starts, commit requests.
-    server = []  # (time, kind, deleted, wrote)
+def server_events():
+    """Jeff's server: saves, starts, commit requests, as (time, kind, deleted, wrote)."""
+    server = []
     for f in sorted(glob.glob(JEFF + "/skgconfig.toml.running/start-servers.*.log")):
         for line in open(f, errors="replace"):
             m = re.match(r"(\S+Z)\s+\w+\s+(.*)", line)
@@ -145,17 +141,23 @@ def check(since, until, before, after, log_path):
             elif "Listening for Emacs connections" in rest: server.append((t, "start", 0, 0))
             elif "Received request" in rest and "stage and commit" in rest:
                 server.append((t, "commit", 0, 0))
+    return server
 
-    # 2. His git: reflog entries in the window.
-    reflog = []  # (time, repo, text)
+def reflog_entries(inwin):
+    """His git: reflog entries in the window, as (time, repo, text)."""
+    reflog = []
     for r in skgrepos():
         for line in git(r, "reflog", "--date=iso-strict", "--format=%gd %gs").splitlines():
             m = re.match(r"HEAD@\{([^}]+)\} (.*)", line)
             if m and inwin(utc(m.group(1))): reflog.append((utc(m.group(1)), r, m.group(2)))
+    return reflog
 
-    # 3. Our sessions, and specialist.sh as the log records it.
-    ours = []  # (time, transcript, tool, text)
-    scripted = []  # specialist.sh born, up, rename: may write his config, as he allowed
+def our_writes(inwin, log_path):
+    """Our sessions, and specialist.sh as the log records it, in the window.
+    Returns (ours, scripted): ours as (time, transcript, tool, text), the
+    tool calls that may write; scripted as (time, file, text), the runs of
+    specialist.sh born, up or rename, which may write his config, as he allowed."""
+    ours, scripted = [], []
     for f in glob.glob(TRANSCRIPTS + "/**/*.jsonl", recursive=True):
         for line in open(f, errors="replace"):
             if '"tool_use"' not in line: continue
@@ -182,19 +184,30 @@ def check(since, until, before, after, log_path):
         for line in open(log_path, errors="replace"):
             m = re.match(r"(\S+Z) (specialist\.sh [^:]*): wrote \d+ lines? of data/jeff/", line)
             if m and inwin(utc(m.group(1))): scripted.append((utc(m.group(1)), log_path, m.group(2)))
+    return ours, scripted
 
-    def placed(path, t):
-        for (e, kind, _, _) in server:
-            lo, hi = TOL[kind]
-            if lo <= (t - e).total_seconds() <= hi: return f"his server ({kind} at {e:%H:%M:%S})"
-        for (e, r, text) in reflog:
-            if -0.5 <= (t - e).total_seconds() <= 5 and path.startswith(r): return f"his git ({text})"
-        for (e, f, text) in scripted:
-            if -0.5 <= (t - e).total_seconds() <= 5 and os.path.basename(path).startswith("skgconfig.toml"):
-                return f"ours by his leave ({text} at {e:%F %T})"
-        for (e, f, tool, text) in ours:
-            if -0.5 <= (t - e).total_seconds() <= 5: return f"OURS? {tool} at {e:%F %T} in {os.path.basename(f)}"
-        return None
+def writer_of(path, t, server, reflog, scripted, ours):
+    """Who wrote PATH at T, or None: his server, his git, specialist.sh by his leave, or OURS?."""
+    for (e, kind, _, _) in server:
+        lo, hi = TOL[kind]
+        if lo <= (t - e).total_seconds() <= hi: return f"his server ({kind} at {e:%H:%M:%S})"
+    for (e, r, text) in reflog:
+        if -0.5 <= (t - e).total_seconds() <= 5 and path.startswith(r): return f"his git ({text})"
+    for (e, f, text) in scripted:
+        if -0.5 <= (t - e).total_seconds() <= 5 and os.path.basename(path).startswith("skgconfig.toml"):
+            return f"ours by his leave ({text} at {e:%F %T})"
+    for (e, f, tool, text) in ours:
+        if -0.5 <= (t - e).total_seconds() <= 5: return f"OURS? {tool} at {e:%F %T} in {os.path.basename(f)}"
+    return None
+
+def check(since, until, before, after, log_path):
+    """Returns (report lines, counts line, lines to read)."""
+    inwin = lambda t: since <= t <= until
+    out, flagged = [], []
+    server = server_events()
+    reflog = reflog_entries(inwin)
+    ours, scripted = our_writes(inwin, log_path)
+    placed = lambda path, t: writer_of(path, t, server, reflog, scripted, ours)
 
     # Files under data/jeff written in the window.
     out.append(f"Window {since:%F %T} to {until:%F %T} UTC")
