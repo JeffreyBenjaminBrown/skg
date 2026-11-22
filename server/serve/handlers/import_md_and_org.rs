@@ -38,68 +38,95 @@ pub fn handle_import_md_and_org_request (
       *pending = None;
       send_import_response (stream, TcpToClient::ImportMdAndOrgResult,
         "Import cancelled; nothing was written.", None, None, &[], &[]); }
-    "apply" => {
-      let token : String = match value_from_request_sexp ("approval-token", request) {
-        Ok (token) => token,
-        Err (error) => return refuse (stream, &error), };
-      if pending . as_ref () . map (|approval| approval . token . as_str ())
-        != Some (token . as_str ()) {
-        return refuse (stream, "Unknown or stale import approval; preview again."); }
-      let approval : PendingImport = pending . take () . unwrap ();
-      if let Err (error) = refuse_a_restricted_destination (
-        &approval . batch . destination_skgrepo, skgrepo_restriction )
-      { return refuse (stream, &error); }
-      let warnings : Vec<String> = diagnostic_warnings (&approval . batch);
-      let gate = env . mutation_gate ();
-      let _guard = block_on (gate . lock ());
-      let result = approval . batch . apply_under_mutation_gate (env);
-      drop (_guard);
-      match result {
-        Ok ((count, record_id)) => send_import_response (
-          stream, TcpToClient::ImportMdAndOrgResult,
-          &format! ("Imported {} nodes. Record: [[id:{}][Import record]]",
-            count, record_id), None, Some (&record_id . 0), &[], &warnings),
-        Err (error) => refuse (stream, &format! (
-          "Import was not written: {} Preview again.", error)), } }
+    "apply" => apply_approved_import (
+      stream, request, env, pending, skgrepo_restriction ),
     "preview" => {
       *pending = None;
-      let input : String = match value_from_request_sexp ("input-directory", request) {
-        Ok (input) => input,
-        Err (error) => return refuse (stream, &error), };
-      let skgrepo : String = match value_from_request_sexp ("destination-repo", request) {
-        Ok (skgrepo) => skgrepo,
-        Err (error) => return refuse (stream, &error), };
-      if let Err (error) = refuse_a_restricted_destination (
-        &SkgrepoName::from (skgrepo . as_str ()), skgrepo_restriction )
-      { return refuse (stream, &error); }
-      let host_answer : Option<String> =
-        value_from_request_sexp ("host-root", request) . ok ();
-      let host_root : Option<PathBuf> = host_answer . as_deref ()
-        .filter (|value| ! value . is_empty ()) . map (PathBuf::from);
-      match prepare_import_batch (
-        Path::new (&input), &SkgrepoName::from (skgrepo),
-        host_root . as_deref (), host_answer . is_some (), env) {
-        Ok (ImportPreparation::HostMappingNeeded) => send_import_response (
-          stream, TcpToClient::ImportMdAndOrgHostMappingNeeded,
-          "Absolute links to .md or .org files were found. Supply the absolute host path corresponding to the input directory, or leave it blank to preserve unresolved links.",
-          None, None, &[], &[]),
-        Ok (ImportPreparation::Prepared (batch)) => {
-          let report : String = batch . preview_report ();
-          let warnings : Vec<String> = diagnostic_warnings (&batch);
-          let token : Option<String> = if batch . record_id . is_some () {
-            Some (Uuid::new_v4 () . to_string ()) } else { None };
-          if let Some (token) = &token {
-            *pending = Some (PendingImport {
-              token : token . clone (), batch }); }
-          send_import_response (stream, TcpToClient::ImportMdAndOrgPreview,
-            &report, token . as_deref (), None, &[], &warnings); }
-        Err (error) => send_import_response (
-          stream, TcpToClient::ImportMdAndOrgPreview,
-          &format! ("* Import preview cannot be applied\n{}", error),
-          None, None, &[error], &[]), } }
+      preview_import (stream, request, env, pending, skgrepo_restriction) }
     _ => refuse (stream, "Unknown import action"),
   }
 }
+
+/// Write the pending import that the request's approval token names,
+/// and answer with the count and the import record; or refuse, when
+/// the token is not the pending one's, the restriction keeps the
+/// destination out, or the write fails. The pending import is
+/// consumed once its token matches.
+fn apply_approved_import (
+  stream : &mut TcpStream,
+  request : &str,
+  env : &SkgEnv,
+  pending : &mut Option<PendingImport>,
+  skgrepo_restriction : &SkgrepoRestriction,
+) {
+  let token : String = match value_from_request_sexp ("approval-token", request) {
+    Ok (token) => token,
+    Err (error) => return refuse (stream, &error), };
+  if pending . as_ref () . map (|approval| approval . token . as_str ())
+    != Some (token . as_str ()) {
+    return refuse (stream, "Unknown or stale import approval; preview again."); }
+  let approval : PendingImport = pending . take () . unwrap ();
+  if let Err (error) = refuse_a_restricted_destination (
+    &approval . batch . destination_skgrepo, skgrepo_restriction )
+  { return refuse (stream, &error); }
+  let warnings : Vec<String> = diagnostic_warnings (&approval . batch);
+  let gate = env . mutation_gate ();
+  let _guard = block_on (gate . lock ());
+  let result = approval . batch . apply_under_mutation_gate (env);
+  drop (_guard);
+  match result {
+    Ok ((count, record_id)) => send_import_response (
+      stream, TcpToClient::ImportMdAndOrgResult,
+      &format! ("Imported {} nodes. Record: [[id:{}][Import record]]",
+        count, record_id), None, Some (&record_id . 0), &[], &warnings),
+    Err (error) => refuse (stream, &format! (
+      "Import was not written: {} Preview again.", error)), } }
+
+/// Prepare the import the request describes and answer with its
+/// preview, keeping it in 'pending' (with a fresh approval token)
+/// when it can be applied; or ask for the host path that absolute
+/// links need; or refuse.
+fn preview_import (
+  stream : &mut TcpStream,
+  request : &str,
+  env : &SkgEnv,
+  pending : &mut Option<PendingImport>,
+  skgrepo_restriction : &SkgrepoRestriction,
+) {
+  let input : String = match value_from_request_sexp ("input-directory", request) {
+    Ok (input) => input,
+    Err (error) => return refuse (stream, &error), };
+  let skgrepo : String = match value_from_request_sexp ("destination-repo", request) {
+    Ok (skgrepo) => skgrepo,
+    Err (error) => return refuse (stream, &error), };
+  if let Err (error) = refuse_a_restricted_destination (
+    &SkgrepoName::from (skgrepo . as_str ()), skgrepo_restriction )
+  { return refuse (stream, &error); }
+  let host_answer : Option<String> =
+    value_from_request_sexp ("host-root", request) . ok ();
+  let host_root : Option<PathBuf> = host_answer . as_deref ()
+    .filter (|value| ! value . is_empty ()) . map (PathBuf::from);
+  match prepare_import_batch (
+    Path::new (&input), &SkgrepoName::from (skgrepo),
+    host_root . as_deref (), host_answer . is_some (), env) {
+    Ok (ImportPreparation::HostMappingNeeded) => send_import_response (
+      stream, TcpToClient::ImportMdAndOrgHostMappingNeeded,
+      "Absolute links to .md or .org files were found. Supply the absolute host path corresponding to the input directory, or leave it blank to preserve unresolved links.",
+      None, None, &[], &[]),
+    Ok (ImportPreparation::Prepared (batch)) => {
+      let report : String = batch . preview_report ();
+      let warnings : Vec<String> = diagnostic_warnings (&batch);
+      let token : Option<String> = if batch . record_id . is_some () {
+        Some (Uuid::new_v4 () . to_string ()) } else { None };
+      if let Some (token) = &token {
+        *pending = Some (PendingImport {
+          token : token . clone (), batch }); }
+      send_import_response (stream, TcpToClient::ImportMdAndOrgPreview,
+        &report, token . as_deref (), None, &[], &warnings); }
+    Err (error) => send_import_response (
+      stream, TcpToClient::ImportMdAndOrgPreview,
+      &format! ("* Import preview cannot be applied\n{}", error),
+      None, None, &[error], &[]), } }
 
 /// The import writes its nodes into its destination skgrepo: refused
 /// when the skgrepo restriction keeps that skgrepo out, since what the
