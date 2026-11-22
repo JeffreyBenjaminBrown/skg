@@ -1,3 +1,10 @@
+//! The containerward role tree of a node: its containers, their
+//! containers, and so on, marking repeats and depth cuts
+//! ('full_containerward_role_tree'). It walks whatever 'PartnersOf'
+//! gives, so it serves the live graph ('containers_in_inRustGraph') and
+//! a graph straddle's union alike. Its caller is the refresh's
+//! ancestry chain ('server/refresh/chain.rs').
+
 use std::collections::{HashMap, HashSet};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;

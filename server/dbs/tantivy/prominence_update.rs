@@ -1,10 +1,8 @@
-// PURPOSE: Refresh the `prominence_source` field on every
-// document matching a given ID. Because Tantivy has no in-place
-// field mutation, this is a read-all-stored-fields / delete /
-// add-back dance. The all-fields copying is the ugliest part of
-// the Tantivy integration — isolating it here makes the cost
-// visible and clearly motivates the "compute origin types before
-// indexing" TODO in the schema doc-comment.
+//! Rewriting the 'prominence_source' field of every document of given
+//! IDs ('update_prominence_sources'). Tantivy cannot change a field in
+//! place, so each document's stored fields are read, it is deleted,
+//! and it is added back with the new value. What a node's prominence
+//! is, is 'server/prominence.rs'.
 
 use crate::consts::{TANTIVY_PER_ID_LOOKUP_LIMIT, TANTIVY_WRITER_BUFFER_BYTES};
 use crate::dbs::tantivy::background_writer::lock_tantivy_writes;

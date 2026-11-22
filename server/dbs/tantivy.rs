@@ -1,14 +1,16 @@
-// PURPOSE: Tantivy integration. This file holds schema + search-index
-// opening, plus exact-ID document lookups. The other phases live
-// in submodules:
-//   - escape:         query preprocessing (pure strings).
-//   - search:         the text-search API (QueryParser / RegexQuery).
-//   - write:          update/delete/add documents + commit helper.
-//   - prominence_update: refresh `prominence_source` via
-//                     delete-and-readd.
-
-// GLOSSARY:
-// See the Tantivy section in docs/glossary.org.
+//! Tantivy, the search index: one document per title and per alias of
+//! every node (bodies stored too, for body search), built at startup
+//! from the '.skg' files and read by the text search. This file holds
+//! the schema ('mk_tantivy_schema'), opening an index, and exact-ID
+//! lookups ('titles_by_gnids', 'title_and_skgrepo_by_gnid').
+//! - 'search': running a text query ('search_index', 'SearchOptions').
+//! - 'write': adding, updating and deleting documents, and the commit.
+//! - 'background_writer': the queue a save's index update goes through.
+//! - 'prominence_update': rewriting each document's 'prominence_source'.
+//! - 'escape': making a typed query's operator characters literal.
+//! The search request's handler, which ranks and shows the matches, is
+//! 'serve/handlers/text_search.rs'. See the Tantivy section of
+//! 'docs/glossary.org'.
 
 pub mod background_writer;
 pub mod prominence_update;

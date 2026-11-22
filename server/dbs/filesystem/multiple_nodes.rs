@@ -1,3 +1,11 @@
+//! Reading every configured skgrepo's '.skg' files at once, as startup
+//! and a rebuild do: 'read_all_skg_files_from_skgrepos' (and its
+//! '_collecting_violations' form, for callers that report telescope
+//! violations) reads each folder ('read_skg_sections_from_folder'),
+//! composes each pid's sections into one node, and writes load errors
+//! and ids claimed by two nodes to report files in the data root.
+//! Also 'write_all_nodes_to_fs'. One node at a time is 'one_node'.
+
 use crate::telescope::compose::compose_telescope_collecting_warnings;
 use crate::telescope::types::{
   CompositionWarning, Telescope, separate_illegal_sections,
@@ -27,7 +35,7 @@ use std::fs::{self, DirEntry, ReadDir};
 ///
 /// Load-time telescope violations are logged here and dropped.
 /// Callers that report them to the user (init and rebuild) take
-/// 'read_all_skg_files_from_repos_collecting_violations' instead.
+/// 'read_all_skg_files_from_skgrepos_collecting_violations' instead.
 pub fn read_all_skg_files_from_skgrepos (
   config: &SkgConfig
 ) -> io::Result<Vec<Graphnode>> {
@@ -52,7 +60,7 @@ pub(crate) fn read_all_skg_files_from_skgrepos_read_only (
   Ok (nodes)
 }
 
-/// As 'read_all_skg_files_from_repos', but hands back the
+/// As 'read_all_skg_files_from_skgrepos', but hands back the
 /// load-time telescope violations rather than logging them, so
 /// init and rebuild can report them alongside the graph-level ones
 /// in DATA_ROOT/telescope-warnings.org.

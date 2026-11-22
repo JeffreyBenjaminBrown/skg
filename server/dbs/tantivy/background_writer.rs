@@ -1,25 +1,16 @@
-//! Background Tantivy index writer.
-//!
-//! Each save's Tantivy update — the ~60% of the save spent in
-//! 'writer.commit()' — used to block the
-//! response, even though the save's re-rendered result is built from
-//! the in-Rust graph and never reads the search index. The save now
-//! enqueues its search-index update here and returns; the tantivy-commit happens off
-//! the critical path.
-//!
-//! A single worker thread applies the queued updates in FIFO order, so
-//! two rapid saves of the same node can never tantivy-commit out of order. A
-//! search blocks on 'wait_for_tantivy_writes_idle' until the queue has
-//! drained, so it always sees a search index reflecting every save issued so
-//! far (read-your-writes), at the cost of waiting through any in-flight
-//! tantivy-commit.
+//! The queue a save's search-index update goes through, so that the
+//! save answers without waiting for Tantivy's commit: its re-rendered
+//! views are built from the in-Rust graph and never read the index.
+//! 'enqueue_tantivy_write' queues an update ('TantivyWriteTask'); one
+//! worker thread applies them in FIFO order, so two rapid saves of one
+//! node never commit out of order. A search first calls
+//! 'wait_for_tantivy_writes_idle', so it sees every save issued so far.
 //!
 //! 'lock_tantivy_writes' serializes every Tantivy writer (this worker,
-//! search-make-link's 'update_index_with_nodes', the init/rebuild
-//! context pass), since backgrounding the worker means it can now run
-//! concurrently with those. On a background-write failure the worker
-//! logs and moves on: the filesystem already holds the truth, so the
-//! search index stays recoverable via a 'rebuild session-lifetime stores'.
+//! search-make-link's 'update_index_with_nodes', the init and rebuild
+//! context pass), since the worker runs concurrently with them. On a
+//! failed write the worker logs and moves on: the files hold the
+//! truth, so a 'rebuild session-lifetime stores' recovers the index.
 
 use crate::save::update_tantivy_from_nodeInstructions;
 use crate::types::misc::{ID, TantivyIndex};

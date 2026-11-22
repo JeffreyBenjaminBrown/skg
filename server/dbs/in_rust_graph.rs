@@ -1,11 +1,21 @@
-//! The in-Rust partial projection of the graph.
-//!
-//! A single 'InRustGraph' value holds every node (as a 'GraphnodeInRust') the
-//! render / save pipeline can read from, plus recorderward relmaps for
-//! every outbound relation and for extra_ids. It lives behind an
-//! 'ArcSwap' so readers never block writers and writers never block
-//! readers — writers clone via 'im''s structural sharing (O(log n)
-//! per mutation) and atomically swap in a new graph snapshot.
+//! The in-Rust graph: every node in memory for the session, which views
+//! are drawn from and saves are checked against. An 'InRustGraph' holds
+//! each node as a 'GraphnodeInRust' (a 'Graphnode' plus the links in its
+//! text), a recorderward relmap per relation, and the extra-id map. It
+//! lives behind an 'ArcSwap' ('InRustGraphHandle'), so readers never
+//! block writers: a writer clones it (cheaply, by 'im''s structural
+//! sharing) and swaps in the new snapshot. A save's changes reach it
+//! through 'apply_nodeInstructions_to_inRustGraph'.
+//! - 'relation_accessors': the relations and their roles, and the
+//!   graph's relation queries, plain and gated by a skgrepo restriction.
+//! - 'mirrors': a note's mirrors, and which of them stands in its place.
+//! - 'fork_rules': what forking, containing and hiding may not do.
+//! - 'complete_validation': the whole-graph checks a new graph must pass.
+//! - 'internal_index_validation': recomputes the indexes to check them.
+//! - 'prepared_update': a save's checked graph, tied to its snapshot.
+//! - 'stats': per-node counts that feed the heralds.
+//! - 'containerward_role_tree': a node's containers, transitively.
+//! - 'query': one relation query by name, used by tests.
 
 pub mod complete_validation;
 pub mod containerward_role_tree;

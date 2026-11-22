@@ -1,8 +1,9 @@
-// PURPOSE: The text-search API. Builds Tantivy queries from a string
-// (either through the QueryParser with optional operator syntax, or
-// through RegexQuery), runs them against the search index, and returns
-// (score, DocAddress) pairs plus the Searcher so callers can fetch
-// stored fields.
+//! Running a text query against the search index ('search_index'):
+//! through Tantivy's QueryParser, with or without operator syntax, or as
+//! a per-word regex ('SearchOptions'), over titles and aliases and
+//! optionally bodies. Returns every match with its Tantivy score;
+//! reranking by context, truncation and the response are
+//! 'serve/handlers/text_search.rs'.
 
 use crate::consts::TANTIVY_SEARCH_LIMIT;
 use crate::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_literal};

@@ -1,7 +1,6 @@
-// PURPOSE: The search-index write path: update/delete/add document
-// helpers, plus `create_documents_from_node` (one title doc + one
-// doc per alias), and the shared `tantivy_commit_with_status` used by both
-// this module and `prominence_update`.
+//! Writing the search index: 'update_index_with_nodes' (one title
+//! document and one per alias, for each node), the deletions by ID,
+//! and 'tantivy_commit_with_status', which every writer commits through.
 
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::dbs::tantivy::background_writer::lock_tantivy_writes;

@@ -1,3 +1,9 @@
+//! The files of a data root that are not nodes: the config file
+//! ('load_config', which also warns of unknown keys) with its paths made
+//! absolute and its retired keys refused, and the skgrepo folders it
+//! names ('validate_skgrepo_paths_creating_owned_ones_if_needed').
+//! The config's type is 'types::config::SkgConfig'.
+
 use crate::telescope::dependencies_manifest::read_foreign_manifest_orders;
 use crate::types::config::{SkgConfig, Skgrepo};
 use crate::types::misc::SkgrepoName;

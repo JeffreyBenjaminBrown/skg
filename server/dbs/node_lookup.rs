@@ -1,5 +1,6 @@
-//! Variations on a simple theme:
-//! Producing a Graphnode from different kinds of information.
+//! A 'Graphnode' from the in-Rust graph by gnid ('graphnode_from_graph',
+//! or 'graphnode_by_gnid', which errs when it is absent). Reading one
+//! from its files instead is 'dbs/filesystem/one_node.rs'.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::ID;

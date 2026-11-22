@@ -1,3 +1,12 @@
+//! One node's '.skg' files. Reading: its telescope (every same-pid
+//! section in the configured skgrepos, composed) by pid
+//! ('graphnode_from_pid_and_skgrepo') or by gnid ('graphnode_from_gnid',
+//! 'optgraphnode_from_gnid'). Writing: 'write_graphnode_telescope'
+//! decomposes a node into sections and writes those whose bytes
+//! changed; a save does the same in two phases ('prepare_graphnode_telescope',
+//! then 'PreparedTelescopeWrite::apply'). Composing and decomposing a
+//! telescope is 'telescope/'.
+
 use crate::telescope::compose::compose_telescope;
 use crate::telescope::types::{
   Telescope, separate_illegal_sections,

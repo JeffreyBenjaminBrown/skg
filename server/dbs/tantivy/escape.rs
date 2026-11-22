@@ -1,6 +1,7 @@
-// PURPOSE: Pre-processors that make literal text findable through
-// Tantivy's QueryParser, or that preserve operator syntax while
-// escaping only intra-word operator characters.
+//! Making a typed search query safe for Tantivy's QueryParser:
+//! 'escape_tantivy_literal' makes each word holding an operator
+//! character literal text, and 'escape_tantivy_intra_word' keeps
+//! operator syntax but escapes operator characters inside words.
 
 /// Pre-process `query` so titles and aliases containing Tantivy
 /// operator characters are findable by typing the literal text.

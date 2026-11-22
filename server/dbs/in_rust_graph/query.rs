@@ -1,3 +1,7 @@
+//! 'find_related_nodes': the nodes related to given ones by a relation
+//! and two roles named as strings. Only tests call it; the server's own
+//! relation queries are the methods in 'relation_accessors'.
+
 use std::collections::HashSet;
 
 use crate::dbs::in_rust_graph::InRustGraph;

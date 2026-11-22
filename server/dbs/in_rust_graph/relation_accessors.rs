@@ -1,3 +1,12 @@
+//! The four stored relations (contains, linksTo, forks, hides) as
+//! values ('NodeRelation', 'RelationRole', 'OUTBOUND_RELATIONSHIP_TYPES'),
+//! and the 'InRustGraph' methods that answer who is related to whom:
+//! outbound and inbound partners, pids or gnids, each with a '_gated'
+//! form that keeps out what the skgrepo restriction hides
+//! ('gnid_presence_gated', 'node_is_shown'); the relRepo of a
+//! relationship ('relRepo', 'RelRepoLookup'); and the neighborhood a
+//! save must re-check ('update_relevant_neighborhood').
+
 use std::collections::{HashMap, HashSet};
 #[cfg(test)]
 use std::cell::Cell;

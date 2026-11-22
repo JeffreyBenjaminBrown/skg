@@ -1,4 +1,11 @@
-// PURPOSE: Build the reconstructible in-memory graph and Tantivy index.
+//! Building the session-lifetime stores at startup: 'initialize_dbs'
+//! reads every '.skg' file once, validates and builds the in-Rust
+//! graph, builds the Tantivy index from the same nodes, reports
+//! telescope violations and writes the dependencies manifests, and
+//! returns the 'SkgEnv' that holds both stores. The index alone is
+//! remade by 'rebuild_tantivy_from_nodes' (after a nodeMerge) and
+//! 'rebuild_tantivy_as_generation' (for the rebuild request,
+//! 'serve/handlers/rebuild_session_lifetime_stores.rs').
 
 use crate::prominence::{MapToContent, MapToContainers};
 use crate::prominence::{content_maps_from_nodes, had_id_set_from_nodes};

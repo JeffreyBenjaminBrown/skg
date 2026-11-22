@@ -1,5 +1,5 @@
 //! PURPOSE: Fetch all graphnode statistics for a set of PIDs from the
-//! in-Rust graph: directional member counts for the five relations, the
+//! in-Rust graph: directional member counts for the four relations, the
 //! alias / extra-id / true-flag counts, and the substantive-mentioner subset.
 //! These feed the uniform-herald token grammar (server/herald_tokens.rs).
 //!
