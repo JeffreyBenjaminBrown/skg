@@ -229,14 +229,17 @@ children.
 *** A member that restates its note
 A member of the forks folder often says what its note says: a fresh
 clone's original, before you edit the clone, or a note forked to file
-a reply under. Where a member's title equals its note's, the clients
-draw =<b's title, unchanged>= over it; where its body equals its
-note's, =<b's body, unchanged>= over the body, in the message style
-(black on white). b is the note, as the heralds name it from the
-member (its grandparent, past the folder). The two are independent: a
-member may show either, both, or neither. This is drawing only: the
-buffer holds the member's real title and body, and a save sends them
-as they are.
+a reply under. The clients say so, mostly in the member's title.
+Where its title and body both equal its note's, they draw
+=<b unchanged>= over its title and hide the lines under it; where only
+its title does, =<b's title unchanged>= over the title; where only its
+body does, =<b's body unchanged>= over the body, its title shown. They
+draw these in the message style (black on white). b is the note, as
+the heralds name it from the member (its grandparent, past the
+folder). Two empty bodies are equal; a body the view omits (a
+write-protected node's, herald B) equals none, being unseen. This is
+drawing only: the buffer holds the member's real title and body, and a
+save sends them as they are.
 
 Each view buffer has its own switch, on by default: =C-c v u=
 ('skg-toggle-fork-dedup-overlay', the buffer-local variable
@@ -244,8 +247,8 @@ Each view buffer has its own switch, on by default: =C-c v u=
 =:SkgToggleForkDedupOverlay=, the buffer variable
 'skg_fork_dedup_overlay') shows the text, to read or edit it. An edit
 that makes the member differ from its note uncovers it. skg-for-ai,
-whose files have no overlays, marks such a member's handle 'title=b'
-or 'body=b' and leaves a restated body out of its compact file
+whose files have no overlays, marks such a member's handle 'title=b',
+'body=b' or both, and leaves a restated body out of its compact file
 ('tools/skg-for-ai/README.org', "Restated titles and bodies").
 *** Every mirror, flat
 A note's forks folder lists every mirror of it, each once: what it

@@ -1516,9 +1516,11 @@ in a magit or raw .skg buffer, use M-x.
 View and maybe edit the set of links you've stored.
 (See "the linkstack" below.)
 *** C-c v u : skg-toggle-fork-dedup-overlay
-Toggles, in this buffer, the overlays that cover what a member of a
-forks folder restates of its note: =<b's title, unchanged>= over a
-title equal to the note's, =<b's body, unchanged>= over such a body
+Toggles, in this buffer, the overlays that say what a member of a
+forks folder restates of its note: =<b unchanged>= over the title of
+a member whose title and body equal the note's, its body hidden;
+=<b's title unchanged>= over a title alone equal to the note's;
+=<b's body unchanged>= over a body alone equal to it
 (docs/forks.org, "A member that restates its note"). They are on by
 default (the buffer-local variable 'skg-fork-dedup-overlay'); turn
 them off to read or edit the text under them. The buffer always holds

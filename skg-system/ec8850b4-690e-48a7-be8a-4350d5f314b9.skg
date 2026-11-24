@@ -1,9 +1,11 @@
 title: '<localleader>vu : :SkgToggleForkDedupOverlay'
 pid: ec8850b4-690e-48a7-be8a-4350d5f314b9
 body: |2-
-  Toggles, in this buffer, the extmarks that cover what a member of a
-  forks folder restates of its note, as C-c v u does in Emacs: =<b's
-  title, unchanged>= over a title equal to the note's, =<b's body,
-  unchanged>= over such a body, its other lines concealed. They are on
+  Toggles, in this buffer, the extmarks that say what a member of a
+  forks folder restates of its note, as C-c v u does in Emacs:
+  =<b unchanged>= over the title of a member whose title and body equal
+  the note's, its body's lines concealed; =<b's title unchanged>= over a
+  title alone equal to the note's; =<b's body unchanged>= over a body
+  alone equal to it, its other lines concealed. They are on
   unless the buffer variable 'skg_fork_dedup_overlay' is false. The
   buffer always holds the real text, and a save sends it.
