@@ -597,8 +597,11 @@ Where its title equals the note's, its handle carries 'title=b'; where
 its nonblank body does, 'body=b', and the compact file leaves its body
 out: it is b's, the body under the headline two levels up ('b' is the
 note's ancestor letter as counted from the member). The full file has
-every body. The clients draw the same members with "<b's title,
-unchanged>" and "<b's body, unchanged>" over the text
+every body. The clients say the same in the member's title: "<b
+unchanged>" where it restates both (there two empty bodies count as
+equal, where 'body=b' needs a nonblank body), "<b's title unchanged>"
+where it restates its title alone, and, over the body, "<b's body
+unchanged>" where it restates its body alone
 ('elisp/skg-fork-dedup.el'). A save of a headline that still says
 'body=b' and has no body under it sends the body the full file gave
 it, unchanged; text written under it is its new body; to empty the
