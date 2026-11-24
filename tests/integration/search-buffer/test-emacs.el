@@ -58,9 +58,9 @@
         (message "✗ FAIL: the first search buffer lacks leaf-b's folded containers folder holding container-a")
         (message "Buffer content:\n%s" content)
         (kill-emacs 1))
-      ;; leaf-b has one container, so its line should include
-      ;; (rels (contains (in 1))).
-      (if (string-match-p "(rels (contains (in 1)))" content)
+      ;; leaf-b has one container, a note of the user's, so its line
+      ;; should include (rels (contains (in 1 usersGraph))).
+      (if (string-match-p "(rels (contains (in 1 usersGraph)))" content)
           (progn
             (message "✓ PASS: the first search buffer holds what the enrichment draws, with node relationship stats")
             (message "Buffer content:\n%s" content)

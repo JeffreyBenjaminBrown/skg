@@ -82,10 +82,10 @@ do -- leaf-b's first child is its folded containers folder, holding
           .. T.buffer_text(buf))
 end
 
--- leaf-b has one container, so its line should include
--- (rels (contains (in 1))).
+-- leaf-b has one container, a note of the user's, so its line should
+-- include (rels (contains (in 1 usersGraph))).
 local content = T.buffer_text(buf)
-if content:find('(rels (contains (in 1)))', 1, true) then
+if content:find('(rels (contains (in 1 usersGraph)))', 1, true) then
   print('node relationship stats present in the search buffer')
   print('Buffer content:\n' .. content)
   T.pass('PASS: Integration test successful!')
