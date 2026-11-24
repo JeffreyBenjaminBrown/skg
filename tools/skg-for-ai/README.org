@@ -34,6 +34,11 @@ three notes link to it, all substantive (3/L); its home skgrepo is
   it those this one does it to: '2C3', two contain it, it contains
   three; 'C3', nothing contains it. Only a token that would read just
   'aC' (the parent alone contains it, the ordinary case) is left out.
+- '•', ending the count before 'C' or 'H': one of your notes, a note
+  of a skgrepo you own, is among them. Before 'C' it is one but the
+  note it stands under: you keep it elsewhere too ('2a•C'); before 'H',
+  you hide it ('1•H'). So under a teammate's note, a child you filed
+  or hid in your fork says so.
 - 'a', 'b', ...: a headline above, 'a' the parent, 'b' its parent,
   and so on; a folder is a headline, so under one 'a' is the folder.
   '2aC', two contain it, the parent one of them; 'Ca', it contains its
@@ -538,6 +543,13 @@ forks, which its parent's list names ('docs/mirrors.org', "The
 inPlaceOf part"). The property counts 'A' (aliases), 'I' (extra IDs)
 and 'F' (true flags) follow. So '⟨0h 2aC3⟩' has two containers, one
 of them the viewparent, and three contents.
+
+A '•' ends the in-side of 'C' or 'H' when a note of your graph, one
+homed in a skgrepo you own, is among its members: before 'C', one but
+the nearest node above the headline, so the note is kept elsewhere by
+you; before 'H', any. '⟨0h 2a•C3 1•H⟩': two containers, the
+viewparent and a note of yours, and a note of yours hides it. It
+comes from the atom 'usersGraph' ending that side's facts.
 
 One token is left out: a bare 'aC', which says only that the
 viewparent contains the node and nothing else does. That is the
