@@ -18,10 +18,10 @@
 ;;; PITFALL: ORPHANED OVERLAYS). This file draws only when called, and
 ;;; the herald machinery calls it: 'heralds-apply-to-buffer' draws them
 ;;; all ('skg-fork-dedup-refresh-buffer'), 'heralds-after-change'
-;;; redraws those of the forks folders an edit can change
-;;; ('skg-fork-dedup-refresh-lines'), and so does the delta redraw
-;;; ('skg-redraw-delta.el'); turning 'heralds-minor-mode' off clears
-;;; them.
+;;; redraws those an edit can change ('skg-fork-dedup-refresh-region'),
+;;; and so does the delta redraw ('skg-redraw-delta.el',
+;;; 'skg-fork-dedup-refresh-lines'); turning 'heralds-minor-mode' off
+;;; clears them.
 ;;;
 ;;; Code:
 
@@ -56,6 +56,22 @@ draw one over each title and body a forks-folder member restates."
         (when (skg-fork-dedup--forks-folder-at-point-p)
           (skg-fork-dedup--draw-folder))
         (forward-line 1)))))
+
+(defun skg-fork-dedup-refresh-region (start end)
+  "Redraw the restatement overlays an edit of the lines from START to
+END can change. Within one headline's lines, those are the forks
+folders around that headline (`skg-fork-dedup-refresh-lines'). Lines
+holding more than one headline, which a paste or a redraw of the
+whole view inserts, can hold any part of any forks folder, so all of
+them are redrawn (`skg-fork-dedup-refresh-buffer')."
+  (when skg-fork-dedup-overlay
+    (if (save-excursion
+          (goto-char start)
+          (forward-line 1)
+          (and (<= (point) end)
+               (re-search-forward "^\\*+[ \t]" end t)))
+        (skg-fork-dedup-refresh-buffer)
+      (skg-fork-dedup-refresh-lines (list start)))))
 
 (defun skg-fork-dedup-refresh-lines (positions)
   "Redraw the restatement overlays an edit at each of POSITIONS can

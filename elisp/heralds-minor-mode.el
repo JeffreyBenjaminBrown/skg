@@ -269,7 +269,7 @@ what forks-folder members restate (`skg-fork-dedup-refresh-buffer')."
           (heralds-apply-to-line)
           (forward-line 1))
         (heralds--refresh-folders-above lbeg)
-        (skg-fork-dedup-refresh-lines (list lbeg lend)) )) ))
+        (skg-fork-dedup-refresh-region lbeg lend) )) ))
 
 (defun heralds--refresh-folders-above (pos)
   "Re-apply the herald of each folder headline among the two headlines

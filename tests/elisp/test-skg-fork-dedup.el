@@ -6,7 +6,9 @@
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
                              (file-name-directory load-file-name)))
 (require 'ert)
+(require 'org)
 (require 'skg-fork-dedup)
+(require 'heralds-minor-mode)
 
 (defconst test-skg-fork-dedup--buffer
   (concat
@@ -82,3 +84,20 @@ equal text goes, the others stay."
    (skg-fork-dedup-refresh-lines (list (point)))
    (should (equal (mapcar #'cdr (test-skg-fork-dedup--covers))
                   '("<b's title, unchanged>")))))
+
+(ert-deftest test-skg-fork-dedup-a-whole-view-inserted-at-once-is-covered ()
+  "A redraw of the whole view inserts it in one edit, whose change hook
+reports its first and last lines. A forks folder far from both, here
+under a note that is not the view's root, is drawn too."
+  (skg-test-install-herald-rules)
+  (with-temp-buffer
+    (org-mode)
+    (heralds-minor-mode 1)
+    (insert (concat
+             "* (skg node (gnid R)) Root\n"
+             (replace-regexp-in-string
+              "^\\*" "**" test-skg-fork-dedup--buffer)
+             "* (skg node (gnid Z)) Last\n"))
+    (should (equal (mapcar #'cdr (test-skg-fork-dedup--covers))
+                   '("<b's title, unchanged>" "<b's body, unchanged>"
+                     "<b's title, unchanged>")))))
