@@ -72,9 +72,9 @@ def check_placing_nodes (context):
     "** First child ⟨0d aC3⟩\n"
     "A body line that stays unnumbered.\n"
     "*** A second container, outside the view ⟨0n aC1⟩\n"
-    "**** Contained twice ⟨0o ☮ 2aC⟩\n"
-    "*** An aside of Fred's ⟨0p 1H ⌂:fred⟩\n"
-    "*** Contained twice ⟨0e 2aC⟩\n" )
+    "**** Contained twice ⟨0o ☮ 2a•C⟩\n"
+    "*** An aside of Fred's ⟨0p 1•H ⌂:fred⟩\n"
+    "*** Contained twice ⟨0e 2a•C⟩\n" )
   if "writeProtected (viewRequests" in read_file (
       os . path . join (folder, ROOT_BASE_NAME + ".full.org") ):
     raise CaseFailure ( "the re-rendered view still carries a paste's request" )
@@ -95,7 +95,7 @@ def check_placing_beside_an_editable_occurrence (context):
     "editable occurrence of it.\n" + saved_line (0) + written_paths (folder) )
   require_equal ( "the second container's content",
                   skg_list (context, "child-b-id", "contains"), [ "shared-id" ] )
-  if not read_compact (folder) . endswith ( "*** Contained twice ⟨0t ☮ 3aC⟩\n" ):
+  if not read_compact (folder) . endswith ( "*** Contained twice ⟨0t ☮ 3a•C⟩\n" ):
     raise CaseFailure (
       f"the placed occurrence is not last and write-protected:\n{read_compact (folder)}" )
 

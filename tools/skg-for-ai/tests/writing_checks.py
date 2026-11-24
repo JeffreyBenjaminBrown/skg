@@ -103,8 +103,8 @@ def check_body_edit (context):
 
 def check_new_child (context):
   folder = fresh_root_view (context, "new")
-  edit_compact ( folder, [ ( "*** Contained twice ⟨0e 2aC⟩\n",
-                             "*** Contained twice ⟨0e 2aC⟩\n"
+  edit_compact ( folder, [ ( "*** Contained twice ⟨0e 2a•C⟩\n",
+                             "*** Contained twice ⟨0e 2a•C⟩\n"
                              "*** A new grandchild\n" ) ])
   report = ( REPORT_HEAD +
              "New: 'A new grandchild', under ⟨0d⟩ 'First child, renamed'.\n" )
@@ -121,10 +121,10 @@ def check_new_child (context):
 def check_move (context):
   folder = fresh_root_view (context, "move")
   edit_compact ( folder, [
-    ( "*** Contained twice ⟨0e 2aC⟩\n", "" ),
-    ( "***** An aside of Fred's ⟨0n ☮ cH ⌂:fred folded⟩\n",
-      "***** An aside of Fred's ⟨0n ☮ cH ⌂:fred folded⟩\n"
-      "*** Contained twice ⟨0e 2aC⟩\n" ) ])
+    ( "*** Contained twice ⟨0e 2a•C⟩\n", "" ),
+    ( "***** An aside of Fred's ⟨0n ☮ c•H ⌂:fred folded⟩\n",
+      "***** An aside of Fred's ⟨0n ☮ c•H ⌂:fred folded⟩\n"
+      "*** Contained twice ⟨0e 2a•C⟩\n" ) ])
   report = ( REPORT_HEAD +
              "Moved: ⟨0e⟩ 'Contained twice', from under ⟨0d⟩ 'First child, "
              "renamed' to under ⟨0g⟩ 'Second child, a forker'.\n" )
@@ -139,7 +139,7 @@ def check_move (context):
 
 def check_removal (context):
   folder = fresh_root_view (context, "remove")
-  edit_compact ( folder, [ ( "*** Contained twice ⟨0n 2aC⟩\n", "" ) ])
+  edit_compact ( folder, [ ( "*** Contained twice ⟨0n 2a•C⟩\n", "" ) ])
   report = ( REPORT_HEAD +
              "Removed: ⟨0n⟩ 'Contained twice', from under ⟨0f⟩ 'Second "
              "child, a forker'.\n" )
@@ -162,7 +162,7 @@ def check_removal (context):
     "the removed node's fresh view",
     read_file ( os . path . join ( shared_folder,
                                    "view_shared-id.compact.org" )),
-    "* Contained twice ⟨0a 1C ⌂:main⟩\n"
+    "* Contained twice ⟨0a 1•C ⌂:main⟩\n"
     "** ⟨0b ☮ These also contain it.⟩\n"
     "*** A second container, outside the view ⟨0c ☮ Cb⟩\n" )
 
@@ -183,8 +183,8 @@ def check_deletion (context):
 
 def check_bad_handles (context):
   folder = fresh_root_view (context, "bad-handle")
-  edit_compact ( folder, [ ( "⟨0a 1C2 L2 ⌂:main⟩",
-                             "⟨0a 1C2 L2 ⌂:main both delete restoreNode⟩" ),
+  edit_compact ( folder, [ ( "⟨0a 1•C2 L2 ⌂:main⟩",
+                             "⟨0a 1•C2 L2 ⌂:main both delete restoreNode⟩" ),
                            ( "** First child, renamed ⟨0d⟩",
                              "** First child, renamed ⟨0s⟩" ),
                            ( "⟨0c ☮ Cb⟩", "⟨zz ☮ Cb⟩" ) ])

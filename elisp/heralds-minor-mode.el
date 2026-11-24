@@ -588,12 +588,23 @@ of birth facts (RELATION SIDE [GEN]), already accounts for."
              (subset-key (cond ((and (eq rel 'contains) (eq side 'out)) 'unintegrated)
                                ((and (eq rel 'linksTo) (eq side 'in)) 'substantive)))
              (subset (and subset-key (heralds--subset-facts facts subset-key))))
-        (if subset
-            (heralds--fraction-text
-             count gens (car subset) (cdr subset) tier
-             (heralds--side-tier rel (if (eq subset-key 'unintegrated)
-                                         'out_unintegrated 'in_substantive)))
-          (heralds--side-text count gens tier))))))
+        (concat
+         (if subset
+             (heralds--fraction-text
+              count gens (car subset) (cdr subset) tier
+              (heralds--side-tier rel (if (eq subset-key 'unintegrated)
+                                          'out_unintegrated 'in_substantive)))
+           (heralds--side-text count gens tier))
+         (heralds--users-graph-marker facts))))))
+
+(defun heralds--users-graph-marker (side-facts)
+  "The marker \"•\" when SIDE-FACTS, from `heralds--side-facts', carry
+the atom `usersGraph': a note of the user's graph is among the side's
+members (on contains, one but the note the headline stands under).
+Else the empty string."
+  (if (memq 'usersGraph (nth 2 side-facts))
+      (heralds--styled "•" (heralds--relationship-style 'users_graph))
+    ""))
 
 (defun heralds--rel-token (rel form birth write-protected in-place-of)
   "Render relation REL's token from FORM, or nil if it has nothing to show."

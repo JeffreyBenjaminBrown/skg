@@ -1,9 +1,9 @@
-* An aside of Fred's ⟨0a 1H ⌂:fred⟩
+* An aside of Fred's ⟨0a 1•H ⌂:fred⟩
 ** ⟨0b ☮ These hide it from their forks.⟩
-*** Second child, a forker ⟨0c ☮ 1C 1/L K1 H2b ⌂:main⟩
+*** Second child, a forker ⟨0c ☮ 1•C 1/L K1 H2b ⌂:main⟩
 **** ⟨0d Its mirrors are these.⟩
 ***** Fred's note ⟨0e ☮ C1 1/L bK ⌂:fred⟩
 ***** ⟨0f b hides these, but no fork partner shown contains them.⟩
-****** An aside of Fred's ⟨0g ☮ cH ⟳ ⌂:fred folded⟩
-**** The fixture root ⟨0h ☮B 1C2a L2a⟩
+****** An aside of Fred's ⟨0g ☮ c•H ⟳ ⌂:fred folded⟩
+**** The fixture root ⟨0h ☮B 1•C2a L2a⟩
 ***** Above the root ⟨0i ☮ Ca⟩

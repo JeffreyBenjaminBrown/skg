@@ -94,6 +94,14 @@
 (skg node (gnid x) (view (rels (contains (in 2) (out 0 (unintegrated 0))))))
 ---- text: 2C
 ---- styles: medium*1 normal*1
+==== contains and hides: a note of the user's graph among the containers and the hiders
+(skg node (gnid x) (view (rels (contains (in 2 (ancestors 1) usersGraph) (out 3)) (hides (in 1 usersGraph))) (birth (contains in 1))))
+---- text: 2a•C3 1•H
+---- styles: medium*1 low*1 high*1 low*1 normal*1 -*1 medium*1 high*1 normal*1
+==== contains: a note of the user's graph beside a fraction on the other side
+(skg node (gnid x) (view (rels (contains (in 1 usersGraph) (out 8 (unintegrated 2))))))
+---- text: 1•C2/8
+---- styles: medium*1 high*1 normal*1 medium*1 normal*2
 ==== forks: inPlaceOf beside an ancestor h
 (skg node (gnid x) (inPlaceOf y) (view (rels (forks (out 1 (ancestors 8))))))
 ---- text: Kĥh

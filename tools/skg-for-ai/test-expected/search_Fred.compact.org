@@ -12,11 +12,11 @@
 # Server errors 0, warnings 0.
 * Fred's note ⟨0a ☮ C1 1/L 1K ⌂:fred⟩
 ** ⟨0b Its mirrors are these. folded⟩
-*** Second child, a forker ⟨0c ☮ 1C 1/L Kb H2 ⌂:main⟩
+*** Second child, a forker ⟨0c ☮ 1•C 1/L Kb H2 ⌂:main⟩
 **** ⟨0d ☮ These also contain it.⟩
-***** The fixture root ⟨0e ☮B 1C2b L2b folded⟩
+***** The fixture root ⟨0e ☮B 1•C2b L2b folded⟩
 ****** Above the root ⟨0f ☮ Ca⟩
-* An aside of Fred's ⟨0g ☮ 1H ⌂:fred⟩
-* A detail of Fred's ⟨0h ☮ 1C 1H ⌂:fred⟩
+* An aside of Fred's ⟨0g ☮ 1•H ⌂:fred⟩
+* A detail of Fred's ⟨0h ☮ 1C 1•H ⌂:fred⟩
 ** ⟨0i ☮ These also contain it. folded⟩
 *** Fred's note ⟨0j ☮ Cb 1/L 1K⟩

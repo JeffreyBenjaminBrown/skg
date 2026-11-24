@@ -10,17 +10,17 @@
 # Contained elsewhere too 3, forked 2, forking 1.
 # Links 0, distinct targets 0, resolved 0, unresolved 0.
 # Server errors 0, warnings 0.
-* Second child, a forker ⟨0a 1C 1/L K1 H2 ⌂:main⟩
+* Second child, a forker ⟨0a 1•C 1/L K1 H2 ⌂:main⟩
 ** ⟨0l ☮ These link to it.⟩
-*** The fixture root ⟨0m ☮B 1C2b L2b⟩
+*** The fixture root ⟨0m ☮B 1•C2b L2b⟩
 **** Above the root ⟨0n ☮ Ca⟩
 ** ⟨0b ☮ These also contain it.⟩
-*** The fixture root ⟨0c ☮B 1C2b L2b⟩
+*** The fixture root ⟨0c ☮B 1•C2b L2b⟩
 **** Above the root ⟨0d ☮ Ca⟩
 ** ⟨0e Its mirrors are these.⟩
 *** Fred's note ⟨0f C1 1/L bK ⌂:fred⟩
 **** ⟨0g ☮ It contains these, but c hides them.⟩
-***** A detail of Fred's ⟨0h ☮ bC dH folded⟩
+***** A detail of Fred's ⟨0h ☮ bC d•H folded⟩
 ****** Fred's note ⟨0i ☮ Ca 1/L 1K ⟳⟩
 *** ⟨0j b hides these, but no fork partner shown contains them.⟩
-**** An aside of Fred's ⟨0k ☮ cH ⌂:fred folded⟩
+**** An aside of Fred's ⟨0k ☮ c•H ⌂:fred folded⟩

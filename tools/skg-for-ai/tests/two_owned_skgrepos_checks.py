@@ -95,7 +95,7 @@ def check_viewing_overPrivateText (context):
                   "Approved: the request is sent again, releasing that text.\n" )
   require_in_file ( folder, "view_tele-id",
                     "* A title kept private ⟨0a C1 ⌂:main⟩\n"
-                    "** Contained twice ⟨0b 3aC⟩\n" )
+                    "** Contained twice ⟨0b 3a•C⟩\n" )
 
 def check_searching_under_a_restriction (context):
   """Under the restriction a search asks whether to include the
@@ -121,8 +121,8 @@ def check_releasing_a_save_s_rerender (context):
   had made a node, whose container would then be an edited stale
   graphnode; the files then show the new node."""
   folder = context [ "daemon_folder" ]
-  edit_compact ( folder, [ ( "** Contained twice ⟨0b 3aC⟩",
-                             "** Contained twice, retitled ⟨0b 3aC⟩" ) ],
+  edit_compact ( folder, [ ( "** Contained twice ⟨0b 3a•C⟩",
+                             "** Contained twice, retitled ⟨0b 3a•C⟩" ) ],
                  "view_tele-id" )
   sidecar = os . path . join (folder, "view_tele-id.view.json")
   release_lines = [
@@ -140,8 +140,8 @@ def check_releasing_a_save_s_rerender (context):
                   skg_title (context, "shared-id"), "Contained twice, retitled" )
   require_tool_run ([ "view", "tele-id", "--out-dir", folder,
                       "--show-overPrivateText", "--no-summary" ])
-  edit_compact ( folder, [ ( "** Contained twice, retitled ⟨0b 3aC⟩\n",
-                             "** Contained twice, retitled ⟨0b 3aC⟩\n"
+  edit_compact ( folder, [ ( "** Contained twice, retitled ⟨0b 3a•C⟩\n",
+                             "** Contained twice, retitled ⟨0b 3a•C⟩\n"
                              "*** Added under the telescope\n" ) ],
                  "view_tele-id" )
   completed = require_tool_run ([ "save", sidecar, "--yes",
@@ -160,7 +160,7 @@ def check_releasing_a_save_s_rerender (context):
   require_equal ( "the telescope's child's content after the release",
                   skg_list (context, "shared-id", "contains"), [ new_id ] )
   require_in_file ( folder, "view_tele-id",
-                    "** Contained twice, retitled ⟨0b 3aC1⟩\n"
+                    "** Contained twice, retitled ⟨0b 3a•C1⟩\n"
                     "*** Added under the telescope ⟨0c⟩\n" )
 
 def check_deleting_under_a_restriction (context):

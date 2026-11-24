@@ -38,6 +38,8 @@ RELATIONS_IN_DISPLAY_ORDER = relations_in_display_order ()
 BARE_PARENT_CONTAINS_TOKEN = "aC"
 PROPERTY_COUNT_LETTERS = [ ( "aliases", "A" ), ( "extraIds", "I" ),
                            ( "flags", "F" ) ]
+# After an in-side carrying 'usersGraph'.
+USERS_GRAPH_MARKER = "•"
 
 def relationship_heralds_text (metadata):
   """The headline's relationship and property-count tokens,
@@ -81,10 +83,14 @@ def relation_side_text (relation_name, side_name, form):
                   if ( relation_name, side_name ) == ( "linksTo", "in" )
                   else None )
   subset = metadata_form (side, subset_name) if subset_name else None
-  if subset is not None:
-    return fraction_text ( count, generations, first_number (subset),
+  text = ( fraction_text ( count, generations, first_number (subset),
                            ancestor_generations (subset) )
-  return side_text (count, generations)
+           if subset is not None
+           else side_text (count, generations) )
+  # 'usersGraph': a note of the user's graph is among the side's
+  # members (on contains, one but the note the headline stands under).
+  return text + ( USERS_GRAPH_MARKER
+                  if metadata_has_atom (side, "usersGraph") else "" )
 
 def side_text (count, generations):
   if count == 0 and not generations:

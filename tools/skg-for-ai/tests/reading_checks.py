@@ -44,7 +44,9 @@ def check_describe (scratch):
   view_files = os . path . join (folder, "view_root-id.view.json")
   require_output (
     run_tool ([ "describe", view_files, "0a" ]),
-    "1C2: 1 note contains this one; this note contains 2 notes.\n"
+    "1•C2: 1 note contains this one; a note of yours, not the one it "
+    "stands under, is among them: you keep it elsewhere (•); this note "
+    "contains 2 notes.\n"
     "L2: this note links to 2 notes.\n"
     "⌂:main: it lives in your skgrepo 'main'.\n" )
   folder_lines = run_tool ([ "describe", view_files, "0b" ]) . stdout

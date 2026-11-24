@@ -396,10 +396,16 @@ local function rel_side_chunks (rel, side, form, birth, write_protected)
   elseif rel == 'linksTo' and side == 'in' then
     subset_key, subset_tier = 'substantive', tiers.in_substantive end
   local subset = subset_key and assq(s, subset_key) or nil
+  local chunks
   if subset then
-    return fraction_chunks(count, gens, first_number(subset) or 0,
-                           ancestors_of(subset), tier, subset_tier) end
-  return side_chunks(count, gens, tier)
+    chunks = fraction_chunks(count, gens, first_number(subset) or 0,
+                             ancestors_of(subset), tier, subset_tier)
+  else chunks = side_chunks(count, gens, tier) end
+  -- 'usersGraph': a note of the user's graph is among the side's
+  -- members (on contains, one but the note the headline stands under).
+  if has_atom(s, 'usersGraph') then
+    table.insert(chunks, styled('•', relationship_styles.users_graph)) end
+  return chunks
 end
 
 ---Chunks for relation REL's token from FORM, or nil if it shows nothing.

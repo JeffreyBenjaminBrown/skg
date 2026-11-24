@@ -34,9 +34,9 @@ FOLLOWS_MAINS_SUMMARY = (
   "# Showing the perspective of main (each root's home skgrepo is the default).\n" )
 FOLLOWS_THIRDS_SUMMARY = (
   "# Showing the perspective of third (each root's home skgrepo is the default).\n" )
-R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨Its mirrors are these.⟩\n**** M ⟨2C 3bK ⌂:origin⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n**** U ⟨K1 ⌂:main⟩\n**** B ⟨K1 ⌂:third⟩\n** K ⟨0i⟩\n"
-R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨Its mirrors are these.⟩\n**** M ⟨2C 3bK ⌂:origin⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n**** A ⟨K1 ⌂:foreign⟩\n**** B ⟨K1 ⌂:third⟩\n** K ⟨0i⟩\n"
-R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨Its mirrors are these.⟩\n**** M ⟨2C 3bK ⌂:origin⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n**** A ⟨K1 ⌂:foreign⟩\n**** U ⟨K1 ⌂:main⟩\n** K ⟨0i⟩\n"
+R_SHOWING_A = "* R ⟨0a C2 ⌂:foreign⟩\n** A ⟨0b Kĥ1⟩\n*** ⟨Its mirrors are these.⟩\n**** M ⟨2•C 3bK ⌂:origin⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n**** U ⟨K1 ⌂:main⟩\n**** B ⟨K1 ⌂:third⟩\n** K ⟨0i⟩\n"
+R_SHOWING_U = "* R ⟨0a C2 ⌂:foreign⟩\n** U ⟨0b Kĥ1 ⌂:main⟩\n*** ⟨Its mirrors are these.⟩\n**** M ⟨2•C 3bK ⌂:origin⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n**** A ⟨K1 ⌂:foreign⟩\n**** B ⟨K1 ⌂:third⟩\n** K ⟨0i⟩\n"
+R_SHOWING_B = "* R ⟨0a C2 ⌂:foreign⟩\n** B ⟨0b Kĥ1 ⌂:third⟩\n*** ⟨Its mirrors are these.⟩\n**** M ⟨2•C 3bK ⌂:origin⟩\n***** ⟨☮ These also contain it.⟩\n****** P ⟨☮ Cb ⌂:main folded⟩\n**** A ⟨K1 ⌂:foreign⟩\n**** U ⟨K1 ⌂:main⟩\n** K ⟨0i⟩\n"
 
 def copy_perspective_fixture (data_root):
   """The perspective data, with a config naming its three foreign

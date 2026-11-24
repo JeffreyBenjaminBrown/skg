@@ -36,7 +36,7 @@ def check_detaching_and_attaching (context):
   refused where the parent reads no claims, and where the headline
   already claims (or does not) what it asks."""
   folder = fresh_root_view (context, "detach")
-  edit_compact ( folder, [ ( "*** Contained twice ⟨0e 2aC⟩",
+  edit_compact ( folder, [ ( "*** Contained twice ⟨0e 2a•C⟩",
                              "*** Contained twice ⟨0e 2aC detach⟩" ) ])
   require_output (
     run_save (folder, "--yes"),
@@ -48,8 +48,8 @@ def check_detaching_and_attaching (context):
                   skg_list (context, "child-a-id", "contains"), [] )
   require_in_compact ( folder, "** First child ⟨0d⟩\n"
                                "A body line that stays unnumbered.\n"
-                               "*** Contained twice ⟨0e ⊥ 1C⟩\n" )
-  edit_compact ( folder, [ ( "*** Contained twice ⟨0e ⊥ 1C⟩",
+                               "*** Contained twice ⟨0e ⊥ 1•C⟩\n" )
+  edit_compact ( folder, [ ( "*** Contained twice ⟨0e ⊥ 1•C⟩",
                              "*** Contained twice ⟨0e ⊥ 1C attach⟩" ) ])
   require_output (
     run_save (folder, "--yes"),
@@ -58,7 +58,7 @@ def check_detaching_and_attaching (context):
     "in its parent's list.\n" + saved_line (0) + written_paths (folder) )
   require_equal ( "the parent's content after 'attach'",
                   skg_list (context, "child-a-id", "contains"), [ "shared-id" ] )
-  edit_compact ( folder, [ ( "*** Contained twice ⟨0e 2aC⟩",
+  edit_compact ( folder, [ ( "*** Contained twice ⟨0e 2a•C⟩",
                              "*** Contained twice ⟨0e 2aC attach⟩" ),
                            ( "*** Above the root ⟨0c ☮ Cb⟩",
                              "*** Above the root ⟨0c ☮ Cb detach⟩" ) ])
@@ -88,7 +88,7 @@ def check_write_protecting (context):
     "writeProtectedView)': after saving its edits, the save makes it "
     "write-protected.\n" + saved_line (0) + written_paths (folder) )
   require_in_compact ( folder, "** First child ⟨0d ☮B aC1⟩\n"
-                               "*** Contained twice ⟨0e 2aC⟩\n" )
+                               "*** Contained twice ⟨0e 2a•C⟩\n" )
   folder = fresh_root_view (context, "write-protect-subtree")
   edit_compact ( folder, [ ( "** First child ⟨0d aC1⟩",
                              "** First child ⟨0d aC1 write-protect subtree⟩" ) ])
@@ -100,7 +100,7 @@ def check_write_protecting (context):
     "and every occurrence of its content subtree write-protected.\n"
     + saved_line (0) + written_paths (folder) )
   require_in_compact ( folder, "** First child ⟨0d ☮B aC1⟩\n"
-                               "*** Contained twice ⟨0e ☮ 2aC⟩\n" )
+                               "*** Contained twice ⟨0e ☮ 2a•C⟩\n" )
   require_equal ( "the graph after write-protecting", skg_files (context),
                   graph_before )
   folder = fresh_root_view (context, "write-protect-refused")
@@ -145,8 +145,8 @@ def check_search_matching (context):
     + saved_line (0) + written_paths (folder) )
   require_equal ( "the flags after 'searchMatching'",
                   skg_list (context, "child-a-id", "flags"), [] )
-  edit_compact ( folder, [ ( "*** Contained twice ⟨0e 2aC⟩\n",
-                             "*** Contained twice ⟨0e 2aC⟩\n"
+  edit_compact ( folder, [ ( "*** Contained twice ⟨0e 2a•C⟩\n",
+                             "*** Contained twice ⟨0e 2a•C⟩\n"
                              "*** Fred's ⟨node:fred-note-id⟩\n" ) ])
   require_save_succeeds (folder)
   root = compact_line_starting (folder, "* The fixture root ⟨0a ")

@@ -46,7 +46,7 @@ def check_edits_to_review (context):
   folder = fresh_root_view (context, "review-edits")
   edit_compact ( folder, [
     ( "** First child ⟨0d aC1⟩", "** First child, renamed ⟨0d aC1⟩" ),
-    ( "*** Contained twice ⟨0e 2aC⟩\n",
+    ( "*** Contained twice ⟨0e 2a•C⟩\n",
       "*** Contained twice ⟨0e 2aC delete⟩\n*** A new grandchild\n" ) ])
   require_save_succeeds (folder)
   require_equal ( "the deleted node's file",
@@ -238,7 +238,7 @@ def check_extending_the_diff_view (context):
   require_in_diff_compact (
     folder, "*** First child, renamed ⟨0d aC2⟩\n"
     "A body line that stays unnumbered.\n"
-    "**** Contained twice ⟨0f ☮ 2aC⟩\n"
+    "**** Contained twice ⟨0f ☮ 2a•C⟩\n"
     "**** A grandchild, retitled ⟨0g M⟩\n"
     "***** A new grandchild ⟨0h old title⟩\n" )
   for line_number in [ 7, 10 ]:

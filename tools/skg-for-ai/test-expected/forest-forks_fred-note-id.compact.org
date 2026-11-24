@@ -1,10 +1,10 @@
 * Fred's note ⟨0a C1 1/L 1K ⌂:fred⟩
 ** ⟨0b Its mirrors are these.⟩
-*** Second child, a forker ⟨0c 1C 1/L Kb H2 ⌂:main⟩
+*** Second child, a forker ⟨0c 1•C 1/L Kb H2 ⌂:main⟩
 **** ⟨0d ☮ a hides these, which c contains.⟩
-***** A detail of Fred's ⟨0e ☮ dC bH ⌂:fred folded⟩
+***** A detail of Fred's ⟨0e ☮ dC b•H ⌂:fred folded⟩
 ****** Fred's note ⟨0f ☮ Ca 1/L 1K ⟳⟩
 **** ⟨0g ☮ These also contain it.⟩
-***** The fixture root ⟨0h ☮B 1C2b L2b folded⟩
+***** The fixture root ⟨0h ☮B 1•C2b L2b folded⟩
 ****** Above the root ⟨0i ☮ Ca⟩
-** A detail of Fred's ⟨0j 1H⟩
+** A detail of Fred's ⟨0j 1•H⟩
