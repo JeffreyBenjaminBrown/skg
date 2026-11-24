@@ -383,7 +383,7 @@ async fn test_editable_view_conflicting (
         "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 1))))) 1
          ** (skg node (gnid 12) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 12
          *** (skg node (gnid 122) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)) (out 1))))) 122
-         * (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1) (out 1))))) 12
+         * (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 usersGraph) (out 1))))) 12
          ** (skg node (gnid 122) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 122
          122 body
          *** (skg node (gnid 1221) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 1221
@@ -417,7 +417,7 @@ async fn test_editable_view_with_cycle (
 
       // a should extend to show b, and b's child a should be marked as cycle
       let expected = indoc! {"
-        * (skg node (gnid cyc-a) (skgRepos (nodeRepo main)) (view (rels (contains (in 1) (out 1))))) cyc-a
+        * (skg node (gnid cyc-a) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 usersGraph) (out 1))))) cyc-a
         cyc-a body
         ** (skg node (gnid cyc-b) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1)))) (birth (contains in 1)))) cyc-b
         cyc-b body
@@ -456,8 +456,8 @@ async fn test_editable_view_with_repeat (
         // editability, so the 121 that 12's request draws among its
         // content is a repeat, and write-protected: the first editable
         // occurrence wins, and nothing yields its editability.
-        "* (skg node (gnid 121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1))))) 121
-         * (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1) (out 4))))) 12
+        "* (skg node (gnid 121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 usersGraph))))) 121
+         * (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 usersGraph) (out 4))))) 12
          12 body
          ** (skg node (gnid 121) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 121
          ** (skg node (gnid 122) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 122

@@ -6,7 +6,8 @@
 
 use skg::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use skg::herald_tokens::{
-  relationship_heralds_sexp, AncestorFlags, BirthFact, RelationshipHeralds, Side};
+  relationship_heralds_sexp, AncestorFlags, BirthFact, RelationshipHeralds, Side,
+  UsersGraphMembers};
 use skg::types::viewnode::RelationCounts;
 
 fn counts () -> RelationCounts { RelationCounts::default () }
@@ -18,7 +19,7 @@ fn emit (
   f     : &AncestorFlags,
   birth : &[BirthFact],
 ) -> Option<String> {
-  joined ( relationship_heralds_sexp (c, al, ex, 0, f, birth, None) ) }
+  joined ( relationship_heralds_sexp (c, al, ex, 0, f, birth, None, &UsersGraphMembers::default ()) ) }
 
 /// The forms that have something to say, joined by a space; None when
 /// none has.
@@ -86,12 +87,36 @@ fn contextual_content_distinguishes_applicable_zero_from_absent () {
   let normal = emit (&c, 0, 0, &f, &[]) . unwrap ();
   assert_eq! (normal, "(rels (contains (in 2) (out 8 (ancestors 2))))");
   let contextual = joined ( relationship_heralds_sexp (
-    &c, 0, 0, 0, &f, &[], Some (2)) ) . unwrap ();
+    &c, 0, 0, 0, &f, &[], Some (2), &UsersGraphMembers::default ()) ) . unwrap ();
   assert_eq! (contextual,
     "(rels (contains (in 2) (out 8 (ancestors 2) (unintegrated 2 (ancestors 2)))))");
   let zero = joined ( relationship_heralds_sexp (
-    &c, 0, 0, 0, &AncestorFlags::default (), &[], Some (0)) ) . unwrap ();
+    &c, 0, 0, 0, &AncestorFlags::default (), &[], Some (0),
+    &UsersGraphMembers::default ()) ) . unwrap ();
   assert_eq! (zero, "(rels (contains (in 2) (out 8 (unintegrated 0))))");
+}
+
+#[test]
+fn the_users_graph_ends_the_in_sides_of_contains_and_hides () {
+  // 2a•C 1•H: the parent and a note of the user's graph contain it,
+  // and a note of the user's graph hides it. Forks and linksTo never
+  // say so, nor does an out-side.
+  let c = RelationCounts { containers : 2, contents : 1, hiders : 1,
+                           hides : 1, forkers : 1, .. counts () };
+  let mut f = AncestorFlags::default ();
+  f . record (NodeRelation::Contains, true, 1);
+  let both = UsersGraphMembers { contains_it_elsewhere : true, hides_it : true };
+  assert_eq! (
+    joined ( relationship_heralds_sexp (
+      &c, 0, 0, 0, &f, &[], None, &both) ) . as_deref (),
+    Some ("(rels (contains (in 2 (ancestors 1) usersGraph) (out 1)) \
+           (forks (in 1)) (hides (in 1 usersGraph) (out 1)))") );
+  let hides_only = UsersGraphMembers { hides_it : true, .. UsersGraphMembers::default () };
+  assert_eq! (
+    joined ( relationship_heralds_sexp (
+      &c, 0, 0, 0, &f, &[], None, &hides_only) ) . as_deref (),
+    Some ("(rels (contains (in 2 (ancestors 1)) (out 1)) \
+           (forks (in 1)) (hides (in 1 usersGraph) (out 1)))") );
 }
 
 #[test]
@@ -183,7 +208,8 @@ fn aliases_and_extra_ids () {
 fn true_flags_are_counted_and_zero_is_omitted () {
   assert_eq! (
     joined ( relationship_heralds_sexp (
-      &counts (), 0, 0, 2, &AncestorFlags::default (), &[], None) )
+      &counts (), 0, 0, 2, &AncestorFlags::default (), &[], None,
+      &UsersGraphMembers::default ()) )
       . as_deref (),
     Some ("(props (flags 2))") );
   assert_eq! (emit (&counts (), 0, 0, &AncestorFlags::default (), &[]),

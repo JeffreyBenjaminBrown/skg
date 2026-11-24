@@ -64,6 +64,9 @@ mod hidden_nodes;
 #[path = "foreign_hidden.rs"]
 mod foreign_hidden;
 
+#[path = "users_graph_heralds.rs"]
+mod users_graph_heralds;
+
 #[path = "illegal_edits.rs"]
 mod illegal_edits;
 

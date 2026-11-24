@@ -879,16 +879,16 @@ async fn test_forkee_and_compound_partner_folders (
        ** (skg forksFolder)
        *** (skg node (gnid E1) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
        **** (skg hiddenInForkPartnerFolder)
-       ***** (skg folded node (gnid hidden-in-E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) hidden-in-E1
+       ***** (skg folded node (gnid hidden-in-E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4) usersGraph))) (birth (contains in 2) (hides in 4)))) hidden-in-E1
        ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (forks (in 1))) cycle)) forkee-1
        **** (skg node (gnid E11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E11
        *** (skg node (gnid E2) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 2 (unintegrated 1))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
        **** (skg hiddenInForkPartnerFolder)
-       ***** (skg folded node (gnid hidden-in-E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) hidden-in-E2
+       ***** (skg folded node (gnid hidden-in-E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4) usersGraph))) (birth (contains in 2) (hides in 4)))) hidden-in-E2
        ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (forks (in 1))) cycle)) forkee-2
        **** (skg node (gnid E21) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E21
        *** (skg hiddenOutsideOfForkPartnersFolder)
-       **** (skg folded node (gnid hidden-for-no-reason) (skgRepos (nodeRepo main)) writeProtected (view (rels (hides (in 1 (ancestors 3)))) (birth (hides in 3)))) hidden-for-no-reason
+       **** (skg folded node (gnid hidden-for-no-reason) (skgRepos (nodeRepo main)) writeProtected (view (rels (hides (in 1 (ancestors 3) usersGraph))) (birth (hides in 3)))) hidden-for-no-reason
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
     assert_metadata_eq!(initial_view, expected_view,
@@ -942,7 +942,7 @@ async fn test_hidden_within_but_none_without (
        ** (skg forksFolder)
        *** (skg node (gnid E1) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 3 (unintegrated 2))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
        **** (skg hiddenInForkPartnerFolder)
-       ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) H
+       ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4) usersGraph))) (birth (contains in 2) (hides in 4)))) H
        ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 3 (ancestors 1))) (forks (in 1))) cycle)) forkee-1
        **** (skg node (gnid E11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E11
        **** (skg node (gnid E12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E12
@@ -1152,7 +1152,7 @@ async fn test_hidden_without_but_none_within (
        ***** (skg node (gnid E121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E121
        *** (skg node (gnid E2) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 0 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
        *** (skg hiddenOutsideOfForkPartnersFolder)
-       **** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (hides (in 1 (ancestors 3)))) (birth (hides in 3)))) H
+       **** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (hides (in 1 (ancestors 3) usersGraph))) (birth (hides in 3)))) H
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
     assert_metadata_eq!(initial_view, expected_view,
@@ -1205,7 +1205,7 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
         . filter ( |line| line . contains ("(gnid E11)") ) . collect ();
       assert! (
         e11_lines . len () == 1
-        && e11_lines [0] . contains ("(hides (in 1 (ancestors 4)))"),
+        && e11_lines [0] . contains ("(hides (in 1 (ancestors 4) usersGraph))"),
         "E11, now hidden inside forkee E1, which is drawn editable, \
          leaves the folder where it was typed and stands only in E1's \
          hiddenInForkPartnerFolder:\n{}",
@@ -1268,12 +1268,12 @@ async fn test_overlapping_hidden_within (
        ** (skg forksFolder)
        *** (skg node (gnid E1) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-1
        **** (skg hiddenInForkPartnerFolder)
-       ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) H
+       ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 2) usersGraph)) (hides (in 1 (ancestors 4) usersGraph))) (birth (contains in 2) (hides in 4)))) H
        ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))) cycle)) forkee-1
        ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))))) forkee-2
        *** (skg node (gnid E2) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 1 (unintegrated 0))) (forks (in 1 (ancestors 2)))) (birth (forks in 2)))) forkee-2
        **** (skg hiddenInForkPartnerFolder)
-       ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 2))) (hides (in 1 (ancestors 4)))) (birth (contains in 2) (hides in 4)))) H
+       ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 2) usersGraph)) (hides (in 1 (ancestors 4) usersGraph))) (birth (contains in 2) (hides in 4)))) H
        ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))))) forkee-1
        ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (forks (in 1))) cycle)) forkee-2
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1

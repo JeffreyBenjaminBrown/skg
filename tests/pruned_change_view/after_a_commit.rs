@@ -26,7 +26,7 @@ use std::error::Error;
 
 const REMOVED_X_UNDER_E : &str = "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim ";
 const REMOVED_X_UNDER_B : &str = // not c's x, under d: that one is x's container
-  "*** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (in 2) (out 1))";
+  "*** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (in 2 usersGraph) (out 1))";
 const RETAINED_X_UNDER_E : &str = // retained claiming nothing, still editable
   "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels ";
 
@@ -87,7 +87,7 @@ fn a_commit_converts_what_the_diff_view_showed (
       "*** (skg node (gnid xc) (skgRepos (nodeRepo main)) writeProtected " ]);
     assert_lines_in_order (&committed, &[ // b, under p, holds x, unwarranted
       "* (skg bodyFolded node (gnid p)", "** (skg node (gnid b) ",
-      "*** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (in 2) (out 1))) noWarrant)) x\n* (skg node (gnid s)" ]);
+      "*** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (in 2 usersGraph) (out 1))) noWarrant)) x\n* (skg node (gnid s)" ]);
     assert! ( ! committed . contains ("(gnid h)"), "h's ghost is gone:\n{}", committed );
     assert! ( without_viewnode_ids (&committed) . contains (
                 "* (skg tombstone)\n** (skg node (gnid hm) (skgRepos (nodeRepo main)) (view noWarrant)) hm\n" ),

@@ -121,10 +121,10 @@ async fn a_search_answers_with_the_search_buffer_in_one_message (
   assert_eq! (
     hit_subtrees (&without_viewnode_ids (&content)),
     hit_subtrees ( indoc! {"
-      * (skg node (gnid kestrel) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1))))) kestrel feather
+      * (skg node (gnid kestrel) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 usersGraph))))) kestrel feather
       ** (skg folded containerFolder)
       *** (skg node (gnid nest) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 2)))) (birth (contains out 2)))) nest of birds
-      * (skg node (gnid osprey) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1))) (props (aliases 2)))) osprey
+      * (skg node (gnid osprey) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 usersGraph))) (props (aliases 2)))) osprey
       ** (skg containerFolder)
       *** (skg folded node (gnid nest) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 2)))) (birth (contains out 2)))) nest of birds
       ** (skg aliasFolder)
@@ -163,7 +163,7 @@ async fn a_title_hit_with_aliases_draws_no_alias_folder (
   assert_eq! (
     without_viewnode_ids (&content),
     indoc! {"
-      * (skg node (gnid osprey) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1))) (props (aliases 2)))) osprey
+      * (skg node (gnid osprey) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 usersGraph))) (props (aliases 2)))) osprey
       ** (skg folded containerFolder)
       *** (skg node (gnid nest) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 2)))) (birth (contains out 2)))) nest of birds
     "},
@@ -226,7 +226,7 @@ fn an_excluded_overPrivateText_container_leaves_no_trace (
         include_overPrivateText_telescopes ) };
   let excluded : String = drawn (false) ?;
   assert_eq! ( without_viewnode_ids (&excluded),
-               "* (skg node (gnid hit) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (in 1))) repoBoundary)) the hit\n",
+               "* (skg node (gnid hit) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (in 1 usersGraph))) repoBoundary)) the hit\n",
                "nothing of the container shows, not even a tombstone" );
   let included : String = drawn (true) ?;
   assert! ( included . contains ("container text from below home"),

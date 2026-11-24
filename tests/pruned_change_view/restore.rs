@@ -121,7 +121,7 @@ fn restoring_a_removed_content_member () -> Result<(), Box<dyn Error>> {
     assert_lines_in_order ( &response . saved_view, &[
       // b no longer differs from HEAD, and x is its member again
       "* (skg node (gnid b) (skgRepos (nodeRepo main)) (view (rels (contains (out 1))))) b",
-      "** (skg node (gnid x) (skgRepos (nodeRepo main)) (view (rels (contains (in 3 (ancestors 1)) (out 1))) (birth (contains in 1)))) x" ] );
+      "** (skg node (gnid x) (skgRepos (nodeRepo main)) (view (rels (contains (in 3 (ancestors 1) usersGraph) (out 1))) (birth (contains in 1)))) x" ] );
     saved_and_rerendered (f, &response . saved_view) ?;
     Ok (( )) }) }
 

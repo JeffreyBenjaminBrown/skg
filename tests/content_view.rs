@@ -84,10 +84,10 @@ async fn test_single_root_view_with_cycle (
       println!("Single root view with cycle result:\n{}", result);
 
       let expected = indoc! {"* (skg node (gnid a) (skgRepos (nodeRepo main)) (view (rels (contains (out 1))))) a
-                              ** (skg node (gnid b) (skgRepos (nodeRepo main)) (view (rels (contains (in 2 (ancestors 1)) (out 1))) (birth (contains in 1)))) b
+                              ** (skg node (gnid b) (skgRepos (nodeRepo main)) (view (rels (contains (in 2 (ancestors 1) usersGraph) (out 1))) (birth (contains in 1)))) b
                               b has a body
                               *** (skg node (gnid c) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1)))) (birth (contains in 1)))) c
-                              **** (skg node (gnid b) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 2 (ancestors 1)) (out 1 (ancestors 1)))) (birth (contains in 1)) cycle)) b
+                              **** (skg node (gnid b) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 2 (ancestors 1) usersGraph) (out 1 (ancestors 1)))) (birth (contains in 1)) cycle)) b
                               "};
       assert_metadata_eq!(result, expected,
                  "Single root view should detect cycle and mark repeated node");
@@ -134,19 +134,19 @@ async fn test_multi_root_view_with_shared_nodes (
          ** (skg node (gnid 3) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (forks (in 1) (out 2))) (props (extraIds 1)) (birth (contains in 1)))) title 3
          this one string could span pages
          *** (skg forksFolder)
-         **** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         **** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2 (ancestors 2))) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2) (forks out 2)))) this title includes a [[id:22][textlink to another file]]
-         **** (skg node (gnid 2) (skgRepos (nodeRepo main)) noClaim writeProtected (view omittedBody (rels (contains (in 1) (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)))) title 2
-         * (skg node (gnid 2) (skgRepos (nodeRepo main)) (view (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)))) title 2
+         **** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hides (in 1 usersGraph))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         **** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2 (ancestors 2))) (hides (in 1 usersGraph))) (props (extraIds 1)) (birth (forks in 2) (forks out 2)))) this title includes a [[id:22][textlink to another file]]
+         **** (skg node (gnid 2) (skgRepos (nodeRepo main)) noClaim writeProtected (view omittedBody (rels (contains (in 1 usersGraph) (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)))) title 2
+         * (skg node (gnid 2) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 usersGraph)) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)))) title 2
          this one string could span pages
          ** (skg containerFolder)
          *** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 2 (ancestors 2))) (hides (out 2))) (birth (contains out 2)))) title 1
          ** (skg forksFolder)
-         *** (skg node (gnid 4) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg node (gnid 4) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hides (in 1 usersGraph))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
          this one string could span pages
-         *** (skg node (gnid 5) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2)) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg node (gnid 5) (skgRepos (nodeRepo main)) contentInPart (view (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2)) (hides (in 1 usersGraph))) (props (extraIds 1)) (birth (forks in 2)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
-         *** (skg node (gnid 3) (skgRepos (nodeRepo main)) noClaim writeProtected (view omittedBody (rels (contains (in 1) (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1))) (forks (in 1) (out 2))) (props (extraIds 1)))) title 3
+         *** (skg node (gnid 3) (skgRepos (nodeRepo main)) noClaim writeProtected (view omittedBody (rels (contains (in 1 usersGraph) (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1))) (forks (in 1) (out 2))) (props (extraIds 1)))) title 3
          "};
       assert_metadata_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
@@ -193,17 +193,17 @@ async fn test_multi_root_view_with_node_limit (
          ** (skg node (gnid 3) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (forks (in 1) (out 2))) (props (extraIds 1)) (birth (contains in 1)))) title 3
          this one string could span pages
          *** (skg forksFolder)
-         **** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         **** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2 (ancestors 2))) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2) (forks out 2)))) this title includes a [[id:22][textlink to another file]]
-         **** (skg node (gnid 2) (skgRepos (nodeRepo main)) noClaim writeProtected (view omittedBody (rels (contains (in 1) (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)))) title 2
-         * (skg node (gnid 2) (skgRepos (nodeRepo main)) (view (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)))) title 2
+         **** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hides (in 1 usersGraph))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         **** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2 (ancestors 2))) (hides (in 1 usersGraph))) (props (extraIds 1)) (birth (forks in 2) (forks out 2)))) this title includes a [[id:22][textlink to another file]]
+         **** (skg node (gnid 2) (skgRepos (nodeRepo main)) noClaim writeProtected (view omittedBody (rels (contains (in 1 usersGraph) (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)))) title 2
+         * (skg node (gnid 2) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 usersGraph)) (linksTo (in 1 (substantive 1))) (forks (out 2))) (props (extraIds 1)))) title 2
          this one string could span pages
          ** (skg containerFolder)
          *** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 2 (ancestors 2))) (hides (out 2))) (birth (contains out 2)))) title 1
          ** (skg forksFolder)
-         *** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2)) (hides (in 1))) (props (extraIds 1)) (birth (forks in 2)))) this title includes a [[id:22][textlink to another file]]
-         *** (skg node (gnid 3) (skgRepos (nodeRepo main)) noClaim writeProtected (view omittedBody (rels (contains (in 1) (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1))) (forks (in 1) (out 2))) (props (extraIds 1)))) title 3
+         *** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (forks (in 3 (ancestors 2))) (hides (in 1 usersGraph))) (props (extraIds 1)) (birth (forks in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (forks (in 2 (ancestors 2)) (out 2)) (hides (in 1 usersGraph))) (props (extraIds 1)) (birth (forks in 2)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg node (gnid 3) (skgRepos (nodeRepo main)) noClaim writeProtected (view omittedBody (rels (contains (in 1 usersGraph) (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1))) (forks (in 1) (out 2))) (props (extraIds 1)))) title 3
          "};
       assert_metadata_eq!(result, expected,
                  "Multi root view limit=3 truncates by the §5.5 budget");

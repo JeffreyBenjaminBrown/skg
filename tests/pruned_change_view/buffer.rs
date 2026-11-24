@@ -297,7 +297,7 @@ fn a_removed_member_first_in_level_order_is_editable_with_its_changes (
   let buffer : String = removed_partners_buffer () ?;
   assert_lines_in_order ( &buffer, &[
     "* (skg node (gnid b)",
-    "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels (contains (in 2) (out 1))) ghostWarrant) (diff (rel removed) (leaves 1 rel))) x",
+    "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels (contains (in 2 usersGraph) (out 1))) ghostWarrant) (diff (rel removed) (leaves 1 rel))) x",
     "*** (skg containerFolder)",
     "**** (skg node (gnid a) (skgRepos (nodeRepo main)) writeProtected",
     "**** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected",
@@ -359,7 +359,7 @@ fn a_removed_member_whose_node_has_an_earlier_occurrence_is_write_protected (
     "* (skg node (gnid b)",
     "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels",
     "* (skg node (gnid e)",
-    "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (in 2) (out 1))) ghostWarrant) (diff (rel removed) (leaves 1 rel))) x\n* " ] );
+    "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (in 2 usersGraph) (out 1))) ghostWarrant) (diff (rel removed) (leaves 1 rel))) x\n* " ] );
   Ok (( )) }
 
 /// The chain node d under c in x's container folder, from a
@@ -391,7 +391,7 @@ fn a_removed_member_editable_before_a_save_stays_editable_after_it (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("removed_partners", &["main"], |f| {
     let x_line : &str =
-      "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels (contains (in 2) (out 1))) ghostWarrant) (diff (rel removed) (leaves 1 rel))) x\n";
+      "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels (contains (in 2 usersGraph) (out 1))) ghostWarrant) (diff (rel removed) (leaves 1 rel))) x\n";
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( without_viewnode_ids (&buffer) . contains (x_line), "{}", buffer );
     let retitled : String = edit_line (
@@ -404,7 +404,7 @@ fn a_removed_member_editable_before_a_save_stays_editable_after_it (
                  "x, retitled" );
     assert_lines_in_order ( &saved, &[
       "* (skg node (gnid b)",
-      "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels (contains (in 2) (out 1))) ghostWarrant) (diff (rel removed) (properties changed)",
+      "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels (contains (in 2 usersGraph) (out 1))) ghostWarrant) (diff (rel removed) (properties changed)",
       "x, retitled\n",
       "*** (skg (oldText title)" ] );
     let editable : Vec<String> = node_lines (&saved, "x") . into_iter ()

@@ -20,6 +20,9 @@
 //!   (birth (RELNAME SIDE [GEN])...)
 //! GEN is an ancestor generation: 1 = viewparent, 2 = grandparent,
 //! ... `in` = "N nodes RELATION it"; `out` = "it RELATIONs N nodes".
+//! The in-side of 'contains' and of 'hides' ends in the atom
+//! 'usersGraph' when a note of the user's graph is among its members
+//! ('UsersGraphMembers'): `(in COUNT (ancestors GEN...) usersGraph)`.
 //! Each birth fact names a relation explaining why this occurrence is
 //! here, the side of this node it is on, and the ancestor generation
 //! it accounts for -- omitted when no ancestor does, as for a
@@ -114,31 +117,48 @@ fn ancestors_sexp (
   let nums : Vec<String> = g . iter () . map ( |n| n . to_string () ) . collect ();
   Some ( format! ("(ancestors {})", nums . join (" ")) ) }
 
+/// Which in-sides count a note of the user's graph ('docs/glossary.org',
+/// "integrated, the user's graph, kept elsewhere"): a note homed in an
+/// owned skgrepo, which the skgrepo restriction shows by a record it
+/// shows. On the wire, the atom 'usersGraph' ending that in-side.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct UsersGraphMembers {
+  /// A note of the user's graph but the nearest node occurrence above
+  /// this one contains it: the user keeps it elsewhere.
+  pub contains_it_elsewhere : bool,
+  /// A note of the user's graph hides it.
+  pub hides_it              : bool,
+}
+
 /// One ordinary (non-link) side: `(SIDE COUNT (ancestors ...))`, or None
 /// when the side is empty (count 0 and no ancestors). COUNT is always
 /// present when the side is present -- it is a fact; the client omits it
-/// when it equals the ancestor count.
+/// when it equals the ancestor count. 'usersGraph' ends it when
+/// 'users_graph' says a note of the user's graph is among its members.
 fn side_sexp (
-  side  : &str,
-  count : usize,
-  flags : &[usize],
+  side        : &str,
+  count       : usize,
+  flags       : &[usize],
+  users_graph : bool,
 ) -> Option<String> {
   if count == 0 && flags . is_empty () { return None; }
   let mut parts : Vec<String> = vec! [ count . to_string () ];
   if let Some (a) = ancestors_sexp (flags) { parts . push (a); }
+  if users_graph { parts . push ("usersGraph" . to_string ()); }
   Some ( format! ("({} {})", side, parts . join (" ")) ) }
 
 /// One ordinary relation `(KEY (in ...) (out ...))`, or None if both
 /// sides are empty.
 fn relation_sexp (
-  key       : &str,
-  in_count  : usize,
-  in_flags  : &[usize],
-  out_count : usize,
-  out_flags : &[usize],
+  key            : &str,
+  in_count       : usize,
+  in_flags       : &[usize],
+  in_users_graph : bool,
+  out_count      : usize,
+  out_flags      : &[usize],
 ) -> Option<String> {
-  let inb : Option<String> = side_sexp ("in",  in_count,  in_flags);
-  let out : Option<String> = side_sexp ("out", out_count, out_flags);
+  let inb : Option<String> = side_sexp ("in",  in_count,  in_flags, in_users_graph);
+  let out : Option<String> = side_sexp ("out", out_count, out_flags, false);
   if inb . is_none () && out . is_none () { return None; }
   let mut inner : Vec<String> = Vec::new ();
   if let Some (s) = inb { inner . push (s); }
@@ -146,12 +166,13 @@ fn relation_sexp (
   Some ( format! ("({} {})", key, inner . join (" ")) ) }
 
 fn contains_sexp (
-  counts       : &RelationCounts,
-  flags        : &AncestorFlags,
-  unintegrated : Option<usize>,
+  counts                : &RelationCounts,
+  flags                 : &AncestorFlags,
+  unintegrated          : Option<usize>,
+  contains_it_elsewhere : bool,
 ) -> Option<String> {
   let inb : Option<String> = side_sexp (
-    "in", counts . containers, &flags . contains_in);
+    "in", counts . containers, &flags . contains_in, contains_it_elsewhere);
   let out : Option<String> = if let Some (numerator) = unintegrated {
     assert! (numerator <= counts . contents);
     let mut facts : Vec<String> = vec![counts . contents . to_string ()];
@@ -163,7 +184,7 @@ fn contains_sexp (
     facts . push (format! ("(unintegrated {})", subset . join (" ")));
     Some (format! ("(out {})", facts . join (" ")))
   } else {
-    side_sexp ("out", counts . contents, &flags . contains_out) };
+    side_sexp ("out", counts . contents, &flags . contains_out, false) };
   if inb . is_none () && out . is_none () { return None; }
   let mut sides : Vec<String> = Vec::new ();
   if let Some (s) = inb { sides . push (s); }
@@ -191,7 +212,7 @@ fn links_sexp (
       subset . push (a); }
     parts . push (format! ("(substantive {})", subset . join (" ")));
     Some ( format! ("(in {})", parts . join (" ")) ) };
-  let out : Option<String> = side_sexp ("out", targets, out_flags);
+  let out : Option<String> = side_sexp ("out", targets, out_flags, false);
   if inb . is_none () && out . is_none () { return None; }
   let mut inner : Vec<String> = Vec::new ();
   if let Some (s) = inb { inner . push (s); }
@@ -216,7 +237,8 @@ impl RelationshipHeralds {
 
 /// Emit the semantic '(rels ...)', '(props ...)' and '(birth ...)'
 /// forms for a node from its member counts, alias/extra-id/flag
-/// counts, ancestor flags, and birth relations. Relations are emitted
+/// counts, ancestor flags, birth relations, and which in-sides count a
+/// note of the user's graph. Relations are emitted
 /// in a fixed order for a stable wire, but order is not meaningful
 /// (the client re-orders; the tests canonicalize).
 pub fn relationship_heralds_sexp (
@@ -227,23 +249,26 @@ pub fn relationship_heralds_sexp (
   flags     : &AncestorFlags,
   birth     : &[BirthFact],
   unintegrated : Option<usize>,
+  users_graph  : &UsersGraphMembers,
 ) -> RelationshipHeralds {
   let form = |head : &str, parts : Vec<String>| -> Option<String> {
     ( ! parts . is_empty () )
       . then ( || format! ("({} {})", head, parts . join (" ")) ) };
   let mut parts : Vec<String> = Vec::new ();
   if let Some (s) = contains_sexp (
-    counts, flags, unintegrated) { parts . push (s); }
+    counts, flags, unintegrated, users_graph . contains_it_elsewhere)
+  { parts . push (s); }
   if let Some (s) = links_sexp (
     counts . link_total, counts . link_substantive,
     &flags . links_in, &flags . links_substantive_in,
     counts . link_targets, &flags . links_out) { parts . push (s); }
   if let Some (s) = relation_sexp (
     NodeRelation::Forks . relation_name (), counts . forkers, &flags . forks_in,
-    counts . forkees, &flags . forks_out) { parts . push (s); }
+    false, counts . forkees, &flags . forks_out) { parts . push (s); }
   if let Some (s) = relation_sexp (
     NodeRelation::Hides . relation_name (), counts . hiders, &flags . hides_in,
-    counts . hides, &flags . hides_out) { parts . push (s); }
+    users_graph . hides_it, counts . hides, &flags . hides_out)
+  { parts . push (s); }
   let props : Vec<String> =
     [ ("aliases", aliases), ("extraIds", extra_ids), ("flags", flag_count) ]
     . into_iter ()

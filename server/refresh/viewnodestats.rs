@@ -1,7 +1,9 @@
 //! The view's stats of each occurrence, the facts that depend on where
 //! it stands ('set_viewnodestats_in_viewforest'): which relations
 //! explain its place (its birth), which relations it has with its
-//! ancestors, 'cycle', 'repoBoundary', 'omittedBody' and its relRepo.
+//! ancestors, whether a note of the user's graph hides it or keeps it
+//! elsewhere ('UsersGraphMembers'), 'cycle', 'repoBoundary',
+//! 'omittedBody' and its relRepo.
 //! Each relation shown only where the skgrepo restriction shows its
 //! record. The heralds draw these; the graph's own stats are
 //! 'graphnodestats.rs'.
@@ -13,7 +15,8 @@ use crate::dbs::in_rust_graph::stats::mentioner_is_substantive;
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelRepoLookup, RelationRole };
 use crate::herald_tokens::{
-  AncestorFlags, BirthFact, RelationshipHeralds, Side, relationship_heralds_sexp };
+  AncestorFlags, BirthFact, RelationshipHeralds, Side, UsersGraphMembers,
+  relationship_heralds_sexp };
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::refresh::ancestry::parent_reads_claims;
 use crate::types::config::SkgConfig;
@@ -258,12 +261,51 @@ fn set_herald_strings_in_viewnode (
       side_of_mirror_shown (graph, restriction, node_pid, original) );
   let birth_facts : Vec<BirthFact> =
     birth_facts (tree, &parent_kind, stands_as_member_here, fork_roles, &flags, side_of_mirror);
+  let users_graph : UsersGraphMembers = {
+    // The note it stands under is no other place the user keeps it.
+    let nearest_occurrence_above : Option<ID> =
+      tree . get (treeid) . unwrap () . ancestors ()
+      . find_map ( |above| above . value () . occurrence_gnid () . cloned () );
+    UsersGraphMembers {
+      contains_it_elsewhere : a_users_graph_note_plays_the_first_role (
+        graph, config, restriction, relRepos, node_pid,
+        NodeRelation::Contains, nearest_occurrence_above . as_ref () ),
+      hides_it : a_users_graph_note_plays_the_first_role (
+        graph, config, restriction, relRepos, node_pid,
+        NodeRelation::Hides, None ), }};
   let rel_heralds : RelationshipHeralds = relationship_heralds_sexp (
     &counts, gstats . aliases, gstats . extra_ids, gstats . flags,
-    &flags, &birth_facts, unintegrated );
+    &flags, &birth_facts, unintegrated, &users_graph );
   if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . rel_heralds = rel_heralds; } }
+
+/// Whether a note of the user's graph ('docs/glossary.org',
+/// "integrated, the user's graph, kept elsewhere") but 'excepted'
+/// plays the first role of 'relation' to 'node_pid' -- contains it,
+/// say -- by a record the skgrepo restriction shows: a note homed in
+/// an owned skgrepo, which the restriction shows. It reads the
+/// recorderward index ('inbound_pids_for_relation_gated_memoized'),
+/// as the stats pass's counts do, so a long list's members do not each
+/// scan it.
+fn a_users_graph_note_plays_the_first_role (
+  graph       : &InRustGraph,
+  config      : &SkgConfig,
+  restriction : &SkgrepoRestriction,
+  relRepos    : &mut RelRepoLookup,
+  node_pid    : &ID,
+  relation    : NodeRelation,
+  excepted    : Option<&ID>,
+) -> bool {
+  let excepted : Option<ID> =
+    excepted . map ( |gnid| graph . pid_else_raw_id (gnid) );
+  relRepos . inbound_pids_for_relation_gated_memoized (
+    node_pid, relation, restriction )
+  . iter ()
+  . any ( |partner| Some (partner) != excepted . as_ref ()
+                    && graph . node_is_shown (partner, restriction)
+                    && graph . get (partner) . is_some_and (
+                         |node| config . skgrepo_is_owned (&node . home_skgrepo) )) }
 
 fn parent_kind_of (
   tree   : &Tree<Viewnode>,
