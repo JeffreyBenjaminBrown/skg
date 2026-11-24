@@ -6,6 +6,7 @@ body: |2-
   | relationship letters | normal      | =C L K H=                                                                     |
   | the birth letter     | low         | the letter of a relation that put this occurrence here                       |
   | relationship sides   | their tier  | counts and ancestor flags; see [[id:8df96460-1785-4df5-bc3b-c814c9fe266d][Relationship heralds]]                     |
+  | your notes           | high        | =•= after an in-side a note of yours is among; see [[id:8df96460-1785-4df5-bc3b-c814c9fe266d][Relationship heralds]] |
   | property counts      | boring      | =A3= aliases, =I1= extra IDs, =F2= true flags                                 |
   | position glyphs      | ghost       | =ᗣ= a ghost, or what HEAD alone warrants                                      |
   |                      | crucial     | =☮= write-protected, =⊥= unwarranted, =ĥ= in place of another (=inPlaceOf=)   |

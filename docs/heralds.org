@@ -63,6 +63,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | relationship letters | normal      | =C L K H=                                                                     |
 | the birth letter     | low         | the letter of a relation that put this occurrence here                       |
 | relationship sides   | their tier  | counts and ancestor flags; see [[*Relationship heralds][Relationship heralds]]                     |
+| your notes           | high        | =•= after an in-side a note of yours is among; see [[*Relationship heralds][Relationship heralds]] |
 | property counts      | boring      | =A3= aliases, =I1= extra IDs, =F2= true flags                                 |
 | position glyphs      | ghost       | =ᗣ= a ghost, or what HEAD alone warrants                                      |
 |                      | crucial     | =☮= write-protected, =⊥= unwarranted, =ĥ= in place of another (=inPlaceOf=)   |
@@ -152,6 +153,18 @@ the slash shows the side's tier. An ancestor appears once: before the
 slash if it belongs to the numerator, otherwise after the denominator's
 numeral. =a/bL= says both ancestors link here and only 'a' is
 substantive.
+*** Your notes
+A high =•= ends the in-side of contains or of hides when a note of the
+user's graph -- a note homed in an owned skgrepo, which the skgrepo
+restriction shows ('docs/glossary.org', "integrated, the user's graph,
+kept elsewhere") -- is among its members. On contains it is one but
+the nearest node occurrence above the headline: the user keeps the
+node elsewhere too. On hides it is any. So =2a•C= says the viewparent
+and a note of yours contain it; =1•H=, that a note of yours hides it.
+Read under a note the user does not own, such as a teammate's mailbox
+drawn from its own root, it says which of its children the user has
+filed elsewhere or hidden in a fork. The marker follows any fraction,
+as in =1•C2/8=, and stands only on those two in-sides.
 *** Birth
 The letter of a relation that put this occurrence here is shown low;
 its counts keep their own styles. An occurrence can have more than one

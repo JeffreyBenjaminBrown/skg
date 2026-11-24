@@ -2065,6 +2065,15 @@ or the user keeps it -- also counts the note, three generations up,
 on its =hides= incoming side, as a =hiddenInForkPartnerFolder=
 member does.
 
+The incoming side of =contains= and of =hides= ends in the atom
+=usersGraph= when a note of the user's graph -- homed in an owned
+skgrepo, shown by the skgrepo restriction, by a record it shows -- is
+among its members: on =contains=, one but the nearest node occurrence
+above the headline (the user keeps it elsewhere); on =hides=, any.
+=(contains (in 2 (ancestors 1) usersGraph))= reads "the viewparent
+and a note of yours contain it". The clients draw it as a =•= after
+that side ('docs/heralds.org', "Your notes").
+
 =(props (aliases K) (extraIds K) (flags K))= holds the property
 counts, each present only when nonzero; =(props ...)= is absent when
 all are zero.
