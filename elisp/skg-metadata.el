@@ -672,6 +672,11 @@ or a restricted viewnode."
   "Return non-nil if METADATA-SEXP has the bare occurrence writeProtected atom."
   (skg-sexp-subtree-p metadata-sexp '(skg node writeProtected)))
 
+(defun skg--omitted-body-p (metadata-sexp)
+  "Return non-nil if the view omits a body the node has: if
+METADATA-SEXP carries '(view omittedBody)'."
+  (skg-sexp-subtree-p metadata-sexp '(skg (view omittedBody))))
+
 (defun skg--change-repo-at-point (new-skgrepo)
   "Set the repo at point to NEW-SKGREPO, and mark the headline a home
 skgrepo boundary ('(view repoBoundary)'), so that until the save its

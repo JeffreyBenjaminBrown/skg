@@ -374,6 +374,14 @@ function M.node_write_protected_p (metadata_sexp)
     { SKG, sexpr.symbol('writeProtected') })
 end
 
+---@param metadata_sexp any
+---@return boolean does the view omit a body the node has: does
+---METADATA_SEXP carry '(view omittedBody)'?
+function M.omitted_body_p (metadata_sexp)
+  return compare.subtree_p(metadata_sexp,
+    { SKG, { sexpr.symbol('view'), sexpr.symbol('omittedBody') } })
+end
+
 ---@return boolean has the headline at point no skg metadata?
 function M.headline_metadata_empty_p ()
   local split = M.split_as_stars_metadata_title(

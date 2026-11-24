@@ -1,9 +1,14 @@
--- PURPOSE: Cover what a forks-folder member restates of its note:
--- where a member's title, or body, equals that of the note whose
--- forks folder holds it, extmarks conceal it and show "<b's title,
--- unchanged>" or "<b's body, unchanged>" in its place, b the note's
--- ancestor letter as counted from the member. The buffer keeps the
--- real text, which a save sends as it is.
+-- PURPOSE: Say what a forks-folder member restates of its note, in
+-- the member's title, b being the note's ancestor letter as counted
+-- from the member (its grandparent, past the folder). Where the
+-- member's title and body both equal the note's, extmarks show
+-- "<b unchanged>" in place of the title and conceal the lines under
+-- it, up to the member's next headline; where the title alone does,
+-- "<b's title unchanged>"; where the body alone does, the title is
+-- shown and "<b's body unchanged>" stands in place of the body. Two
+-- empty bodies are equal; a body the view does not draw (a
+-- write-protected node's 'omittedBody') equals none. The buffer keeps
+-- the real text, which a save sends as it is.
 -- 'vim.b.skg_fork_dedup_overlay' (true unless set false) turns the
 -- covers on or off per buffer; 'toggle' (':SkgToggleForkDedupOverlay',
 -- '<localleader>vu') flips it. This module draws only when called:
@@ -49,22 +54,33 @@ local function forks_folder_p (line)
          == 'forksFolder'
 end
 
----For the node headline LINES[INDEX]: its title, where it starts
----(0-based column), and its body's first and last indices, nil
----without a nonblank body; nil when the headline is no node's.
----@return table|nil { title, title_col, body_first, body_last, body }
-local function title_and_body (lines, index)
+---@param line string|nil
+---@return boolean is LINE a headline?
+local function headline_p (line)
+  return line ~= nil and line:match('^%*+%s') ~= nil
+end
+
+---For the node headline LINES[INDEX]: its title and where it starts
+---(0-based column); its body, trailing blanks dropped, '' when blank,
+---and the indices of its first and last lines, nil when blank;
+---'under_last', the index of the last line before the next headline;
+---and 'body_known', false when the view omits a body the node has
+---('omittedBody'). Nil when the headline is no node's.
+---@return table|nil
+local function entry (lines, index)
   local line = lines[index]
   local split = metadata.split_as_stars_metadata_title(line)
   if not split or split.metadata == '' then return nil end
   local ok, sexp = pcall(sexpr.read, split.metadata)
   if not (ok and metadata.occurrence_sexp_p(sexp)) then return nil end
-  local title_col = #line - #split.title
-  local last = index
-  while lines[last + 1] and not lines[last + 1]:match('^%*+%s') do
-    last = last + 1 end
+  local under_last = index
+  while lines[under_last + 1] and not headline_p(lines[under_last + 1]) do
+    under_last = under_last + 1 end
+  local last = under_last
   while last > index and lines[last]:match('^%s*$') do last = last - 1 end
-  local result = { title = split.title, title_col = title_col }
+  local result = { title = split.title, title_col = #line - #split.title,
+                   body = '', under_last = under_last,
+                   body_known = not metadata.omitted_body_p(sexp) }
   if last > index then
     result.body_first = index + 1
     result.body_last = last
@@ -78,13 +94,23 @@ local function clear_rows (buf, first, last)
   vim.api.nvim_buf_clear_namespace(buf, M.namespace, first - 1, last)
 end
 
-local function cover_title (buf, index, member)
+---Show MESSAGE in place of the title of MEMBER, the headline LINES[INDEX].
+local function cover_title (buf, index, member, message)
   vim.api.nvim_buf_set_extmark(buf, M.namespace, index - 1, member.title_col, {
     end_col = member.title_col + #member.title,
     conceal = '',
-    virt_text = { { string.format("<%s's title, unchanged>", M.note_letter),
-                    'SkgHeraldMessage' } },
+    virt_text = { { message, 'SkgHeraldMessage' } },
     virt_text_pos = 'inline' })
+end
+
+---Conceal LINES[FIRST..LAST] (1-based, inclusive), when there are any.
+local function conceal_lines (buf, first, last)
+  if last < first then return end
+  -- 'conceal_lines' hides every row from the mark's to 'end_row',
+  -- both included.
+  vim.api.nvim_buf_set_extmark(buf, M.namespace, first - 1, 0, {
+    end_row = last - 1, end_col = 0,
+    conceal_lines = '' })
 end
 
 local function cover_body (buf, lines, member)
@@ -92,15 +118,32 @@ local function cover_body (buf, lines, member)
   vim.api.nvim_buf_set_extmark(buf, M.namespace, first - 1, 0, {
     end_col = #lines[first],
     conceal = '',
-    virt_text = { { string.format("<%s's body, unchanged>", M.note_letter),
+    virt_text = { { string.format("<%s's body unchanged>", M.note_letter),
                     'SkgHeraldMessage' } },
     virt_text_pos = 'inline' })
-  if member.body_last > first then
-    -- 'conceal_lines' hides every row from the mark's to 'end_row',
-    -- both included.
-    vim.api.nvim_buf_set_extmark(buf, M.namespace, first, 0, {
-      end_row = member.body_last - 1, end_col = 0,
-      conceal_lines = '' }) end
+  conceal_lines(buf, first + 1, member.body_last)
+end
+
+---Draw what MEMBER, the headline LINES[INDEX], restates of NOTE, each
+---an 'entry': with its title and body, "<b unchanged>" in place of its
+---title, the lines under it concealed; with its title alone, "<b's
+---title unchanged>"; with its nonblank body alone, "<b's body
+---unchanged>" in place of the body. A blank title restates nothing.
+local function cover_member (buf, lines, index, member, note)
+  local same_title = member.title:match('%S') ~= nil
+                     and member.title == note.title
+  local same_body = member.body_known and note.body_known
+                    and member.body == note.body
+  if same_title and same_body then
+    cover_title(buf, index, member,
+                string.format('<%s unchanged>', M.note_letter))
+    conceal_lines(buf, index + 1, member.under_last)
+  elseif same_title then
+    cover_title(buf, index, member,
+                string.format("<%s's title unchanged>", M.note_letter))
+  elseif same_body and member.body_first then
+    cover_body(buf, lines, member)
+  end
 end
 
 ---Redraw the covers of the members of the forks folder LINES[FOLDER].
@@ -108,31 +151,25 @@ local function draw_folder (buf, lines, folder)
   local level = metadata.headline_level_on_line(lines[folder])
   local note_index =
     metadata.ancestor_headline_indices_in_lines(lines, folder, 1)[1]
-  local note = note_index and title_and_body(lines, note_index)
+  local note = note_index and entry(lines, note_index)
   local index = folder + 1
   while lines[index] do
     local member_level = metadata.headline_level_on_line(lines[index])
     if member_level and member_level <= level then break end
     if member_level == level + 1 then
       local next_headline = index + 1
-      while lines[next_headline]
-            and not lines[next_headline]:match('^%*+%s') do
+      while lines[next_headline] and not headline_p(lines[next_headline]) do
         next_headline = next_headline + 1 end
       clear_rows(buf, index, next_headline - 1)
-      local member = note and title_and_body(lines, index)
-      if member then
-        if member.title:match('%S') and member.title == note.title then
-          cover_title(buf, index, member) end
-        if member.body and note.body and member.body == note.body then
-          cover_body(buf, lines, member) end
-      end
+      local member = note and entry(lines, index)
+      if member then cover_member(buf, lines, index, member, note) end
     end
     index = index + 1
   end
 end
 
----Remove every cover in BUF, then, when enabled, draw one over each
----title and body a forks-folder member restates.
+---Remove every cover in BUF, then, when enabled, draw those of each
+---forks folder.
 ---@param buf integer
 ---@param lines string[]|nil BUF's lines
 function M.refresh_buffer (buf, lines)
@@ -158,7 +195,7 @@ function M.refresh_region (buf, first, last, lines)
   if not M.enabled_p(buf) then return end
   lines = lines or vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   for index = first + 2, math.min(last + 1, #lines) do
-    if lines[index]:match('^%*+%s') then
+    if headline_p(lines[index]) then
       return M.refresh_buffer(buf, lines) end
   end
   M.refresh_rows(buf, { first }, lines)
@@ -192,7 +229,7 @@ function M.refresh_rows (buf, rows, lines)
   local folders = {}
   for _, row in ipairs(rows) do
     local index = math.min(row + 1, #lines)
-    while index >= 1 and not lines[index]:match('^%*+%s') do
+    while index >= 1 and not headline_p(lines[index]) do
       index = index - 1 end
     if index >= 1 then
       if forks_folder_p(lines[index]) then folders[index] = true end

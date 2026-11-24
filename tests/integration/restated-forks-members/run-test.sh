@@ -1,10 +1,11 @@
 #!/bin/bash
 
 # Integration test: a member of a forks folder that restates its note
-# is drawn with its title and body covered, '<b's title, unchanged>'
-# and '<b's body, unchanged>' ('docs/forks.org', "A member that
-# restates its note"), while the buffer, and so a save, keeps the real
-# text. Run once per client (test-emacs.el, test-nvim.lua). The data is
+# is drawn as such, '<b unchanged>' over the title of one that restates
+# its title and body, '<b's body unchanged>' over the body of one that
+# restates its body alone ('docs/forks.org', "A member that restates
+# its note"), while the buffer, and so a save, keeps the real text.
+# Run once per client (test-emacs.el, test-nvim.lua). The data is
 # written here, fresh for each run, since the test's save changes it.
 
 set -e

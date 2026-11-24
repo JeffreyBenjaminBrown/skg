@@ -3,11 +3,17 @@
 ;;; Commentary:
 ;;;
 ;;; A member of a forks folder often says what the folder's note says:
-;;; its title, its body, or both, are the note's. Where so, an overlay
-;;; covers the member's title with "<b's title, unchanged>" and its
-;;; body with "<b's body, unchanged>", b the note's ancestor letter as
-;;; counted from the member (its grandparent, past the folder). The
-;;; buffer keeps the real text, which a save sends as it is; the
+;;; its title, its body, or both, are the note's. Where so, overlays
+;;; say it in the member's title, b being the note's ancestor letter
+;;; as counted from the member (its grandparent, past the folder):
+;;; - both: the title reads "<b unchanged>", and the lines under it,
+;;;   up to the member's next headline, are hidden;
+;;; - the title alone: the title reads "<b's title unchanged>";
+;;; - the body alone: the title is shown, and the body reads
+;;;   "<b's body unchanged>".
+;;; Two empty bodies are equal. A body the view does not draw (a
+;;; write-protected node's 'omittedBody') equals none.
+;;; The buffer keeps the real text, which a save sends as it is; the
 ;;; overlays are drawing only. 'skg-fork-dedup-overlay', buffer-local,
 ;;; turns them on (the default) or off; 'skg-toggle-fork-dedup-overlay'
 ;;; (C-c v u) toggles it, so that the text can be read and edited.
@@ -28,8 +34,8 @@
 (require 'skg-metadata)
 
 (defvar-local skg-fork-dedup-overlay t
-  "Non-nil: in this buffer, an overlay covers the title or body of a
-forks-folder member that equals its note's ('skg-fork-dedup.el').")
+  "Non-nil: in this buffer, overlays say what a forks-folder member
+restates of its note ('skg-fork-dedup.el').")
 
 (defconst skg-fork-dedup--note-letter "b"
   "The ancestor letter of a forks-folder member's note: its
@@ -46,7 +52,7 @@ overlays that cover what a forks-folder member restates of its note."
 
 (defun skg-fork-dedup-refresh-buffer ()
   "Remove every restatement overlay, then, if `skg-fork-dedup-overlay',
-draw one over each title and body a forks-folder member restates."
+draw those of each forks folder."
   (skg-fork-dedup--clear (point-min) (point-max))
   (when skg-fork-dedup-overlay
     (save-excursion
@@ -135,27 +141,27 @@ whose headline is on the line at point."
            (note-start (car (skg--ancestor-headline-starts-on-line 1)))
            (note (and note-start
                       (save-excursion (goto-char note-start)
-                                      (skg-fork-dedup--title-and-body)))))
+                                      (skg-fork-dedup--entry)))))
       (end-of-line)
       (while (and (re-search-forward
                    (format "^\\*\\{1,%d\\}[ \t]" (1+ level)) nil t)
                   (> (skg--headline-level-on-line) level))
         (beginning-of-line)
-        (let ((member (skg-fork-dedup--title-and-body)))
+        (let ((member (skg-fork-dedup--entry)))
           (skg-fork-dedup--clear (line-beginning-position)
-                                 (or (nth 4 member) (line-end-position)))
+                                 (if member (plist-get member :end)
+                                   (line-end-position)))
           (when (and note member)
-            (skg-fork-dedup--cover (nth 0 member) (nth 1 note)
-                                   (nth 1 member) "title")
-            (skg-fork-dedup--cover (nth 2 member) (nth 3 note)
-                                   (nth 3 member) "body")))
+            (skg-fork-dedup--cover-member member note)))
         (end-of-line)))))
 
-(defun skg-fork-dedup--title-and-body ()
-  "For the node headline on the line at point: (TITLE-START TITLE
-BODY-START BODY ENTRY-END), BODY-START and BODY nil without a nonblank
-body, ENTRY-END where the next headline begins; nil when the headline
-is no node's. A body ends, trailing blanks dropped, at ENTRY-END."
+(defun skg-fork-dedup--entry ()
+  "For the node headline on the line at point, a plist: :title-start
+and :title; :under-start, where the line after the headline begins;
+:body, its body with trailing blanks dropped, \"\" when blank;
+:body-known, nil when the view omits a body the node has
+\('omittedBody'); and :end, where the next headline begins. Nil when
+the headline is no node's."
   (let ((metadata (skg--metadata-on-line)))
     (when (and metadata (skg--occurrence-sexp-p (nth 2 metadata)))
       (save-excursion
@@ -164,32 +170,60 @@ is no node's. A body ends, trailing blanks dropped, at ENTRY-END."
         (let* ((title-start (point))
                (title (buffer-substring-no-properties title-start
                                                       (line-end-position)))
-               (body-start (min (point-max) (1+ (line-end-position))))
-               (body-end (progn (goto-char body-start)
-                                (if (re-search-forward "^\\*+[ \t]" nil t)
-                                    (match-beginning 0)
-                                  (point-max))))
-               (body (progn (goto-char body-end)
-                            (skip-chars-backward " \t\n" body-start)
+               (under-start (min (point-max) (1+ (line-end-position))))
+               (end (progn (goto-char under-start)
+                           (if (re-search-forward "^\\*+[ \t]" nil t)
+                               (match-beginning 0)
+                             (point-max))))
+               (body (progn (goto-char end)
+                            (skip-chars-backward " \t\n" under-start)
                             (buffer-substring-no-properties
-                             body-start (point)))))
-          (list title-start title
-                (and (not (string-empty-p body)) body-start)
-                (and (not (string-empty-p body)) body)
-                body-end))))))
+                             under-start (point)))))
+          (list :title-start title-start
+                :title title
+                :under-start under-start
+                :body body
+                :body-known (not (skg--omitted-body-p (nth 2 metadata)))
+                :end end))))))
 
-(defun skg-fork-dedup--cover (start text note-text field)
-  "Cover TEXT, which begins at START, with \"<b's FIELD, unchanged>\"
-when it is nonblank and equals NOTE-TEXT."
-  (when (and start text note-text
-             (not (string-blank-p text))
-             (string= text note-text))
-    (let ((ov (make-overlay start (+ start (length text)))))
-      (overlay-put ov 'display
-                   (propertize (format "<%s's %s, unchanged>"
-                                       skg-fork-dedup--note-letter field)
-                               'face 'heralds-message-face))
-      (overlay-put ov 'skg-fork-dedup t)
-      (overlay-put ov 'evaporate t))))
+(defun skg-fork-dedup--cover-member (member note)
+  "Draw what MEMBER restates of NOTE, each a `skg-fork-dedup--entry':
+with its title and body, \"<b unchanged>\" over its title, and nothing
+over the lines under it; with its title alone, \"<b's title
+unchanged>\"; with its nonblank body alone, \"<b's body unchanged>\"
+over the body. A blank title restates nothing."
+  (let* ((title (plist-get member :title))
+         (title-start (plist-get member :title-start))
+         (body (plist-get member :body))
+         (under-start (plist-get member :under-start))
+         (same-title (and (not (string-blank-p title))
+                          (string= title (plist-get note :title))))
+         (same-body (and (plist-get member :body-known)
+                         (plist-get note :body-known)
+                         (string= body (plist-get note :body)))))
+    (cond ((and same-title same-body)
+           (skg-fork-dedup--overlay title-start (+ title-start (length title))
+                                    (format "<%s unchanged>"
+                                            skg-fork-dedup--note-letter))
+           (when (< under-start (plist-get member :end))
+             (skg-fork-dedup--overlay under-start (plist-get member :end) nil)))
+          (same-title
+           (skg-fork-dedup--overlay title-start (+ title-start (length title))
+                                    (format "<%s's title unchanged>"
+                                            skg-fork-dedup--note-letter)))
+          ((and same-body (not (string-empty-p body)))
+           (skg-fork-dedup--overlay under-start (+ under-start (length body))
+                                    (format "<%s's body unchanged>"
+                                            skg-fork-dedup--note-letter))))))
+
+(defun skg-fork-dedup--overlay (start end message)
+  "A restatement overlay over [START, END) showing MESSAGE in the
+message face, or nothing when MESSAGE is nil."
+  (let ((ov (make-overlay start end)))
+    (overlay-put ov 'display
+                 (if message (propertize message 'face 'heralds-message-face)
+                   ""))
+    (overlay-put ov 'skg-fork-dedup t)
+    (overlay-put ov 'evaporate t)))
 
 (provide 'skg-fork-dedup)

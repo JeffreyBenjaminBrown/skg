@@ -1,5 +1,6 @@
 -- Integration test: a member of a forks folder that restates its
--- note, in Neovim. The Lua mirror of test-emacs.el in this directory.
+-- note, in Neovim. The Lua mirror of test-emacs.el in this directory,
+-- whose header describes the phases.
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(40)
@@ -40,11 +41,12 @@ T.check(buf, "F's view opened")
 T.check(T.wait_for_response(15), 'the view arrived')
 vim.api.nvim_set_current_buf(buf)
 print("F's view:\n" .. T.buffer_text(buf))
-T.check(T.wait_for(function () return #covers(buf) == 2 end, 5),
+T.check(T.wait_for(function () return #covers(buf) == 1 end, 5),
         'G is covered: ' .. vim.inspect(covers(buf)))
-T.check(vim.deep_equal(covers(buf),
-                       { "<b's title, unchanged>", "<b's body, unchanged>" }),
+T.check(vim.deep_equal(covers(buf), { '<b unchanged>' }),
         'the covers read as expected: ' .. vim.inspect(covers(buf)))
+T.check(#vim.api.nvim_buf_get_extmarks(buf, fork_dedup.namespace, 0, -1, {}) == 2,
+        "G's body is concealed")
 local g_row = row_showing(buf, 'G')
 local g_line = vim.api.nvim_buf_get_lines(buf, g_row, g_row + 1, false)[1]
 T.check(vim.endswith(g_line, ' Same words'), "the buffer keeps G's real title")
@@ -53,7 +55,7 @@ print('=== PHASE 2: toggle ===')
 fork_dedup.toggle(buf)
 T.check(#covers(buf) == 0, 'the toggle uncovered G')
 fork_dedup.toggle(buf)
-T.check(#covers(buf) == 2, 'the toggle covered G again')
+T.check(#covers(buf) == 1, 'the toggle covered G again')
 
 print('=== PHASE 3: retitle G, save ===')
 vim.api.nvim_buf_set_lines(buf, g_row, g_row + 1, false,
@@ -62,7 +64,7 @@ vim.cmd('silent write')
 T.check(T.wait_for_response(20), 'the save got a response')
 print("F's view after the save:\n" .. T.buffer_text(buf))
 T.check(T.wait_for(function ()
-          return vim.deep_equal(covers(buf), { "<b's body, unchanged>" }) end, 5),
+          return vim.deep_equal(covers(buf), { "<b's body unchanged>" }) end, 5),
         'after the save only the body is covered: ' .. vim.inspect(covers(buf)))
 
 local g = read('data/main/G.skg')

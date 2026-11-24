@@ -1,13 +1,12 @@
 ;;; Integration test: a member of a forks folder that restates its
 ;;; note, in Emacs (run-test.sh gives the data: F forks G, both titled
 ;;; "Same words", with one body).
-;;; 1. F's view: G's title is covered by '<b's title, unchanged>' and
-;;;    its body by '<b's body, unchanged>', in the message face; the
-;;;    buffer holds G's real title and body.
+;;; 1. F's view: G's title reads '<b unchanged>' and its body is
+;;;    hidden; the buffer holds G's real title and body.
 ;;; 2. C-c v u uncovers them; again, covers them.
 ;;; 3. The real title, uncovered, edited to "G retitled", and the view
 ;;;    saved: G's file has the new title and its own body; redrawn, G's
-;;;    title is no longer covered, its body still is.
+;;;    title is shown, and its body reads '<b's body unchanged>'.
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../test-wait.el")
@@ -54,9 +53,9 @@
     (with-current-buffer buffer
       (message "F's view:\n%s" (buffer-string))
       (let ((covers (restated-covers)))
-        (unless (equal covers
-                       `(("Same words" . "<b's title, unchanged>")
-                         (,restated-body . "<b's body, unchanged>")))
+        (unless (and (equal (mapcar #'cdr covers) '("<b unchanged>" ""))
+                     (equal (car (car covers)) "Same words")
+                     (string-prefix-p restated-body (car (cadr covers))))
           (test-fail "G is not covered as expected: %S" covers)))
       (restated-goto-line-showing "G")
       (unless (string-suffix-p " Same words"
@@ -78,7 +77,7 @@
         (test-fail "the save got no response"))
       (message "F's view after the save:\n%s" (buffer-string))
       (let ((covers (restated-covers)))
-        (unless (equal covers `((,restated-body . "<b's body, unchanged>")))
+        (unless (equal covers `((,restated-body . "<b's body unchanged>")))
           (test-fail "after the save, G is not covered as expected: %S" covers)))))
   (let ((g (restated-file "G.skg"))
         (f (restated-file "F.skg")))
