@@ -127,6 +127,7 @@
     "birth_letter": "low",
     "property_counts": "boring",
     "in_place_of": "crucial",
+    "users_graph": "high",
     "side_tiers": {
       "contains":                     { "in": "medium", "out": "normal",
                                         "out_write_protected": "low",

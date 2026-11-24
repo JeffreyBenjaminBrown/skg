@@ -393,10 +393,15 @@ fn skgrepo_label (
 
 /// One side of a relation in '(view (rels ...))'.
 struct SideFacts {
-  count  : usize,
-  gens   : Vec<usize>,                  // distinct and sorted
-  subset : Option<(usize, Vec<usize>)>, // the fraction's numerator, if the side has one
+  count       : usize,
+  gens        : Vec<usize>,                  // distinct and sorted
+  subset      : Option<(usize, Vec<usize>)>, // the fraction's numerator, if the side has one
+  users_graph : bool, // 'usersGraph': a note of the user's graph is among its members
 }
+
+/// What the clients draw after an in-side that carries 'usersGraph'
+/// ('heralds--rel-side-text').
+const USERS_GRAPH_MARKER : &str = "•";
 
 /// One sentence per relation token, in display order.
 fn relationship_sentences (
@@ -434,6 +439,8 @@ fn relation_sentence (
     . collect ();
   let tier : &'static str = sides . iter ()
     . map ( |(side, facts)| side_tier (relation, side, facts, context) )
+    . chain ( sides . iter () . any ( |(_, facts)| facts . users_graph )
+              . then ( || relationship_style ("users_graph") ) )
     . fold ( "normal", greater_tier );
   let born_here : bool = context . birth . iter ()
     . any ( |(born_of, _, _)| born_of == relation );
@@ -458,11 +465,21 @@ fn side_facts (
     count  : first_number (facts),
     gens   : ancestor_generations (facts),
     subset : subset_key . and_then ( |key| form_tail (facts, key) )
-      . map ( |subset| ( first_number (subset), ancestor_generations (subset) )), } ) }
+      . map ( |subset| ( first_number (subset), ancestor_generations (subset) )),
+    users_graph : facts . iter () . any (
+      |value| atom_text (value) . as_deref () == Some ("usersGraph") ), } ) }
 
 /// The side's text in the token, as the clients render it
-/// ('heralds--rel-side-text').
+/// ('heralds--rel-side-text'): its count or fraction, then the marker
+/// when a note of the user's graph is among its members.
 fn side_token_text (
+  facts : &SideFacts,
+) -> String {
+  format! ( "{}{}", side_count_text (facts),
+            if facts . users_graph { USERS_GRAPH_MARKER } else { "" } ) }
+
+/// The side's count, or its fraction, as the clients render it.
+fn side_count_text (
   facts : &SideFacts,
 ) -> String {
   match &facts . subset {
@@ -512,13 +529,17 @@ fn side_clause (
     members_phrase (facts . count, &facts . gens);
   let many : bool = facts . count != 1;
   let main : String = if side == "in" {
-    format! ( "{}{} {} this one{}",
+    format! ( "{}{} {} this one{}{}",
               members,
               among . map ( |names| format! (", among them {},", names) )
                 . unwrap_or_default (),
               if many { verb_many } else { verb_one },
               if ! hides { "" } else if many { " from their forks" }
-              else { " from its forks" } )
+              else { " from its forks" },
+              if ! facts . users_graph { "" }
+              else if hides { "; a note of yours is among them (•)" }
+              else { "; a note of yours, not the one it stands under, is \
+                      among them: you keep it elsewhere (•)" } )
   } else {
     format! ( "this note {} {}{}{}",
               verb_one, members,

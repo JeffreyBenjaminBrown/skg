@@ -117,6 +117,24 @@ fn an_ordinary_headline_with_several_heralds () {
     "A2: it has 2 aliases, other names for it.",
   ] ); }
 
+// A note of the user's graph among an in-side's members: the marker
+// after that side, and a clause saying so.
+#[test]
+fn a_message_the_user_keeps_elsewhere_and_hides () {
+  let lines : Vec<String> = describe_heralds (
+    "(skg (vnid 9) node (gnid g9) \
+          (view (rels (contains (in 2 (ancestors 1) usersGraph)) \
+                      (hides (in 1 usersGraph))) \
+                (birth (contains in 1))))",
+    None, &config_with_skgrepos () ) . unwrap ();
+  assert_eq! ( lines, vec! [
+    "2a•C: 2 notes, among them the headline above it (a), contain this \
+     one; a note of yours, not the one it stands under, is among them: you \
+     keep it elsewhere (•). This relationship is why it is drawn here.",
+    "1•H: 1 note hides this one from its forks; a note of yours is among \
+     them (•).",
+  ] ); }
+
 #[test]
 fn a_headline_with_no_heralds_says_so () {
   assert_eq! ( describe_heralds ( "(skg (vnid 6) node (gnid g6))", None,
