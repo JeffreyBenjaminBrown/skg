@@ -8,7 +8,7 @@
 -- covers on or off per buffer; 'toggle' (':SkgToggleForkDedupOverlay',
 -- '<localleader>vu') flips it. This module draws only when called:
 -- skg.heralds calls 'refresh_buffer' when it draws a buffer and
--- 'refresh_rows' from its edit watcher, and skg.redraw_delta calls
+-- 'refresh_region' from its edit watcher, and skg.redraw_delta calls
 -- 'refresh_rows', so an edit that makes the two differ removes the
 -- cover; turning heralds off ('skg.heralds.disable') clears the
 -- covers too. The Lua port of elisp/skg-fork-dedup.el.
@@ -140,6 +140,26 @@ function M.refresh_buffer (buf, lines)
   for index, line in ipairs(lines) do
     if forks_folder_p(line) then draw_folder(buf, lines, index) end
   end
+end
+
+---Redraw the covers an edit of the 0-based rows FIRST..LAST of BUF can
+---change. Within one headline's lines, those are the forks folders
+---around that headline ('refresh_rows'). Rows holding more than one
+---headline, which a paste or a redraw of the whole view writes, can
+---hold any part of any forks folder, so all of them are redrawn
+---('refresh_buffer').
+---@param buf integer
+---@param first integer
+---@param last integer
+---@param lines string[]|nil BUF's lines
+function M.refresh_region (buf, first, last, lines)
+  if not M.enabled_p(buf) then return end
+  lines = lines or vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  for index = first + 2, math.min(last + 1, #lines) do
+    if lines[index]:match('^%*+%s') then
+      return M.refresh_buffer(buf, lines) end
+  end
+  M.refresh_rows(buf, { first }, lines)
 end
 
 ---The forks folder among the children of the headline LINES[INDEX].

@@ -825,8 +825,8 @@ function M.watch_buffer (buf)
           buf, M.namespace, first, last)
         for row = first, last - 1 do M.apply_to_line(buf, row, lines) end
         M.reapply_to_folder_ancestors(buf, first - 1, lines)
-        require('skg.fork_dedup').refresh_rows(
-          buf, { first, math.max(first, last - 1) }, lines)
+        require('skg.fork_dedup').refresh_region(
+          buf, first, last - 1, lines)
       end)
     end })
 end

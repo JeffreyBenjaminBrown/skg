@@ -5,8 +5,9 @@
 local helpers = dofile(
   debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 local fork_dedup = require('skg.fork_dedup')
+local heralds = require('skg.heralds')
 
-local text = table.concat({
+local text_lines = {
   '* (skg node (gnid F) (skgRepos (nodeRepo main))) Same words',
   'A long body',
   'that its forks restate.',
@@ -20,7 +21,8 @@ local text = table.concat({
   '*** (skg node (gnid L) (skgRepos (nodeRepo main)) contentInPart) Other words',
   '** (skg node (gnid C) (skgRepos (nodeRepo main))) Same words',
   'A long body',
-  'that its forks restate.' }, '\n')
+  'that its forks restate.' }
+local text = table.concat(text_lines, '\n')
 
 ---Each cover, in buffer order: { row (0-based), shown text or
 ---'(lines)' for a mark hiding whole lines }.
@@ -72,5 +74,26 @@ describe('skg.fork_dedup', function ()
     vim.api.nvim_buf_set_lines(buf, 2, 3, false, { 'that its forks restate. More.' })
     fork_dedup.refresh_rows(buf, { 2 })
     assert.are.same({ { 8, "<b's title, unchanged>" } }, covers(buf))
+  end)
+
+  it('covers a whole view written at once, the folder far from its ends',
+     function ()
+    helpers.install_fixture_herald_rules()
+    local view = buf
+    vim.api.nvim_buf_set_lines(view, 0, -1, false,
+                               { '* (skg node (gnid R)) Root' })
+    heralds.enable(view)
+    local nested = { '* (skg node (gnid R)) Root' }
+    for _, line in ipairs(text_lines) do
+      table.insert(nested, (line:gsub('^%*', '**'))) end
+    table.insert(nested, '* (skg node (gnid Z)) Last')
+    vim.api.nvim_buf_set_lines(view, 0, -1, false, nested)
+    vim.wait(500, function () return #covers(view) == 4 end, 10)
+    assert.are.same({
+      { 5, "<b's title, unchanged>" },
+      { 6, "<b's body, unchanged>" },
+      { 7, '(lines)' },
+      { 9, "<b's title, unchanged>" } }, covers(view))
+    heralds.disable(view)
   end)
 end)
