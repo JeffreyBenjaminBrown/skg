@@ -24,15 +24,16 @@ local text_lines = {
   'that its forks restate.' }
 local text = table.concat(text_lines, '\n')
 
----Each cover, in buffer order: { row (0-based), shown text or
----'(lines)' for a mark hiding whole lines }.
+---Each cover, in buffer order: { row (0-based), shown text, or
+---'rows FIRST-LAST' for a mark concealing those whole rows }.
 local function covers (buf)
   local result = {}
   for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(
                           buf, fork_dedup.namespace, 0, -1, { details = true })) do
     local details = mark[4]
     table.insert(result, { mark[2], details.virt_text
-                           and details.virt_text[1][1] or '(lines)' })
+                           and details.virt_text[1][1]
+                           or ('rows ' .. mark[2] .. '-' .. details.end_row) })
   end
   return result
 end
@@ -51,7 +52,7 @@ describe('skg.fork_dedup', function ()
     assert.are.same({
       { 4, "<b's title, unchanged>" },
       { 5, "<b's body, unchanged>" },
-      { 6, '(lines)' },
+      { 6, 'rows 6-6' },
       { 8, "<b's title, unchanged>" } }, covers(buf))
     assert.are.equal(text, helpers.buffer_text())
   end)
@@ -69,11 +70,24 @@ describe('skg.fork_dedup', function ()
     fork_dedup.refresh_rows(buf, { 4 })
     assert.are.same({
       { 5, "<b's body, unchanged>" },
-      { 6, '(lines)' },
+      { 6, 'rows 6-6' },
       { 8, "<b's title, unchanged>" } }, covers(buf))
     vim.api.nvim_buf_set_lines(buf, 2, 3, false, { 'that its forks restate. More.' })
     fork_dedup.refresh_rows(buf, { 2 })
     assert.are.same({ { 8, "<b's title, unchanged>" } }, covers(buf))
+  end)
+
+  it('conceals no line past the body, nor the next headline', function ()
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+      '* (skg node (gnid F)) F',
+      'b1', 'b2',
+      '** (skg forksFolder)',
+      '*** (skg node (gnid G)) G',
+      'b1', 'b2',
+      '** (skg node (gnid H)) H' })
+    fork_dedup.refresh_buffer(buf)
+    assert.are.same({ { 5, "<b's body, unchanged>" }, { 6, 'rows 6-6' } },
+                    covers(buf))
   end)
 
   it('covers a whole view written at once, the folder far from its ends',
@@ -92,7 +106,7 @@ describe('skg.fork_dedup', function ()
     assert.are.same({
       { 5, "<b's title, unchanged>" },
       { 6, "<b's body, unchanged>" },
-      { 7, '(lines)' },
+      { 7, 'rows 7-7' },
       { 9, "<b's title, unchanged>" } }, covers(view))
     heralds.disable(view)
   end)

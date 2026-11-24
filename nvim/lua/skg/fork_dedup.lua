@@ -96,8 +96,10 @@ local function cover_body (buf, lines, member)
                     'SkgHeraldMessage' } },
     virt_text_pos = 'inline' })
   if member.body_last > first then
+    -- 'conceal_lines' hides every row from the mark's to 'end_row',
+    -- both included.
     vim.api.nvim_buf_set_extmark(buf, M.namespace, first, 0, {
-      end_row = member.body_last, end_col = 0,
+      end_row = member.body_last - 1, end_col = 0,
       conceal_lines = '' }) end
 end
 
