@@ -4,9 +4,11 @@
 # is drawn as such, '<b unchanged>' over the title of one that restates
 # its title and body, '<b's body unchanged>' over the body of one that
 # restates its body alone ('docs/forks.org', "A member that restates
-# its note"), while the buffer, and so a save, keeps the real text.
-# Run once per client (test-emacs.el, test-nvim.lua). The data is
-# written here, fresh for each run, since the test's save changes it.
+# its note"), while the buffer, and so a save, keeps the real text;
+# and so is one in a forks folder asked for (C-c l f) under a note
+# that is not the view's root. Run once per client (test-emacs.el,
+# test-nvim.lua). The data is written here, fresh for each run, since
+# the test's save changes it.
 
 set -e
 
@@ -28,6 +30,19 @@ body: |-
   that its forks restate.
 forks:
 - G
+EOF
+  cat > "$TEST_DIR/data/main/P.skg" << 'EOF'
+pid: P
+title: Parent
+contains:
+- F
+- X
+EOF
+  cat > "$TEST_DIR/data/main/X.skg" << 'EOF'
+pid: X
+title: Last
+body: |-
+  Its own body.
 EOF
   cat > "$TEST_DIR/data/main/G.skg" << 'EOF'
 pid: G

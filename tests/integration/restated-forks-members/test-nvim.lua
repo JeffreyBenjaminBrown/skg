@@ -76,4 +76,24 @@ T.check(not (f .. g):find('unchanged>', 1, true),
         "no cover's text reached a file:\n" .. f .. '\n' .. g)
 T.check(f:find('title: Same words', 1, true), "F's title is unchanged:\n" .. f)
 
+print("=== PHASE 4: P's view, C-c l f on G ===")
+require('skg.single_root_content_view').request_single_root_content_view_from_id('P')
+local p_buf = T.wait_for_buffer('skg://Parent', 15)
+T.check(p_buf, "P's view opened")
+T.check(T.wait_for_response(15), "P's view arrived")
+vim.api.nvim_set_current_buf(p_buf)
+print("P's view:\n" .. T.buffer_text(p_buf))
+T.check(T.wait_for(function ()
+          return vim.deep_equal(covers(p_buf), { "<b's body unchanged>" }) end, 5),
+        "in P's view G's body is covered: " .. vim.inspect(covers(p_buf)))
+vim.api.nvim_win_set_cursor(0, { row_showing(p_buf, 'G') + 1, 0 })
+require('skg.views').show_folderOf_forks()
+T.check(T.wait_for_response(20), 'the forks-folder request got a response')
+print("P's view with G's forks folder:\n" .. T.buffer_text(p_buf))
+T.check(T.buffer_text(p_buf):find('forksFolder%)\n[^\n]*%(gnid F%)'),
+        'C-c l f drew a forks folder under G')
+T.check(T.wait_for(function ()
+          return vim.deep_equal(covers(p_buf), { "<b's body unchanged>" }) end, 5),
+        'after C-c l f, G is still covered: ' .. vim.inspect(covers(p_buf)))
+
 T.pass('PASS: Integration test successful!')

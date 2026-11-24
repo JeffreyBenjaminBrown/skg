@@ -1,12 +1,18 @@
 ;;; Integration test: a member of a forks folder that restates its
 ;;; note, in Emacs (run-test.sh gives the data: F forks G, both titled
-;;; "Same words", with one body).
+;;; "Same words", with one body; P contains F, then X).
 ;;; 1. F's view: G's title reads '<b unchanged>' and its body is
 ;;;    hidden; the buffer holds G's real title and body.
 ;;; 2. C-c v u uncovers them; again, covers them.
 ;;; 3. The real title, uncovered, edited to "G retitled", and the view
 ;;;    saved: G's file has the new title and its own body; redrawn, G's
 ;;;    title is shown, and its body reads '<b's body unchanged>'.
+;;; 4. P's view, where F's forks folder stands between P and X: G's
+;;;    body is covered. C-c l f on G, a member, draws G's own forks
+;;;    folder, F under it, which the save answers with the whole view:
+;;;    G's body is still covered, though its folder is near neither
+;;;    end of the view. (F there, a repeat, draws no body, and its
+;;;    title is not G's, so it restates nothing.)
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../test-wait.el")
@@ -79,6 +85,29 @@
       (let ((covers (restated-covers)))
         (unless (equal covers `((,restated-body . "<b's body unchanged>")))
           (test-fail "after the save, G is not covered as expected: %S" covers)))))
+  (message "=== PHASE 4: P's view, C-c l f on G ===")
+  (skg-request-single-root-content-view-from-id "P")
+  (let ((buffer (skg-test-wait-for-buffer "*Parent*" 15)))
+    (unless buffer (test-fail "no buffer for P"))
+    (skg-test-wait-for-response 15)
+    (with-current-buffer buffer
+      (message "P's view:\n%s" (buffer-string))
+      (let ((covers (restated-covers)))
+        (unless (equal covers `((,restated-body . "<b's body unchanged>")))
+          (test-fail "in P's view, G is not covered as expected: %S" covers)))
+      (restated-goto-line-showing "G")
+      (skg-show-folderOf-forks)
+      (unless (skg-test-wait-for-response 20)
+        (test-fail "the forks-folder request got no response"))
+      (message "P's view with G's forks folder:\n%s" (buffer-string))
+      (let ((covers (restated-covers)))
+        (unless (string-match-p "^\\*+ (skg (vnid [0-9a-z]+) forksFolder)\n.*(gnid F)"
+                                (buffer-substring-no-properties
+                                 (point-min) (point-max)))
+          (test-fail "C-c l f drew no forks folder under G"))
+        (unless (equal covers `((,restated-body . "<b's body unchanged>")))
+          (test-fail "after C-c l f, G is not covered as expected: %S"
+                     covers)))))
   (let ((g (restated-file "G.skg"))
         (f (restated-file "F.skg")))
     (unless (string-match-p "title: G retitled" g)
